@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { routing, type Locale } from "@/i18n/routing";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export function LanguageSwitcher({
   currentLocale,
@@ -17,44 +17,43 @@ export function LanguageSwitcher({
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
 
-  const nextLocale: Locale = currentLocale === "en" ? "ar" : "en";
-  const label =
-    nextLocale === "ar" ? t("switchToArabic") : t("switchToEnglish");
-
   function switchTo(locale: Locale) {
+    if (locale === currentLocale) return;
     startTransition(() => {
       router.replace(pathname, { locale });
     });
   }
 
   return (
-    <div className="flex items-center gap-1" aria-label={t("label")}>
+    <div
+      className="inline-flex items-center gap-0.5 rounded-full border border-border bg-card/70 p-0.5"
+      aria-label={t("label")}
+    >
       {routing.locales.map((loc) => {
         const isActive = loc === currentLocale;
-        const text = loc === "ar" ? "العربية" : "EN";
+        const text = loc === "ar" ? "ع" : "EN";
         return (
-          <Button
+          <button
             key={loc}
             type="button"
-            size="sm"
-            variant={isActive ? "secondary" : "ghost"}
-            onClick={() => !isActive && switchTo(loc)}
-            disabled={isPending && !isActive}
+            onClick={() => switchTo(loc)}
+            disabled={isPending}
             aria-pressed={isActive}
             aria-label={
               loc === "ar" ? t("switchToArabic") : t("switchToEnglish")
             }
-            className={
-              loc === "ar"
-                ? "font-arabic text-sm leading-none"
-                : "text-xs font-semibold tracking-wider"
-            }
+            className={cn(
+              "rounded-full px-2.5 py-0.5 text-xs font-semibold leading-none transition-colors disabled:opacity-60",
+              loc === "ar" && "font-arabic text-sm",
+              isActive
+                ? "bg-azure text-background"
+                : "text-mutedtext hover:text-heading"
+            )}
           >
             {text}
-          </Button>
+          </button>
         );
       })}
-      <span className="sr-only">{label}</span>
     </div>
   );
 }

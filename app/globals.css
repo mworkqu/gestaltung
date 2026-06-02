@@ -4,34 +4,37 @@
 
 @layer base {
   :root {
-    /* Near-black background, blue-grey metallic accents — matched to the logo */
-    --background: 220 24% 6%;
-    --foreground: 210 22% 94%;
+    /* "Precision / engineering" — dark with a bright azure accent.
+       HSL triplets here drive the shadcn tokens (Button, borders, etc.);
+       exact-hex brand colors live in tailwind.config.ts (azure, heading, …). */
 
-    --card: 220 22% 9%;
-    --card-foreground: 210 20% 94%;
+    --background: 218 38% 6%; /* #0a0e15 */
+    --foreground: 212 33% 85%; /* body text #cdd9e6 */
 
-    --popover: 220 22% 9%;
-    --popover-foreground: 210 20% 94%;
+    --card: 214 43% 11%; /* #101a28 */
+    --card-foreground: 213 64% 97%; /* heading text #f1f6fc */
 
-    --primary: 210 28% 74%;
-    --primary-foreground: 220 30% 8%;
+    --popover: 219 45% 9%; /* panel/blueprint #0c1320 */
+    --popover-foreground: 212 33% 85%;
 
-    --secondary: 215 18% 18%;
-    --secondary-foreground: 210 18% 92%;
+    --primary: 208 100% 62%; /* accent azure #3ea6ff */
+    --primary-foreground: 218 38% 6%; /* dark text on azure */
 
-    --muted: 215 16% 14%;
-    --muted-foreground: 213 14% 64%;
+    --secondary: 213 33% 15%;
+    --secondary-foreground: 213 64% 97%;
 
-    --accent: 205 32% 58%;
-    --accent-foreground: 220 30% 8%;
+    --muted: 214 30% 13%;
+    --muted-foreground: 211 22% 69%; /* muted text #9fb0c2 */
+
+    --accent: 208 100% 62%; /* azure */
+    --accent-foreground: 218 38% 6%;
 
     --destructive: 0 62% 50%;
     --destructive-foreground: 210 20% 96%;
 
-    --border: 215 16% 18%;
-    --input: 215 16% 18%;
-    --ring: 205 32% 58%;
+    --border: 211 33% 18%; /* #1f2e3e */
+    --input: 211 33% 18%;
+    --ring: 208 100% 62%; /* azure */
 
     --radius: 0.5rem;
   }
@@ -47,13 +50,39 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-body antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply text-heading;
   }
 
   /* When the document direction is RTL, prefer the Arabic font stack */
   html[dir="rtl"] body {
     font-family: var(--font-sans-ar), var(--font-sans), ui-sans-serif,
       system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  /* Faint blueprint grid used behind the hero panel. */
+  .bg-blueprint-grid {
+    background-image: repeating-linear-gradient(
+        to right,
+        hsl(208 100% 62% / 0.07) 0,
+        hsl(208 100% 62% / 0.07) 1px,
+        transparent 1px,
+        transparent 32px
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        hsl(208 100% 62% / 0.07) 0,
+        hsl(208 100% 62% / 0.07) 1px,
+        transparent 1px,
+        transparent 32px
+      );
   }
 }
