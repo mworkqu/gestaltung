@@ -4,21 +4,35 @@
 
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 210 16% 92%;
-    --card: 220 18% 10%;
-    --card-foreground: 210 16% 92%;
-    --primary: 210 28% 70%;
-    --primary-foreground: 220 30% 10%;
-    --secondary: 215 16% 22%;
-    --secondary-foreground: 210 16% 92%;
-    --muted: 215 14% 18%;
-    --muted-foreground: 213 12% 62%;
-    --accent: 205 30% 60%;
-    --accent-foreground: 220 30% 10%;
-    --border: 214 14% 20%;
-    --input: 214 14% 20%;
-    --ring: 205 30% 60%;
+    /* Near-black background, blue-grey metallic accents — matched to the logo */
+    --background: 220 24% 6%;
+    --foreground: 210 22% 94%;
+
+    --card: 220 22% 9%;
+    --card-foreground: 210 20% 94%;
+
+    --popover: 220 22% 9%;
+    --popover-foreground: 210 20% 94%;
+
+    --primary: 210 28% 74%;
+    --primary-foreground: 220 30% 8%;
+
+    --secondary: 215 18% 18%;
+    --secondary-foreground: 210 18% 92%;
+
+    --muted: 215 16% 14%;
+    --muted-foreground: 213 14% 64%;
+
+    --accent: 205 32% 58%;
+    --accent-foreground: 220 30% 8%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 210 20% 96%;
+
+    --border: 215 16% 18%;
+    --input: 215 16% 18%;
+    --ring: 205 32% 58%;
+
     --radius: 0.5rem;
   }
 }
@@ -27,8 +41,19 @@
   * {
     @apply border-border;
   }
+
+  html {
+    color-scheme: dark;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* When the document direction is RTL, prefer the Arabic font stack */
+  html[dir="rtl"] body {
+    font-family: var(--font-sans-ar), var(--font-sans), ui-sans-serif,
+      system-ui, sans-serif;
   }
 }

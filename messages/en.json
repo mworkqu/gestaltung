@@ -1,0 +1,30 @@
+{
+  "Brand": {
+    "name": "Gestaltung",
+    "tagline": "Manufacturing, made simple."
+  },
+  "Nav": {
+    "home": "Home",
+    "howItWorks": "How it works",
+    "store": "Store",
+    "about": "About",
+    "contact": "Contact"
+  },
+  "LanguageSwitcher": {
+    "label": "Language",
+    "switchToArabic": "العربية",
+    "switchToEnglish": "English"
+  },
+  "Home": {
+    "location": "Lusail · Qatar",
+    "heading": "Gestaltung",
+    "subheading": "Manufacturing, made simple. Upload your design — we match it to the right production method and partner workshop across Qatar, then deliver the finished part.",
+    "ctaPrimary": "Get started",
+    "ctaSecondary": "How it works",
+    "stageNote": "Stage 2 — bilingual shell. More coming soon."
+  },
+  "Footer": {
+    "rights": "All rights reserved.",
+    "tagline": "A manufacturing marketplace and inventory platform for Qatar."
+  }
+}
