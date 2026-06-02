@@ -26,6 +26,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# netlify
+.netlify
+deno.lock
+
 # typescript
 *.tsbuildinfo
 
