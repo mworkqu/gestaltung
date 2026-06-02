@@ -23,9 +23,9 @@ export default function Home() {
         </h1>
 
         <p className="mt-5 max-w-xl text-balance text-lg text-muted-foreground sm:text-xl">
-          Manufacturing, made simple. Upload a design — we match it to the right
-          production method and partner workshop across Qatar, then deliver the
-          finished part.
+          Manufacturing, made simple. Upload your design — we match it to the
+          right production method and partner workshop across Qatar, then
+          deliver the finished part.
         </p>
 
         <div className="mt-10 flex items-center gap-3">
