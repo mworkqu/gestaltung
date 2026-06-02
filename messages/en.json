@@ -1,30 +1,35 @@
 {
   "Brand": {
-    "name": "Gestaltung",
-    "tagline": "Manufacturing, made simple."
+    "name": "Gestaltung"
   },
   "Nav": {
-    "home": "Home",
     "howItWorks": "How it works",
     "store": "Store",
     "about": "About",
-    "contact": "Contact"
+    "uploadFile": "Upload a file"
   },
   "LanguageSwitcher": {
     "label": "Language",
     "switchToArabic": "العربية",
     "switchToEnglish": "English"
   },
-  "Home": {
-    "location": "Lusail · Qatar",
-    "heading": "Gestaltung",
-    "subheading": "Manufacturing, made simple. Upload your design — we match it to the right production method and partner workshop across Qatar, then deliver the finished part.",
-    "ctaPrimary": "Get started",
+  "Hero": {
+    "kicker": "Precision manufacturing · Qatar",
+    "heading": "From a CAD file to a finished part.",
+    "subheading": "Upload your design. We identify the right method — 3D printing, CNC, laser, EDM — route it to a Qatari workshop, and deliver the part.",
+    "ctaPrimary": "Get a quote",
     "ctaSecondary": "How it works",
-    "stageNote": "Stage 2 — bilingual shell. More coming soon."
+    "formats": "STL · STEP · DXF · IGES"
+  },
+  "Features": {
+    "customTitle": "Custom manufacturing",
+    "customCopy": "Upload, match, produce, deliver.",
+    "storeTitle": "Mechanical parts store",
+    "storeCopy": "Screws, nuts, fasteners.",
+    "aiTitle": "AI design — soon",
+    "aiCopy": "Describe it, we model it."
   },
   "Footer": {
-    "rights": "All rights reserved.",
-    "tagline": "A manufacturing marketplace and inventory platform for Qatar."
+    "text": "Gestaltung for Trading and Services · Lusail, Qatar"
   }
 }

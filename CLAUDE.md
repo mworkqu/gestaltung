@@ -47,8 +47,18 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     path and is unaffected — prefer push-to-deploy.
   - STALE: the old Vercel helper scripts (GO-LIVE.bat / go-live.ps1 / push-to-github.ps1 / DEPLOY.md)
     predate the Netlify+GitHub setup and no longer reflect how deploys work.
-- Stage 2 (bilingual EN/AR shell + dark metallic theme + logo in header): NOT STARTED.
-  - Logo was provided in chat but not saved to disk; user must drop the file into /public when Stage 2 begins.
+- Stage 2 (bilingual EN/AR shell + on-brand theme + logo in header): DONE.
+  - Full next-intl bilingual shell: /[locale] routing (en default, ar), middleware, RTL/dir + IBM Plex
+    Arabic font, messages/en.json + ar.json, working EN/ع language switcher (components/language-switcher.tsx).
+  - Theme: "precision / engineering" — dark (#0a0e15) with a bright azure accent (#3ea6ff). Palette lives in
+    app/globals.css (shadcn HSL tokens) + tailwind.config.ts (exact-hex brand colors: azure/panel/heading/
+    body/mutedtext/faint/borderstrong). Supersedes the earlier "metallic" idea.
+  - Landing page (app/[locale]/page.tsx): redesigned 2-col hero (azure kicker, H1, CAD→part copy, Get a quote /
+    How it works, blueprint panel with faint grid + geometric G mark + STL·STEP·DXF·IGES) and a 3-card feature row.
+  - Real /public/logo.png is in the header (components/header.tsx). components/g-mark.tsx is an inline-SVG G
+    used as the blueprint-panel mark in the hero.
+  - Both /en and /ar are fully translated; /ar is RTL-correct (no letter-spacing on Arabic). Brand name in
+    Arabic is جِشتالتُونج.
 
 ## ENVIRONMENT NOTES (for Claude)
 - The project folder is mounted read/write in the agent sandbox but BLOCKS file deletion/rename,

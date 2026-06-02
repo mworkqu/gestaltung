@@ -1,23 +1,42 @@
+import Image from "next/image";
+import { getTranslations } from "next-intl/server";
+
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { GMark } from "@/components/g-mark";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { cn } from "@/lib/utils";
 
-const navLinks = [
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#store", label: "Store" },
-  { href: "#about", label: "About" },
-];
+export async function Header({ locale }: { locale: Locale }) {
+  const t = await getTranslations("Nav");
+  const tBrand = await getTranslations("Brand");
+  const isRtl = locale === "ar";
 
-export function Header({ locale }: { locale: Locale }) {
+  const navLinks = [
+    { href: "#how-it-works", label: t("howItWorks") },
+    { href: "#store", label: t("store") },
+    { href: "#about", label: t("about") },
+  ];
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2.5">
-          <GMark className="h-8 w-8" />
-          <span className="text-base font-semibold tracking-[0.14em] text-heading">
-            Gestaltung
+          <Image
+            src="/logo.png"
+            alt={tBrand("name")}
+            width={32}
+            height={32}
+            priority
+            className="h-8 w-8 object-contain"
+          />
+          <span
+            className={cn(
+              "text-base font-semibold text-heading",
+              !isRtl && "tracking-[0.14em]"
+            )}
+          >
+            {tBrand("name")}
           </span>
         </Link>
 
@@ -36,7 +55,7 @@ export function Header({ locale }: { locale: Locale }) {
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher currentLocale={locale} />
           <Button asChild size="sm" className="h-9 px-4">
-            <a href="#upload">Upload a file</a>
+            <a href="#upload">{t("uploadFile")}</a>
           </Button>
         </div>
       </div>

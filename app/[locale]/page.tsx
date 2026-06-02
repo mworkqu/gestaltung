@@ -1,29 +1,9 @@
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Wrench, ShoppingCart, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
-
-const features = [
-  {
-    icon: Wrench,
-    title: "Custom manufacturing",
-    copy: "Upload, match, produce, deliver.",
-    accent: true,
-  },
-  {
-    icon: ShoppingCart,
-    title: "Mechanical parts store",
-    copy: "Screws, nuts, fasteners.",
-    accent: true,
-  },
-  {
-    icon: Sparkles,
-    title: "AI design — soon",
-    copy: "Describe it, we model it.",
-    accent: false,
-  },
-];
+import { cn } from "@/lib/utils";
 
 export default async function Home({
   params,
@@ -33,14 +13,42 @@ export default async function Home({
   const { locale } = await params;
   setRequestLocale(locale);
 
+  const t = await getTranslations("Hero");
+  const tf = await getTranslations("Features");
+  const isRtl = locale === "ar";
+
+  const features = [
+    {
+      icon: Wrench,
+      title: tf("customTitle"),
+      copy: tf("customCopy"),
+      accent: true,
+    },
+    {
+      icon: ShoppingCart,
+      title: tf("storeTitle"),
+      copy: tf("storeCopy"),
+      accent: true,
+    },
+    {
+      icon: Sparkles,
+      title: tf("aiTitle"),
+      copy: tf("aiCopy"),
+      accent: false,
+    },
+  ];
+
   return (
     <>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        {/* Subtle azure glow behind the left column */}
+        {/* Subtle azure glow behind the leading column */}
         <div
           aria-hidden
-          className="pointer-events-none absolute -left-32 -top-24 -z-10 h-[640px] w-[640px] rounded-full"
+          className={cn(
+            "pointer-events-none absolute -top-24 -z-10 h-[640px] w-[640px] rounded-full",
+            isRtl ? "-right-32" : "-left-32"
+          )}
           style={{
             background:
               "radial-gradient(circle, rgba(62,166,255,0.16) 0%, rgba(62,166,255,0.04) 38%, transparent 68%)",
@@ -48,42 +56,42 @@ export default async function Home({
         />
 
         <div className="container grid items-center gap-12 py-16 md:grid-cols-2 md:py-24">
-          {/* Left column */}
+          {/* Leading column */}
           <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.22em] text-azure">
-              Precision manufacturing · Qatar
+            <span
+              className={cn(
+                "text-xs font-semibold text-azure",
+                !isRtl && "uppercase tracking-[0.22em]"
+              )}
+            >
+              {t("kicker")}
             </span>
 
             <h1 className="mt-5 text-[2rem] font-semibold leading-[1.1] tracking-tight text-heading sm:text-[2.375rem]">
-              From a CAD file to a finished part.
+              {t("heading")}
             </h1>
 
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-body">
-              Upload your design. We identify the right method — 3D printing,
-              CNC, laser, EDM — route it to a Qatari workshop, and deliver the
-              part.
+              {t("subheading")}
             </p>
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
-                <a href="#upload">Get a quote</a>
+                <a href="#upload">{t("ctaPrimary")}</a>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <a href="#how-it-works">How it works</a>
+                <a href="#how-it-works">{t("ctaSecondary")}</a>
               </Button>
             </div>
           </div>
 
-          {/* Right column — blueprint panel */}
+          {/* Trailing column — blueprint panel */}
           <div className="relative flex min-h-[320px] items-center justify-center overflow-hidden rounded-xl border border-borderstrong bg-panel p-8 md:min-h-[420px]">
-            <div
-              aria-hidden
-              className="bg-blueprint-grid absolute inset-0"
-            />
+            <div aria-hidden className="bg-blueprint-grid absolute inset-0" />
             <div className="relative flex flex-col items-center">
               <GMark className="h-24 w-24 md:h-28 md:w-28" />
               <p className="mt-6 text-xs font-medium uppercase tracking-[0.28em] text-faint">
-                STL · STEP · DXF · IGES
+                {t("formats")}
               </p>
             </div>
           </div>
@@ -96,12 +104,13 @@ export default async function Home({
           {features.map(({ icon: Icon, title, copy, accent }) => (
             <div
               key={title}
-              className={`rounded-lg border border-border bg-card p-6 ${
-                accent ? "border-t-2 border-t-azure" : "border-t-2 border-t-borderstrong"
-              }`}
+              className={cn(
+                "rounded-lg border border-border bg-card p-6 border-t-2",
+                accent ? "border-t-azure" : "border-t-borderstrong"
+              )}
             >
               <Icon
-                className={`h-6 w-6 ${accent ? "text-azure" : "text-faint"}`}
+                className={cn("h-6 w-6", accent ? "text-azure" : "text-faint")}
                 strokeWidth={1.75}
               />
               <h3 className="mt-4 text-lg font-semibold text-heading">
