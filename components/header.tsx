@@ -13,9 +13,9 @@ export async function Header({ locale }: { locale: Locale }) {
   const isRtl = locale === "ar";
 
   const navLinks = [
-    { href: "#how-it-works", label: t("howItWorks") },
-    { href: "#store", label: t("store") },
-    { href: "#about", label: t("about") },
+    { href: "/how-it-works", label: t("howItWorks") },
+    { href: "/about", label: t("about") },
+    { href: "/contact", label: t("contact") },
   ];
 
   return (
@@ -42,20 +42,20 @@ export async function Header({ locale }: { locale: Locale }) {
 
         <nav className="hidden items-center gap-1 md:flex">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.label}
               href={link.href}
               className="rounded-md px-3 py-2 text-sm text-mutedtext transition-colors hover:text-heading"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher currentLocale={locale} />
           <Button asChild size="sm" className="h-9 px-4">
-            <a href="#upload">{t("uploadFile")}</a>
+            <Link href="/contact">{t("uploadFile")}</Link>
           </Button>
         </div>
       </div>

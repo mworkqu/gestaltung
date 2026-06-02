@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Wrench, ShoppingCart, Sparkles } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
 import { cn } from "@/lib/utils";
@@ -77,10 +78,10 @@ export default async function Home({
 
             <div className="mt-9 flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
-                <a href="#upload">{t("ctaPrimary")}</a>
+                <Link href="/contact">{t("ctaPrimary")}</Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <a href="#how-it-works">{t("ctaSecondary")}</a>
+                <Link href="/how-it-works">{t("ctaSecondary")}</Link>
               </Button>
             </div>
           </div>

@@ -59,8 +59,20 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     used as the blueprint-panel mark in the hero.
   - Both /en and /ar are fully translated; /ar is RTL-correct (no letter-spacing on Arabic). Brand name in
     Arabic is جِشتالتُونج.
+- Stage 3 (public presentation site): DONE.
+  - Bilingual marketing pages under app/[locale]: home (/), how-it-works, about, contact. Responsive,
+    existing azure theme, all copy from messages/{en,ar}.json (no hardcoded strings).
+  - Contact form (components/contact-form.tsx, client) submits → logs to console + success state. No backend yet.
+  - Header nav links to the real pages. Store is intentionally deferred from the nav until Stage 8
+    (e-commerce). "Get a quote" / "Upload a file" route to /contact for now (real upload arrives in Stage 6).
+- ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
+  Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
+  Stage 4 = Supabase auth + roles (super_admin/workshop/client) + RLS multi-tenant isolation (needs a Supabase
+  project + env vars from the owner); then 5 inventory, 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
 
 ## ENVIRONMENT NOTES (for Claude)
-- The project folder is mounted read/write in the agent sandbox but BLOCKS file deletion/rename,
-  and the agent's npm registry is blocked (cannot create-next-app / npm install / build / run git here).
-  => Build, install, git, and deploy all run on the USER'S Windows machine via the PowerShell scripts above.
+- This project now runs on the USER'S Windows machine (PowerShell): npm, git, next build, netlify, and vercel
+  CLIs all work here. (Earlier sandbox notes about blocked npm/git no longer apply.)
+- The Next.js project root is the subfolder "Gestaltung — a manufacturing marketplace and inventory platform
+  for Qatar" (contains package.json + .git). The Claude Code working dir is its PARENT, so cd/Set-Location into
+  the subfolder for npm/git, or pass an explicit path (e.g. `vercel --cwd <subfolder>`).

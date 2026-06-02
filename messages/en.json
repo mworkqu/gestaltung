@@ -4,8 +4,8 @@
   },
   "Nav": {
     "howItWorks": "How it works",
-    "store": "Store",
     "about": "About",
+    "contact": "Contact",
     "uploadFile": "Upload a file"
   },
   "LanguageSwitcher": {
@@ -28,6 +28,52 @@
     "storeCopy": "Screws, nuts, fasteners.",
     "aiTitle": "AI design — soon",
     "aiCopy": "Describe it, we model it."
+  },
+  "HowItWorks": {
+    "kicker": "How it works",
+    "heading": "From upload to delivery.",
+    "intro": "Every order follows the same clear path — you send a design, we handle the rest.",
+    "step1Title": "Upload your design",
+    "step1Copy": "Send us your STL, STEP, DXF, or IGES file with quantity, material, and any notes.",
+    "step2Title": "We match the method",
+    "step2Copy": "We identify the right process for your part — 3D printing, CNC machining, laser cutting, or EDM.",
+    "step3Title": "A Qatari workshop produces it",
+    "step3Copy": "We route the job to a vetted partner workshop and track it through production.",
+    "step4Title": "We deliver the part",
+    "step4Copy": "Your finished part is quality-checked and delivered back to you.",
+    "ctaText": "Have a design ready?",
+    "ctaButton": "Get a quote"
+  },
+  "About": {
+    "kicker": "About",
+    "heading": "Manufacturing, made simple in Qatar.",
+    "lead": "Gestaltung for Trading and Services is a manufacturing marketplace and inventory platform based in Lusail, Qatar.",
+    "body1": "We connect clients who need parts made with the network of skilled workshops that can make them. You send a design; we match it to the right production method and a capable Qatari workshop, then manage the job through to delivery.",
+    "body2": "Alongside custom manufacturing, we run a store for high-quality mechanical parts and a multi-tenant inventory system that keeps every workshop's and client's data cleanly separated.",
+    "valuesTitle": "What we focus on",
+    "value1Title": "Precision",
+    "value1Copy": "The right method for every part, not a one-size-fits-all process.",
+    "value2Title": "Local network",
+    "value2Copy": "Vetted workshops across Qatar, coordinated in one place.",
+    "value3Title": "Clarity",
+    "value3Copy": "Track every job and every item from one bilingual dashboard."
+  },
+  "Contact": {
+    "kicker": "Contact",
+    "heading": "Tell us about your project.",
+    "intro": "Send us your details and we'll get back to you with next steps.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Your name",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@company.com",
+    "messageLabel": "Message",
+    "messagePlaceholder": "What would you like made?",
+    "submit": "Send message",
+    "success": "Thanks — we've received your message and will be in touch.",
+    "detailsTitle": "Company details",
+    "company": "Gestaltung for Trading and Services",
+    "location": "Lusail, Qatar",
+    "email": "hello@gestaltung.qa"
   },
   "Footer": {
     "text": "Gestaltung for Trading and Services · Lusail, Qatar"
