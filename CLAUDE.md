@@ -42,11 +42,14 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     NOTE: local builds mis-detect the Next.js workspace root because of a stray
     C:\Users\<user>\package-lock.json plus the spaces/em-dash in this folder name. Vercel's CD build
     checks the repo out to a clean path and is unaffected — prefer push-to-deploy.
+  - DONE (2026-06-04): Vercel Git reconnected, production deploy verified on gestaltung.vercel.app
+    (Node 20 confirmed in build logs; /en LTR, /ar RTL + جِشتالتُونج, / → default locale all 200).
+    Vercel Node.js Version set to 20.x in Project Settings too (matches engines). Netlify projects
+    were fully DELETED, so GitHub now auto-deploys only to Vercel.
   - SUPERSEDED (Netlify era, 2026-06-03 → 2026-06-04): site was briefly hosted on Netlify
     (gestaltung.netlify.app, @netlify/plugin-nextjs, netlify.toml). netlify.toml and the only Netlify
-    env var (NODE_VERSION=20) are gone; the Netlify site is left up as manual cleanup until the Vercel
-    production deploy is confirmed. Removed the stale old-Vercel/Netlify helper scripts
-    (GO-LIVE.bat / go-live.ps1 / push-to-github.ps1 / DEPLOY.md).
+    env var (NODE_VERSION=20) are gone; the Netlify projects have been deleted. Removed the stale
+    old-Vercel/Netlify helper scripts (GO-LIVE.bat / go-live.ps1 / push-to-github.ps1 / DEPLOY.md).
 - Stage 2 (bilingual EN/AR shell + on-brand theme + logo in header): DONE.
   - Full next-intl bilingual shell: /[locale] routing (en default, ar), middleware, RTL/dir + IBM Plex
     Arabic font, messages/en.json + ar.json, working EN/ع language switcher (components/language-switcher.tsx).
