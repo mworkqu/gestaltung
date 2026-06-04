@@ -4,39 +4,39 @@
 
 @layer base {
   :root {
-    /* "Precision / engineering" — dark with a bright azure accent.
-       HSL triplets here drive the shadcn tokens (Button, borders, etc.);
-       exact-hex brand colors live in tailwind.config.ts (azure, heading, …). */
+    /* "Precision / engineering" — light neomorphic with a cobalt accent.
+       HSL triplets drive the shadcn tokens (Button, borders, etc.);
+       exact-hex brand colors live in tailwind.config.ts (azure/cobalt, ink, …). */
 
-    --background: 218 38% 6%; /* #0a0e15 */
-    --foreground: 212 33% 85%; /* body text #cdd9e6 */
+    --background: 213 33% 95%; /* #eef2f7 canvas */
+    --foreground: 218 31% 16%; /* ink #1c2434 */
 
-    --card: 214 43% 11%; /* #101a28 */
-    --card-foreground: 213 64% 97%; /* heading text #f1f6fc */
+    --card: 0 0% 100%; /* #ffffff */
+    --card-foreground: 218 31% 16%;
 
-    --popover: 219 45% 9%; /* panel/blueprint #0c1320 */
-    --popover-foreground: 212 33% 85%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 31% 16%;
 
-    --primary: 208 100% 62%; /* accent azure #3ea6ff */
-    --primary-foreground: 218 38% 6%; /* dark text on azure */
+    --primary: 214 87% 41%; /* cobalt #0e59c5 */
+    --primary-foreground: 0 0% 100%; /* white on cobalt */
 
-    --secondary: 213 33% 15%;
-    --secondary-foreground: 213 64% 97%;
+    --secondary: 214 32% 91%; /* soft slate chip */
+    --secondary-foreground: 218 31% 16%;
 
-    --muted: 214 30% 13%;
-    --muted-foreground: 211 22% 69%; /* muted text #9fb0c2 */
+    --muted: 214 32% 91%;
+    --muted-foreground: 215 16% 47%; /* #64748b */
 
-    --accent: 208 100% 62%; /* azure */
-    --accent-foreground: 218 38% 6%;
+    --accent: 214 87% 41%; /* cobalt */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 210 20% 96%;
+    --destructive: 4 74% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 211 33% 18%; /* #1f2e3e */
-    --input: 211 33% 18%;
-    --ring: 208 100% 62%; /* azure */
+    --border: 214 30% 86%; /* #d3dbe6 hairline */
+    --input: 214 30% 86%;
+    --ring: 214 87% 41%; /* cobalt */
 
-    --radius: 0.5rem;
+    --radius: 0.9rem;
   }
 }
 
@@ -46,7 +46,7 @@
   }
 
   html {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
@@ -67,22 +67,71 @@
   }
 }
 
+@layer components {
+  /* Tactile extruded surface — the core Gestaltung card. */
+  .neu {
+    background-color: #eef2f7;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 1.75rem;
+    box-shadow: 6px 6px 16px rgba(163, 177, 198, 0.5),
+      -6px -6px 16px rgba(255, 255, 255, 0.85);
+  }
+
+  .neu-hover {
+    transition: box-shadow 0.4s cubic-bezier(0.32, 0.72, 0, 1),
+      transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .neu-hover:hover {
+    box-shadow: 8px 8px 20px rgba(163, 177, 198, 0.6),
+      -8px -8px 20px rgba(255, 255, 255, 0.95);
+  }
+
+  /* Recessed well — used for the blueprint panel and inputs. */
+  .neu-inset {
+    background-color: #e9edf3;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 1.25rem;
+    box-shadow: inset 4px 4px 10px rgba(163, 177, 198, 0.45),
+      inset -4px -4px 10px rgba(255, 255, 255, 0.9);
+  }
+}
+
 @layer utilities {
-  /* Faint blueprint grid used behind the hero panel. */
+  /* Faint blueprint grid used behind the hero panel — drawn in ink, not accent. */
   .bg-blueprint-grid {
     background-image: repeating-linear-gradient(
         to right,
-        hsl(208 100% 62% / 0.07) 0,
-        hsl(208 100% 62% / 0.07) 1px,
+        hsl(218 31% 16% / 0.06) 0,
+        hsl(218 31% 16% / 0.06) 1px,
         transparent 1px,
-        transparent 32px
+        transparent 28px
       ),
       repeating-linear-gradient(
         to bottom,
-        hsl(208 100% 62% / 0.07) 0,
-        hsl(208 100% 62% / 0.07) 1px,
+        hsl(218 31% 16% / 0.06) 0,
+        hsl(218 31% 16% / 0.06) 1px,
         transparent 1px,
-        transparent 32px
+        transparent 28px
       );
+  }
+
+  /* Staggered entry delays for fade-up reveals. */
+  .delay-1 {
+    animation-delay: 0.08s;
+  }
+  .delay-2 {
+    animation-delay: 0.16s;
+  }
+  .delay-3 {
+    animation-delay: 0.24s;
+  }
+  .delay-4 {
+    animation-delay: 0.32s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-up {
+      animation: none !important;
+    }
   }
 }

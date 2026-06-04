@@ -1,6 +1,21 @@
 {
   "Brand": {
-    "name": "Gestaltung"
+    "name": "Gestaltung",
+    "tagline": "Precision manufacturing"
+  },
+  "Home": {
+    "statusOnline": "Systems online",
+    "bilingual": "Bilingual · EN / ع",
+    "location": "Lusail · Qatar",
+    "panelTag": "CAD → Part",
+    "processTag": "The process",
+    "capabilitiesTag": "What we do",
+    "specMethodLabel": "Method",
+    "specMethodValue": "Auto-matched",
+    "specNetworkLabel": "Network",
+    "specNetworkValue": "Qatar",
+    "specOutputLabel": "Output",
+    "specOutputValue": "Finished part"
   },
   "Nav": {
     "howItWorks": "How it works",
@@ -31,6 +46,8 @@
   },
   "HowItWorks": {
     "kicker": "How it works",
+    "panelTag": "Workflow",
+    "stepsTag": "The process",
     "heading": "From upload to delivery.",
     "intro": "Every order follows the same clear path — you send a design, we handle the rest.",
     "step1Title": "Upload your design",
@@ -46,6 +63,13 @@
   },
   "About": {
     "kicker": "About",
+    "panelTag": "Profile",
+    "stat1Label": "Based in",
+    "stat1Value": "Lusail · QA",
+    "stat2Label": "Network",
+    "stat2Value": "Qatar-wide",
+    "stat3Label": "Model",
+    "stat3Value": "Marketplace",
     "heading": "Manufacturing, made simple in Qatar.",
     "lead": "Gestaltung for Trading and Services is a manufacturing marketplace and inventory platform based in Lusail, Qatar.",
     "body1": "We connect clients who need parts made with the network of skilled workshops that can make them. You send a design; we match it to the right production method and a capable Qatari workshop, then manage the job through to delivery.",
@@ -62,6 +86,8 @@
     "kicker": "Contact",
     "heading": "Tell us about your project.",
     "intro": "Send us your details and we'll get back to you with next steps.",
+    "formTag": "New inquiry",
+    "responseNote": "We reply within one business day.",
     "nameLabel": "Name",
     "namePlaceholder": "Your name",
     "emailLabel": "Email",
@@ -73,7 +99,7 @@
     "detailsTitle": "Company details",
     "company": "Gestaltung for Trading and Services",
     "location": "Lusail, Qatar",
-    "email": "hello@gestaltung.qa"
+    "email": "info@gestaltung360.com"
   },
   "Footer": {
     "text": "Gestaltung for Trading and Services · Lusail, Qatar"

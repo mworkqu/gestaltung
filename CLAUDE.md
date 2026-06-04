@@ -39,9 +39,10 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     in package.json. NEXT_PUBLIC_ rule: only NEXT_PUBLIC_-prefixed vars reach the browser.
   - next pinned to ^15.2.3 (>=15.2.3 required for CVE-2025-29927).
   - Manual deploy if ever needed: `vercel --prod` from the project folder (after `vercel link`).
-    NOTE: local builds mis-detect the Next.js workspace root because of a stray
-    C:\Users\<user>\package-lock.json plus the spaces/em-dash in this folder name. Vercel's CD build
-    checks the repo out to a clean path and is unaffected — prefer push-to-deploy.
+    NOTE: local builds used to mis-detect the Next.js workspace root because of a stray
+    C:\Users\<user>\package-lock.json plus the spaces/em-dash in this folder name. FIXED 2026-06-04 by
+    pinning `outputFileTracingRoot` to this folder in next.config.mjs (silences the "inferred workspace
+    root" warning locally; Vercel's clean checkout is unaffected). Still prefer push-to-deploy.
   - DONE (2026-06-04): Vercel Git reconnected, production deploy verified on gestaltung.vercel.app
     (Node 20 confirmed in build logs; /en LTR, /ar RTL + جِشتالتُونج, / → default locale all 200).
     Vercel Node.js Version set to 20.x in Project Settings too (matches engines). Netlify projects

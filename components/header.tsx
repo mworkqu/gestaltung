@@ -19,44 +19,67 @@ export async function Header({ locale }: { locale: Locale }) {
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-2.5">
-          <Image
-            src="/logo.png"
-            alt={tBrand("name")}
-            width={32}
-            height={32}
-            priority
-            className="h-8 w-8 object-contain"
-          />
-          <span
-            className={cn(
-              "text-base font-semibold text-heading",
-              !isRtl && "tracking-[0.14em]"
-            )}
-          >
-            {tBrand("name")}
-          </span>
-        </Link>
+    <header className="sticky top-0 z-40 w-full">
+      <div className="container pt-4">
+        <div className="neu flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
+          {/* Brand lockup */}
+          <Link href="/" className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink shadow-neu-sm">
+              <Image
+                src="/logo.png"
+                alt={tBrand("name")}
+                width={24}
+                height={24}
+                priority
+                className="h-5 w-5 object-contain"
+              />
+            </span>
+            <span className="leading-none">
+              <span
+                className={cn(
+                  "block text-sm font-extrabold text-heading",
+                  !isRtl && "uppercase tracking-[0.12em]"
+                )}
+              >
+                {tBrand("name")}
+              </span>
+              <span
+                className={cn(
+                  "mt-1 block text-[9px] text-faint",
+                  isRtl
+                    ? "font-sans"
+                    : "font-mono uppercase tracking-[0.18em]"
+                )}
+              >
+                {tBrand("tagline")}
+              </span>
+            </span>
+          </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
-          {navLinks.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              className="rounded-md px-3 py-2 text-sm text-mutedtext transition-colors hover:text-heading"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+          {/* Primary nav */}
+          <nav className="hidden items-center gap-1 md:flex">
+            {navLinks.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className={cn(
+                  "rounded-lg px-3 py-2 text-mutedtext transition-colors duration-300 hover:text-heading",
+                  isRtl
+                    ? "text-sm font-medium"
+                    : "font-mono text-[11px] uppercase tracking-wider"
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
-        <div className="flex items-center gap-2 sm:gap-3">
-          <LanguageSwitcher currentLocale={locale} />
-          <Button asChild size="sm" className="h-9 px-4">
-            <Link href="/contact">{t("uploadFile")}</Link>
-          </Button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSwitcher currentLocale={locale} />
+            <Button asChild size="sm" className="h-9 rounded-full px-4">
+              <Link href="/contact">{t("uploadFile")}</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </header>

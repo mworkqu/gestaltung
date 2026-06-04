@@ -1,16 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
+// Recessed "well" inputs. Uses the shadow-neu-inset utility (not the .neu-inset
+// component class) so the cobalt focus ring composes with the inset shadow via
+// Tailwind's box-shadow chain instead of overwriting it.
 const fieldClass =
-  "w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-heading placeholder:text-faint focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+  "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
 
 export function ContactForm() {
   const t = useTranslations("Contact");
+  const locale = useLocale();
+  const isRtl = locale === "ar";
   const [submitted, setSubmitted] = useState(false);
+
+  // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
+  const mono = (extra = "") =>
+    cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -27,16 +38,19 @@ export function ContactForm() {
 
   if (submitted) {
     return (
-      <div className="rounded-lg border border-azure/40 bg-azure/10 p-6 text-sm text-body">
-        {t("success")}
+      <div className="neu-inset flex items-start gap-4 p-6">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cobalt shadow-neu-sm">
+          <CheckCircle2 className="h-6 w-6 text-white" strokeWidth={1.5} />
+        </span>
+        <p className="text-sm leading-relaxed text-body">{t("success")}</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-1.5">
-        <label htmlFor="name" className="text-sm font-medium text-body">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="space-y-2">
+        <label htmlFor="name" className={mono("block text-[10px] text-mutedtext")}>
           {t("nameLabel")}
         </label>
         <input
@@ -49,8 +63,8 @@ export function ContactForm() {
         />
       </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor="email" className="text-sm font-medium text-body">
+      <div className="space-y-2">
+        <label htmlFor="email" className={mono("block text-[10px] text-mutedtext")}>
           {t("emailLabel")}
         </label>
         <input
@@ -63,8 +77,8 @@ export function ContactForm() {
         />
       </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor="message" className="text-sm font-medium text-body">
+      <div className="space-y-2">
+        <label htmlFor="message" className={mono("block text-[10px] text-mutedtext")}>
           {t("messageLabel")}
         </label>
         <textarea
@@ -73,11 +87,11 @@ export function ContactForm() {
           required
           rows={5}
           placeholder={t("messagePlaceholder")}
-          className={`${fieldClass} resize-y`}
+          className={cn(fieldClass, "resize-y")}
         />
       </div>
 
-      <Button type="submit" className="w-full sm:w-auto">
+      <Button type="submit" size="lg" className="w-full rounded-full sm:w-auto sm:px-8">
         {t("submit")}
       </Button>
     </form>

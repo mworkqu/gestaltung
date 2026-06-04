@@ -36,5 +36,12 @@ deno.lock
 # stray sandbox probe files (safe to delete manually)
 __deltest.txt
 __ow.txt
+tsconfig.tmp.json
+tsconfig.tmp.tsbuildinfo
 
 .vercel
+
+# local tooling / personal reference material (not part of the app)
+.claude/
+Design that I like/
+claude-code-vercel-migration-prompt.md

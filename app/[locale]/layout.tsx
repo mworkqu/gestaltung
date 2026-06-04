@@ -2,17 +2,24 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
-import { IBM_Plex_Sans, IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Outfit, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 
 import { routing, type Locale } from "@/i18n/routing";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import "../globals.css";
 
-const sans = IBM_Plex_Sans({
+const sans = Outfit({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
   display: "swap",
 });
 
@@ -57,9 +64,9 @@ export default async function LocaleLayout({
     <html
       lang={locale}
       dir={dir}
-      className={`dark ${sans.variable} ${sansArabic.variable}`}
+      className={`${sans.variable} ${mono.variable} ${sansArabic.variable}`}
     >
-      <body className="min-h-screen bg-background font-sans text-foreground">
+      <body className="min-h-screen bg-background font-sans text-body">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <div className="flex min-h-screen flex-col">
             <Header locale={locale as Locale} />
