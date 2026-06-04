@@ -35,8 +35,9 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   - SOURCE OF TRUTH = GitHub repo mworkqu/gestaltung, branch main.
   - AUTO-DEPLOY: push to main -> Vercel builds & deploys (Git integration, production branch = main).
     Config in vercel.json (framework: nextjs — Vercel's Next.js preset runs `next build`, no publish
-    dir / output setting needed). Node version carried over as Node 20 via "engines": {"node":"20.x"}
-    in package.json. NEXT_PUBLIC_ rule: only NEXT_PUBLIC_-prefixed vars reach the browser.
+    dir / output setting needed). Node version = "engines": {"node":"24.x"} in package.json (bumped
+    from 20.x on 2026-06-04 — Node 20 reached EOL; Vercel project + local machine both run 24.x).
+    NEXT_PUBLIC_ rule: only NEXT_PUBLIC_-prefixed vars reach the browser.
   - next pinned to ^15.2.3 (>=15.2.3 required for CVE-2025-29927).
   - Manual deploy if ever needed: `vercel --prod` from the project folder (after `vercel link`).
     NOTE: local builds used to mis-detect the Next.js workspace root because of a stray
@@ -44,9 +45,10 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     pinning `outputFileTracingRoot` to this folder in next.config.mjs (silences the "inferred workspace
     root" warning locally; Vercel's clean checkout is unaffected). Still prefer push-to-deploy.
   - DONE (2026-06-04): Vercel Git reconnected, production deploy verified on gestaltung.vercel.app
-    (Node 20 confirmed in build logs; /en LTR, /ar RTL + جِشتالتُونج, / → default locale all 200).
-    Vercel Node.js Version set to 20.x in Project Settings too (matches engines). Netlify projects
+    (/en LTR, /ar RTL + جِشتالتُونج, / → default locale all 200). Netlify projects
     were fully DELETED, so GitHub now auto-deploys only to Vercel.
+    NODE UPDATE (2026-06-04): Vercel Project Settings → Node.js Version is now 24.x and engines was
+    bumped to 24.x to match (was 20.x on both). If they ever drift, the dashboard setting wins the build.
   - SUPERSEDED (Netlify era, 2026-06-03 → 2026-06-04): site was briefly hosted on Netlify
     (gestaltung.netlify.app, @netlify/plugin-nextjs, netlify.toml). netlify.toml and the only Netlify
     env var (NODE_VERSION=20) are gone; the Netlify projects have been deleted. Removed the stale
