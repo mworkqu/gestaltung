@@ -19,7 +19,7 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 
 ## REQUIREMENTS
 - Fully bilingual: Arabic (RTL) and English. Language toggle everywhere.
-- Stack: Next.js 15 App Router, TypeScript, Tailwind CSS, shadcn/ui, next-intl, Supabase (Postgres + Auth + Storage), deployed on Netlify (free plan; commercial use allowed).
+- Stack: Next.js 15 App Router, TypeScript, Tailwind CSS, shadcn/ui, next-intl, Supabase (Postgres + Auth + Storage), deployed on Vercel.
 
 ## BUILD STYLE
 - Build incrementally. Do only what each prompt asks. Do not scaffold future features early.
@@ -29,24 +29,24 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 - Stage 1 (scaffold + deploy "hello world"): DONE and LIVE.
   - Next.js 15 (App Router) + TypeScript + Tailwind + shadcn/ui. Single landing page at app/page.tsx
     (Gestaltung name + tagline + shadcn Buttons, dark on-brand look).
-  - LIVE (public, no auth wall): https://gestaltung.netlify.app
-  - HOSTING = Netlify (moved off Vercel on 2026-06-03). Site "gestaltung" in team "GESTALTUNG RASHWAN"
-    (account slug gestaltung-co), free plan (commercial use allowed). Admin: https://app.netlify.com/projects/gestaltung
+  - LIVE (public, no auth wall): https://gestaltung.vercel.app
+  - HOSTING = Vercel (migrated back from Netlify on 2026-06-04). Project "gestaltung"
+    (id prj_xO2xcUzSvV0Y7D0fAlqHmFcB6n5P) in team "GESTALTUNG RASHWAN" (slug gestaltungco-7345s).
   - SOURCE OF TRUTH = GitHub repo mworkqu/gestaltung, branch main.
-  - AUTO-DEPLOY: push to main -> Netlify builds & deploys (continuous deployment via the Netlify GitHub App).
-    Production branch = main. Build config in netlify.toml (next build, NODE_VERSION 20, @netlify/plugin-nextjs /
-    Next.js Runtime v5). Verified: pushing commit 6aa7cd1 auto-built and deployed on Netlify.
-  - VERCEL: Git integration DISCONNECTED (`vercel git disconnect`) — pushes no longer deploy to Vercel.
-    Old Vercel project + deploys (gestaltung.vercel.app) left up for now; can be deleted later.
-    vercel.json left in repo (Netlify ignores it).
+  - AUTO-DEPLOY: push to main -> Vercel builds & deploys (Git integration, production branch = main).
+    Config in vercel.json (framework: nextjs — Vercel's Next.js preset runs `next build`, no publish
+    dir / output setting needed). Node version carried over as Node 20 via "engines": {"node":"20.x"}
+    in package.json. NEXT_PUBLIC_ rule: only NEXT_PUBLIC_-prefixed vars reach the browser.
   - next pinned to ^15.2.3 (>=15.2.3 required for CVE-2025-29927).
-  - Manual deploy if ever needed: `netlify deploy --build --prod` from the project folder.
-    NOTE: local builds can mis-detect the Next.js workspace root because of a stray, empty
-    C:\Users\<user>\package-lock.json plus the spaces/em-dash in this folder name, which produced a
-    broken serverless function on a local CLI deploy. Netlify's CD build checks the repo out to a clean
-    path and is unaffected — prefer push-to-deploy.
-  - STALE: the old Vercel helper scripts (GO-LIVE.bat / go-live.ps1 / push-to-github.ps1 / DEPLOY.md)
-    predate the Netlify+GitHub setup and no longer reflect how deploys work.
+  - Manual deploy if ever needed: `vercel --prod` from the project folder (after `vercel link`).
+    NOTE: local builds mis-detect the Next.js workspace root because of a stray
+    C:\Users\<user>\package-lock.json plus the spaces/em-dash in this folder name. Vercel's CD build
+    checks the repo out to a clean path and is unaffected — prefer push-to-deploy.
+  - SUPERSEDED (Netlify era, 2026-06-03 → 2026-06-04): site was briefly hosted on Netlify
+    (gestaltung.netlify.app, @netlify/plugin-nextjs, netlify.toml). netlify.toml and the only Netlify
+    env var (NODE_VERSION=20) are gone; the Netlify site is left up as manual cleanup until the Vercel
+    production deploy is confirmed. Removed the stale old-Vercel/Netlify helper scripts
+    (GO-LIVE.bat / go-live.ps1 / push-to-github.ps1 / DEPLOY.md).
 - Stage 2 (bilingual EN/AR shell + on-brand theme + logo in header): DONE.
   - Full next-intl bilingual shell: /[locale] routing (en default, ar), middleware, RTL/dir + IBM Plex
     Arabic font, messages/en.json + ar.json, working EN/ع language switcher (components/language-switcher.tsx).
@@ -69,6 +69,10 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
   Stage 4 = Supabase auth + roles (super_admin/workshop/client) + RLS multi-tenant isolation (needs a Supabase
   project + env vars from the owner); then 5 inventory, 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
+  - HOSTING ENV NOTE for Stage 4: add the Supabase env vars in Vercel (Project → Settings → Environment
+    Variables) for ALL THREE scopes (Production / Preview / Development): NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY (browser-safe), and the server-only SUPABASE_SERVICE_ROLE_KEY
+    (NO NEXT_PUBLIC_ prefix — keep it server-side only). There are NO app env vars today.
 
 ## ENVIRONMENT NOTES (for Claude)
 - This project now runs on the USER'S Windows machine (PowerShell): npm, git, next build, netlify, and vercel
