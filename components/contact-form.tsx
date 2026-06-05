@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,22 +19,40 @@ export function ContactForm() {
   const locale = useLocale();
   const isRtl = locale === "ar";
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
+
     const data = new FormData(e.currentTarget);
-    // No backend yet (Stage 4+). For now, log the submission.
-    console.log("Contact form submission:", {
-      name: data.get("name"),
-      email: data.get("email"),
-      message: data.get("message"),
-    });
-    setSubmitted(true);
-    e.currentTarget.reset();
+    const payload = {
+      name: String(data.get("name")).trim(),
+      phone: String(data.get("phone")).trim(), // WhatsApp — primary contact
+      email: String(data.get("email") ?? "").trim() || null, // optional
+      message: String(data.get("message")).trim(),
+      locale,
+    };
+
+    try {
+      const supabase = createClient();
+      const { error: insertError } = await supabase
+        .from("inquiries")
+        .insert(payload);
+      if (insertError) throw insertError;
+      setSubmitted(true);
+      e.currentTarget.reset();
+    } catch {
+      setError(t("errorSubmit"));
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (submitted) {
@@ -63,17 +82,36 @@ export function ContactForm() {
         />
       </div>
 
+      {/* WhatsApp is the primary contact channel — required. */}
+      <div className="space-y-2">
+        <label htmlFor="phone" className={mono("block text-[10px] text-mutedtext")}>
+          {t("whatsappLabel")}
+        </label>
+        <input
+          id="phone"
+          name="phone"
+          type="tel"
+          required
+          dir="ltr"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder={t("whatsappPlaceholder")}
+          className={cn(fieldClass, isRtl && "text-right")}
+        />
+        <p className="text-[11px] leading-snug text-faint">{t("whatsappNote")}</p>
+      </div>
+
       <div className="space-y-2">
         <label htmlFor="email" className={mono("block text-[10px] text-mutedtext")}>
-          {t("emailLabel")}
+          {t("emailOptional")}
         </label>
         <input
           id="email"
           name="email"
           type="email"
-          required
+          dir="ltr"
           placeholder={t("emailPlaceholder")}
-          className={fieldClass}
+          className={cn(fieldClass, isRtl && "text-right")}
         />
       </div>
 
@@ -91,7 +129,15 @@ export function ContactForm() {
         />
       </div>
 
-      <Button type="submit" size="lg" className="w-full rounded-full sm:w-auto sm:px-8">
+      {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+
+      <Button
+        type="submit"
+        size="lg"
+        disabled={loading}
+        className="w-full rounded-full sm:w-auto sm:px-8"
+      >
+        {loading && <Loader2 className="animate-spin" />}
         {t("submit")}
       </Button>
     </form>
