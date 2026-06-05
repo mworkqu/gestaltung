@@ -90,6 +90,11 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     redirects anon → /[locale]/sign-in. Role-aware redirect helper lib/auth/redirects.ts (locale-agnostic
     path; all roles → /dashboard for now). Role-specific dashboards deliberately NOT built yet.
   - tsconfig.json now excludes "Design that I like" (a gitignored reference Vite app that broke local typecheck).
+  - Contact form lead capture (supabase/migrations/0002_inquiries.sql): public.inquiries table — anon INSERT
+    (public form), super_admin-only SELECT/UPDATE/DELETE via RLS (reuses is_super_admin()). The contact form
+    (components/contact-form.tsx) now inserts to Supabase via the browser client instead of console.logging.
+    WhatsApp number is the REQUIRED primary contact channel (owner: WhatsApp is the main medium, not email);
+    email is optional. Copy is WhatsApp-first in en+ar. RUN 0002 in Supabase after 0001.
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
   Stage 5 inventory, 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
