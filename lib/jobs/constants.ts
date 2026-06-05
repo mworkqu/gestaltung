@@ -9,6 +9,30 @@ export const JOB_METHODS = [
   "edm",
 ] as const;
 
+// Canonical status set + the linear workshop progression chain.
+export const JOB_STATUSES = [
+  "submitted",
+  "quoted",
+  "in_production",
+  "ready",
+  "delivered",
+  "cancelled",
+] as const;
+
+export const STATUS_CHAIN = [
+  "submitted",
+  "quoted",
+  "in_production",
+  "ready",
+  "delivered",
+] as const;
+
+// The next status a workshop can advance to, or null at the end of the chain.
+export function nextStatus(current: string): string | null {
+  const i = (STATUS_CHAIN as readonly string[]).indexOf(current);
+  return i >= 0 && i < STATUS_CHAIN.length - 1 ? STATUS_CHAIN[i + 1] : null;
+}
+
 export const FILE_EXTS = ["stl", "step", "dxf", "iges"] as const;
 export type NormalizedExt = (typeof FILE_EXTS)[number];
 

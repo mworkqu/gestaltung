@@ -5,7 +5,7 @@ import { getTranslations } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
-import { JOB_METHODS, FILE_EXTS } from "@/lib/jobs/constants";
+import { JOB_METHODS, FILE_EXTS, JOB_STATUSES } from "@/lib/jobs/constants";
 
 export type CreateJobInput = {
   locale: string;
@@ -94,4 +94,63 @@ export async function createJob(
 
   revalidatePath(`/${locale}/dashboard/jobs`);
   return { jobId: job.id };
+}
+
+export type ActionResult = { error?: string; ok?: boolean };
+
+// super_admin assigns (or clears) the workshop for a job. RLS + the status
+// trigger enforce that only an admin may change the assignment.
+export async function assignWorkshop(input: {
+  locale: string;
+  jobId: string;
+  workshopTenantId: string | null;
+}): Promise<ActionResult> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const t = await getTranslations({ locale, namespace: "Jobs" });
+
+  const session = await getSessionContext();
+  if (!session) return { error: t("error_unknown") };
+  if (session.profile.role !== "super_admin") return { error: t("error_not_admin") };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("jobs")
+    .update({ assigned_workshop_tenant_id: input.workshopTenantId || null })
+    .eq("id", input.jobId);
+
+  if (error) return { error: t("error_assign") };
+
+  revalidatePath(`/${locale}/dashboard/jobs`);
+  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  return { ok: true };
+}
+
+// Status change. The DB trigger decides legality per role (workshop advances one
+// step on its assigned job; client cancels an unassigned submitted job;
+// super_admin overrides). Any rejection surfaces as a translated error.
+export async function changeStatus(input: {
+  locale: string;
+  jobId: string;
+  status: string;
+}): Promise<ActionResult> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const t = await getTranslations({ locale, namespace: "Jobs" });
+
+  const session = await getSessionContext();
+  if (!session) return { error: t("error_unknown") };
+  if (!(JOB_STATUSES as readonly string[]).includes(input.status)) {
+    return { error: t("error_transition") };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("jobs")
+    .update({ status: input.status })
+    .eq("id", input.jobId);
+
+  if (error) return { error: t("error_transition") };
+
+  revalidatePath(`/${locale}/dashboard/jobs`);
+  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  return { ok: true };
 }

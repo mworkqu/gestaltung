@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { JobsFilters } from "@/components/jobs/jobs-filters";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +23,13 @@ type JobRow = {
 
 export default async function JobsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ status?: string; tenant?: string }>;
 }) {
   const { locale } = await params;
+  const { status: statusFilter, tenant: tenantFilter } = await searchParams;
   setRequestLocale(locale);
 
   const session = await getSessionContext();
@@ -40,18 +44,29 @@ export default async function JobsPage({
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   const supabase = await createClient();
-  // RLS scopes rows: client = own, super_admin = all, workshop = none (6a).
-  const { data, error } = await supabase
+  // RLS scopes rows: client = own, workshop = assigned, super_admin = all.
+  let query = supabase
     .from("jobs")
     .select("id, title, method, status, quantity, created_at, client_tenant_id")
     .order("created_at", { ascending: false });
+
+  // super_admin filters (ignored for other roles — RLS already scopes them).
+  if (isSuperAdmin && statusFilter) query = query.eq("status", statusFilter);
+  if (isSuperAdmin && tenantFilter) query = query.eq("client_tenant_id", tenantFilter);
+
+  const { data, error } = await query;
   const jobs = (data ?? []) as JobRow[];
 
-  // Client-tenant names for the super_admin view.
+  // Client-tenant names + the filter tenant list for the super_admin view.
   const tenantNames = new Map<string, string>();
-  if (isSuperAdmin && jobs.length > 0) {
-    const { data: tdata } = await supabase.from("tenants").select("id, name");
-    (tdata ?? []).forEach((x) => tenantNames.set(x.id, x.name));
+  let tenants: { id: string; name: string }[] = [];
+  if (isSuperAdmin) {
+    const { data: tdata } = await supabase
+      .from("tenants")
+      .select("id, name")
+      .order("name", { ascending: true });
+    tenants = tdata ?? [];
+    tenants.forEach((x) => tenantNames.set(x.id, x.name));
   }
 
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
@@ -70,14 +85,23 @@ export default async function JobsPage({
             {t("count", { count: jobs.length })}
           </p>
         </div>
-        {isClient && (
-          <Button asChild className="rounded-full">
-            <Link href="/dashboard/jobs/new">
-              <Plus className="h-4 w-4" />
-              {t("newJob")}
-            </Link>
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {isSuperAdmin && (
+            <JobsFilters
+              tenants={tenants}
+              selectedStatus={statusFilter}
+              selectedTenant={tenantFilter}
+            />
+          )}
+          {isClient && (
+            <Button asChild className="rounded-full">
+              <Link href="/dashboard/jobs/new">
+                <Plus className="h-4 w-4" />
+                {t("newJob")}
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (

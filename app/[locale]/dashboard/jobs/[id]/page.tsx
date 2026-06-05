@@ -6,7 +6,8 @@ import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { CAD_BUCKET } from "@/lib/jobs/constants";
-import type { Job, JobFile } from "@/lib/supabase/types";
+import type { Job, JobFile, JobEvent } from "@/lib/supabase/types";
+import { JobActions } from "@/components/jobs/job-actions";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function JobDetailPage({
 
   const supabase = await createClient();
 
-  // RLS ensures only an owner-tenant client or super_admin can load this row.
+  // RLS: only the owner client, the assigned workshop, or super_admin loads it.
   const { data: job } = await supabase
     .from("jobs")
     .select("*")
@@ -44,7 +45,6 @@ export default async function JobDetailPage({
     .order("uploaded_at", { ascending: true });
   const files = (fileRows ?? []) as JobFile[];
 
-  // Short-lived signed URLs (60s) — bucket is private, generated per request.
   const filesWithUrls = await Promise.all(
     files.map(async (f) => {
       const { data } = await supabase.storage
@@ -54,15 +54,31 @@ export default async function JobDetailPage({
     })
   );
 
-  // super_admin: show which client this job belongs to.
+  const { data: eventRows } = await supabase
+    .from("job_events")
+    .select("*")
+    .eq("job_id", id)
+    .order("created_at", { ascending: true });
+  const events = (eventRows ?? []) as JobEvent[];
+
+  const role = session.profile.role;
+  const myTenant = session.profile.tenant_id;
+  const isSuperAdmin = role === "super_admin";
+  const isOwnerClient = role === "client" && job.client_tenant_id === myTenant;
+  const isAssignedWorkshop =
+    role === "workshop" && job.assigned_workshop_tenant_id === myTenant;
+
+  // super_admin: client name, the workshop picker list, and assigned name.
   let clientName: string | null = null;
-  if (session.profile.role === "super_admin") {
-    const { data: ten } = await supabase
-      .from("tenants")
-      .select("name")
-      .eq("id", job.client_tenant_id)
-      .single<{ name: string }>();
-    clientName = ten?.name ?? null;
+  let workshopTenants: { id: string; name: string }[] = [];
+  let assignedName: string | null = null;
+  if (isSuperAdmin) {
+    const { data: tens } = await supabase.from("tenants").select("id, name, type");
+    const all = tens ?? [];
+    clientName = all.find((x) => x.id === job.client_tenant_id)?.name ?? null;
+    workshopTenants = all.filter((x) => x.type === "workshop");
+    assignedName =
+      all.find((x) => x.id === job.assigned_workshop_tenant_id)?.name ?? null;
   }
 
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
@@ -76,6 +92,9 @@ export default async function JobDetailPage({
     { label: t("quantityLabel"), value: String(job.quantity) },
     { label: t("materialLabel"), value: job.material || "—" },
     ...(clientName ? [{ label: t("colClient"), value: clientName }] : []),
+    ...(isSuperAdmin
+      ? [{ label: t("assignedToLabel"), value: assignedName ?? t("unassigned") }]
+      : []),
     { label: t("createdLabel"), value: dateFmt.format(new Date(job.created_at)) },
   ];
 
@@ -102,9 +121,7 @@ export default async function JobDetailPage({
             key={row.label}
             className="flex items-center justify-between gap-4 px-4 py-3"
           >
-            <span className={mono("text-[10px] text-mutedtext")}>
-              {row.label}
-            </span>
+            <span className={mono("text-[10px] text-mutedtext")}>{row.label}</span>
             <span className="text-sm font-medium text-heading">{row.value}</span>
           </div>
         ))}
@@ -119,6 +136,17 @@ export default async function JobDetailPage({
         </div>
       )}
 
+      {/* Role-aware actions: assign/override (admin), advance (workshop), cancel (client) */}
+      <JobActions
+        role={role}
+        jobId={job.id}
+        status={job.status}
+        assignedWorkshopTenantId={job.assigned_workshop_tenant_id}
+        isOwnerClient={isOwnerClient}
+        isAssignedWorkshop={isAssignedWorkshop}
+        workshopTenants={workshopTenants}
+      />
+
       {/* Files */}
       <div className="mt-6">
         <p className={mono("text-[10px] text-azure")}>{t("filesTitle")}</p>
@@ -127,10 +155,7 @@ export default async function JobDetailPage({
         ) : (
           <ul className="mt-3 space-y-2">
             {filesWithUrls.map((f) => (
-              <li
-                key={f.id}
-                className="neu flex items-center gap-3 px-4 py-3"
-              >
+              <li key={f.id} className="neu flex items-center gap-3 px-4 py-3">
                 <FileBox className="h-5 w-5 shrink-0 text-cobalt" strokeWidth={1.5} />
                 <span className="flex-1 truncate text-sm text-heading" dir="ltr">
                   {f.file_name}
@@ -157,6 +182,26 @@ export default async function JobDetailPage({
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Status timeline */}
+      <div className="mt-6">
+        <p className={mono("text-[10px] text-azure")}>{t("timelineTitle")}</p>
+        <ol className="mt-3 space-y-3">
+          {events.map((ev) => (
+            <li key={ev.id} className="flex items-start gap-3">
+              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cobalt" />
+              <div>
+                <p className="text-sm font-medium text-heading">
+                  {t(`status_${ev.to_status}`)}
+                </p>
+                <p className="text-[11px] text-mutedtext">
+                  {dateFmt.format(new Date(ev.created_at))}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   );

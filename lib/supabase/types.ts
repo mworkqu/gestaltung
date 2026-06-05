@@ -29,10 +29,9 @@ export type JobMethod =
 
 export type JobStatus =
   | "submitted"
-  | "in_review"
-  | "assigned"
+  | "quoted"
   | "in_production"
-  | "completed"
+  | "ready"
   | "delivered"
   | "cancelled";
 
@@ -60,6 +59,16 @@ export type JobFile = {
   file_ext: FileExt;
   size_bytes: number | null;
   uploaded_at: string;
+};
+
+export type JobEvent = {
+  id: string;
+  job_id: string;
+  from_status: JobStatus | null;
+  to_status: JobStatus;
+  note: string | null;
+  actor: string | null;
+  created_at: string;
 };
 
 export type InventoryItem = {

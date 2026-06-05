@@ -132,9 +132,25 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     no service-role). Jobs link added to dashboard nav. lib/jobs/constants.ts (methods, exts, 50MB, bucket).
   - GA4 (global): @next/third-parties <GoogleAnalytics> in app/[locale]/layout.tsx, gated on
     NEXT_PUBLIC_GA_MEASUREMENT_ID (value G-QXVQ4H05Y7; in .env.local). ADD it in Vercel (Prod/Preview/Dev).
+- Stage 6b (workshop dispatch + status workflow): DONE (code) — needs migration 0006 run in Supabase.
+  - supabase/migrations/0006_job_workflow.sql: canonical status set submitted→quoted→in_production→ready→delivered
+    (+cancelled) [replaces 6a set]. jobs RLS now also lets the assigned workshop SELECT/UPDATE its rows; storage
+    cad_files_select extended via can_read_cad_object() so the assigned workshop can download the client's files;
+    can_access_job() now includes the assigned workshop (covers job_files + job_events). jobs_status_transition
+    trigger (replaces 6a jobs_guard_status): super_admin override; only admin sets assigned_workshop_tenant_id;
+    client may cancel only an unassigned submitted job; workshop advances its assigned job exactly one step along
+    the chain; illegal transitions raise. job_events audit table (RLS via can_access_job) auto-filled by
+    insert/update triggers. RUN 0006 after 0005.
+  - UI (app/[locale]/dashboard/jobs): list adds super_admin status+tenant filters (components/jobs/jobs-filters.tsx,
+    ?status=&tenant=); detail adds role-aware controls (components/jobs/job-actions.tsx) — super_admin assign
+    workshop + override status, workshop advance one step, client cancel — plus a status timeline from job_events.
+    Workshops now see their assigned jobs via RLS. Server actions assignWorkshop/changeStatus in jobs/actions.ts
+    (RLS + trigger enforce; no service-role). lib/jobs/constants.ts has JOB_STATUSES/STATUS_CHAIN/nextStatus().
+  - Jobs namespace extended (en+ar) with the new status labels + assignment/override/advance/cancel/timeline/filter
+    strings. JobStatus type + JobEvent type added.
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
-  Stage 6b workshop assignment + status workflow, 7 admin dashboard, 8 e-commerce, 9 AI. 4 stages remain (6–9).
+  Stage 7 admin dashboard, 8 e-commerce, 9 AI. 4 stages remain (6–9).
   - STAGE 6 IS SPLIT into two passes (decided 2026-06-05; biggest jump so far — private file storage + a
     stateful 3-role workflow). Build 6a fully (incl. migration run + test) before starting 6b. The two
     Claude Code prompts live in the project root as STAGE_6A_PROMPT.md and STAGE_6B_PROMPT.md.
