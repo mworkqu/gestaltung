@@ -88,7 +88,12 @@ export function ContactForm() {
         <label htmlFor="phone" className={mono("block text-[10px] text-mutedtext")}>
           {t("whatsappLabel")}
         </label>
-        <PhoneInput id="phone" name="phone" placeholder={t("whatsappPlaceholder")} />
+        <PhoneInput
+          id="phone"
+          name="phone"
+          placeholder={t("whatsappPlaceholder")}
+          codeAriaLabel={t("countryCode")}
+        />
         <p className="text-[11px] leading-snug text-faint">{t("whatsappNote")}</p>
       </div>
 

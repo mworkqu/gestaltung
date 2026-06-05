@@ -4,33 +4,43 @@ import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 
-const COUNTRY_CODE = "+974"; // Qatar
+const DEFAULT_CODE = "+974"; // Qatar — pre-filled but editable
 
-// Phone field with a fixed +974 prefix. The user types only the 8 local digits;
-// a hidden input named `name` submits the full E.164 value (e.g. +97433001122),
-// so form handlers just read FormData[name] as usual. Always LTR (numbers read
-// left-to-right) even on the Arabic/RTL pages.
+// Two-part phone field: an editable country-code box (defaults to +974) and the
+// rest of the number. A hidden input named `name` submits the combined E.164
+// value (e.g. +97430012345, or +12025550123 for a US number), so form handlers
+// just read FormData[name]. Always LTR — numbers read left-to-right even on the
+// Arabic/RTL pages.
 export function PhoneInput({
   id,
   name,
   required = true,
   placeholder,
+  codeAriaLabel = "Country code",
   className,
 }: {
   id: string;
   name: string;
   required?: boolean;
   placeholder?: string;
+  codeAriaLabel?: string;
   className?: string;
 }) {
-  const [digits, setDigits] = useState("");
+  const [code, setCode] = useState(DEFAULT_CODE);
+  const [number, setNumber] = useState("");
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    // Keep digits only, Qatar local numbers are 8 digits.
-    setDigits(e.target.value.replace(/\D/g, "").slice(0, 8));
+  function handleCode(e: React.ChangeEvent<HTMLInputElement>) {
+    // Keep digits, force a single leading "+", cap at "+" plus 4 digits.
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+    setCode(`+${digits}`);
   }
 
-  const fullValue = digits ? `${COUNTRY_CODE}${digits}` : "";
+  function handleNumber(e: React.ChangeEvent<HTMLInputElement>) {
+    // Digits only; E.164 allows up to ~15 total, leave room for the code.
+    setNumber(e.target.value.replace(/\D/g, "").slice(0, 14));
+  }
+
+  const fullValue = number ? `${code}${number}` : "";
 
   return (
     <div
@@ -40,19 +50,26 @@ export function PhoneInput({
         className
       )}
     >
-      <span className="select-none border-r border-white/60 px-3.5 py-3 font-medium text-mutedtext">
-        {COUNTRY_CODE}
-      </span>
+      <input
+        type="tel"
+        inputMode="tel"
+        aria-label={codeAriaLabel}
+        required={required}
+        pattern="\+[0-9]{1,4}"
+        value={code}
+        onChange={handleCode}
+        className="w-16 shrink-0 border-r border-white/60 bg-transparent py-3 text-center font-medium text-mutedtext focus:outline-none"
+      />
       <input
         id={id}
         type="tel"
         inputMode="numeric"
         autoComplete="tel-national"
         required={required}
-        pattern="[0-9]{8}"
-        maxLength={8}
-        value={digits}
-        onChange={handleChange}
+        pattern="[0-9]{6,14}"
+        maxLength={14}
+        value={number}
+        onChange={handleNumber}
         placeholder={placeholder}
         className="w-full bg-transparent px-4 py-3 placeholder:text-faint focus:outline-none"
       />

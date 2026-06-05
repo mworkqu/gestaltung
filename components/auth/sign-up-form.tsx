@@ -117,7 +117,12 @@ export function SignUpForm() {
           <label htmlFor="phone" className={mono("block text-[10px] text-mutedtext")}>
             {t("phoneLabel")}
           </label>
-          <PhoneInput id="phone" name="phone" placeholder={t("phonePlaceholder")} />
+          <PhoneInput
+            id="phone"
+            name="phone"
+            placeholder={t("phonePlaceholder")}
+            codeAriaLabel={t("countryCode")}
+          />
         </div>
 
         <div className="space-y-2">
