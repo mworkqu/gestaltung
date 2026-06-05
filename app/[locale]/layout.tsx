@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { Outfit, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 
 import { routing, type Locale } from "@/i18n/routing";
@@ -60,6 +61,10 @@ export default async function LocaleLayout({
 
   const dir: "rtl" | "ltr" = locale === "ar" ? "rtl" : "ltr";
 
+  // GA4: only inject when the Measurement ID is configured, so local dev /
+  // previews without the env var don't pollute analytics.
+  const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
   return (
     <html
       lang={locale}
@@ -74,6 +79,7 @@ export default async function LocaleLayout({
             <Footer />
           </div>
         </NextIntlClientProvider>
+        {gaId && <GoogleAnalytics gaId={gaId} />}
       </body>
     </html>
   );

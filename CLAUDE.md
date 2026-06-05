@@ -116,9 +116,46 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     components/dashboard/dashboard-nav.tsx) + SignOut. Overview page (dashboard/page.tsx) refactored to live
     inside that layout (dropped its own container + SignOut).
   - Inventory + DashboardNav namespaces in messages/{en,ar}.json (bilingual, RTL, azure/neu theme). currency = QAR/ر.ق.
+- Stage 6a (CAD upload + job creation): DONE (code) — needs migration 0005 run + GA env var in Vercel.
+  - supabase/migrations/0005_jobs.sql: creates the PRIVATE storage bucket 'cad-files' (50MB limit) + storage.objects
+    policies (tenant = first path folder; super_admin all). jobs table (client_tenant_id NOT NULL FK,
+    assigned_workshop_tenant_id nullable [reserved 6b], title, notes, material, quantity, method check
+    3d_printing|cnc_machining|laser_cutting|edm, status check default 'submitted', created/updated_at). job_files
+    (job_id FK, storage_path, file_name, file_ext check stl|step|dxf|iges, size_bytes, uploaded_at). Triggers:
+    set_updated_at, jobs_default_tenant, jobs_guard_status (blocks non-super_admin status changes). RLS reuses
+    is_super_admin()/current_user_tenant_id(); job_files gated by can_access_job() SECURITY DEFINER helper.
+    client = own rows, super_admin = all, workshop = none yet. RUN 0005 after 0001+0004.
+  - UI under app/[locale]/dashboard/jobs: list (page.tsx, RLS reads; super_admin gets a Client column), new/
+    (client-only NewJobForm), [id]/ detail with 60s signed-URL downloads. Files upload DIRECT from browser to
+    Storage (lib/supabase/client) under <tenant_id>/<uuid>/<file> — keeps big CAD files off the Vercel
+    server-action 4.5MB body limit; DB rows written via server action createJob (jobs/actions.ts, RLS server-side,
+    no service-role). Jobs link added to dashboard nav. lib/jobs/constants.ts (methods, exts, 50MB, bucket).
+  - GA4 (global): @next/third-parties <GoogleAnalytics> in app/[locale]/layout.tsx, gated on
+    NEXT_PUBLIC_GA_MEASUREMENT_ID (value G-QXVQ4H05Y7; in .env.local). ADD it in Vercel (Prod/Preview/Dev).
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
-  Stage 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
+  Stage 6b workshop assignment + status workflow, 7 admin dashboard, 8 e-commerce, 9 AI. 4 stages remain (6–9).
+  - STAGE 6 IS SPLIT into two passes (decided 2026-06-05; biggest jump so far — private file storage + a
+    stateful 3-role workflow). Build 6a fully (incl. migration run + test) before starting 6b. The two
+    Claude Code prompts live in the project root as STAGE_6A_PROMPT.md and STAGE_6B_PROMPT.md.
+    - Stage 6a — CAD upload + job creation. Private Supabase Storage bucket "cad-files" (signed-URL
+      downloads, never public); jobs + job_files tables; method picked MANUALLY (3d_printing | cnc_machining
+      | laser_cutting | edm); same multi-tenant RLS as 4–5 (client sees only own jobs). NO assignment/status
+      changes yet. New migration is next in sequence (0005_*). ALSO in 6a: site-wide Google Analytics (GA4)
+      via @next/third-parties GoogleAnalytics in the root [locale] layout — covers every page EN+AR
+      (see ANALYTICS note below).
+    - Stage 6b — Dispatch + status workflow. super_admin assigns a job to a workshop; assigned workshop (only)
+      downloads files + advances status (submitted→quoted→in_production→ready→delivered) under role-allowed
+      transitions; client tracks to delivered; optional job_events audit trail (0006_*).
+    - Method AUTO-detection stays manual; rules-based / AI suggestion deferred to Stage 9.
+    - ANALYTICS (added to 6a 2026-06-05): Google Analytics 4, site-wide. GA4 stream "gestaltung",
+      Stream ID 15007875857, Measurement ID G-QXVQ4H05Y7, configured stream URL
+      https://www.gestaltung360.com (the intended custom domain; site currently also at
+      gestaltung.vercel.app). Wire via @next/third-parties GoogleAnalytics in app/[locale]/layout.tsx;
+      read the ID from NEXT_PUBLIC_GA_MEASUREMENT_ID (browser-safe, NOT hardcoded), inject only when set.
+      Add NEXT_PUBLIC_GA_MEASUREMENT_ID to .env.local AND Vercel (Production / Preview / Development).
+      Custom domain www.gestaltung360.com is the planned production hostname (point it at the Vercel
+      project when DNS is ready). No custom GA events yet — baseline pageviews only.
   - HOSTING ENV NOTE for Stage 4: add the Supabase env vars in Vercel (Project → Settings → Environment
     Variables) for ALL THREE scopes (Production / Preview / Development): NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY (browser-safe), and the server-only SUPABASE_SERVICE_ROLE_KEY

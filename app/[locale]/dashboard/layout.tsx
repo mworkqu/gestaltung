@@ -28,6 +28,7 @@ export default async function DashboardLayout({
   const navItems = [
     { href: "/dashboard", label: t("overview") },
     { href: "/dashboard/inventory", label: t("inventory") },
+    { href: "/dashboard/jobs", label: t("jobs") },
   ];
 
   return (

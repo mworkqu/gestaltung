@@ -21,6 +21,47 @@ export type Profile = {
   created_at: string;
 };
 
+export type JobMethod =
+  | "3d_printing"
+  | "cnc_machining"
+  | "laser_cutting"
+  | "edm";
+
+export type JobStatus =
+  | "submitted"
+  | "in_review"
+  | "assigned"
+  | "in_production"
+  | "completed"
+  | "delivered"
+  | "cancelled";
+
+export type FileExt = "stl" | "step" | "dxf" | "iges";
+
+export type Job = {
+  id: string;
+  client_tenant_id: string;
+  assigned_workshop_tenant_id: string | null;
+  title: string;
+  notes: string | null;
+  material: string | null;
+  quantity: number;
+  method: JobMethod;
+  status: JobStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type JobFile = {
+  id: string;
+  job_id: string;
+  storage_path: string;
+  file_name: string;
+  file_ext: FileExt;
+  size_bytes: number | null;
+  uploaded_at: string;
+};
+
 export type InventoryItem = {
   id: string;
   tenant_id: string;
