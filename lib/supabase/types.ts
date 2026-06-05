@@ -20,3 +20,18 @@ export type Profile = {
   locale: string;
   created_at: string;
 };
+
+export type InventoryItem = {
+  id: string;
+  tenant_id: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number | null;
+  low_stock_threshold: number | null;
+  created_at: string;
+  updated_at: string;
+};

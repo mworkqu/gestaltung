@@ -100,9 +100,24 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     Owner picked the 100%-free path (no SMS/WhatsApp provider) — phone is stored now, reserved for future use
     as a confirmation channel or alternative login. NOT written to auth.users.phone (that triggers paid phone
     auth). RUN 0003 in Supabase after 0001. Phone/WhatsApp OTP deferred (costs per-message; revisit later).
+- Stage 5 (multi-tenant inventory): DONE (code) — needs SQL migration 0004 run once in Supabase.
+  - supabase/migrations/0004_inventory_items.sql: inventory_items (tenant_id NOT NULL FK, sku, name,
+    description, category, quantity, unit, unit_price, low_stock_threshold, created_at, updated_at).
+    set_updated_at trigger; inventory_default_tenant trigger forces tenant_id to caller's tenant when omitted.
+    Unique (tenant_id, sku). RLS reuses is_super_admin()/current_user_tenant_id(): super_admin all rows,
+    workshop/client only their own tenant. Explicit select/insert/update/delete policies. RUN 0004 after 0001.
+  - Protected CRUD under app/[locale]/dashboard/inventory: list (page.tsx, server, RLS reads, low-stock badge,
+    super_admin gets a tenant column + TenantFilter via ?tenant= query), new/ + [id]/edit/ pages, server
+    actions in inventory/actions.ts (createItem/updateItem/deleteItem via server client — RLS server-side, no
+    service-role). item-form.tsx (useActionState, client+server validation), delete-item-button.tsx (themed
+    confirm modal, no radix). Empty/error/loading states.
+  - Dashboard now has app/[locale]/dashboard/layout.tsx: single auth gate + sub-nav (Overview | Inventory via
+    components/dashboard/dashboard-nav.tsx) + SignOut. Overview page (dashboard/page.tsx) refactored to live
+    inside that layout (dropped its own container + SignOut).
+  - Inventory + DashboardNav namespaces in messages/{en,ar}.json (bilingual, RTL, azure/neu theme). currency = QAR/ر.ق.
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
-  Stage 5 inventory, 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
+  Stage 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
   - HOSTING ENV NOTE for Stage 4: add the Supabase env vars in Vercel (Project → Settings → Environment
     Variables) for ALL THREE scopes (Production / Preview / Development): NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY (browser-safe), and the server-only SUPABASE_SERVICE_ROLE_KEY
