@@ -24,7 +24,8 @@
     "howItWorks": "How it works",
     "about": "About",
     "contact": "Contact",
-    "uploadFile": "Upload a file"
+    "uploadFile": "Upload a file",
+    "signIn": "Sign in"
   },
   "LanguageSwitcher": {
     "label": "Language",
@@ -106,5 +107,45 @@
   },
   "Footer": {
     "text": "Gestaltung for Trading and Services · Lusail, Qatar"
+  },
+  "Auth": {
+    "signInKicker": "Account access",
+    "signInHeading": "Sign in",
+    "signInIntro": "Sign in to reach your Gestaltung dashboard.",
+    "signInSubmit": "Sign in",
+    "signUpKicker": "Create account",
+    "signUpHeading": "Create your account",
+    "signUpIntro": "Set up access to Gestaltung. New accounts start as clients.",
+    "signUpSubmit": "Create account",
+    "nameLabel": "Full name",
+    "namePlaceholder": "Your name",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@company.com",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "At least 6 characters",
+    "noAccount": "Don't have an account?",
+    "signUpLink": "Create one",
+    "haveAccount": "Already have an account?",
+    "signInLink": "Sign in",
+    "errorInvalid": "Invalid email or password.",
+    "checkEmailHeading": "Confirm your email",
+    "checkEmailIntro": "One more step to finish signing up.",
+    "checkEmailBody": "We've sent you a confirmation link. Open it to activate your account, then sign in.",
+    "signOut": "Sign out"
+  },
+  "Dashboard": {
+    "kicker": "Dashboard",
+    "welcome": "Welcome back",
+    "welcomeNamed": "Welcome, {name}",
+    "emailLabel": "Email",
+    "roleLabel": "Role",
+    "tenantLabel": "Tenant",
+    "noTenant": "No tenant (platform-wide)",
+    "role_super_admin": "Super Admin",
+    "role_workshop": "Workshop",
+    "role_client": "Client",
+    "tenantType_workshop": "Workshop",
+    "tenantType_client": "Client",
+    "note": "This is your account context, read live through row-level security. Role-specific dashboards arrive in a later stage."
   }
 }

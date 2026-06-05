@@ -24,7 +24,8 @@
     "howItWorks": "كيف نعمل",
     "about": "من نحن",
     "contact": "تواصل معنا",
-    "uploadFile": "ارفع ملفًا"
+    "uploadFile": "ارفع ملفًا",
+    "signIn": "تسجيل الدخول"
   },
   "LanguageSwitcher": {
     "label": "اللغة",
@@ -106,5 +107,45 @@
   },
   "Footer": {
     "text": "جِشتالتُونج للتجارة والخدمات · لوسيل، قطر"
+  },
+  "Auth": {
+    "signInKicker": "الدخول إلى الحساب",
+    "signInHeading": "تسجيل الدخول",
+    "signInIntro": "سجّل الدخول للوصول إلى لوحة تحكم جِشتالتُونج.",
+    "signInSubmit": "تسجيل الدخول",
+    "signUpKicker": "إنشاء حساب",
+    "signUpHeading": "أنشئ حسابك",
+    "signUpIntro": "أنشئ وصولك إلى جِشتالتُونج. تبدأ الحسابات الجديدة كعملاء.",
+    "signUpSubmit": "إنشاء الحساب",
+    "nameLabel": "الاسم الكامل",
+    "namePlaceholder": "اسمك",
+    "emailLabel": "البريد الإلكتروني",
+    "emailPlaceholder": "you@company.com",
+    "passwordLabel": "كلمة المرور",
+    "passwordPlaceholder": "٦ أحرف على الأقل",
+    "noAccount": "ليس لديك حساب؟",
+    "signUpLink": "أنشئ حسابًا",
+    "haveAccount": "لديك حساب بالفعل؟",
+    "signInLink": "سجّل الدخول",
+    "errorInvalid": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+    "checkEmailHeading": "أكّد بريدك الإلكتروني",
+    "checkEmailIntro": "خطوة أخيرة لإتمام التسجيل.",
+    "checkEmailBody": "أرسلنا إليك رابط تأكيد. افتحه لتفعيل حسابك ثم سجّل الدخول.",
+    "signOut": "تسجيل الخروج"
+  },
+  "Dashboard": {
+    "kicker": "لوحة التحكم",
+    "welcome": "مرحبًا بعودتك",
+    "welcomeNamed": "مرحبًا، {name}",
+    "emailLabel": "البريد الإلكتروني",
+    "roleLabel": "الدور",
+    "tenantLabel": "المستأجر",
+    "noTenant": "بلا مستأجر (على مستوى المنصّة)",
+    "role_super_admin": "مدير عام",
+    "role_workshop": "ورشة",
+    "role_client": "عميل",
+    "tenantType_workshop": "ورشة",
+    "tenantType_client": "عميل",
+    "note": "هذا هو سياق حسابك، يُقرأ مباشرةً عبر أمان مستوى الصفوف. ستصل لوحات التحكم الخاصة بكل دور في مرحلة لاحقة."
   }
 }

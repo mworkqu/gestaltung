@@ -71,10 +71,28 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   - Contact form (components/contact-form.tsx, client) submits → logs to console + success state. No backend yet.
   - Header nav links to the real pages. Store is intentionally deferred from the nav until Stage 8
     (e-commerce). "Get a quote" / "Upload a file" route to /contact for now (real upload arrives in Stage 6).
+- Stage 4 (Supabase auth + roles + multi-tenant RLS): DONE (code) — needs the SQL migration run once in Supabase.
+  - @supabase/ssr wiring: browser client (lib/supabase/client.ts), server client (lib/supabase/server.ts),
+    and middleware session refresh (lib/supabase/middleware.ts updateSession) that COMPOSES with next-intl —
+    root middleware.ts runs the intl middleware first, then augments that same response with refreshed auth
+    cookies, so /[locale] routing + EN/AR switcher are untouched. Middleware no-ops if Supabase env is missing.
+  - Schema + RLS in supabase/migrations/0001_auth_roles_rls.sql (RUN THIS in the Supabase SQL editor):
+    tenants (type workshop|client), profiles (id->auth.users, role super_admin|workshop|client, tenant_id,
+    full_name, locale), handle_new_user trigger auto-creates a profile (default role 'client'). RLS enabled on
+    both tables with explicit select/insert/update/delete policies: super_admin sees ALL, workshop/client see
+    ONLY their own tenant_id. Recursion avoided via SECURITY DEFINER helpers is_super_admin() /
+    current_user_role() / current_user_tenant_id() (search_path='').
+  - First super_admin = sign up, then: update public.profiles set role='super_admin', tenant_id=null where
+    id=(select id from auth.users where email='...').
+  - Bilingual auth UI under app/[locale]: sign-in, sign-up, sign-out (components/auth/*), azure/neu themed,
+    strings in messages/{en,ar}.json (Auth + Dashboard namespaces). Header has a Sign in link.
+  - Protected app/[locale]/dashboard (force-dynamic) shows email/role/tenant via lib/auth/get-session.ts;
+    redirects anon → /[locale]/sign-in. Role-aware redirect helper lib/auth/redirects.ts (locale-agnostic
+    path; all roles → /dashboard for now). Role-specific dashboards deliberately NOT built yet.
+  - tsconfig.json now excludes "Design that I like" (a gitignored reference Vite app that broke local typecheck).
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
-  Stage 4 = Supabase auth + roles (super_admin/workshop/client) + RLS multi-tenant isolation (needs a Supabase
-  project + env vars from the owner); then 5 inventory, 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
+  Stage 5 inventory, 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.
   - HOSTING ENV NOTE for Stage 4: add the Supabase env vars in Vercel (Project → Settings → Environment
     Variables) for ALL THREE scopes (Production / Preview / Development): NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY (browser-safe), and the server-only SUPABASE_SERVICE_ROLE_KEY
