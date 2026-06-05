@@ -119,13 +119,13 @@ export default async function HowItWorksPage({
         <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
           <div className="relative space-y-2">
-            <span className={mono("text-[10px] text-white/45")}>{t("panelTag")}</span>
+            <span className={mono("text-[10px] text-white/45")}>{tHome("ctaTag")}</span>
             <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-              {t("ctaText")}
+              {tHome("ctaHeading")}
             </h2>
           </div>
           <Button asChild size="lg" variant="secondary" className="relative rounded-full px-7">
-            <Link href="/contact">{t("ctaButton")}</Link>
+            <Link href="/contact">{tHome("ctaButton")}</Link>
           </Button>
         </div>
       </section>
