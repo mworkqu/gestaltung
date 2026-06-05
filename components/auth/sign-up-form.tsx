@@ -8,6 +8,7 @@ import { useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
+import { PhoneInput } from "@/components/phone-input";
 import { cn } from "@/lib/utils";
 
 export function SignUpForm() {
@@ -116,17 +117,7 @@ export function SignUpForm() {
           <label htmlFor="phone" className={mono("block text-[10px] text-mutedtext")}>
             {t("phoneLabel")}
           </label>
-          <input
-            id="phone"
-            name="phone"
-            type="tel"
-            required
-            dir="ltr"
-            inputMode="tel"
-            autoComplete="tel"
-            placeholder={t("phonePlaceholder")}
-            className={cn(authFieldClass, isRtl && "text-right")}
-          />
+          <PhoneInput id="phone" name="phone" placeholder={t("phonePlaceholder")} />
         </div>
 
         <div className="space-y-2">

@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { PhoneInput } from "@/components/phone-input";
 import { cn } from "@/lib/utils";
 
 // Recessed "well" inputs. Uses the shadow-neu-inset utility (not the .neu-inset
@@ -87,17 +88,7 @@ export function ContactForm() {
         <label htmlFor="phone" className={mono("block text-[10px] text-mutedtext")}>
           {t("whatsappLabel")}
         </label>
-        <input
-          id="phone"
-          name="phone"
-          type="tel"
-          required
-          dir="ltr"
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder={t("whatsappPlaceholder")}
-          className={cn(fieldClass, isRtl && "text-right")}
-        />
+        <PhoneInput id="phone" name="phone" placeholder={t("whatsappPlaceholder")} />
         <p className="text-[11px] leading-snug text-faint">{t("whatsappNote")}</p>
       </div>
 
