@@ -71,7 +71,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   - Contact form (components/contact-form.tsx, client) submits → logs to console + success state. No backend yet.
   - Header nav links to the real pages. Store is intentionally deferred from the nav until Stage 8
     (e-commerce). "Get a quote" / "Upload a file" route to /contact for now (real upload arrives in Stage 6).
-- Stage 4 (Supabase auth + roles + multi-tenant RLS): DONE (code) — needs the SQL migration run once in Supabase.
+- Stage 4 (Supabase auth + roles + multi-tenant RLS): DONE and verified live (migrations 0001–0003 run; Supabase
+  project jgwuafubtmpaonsznfyw, new sb_publishable_ key format; Vercel env set Production + Development).
   - @supabase/ssr wiring: browser client (lib/supabase/client.ts), server client (lib/supabase/server.ts),
     and middleware session refresh (lib/supabase/middleware.ts updateSession) that COMPOSES with next-intl —
     root middleware.ts runs the intl middleware first, then augments that same response with refreshed auth
@@ -100,7 +101,7 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     Owner picked the 100%-free path (no SMS/WhatsApp provider) — phone is stored now, reserved for future use
     as a confirmation channel or alternative login. NOT written to auth.users.phone (that triggers paid phone
     auth). RUN 0003 in Supabase after 0001. Phone/WhatsApp OTP deferred (costs per-message; revisit later).
-- Stage 5 (multi-tenant inventory): DONE (code) — needs SQL migration 0004 run once in Supabase.
+- Stage 5 (multi-tenant inventory): DONE and verified live (migration 0004 run in Supabase 2026-06-05).
   - supabase/migrations/0004_inventory_items.sql: inventory_items (tenant_id NOT NULL FK, sku, name,
     description, category, quantity, unit, unit_price, low_stock_threshold, created_at, updated_at).
     set_updated_at trigger; inventory_default_tenant trigger forces tenant_id to caller's tenant when omitted.
