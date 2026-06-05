@@ -22,7 +22,7 @@ export async function getSessionContext(): Promise<SessionContext | null> {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, role, tenant_id, full_name, locale, created_at")
+    .select("id, role, tenant_id, full_name, phone, locale, created_at")
     .eq("id", user.id)
     .single<Profile>();
 

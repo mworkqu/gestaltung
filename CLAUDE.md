@@ -95,6 +95,11 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     (components/contact-form.tsx) now inserts to Supabase via the browser client instead of console.logging.
     WhatsApp number is the REQUIRED primary contact channel (owner: WhatsApp is the main medium, not email);
     email is optional. Copy is WhatsApp-first in en+ar. RUN 0002 in Supabase after 0001.
+  - Account phone number (supabase/migrations/0003_profiles_phone.sql): profiles.phone column; sign-up form
+    collects a required phone (handle_new_user trigger copies it from metadata); shown on the dashboard.
+    Owner picked the 100%-free path (no SMS/WhatsApp provider) — phone is stored now, reserved for future use
+    as a confirmation channel or alternative login. NOT written to auth.users.phone (that triggers paid phone
+    auth). RUN 0003 in Supabase after 0001. Phone/WhatsApp OTP deferred (costs per-message; revisit later).
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
   Stage 5 inventory, 6 manufacturing flow, 7 admin dashboard, 8 e-commerce, 9 AI.

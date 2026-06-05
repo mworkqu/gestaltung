@@ -16,6 +16,7 @@ export type Profile = {
   role: Role;
   tenant_id: string | null;
   full_name: string | null;
+  phone: string | null;
   locale: string;
   created_at: string;
 };

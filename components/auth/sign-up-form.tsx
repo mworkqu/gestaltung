@@ -30,16 +30,17 @@ export function SignUpForm() {
 
     const data = new FormData(e.currentTarget);
     const fullName = String(data.get("fullName"));
+    const phone = String(data.get("phone")).trim();
     const email = String(data.get("email"));
     const password = String(data.get("password"));
 
     const supabase = createClient();
-    // full_name + locale go into user metadata; the handle_new_user() trigger
-    // copies them into the auto-created profiles row.
+    // full_name + phone + locale go into user metadata; the handle_new_user()
+    // trigger copies them into the auto-created profiles row.
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, locale } },
+      options: { data: { full_name: fullName, phone, locale } },
     });
 
     if (signUpError) {
@@ -108,6 +109,23 @@ export function SignUpForm() {
             autoComplete="name"
             placeholder={t("namePlaceholder")}
             className={authFieldClass}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="phone" className={mono("block text-[10px] text-mutedtext")}>
+            {t("phoneLabel")}
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            required
+            dir="ltr"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder={t("phonePlaceholder")}
+            className={cn(authFieldClass, isRtl && "text-right")}
           />
         </div>
 
