@@ -33,6 +33,40 @@ export function nextStatus(current: string): string | null {
   return i >= 0 && i < STATUS_CHAIN.length - 1 ? STATUS_CHAIN[i + 1] : null;
 }
 
+// A job is locked from variations once it's delivered or cancelled.
+export const VARY_LOCKED_STATUSES = ["delivered", "cancelled"] as const;
+
+// Whether a caller may edit ("vary") a job. Shared by the detail page, the edit
+// page, and the server actions so the rule lives in one place:
+//   client      -> own job, only while still 'submitted' (pre-approval)
+//   workshop    -> its assigned job (incl. its own internal jobs), any non-terminal status
+//   super_admin -> any non-terminal job
+export function canVaryJob(opts: {
+  role: string;
+  tenantId: string | null;
+  job: {
+    status: string;
+    client_tenant_id: string;
+    assigned_workshop_tenant_id: string | null;
+    job_source?: string;
+  };
+}): boolean {
+  const { role, tenantId, job } = opts;
+  if ((VARY_LOCKED_STATUSES as readonly string[]).includes(job.status)) return false;
+  if (role === "super_admin") return true;
+  if (
+    role === "client" &&
+    job.client_tenant_id === tenantId &&
+    job.status === "submitted"
+  ) {
+    return true;
+  }
+  if (role === "workshop" && job.assigned_workshop_tenant_id === tenantId) {
+    return true;
+  }
+  return false;
+}
+
 export const FILE_EXTS = ["stl", "step", "dxf", "iges"] as const;
 export type NormalizedExt = (typeof FILE_EXTS)[number];
 

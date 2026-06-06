@@ -85,6 +85,20 @@ export type JobEvent = {
   created_at: string;
 };
 
+// One changed field in a variation. `field` is a job column key
+// (title | method | material | quantity | notes | parts); `from`/`to` are the
+// display strings before and after the change.
+export type JobVariationChange = { field: string; from: string; to: string };
+
+export type JobVariation = {
+  id: string;
+  job_id: string;
+  changed_by: string | null;
+  changed_by_role: string | null;
+  changes: JobVariationChange[];
+  created_at: string;
+};
+
 export type InventoryItem = {
   id: string;
   tenant_id: string;

@@ -5,8 +5,13 @@ import { ArrowLeft, Download, FileBox, Pencil } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
-import { CAD_BUCKET } from "@/lib/jobs/constants";
-import type { Job, JobFile, JobEvent } from "@/lib/supabase/types";
+import { CAD_BUCKET, canVaryJob } from "@/lib/jobs/constants";
+import type {
+  Job,
+  JobFile,
+  JobEvent,
+  JobVariation,
+} from "@/lib/supabase/types";
 import { JobActions } from "@/components/jobs/job-actions";
 import { WorkshopJobPanel } from "@/components/jobs/workshop-job-panel";
 import { cn } from "@/lib/utils";
@@ -40,21 +45,28 @@ export default async function JobDetailPage({
     .single<Job>();
   if (!job) notFound();
 
-  // Fetch files, events in parallel.
-  const [{ data: fileRows }, { data: eventRows }] = await Promise.all([
-    supabase
-      .from("job_files")
-      .select("*")
-      .eq("job_id", id)
-      .order("uploaded_at", { ascending: true }),
-    supabase
-      .from("job_events")
-      .select("*")
-      .eq("job_id", id)
-      .order("created_at", { ascending: true }),
-  ]);
+  // Fetch files, events, and variations in parallel.
+  const [{ data: fileRows }, { data: eventRows }, { data: variationRows }] =
+    await Promise.all([
+      supabase
+        .from("job_files")
+        .select("*")
+        .eq("job_id", id)
+        .order("uploaded_at", { ascending: true }),
+      supabase
+        .from("job_events")
+        .select("*")
+        .eq("job_id", id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("job_variations")
+        .select("*")
+        .eq("job_id", id)
+        .order("created_at", { ascending: true }),
+    ]);
   const files = (fileRows ?? []) as JobFile[];
   const events = (eventRows ?? []) as JobEvent[];
+  const variations = (variationRows ?? []) as JobVariation[];
 
   const role = session.profile.role;
   const myTenant = session.profile.tenant_id;
@@ -160,7 +172,9 @@ export default async function JobDetailPage({
   });
 
   const isInternal = job.job_source === "internal";
-  const canEdit = isOwnerClient && job.status === "submitted" && !isInternal;
+  // Who may "vary" (edit) this job: client while submitted, assigned workshop on
+  // any non-terminal status, super_admin always. Shared with the edit page.
+  const canEdit = canVaryJob({ role, tenantId: myTenant, job });
 
   const rows: { label: string; value: string }[] = [
     { label: t("methodLabel"), value: t(`method_${job.method}`) },
@@ -179,6 +193,47 @@ export default async function JobDetailPage({
       : []),
     { label: t("createdLabel"), value: dateFmt.format(new Date(job.created_at)) },
   ];
+
+  // Field labels + value formatting for variation entries.
+  const fieldLabel = (f: string) => {
+    switch (f) {
+      case "title":
+        return t("titleLabel");
+      case "method":
+        return t("methodLabel");
+      case "material":
+        return t("materialLabel");
+      case "quantity":
+        return t("quantityLabel");
+      case "notes":
+        return t("notesLabel");
+      case "parts":
+        return t("partsLabel");
+      default:
+        return f;
+    }
+  };
+  const fieldValue = (f: string, v: string) => {
+    if (!v) return "—";
+    if (f === "method") return t(`method_${v}` as Parameters<typeof t>[0]);
+    return v;
+  };
+
+  // Merge status events + variations into one chronological trail.
+  const timeline = [
+    ...events.map((e) => ({
+      kind: "status" as const,
+      id: e.id,
+      at: e.created_at,
+      to: e.to_status,
+    })),
+    ...variations.map((v) => ({
+      kind: "variation" as const,
+      id: v.id,
+      at: v.created_at,
+      changes: v.changes,
+    })),
+  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -322,19 +377,41 @@ export default async function JobDetailPage({
       <div className="mt-6">
         <p className={mono("text-[10px] text-azure")}>{t("timelineTitle")}</p>
         <ol className="mt-3 space-y-3">
-          {events.map((ev) => (
-            <li key={ev.id} className="flex items-start gap-3">
-              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cobalt" />
-              <div>
-                <p className="text-sm font-medium text-heading">
-                  {t(`status_${ev.to_status}`)}
-                </p>
-                <p className="text-[11px] text-mutedtext">
-                  {dateFmt.format(new Date(ev.created_at))}
-                </p>
-              </div>
-            </li>
-          ))}
+          {timeline.map((item) =>
+            item.kind === "status" ? (
+              <li key={item.id} className="flex items-start gap-3">
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cobalt" />
+                <div>
+                  <p className="text-sm font-medium text-heading">
+                    {t(`status_${item.to}`)}
+                  </p>
+                  <p className="text-[11px] text-mutedtext">
+                    {dateFmt.format(new Date(item.at))}
+                  </p>
+                </div>
+              </li>
+            ) : (
+              <li key={item.id} className="flex items-start gap-3">
+                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                <div>
+                  <p className="text-sm font-medium text-heading">
+                    {t("variationLabel")}
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {item.changes.map((c, i) => (
+                      <li key={i} className="text-xs text-body" dir={isRtl ? "rtl" : "ltr"}>
+                        <span className="text-mutedtext">{fieldLabel(c.field)}:</span>{" "}
+                        {fieldValue(c.field, c.from)} → {fieldValue(c.field, c.to)}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-[11px] text-mutedtext">
+                    {dateFmt.format(new Date(item.at))}
+                  </p>
+                </div>
+              </li>
+            )
+          )}
         </ol>
       </div>
     </div>

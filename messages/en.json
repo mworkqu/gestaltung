@@ -282,6 +282,8 @@
     "editTitle": "Edit Job",
     "editSubmit": "Save changes",
     "editOnlySubmitted": "Only submitted jobs can be edited.",
+    "editLocked": "This job can no longer be edited.",
+    "variationLabel": "Variation",
     "statusLabel": "Status",
     "createdLabel": "Created",
     "filesTitle": "Files",
@@ -341,6 +343,7 @@
     "error_assign": "Could not assign the workshop. Please try again.",
     "error_transition": "That status change isn't allowed.",
     "error_bom_invalid": "Pick an item and a quantity greater than zero.",
+    "error_locked": "This job can no longer be edited.",
     "error_unknown": "Something went wrong. Please try again."
   }
 }

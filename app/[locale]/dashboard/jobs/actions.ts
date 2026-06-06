@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
-import { JOB_METHODS, FILE_EXTS, JOB_STATUSES } from "@/lib/jobs/constants";
+import {
+  JOB_METHODS,
+  FILE_EXTS,
+  JOB_STATUSES,
+  canVaryJob,
+} from "@/lib/jobs/constants";
+import type { Job, JobPart, JobVariationChange } from "@/lib/supabase/types";
 
 export type CreateJobInput = {
   locale: string;
@@ -308,7 +314,36 @@ export async function startJob(input: {
   return { ok: true };
 }
 
-// Edit a submitted job (client only; status must be 'submitted').
+// ---- Stage 7b: variations (editing a job after creation) -------------------
+
+// Render a parts list as a short, stable string for the variation trail.
+function partsToText(parts: JobPart[] | null | undefined): string {
+  const list = (parts ?? []).filter((p) => p && p.name);
+  if (!list.length) return "—";
+  return list.map((p) => `${p.name} ×${p.quantity} ${p.unit}`).join(", ");
+}
+
+// Append a variation row for the given field changes (no-op when nothing changed).
+async function logVariation(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  jobId: string,
+  changedBy: string | null,
+  changedByRole: string,
+  changes: JobVariationChange[]
+) {
+  if (!changes.length) return;
+  await supabase.from("job_variations").insert({
+    job_id: jobId,
+    changed_by: changedBy,
+    changed_by_role: changedByRole,
+    changes,
+  });
+}
+
+// Edit ("vary") a client-style job's spec. Permission per canVaryJob:
+// the owner client may edit only while 'submitted'; the assigned workshop or
+// super_admin may edit any non-delivered/cancelled job. Records a field-level
+// before->after trail.
 export async function updateJob(input: {
   locale: string;
   jobId: string;
@@ -324,7 +359,18 @@ export async function updateJob(input: {
     createClient(),
   ]);
   if (!session) return { error: "error_unknown" };
-  if (session.profile.role !== "client") return { error: "error_not_client" };
+
+  // Load current state (RLS scopes visibility) for the permission check + diff.
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("*")
+    .eq("id", input.jobId)
+    .single<Job>();
+  if (!job) return { error: "error_unknown" };
+
+  const role = session.profile.role;
+  const tenantId = session.profile.tenant_id;
+  if (!canVaryJob({ role, tenantId, job })) return { error: "error_locked" };
 
   const title = input.title?.trim();
   const material = input.material?.trim() || null;
@@ -335,14 +381,95 @@ export async function updateJob(input: {
   if (!(JOB_METHODS as readonly string[]).includes(input.method)) return { error: "error_method" };
   if (!Number.isInteger(quantity) || quantity < 1) return { error: "error_quantity" };
 
-  // RLS ensures the client owns this job; only update while still 'submitted'.
+  const changes: JobVariationChange[] = [];
+  if (job.title !== title) changes.push({ field: "title", from: job.title, to: title });
+  if (job.method !== input.method)
+    changes.push({ field: "method", from: job.method, to: input.method });
+  if ((job.material ?? "") !== (material ?? ""))
+    changes.push({ field: "material", from: job.material ?? "", to: material ?? "" });
+  if (Number(job.quantity) !== quantity)
+    changes.push({ field: "quantity", from: String(job.quantity), to: String(quantity) });
+  if ((job.notes ?? "") !== (notes ?? ""))
+    changes.push({ field: "notes", from: job.notes ?? "", to: notes ?? "" });
+
+  // RLS + the status trigger allow the edit; .eq("status", job.status) is an
+  // optimistic guard so a concurrent status move quietly rejects a stale edit.
   const { error } = await supabase
     .from("jobs")
     .update({ title, material, notes, method: input.method, quantity })
     .eq("id", input.jobId)
-    .eq("status", "submitted");
+    .eq("status", job.status);
 
   if (error) return { error: "error_unknown" };
+
+  await logVariation(supabase, input.jobId, session.profile.id, role, changes);
+
+  revalidatePath(`/${locale}/dashboard/jobs`);
+  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  return { ok: true };
+}
+
+// Edit ("vary") an internal (workshop-owned) job: title, method, notes, parts.
+export async function updateInternalJob(input: {
+  locale: string;
+  jobId: string;
+  title: string;
+  notes: string;
+  method: string;
+  parts: { name: string; quantity: number; unit: string }[];
+}): Promise<ActionResult> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
+
+  const { data: job } = await supabase
+    .from("jobs")
+    .select("*")
+    .eq("id", input.jobId)
+    .single<Job>();
+  if (!job) return { error: "error_unknown" };
+  if (job.job_source !== "internal") return { error: "error_unknown" };
+
+  const role = session.profile.role;
+  const tenantId = session.profile.tenant_id;
+  if (!canVaryJob({ role, tenantId, job })) return { error: "error_locked" };
+
+  const title = input.title?.trim();
+  const notes = input.notes?.trim() || null;
+  if (!title) return { error: "error_required" };
+  if (!(JOB_METHODS as readonly string[]).includes(input.method)) return { error: "error_method" };
+
+  const parts: JobPart[] = (input.parts ?? [])
+    .map((p) => ({
+      name: String(p.name ?? "").trim(),
+      quantity: Number(p.quantity),
+      unit: String(p.unit ?? "").trim() || "pcs",
+    }))
+    .filter((p) => p.name && Number.isFinite(p.quantity) && p.quantity > 0);
+
+  const changes: JobVariationChange[] = [];
+  if (job.title !== title) changes.push({ field: "title", from: job.title, to: title });
+  if (job.method !== input.method)
+    changes.push({ field: "method", from: job.method, to: input.method });
+  if ((job.notes ?? "") !== (notes ?? ""))
+    changes.push({ field: "notes", from: job.notes ?? "", to: notes ?? "" });
+  const oldParts = partsToText(job.parts);
+  const newParts = partsToText(parts);
+  if (oldParts !== newParts)
+    changes.push({ field: "parts", from: oldParts, to: newParts });
+
+  const { error } = await supabase
+    .from("jobs")
+    .update({ title, notes, method: input.method, parts: parts.length ? parts : null })
+    .eq("id", input.jobId)
+    .eq("status", job.status);
+
+  if (error) return { error: "error_unknown" };
+
+  await logVariation(supabase, input.jobId, session.profile.id, role, changes);
 
   revalidatePath(`/${locale}/dashboard/jobs`);
   revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
