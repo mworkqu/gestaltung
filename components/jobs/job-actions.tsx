@@ -53,7 +53,10 @@ export function JobActions({
   }
 
   const next = nextStatus(status);
-  const showWorkshopAdvance = isAssignedWorkshop && next !== null;
+  // 'submitted' -> 'quoted' is handled by the BOM / Start Job panel (it also
+  // deducts stock), so the plain advance starts from 'quoted' onward.
+  const showWorkshopAdvance =
+    isAssignedWorkshop && next !== null && status !== "submitted";
   const showClientCancel =
     isOwnerClient && status === "submitted" && !assignedWorkshopTenantId;
 

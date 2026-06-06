@@ -37,6 +37,10 @@ export type JobStatus =
 
 export type FileExt = "stl" | "step" | "dxf" | "iges";
 
+export type JobSource = "client" | "internal";
+
+export type JobPart = { name: string; quantity: number; unit: string };
+
 export type Job = {
   id: string;
   client_tenant_id: string;
@@ -47,8 +51,18 @@ export type Job = {
   quantity: number;
   method: JobMethod;
   status: JobStatus;
+  job_source: JobSource;
+  parts: JobPart[] | null;
   created_at: string;
   updated_at: string;
+};
+
+export type JobBomRow = {
+  id: string;
+  job_id: string;
+  inventory_item_id: string;
+  quantity_needed: number;
+  created_at: string;
 };
 
 export type JobFile = {

@@ -25,9 +25,14 @@ export default async function DashboardLayout({
   }
 
   const t = await getTranslations("DashboardNav");
+  const isClient = session.profile.role === "client";
   const navItems = [
     { href: "/dashboard", label: t("overview") },
-    { href: "/dashboard/inventory", label: t("inventory") },
+    // Inventory is hidden from clients in the UI (their table stays in the DB,
+    // reserved for future use); workshops + super_admin keep it.
+    ...(isClient
+      ? []
+      : [{ href: "/dashboard/inventory", label: t("inventory") }]),
     { href: "/dashboard/jobs", label: t("jobs") },
   ];
 

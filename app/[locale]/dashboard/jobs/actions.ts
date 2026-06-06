@@ -154,3 +154,160 @@ export async function changeStatus(input: {
   revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
   return { ok: true };
 }
+
+// ---- Stage 7: internal jobs + BOM + Start Job ------------------------------
+
+export async function createInternalJob(input: {
+  locale: string;
+  title: string;
+  notes: string;
+  method: string;
+  parts: { name: string; quantity: number; unit: string }[];
+}): Promise<{ error?: string; jobId?: string }> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const t = await getTranslations({ locale, namespace: "Jobs" });
+
+  const session = await getSessionContext();
+  if (!session) return { error: t("error_unknown") };
+  if (session.profile.role !== "workshop" || !session.profile.tenant_id) {
+    return { error: t("error_not_workshop") };
+  }
+  const tenantId = session.profile.tenant_id;
+
+  const title = input.title?.trim();
+  if (!title) return { error: t("error_required") };
+  if (!(JOB_METHODS as readonly string[]).includes(input.method)) {
+    return { error: t("error_method") };
+  }
+
+  // Keep only well-formed part rows.
+  const parts = (input.parts ?? [])
+    .map((p) => ({
+      name: String(p.name ?? "").trim(),
+      quantity: Number(p.quantity),
+      unit: String(p.unit ?? "").trim() || "pcs",
+    }))
+    .filter((p) => p.name && Number.isFinite(p.quantity) && p.quantity > 0);
+
+  const supabase = await createClient();
+  // Internal job: client + assigned workshop are both this tenant, so the
+  // workshop can advance it via the status-transition trigger.
+  const { data: job, error } = await supabase
+    .from("jobs")
+    .insert({
+      client_tenant_id: tenantId,
+      assigned_workshop_tenant_id: tenantId,
+      job_source: "internal",
+      title,
+      notes: input.notes?.trim() || null,
+      method: input.method,
+      quantity: 1,
+      parts: parts.length ? parts : null,
+    })
+    .select("id")
+    .single();
+
+  if (error || !job) return { error: t("error_unknown") };
+
+  revalidatePath(`/${locale}/dashboard/jobs`);
+  return { jobId: job.id };
+}
+
+export async function addBomRow(input: {
+  locale: string;
+  jobId: string;
+  inventoryItemId: string;
+  quantityNeeded: number;
+}): Promise<ActionResult> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const t = await getTranslations({ locale, namespace: "Jobs" });
+
+  const session = await getSessionContext();
+  if (!session) return { error: t("error_unknown") };
+
+  const qty = Number(input.quantityNeeded);
+  if (!input.inventoryItemId || !Number.isFinite(qty) || qty <= 0) {
+    return { error: t("error_bom_invalid") };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("job_bom").insert({
+    job_id: input.jobId,
+    inventory_item_id: input.inventoryItemId,
+    quantity_needed: qty,
+  });
+  if (error) return { error: t("error_unknown") };
+
+  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  return { ok: true };
+}
+
+export async function deleteBomRow(input: {
+  locale: string;
+  jobId: string;
+  bomId: string;
+}): Promise<ActionResult> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const session = await getSessionContext();
+  if (!session) return { error: "unauthorized" };
+
+  const supabase = await createClient();
+  await supabase.from("job_bom").delete().eq("id", input.bomId);
+  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  return { ok: true };
+}
+
+// Deducts BOM quantities from inventory (floored at 0) then advances the job
+// from 'submitted' to the first workshop step ('quoted'). All RLS-enforced.
+export async function startJob(input: {
+  locale: string;
+  jobId: string;
+}): Promise<ActionResult> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const t = await getTranslations({ locale, namespace: "Jobs" });
+
+  const session = await getSessionContext();
+  if (!session) return { error: t("error_unknown") };
+
+  const supabase = await createClient();
+
+  // Pull the BOM with each item's current stock (RLS scopes both).
+  const { data: bom } = await supabase
+    .from("job_bom")
+    .select("quantity_needed, inventory_item_id, inventory_items(quantity)")
+    .eq("job_id", input.jobId);
+
+  for (const raw of (bom ?? []) as unknown[]) {
+    const row = raw as {
+      quantity_needed: number;
+      inventory_item_id: string;
+      inventory_items:
+        | { quantity: number }
+        | { quantity: number }[]
+        | null;
+    };
+    const item = Array.isArray(row.inventory_items)
+      ? row.inventory_items[0] ?? null
+      : row.inventory_items;
+    if (!item) continue; // not the caller's item / not visible — skip
+    const current = Number(item.quantity) || 0;
+    const needed = Number(row.quantity_needed);
+    const next = Math.max(0, current - needed);
+    await supabase
+      .from("inventory_items")
+      .update({ quantity: next })
+      .eq("id", row.inventory_item_id);
+  }
+
+  // Advance submitted -> quoted (the transition trigger validates the role).
+  const { error } = await supabase
+    .from("jobs")
+    .update({ status: "quoted" })
+    .eq("id", input.jobId)
+    .eq("status", "submitted");
+  if (error) return { error: t("error_transition") };
+
+  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${locale}/dashboard/inventory`);
+  return { ok: true };
+}

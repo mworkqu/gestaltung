@@ -148,9 +148,31 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     (RLS + trigger enforce; no service-role). lib/jobs/constants.ts has JOB_STATUSES/STATUS_CHAIN/nextStatus().
   - Jobs namespace extended (en+ar) with the new status labels + assignment/override/advance/cancel/timeline/filter
     strings. JobStatus type + JobEvent type added.
+- Stage 7 (workshop jobs, internal jobs, BOM + inventory deduction): DONE (code) — needs migration 0007 run.
+  - Part 1: Inventory nav link hidden from clients (filtered in app/[locale]/dashboard/layout.tsx by role; the
+    inventory table/route stays in the DB for clients, just not shown).
+  - Part 2: jobs list usable for workshops — Client column shown for workshop+super_admin via the new
+    accessible_client_tenants() SECURITY DEFINER RPC (a workshop can't read other tenants directly); status
+    advance controls already work for the assigned workshop.
+  - Part 3: workshop internal jobs. supabase/migrations/0007_internal_jobs.sql adds jobs.job_source
+    (client|internal, default client) + jobs.parts jsonb ([{name,quantity,unit}]). Internal jobs are inserted with
+    client_tenant_id = assigned_workshop_tenant_id = the workshop's tenant (self-assigned) so the existing
+    jobs_insert policy + jobs_status_transition trigger let the workshop create and advance them. "New internal
+    job" button + form (components/jobs/internal-job-form.tsx, app/.../jobs/new-internal). Internal/Client badge
+    in the list + detail (source_internal/source_client labels).
+  - Part 4: BOM + stock deduction. 0007 also: alters inventory_items.quantity to numeric(12,2) so fractional
+    deductions don't truncate; new job_bom table (job_id FK, inventory_item_id FK, quantity_needed numeric) with
+    RLS gated by can_access_job(). Job detail shows a Bill of Materials panel for the assigned workshop
+    (components/jobs/workshop-job-panel.tsx): add/remove rows picking from their own inventory, per-row current
+    stock with a red under-stock flag, and a Start Job button (submitted→quoted) with an insufficient-stock
+    warning banner. Start Job (startJob server action) deducts quantity_needed from inventory_items.quantity
+    (floored at 0) then advances status — all via the RLS server client, no service-role. The plain workshop
+    "advance" in job-actions.tsx now starts from 'quoted' (submitted→quoted is the BOM/Start Job step).
+  - Server actions added to jobs/actions.ts: createInternalJob, addBomRow, deleteBomRow, startJob. New types
+    JobSource/JobPart/JobBomRow. Jobs namespace extended (en+ar) with internal-job + BOM strings. RUN 0007 after 0006.
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
-  Stage 7 admin dashboard, 8 e-commerce, 9 AI. 4 stages remain (6–9).
+  Stage 8 e-commerce, 9 AI (admin analytics dashboard may slot in too). 4 stages remain (6–9).
   - STAGE 6 IS SPLIT into two passes (decided 2026-06-05; biggest jump so far — private file storage + a
     stateful 3-role workflow). Build 6a fully (incl. migration run + test) before starting 6b. The two
     Claude Code prompts live in the project root as STAGE_6A_PROMPT.md and STAGE_6B_PROMPT.md.
