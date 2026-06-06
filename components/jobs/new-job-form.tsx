@@ -122,7 +122,7 @@ export function NewJobForm({ tenantId }: { tenantId: string }) {
       });
 
       if (res.error) {
-        setError(res.error);
+        setError(t(res.error as Parameters<typeof t>[0]));
         setLoading(false);
         return;
       }

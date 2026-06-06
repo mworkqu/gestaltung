@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowLeft, Download, FileBox } from "lucide-react";
+import { ArrowLeft, Download, FileBox, Pencil } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
@@ -21,15 +21,16 @@ export default async function JobDetailPage({
   const { locale, id } = await params;
   setRequestLocale(locale);
 
-  const session = await getSessionContext();
+  const [session, t, supabase] = await Promise.all([
+    getSessionContext(),
+    getTranslations("Jobs"),
+    createClient(),
+  ]);
   if (!session) redirect(`/${locale}/sign-in`);
 
-  const t = await getTranslations("Jobs");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-
-  const supabase = await createClient();
 
   // RLS: only the owner client, the assigned workshop, or super_admin loads it.
   const { data: job } = await supabase
@@ -39,27 +40,20 @@ export default async function JobDetailPage({
     .single<Job>();
   if (!job) notFound();
 
-  const { data: fileRows } = await supabase
-    .from("job_files")
-    .select("*")
-    .eq("job_id", id)
-    .order("uploaded_at", { ascending: true });
+  // Fetch files, events in parallel.
+  const [{ data: fileRows }, { data: eventRows }] = await Promise.all([
+    supabase
+      .from("job_files")
+      .select("*")
+      .eq("job_id", id)
+      .order("uploaded_at", { ascending: true }),
+    supabase
+      .from("job_events")
+      .select("*")
+      .eq("job_id", id)
+      .order("created_at", { ascending: true }),
+  ]);
   const files = (fileRows ?? []) as JobFile[];
-
-  const filesWithUrls = await Promise.all(
-    files.map(async (f) => {
-      const { data } = await supabase.storage
-        .from(CAD_BUCKET)
-        .createSignedUrl(f.storage_path, 60);
-      return { ...f, url: data?.signedUrl ?? null };
-    })
-  );
-
-  const { data: eventRows } = await supabase
-    .from("job_events")
-    .select("*")
-    .eq("job_id", id)
-    .order("created_at", { ascending: true });
   const events = (eventRows ?? []) as JobEvent[];
 
   const role = session.profile.role;
@@ -69,27 +63,62 @@ export default async function JobDetailPage({
   const isAssignedWorkshop =
     role === "workshop" && job.assigned_workshop_tenant_id === myTenant;
 
-  // super_admin: client name, the workshop picker list, and assigned name.
+  // All role-specific DB work in parallel.
+  const [filesWithUrls, tenantData, workshopClientData, inventoryAndBom] =
+    await Promise.all([
+      // Signed URLs for each file — all in parallel.
+      Promise.all(
+        files.map(async (f) => {
+          const { data } = await supabase.storage
+            .from(CAD_BUCKET)
+            .createSignedUrl(f.storage_path, 60);
+          return { ...f, url: data?.signedUrl ?? null };
+        })
+      ),
+      // super_admin: fetch tenant list.
+      isSuperAdmin
+        ? supabase.from("tenants").select("id, name, type")
+        : Promise.resolve({ data: null }),
+      // assigned workshop: resolve client name via RPC.
+      isAssignedWorkshop
+        ? supabase.rpc("accessible_client_tenants")
+        : Promise.resolve({ data: null }),
+      // assigned workshop: inventory + BOM.
+      isAssignedWorkshop
+        ? Promise.all([
+            supabase
+              .from("inventory_items")
+              .select("id, name, unit, quantity")
+              .order("name", { ascending: true }),
+            supabase
+              .from("job_bom")
+              .select(
+                "id, inventory_item_id, quantity_needed, inventory_items(name, unit, quantity)"
+              )
+              .eq("job_id", id)
+              .order("created_at", { ascending: true }),
+          ])
+        : Promise.resolve([{ data: null }, { data: null }] as const),
+    ]);
+
+  // Resolve tenant names.
   let clientName: string | null = null;
   let workshopTenants: { id: string; name: string }[] = [];
   let assignedName: string | null = null;
-  if (isSuperAdmin) {
-    const { data: tens } = await supabase.from("tenants").select("id, name, type");
-    const all = tens ?? [];
+  if (isSuperAdmin && tenantData.data) {
+    const all = tenantData.data as { id: string; name: string; type: string }[];
     clientName = all.find((x) => x.id === job.client_tenant_id)?.name ?? null;
     workshopTenants = all.filter((x) => x.type === "workshop");
     assignedName =
       all.find((x) => x.id === job.assigned_workshop_tenant_id)?.name ?? null;
-  } else if (isAssignedWorkshop) {
-    // Workshop can't read other tenants directly — resolve the client via RPC.
-    const { data: cn } = await supabase.rpc("accessible_client_tenants");
+  } else if (isAssignedWorkshop && workshopClientData.data) {
     clientName =
-      (cn ?? []).find(
-        (x: { id: string; name: string }) => x.id === job.client_tenant_id
+      (workshopClientData.data as { id: string; name: string }[]).find(
+        (x) => x.id === job.client_tenant_id
       )?.name ?? null;
   }
 
-  // Workshop's own inventory + this job's BOM rows (for the BOM / Start Job panel).
+  // Resolve inventory + BOM for workshop panel.
   let inventoryItems: { id: string; name: string; unit: string; quantity: number }[] = [];
   let bomRows: {
     id: string;
@@ -97,21 +126,13 @@ export default async function JobDetailPage({
     quantity_needed: number;
     item: { name: string; unit: string; quantity: number } | null;
   }[] = [];
-  if (isAssignedWorkshop) {
-    const { data: inv } = await supabase
-      .from("inventory_items")
-      .select("id, name, unit, quantity")
-      .order("name", { ascending: true });
-    inventoryItems = inv ?? [];
-
-    const { data: bom } = await supabase
-      .from("job_bom")
-      .select("id, inventory_item_id, quantity_needed, inventory_items(name, unit, quantity)")
-      .eq("job_id", id)
-      .order("created_at", { ascending: true });
-    // PostgREST returns the to-one embed as an object at runtime, but the
-    // untyped client infers an array — normalize either shape.
-    bomRows = ((bom ?? []) as unknown[]).map((raw) => {
+  if (isAssignedWorkshop && Array.isArray(inventoryAndBom)) {
+    const [invRes, bomRes] = inventoryAndBom as [
+      { data: unknown },
+      { data: unknown },
+    ];
+    inventoryItems = (invRes.data as typeof inventoryItems) ?? [];
+    bomRows = ((bomRes.data ?? []) as unknown[]).map((raw) => {
       const r = raw as {
         id: string;
         inventory_item_id: string;
@@ -139,6 +160,8 @@ export default async function JobDetailPage({
   });
 
   const isInternal = job.job_source === "internal";
+  const canEdit = isOwnerClient && job.status === "submitted" && !isInternal;
+
   const rows: { label: string; value: string }[] = [
     { label: t("methodLabel"), value: t(`method_${job.method}`) },
     { label: t("statusLabel"), value: t(`status_${job.status}`) },
@@ -159,13 +182,25 @@ export default async function JobDetailPage({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link
-        href="/dashboard/jobs"
-        className="inline-flex items-center gap-2 text-sm text-mutedtext transition-colors hover:text-heading"
-      >
-        <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
-        {t("backToList")}
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href="/dashboard/jobs"
+          className="inline-flex items-center gap-2 text-sm text-mutedtext transition-colors hover:text-heading"
+        >
+          <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
+          {t("backToList")}
+        </Link>
+
+        {canEdit && (
+          <Link
+            href={`/dashboard/jobs/${id}/edit`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition hover:text-azure"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            {t("editJob")}
+          </Link>
+        )}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-extrabold text-heading">{job.title}</h1>

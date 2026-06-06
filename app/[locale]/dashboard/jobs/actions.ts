@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getTranslations } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
@@ -26,22 +25,23 @@ export type CreateJobResult = { error?: string; jobId?: string };
 
 // Records the job + its file metadata. Files themselves are uploaded directly to
 // Supabase Storage from the browser (RLS-protected) BEFORE this runs — this keeps
-// large CAD files off the server-action request body while DB writes stay
+// large CAD files off the Vercel server-action 4.5MB body limit; DB writes stay
 // server-side and RLS-enforced. We never touch the service-role key.
 export async function createJob(
   input: CreateJobInput
 ): Promise<CreateJobResult> {
-  const locale = input.locale === "ar" ? "ar" : "en";
-  const t = await getTranslations({ locale, namespace: "Jobs" });
-
-  const session = await getSessionContext();
-  if (!session) return { error: t("error_unknown") };
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
 
   // Stage 6a: only clients (with a tenant) create jobs.
   if (session.profile.role !== "client" || !session.profile.tenant_id) {
-    return { error: t("error_not_client") };
+    return { error: "error_not_client" };
   }
   const tenantId = session.profile.tenant_id;
+  const locale = input.locale === "ar" ? "ar" : "en";
 
   const title = input.title?.trim();
   const material = input.material?.trim() || null;
@@ -49,25 +49,23 @@ export async function createJob(
   const method = input.method;
   const quantity = Number(input.quantity);
 
-  if (!title) return { error: t("error_required") };
+  if (!title) return { error: "error_required" };
   if (!(JOB_METHODS as readonly string[]).includes(method)) {
-    return { error: t("error_method") };
+    return { error: "error_method" };
   }
   if (!Number.isInteger(quantity) || quantity < 1) {
-    return { error: t("error_quantity") };
+    return { error: "error_quantity" };
   }
-  if (!input.files?.length) return { error: t("error_no_files") };
+  if (!input.files?.length) return { error: "error_no_files" };
   for (const f of input.files) {
     if (!(FILE_EXTS as readonly string[]).includes(f.file_ext)) {
-      return { error: t("error_file_type") };
+      return { error: "error_file_type" };
     }
     // Defense-in-depth: the path must live under the caller's own tenant folder.
     if (!f.storage_path.startsWith(`${tenantId}/`)) {
-      return { error: t("error_unknown") };
+      return { error: "error_unknown" };
     }
   }
-
-  const supabase = await createClient();
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -75,7 +73,7 @@ export async function createJob(
     .select("id")
     .single();
 
-  if (jobErr || !job) return { error: t("error_unknown") };
+  if (jobErr || !job) return { error: "error_unknown" };
 
   const rows = input.files.map((f) => ({
     job_id: job.id,
@@ -89,7 +87,7 @@ export async function createJob(
   if (filesErr) {
     // Best-effort cleanup so we don't leave a job with no files.
     await supabase.from("jobs").delete().eq("id", job.id);
-    return { error: t("error_unknown") };
+    return { error: "error_unknown" };
   }
 
   revalidatePath(`/${locale}/dashboard/jobs`);
@@ -106,19 +104,19 @@ export async function assignWorkshop(input: {
   workshopTenantId: string | null;
 }): Promise<ActionResult> {
   const locale = input.locale === "ar" ? "ar" : "en";
-  const t = await getTranslations({ locale, namespace: "Jobs" });
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
+  if (session.profile.role !== "super_admin") return { error: "error_not_admin" };
 
-  const session = await getSessionContext();
-  if (!session) return { error: t("error_unknown") };
-  if (session.profile.role !== "super_admin") return { error: t("error_not_admin") };
-
-  const supabase = await createClient();
   const { error } = await supabase
     .from("jobs")
     .update({ assigned_workshop_tenant_id: input.workshopTenantId || null })
     .eq("id", input.jobId);
 
-  if (error) return { error: t("error_assign") };
+  if (error) return { error: "error_assign" };
 
   revalidatePath(`/${locale}/dashboard/jobs`);
   revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
@@ -134,21 +132,21 @@ export async function changeStatus(input: {
   status: string;
 }): Promise<ActionResult> {
   const locale = input.locale === "ar" ? "ar" : "en";
-  const t = await getTranslations({ locale, namespace: "Jobs" });
-
-  const session = await getSessionContext();
-  if (!session) return { error: t("error_unknown") };
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
   if (!(JOB_STATUSES as readonly string[]).includes(input.status)) {
-    return { error: t("error_transition") };
+    return { error: "error_transition" };
   }
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("jobs")
     .update({ status: input.status })
     .eq("id", input.jobId);
 
-  if (error) return { error: t("error_transition") };
+  if (error) return { error: "error_transition" };
 
   revalidatePath(`/${locale}/dashboard/jobs`);
   revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
@@ -165,19 +163,20 @@ export async function createInternalJob(input: {
   parts: { name: string; quantity: number; unit: string }[];
 }): Promise<{ error?: string; jobId?: string }> {
   const locale = input.locale === "ar" ? "ar" : "en";
-  const t = await getTranslations({ locale, namespace: "Jobs" });
-
-  const session = await getSessionContext();
-  if (!session) return { error: t("error_unknown") };
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
   if (session.profile.role !== "workshop" || !session.profile.tenant_id) {
-    return { error: t("error_not_workshop") };
+    return { error: "error_not_workshop" };
   }
   const tenantId = session.profile.tenant_id;
 
   const title = input.title?.trim();
-  if (!title) return { error: t("error_required") };
+  if (!title) return { error: "error_required" };
   if (!(JOB_METHODS as readonly string[]).includes(input.method)) {
-    return { error: t("error_method") };
+    return { error: "error_method" };
   }
 
   // Keep only well-formed part rows.
@@ -189,7 +188,6 @@ export async function createInternalJob(input: {
     }))
     .filter((p) => p.name && Number.isFinite(p.quantity) && p.quantity > 0);
 
-  const supabase = await createClient();
   // Internal job: client + assigned workshop are both this tenant, so the
   // workshop can advance it via the status-transition trigger.
   const { data: job, error } = await supabase
@@ -207,7 +205,7 @@ export async function createInternalJob(input: {
     .select("id")
     .single();
 
-  if (error || !job) return { error: t("error_unknown") };
+  if (error || !job) return { error: "error_unknown" };
 
   revalidatePath(`/${locale}/dashboard/jobs`);
   return { jobId: job.id };
@@ -219,26 +217,25 @@ export async function addBomRow(input: {
   inventoryItemId: string;
   quantityNeeded: number;
 }): Promise<ActionResult> {
-  const locale = input.locale === "ar" ? "ar" : "en";
-  const t = await getTranslations({ locale, namespace: "Jobs" });
-
-  const session = await getSessionContext();
-  if (!session) return { error: t("error_unknown") };
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
 
   const qty = Number(input.quantityNeeded);
   if (!input.inventoryItemId || !Number.isFinite(qty) || qty <= 0) {
-    return { error: t("error_bom_invalid") };
+    return { error: "error_bom_invalid" };
   }
 
-  const supabase = await createClient();
   const { error } = await supabase.from("job_bom").insert({
     job_id: input.jobId,
     inventory_item_id: input.inventoryItemId,
     quantity_needed: qty,
   });
-  if (error) return { error: t("error_unknown") };
+  if (error) return { error: "error_unknown" };
 
-  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${input.locale}/dashboard/jobs/${input.jobId}`);
   return { ok: true };
 }
 
@@ -247,13 +244,14 @@ export async function deleteBomRow(input: {
   jobId: string;
   bomId: string;
 }): Promise<ActionResult> {
-  const locale = input.locale === "ar" ? "ar" : "en";
-  const session = await getSessionContext();
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
   if (!session) return { error: "unauthorized" };
 
-  const supabase = await createClient();
   await supabase.from("job_bom").delete().eq("id", input.bomId);
-  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${input.locale}/dashboard/jobs/${input.jobId}`);
   return { ok: true };
 }
 
@@ -263,13 +261,11 @@ export async function startJob(input: {
   locale: string;
   jobId: string;
 }): Promise<ActionResult> {
-  const locale = input.locale === "ar" ? "ar" : "en";
-  const t = await getTranslations({ locale, namespace: "Jobs" });
-
-  const session = await getSessionContext();
-  if (!session) return { error: t("error_unknown") };
-
-  const supabase = await createClient();
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
 
   // Pull the BOM with each item's current stock (RLS scopes both).
   const { data: bom } = await supabase
@@ -289,7 +285,7 @@ export async function startJob(input: {
     const item = Array.isArray(row.inventory_items)
       ? row.inventory_items[0] ?? null
       : row.inventory_items;
-    if (!item) continue; // not the caller's item / not visible — skip
+    if (!item) continue;
     const current = Number(item.quantity) || 0;
     const needed = Number(row.quantity_needed);
     const next = Math.max(0, current - needed);
@@ -305,9 +301,50 @@ export async function startJob(input: {
     .update({ status: "quoted" })
     .eq("id", input.jobId)
     .eq("status", "submitted");
-  if (error) return { error: t("error_transition") };
+  if (error) return { error: "error_transition" };
 
+  revalidatePath(`/${input.locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${input.locale}/dashboard/inventory`);
+  return { ok: true };
+}
+
+// Edit a submitted job (client only; status must be 'submitted').
+export async function updateJob(input: {
+  locale: string;
+  jobId: string;
+  title: string;
+  material: string;
+  quantity: number;
+  notes: string;
+  method: string;
+}): Promise<ActionResult> {
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const [session, supabase] = await Promise.all([
+    getSessionContext(),
+    createClient(),
+  ]);
+  if (!session) return { error: "error_unknown" };
+  if (session.profile.role !== "client") return { error: "error_not_client" };
+
+  const title = input.title?.trim();
+  const material = input.material?.trim() || null;
+  const notes = input.notes?.trim() || null;
+  const quantity = Number(input.quantity);
+
+  if (!title) return { error: "error_required" };
+  if (!(JOB_METHODS as readonly string[]).includes(input.method)) return { error: "error_method" };
+  if (!Number.isInteger(quantity) || quantity < 1) return { error: "error_quantity" };
+
+  // RLS ensures the client owns this job; only update while still 'submitted'.
+  const { error } = await supabase
+    .from("jobs")
+    .update({ title, material, notes, method: input.method, quantity })
+    .eq("id", input.jobId)
+    .eq("status", "submitted");
+
+  if (error) return { error: "error_unknown" };
+
+  revalidatePath(`/${locale}/dashboard/jobs`);
   revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
-  revalidatePath(`/${locale}/dashboard/inventory`);
   return { ok: true };
 }

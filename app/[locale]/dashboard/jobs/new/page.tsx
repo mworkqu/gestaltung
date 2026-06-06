@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { ArrowLeft } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { NewJobForm } from "@/components/jobs/new-job-form";
 import { cn } from "@/lib/utils";
@@ -28,7 +30,15 @@ export default async function NewJobPage({
 
   return (
     <div className="mx-auto max-w-2xl">
-      <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
+      <Link
+        href="/dashboard/jobs"
+        className="inline-flex items-center gap-2 text-sm text-mutedtext transition-colors hover:text-heading"
+      >
+        <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
+        {t("backToList")}
+      </Link>
+
+      <p className={cn(mono("text-[10px] text-azure"), "mt-4")}>{t("kicker")}</p>
       <h1 className="mt-2 text-2xl font-extrabold text-heading">
         {t("newTitle")}
       </h1>

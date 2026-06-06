@@ -47,7 +47,7 @@ export function JobActions({
     setError(null);
     startTransition(async () => {
       const res = await fn();
-      if (res.error) setError(res.error);
+      if (res.error) setError(t(res.error as Parameters<typeof t>[0]));
       else router.refresh();
     });
   }
