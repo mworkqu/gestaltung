@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Boxes, Plus } from "lucide-react";
+import { Boxes, Pencil, Plus } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
+import { canVaryJob } from "@/lib/jobs/constants";
 import { Button } from "@/components/ui/button";
 import { JobsFilters } from "@/components/jobs/jobs-filters";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ type JobRow = {
   quantity: number;
   created_at: string;
   client_tenant_id: string;
+  assigned_workshop_tenant_id: string | null;
   job_source: string;
 };
 
@@ -50,7 +52,7 @@ export default async function JobsPage({
   let query = supabase
     .from("jobs")
     .select(
-      "id, title, method, status, quantity, created_at, client_tenant_id, job_source"
+      "id, title, method, status, quantity, created_at, client_tenant_id, assigned_workshop_tenant_id, job_source"
     )
     .order("created_at", { ascending: false });
 
@@ -168,6 +170,9 @@ export default async function JobsPage({
                 </Th>
                 <Th mono={mono}>{t("colStatus")}</Th>
                 <Th mono={mono}>{t("colCreated")}</Th>
+                <th className="px-4 py-3">
+                  <span className="sr-only">{t("actionsTitle")}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -212,6 +217,21 @@ export default async function JobsPage({
                   </td>
                   <td className="px-4 py-3 text-mutedtext">
                     {dateFmt.format(new Date(job.created_at))}
+                  </td>
+                  <td className="px-4 py-3 text-end">
+                    {canVaryJob({
+                      role,
+                      tenantId: session.profile.tenant_id,
+                      job,
+                    }) && (
+                      <Link
+                        href={`/dashboard/jobs/${job.id}/edit`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition hover:text-azure"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        {t("editJob")}
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}
