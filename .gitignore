@@ -45,3 +45,6 @@ tsconfig.tmp.tsbuildinfo
 .claude/
 Design that I like/
 claude-code-vercel-migration-prompt.md
+
+# high-res brand masters (kept locally; small served versions live in /public)
+brand-assets/
