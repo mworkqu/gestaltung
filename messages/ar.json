@@ -25,7 +25,8 @@
     "about": "من نحن",
     "contact": "تواصل معنا",
     "uploadFile": "ارفع ملفًا",
-    "signIn": "تسجيل الدخول"
+    "signIn": "تسجيل الدخول",
+    "dashboard": "لوحة التحكم"
   },
   "LanguageSwitcher": {
     "label": "اللغة",

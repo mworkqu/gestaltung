@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { HeaderAuthLink } from "@/components/header-auth-link";
 import { cn } from "@/lib/utils";
 
 export async function Header({ locale }: { locale: Locale }) {
@@ -76,17 +77,7 @@ export async function Header({ locale }: { locale: Locale }) {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher currentLocale={locale} />
-            <Link
-              href="/sign-in"
-              className={cn(
-                "hidden rounded-lg px-3 py-2 text-mutedtext transition-colors duration-300 hover:text-heading sm:block",
-                isRtl
-                  ? "text-sm font-medium"
-                  : "font-mono text-[11px] uppercase tracking-wider"
-              )}
-            >
-              {t("signIn")}
-            </Link>
+            <HeaderAuthLink isRtl={isRtl} />
             <Button asChild size="sm" className="h-9 rounded-full px-4">
               <Link href="/contact">{t("uploadFile")}</Link>
             </Button>

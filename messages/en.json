@@ -25,7 +25,8 @@
     "about": "About",
     "contact": "Contact",
     "uploadFile": "Upload a file",
-    "signIn": "Sign in"
+    "signIn": "Sign in",
+    "dashboard": "Dashboard"
   },
   "LanguageSwitcher": {
     "label": "Language",
