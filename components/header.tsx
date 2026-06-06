@@ -1,9 +1,9 @@
-import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
+import { LogoMark } from "@/components/logo-mark";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { HeaderAuthLink } from "@/components/header-auth-link";
 import { cn } from "@/lib/utils";
@@ -26,14 +26,7 @@ export async function Header({ locale }: { locale: Locale }) {
           {/* Brand lockup */}
           <Link href="/" className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink shadow-neu-sm">
-              <Image
-                src="/logo.png"
-                alt={tBrand("name")}
-                width={24}
-                height={24}
-                priority
-                className="h-5 w-5 object-contain"
-              />
+              <LogoMark title={tBrand("name")} className="h-5 w-5" />
             </span>
             <span className="leading-none">
               <span
