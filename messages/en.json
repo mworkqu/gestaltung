@@ -165,6 +165,23 @@
     "inventory": "Inventory",
     "jobs": "Jobs"
   },
+  "Admin": {
+    "kicker": "Command center",
+    "title": "Overview",
+    "tenants": "Tenants",
+    "tenantsBreakdown": "{workshops} workshops · {clients} clients",
+    "jobs": "Jobs",
+    "openJobs": "{count} open",
+    "inventory": "Inventory items",
+    "lowStock": "Low-stock items",
+    "statusTitle": "Jobs by status",
+    "recentTitle": "Recent jobs",
+    "recentEmpty": "No jobs yet.",
+    "viewAllJobs": "View all",
+    "lowStockTitle": "Low stock across workshops",
+    "lowStockEmpty": "Nothing is low on stock.",
+    "haveNeed": "{quantity} {unit} (≤ {threshold})"
+  },
   "Inventory": {
     "kicker": "Inventory",
     "title": "Inventory",

@@ -165,6 +165,23 @@
     "inventory": "المخزون",
     "jobs": "الطلبات"
   },
+  "Admin": {
+    "kicker": "مركز التحكم",
+    "title": "نظرة عامة",
+    "tenants": "المستأجرون",
+    "tenantsBreakdown": "{workshops} ورشة · {clients} عميل",
+    "jobs": "الطلبات",
+    "openJobs": "{count} مفتوح",
+    "inventory": "أصناف المخزون",
+    "lowStock": "أصناف منخفضة المخزون",
+    "statusTitle": "الطلبات حسب الحالة",
+    "recentTitle": "أحدث الطلبات",
+    "recentEmpty": "لا توجد طلبات بعد.",
+    "viewAllJobs": "عرض الكل",
+    "lowStockTitle": "مخزون منخفض عبر الورش",
+    "lowStockEmpty": "لا يوجد نقص في المخزون.",
+    "haveNeed": "{quantity} {unit} (≤ {threshold})"
+  },
   "Inventory": {
     "kicker": "المخزون",
     "title": "المخزون",

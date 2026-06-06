@@ -170,9 +170,19 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     "advance" in job-actions.tsx now starts from 'quoted' (submitted→quoted is the BOM/Start Job step).
   - Server actions added to jobs/actions.ts: createInternalJob, addBomRow, deleteBomRow, startJob. New types
     JobSource/JobPart/JobBomRow. Jobs namespace extended (en+ar) with internal-job + BOM strings. RUN 0007 after 0006.
+- Original-plan Stage 7 (Super Admin global dashboard): DONE — no migration (reads via RLS).
+  - components/dashboard/admin-overview.tsx: super_admin /dashboard overview becomes a command center —
+    KPI cards (tenants with workshop/client split, jobs + open count, inventory item count, low-stock count),
+    jobs-by-status breakdown, low-stock list across all workshops, and a recent-jobs table (all tenants).
+    app/[locale]/dashboard/page.tsx branches: super_admin → AdminOverview, others → the account card.
+    New Admin messages namespace (en+ar); reuses Jobs status/method/column labels.
+  - Header now session-aware: components/header-auth-link.tsx (client) shows "Sign in" when anon, "Dashboard"
+    when signed in (live via onAuthStateChange); marketing pages stay static. Nav.dashboard string added.
+  - NOTE on numbering: the custom "Stage 7" the owner ran earlier (workshop jobs + BOM + inventory deduction,
+    migration 0007) is a SEPARATE addition from this original-plan Stage 7. Both are now done.
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
-  Stage 8 e-commerce, 9 AI (admin analytics dashboard may slot in too). 4 stages remain (6–9).
+  Stage 8 e-commerce, 9 AI. 4 stages remain (6–9).
   - STAGE 6 IS SPLIT into two passes (decided 2026-06-05; biggest jump so far — private file storage + a
     stateful 3-role workflow). Build 6a fully (incl. migration run + test) before starting 6b. The two
     Claude Code prompts live in the project root as STAGE_6A_PROMPT.md and STAGE_6B_PROMPT.md.
