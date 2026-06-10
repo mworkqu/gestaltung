@@ -180,6 +180,26 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     when signed in (live via onAuthStateChange); marketing pages stay static. Nav.dashboard string added.
   - NOTE on numbering: the custom "Stage 7" the owner ran earlier (workshop jobs + BOM + inventory deduction,
     migration 0007) is a SEPARATE addition from this original-plan Stage 7. Both are now done.
+- Stage 8a (security review + conversion wins): DONE (code) — needs migration 0009 run in Supabase.
+  - SECURITY REVIEW: full report in SECURITY_REVIEW.md (project root). npm audit: 0 high/critical.
+    Critical/High fixes applied: supabase/migrations/0009_security_hardening.sql (RUN AFTER 0008 —
+    blocks self-promotion to super_admin / tenant hopping via profiles UPDATE [CRITICAL], pins
+    tenants.type, DB-enforces the canVaryJob edit window in jobs_status_transition, narrows job_bom
+    writes to the assigned workshop via can_manage_job_bom(), binds job_variations.changed_by to
+    auth.uid()). Code fixes: startJob now CAS-advances submitted→quoted FIRST then deducts (kills the
+    double-deduction on repeat calls; workshop-only), inventory actions sanitize the locale form field
+    (open-redirect sink). Mediums for next stage are listed in SECURITY_REVIEW.md (atomic stock
+    deduction RPC, inquiries length limits/rate limit, security headers, next-intl 4 upgrade).
+  - Homepage additions (app/[locale]/page.tsx): LocalAdvantage 3-item strip (Factory/PackageCheck/
+    ShieldCheck) after the feature cards + Social proof band (bg-ink, 4 grayscale placeholder
+    institution tiles + "representative institutions" footnote). The third feature card is now the
+    CAD drawing service chip (Features.cadTitle/cadCopy replaced aiTitle/aiCopy) linking to
+    /cad-assistance.
+  - NEW PAGE app/[locale]/cad-assistance/page.tsx (paid CAD-drawing service): hero, 3 steps, pricing
+    tiers (Simple 200 / Assembly 450 / Complex from 800 QAR), WhatsApp CTA from
+    NEXT_PUBLIC_WHATSAPP_NUMBER (digits only; NOT SET YET — falls back to /contact until added in
+    .env.local + Vercel). Header nav link added (Nav.cadAssistance, between How-it-works and About).
+    New namespaces LocalAdvantage/Social/CadAssistance in messages/{en,ar}.json.
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
   Stage 8 e-commerce, 9 AI. 4 stages remain (6–9).

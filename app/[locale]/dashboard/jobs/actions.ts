@@ -261,8 +261,8 @@ export async function deleteBomRow(input: {
   return { ok: true };
 }
 
-// Deducts BOM quantities from inventory (floored at 0) then advances the job
-// from 'submitted' to the first workshop step ('quoted'). All RLS-enforced.
+// Advances the job from 'submitted' to the first workshop step ('quoted'),
+// then deducts BOM quantities from inventory (floored at 0). All RLS-enforced.
 export async function startJob(input: {
   locale: string;
   jobId: string;
@@ -272,6 +272,23 @@ export async function startJob(input: {
     createClient(),
   ]);
   if (!session) return { error: "error_unknown" };
+  // Only the assigned workshop starts a job (it deducts ITS OWN stock).
+  if (session.profile.role !== "workshop" || !session.profile.tenant_id) {
+    return { error: "error_not_workshop" };
+  }
+
+  // Advance submitted -> quoted FIRST, as a compare-and-set on the current
+  // status (the transition trigger validates the role + assignment). Exactly
+  // one call can win this update, so the deduction below can never run twice
+  // for the same job — repeating it used to double-deduct stock.
+  const { data: started, error } = await supabase
+    .from("jobs")
+    .update({ status: "quoted" })
+    .eq("id", input.jobId)
+    .eq("status", "submitted")
+    .eq("assigned_workshop_tenant_id", session.profile.tenant_id)
+    .select("id");
+  if (error || !started?.length) return { error: "error_transition" };
 
   // Pull the BOM with each item's current stock (RLS scopes both).
   const { data: bom } = await supabase
@@ -300,14 +317,6 @@ export async function startJob(input: {
       .update({ quantity: next })
       .eq("id", row.inventory_item_id);
   }
-
-  // Advance submitted -> quoted (the transition trigger validates the role).
-  const { error } = await supabase
-    .from("jobs")
-    .update({ status: "quoted" })
-    .eq("id", input.jobId)
-    .eq("status", "submitted");
-  if (error) return { error: "error_transition" };
 
   revalidatePath(`/${input.locale}/dashboard/jobs/${input.jobId}`);
   revalidatePath(`/${input.locale}/dashboard/inventory`);

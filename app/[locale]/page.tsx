@@ -2,12 +2,15 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import {
   Wrench,
   ShoppingCart,
-  Sparkles,
+  PencilRuler,
   UploadCloud,
   Cpu,
   Factory,
   PackageCheck,
+  ShieldCheck,
+  ArrowUpRight,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,8 @@ export default async function Home({
   const tf = await getTranslations("Features");
   const th = await getTranslations("HowItWorks");
   const tHome = await getTranslations("Home");
+  const tla = await getTranslations("LocalAdvantage");
+  const ts = await getTranslations("Social");
   const isRtl = locale === "ar";
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
@@ -44,7 +49,13 @@ export default async function Home({
     { icon: PackageCheck, title: th("step4Title"), copy: th("step4Copy") },
   ];
 
-  const features = [
+  const features: {
+    icon: LucideIcon;
+    title: string;
+    copy: string;
+    accent: boolean;
+    href?: string;
+  }[] = [
     {
       icon: Wrench,
       title: tf("customTitle"),
@@ -58,12 +69,21 @@ export default async function Home({
       accent: true,
     },
     {
-      icon: Sparkles,
-      title: tf("aiTitle"),
-      copy: tf("aiCopy"),
+      icon: PencilRuler,
+      title: tf("cadTitle"),
+      copy: tf("cadCopy"),
       accent: false,
+      href: "/cad-assistance",
     },
   ];
+
+  const advantages = [
+    { icon: Factory, title: tla("item1Title"), copy: tla("item1Copy") },
+    { icon: PackageCheck, title: tla("item2Title"), copy: tla("item2Copy") },
+    { icon: ShieldCheck, title: tla("item3Title"), copy: tla("item3Copy") },
+  ];
+
+  const institutions = [ts("org1"), ts("org2"), ts("org3"), ts("org4")];
 
   const specs = [
     { label: tHome("specMethodLabel"), value: tHome("specMethodValue") },
@@ -185,23 +205,89 @@ export default async function Home({
           <span className={mono("text-[10px] text-cobalt")}>{tHome("capabilitiesTag")}</span>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ icon: Icon, title, copy, accent }) => (
-            <div key={title} className="neu neu-hover p-7">
-              <span
-                className={cn(
-                  "flex h-12 w-12 items-center justify-center rounded-2xl shadow-neu-sm",
-                  accent ? "bg-cobalt" : "bg-panel"
-                )}
-              >
-                <Icon
-                  className={cn("h-6 w-6", accent ? "text-white" : "text-mutedtext")}
-                  strokeWidth={1.5}
-                />
+          {features.map(({ icon: Icon, title, copy, accent, href }) => {
+            const card = (
+              <>
+                <span
+                  className={cn(
+                    "flex h-12 w-12 items-center justify-center rounded-2xl shadow-neu-sm",
+                    accent ? "bg-cobalt" : "bg-panel"
+                  )}
+                >
+                  <Icon
+                    className={cn("h-6 w-6", accent ? "text-white" : "text-mutedtext")}
+                    strokeWidth={1.5}
+                  />
+                </span>
+                <h3 className="mt-5 flex items-center gap-1.5 text-lg font-bold text-heading">
+                  {title}
+                  {href && (
+                    <ArrowUpRight
+                      className={cn("h-4 w-4 text-cobalt", isRtl && "-scale-x-100")}
+                    />
+                  )}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-mutedtext">{copy}</p>
+              </>
+            );
+            return href ? (
+              <Link key={title} href={href} className="neu neu-hover block p-7">
+                {card}
+              </Link>
+            ) : (
+              <div key={title} className="neu neu-hover p-7">
+                {card}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Local advantage strip */}
+      <section className="neu animate-fade-up delay-3 p-6 sm:p-8">
+        <div className="grid gap-5 md:grid-cols-3">
+          {advantages.map(({ icon: Icon, title, copy }) => (
+            <div key={title} className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cobalt shadow-neu-sm">
+                <Icon className="h-5 w-5 text-white" strokeWidth={1.5} />
               </span>
-              <h3 className="mt-5 text-lg font-bold text-heading">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-mutedtext">{copy}</p>
+              <div>
+                <h3 className="text-sm font-bold text-heading">{title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-mutedtext">{copy}</p>
+              </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Social proof */}
+      <section className="animate-fade-up delay-4 overflow-hidden rounded-[1.75rem] bg-ink p-8 sm:p-12">
+        <div className="relative">
+          <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
+          <div className="relative space-y-2 text-center">
+            <span className={mono("text-[10px] text-white/45")}>{ts("tag")}</span>
+            <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+              {ts("heading")}
+            </h2>
+            <p className="mx-auto max-w-xl text-sm leading-relaxed text-white/60">
+              {ts("subtext")}
+            </p>
+          </div>
+          <div className="relative mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {institutions.map((name) => (
+              <div
+                key={name}
+                className="flex min-h-[4.5rem] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5 text-center grayscale"
+              >
+                <span className={mono("text-[10px] leading-relaxed text-white/55")}>
+                  {name}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="relative mt-4 text-center text-[11px] leading-relaxed text-white/35">
+            * {ts("footnote")}
+          </p>
         </div>
       </section>
 
