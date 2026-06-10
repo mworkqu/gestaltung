@@ -14,7 +14,10 @@ import {
   ACCEPT_ATTR,
   ACCEPT_EXTENSIONS,
   MAX_FILE_BYTES,
+  PRODUCTION_QTY_RANGES,
+  POST_PROCESSING_OPTIONS,
 } from "@/lib/jobs/constants";
+import type { JobPath, SpeedTier } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -38,12 +41,30 @@ export function NewJobForm({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Stage 8b upsells.
+  const [jobPath, setJobPath] = useState<JobPath>("prototype");
+  const [qtyRange, setQtyRange] = useState("");
+  const [speedTier, setSpeedTier] = useState<SpeedTier>("standard");
+  const [postProcessing, setPostProcessing] = useState<string[]>([]);
+  const [inspectionReport, setInspectionReport] = useState(false);
+
+  function togglePostProcessing(option: string) {
+    setPostProcessing((prev) =>
+      prev.includes(option)
+        ? prev.filter((p) => p !== option)
+        : [...prev, option]
+    );
+  }
+
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const label = (htmlFor: string, text: string) => (
     <label htmlFor={htmlFor} className={mono("block text-[10px] text-mutedtext")}>
       {text}
     </label>
+  );
+  const groupLabel = (text: string) => (
+    <span className={mono("block text-[10px] text-mutedtext")}>{text}</span>
   );
 
   function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
@@ -64,6 +85,12 @@ export function NewJobForm({ tenantId }: { tenantId: string }) {
 
     const form = e.currentTarget;
     const data = new FormData(form);
+
+    // Production path needs an estimated quantity range before anything uploads.
+    if (jobPath === "production" && !qtyRange) {
+      setError(t("error_qty_range"));
+      return;
+    }
 
     // Validate files client-side before uploading.
     if (files.length === 0) {
@@ -118,6 +145,11 @@ export function NewJobForm({ tenantId }: { tenantId: string }) {
         quantity: Number(data.get("quantity") ?? 1),
         notes: String(data.get("notes") ?? ""),
         method: String(data.get("method") ?? ""),
+        job_path: jobPath,
+        production_qty_range: jobPath === "production" ? qtyRange : null,
+        speed_tier: speedTier,
+        post_processing: postProcessing,
+        inspection_report: inspectionReport,
         files: uploaded,
       });
 
@@ -241,6 +273,158 @@ export function NewJobForm({ tenantId }: { tenantId: string }) {
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Path: prototyping vs low-volume production */}
+      <div className="space-y-2">
+        {groupLabel(t("pathLabel"))}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["prototype", "production"] as const).map((path) => (
+            <label
+              key={path}
+              className={cn(
+                "flex cursor-pointer flex-col gap-1 rounded-xl border px-4 py-3 transition",
+                jobPath === path
+                  ? "border-cobalt bg-cobalt/5 shadow-neu-sm"
+                  : "border-white/60 bg-panel shadow-neu-inset hover:border-cobalt/40"
+              )}
+            >
+              <input
+                type="radio"
+                name="job_path"
+                value={path}
+                checked={jobPath === path}
+                onChange={() => setJobPath(path)}
+                className="sr-only"
+              />
+              <span className="text-sm font-bold text-heading">
+                {t(`path_${path}`)}
+              </span>
+              <span className="text-[11px] leading-snug text-mutedtext">
+                {t(`path_${path}_sub`)}
+              </span>
+            </label>
+          ))}
+        </div>
+
+        {jobPath === "production" && (
+          <div className="space-y-2 pt-2">
+            {label("production_qty_range", t("qtyRangeLabel"))}
+            <select
+              id="production_qty_range"
+              name="production_qty_range"
+              value={qtyRange}
+              onChange={(e) => setQtyRange(e.target.value)}
+              className={cn(fieldClass, isRtl && "text-right", "sm:max-w-[16rem]")}
+            >
+              <option value="" disabled>
+                {t("qtyRangePlaceholder")}
+              </option>
+              {PRODUCTION_QTY_RANGES.map((r) => (
+                <option key={r} value={r}>
+                  {t(`qty_range_${r.replace(/[-+]/g, "_")}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {/* Speed tier */}
+      <div className="space-y-2">
+        {groupLabel(t("speedLabel"))}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(["standard", "express"] as const).map((tier) => (
+            <label
+              key={tier}
+              className={cn(
+                "flex cursor-pointer flex-col gap-1 rounded-xl border px-4 py-3 transition",
+                speedTier === tier
+                  ? "border-cobalt bg-cobalt/5 shadow-neu-sm"
+                  : "border-white/60 bg-panel shadow-neu-inset hover:border-cobalt/40"
+              )}
+            >
+              <input
+                type="radio"
+                name="speed_tier"
+                value={tier}
+                checked={speedTier === tier}
+                onChange={() => setSpeedTier(tier)}
+                className="sr-only"
+              />
+              <span className="flex items-center gap-2 text-sm font-bold text-heading">
+                {t(`speed_${tier}`)}
+                {tier === "express" && (
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
+                    {t("rushBadge")}
+                  </span>
+                )}
+              </span>
+              <span className="text-[11px] leading-snug text-mutedtext">
+                {t(`speed_${tier}_sub`)}
+              </span>
+            </label>
+          ))}
+        </div>
+        {speedTier === "express" && (
+          <p className="text-[11px] leading-snug text-faint">{t("speedNote")}</p>
+        )}
+      </div>
+
+      {/* Add-ons */}
+      <div className="space-y-2">
+        {groupLabel(t("addonsLabel"))}
+        <div className="space-y-2">
+          {POST_PROCESSING_OPTIONS.map((option) => (
+            <label
+              key={option}
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition",
+                postProcessing.includes(option)
+                  ? "border-cobalt bg-cobalt/5 shadow-neu-sm"
+                  : "border-white/60 bg-panel shadow-neu-inset hover:border-cobalt/40"
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={postProcessing.includes(option)}
+                onChange={() => togglePostProcessing(option)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-cobalt"
+              />
+              <span>
+                <span className="block text-sm font-bold text-heading">
+                  {t(`addon_${option}`)}
+                </span>
+                <span className="block text-[11px] leading-snug text-mutedtext">
+                  {t(`addon_${option}_sub`)}
+                </span>
+              </span>
+            </label>
+          ))}
+          <label
+            className={cn(
+              "flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition",
+              inspectionReport
+                ? "border-cobalt bg-cobalt/5 shadow-neu-sm"
+                : "border-white/60 bg-panel shadow-neu-inset hover:border-cobalt/40"
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={inspectionReport}
+              onChange={() => setInspectionReport((v) => !v)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-cobalt"
+            />
+            <span>
+              <span className="block text-sm font-bold text-heading">
+                {t("addon_inspection")}
+              </span>
+              <span className="block text-[11px] leading-snug text-mutedtext">
+                {t("addon_inspection_sub")}
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
 
       <div className="space-y-2">

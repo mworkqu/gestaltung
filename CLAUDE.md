@@ -200,6 +200,26 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     NEXT_PUBLIC_WHATSAPP_NUMBER (digits only; NOT SET YET — falls back to /contact until added in
     .env.local + Vercel). Header nav link added (Nav.cadAssistance, between How-it-works and About).
     New namespaces LocalAdvantage/Social/CadAssistance in messages/{en,ar}.json.
+- Stage 8b (upload-funnel upsells + B2B path bifurcation): DONE (code) — needs migration 0010 run in
+  Supabase. Migration 0009 (security hardening) was RUN by the owner 2026-06-10. ✔
+  - supabase/migrations/0010_job_upsells.sql (RUN AFTER 0009; the 8b prompt said "0008" but that number
+    was taken): jobs gains speed_tier (standard|express), post_processing text[] ({bead_blast,anodize}),
+    inspection_report bool, job_path (prototype|production), production_qty_range
+    (10-50|50-250|250-1000|1000+, null unless production). No RLS changes needed.
+  - New-job form (components/jobs/new-job-form.tsx): path two-card toggle (production reveals qty-range
+    select, client+server validated), speed-tier cards (express = amber +35% badge + informational note,
+    no computed price), add-on checkbox cards (bead blast / anodize / inspection report — the report is
+    the separate boolean, NOT in post_processing). createJob validates everything against
+    lib/jobs/constants.ts (JOB_PATHS/SPEED_TIERS/PRODUCTION_QTY_RANGES/POST_PROCESSING_OPTIONS).
+  - Job detail: "Job specifications" card (JobSpecs namespace) for client-source jobs only (internal
+    jobs never set these; pre-migration rows render via defensive defaults). Below the files list:
+    dismissible fastener-bundle teaser (components/jobs/fastener-banner.tsx, localStorage key
+    gestaltung:fastener-banner:<job_id>) linking to /parts.
+  - NEW PAGE app/[locale]/parts/page.tsx: parts-store "coming soon" + WhatsApp waitlist CTA with
+    pre-filled message (falls back to /contact while NEXT_PUBLIC_WHATSAPP_NUMBER is unset — owner chose
+    to NOT publish the number for now since wa.me links expose it; revisit before launch). Nav.partsStore
+    added after CAD Assistance. New namespaces JobSpecs/PartsStore + Jobs form keys in messages/{en,ar}.json.
+  - OWNER RULE: never sign the owner up for paid services/subscriptions (stated 2026-06-10).
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
   Stage 8 e-commerce, 9 AI. 4 stages remain (6–9).

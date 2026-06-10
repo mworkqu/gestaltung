@@ -41,6 +41,11 @@ export type JobSource = "client" | "internal";
 
 export type JobPart = { name: string; quantity: number; unit: string };
 
+export type JobPath = "prototype" | "production";
+export type SpeedTier = "standard" | "express";
+export type ProductionQtyRange = "10-50" | "50-250" | "250-1000" | "1000+";
+export type PostProcessing = "bead_blast" | "anodize";
+
 export type Job = {
   id: string;
   client_tenant_id: string;
@@ -53,6 +58,11 @@ export type Job = {
   status: JobStatus;
   job_source: JobSource;
   parts: JobPart[] | null;
+  job_path: JobPath;
+  production_qty_range: ProductionQtyRange | null;
+  speed_tier: SpeedTier;
+  post_processing: PostProcessing[];
+  inspection_report: boolean;
   created_at: string;
   updated_at: string;
 };

@@ -8,6 +8,10 @@ import {
   JOB_METHODS,
   FILE_EXTS,
   JOB_STATUSES,
+  JOB_PATHS,
+  SPEED_TIERS,
+  PRODUCTION_QTY_RANGES,
+  POST_PROCESSING_OPTIONS,
   canVaryJob,
 } from "@/lib/jobs/constants";
 import type { Job, JobPart, JobVariationChange } from "@/lib/supabase/types";
@@ -19,6 +23,11 @@ export type CreateJobInput = {
   quantity: number;
   notes: string;
   method: string;
+  job_path: string;
+  production_qty_range: string | null;
+  speed_tier: string;
+  post_processing: string[];
+  inspection_report: boolean;
   files: {
     storage_path: string;
     file_name: string;
@@ -62,6 +71,35 @@ export async function createJob(
   if (!Number.isInteger(quantity) || quantity < 1) {
     return { error: "error_quantity" };
   }
+
+  // Stage 8b upsells. Every enum-ish field is validated against the shared
+  // constant lists (the DB CHECK constraints back these up).
+  const job_path = input.job_path;
+  if (!(JOB_PATHS as readonly string[]).includes(job_path)) {
+    return { error: "error_unknown" };
+  }
+  let production_qty_range: string | null = null;
+  if (job_path === "production") {
+    production_qty_range = input.production_qty_range ?? null;
+    if (
+      !production_qty_range ||
+      !(PRODUCTION_QTY_RANGES as readonly string[]).includes(production_qty_range)
+    ) {
+      return { error: "error_qty_range" };
+    }
+  }
+  const speed_tier = input.speed_tier;
+  if (!(SPEED_TIERS as readonly string[]).includes(speed_tier)) {
+    return { error: "error_unknown" };
+  }
+  const post_processing = [...new Set(input.post_processing ?? [])];
+  for (const p of post_processing) {
+    if (!(POST_PROCESSING_OPTIONS as readonly string[]).includes(p)) {
+      return { error: "error_unknown" };
+    }
+  }
+  const inspection_report = input.inspection_report === true;
+
   if (!input.files?.length) return { error: "error_no_files" };
   for (const f of input.files) {
     if (!(FILE_EXTS as readonly string[]).includes(f.file_ext)) {
@@ -75,7 +113,19 @@ export async function createJob(
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .insert({ client_tenant_id: tenantId, title, material, notes, method, quantity })
+    .insert({
+      client_tenant_id: tenantId,
+      title,
+      material,
+      notes,
+      method,
+      quantity,
+      job_path,
+      production_qty_range,
+      speed_tier,
+      post_processing,
+      inspection_report,
+    })
     .select("id")
     .single();
 

@@ -14,6 +14,7 @@ import type {
 } from "@/lib/supabase/types";
 import { JobActions } from "@/components/jobs/job-actions";
 import { WorkshopJobPanel } from "@/components/jobs/workshop-job-panel";
+import { FastenerBanner } from "@/components/jobs/fastener-banner";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +27,10 @@ export default async function JobDetailPage({
   const { locale, id } = await params;
   setRequestLocale(locale);
 
-  const [session, t, supabase] = await Promise.all([
+  const [session, t, tSpecs, supabase] = await Promise.all([
     getSessionContext(),
     getTranslations("Jobs"),
+    getTranslations("JobSpecs"),
     createClient(),
   ]);
   if (!session) redirect(`/${locale}/sign-in`);
@@ -172,6 +174,37 @@ export default async function JobDetailPage({
   });
 
   const isInternal = job.job_source === "internal";
+
+  // Stage 8b upsell specs (client-funnel jobs only — internal jobs never set
+  // these). Defensive defaults keep pre-migration rows rendering cleanly.
+  const jobPath = job.job_path ?? "prototype";
+  const speedTier = job.speed_tier ?? "standard";
+  const postProcessing = job.post_processing ?? [];
+  const specRows: { label: string; value: string }[] = [
+    {
+      label: tSpecs("pathLabel"),
+      value:
+        tSpecs(`path_${jobPath}`) +
+        (job.production_qty_range
+          ? ` · ${t(`qty_range_${job.production_qty_range.replace(/[-+]/g, "_")}` as Parameters<typeof t>[0])}`
+          : ""),
+    },
+    { label: tSpecs("speedLabel"), value: tSpecs(`speed_${speedTier}`) },
+    {
+      label: tSpecs("postLabel"),
+      value: postProcessing.length
+        ? postProcessing
+            .map((p) => tSpecs(`post_${p}`))
+            .join(isRtl ? "، " : ", ")
+        : tSpecs("none"),
+    },
+    {
+      label: tSpecs("inspectionLabel"),
+      value: job.inspection_report
+        ? tSpecs("inspectionYes")
+        : tSpecs("inspectionNo"),
+    },
+  ];
   // Who may "vary" (edit) this job: client while submitted, assigned workshop on
   // any non-terminal status, super_admin always. Shared with the edit page.
   const canEdit = canVaryJob({ role, tenantId: myTenant, job });
@@ -286,6 +319,28 @@ export default async function JobDetailPage({
         ))}
       </div>
 
+      {/* Job specifications (Stage 8b upsells — client-funnel jobs only) */}
+      {!isInternal && (
+        <div className="neu mt-6 p-5">
+          <p className={mono("text-[10px] text-azure")}>{tSpecs("title")}</p>
+          <div className="mt-2 divide-y divide-borderstrong/60">
+            {specRows.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between gap-4 py-3"
+              >
+                <span className={mono("text-[10px] text-mutedtext")}>
+                  {row.label}
+                </span>
+                <span className="text-sm font-medium text-heading">
+                  {row.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {job.notes && (
         <div className="neu mt-6 p-5">
           <p className={mono("text-[10px] text-mutedtext")}>{t("notesLabel")}</p>
@@ -372,6 +427,9 @@ export default async function JobDetailPage({
           </ul>
         )}
       </div>
+
+      {/* Parts-store teaser (UI only; dismissed state lives in localStorage) */}
+      <FastenerBanner jobId={job.id} />
 
       {/* Status timeline */}
       <div className="mt-6">

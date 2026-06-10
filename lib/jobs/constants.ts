@@ -67,6 +67,20 @@ export function canVaryJob(opts: {
   return false;
 }
 
+// ---- Stage 8b: upload-funnel upsells ---------------------------------------
+
+export const JOB_PATHS = ["prototype", "production"] as const;
+export const SPEED_TIERS = ["standard", "express"] as const;
+export const PRODUCTION_QTY_RANGES = [
+  "10-50",
+  "50-250",
+  "250-1000",
+  "1000+",
+] as const;
+// Post-processing options stored in jobs.post_processing. The inspection
+// report is a separate boolean column, not a member of this array.
+export const POST_PROCESSING_OPTIONS = ["bead_blast", "anodize"] as const;
+
 export const FILE_EXTS = ["stl", "step", "dxf", "iges"] as const;
 export type NormalizedExt = (typeof FILE_EXTS)[number];
 
