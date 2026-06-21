@@ -123,3 +123,74 @@ export type InventoryItem = {
   created_at: string;
   updated_at: string;
 };
+
+// ─── Parts Store (e-commerce module) ─────────────────────────────────────────
+
+export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
+
+export type Part = {
+  id: string;
+  sku: string;
+  name: string;
+  name_ar: string | null;
+  description: string | null;
+  description_ar: string | null;
+  category: string;
+  material: string | null;
+  standard: string | null;
+  unit_price: number;
+  min_order_qty: number;
+  stock_status: StockStatus;
+  image_url: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PartOrderStatus =
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "shipped"
+  | "delivered"
+  | "cancelled";
+
+export type PartOrder = {
+  id: string;
+  profile_id: string | null;
+  customer_name: string;
+  customer_phone: string;
+  customer_email: string | null;
+  delivery_area: string;
+  delivery_notes: string | null;
+  status: PartOrderStatus;
+  total_qar: number;
+  whatsapp_sent: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PartOrderItem = {
+  id: string;
+  order_id: string;
+  part_id: string;
+  part_sku: string;
+  part_name: string;
+  quantity: number;
+  unit_price_qar: number;
+  line_total_qar: number;
+};
+
+// A single line in the localStorage cart. Carries the snapshot needed to render
+// the cart without re-fetching, keyed by the part's (unique) SKU.
+export type CartItem = {
+  partId: string;
+  sku: string;
+  name: string;
+  nameAr: string | null;
+  unitPrice: number;
+  imageUrl: string | null;
+  minOrderQty: number;
+  stockStatus: StockStatus;
+  quantity: number;
+};

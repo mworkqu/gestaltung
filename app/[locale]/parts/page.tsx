@@ -1,70 +1,107 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { MessageCircle, ShoppingCart } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 
+import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { PartCard } from "@/components/parts/part-card";
+import { PartsFilters } from "@/components/parts/parts-filters";
 import { cn } from "@/lib/utils";
 
-// The business WhatsApp number, digits only. When unset, the waitlist CTA
-// falls back to the contact page instead of a broken wa.me link.
+// Published catalog reflects admin publish toggles immediately.
+export const dynamic = "force-dynamic";
+
 const WHATSAPP_DIGITS =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
 
 export default async function PartsStorePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ category?: string; material?: string; stock?: string }>;
 }) {
   const { locale } = await params;
+  const { category, material, stock } = await searchParams;
   setRequestLocale(locale);
 
-  const t = await getTranslations("PartsStore");
+  const t = await getTranslations("Parts");
   const isRtl = locale === "ar";
-
-  // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
+  const supabase = await createClient();
+
+  // Public RLS policy returns only published rows for anon visitors. Fetch the
+  // full published set once so we can both derive filter options and apply the
+  // (small-catalog) filters in memory.
+  const { data } = await supabase
+    .from("parts")
+    .select("*")
+    .eq("is_published", true)
+    .order("name", { ascending: true });
+
+  const all = (data ?? []) as Part[];
+
+  const categories = Array.from(new Set(all.map((p) => p.category))).sort();
+  const materials = Array.from(
+    new Set(all.map((p) => p.material).filter((m): m is string => !!m))
+  ).sort();
+
+  const parts = all.filter(
+    (p) =>
+      (!category || p.category === category) &&
+      (!material || p.material === material) &&
+      (!stock || p.stock_status === stock)
+  );
+
   const waHref = WHATSAPP_DIGITS
-    ? `https://wa.me/${WHATSAPP_DIGITS}?text=${encodeURIComponent(t("waitlistMessage"))}`
+    ? `https://wa.me/${WHATSAPP_DIGITS}?text=${encodeURIComponent(t("emptyWhatsapp"))}`
     : null;
 
   return (
-    <div className="container py-6">
-      <section className="neu animate-fade-up flex flex-col items-center gap-8 p-8 text-center sm:p-12 lg:p-16">
-        <span className="inline-flex items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
-          <span className="h-2 w-2 rounded-full bg-amber-500" />
-          <span className={mono("text-[10px] text-mutedtext")}>
-            {t("kicker")} · {t("comingSoon")}
-          </span>
-        </span>
+    <div className="container space-y-8 py-8">
+      <header className="space-y-3">
+        <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
+          {t("heading")}
+        </h1>
+        <p className="max-w-2xl text-base leading-relaxed text-body">
+          {t("subtext")}
+        </p>
+      </header>
 
-        <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-cobalt shadow-neu-sm">
-          <ShoppingCart className="h-8 w-8 text-white" strokeWidth={1.5} />
-        </span>
+      <PartsFilters
+        categories={categories}
+        materials={materials}
+        current={{ category, material, stock }}
+      />
 
-        <div className="space-y-4">
-          <h1 className="text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl">
-            {t("heading")}
-          </h1>
-          <p className="mx-auto max-w-xl text-base leading-relaxed text-body sm:text-lg">
-            {t("subtext")}
-          </p>
+      {parts.length === 0 ? (
+        <div className="neu flex flex-col items-center gap-4 p-12 text-center">
+          <p className="text-base font-semibold text-heading">{t("emptyTitle")}</p>
+          <p className="max-w-md text-sm text-mutedtext">{t("emptyBody")}</p>
+          {waHref ? (
+            <Button asChild className="rounded-full">
+              <a href={waHref} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="h-4 w-4" />
+                {t("emptyCta")}
+              </a>
+            </Button>
+          ) : (
+            <Button asChild className="rounded-full">
+              <Link href="/contact">{t("emptyCtaFallback")}</Link>
+            </Button>
+          )}
         </div>
-
-        {waHref ? (
-          <Button asChild size="lg" className="rounded-full px-7">
-            <a href={waHref} target="_blank" rel="noopener noreferrer">
-              <MessageCircle className="h-4 w-4" />
-              {t("waitlistCta")}
-            </a>
-          </Button>
-        ) : (
-          <Button asChild size="lg" className="rounded-full px-7">
-            <Link href="/contact">{t("waitlistFallback")}</Link>
-          </Button>
-        )}
-      </section>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {parts.map((part) => (
+            <PartCard key={part.id} part={part} locale={locale} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

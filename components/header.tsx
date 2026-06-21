@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/logo-mark";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { HeaderAuthLink } from "@/components/header-auth-link";
+import { CartIcon } from "@/components/parts/cart-icon";
 import { cn } from "@/lib/utils";
 
 export async function Header({ locale }: { locale: Locale }) {
@@ -71,6 +72,7 @@ export async function Header({ locale }: { locale: Locale }) {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <CartIcon />
             <LanguageSwitcher currentLocale={locale} />
             <HeaderAuthLink isRtl={isRtl} />
             <Button asChild size="sm" className="h-9 rounded-full px-4">

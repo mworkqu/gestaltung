@@ -26,6 +26,7 @@ export default async function DashboardLayout({
 
   const t = await getTranslations("DashboardNav");
   const isClient = session.profile.role === "client";
+  const isSuperAdmin = session.profile.role === "super_admin";
   const navItems = [
     { href: "/dashboard", label: t("overview") },
     // Inventory is hidden from clients in the UI (their table stays in the DB,
@@ -34,6 +35,13 @@ export default async function DashboardLayout({
       ? []
       : [{ href: "/dashboard/inventory", label: t("inventory") }]),
     { href: "/dashboard/jobs", label: t("jobs") },
+    // Parts catalog + orders are super_admin only.
+    ...(isSuperAdmin
+      ? [
+          { href: "/dashboard/parts/orders", label: t("partsOrders") },
+          { href: "/dashboard/parts", label: t("partsCatalog") },
+        ]
+      : []),
   ];
 
   return (

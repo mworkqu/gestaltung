@@ -8,6 +8,7 @@ import { Outfit, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 import { routing, type Locale } from "@/i18n/routing";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { CartProvider } from "@/components/parts/cart-provider";
 import "../globals.css";
 
 const sans = Outfit({
@@ -73,11 +74,13 @@ export default async function LocaleLayout({
     >
       <body className="min-h-screen bg-background font-sans text-body">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <div className="flex min-h-screen flex-col">
-            <Header locale={locale as Locale} />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <CartProvider>
+            <div className="flex min-h-screen flex-col">
+              <Header locale={locale as Locale} />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </CartProvider>
         </NextIntlClientProvider>
         {gaId && <GoogleAnalytics gaId={gaId} />}
       </body>
