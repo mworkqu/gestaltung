@@ -220,6 +220,39 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     to NOT publish the number for now since wa.me links expose it; revisit before launch). Nav.partsStore
     added after CAD Assistance. New namespaces JobSpecs/PartsStore + Jobs form keys in messages/{en,ar}.json.
   - OWNER RULE: never sign the owner up for paid services/subscriptions (stated 2026-06-10).
+- Stage Parts Store (e-commerce module): DONE (code, 2026-06-22) — needs migration 0011 run in Supabase.
+  Replaces the /parts "coming soon" teaser with a real storefront. No payment processor — orders are
+  confirmed via WhatsApp.
+  - supabase/migrations/0011_parts_store.sql (RUN AFTER 0010): parts (public catalog, anon SELECT on
+    is_published rows), part_orders (guest checkout — profile_id nullable), part_order_items (snapshot
+    sku/name/price; line_total_qar generated column). RLS reuses public.is_super_admin(); reuses shared
+    set_updated_at() trigger. KEY: public.create_part_order(...) SECURITY DEFINER RPC is the checkout
+    path — a guest can't SELECT their own freshly-inserted order back through RLS, and the RPC snapshots
+    prices authoritatively from the catalog (ignores client-sent prices) + computes the total. anon/auth
+    both GRANTed EXECUTE. The plain anon INSERT policies exist too but the app uses the RPC.
+  - Public: app/[locale]/parts/page.tsx (force-dynamic catalog, 2/3/4-col grid, filter bar
+    ?category=&material=&stock= applied in-memory over the published set) + /parts/[sku] detail
+    (notFound if unpublished/missing; out_of_stock disables add + shows WhatsApp "notify me").
+    components/parts/: part-card, parts-filters, add-to-cart-button, part-detail-cart, stock-badge,
+    gear-placeholder (inline SVG fallback when image_url null). Part images use a plain <img> (admin
+    pastes arbitrary remote URLs — next/image would need configured domains).
+  - Cart: localStorage only (key gestaltung:cart), no DB table. lib/parts/cart.ts (pure transforms),
+    components/parts/cart-provider.tsx (context wraps app/[locale]/layout.tsx), cart-icon.tsx (header
+    badge, always visible). /parts/cart page (client). Keyed by SKU.
+  - Checkout: /parts/checkout (client, calls supabase.rpc('create_part_order')) → on success stashes an
+    order snapshot in sessionStorage (key gestaltung:last-order) so the guest-safe
+    /parts/checkout/success page can render the summary + WhatsApp confirm link (RLS hides a guest's own
+    order, so we can't re-read it). Delivery areas: doha/lusail/al_wakra/industrial_area/other.
+  - Admin (super_admin only, guarded in app/[locale]/dashboard/parts/layout.tsx): /dashboard/parts catalog
+    manager (table + inline published toggle + delete), new/ + [id]/edit/ (PartForm), server actions
+    createPart/updatePart/deletePart/togglePublished in parts/actions.ts. /dashboard/parts/orders list +
+    [id] detail; orders/actions.ts updateOrderStatus/toggleWhatsappSent. Nav links partsCatalog/partsOrders
+    added to dashboard/layout.tsx for super_admin only.
+  - i18n: new namespaces Parts / Checkout / PartsDashboard in messages/{en,ar}.json; DashboardNav gains
+    partsCatalog/partsOrders. lib/parts/constants.ts (STOCK_STATUSES, PART_ORDER_STATUSES, DELIVERY_AREAS,
+    CART_KEY, LAST_ORDER_KEY) + lib/parts/format.ts (formatPrice QAR, partName/partDescription locale
+    fallback). Types Part/PartOrder/PartOrderItem/CartItem/StockStatus added to lib/supabase/types.ts.
+    `npm run build` passes.
 - ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
   Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
   Stage 8 e-commerce, 9 AI. 4 stages remain (6–9).
