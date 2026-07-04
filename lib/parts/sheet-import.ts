@@ -66,7 +66,16 @@ const HEADER_ALIASES: Record<string, string> = {
 const REQUIRED = ["sku", "name", "category", "unit_price"];
 
 function normalizeHeader(h: string): string {
-  return h.trim().toLowerCase().replace(/\s+/g, "_");
+  // Tolerant: strip the "*" required-markers people copy from the column list,
+  // collapse any run of punctuation/space (stray commas, quotes) to a single
+  // underscore, and trim edge underscores. So "sku*", "name *", ", category*"
+  // and "Unit Price" all resolve to sku / name / category / unit_price.
+  return h
+    .trim()
+    .toLowerCase()
+    .replace(/\*/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }
 
 // Minimal RFC-4180-ish CSV parser: handles quoted fields, escaped quotes (""),
