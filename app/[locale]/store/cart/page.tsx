@@ -29,7 +29,7 @@ export default function CartPage() {
           <p className="text-base font-semibold text-heading">{t("cartEmptyTitle")}</p>
           <p className="text-sm text-mutedtext">{t("cartEmptyBody")}</p>
           <Button asChild className="rounded-full">
-            <Link href="/parts">{t("cartBrowse")}</Link>
+            <Link href="/store">{t("cartBrowse")}</Link>
           </Button>
         </div>
       </div>
@@ -54,7 +54,7 @@ export default function CartPage() {
                 className="neu flex items-center gap-4 p-3 sm:p-4"
               >
                 <Link
-                  href={`/parts/${item.sku}`}
+                  href={`/store/${item.sku}`}
                   className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-panel"
                 >
                   {item.imageUrl ? (
@@ -71,7 +71,7 @@ export default function CartPage() {
 
                 <div className="min-w-0 flex-1">
                   <Link
-                    href={`/parts/${item.sku}`}
+                    href={`/store/${item.sku}`}
                     className="line-clamp-1 text-sm font-semibold text-heading hover:text-cobalt"
                   >
                     {name}
@@ -133,10 +133,10 @@ export default function CartPage() {
           </div>
           <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>
           <Button asChild size="lg" className="w-full rounded-full">
-            <Link href="/parts/checkout">{t("checkoutCta")}</Link>
+            <Link href="/store/checkout">{t("checkoutCta")}</Link>
           </Button>
           <Button asChild variant="ghost" className="w-full rounded-full">
-            <Link href="/parts">{t("continueShopping")}</Link>
+            <Link href="/store">{t("continueShopping")}</Link>
           </Button>
         </aside>
       </div>

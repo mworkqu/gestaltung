@@ -49,7 +49,7 @@ export function FastenerBanner({ jobId }: { jobId: string }) {
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Button asChild size="sm" className="rounded-full">
-          <Link href="/parts">{t("bannerCta")}</Link>
+          <Link href="/store">{t("bannerCta")}</Link>
         </Button>
         <button
           type="button"

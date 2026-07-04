@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 
@@ -6,9 +5,12 @@ import type { Part, StockStatus } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, partName } from "@/lib/parts/format";
+import { LogoMark } from "@/components/logo-mark";
 import { LandingHeader } from "@/components/store-landing/landing-header";
 import { CategoryChips } from "@/components/store-landing/category-chips";
 import { FeaturedAddButton } from "@/components/store-landing/featured-add-button";
+import { CallbackForm } from "@/components/store-landing/callback-form";
+import { STORE_THEME_KEY } from "@/components/store-landing/theme-toggle";
 import type { Locale } from "@/i18n/routing";
 
 // Design-handoff fonts, scoped to the landing via CSS variables consumed by
@@ -50,8 +52,10 @@ export async function generateMetadata({
   };
 }
 
-const WHATSAPP_DIGITS =
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
+// Runs before paint: apply the saved theme, or on a mobile device follow the
+// phone's theme. Desktop with no saved choice stays light. Kept dependency-free
+// so it can be inlined as a string.
+const THEME_INIT_SCRIPT = `(function(){try{var r=document.currentScript.parentElement;var s=localStorage.getItem('${STORE_THEME_KEY}');var d;if(s==='dark'||s==='light'){d=s==='dark';}else{var m=window.matchMedia('(pointer:coarse)').matches||window.matchMedia('(max-width:767px)').matches;d=m&&window.matchMedia('(prefers-color-scheme:dark)').matches;}if(d)r.classList.add('sl-dark');}catch(e){}})();`;
 
 const STOCK_TOKENS: Record<StockStatus, { fg: string; bg: string }> = {
   in_stock: { fg: "var(--sl-ok)", bg: "var(--sl-ok-bg)" },
@@ -104,14 +108,13 @@ export default async function StoreLandingPage({
     t("cat6"),
   ];
 
-  const waHref = WHATSAPP_DIGITS
-    ? `https://wa.me/${WHATSAPP_DIGITS}?text=${encodeURIComponent(t("whatsappMsg"))}`
-    : null;
-
   return (
     <div
       className={`store-landing sl-sans min-h-screen ${spaceGrotesk.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
+      {/* Pre-paint theme init (light default; mobile follows the device). */}
+      <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+
       <LandingHeader locale={locale as Locale} />
 
       {/* ── Hero ── */}
@@ -130,7 +133,7 @@ export default async function StoreLandingPage({
             {t("heroTitle")}
           </h1>
           <form
-            action={`/${locale}/parts`}
+            action={`/${locale}/store`}
             className="flex max-w-[560px] items-stretch gap-2.5"
           >
             <div className="flex flex-1 items-center gap-2.5 rounded-[10px] border border-[var(--sl-search-border)] bg-[var(--sl-search-bg)] px-3.5 text-[var(--sl-faint)]">
@@ -181,7 +184,7 @@ export default async function StoreLandingPage({
             </p>
           </div>
           <Link
-            href="/parts"
+            href="/store"
             className="whitespace-nowrap text-[13px] text-[var(--sl-accent)]"
           >
             {t("viewAll")}
@@ -205,7 +208,7 @@ export default async function StoreLandingPage({
                   className="flex flex-col overflow-hidden rounded-xl border border-[var(--sl-border)] bg-[var(--sl-panel)]"
                 >
                   <Link
-                    href={`/parts/${part.sku}`}
+                    href={`/store/${part.sku}`}
                     className="relative flex h-[116px] items-end p-2.5 md:h-40"
                     style={{
                       background:
@@ -240,7 +243,7 @@ export default async function StoreLandingPage({
                       {spec}
                     </span>
                     <Link
-                      href={`/parts/${part.sku}`}
+                      href={`/store/${part.sku}`}
                       className="text-sm font-medium leading-[1.35] text-[var(--sl-heading)]"
                     >
                       {partName(part, locale)}
@@ -304,13 +307,11 @@ export default async function StoreLandingPage({
       <footer className="flex flex-col justify-between gap-6 border-t border-[var(--sl-border2)] bg-[var(--sl-foot-bg)] px-[18px] py-7 md:flex-row md:px-10 md:py-9">
         <div className="max-w-[280px]">
           <div className="mb-3 flex items-center gap-2.5">
-            <span className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-2xl bg-[var(--sl-logo-plate)]">
-              <Image
-                src="/store-logo.png"
-                alt={tBrand("name")}
-                width={92}
-                height={92}
-                className="h-[92px] w-[92px] object-contain"
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0a0e15]">
+              <LogoMark
+                title={tBrand("name")}
+                gradientId="gestaltung-footer-logo"
+                className="h-7 w-7"
               />
             </span>
             <span className="sl-heading text-[15px] font-semibold text-[var(--sl-heading)]">
@@ -321,25 +322,7 @@ export default async function StoreLandingPage({
             {t("footerText")}
           </p>
         </div>
-        {waHref ? (
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-[9px] self-start rounded-[10px] border border-[var(--sl-wa-border)] bg-[var(--sl-wa-bg)] px-[18px] py-[11px] text-sm font-medium text-[var(--sl-wa)]"
-          >
-            <span className="h-2 w-2 rounded-full bg-[var(--sl-wa)]" />
-            {t("footerCta")}
-          </a>
-        ) : (
-          <Link
-            href="/contact"
-            className="flex items-center gap-[9px] self-start rounded-[10px] border border-[var(--sl-wa-border)] bg-[var(--sl-wa-bg)] px-[18px] py-[11px] text-sm font-medium text-[var(--sl-wa)]"
-          >
-            <span className="h-2 w-2 rounded-full bg-[var(--sl-wa)]" />
-            {t("footerCta")}
-          </Link>
-        )}
+        <CallbackForm />
       </footer>
     </div>
   );

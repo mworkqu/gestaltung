@@ -109,7 +109,7 @@ export default function CheckoutSuccessPage() {
         </Button>
 
         <Button asChild variant="ghost" className="rounded-full">
-          <Link href="/parts">{t("backToStore")}</Link>
+          <Link href="/store">{t("backToStore")}</Link>
         </Button>
       </div>
     </div>

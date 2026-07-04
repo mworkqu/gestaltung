@@ -52,11 +52,11 @@ export default async function PartDetailPage({
     <div className="container space-y-8 py-8">
       {/* Breadcrumb */}
       <nav className="flex flex-wrap items-center gap-1.5 text-xs text-mutedtext">
-        <Link href="/parts" className="hover:text-heading">
+        <Link href="/store" className="hover:text-heading">
           {t("breadcrumbStore")}
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-        <Link href={{ pathname: "/parts", query: { category: part.category } }} className="hover:text-heading">
+        <Link href={{ pathname: "/store", query: { category: part.category } }} className="hover:text-heading">
           {part.category}
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />

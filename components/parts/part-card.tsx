@@ -23,7 +23,7 @@ export async function PartCard({
   return (
     <div className="neu flex flex-col overflow-hidden">
       <Link
-        href={`/parts/${part.sku}`}
+        href={`/store/${part.sku}`}
         className="block aspect-square overflow-hidden bg-panel"
       >
         {part.image_url ? (
@@ -42,7 +42,7 @@ export async function PartCard({
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <Link
-            href={`/parts/${part.sku}`}
+            href={`/store/${part.sku}`}
             className="line-clamp-2 text-sm font-semibold text-heading transition-colors hover:text-cobalt"
           >
             {name}

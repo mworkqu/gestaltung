@@ -148,9 +148,11 @@
     color: var(--sl-body);
   }
 
-  @media (prefers-color-scheme: dark) {
-    .store-landing {
-      --sl-bg: #0a0e15;
+  /* Dark theme is opt-in via the .sl-dark class (set by the header toggle, or
+     auto-applied on mobile from the device theme by the no-FOUC script in the
+     landing page). Desktop default stays light. */
+  .store-landing.sl-dark {
+    --sl-bg: #0a0e15;
       --sl-panel: #121a26;
       --sl-border: #1c2634;
       --sl-border2: #161f2c;
@@ -192,7 +194,6 @@
       --sl-wa-bg: rgba(37, 211, 102, 0.12);
       --sl-wa-border: rgba(37, 211, 102, 0.3);
       color-scheme: dark;
-    }
   }
 
   /* Design-handoff font stacks (loaded via next/font on the landing page). */

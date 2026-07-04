@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import Image from "next/image";
 import { useTranslations } from "next-intl";
 
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/client";
 import { useCart } from "@/components/parts/cart-provider";
+import { LogoMark } from "@/components/logo-mark";
+import { ThemeToggle } from "@/components/store-landing/theme-toggle";
 
 // Store-landing header from the design handoff. Client component: the cart
-// badge, language toggle, auth-aware link and mobile menu all need state.
-// NOTE: no Inventory link here — inventory must never appear on the landing.
+// badge, language toggle, theme switch, auth-aware link and mobile menu all
+// need state. NOTE: no Inventory link here — inventory (the production/
+// multi-tenant stock system) must never appear on the store landing.
 export function LandingHeader({ locale }: { locale: Locale }) {
   const t = useTranslations("StoreLanding");
   const tBrand = useTranslations("Brand");
@@ -41,18 +43,14 @@ export function LandingHeader({ locale }: { locale: Locale }) {
     });
   }
 
-  const logoPlate = (size: string, img: string, radius: string) => (
+  // The code-based brand mark (inline SVG, zero network cost). Its light
+  // metallic gradient is designed for a dark plate, so it sits in an ink chip
+  // that reads on both the light and dark landing themes.
+  const brandMark = (chip: string, mark: string) => (
     <span
-      className={`flex ${size} shrink-0 items-center justify-center ${radius} bg-[var(--sl-logo-plate)]`}
+      className={`flex ${chip} shrink-0 items-center justify-center rounded-xl bg-[#0a0e15]`}
     >
-      <Image
-        src="/store-logo.png"
-        alt={tBrand("name")}
-        width={104}
-        height={104}
-        priority
-        className={`${img} object-contain`}
-      />
+      <LogoMark title={tBrand("name")} className={mark} />
     </span>
   );
 
@@ -61,7 +59,7 @@ export function LandingHeader({ locale }: { locale: Locale }) {
       {/* Desktop */}
       <div className="hidden items-center justify-between gap-6 px-10 py-4 md:flex">
         <Link href="/" className="flex items-center gap-3">
-          {logoPlate("h-28 w-28", "h-[104px] w-[104px]", "rounded-[18px]")}
+          {brandMark("h-11 w-11", "h-7 w-7")}
           <span className="flex flex-col leading-[1.1]">
             <span className="sl-heading text-base font-semibold tracking-[0.2px] text-[var(--sl-heading)]">
               {tBrand("name")}
@@ -79,6 +77,7 @@ export function LandingHeader({ locale }: { locale: Locale }) {
           >
             {t("navStore")}
           </Link>
+          <ThemeToggle />
           <button
             type="button"
             onClick={switchLocale}
@@ -108,12 +107,13 @@ export function LandingHeader({ locale }: { locale: Locale }) {
       {/* Mobile */}
       <div className="flex items-center justify-between gap-3 px-[18px] py-3.5 md:hidden">
         <Link href="/" className="flex items-center gap-2.5">
-          {logoPlate("h-[92px] w-[92px]", "h-[84px] w-[84px]", "rounded-2xl")}
+          {brandMark("h-9 w-9", "h-6 w-6")}
           <span className="sl-heading text-[15px] font-semibold text-[var(--sl-heading)]">
             {tBrand("name")}
           </span>
         </Link>
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-2.5">
+          <ThemeToggle />
           <button
             type="button"
             onClick={switchLocale}

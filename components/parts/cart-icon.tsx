@@ -14,7 +14,7 @@ export function CartIcon() {
 
   return (
     <Link
-      href="/parts/cart"
+      href="/store/cart"
       aria-label={t("cartAria", { count: itemCount })}
       className="relative flex h-9 w-9 items-center justify-center rounded-full text-mutedtext transition-colors duration-300 hover:text-heading"
     >

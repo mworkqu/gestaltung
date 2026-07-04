@@ -656,7 +656,15 @@
     "customText": "Upload a CAD file for an instant quote, or hire us to draw it for you — machined, printed or laser-cut.",
     "customBtn": "Design",
     "footerText": "Doha, Qatar\nSun–Thu · 8:00–18:00",
-    "footerCta": "Chat on WhatsApp",
-    "whatsappMsg": "Hi! I'm browsing the Gestaltung store."
+    "footerCta": "Request a callback",
+    "whatsappMsg": "Hi! I'm browsing the Gestaltung store.",
+    "themeDark": "Switch to dark theme",
+    "themeLight": "Switch to light theme",
+    "callbackPrompt": "Leave your number and we'll contact you on WhatsApp.",
+    "callbackName": "Your name",
+    "callbackPhone": "WhatsApp number",
+    "callbackSubmit": "Request callback",
+    "callbackDone": "Thanks! We'll contact you on WhatsApp shortly.",
+    "callbackError": "Please enter your name and number and try again."
   }
 }

@@ -25,10 +25,10 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // If the cart is empty (e.g. after a refresh post-checkout), bounce to /parts.
+  // If the cart is empty (e.g. after a refresh post-checkout), bounce to /store.
   useEffect(() => {
     if (ready && items.length === 0 && !submitting) {
-      router.replace("/parts");
+      router.replace("/store");
     }
   }, [ready, items.length, submitting, router]);
 
@@ -105,7 +105,7 @@ export default function CheckoutPage() {
     }
 
     clearCart();
-    router.push({ pathname: "/parts/checkout/success", query: { order: orderId } });
+    router.push({ pathname: "/store/checkout/success", query: { order: orderId } });
   }
 
   if (!ready) return <div className="container py-16" />;
@@ -187,7 +187,7 @@ export default function CheckoutPage() {
               {t("placeOrder")}
             </Button>
             <Button asChild variant="ghost" className="rounded-full">
-              <Link href="/parts/cart">{t("backToCart")}</Link>
+              <Link href="/store/cart">{t("backToCart")}</Link>
             </Button>
           </div>
         </form>
