@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Package, Plus, Pencil, ClipboardList } from "lucide-react";
+import { Package, Plus, Pencil, ClipboardList, FileSpreadsheet } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
@@ -60,6 +60,12 @@ export default async function PartsCatalogManager({
             <Link href="/dashboard/parts/orders">
               <ClipboardList className="h-4 w-4" />
               {t("ordersLink")}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-full">
+            <Link href="/dashboard/parts/import">
+              <FileSpreadsheet className="h-4 w-4" />
+              {t("import_nav")}
             </Link>
           </Button>
           <Button asChild className="rounded-full">

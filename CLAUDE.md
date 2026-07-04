@@ -281,6 +281,44 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   - NOTE: .env.local on this machine has NO Supabase vars (only GA + Vercel OIDC), so local featured
     products render the empty state; production (Vercel env) loads real parts. `vercel env pull` was
     blocked by the permission classifier — pull manually if local product data is wanted.
+- STORE-FIRST REBUILD — Stage 2 + owner requests (2026-07-04): DONE (code, deployed). No migration.
+  - Stage 2 route rename: app/[locale]/parts → app/[locale]/store (catalog, [sku], cart, checkout,
+    checkout/success), all /parts hrefs → /store, and 308 redirects /:locale(en|ar)/parts(+/:path*) →
+    /store in next.config.mjs. The /dashboard/parts ADMIN did NOT move (that's Stage 5). components/parts/*
+    and lib/parts/* keep their module paths (internal, not URLs). Namespace rename PartsStore→Store was
+    SKIPPED on purpose: the real catalog strings live under "Parts"/"Checkout", "PartsStore" is only the
+    fastener-banner teaser, and "no behaviour change" outweighed cosmetic churn before a deploy.
+  - LOGO is now code-based: components/logo-mark.tsx (inline SVG "G", light metallic gradient) in a dark
+    #0a0e15 chip in the landing header + footer. Deleted public/store-logo.png (the owner prefers the
+    code logo; keeps /public lean). GMark/LogoMark already existed.
+  - THEME: light is the default; header ThemeToggle (components/store-landing/theme-toggle.tsx) flips a
+    .sl-dark class on the .store-landing root and persists gestaltung:store-theme in localStorage. On
+    mobile with no saved choice, a pre-paint inline script in page.tsx follows the device theme
+    (prefers-color-scheme). globals.css: dark tokens moved from @media(prefers-color-scheme) to
+    .store-landing.sl-dark. Desktop default stays light regardless of OS.
+  - WHATSAPP CALLBACK (owner: collect the number, tell them we'll contact them, email me): footer button →
+    components/store-landing/callback-form.tsx (name + phone). POSTs /api/store-lead (app/api/store-lead/
+    route.ts) which (1) inserts into the existing inquiries table [anon RLS insert; message="Store landing
+    — requested a callback."] and (2) emails STORE_LEAD_EMAIL (default info@gestaltung360.com) via Resend's
+    REST API (fetch, no SDK). Best-effort: returns 200 if EITHER saved or emailed, so a missing key never
+    loses a lead. Email is OFF until RESEND_API_KEY is set; leads still save + show in the dashboard
+    inquiries (super_admin). Env: RESEND_API_KEY (server-only), optional STORE_LEAD_EMAIL, RESEND_FROM
+    (default "Gestaltung Store <onboarding@resend.dev>" — Resend's shared sender, works without domain
+    verification on the free tier).
+  - STORE FILLING via GOOGLE SHEET (owner chose the free Sheet path; STORE ≠ inventory): new super_admin
+    page app/[locale]/dashboard/parts/import/page.tsx (guarded by the existing dashboard/parts layout) +
+    "Import from sheet" button on the catalog. lib/parts/sheet-import.ts = pure CSV parser + validation
+    (header aliases, required sku/name/category/unit_price, is_published defaults TRUE, stock defaults
+    in_stock). Server action importPartsFromSheet(locale, csvUrl) in dashboard/parts/actions.ts: super_admin
+    only, https+Google-host-restricted fetch (SSRF guard) with 12s timeout + 2MB cap, then upserts rows
+    into the `parts` STORE table by SKU (onConflict:'sku' — re-import = sheet is source of truth). This is
+    the STORE catalog (parts), entirely separate from the production inventory_items. Optional env
+    STORE_SHEET_CSV_URL pre-fills the URL box. i18n: import_* keys in PartsDashboard (en+ar).
+    OWNER TODO to go live: publish the Google Sheet to web as CSV (File→Share→Publish to web→CSV) and paste
+    the link on /dashboard/parts/import; columns: sku*, name*, category*, unit_price*, name_ar, description,
+    description_ar, material, standard, min_order_qty, stock_status, image_url, is_published.
+  - PENDING owner actions: (a) create a free Resend account + add RESEND_API_KEY in Vercel to turn on lead
+    emails (leads already save without it); (b) publish the product Google Sheet + import it.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 

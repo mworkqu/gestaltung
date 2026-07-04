@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { STOCK_STATUSES } from "@/lib/parts/constants";
+import { parseSheet, type SkippedRow } from "@/lib/parts/sheet-import";
 import type { StockStatus } from "@/lib/supabase/types";
 
 export type PartFormState = { error?: string };
@@ -152,6 +153,96 @@ export async function deletePart(formData: FormData): Promise<void> {
   await supabase.from("parts").delete().eq("id", id);
 
   revalidatePath(`/${locale}/dashboard/parts`);
+}
+
+// ─── Google Sheet import ("store filling") ──────────────────────────────────
+// Fetches a published Google-Sheet CSV and upserts its rows into the STORE
+// catalog (`parts`) by SKU. This is the store the owner sells from — separate
+// from the production inventory. Re-importing treats the sheet as the source of
+// truth (existing SKUs are overwritten). super_admin only; RLS enforces it too.
+export type ImportResult = {
+  ok?: boolean;
+  error?:
+    | "auth"
+    | "bad_url"
+    | "bad_host"
+    | "fetch_failed"
+    | "no_header"
+    | "no_rows"
+    | "missing_columns"
+    | "db"
+    | "empty";
+  missing?: string[];
+  imported?: number;
+  skipped?: SkippedRow[];
+  totalRows?: number;
+};
+
+export async function importPartsFromSheet(
+  locale: "en" | "ar",
+  csvUrl: string
+): Promise<ImportResult> {
+  const session = await getSessionContext();
+  if (!session || session.profile.role !== "super_admin") {
+    return { error: "auth" };
+  }
+
+  // Validate the URL: https only, and restricted to Google hosts. Only the
+  // super_admin can reach this, but pinning the host still avoids the action
+  // being used as an arbitrary server-side fetcher (SSRF).
+  let url: URL;
+  try {
+    url = new URL(csvUrl.trim());
+  } catch {
+    return { error: "bad_url" };
+  }
+  if (url.protocol !== "https:") return { error: "bad_url" };
+  const host = url.hostname.toLowerCase();
+  const hostOk =
+    host === "docs.google.com" ||
+    host.endsWith(".google.com") ||
+    host.endsWith(".googleusercontent.com");
+  if (!hostOk) return { error: "bad_host" };
+
+  // Fetch the CSV with a timeout and a size cap.
+  let text: string;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    const res = await fetch(url.toString(), {
+      signal: controller.signal,
+      cache: "no-store",
+      redirect: "follow",
+    });
+    clearTimeout(timer);
+    if (!res.ok) return { error: "fetch_failed" };
+    text = (await res.text()).slice(0, 2_000_000); // ~2MB cap
+  } catch {
+    return { error: "fetch_failed" };
+  }
+
+  const parsed = parseSheet(text);
+  if (parsed.error) {
+    return { error: parsed.error, missing: parsed.missing };
+  }
+  if (parsed.valid.length === 0) {
+    return { error: "empty", skipped: parsed.skipped, totalRows: parsed.totalRows };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("parts")
+    .upsert(parsed.valid, { onConflict: "sku" });
+  if (error) return { error: "db" };
+
+  revalidatePath(`/${locale}/dashboard/parts`);
+  revalidatePath(`/${locale}/store`);
+  return {
+    ok: true,
+    imported: parsed.valid.length,
+    skipped: parsed.skipped,
+    totalRows: parsed.totalRows,
+  };
 }
 
 // Inline publish/unpublish toggle from the catalog table.
