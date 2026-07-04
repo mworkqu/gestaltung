@@ -1,23 +1,65 @@
+import Image from "next/image";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import {
-  Wrench,
-  ShoppingCart,
-  PencilRuler,
-  UploadCloud,
-  Cpu,
-  Factory,
-  PackageCheck,
-  ShieldCheck,
-  ArrowUpRight,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 
+import type { Part, StockStatus } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
-import { GMark } from "@/components/g-mark";
-import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/server";
+import { formatPrice, partName } from "@/lib/parts/format";
+import { LandingHeader } from "@/components/store-landing/landing-header";
+import { CategoryChips } from "@/components/store-landing/category-chips";
+import { FeaturedAddButton } from "@/components/store-landing/featured-add-button";
+import type { Locale } from "@/i18n/routing";
 
-export default async function Home({
+// Design-handoff fonts, scoped to the landing via CSS variables consumed by
+// the .sl-sans / .sl-heading / .sl-mono stacks in globals.css.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-space-grotesk",
+  display: "swap",
+});
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-sans",
+  display: "swap",
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-plex-mono",
+  display: "swap",
+});
+
+// Featured products must reflect admin publish toggles immediately.
+export const dynamic = "force-dynamic";
+
+// Store-first metadata for the homepage (overrides the sitewide default,
+// which mentions the inventory platform — banned on the store landing).
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "StoreLanding" });
+  return {
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+  };
+}
+
+const WHATSAPP_DIGITS =
+  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
+
+const STOCK_TOKENS: Record<StockStatus, { fg: string; bg: string }> = {
+  in_stock: { fg: "var(--sl-ok)", bg: "var(--sl-ok-bg)" },
+  low_stock: { fg: "var(--sl-warn)", bg: "var(--sl-warn-bg)" },
+  out_of_stock: { fg: "var(--sl-err)", bg: "var(--sl-err-bg)" },
+};
+
+export default async function StoreLandingPage({
   params,
 }: {
   params: Promise<{ locale: string }>;
@@ -25,287 +67,280 @@ export default async function Home({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const t = await getTranslations("Hero");
-  const tf = await getTranslations("Features");
-  const th = await getTranslations("HowItWorks");
-  const tHome = await getTranslations("Home");
-  const tla = await getTranslations("LocalAdvantage");
-  const ts = await getTranslations("Social");
+  const t = await getTranslations("StoreLanding");
+  const tBrand = await getTranslations("Brand");
   const isRtl = locale === "ar";
 
-  // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
-  const mono = (extra = "") =>
-    cn(
-      isRtl
-        ? "font-sans"
-        : "font-mono uppercase tracking-[0.18em]",
-      extra
-    );
+  // Published parts via the anon-safe RLS read; newest first as "featured".
+  // The homepage must never crash if Supabase env is absent (fresh local
+  // checkout) — fall back to the empty featured state instead.
+  let products: Part[] = [];
+  if (
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("parts")
+      .select("*")
+      .eq("is_published", true)
+      .order("created_at", { ascending: false })
+      .limit(8);
+    products = (data ?? []) as Part[];
+  }
 
-  const steps = [
-    { icon: UploadCloud, title: th("step1Title"), copy: th("step1Copy") },
-    { icon: Cpu, title: th("step2Title"), copy: th("step2Copy") },
-    { icon: Factory, title: th("step3Title"), copy: th("step3Copy") },
-    { icon: PackageCheck, title: th("step4Title"), copy: th("step4Copy") },
+  const stockLabel: Record<StockStatus, string> = {
+    in_stock: t("inStock"),
+    low_stock: t("lowStock"),
+    out_of_stock: t("outOfStock"),
+  };
+
+  const categories = [
+    t("cat1"),
+    t("cat2"),
+    t("cat3"),
+    t("cat4"),
+    t("cat5"),
+    t("cat6"),
   ];
 
-  const features: {
-    icon: LucideIcon;
-    title: string;
-    copy: string;
-    accent: boolean;
-    href?: string;
-  }[] = [
-    {
-      icon: Wrench,
-      title: tf("customTitle"),
-      copy: tf("customCopy"),
-      accent: true,
-    },
-    {
-      icon: ShoppingCart,
-      title: tf("storeTitle"),
-      copy: tf("storeCopy"),
-      accent: true,
-    },
-    {
-      icon: PencilRuler,
-      title: tf("cadTitle"),
-      copy: tf("cadCopy"),
-      accent: false,
-      href: "/cad-assistance",
-    },
-  ];
-
-  const advantages = [
-    { icon: Factory, title: tla("item1Title"), copy: tla("item1Copy") },
-    { icon: PackageCheck, title: tla("item2Title"), copy: tla("item2Copy") },
-    { icon: ShieldCheck, title: tla("item3Title"), copy: tla("item3Copy") },
-  ];
-
-  const institutions = [ts("org1"), ts("org2"), ts("org3"), ts("org4")];
-
-  const specs = [
-    { label: tHome("specMethodLabel"), value: tHome("specMethodValue") },
-    { label: tHome("specNetworkLabel"), value: tHome("specNetworkValue") },
-    { label: tHome("specOutputLabel"), value: tHome("specOutputValue") },
-  ];
+  const waHref = WHATSAPP_DIGITS
+    ? `https://wa.me/${WHATSAPP_DIGITS}?text=${encodeURIComponent(t("whatsappMsg"))}`
+    : null;
 
   return (
-    <div className="container space-y-6 py-6">
-      {/* Telemetry strip */}
-      <div className="neu-inset flex items-center justify-between gap-6 overflow-x-auto px-5 py-2.5">
-        <div className={mono("flex shrink-0 items-center gap-4 text-[10px] text-mutedtext")}>
-          <span className="flex items-center gap-1.5 font-semibold text-heading">
-            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-            {tHome("statusOnline")}
+    <div
+      className={`store-landing sl-sans min-h-screen ${spaceGrotesk.variable} ${plexSans.variable} ${plexMono.variable}`}
+    >
+      <LandingHeader locale={locale as Locale} />
+
+      {/* ── Hero ── */}
+      <section
+        className="border-b border-[var(--sl-border2)] px-[18px] pb-[26px] pt-7 md:px-10 md:pb-10 md:pt-[46px]"
+        style={{
+          background:
+            "radial-gradient(120% 140% at 100% 0%, var(--sl-hero-glow) 0%, transparent 55%)",
+        }}
+      >
+        <div className="max-w-[760px]">
+          <span className="sl-mono text-xs uppercase tracking-[1px] text-[var(--sl-accent)]">
+            {t("tagline")}
           </span>
-          <span className="text-faint">{tHome("location")}</span>
-        </div>
-        <div className={mono("hidden shrink-0 items-center gap-4 text-[10px] text-faint sm:flex")}>
-          <span>{t("formats")}</span>
-          <span>{tHome("bilingual")}</span>
-        </div>
-      </div>
-
-      {/* Hero bento */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Manifesto */}
-        <div className="neu animate-fade-up flex flex-col justify-between gap-10 p-8 sm:p-10 lg:col-span-7 lg:p-12">
-          <div className="space-y-6">
-            <span className="inline-flex items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
-              <span className="h-2 w-2 rounded-full bg-cobalt" />
-              <span className={mono("text-[10px] text-mutedtext")}>{t("kicker")}</span>
-            </span>
-
-            <h1 className="text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl lg:text-[3.25rem]">
-              {t("heading")}
-            </h1>
-
-            <p className="max-w-xl text-base leading-relaxed text-body sm:text-lg">
-              {t("subheading")}
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Button asChild size="lg" className="rounded-full px-7">
-              <Link href="/contact">{t("ctaPrimary")}</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="rounded-full px-7">
-              <Link href="/how-it-works">{t("ctaSecondary")}</Link>
-            </Button>
-          </div>
-        </div>
-
-        {/* Blueprint panel */}
-        <div className="neu animate-fade-up delay-1 flex flex-col justify-between gap-6 p-8 lg:col-span-5">
-          <div className={mono("flex items-center justify-between text-[10px] text-faint")}>
-            <span>{tHome("panelTag")}</span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> FIG·01
-            </span>
-          </div>
-
-          {/* Inset well with grid + concentric geometry + G mark */}
-          <div className="neu-inset relative flex flex-1 items-center justify-center overflow-hidden p-8">
-            <div aria-hidden className="bg-blueprint-grid absolute inset-0 opacity-70" />
-            <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-50">
-              <span className="absolute h-40 w-40 rounded-full border border-borderstrong" />
-              <span className="absolute h-56 w-56 rounded-full border border-dashed border-borderstrong/70" />
-            </div>
-            <div className="relative flex flex-col items-center">
-              <GMark className="h-24 w-24" />
-              <p className={mono("mt-5 text-[10px] text-faint")}>{t("formats")}</p>
-            </div>
-          </div>
-
-          {/* Spec readouts */}
-          <div className="grid grid-cols-3 gap-2">
-            {specs.map((s) => (
-              <div key={s.label} className="rounded-xl bg-panel px-3 py-2.5 shadow-neu-sm">
-                <span className={mono("block text-[8.5px] text-faint")}>{s.label}</span>
-                <span className="mt-1 block text-xs font-bold text-heading">{s.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Process */}
-      <section className="neu animate-fade-up delay-2 p-8 sm:p-10">
-        <div className="mb-8 flex flex-col gap-2">
-          <span className={mono("text-[10px] text-cobalt")}>{tHome("processTag")}</span>
-          <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
-            {th("heading")}
-          </h2>
-          <p className="max-w-2xl text-sm leading-relaxed text-mutedtext">{th("intro")}</p>
-        </div>
-
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map(({ icon: Icon, title, copy }, i) => (
-            <div key={title} className="neu-hover rounded-2xl bg-panel p-5 shadow-neu-sm">
-              <div className="flex items-center justify-between">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface shadow-neu-sm">
-                  <Icon className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
-                </span>
-                <span className="font-mono text-xs font-medium text-faint">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-              </div>
-              <h3 className="mt-4 text-base font-bold text-heading">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-mutedtext">{copy}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Capabilities */}
-      <section className="animate-fade-up delay-3 space-y-6">
-        <div className="flex flex-col gap-2 px-1">
-          <span className={mono("text-[10px] text-cobalt")}>{tHome("capabilitiesTag")}</span>
-        </div>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map(({ icon: Icon, title, copy, accent, href }) => {
-            const card = (
-              <>
-                <span
-                  className={cn(
-                    "flex h-12 w-12 items-center justify-center rounded-2xl shadow-neu-sm",
-                    accent ? "bg-cobalt" : "bg-panel"
-                  )}
-                >
-                  <Icon
-                    className={cn("h-6 w-6", accent ? "text-white" : "text-mutedtext")}
-                    strokeWidth={1.5}
-                  />
-                </span>
-                <h3 className="mt-5 flex items-center gap-1.5 text-lg font-bold text-heading">
-                  {title}
-                  {href && (
-                    <ArrowUpRight
-                      className={cn("h-4 w-4 text-cobalt", isRtl && "-scale-x-100")}
-                    />
-                  )}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-mutedtext">{copy}</p>
-              </>
-            );
-            return href ? (
-              <Link key={title} href={href} className="neu neu-hover block p-7">
-                {card}
-              </Link>
-            ) : (
-              <div key={title} className="neu neu-hover p-7">
-                {card}
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Local advantage strip */}
-      <section className="neu animate-fade-up delay-3 p-6 sm:p-8">
-        <div className="grid gap-5 md:grid-cols-3">
-          {advantages.map(({ icon: Icon, title, copy }) => (
-            <div key={title} className="flex items-start gap-4">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cobalt shadow-neu-sm">
-                <Icon className="h-5 w-5 text-white" strokeWidth={1.5} />
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-heading">{title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-mutedtext">{copy}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Social proof */}
-      <section className="animate-fade-up delay-4 overflow-hidden rounded-[1.75rem] bg-ink p-8 sm:p-12">
-        <div className="relative">
-          <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
-          <div className="relative space-y-2 text-center">
-            <span className={mono("text-[10px] text-white/45")}>{ts("tag")}</span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-              {ts("heading")}
-            </h2>
-            <p className="mx-auto max-w-xl text-sm leading-relaxed text-white/60">
-              {ts("subtext")}
-            </p>
-          </div>
-          <div className="relative mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {institutions.map((name) => (
-              <div
-                key={name}
-                className="flex min-h-[4.5rem] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-5 text-center grayscale"
+          <h1 className="sl-heading mb-[22px] mt-3 text-[28px] font-bold leading-[1.1] tracking-[-0.5px] text-[var(--sl-heading)] [text-wrap:balance] md:text-[42px]">
+            {t("heroTitle")}
+          </h1>
+          <form
+            action={`/${locale}/parts`}
+            className="flex max-w-[560px] items-stretch gap-2.5"
+          >
+            <div className="flex flex-1 items-center gap-2.5 rounded-[10px] border border-[var(--sl-search-border)] bg-[var(--sl-search-bg)] px-3.5 text-[var(--sl-faint)]">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                className="shrink-0"
+                aria-hidden
               >
-                <span className={mono("text-[10px] leading-relaxed text-white/55")}>
-                  {name}
-                </span>
-              </div>
-            ))}
+                <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+                <line
+                  x1="11"
+                  y1="11"
+                  x2="14.5"
+                  y2="14.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+              </svg>
+              <input
+                name="q"
+                placeholder={t("searchPh")}
+                className="w-full flex-1 border-none bg-transparent py-3 text-sm text-[var(--sl-heading)] outline-none placeholder:text-[var(--sl-faint)]"
+              />
+            </div>
+            <button
+              type="submit"
+              className="sl-heading rounded-[10px] bg-[var(--sl-accent)] px-[22px] text-sm font-semibold text-[var(--sl-accent-ink)]"
+            >
+              {t("searchBtn")}
+            </button>
+          </form>
+          <CategoryChips labels={categories} />
+        </div>
+      </section>
+
+      {/* ── Featured products ── */}
+      <section className="px-[18px] py-[26px] md:p-10">
+        <div className="mb-[22px] flex items-end justify-between gap-4">
+          <div>
+            <h2 className="sl-heading m-0 text-xl font-semibold text-[var(--sl-heading)] md:text-[26px]">
+              {t("featured")}
+            </h2>
+            <p className="mb-0 mt-1.5 text-[13px] text-[var(--sl-muted)]">
+              {t("featuredSub")}
+            </p>
           </div>
-          <p className="relative mt-4 text-center text-[11px] leading-relaxed text-white/35">
-            * {ts("footnote")}
+          <Link
+            href="/parts"
+            className="whitespace-nowrap text-[13px] text-[var(--sl-accent)]"
+          >
+            {t("viewAll")}
+          </Link>
+        </div>
+
+        {products.length === 0 ? (
+          <p className="sl-mono text-[13px] text-[var(--sl-faint)]">
+            {t("emptyFeatured")}
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {products.map((part) => {
+              const spec =
+                [part.material, part.standard].filter(Boolean).join(" · ") ||
+                part.category;
+              const stock = STOCK_TOKENS[part.stock_status];
+              return (
+                <div
+                  key={part.id}
+                  className="flex flex-col overflow-hidden rounded-xl border border-[var(--sl-border)] bg-[var(--sl-panel)]"
+                >
+                  <Link
+                    href={`/parts/${part.sku}`}
+                    className="relative flex h-[116px] items-end p-2.5 md:h-40"
+                    style={{
+                      background:
+                        "repeating-linear-gradient(135deg, var(--sl-stripe1) 0, var(--sl-stripe1) 9px, var(--sl-stripe2) 9px, var(--sl-stripe2) 18px)",
+                    }}
+                  >
+                    {part.image_url ? (
+                      // Admin-pasted arbitrary hosts → plain <img>, same as the
+                      // store catalog (next/image needs configured domains).
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={part.image_url}
+                        alt={partName(part, locale)}
+                        loading="lazy"
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    ) : (
+                      <span className="sl-mono text-[11px] text-[var(--sl-cap)]">
+                        {"// "}
+                        {part.sku.toLowerCase()}
+                      </span>
+                    )}
+                    <span
+                      className="absolute top-2.5 rounded-md px-2 py-[3px] text-[11px] font-medium ltr:right-2.5 rtl:left-2.5"
+                      style={{ background: stock.bg, color: stock.fg }}
+                    >
+                      {stockLabel[part.stock_status]}
+                    </span>
+                  </Link>
+                  <div className="flex flex-1 flex-col gap-[7px] p-3.5 pb-[15px]">
+                    <span className="sl-mono text-[11px] tracking-[0.3px] text-[var(--sl-faint)]">
+                      {spec}
+                    </span>
+                    <Link
+                      href={`/parts/${part.sku}`}
+                      className="text-sm font-medium leading-[1.35] text-[var(--sl-heading)]"
+                    >
+                      {partName(part, locale)}
+                    </Link>
+                    <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                      <span className="sl-mono text-[15px] font-medium text-[var(--sl-accent)]">
+                        {formatPrice(part.unit_price, locale)}
+                      </span>
+                      <FeaturedAddButton part={part} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Custom manufacturing strip (the ONE Design button) ── */}
+      <section className="px-[18px] pb-[18px] md:px-10 md:pb-10">
+        <div
+          className="relative flex flex-col items-stretch overflow-hidden rounded-2xl border border-[var(--sl-border)] md:flex-row"
+          style={{ background: "var(--sl-strip-bg)" }}
+        >
+          <div className="absolute top-0 h-full w-1 bg-[var(--sl-accent)] ltr:left-0 rtl:right-0" />
+          <div className="flex-1 px-5 py-[26px] md:px-11 md:py-10">
+            <span className="sl-mono text-xs uppercase tracking-[1px] text-[var(--sl-accent)]">
+              {t("customKicker")}
+            </span>
+            <h3 className="sl-heading mb-2.5 mt-3 text-[22px] font-bold leading-[1.15] text-[var(--sl-heading)] md:text-3xl">
+              {t("customTitle")}
+            </h3>
+            <p className="mb-[22px] mt-0 max-w-[440px] text-sm leading-[1.6] text-[var(--sl-body)]">
+              {t("customText")}
+            </p>
+            <div className="flex flex-wrap items-center gap-3.5">
+              <Link
+                href="/design"
+                className="sl-heading flex items-center gap-2 rounded-[10px] bg-[var(--sl-accent)] px-6 py-[13px] text-[15px] font-semibold text-[var(--sl-accent-ink)]"
+              >
+                {t("customBtn")}
+                <span className="text-base">{isRtl ? "←" : "→"}</span>
+              </Link>
+              <span className="sl-mono text-xs text-[var(--sl-faint)]">
+                STL · STEP · DXF · IGES
+              </span>
+            </div>
+          </div>
+          <div
+            className="flex h-[140px] items-center justify-center border-t border-[var(--sl-border)] md:h-auto md:min-h-[180px] md:w-[300px] md:flex-none md:border-t-0 ltr:md:border-l rtl:md:border-r"
+            style={{ background: "var(--sl-art-bg)" }}
+          >
+            <span className="sl-mono text-xs text-[var(--sl-art-text)]">
+              {"// cad-render.step"}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="flex flex-col justify-between gap-6 border-t border-[var(--sl-border2)] bg-[var(--sl-foot-bg)] px-[18px] py-7 md:flex-row md:px-10 md:py-9">
+        <div className="max-w-[280px]">
+          <div className="mb-3 flex items-center gap-2.5">
+            <span className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-2xl bg-[var(--sl-logo-plate)]">
+              <Image
+                src="/store-logo.png"
+                alt={tBrand("name")}
+                width={92}
+                height={92}
+                className="h-[92px] w-[92px] object-contain"
+              />
+            </span>
+            <span className="sl-heading text-[15px] font-semibold text-[var(--sl-heading)]">
+              {tBrand("name")}
+            </span>
+          </div>
+          <p className="sl-mono m-0 whitespace-pre-line text-xs leading-[1.6] text-[var(--sl-faint)]">
+            {t("footerText")}
           </p>
         </div>
-      </section>
-
-      {/* Closing CTA band */}
-      <section className="animate-fade-up delay-4 overflow-hidden rounded-[1.75rem] bg-ink p-8 sm:p-12">
-        <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-          <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
-          <div className="relative space-y-2">
-            <span className={mono("text-[10px] text-white/45")}>{tHome("ctaTag")}</span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-              {tHome("ctaHeading")}
-            </h2>
-          </div>
-          <Button asChild size="lg" variant="secondary" className="relative rounded-full px-7">
-            <Link href="/contact">{tHome("ctaButton")}</Link>
-          </Button>
-        </div>
-      </section>
+        {waHref ? (
+          <a
+            href={waHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-[9px] self-start rounded-[10px] border border-[var(--sl-wa-border)] bg-[var(--sl-wa-bg)] px-[18px] py-[11px] text-sm font-medium text-[var(--sl-wa)]"
+          >
+            <span className="h-2 w-2 rounded-full bg-[var(--sl-wa)]" />
+            {t("footerCta")}
+          </a>
+        ) : (
+          <Link
+            href="/contact"
+            className="flex items-center gap-[9px] self-start rounded-[10px] border border-[var(--sl-wa-border)] bg-[var(--sl-wa-bg)] px-[18px] py-[11px] text-sm font-medium text-[var(--sl-wa)]"
+          >
+            <span className="h-2 w-2 rounded-full bg-[var(--sl-wa)]" />
+            {t("footerCta")}
+          </Link>
+        )}
+      </footer>
     </div>
   );
 }

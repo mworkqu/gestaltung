@@ -253,34 +253,87 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     CART_KEY, LAST_ORDER_KEY) + lib/parts/format.ts (formatPrice QAR, partName/partDescription locale
     fallback). Types Part/PartOrder/PartOrderItem/CartItem/StockStatus added to lib/supabase/types.ts.
     `npm run build` passes.
-- ROADMAP: the full staged plan (Stages 1–9) lives in Gestaltung_Build_Plan.md — note that file is actually a
-  Word/.docx (binary, mislabeled .md), so extract word/document.xml to read it. Next up:
-  Stage 8 e-commerce, 9 AI. 4 stages remain (6–9).
-  - STAGE 6 IS SPLIT into two passes (decided 2026-06-05; biggest jump so far — private file storage + a
-    stateful 3-role workflow). Build 6a fully (incl. migration run + test) before starting 6b. The two
-    Claude Code prompts live in the project root as STAGE_6A_PROMPT.md and STAGE_6B_PROMPT.md.
-    - Stage 6a — CAD upload + job creation. Private Supabase Storage bucket "cad-files" (signed-URL
-      downloads, never public); jobs + job_files tables; method picked MANUALLY (3d_printing | cnc_machining
-      | laser_cutting | edm); same multi-tenant RLS as 4–5 (client sees only own jobs). NO assignment/status
-      changes yet. New migration is next in sequence (0005_*). ALSO in 6a: site-wide Google Analytics (GA4)
-      via @next/third-parties GoogleAnalytics in the root [locale] layout — covers every page EN+AR
-      (see ANALYTICS note below).
-    - Stage 6b — Dispatch + status workflow. super_admin assigns a job to a workshop; assigned workshop (only)
-      downloads files + advances status (submitted→quoted→in_production→ready→delivered) under role-allowed
-      transitions; client tracks to delivered; optional job_events audit trail (0006_*).
-    - Method AUTO-detection stays manual; rules-based / AI suggestion deferred to Stage 9.
-    - ANALYTICS (added to 6a 2026-06-05): Google Analytics 4, site-wide. GA4 stream "gestaltung",
-      Stream ID 15007875857, Measurement ID G-QXVQ4H05Y7, configured stream URL
-      https://www.gestaltung360.com (the intended custom domain; site currently also at
-      gestaltung.vercel.app). Wire via @next/third-parties GoogleAnalytics in app/[locale]/layout.tsx;
-      read the ID from NEXT_PUBLIC_GA_MEASUREMENT_ID (browser-safe, NOT hardcoded), inject only when set.
-      Add NEXT_PUBLIC_GA_MEASUREMENT_ID to .env.local AND Vercel (Production / Preview / Development).
-      Custom domain www.gestaltung360.com is the planned production hostname (point it at the Vercel
-      project when DNS is ready). No custom GA events yet — baseline pageviews only.
-  - HOSTING ENV NOTE for Stage 4: add the Supabase env vars in Vercel (Project → Settings → Environment
-    Variables) for ALL THREE scopes (Production / Preview / Development): NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY (browser-safe), and the server-only SUPABASE_SERVICE_ROLE_KEY
-    (NO NEXT_PUBLIC_ prefix — keep it server-side only). There are NO app env vars today.
+- STORE-FIRST REBUILD — Stage 1 (store landing from the design handoff): DONE (2026-07-04). Plan lives in
+  STAGES_STORE_FIRST.md (5 stages; run one at a time). No migration.
+  - Homepage app/[locale]/page.tsx REPLACED by the store landing from "Store-first platform
+    design-handoff.zip" (Claude Design bundle; StoreLanding.dc.html is the spec — zip kept untracked, it's
+    1.4MB). Sections: design header (logo plate + Store nav + EN·ع toggle + session-aware Sign in/Dashboard +
+    Cart→/store/cart), hero "Order parts. Or design your own." + search (submits to /parts) + category chips,
+    Featured products (Supabase published parts, newest 8, RLS anon read — page stays force-dynamic and
+    degrades to an empty state if Supabase env is missing), Custom-manufacturing strip with ONE Design
+    button → /design, WhatsApp footer (env-gated wa.me, /contact fallback).
+  - HARD RULE honored: zero inventory link/mention on the landing (design's Inventory nav item dropped;
+    homepage also gets its own store-first generateMetadata because the sitewide meta description says
+    "inventory platform").
+  - Theming: design token system scoped as .store-landing in app/globals.css (--sl-* vars; light base +
+    dark via prefers-color-scheme — the rest of the site keeps the light neu theme). Fonts Space Grotesk /
+    IBM Plex Sans / IBM Plex Mono loaded via next/font IN THE PAGE, exposed through .sl-heading/.sl-sans/
+    .sl-mono. RTL via logical props (ltr:/rtl: variants where needed).
+  - New components/store-landing/: landing-header.tsx (client: cart badge via useCart, locale toggle,
+    auth-aware link, mobile menu), category-chips.tsx, featured-add-button.tsx (addItem(part, min_order_qty)
+    + Added flash). components/homepage-chrome-gate.tsx hides the OLD global Header/Footer on "/" only
+    (next-intl usePathname strips the locale) — landing ships its own chrome until Stage 5 rebuilds the
+    global header. public/store-logo.png = design logo downscaled 1024→224px (10 KB; keep /public lean).
+  - i18n: new StoreLanding namespace in messages/{en,ar}.json (incl. metaTitle/metaDescription).
+  - KNOWN 404s BY DESIGN until later stages: /design (Stage 3) and /store/cart (Stage 2) — the stage plan
+    wires these targets now on purpose. "View all" + search point at /parts and get swept to /store by
+    Stage 2's href update.
+  - NOTE: .env.local on this machine has NO Supabase vars (only GA + Vercel OIDC), so local featured
+    products render the empty state; production (Vercel env) loads real parts. `vercel env pull` was
+    blocked by the permission classifier — pull manually if local product data is wanted.
+
+## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
+
+| # | Stage | Migration(s) | Status |
+|---|-------|-------------|--------|
+| 1 | Scaffold + deploy (Next.js + Vercel) | — | ✅ LIVE |
+| 2 | Bilingual EN/AR shell + theme + logo | — | ✅ DONE |
+| 3 | Public marketing site (home, how-it-works, about, contact) | — | ✅ DONE |
+| 4 | Supabase auth + roles + RLS | 0001, 0002, 0003 | ✅ DONE |
+| 5 | Multi-tenant inventory (workshop/client) | 0004 | ✅ DONE |
+| 6a | CAD upload + job creation + GA4 | 0005 | ✅ DONE |
+| 6b | Workshop dispatch + status workflow + job events | 0006 | ✅ DONE |
+| 7 | Workshop internal jobs + BOM + inventory deduction | 0007 | ✅ DONE |
+| 7† | Super Admin global command-centre dashboard | — | ✅ DONE |
+| 8a | Security hardening + conversion wins (social proof, local advantage, CAD service page) | 0009 | ✅ DONE |
+| 8b | Upload-funnel upsells + B2B path bifurcation | 0010 | ✅ DONE |
+| PS | Parts Store e-commerce module (catalog, cart, checkout, admin) | 0011 | ✅ DONE (code) — run 0011 in Supabase |
+| 9 | AI method auto-detection | TBD | ⬜ NEXT |
+
+† The "original-plan Stage 7" (super admin dashboard) was built as an add-on alongside the workshop Stage 7.
+
+## PROMPT FILES IN PROJECT ROOT
+- STAGE_6A_PROMPT.md — CAD upload + GA4
+- STAGE_6B_PROMPT.md — workshop dispatch + status workflow
+- STAGE_PARTS_STORE_PROMPT.md — e-commerce parts store (the prompt used for Stage PS above)
+- STAGE_8A_PROMPT.md — security review + conversion wins (reference; stage already done)
+- STAGE_8B_PROMPT.md — upload-funnel upsells + B2B paths (reference; stage already done)
+
+## WHAT'S NEXT — Stage 9: AI Method Auto-Detection
+Currently the manufacturing method (3D printing / CNC / laser cutting / EDM) is selected manually
+by the client on the job form. Stage 9 adds a rules-based suggestion engine (and optionally an
+LLM call) that analyses the uploaded file extension + material + geometry hints to recommend the
+best method, with the client free to override.
+Prompt file: STAGE_9_AI_PROMPT.md (not yet written — create when ready to build).
+
+## PENDING MIGRATIONS (run in order if not already done)
+Check Supabase → Table Editor to confirm which tables exist before running:
+- 0010_job_upsells.sql — jobs upsell columns (speed_tier, post_processing, inspection_report, job_path, production_qty_range)
+- 0011_parts_store.sql — parts, part_orders, part_order_items tables + create_part_order RPC
+
+## PERMANENT NOTES
+- Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in
+  Vercel (Production / Preview / Development). Custom domain www.gestaltung360.com (point DNS at Vercel
+  when ready; currently live at gestaltung.vercel.app).
+- WhatsApp: primary contact channel. Env var NEXT_PUBLIC_WHATSAPP_NUMBER (digits only, e.g. 97412345678).
+  NOT set yet — owner chose not to publish the number publicly until launch. Falls back to /contact.
+- OWNER RULE: never sign the owner up for paid services or subscriptions.
+- Supabase project: jgwuafubtmpaonsznfyw. Vercel env vars required (all 3 scopes):
+  NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (server-only).
+- Hosting: Vercel project "gestaltung" (prj_xO2xcUzSvV0Y7D0fAlqHmFcB6n5P), team "GESTALTUNG RASHWAN"
+  (slug gestaltungco-7345s). GitHub repo mworkqu/gestaltung, branch main → auto-deploy.
+- Node: 24.x (engines in package.json + Vercel project setting must match).
+- next pinned to ^15.2.3 (CVE-2025-29927 fix).
 
 ## ENVIRONMENT NOTES (for Claude)
 - This project now runs on the USER'S Windows machine (PowerShell): npm, git, next build, netlify, and vercel

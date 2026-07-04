@@ -96,6 +96,119 @@
   }
 }
 
+@layer components {
+  /* ── Store landing (store-first rebuild, Stage 1) ─────────────────────────
+     Token system from the design handoff, scoped to the landing page only so
+     the rest of the site keeps its light neomorphic theme. Light is the base;
+     dark follows the visitor's system preference (prefers-color-scheme). */
+  .store-landing {
+    --sl-bg: #f2f5f9;
+    --sl-panel: #ffffff;
+    --sl-border: #e3e8ef;
+    --sl-border2: #e7ecf2;
+    --sl-heading: #111820;
+    --sl-body: #414b59;
+    --sl-muted: #68727f;
+    --sl-faint: #8b96a3;
+    --sl-cap: #9aa6b3;
+    --sl-accent: #1f7ae0;
+    --sl-accent-ink: #ffffff;
+    --sl-logo-plate: transparent;
+    --sl-soft-bg: rgba(31, 122, 224, 0.09);
+    --sl-soft-border: rgba(31, 122, 224, 0.28);
+    --sl-chip-bg: #eef2f7;
+    --sl-chip-border: #e0e6ee;
+    --sl-stripe1: #e8edf3;
+    --sl-stripe2: #f1f4f8;
+    --sl-hero-glow: rgba(31, 122, 224, 0.07);
+    --sl-strip-bg: linear-gradient(135deg, #ffffff 0%, #eaf1fa 100%);
+    --sl-art-bg: repeating-linear-gradient(
+      45deg,
+      #e6ebf2 0,
+      #e6ebf2 10px,
+      #eff3f8 10px,
+      #eff3f8 20px
+    );
+    --sl-art-text: #aeb8c4;
+    --sl-foot-bg: #eef2f7;
+    --sl-header-bg: rgba(255, 255, 255, 0.92);
+    --sl-search-bg: #ffffff;
+    --sl-search-border: #d8e0ea;
+    --sl-ok: #12925a;
+    --sl-ok-bg: rgba(18, 146, 90, 0.1);
+    --sl-warn: #b06a00;
+    --sl-warn-bg: rgba(176, 106, 0, 0.1);
+    --sl-err: #c0392b;
+    --sl-err-bg: rgba(192, 57, 43, 0.1);
+    --sl-wa: #12926a;
+    --sl-wa-bg: rgba(18, 146, 106, 0.1);
+    --sl-wa-border: rgba(18, 146, 106, 0.28);
+    color-scheme: light;
+    background: var(--sl-bg);
+    color: var(--sl-body);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .store-landing {
+      --sl-bg: #0a0e15;
+      --sl-panel: #121a26;
+      --sl-border: #1c2634;
+      --sl-border2: #161f2c;
+      --sl-heading: #e8eef5;
+      --sl-body: #c3cedb;
+      --sl-muted: #8b98a8;
+      --sl-faint: #5b6b7f;
+      --sl-cap: #546477;
+      --sl-accent: #3ea6ff;
+      --sl-accent-ink: #06101c;
+      --sl-logo-plate: #e8eef5;
+      --sl-soft-bg: rgba(62, 166, 255, 0.12);
+      --sl-soft-border: rgba(62, 166, 255, 0.28);
+      --sl-chip-bg: #121a26;
+      --sl-chip-border: #1c2634;
+      --sl-stripe1: #0e1521;
+      --sl-stripe2: #121b28;
+      --sl-hero-glow: rgba(62, 166, 255, 0.06);
+      --sl-strip-bg: linear-gradient(135deg, #101826 0%, #0c1420 100%);
+      --sl-art-bg: repeating-linear-gradient(
+        45deg,
+        #0b111c 0,
+        #0b111c 10px,
+        #0e1622 10px,
+        #0e1622 20px
+      );
+      --sl-art-text: #3d4b5c;
+      --sl-foot-bg: #080b12;
+      --sl-header-bg: rgba(10, 14, 21, 0.9);
+      --sl-search-bg: #121a26;
+      --sl-search-border: #223044;
+      --sl-ok: #5fd48a;
+      --sl-ok-bg: rgba(95, 212, 138, 0.12);
+      --sl-warn: #f2b53d;
+      --sl-warn-bg: rgba(242, 181, 61, 0.12);
+      --sl-err: #f2695c;
+      --sl-err-bg: rgba(242, 105, 92, 0.12);
+      --sl-wa: #25d366;
+      --sl-wa-bg: rgba(37, 211, 102, 0.12);
+      --sl-wa-border: rgba(37, 211, 102, 0.3);
+      color-scheme: dark;
+    }
+  }
+
+  /* Design-handoff font stacks (loaded via next/font on the landing page). */
+  .sl-sans {
+    font-family: var(--font-plex-sans), var(--font-sans-ar), ui-sans-serif,
+      system-ui, sans-serif;
+  }
+  .sl-heading {
+    font-family: var(--font-space-grotesk), var(--font-sans-ar), ui-sans-serif,
+      sans-serif;
+  }
+  .sl-mono {
+    font-family: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+  }
+}
+
 @layer utilities {
   /* Faint blueprint grid used behind the hero panel — drawn in ink, not accent. */
   .bg-blueprint-grid {
