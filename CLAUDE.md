@@ -317,8 +317,16 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     OWNER TODO to go live: publish the Google Sheet to web as CSV (File→Share→Publish to web→CSV) and paste
     the link on /dashboard/parts/import; columns: sku*, name*, category*, unit_price*, name_ar, description,
     description_ar, material, standard, min_order_qty, stock_status, image_url, is_published.
-  - PENDING owner actions: (a) create a free Resend account + add RESEND_API_KEY in Vercel to turn on lead
-    emails (leads already save without it); (b) publish the product Google Sheet + import it.
+  - DONE 2026-07-05: Resend configured + verified end-to-end. RESEND_API_KEY (all scopes) + RESEND_FROM
+    "Gestaltung <noreply@contact.gestaltung360.com>" (sending domain contact.gestaltung360.com verified in
+    Resend) + STORE_SHEET_CSV_URL (the owner's published sheet) set in Vercel. A test POST to
+    /api/store-lead returned {ok,saved,emailed all true} — lead saved to inquiries AND email delivered to
+    info@gestaltung360.com. (One "TEST LEAD (please ignore)" inquiry row + one test email exist to delete.)
+  - The owner's product Google Sheet parses cleanly (5 rows: GR-001..004 published, GR-005 out-of-stock
+    draft; all with Arabic names + image links). Header normalizer was hardened to tolerate the "*" markers
+    and stray punctuation the owner's headers contained. Import URL is pre-filled from STORE_SHEET_CSV_URL;
+    the owner clicks "Import from sheet" on /dashboard/parts/import to populate the live store (that action
+    is super_admin-gated, so it can't be run headlessly).
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
