@@ -390,6 +390,36 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     "inventory" still appears in every page's HTML because NextIntlClientProvider serializes ALL message
     namespaces for client hydration — that's an invisible bundle, not a landing mention/link.)
 
+- STORE-FIRST REBUILD — Stage 5 (admin store rename + header/footer rebuild): DONE (deployed + verified
+  2026-07-05). No migration. **Store-first rebuild (Stages 1–5) COMPLETE.**
+  - MOVED app/[locale]/dashboard/parts → app/[locale]/dashboard/store (catalog, new, [id]/edit, import,
+    orders, actions.ts); super-admin guard (dashboard/store/layout.tsx) kept; rewrote every href / import
+    (`@/app/[locale]/dashboard/parts/*` → …/dashboard/store/*) / revalidatePath / redirect. 308 redirects
+    /dashboard/parts(+/:path*) → /dashboard/store(+/:path*). DashboardNav labels: partsCatalog→"Store",
+    partsOrders→"Store orders" (en+ar; ar partsOrders="طلبات المتجر" to not clash with jobs="الطلبات").
+  - HEADER DECISION = (b): Inventory is NOT in the public header. Rationale: the homepage now uses the
+    GLOBAL header, so an Inventory link there would put inventory on the store landing (hard-rule
+    violation). Inventory is reached only from the dashboard/account menu (dashboard/layout nav → /inventory,
+    non-clients).
+  - HEADER rebuilt store-first (components/header.tsx): primary nav = Store (/store) + Design (/design)
+    only. Removed How-it-works / CAD / About / Contact and the "Upload a file" button. Kept Cart + EN·ع
+    (LanguageSwitcher) + session-aware Sign in/Dashboard (HeaderAuthLink). New Nav.store/Nav.design (en+ar).
+  - FOOTER rebuilt (components/footer.tsx): gains a secondary nav — Store, Design, How it works, About,
+    Contact — so those pages aren't orphaned. Inventory intentionally absent here too.
+  - Verified live (vercel + gestaltung360.com): header block has only Store+Design (no how-it-works/about/
+    contact/inventory); footer has the marketing links; /dashboard/parts* → 308 → /dashboard/store*;
+    /dashboard/store anon → 307 sign-in.
+  - FINAL ACCEPTANCE (store-first plan) — all green: homepage=store landing (neu, EN+AR, light-only per
+    owner); featured products from Supabase + add-to-cart badge; exactly ONE Design button → /design; zero
+    inventory link/mention on the landing; /store + [sku] + cart + checkout work, old /parts 308-redirect;
+    /design hub (upload + drawing), signed-in upload creates a job; /inventory signed-in only from the
+    account menu + project-planning board; all legacy URLs 308-redirect; `npm run build` passes; Vercel
+    green on /en + /ar. (RLS per-role isolation unchanged — no migrations in the whole rebuild.)
+  - LEFTOVER (non-blocking): dead .store-landing/.sl-* CSS block in globals.css (nothing uses it) — prune
+    anytime. next-intl ships ALL message namespaces to every page's hydration bundle (so words like
+    "inventory" appear in HTML source everywhere) — an invisible bundle, not a UI mention; per-route
+    message scoping is a possible future optimization.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
