@@ -349,6 +349,34 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     /dashboard/jobs/:path* → /design/jobs/:path*.
   - NOTE: jobs are no longer under the dashboard sub-nav (Overview | Inventory | …). The dashboard's "Jobs"
     nav link now points to /design/jobs (leaves the dashboard chrome). Stage 5 rebuilds the header/nav.
+  - DESIGN LANGUAGE FIX (2026-07-05, owner feedback "the old design is way better, match how-it-works"):
+    the /design hub was rebuilt in the marketing neu language — pill kicker, neu bento hero with the
+    blueprint panel (GMark + bg-blueprint-grid + concentric circles + spec readouts), two prominent
+    neu-hover path cards, ink CTA band. Reuses Home spec/CTA + Hero("formats"); DesignHub gained
+    panelTag/pathsTag/ctaTag/ctaHeading/ctaButton. RULE GOING FORWARD: new custom pages use the light neu
+    "precision" design system (how-it-works is the reference), NOT the store-landing --sl-* tokens. The
+    store landing itself keeps the store-first handoff design.
+- STORE-FIRST REBUILD — Stage 4 (inventory as a standalone signed-in area + project planning): DONE
+  (deployed + verified 2026-07-05). No migration.
+  - MOVED app/[locale]/dashboard/inventory → app/[locale]/inventory (list, new, [id]/edit, actions.ts);
+    rewrote every href/import (`@/app/[locale]/dashboard/inventory/actions` → …/inventory/actions) +
+    revalidatePath/redirect strings (incl. design/jobs/actions.ts startJob's inventory revalidate). NEW
+    app/[locale]/inventory/layout.tsx = single auth gate (redirect anon) + `container py-10` + Items|Projects
+    sub-nav (components/inventory/inventory-nav.tsx) + Dashboard back-link + SignOut. RLS still scopes rows
+    to the caller's tenant. dashboard/layout.tsx "Inventory" menu link now → /inventory (still hidden from
+    clients). Reached only from the dashboard/account menu; NEVER from the store landing.
+  - NEW /inventory/projects = project-planning board (components/inventory/project-planner.tsx, client).
+    Group inventory items into projects with a bill of materials; per-row current stock with green (ok) /
+    red (short) flags; project-level short badge; Planned→In progress→Done kanban via ◄ ► move buttons.
+    KEY DECISION (honoring "NO new DB migration"): stock is read LIVE via RLS from inventory_items (passed
+    from app/[locale]/inventory/projects/page.tsx), but the PROJECTS THEMSELVES are stored in the browser
+    (localStorage key gestaltung:inventory-projects) — a per-browser planning aid, not shared/persistent.
+    If shared or multi-device projects are wanted later, that needs a projects table (would STOP + ask, per
+    the stage rule). i18n: Inventory namespace extended with projects/kanban strings (en+ar).
+  - 308 redirects (verified live, both locales): /dashboard/inventory(+/:path*) → /inventory(+/:path*).
+  - Hard rule verified: store landing has NO inventory link and its meta description is clean. (The word
+    "inventory" still appears in every page's HTML because NextIntlClientProvider serializes ALL message
+    namespaces for client hydration — that's an invisible bundle, not a landing mention/link.)
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
