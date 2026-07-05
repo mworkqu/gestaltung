@@ -2,7 +2,6 @@ import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
-import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/logo-mark";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { HeaderAuthLink } from "@/components/header-auth-link";
@@ -14,12 +13,12 @@ export async function Header({ locale }: { locale: Locale }) {
   const tBrand = await getTranslations("Brand");
   const isRtl = locale === "ar";
 
+  // Store-first primary nav (Stage 5): the two customer paths only. Inventory is
+  // deliberately absent from the public header — it lives behind the dashboard/
+  // account menu — so it never appears on the store landing (hard rule).
   const navLinks = [
-    { href: "/how-it-works", label: t("howItWorks") },
-    { href: "/design/drawing", label: t("cadAssistance") },
-    { href: "/store", label: t("partsStore") },
-    { href: "/about", label: t("about") },
-    { href: "/contact", label: t("contact") },
+    { href: "/store", label: t("store") },
+    { href: "/design", label: t("design") },
   ];
 
   return (
@@ -75,9 +74,6 @@ export async function Header({ locale }: { locale: Locale }) {
             <CartIcon />
             <LanguageSwitcher currentLocale={locale} />
             <HeaderAuthLink isRtl={isRtl} />
-            <Button asChild size="sm" className="h-9 rounded-full px-4">
-              <Link href="/contact">{t("uploadFile")}</Link>
-            </Button>
           </div>
         </div>
       </div>

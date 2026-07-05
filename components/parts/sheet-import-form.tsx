@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   importPartsFromSheet,
   type ImportResult,
-} from "@/app/[locale]/dashboard/parts/actions";
+} from "@/app/[locale]/dashboard/store/actions";
 import { cn } from "@/lib/utils";
 
 const fieldClass =
@@ -118,7 +118,7 @@ export function SheetImportForm({
           )}
           <div className="flex flex-wrap gap-3 pt-1">
             <Button asChild variant="outline" size="sm" className="rounded-full">
-              <Link href="/dashboard/parts">{t("import_back")}</Link>
+              <Link href="/dashboard/store">{t("import_back")}</Link>
             </Button>
             <Button asChild size="sm" className="rounded-full">
               <Link href="/store">{t("import_view_store")}</Link>

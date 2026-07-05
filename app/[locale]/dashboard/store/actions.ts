@@ -108,8 +108,8 @@ export async function createPart(
     return { error: t("error_unknown") };
   }
 
-  revalidatePath(`/${locale}/dashboard/parts`);
-  redirect(`/${locale}/dashboard/parts`);
+  revalidatePath(`/${locale}/dashboard/store`);
+  redirect(`/${locale}/dashboard/store`);
 }
 
 export async function updatePart(
@@ -136,8 +136,8 @@ export async function updatePart(
     return { error: t("error_unknown") };
   }
 
-  revalidatePath(`/${locale}/dashboard/parts`);
-  redirect(`/${locale}/dashboard/parts`);
+  revalidatePath(`/${locale}/dashboard/store`);
+  redirect(`/${locale}/dashboard/store`);
 }
 
 export async function deletePart(formData: FormData): Promise<void> {
@@ -152,7 +152,7 @@ export async function deletePart(formData: FormData): Promise<void> {
   const supabase = await createClient();
   await supabase.from("parts").delete().eq("id", id);
 
-  revalidatePath(`/${locale}/dashboard/parts`);
+  revalidatePath(`/${locale}/dashboard/store`);
 }
 
 // ─── Google Sheet import ("store filling") ──────────────────────────────────
@@ -235,7 +235,7 @@ export async function importPartsFromSheet(
     .upsert(parsed.valid, { onConflict: "sku" });
   if (error) return { error: "db" };
 
-  revalidatePath(`/${locale}/dashboard/parts`);
+  revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/store`);
   return {
     ok: true,
@@ -259,5 +259,5 @@ export async function togglePublished(formData: FormData): Promise<void> {
   const supabase = await createClient();
   await supabase.from("parts").update({ is_published: next }).eq("id", id);
 
-  revalidatePath(`/${locale}/dashboard/parts`);
+  revalidatePath(`/${locale}/dashboard/store`);
 }

@@ -28,8 +28,8 @@ export async function updateOrderStatus(formData: FormData): Promise<void> {
   const supabase = await createClient();
   await supabase.from("part_orders").update({ status }).eq("id", id);
 
-  revalidatePath(`/${locale}/dashboard/parts/orders`);
-  revalidatePath(`/${locale}/dashboard/parts/orders/${id}`);
+  revalidatePath(`/${locale}/dashboard/store/orders`);
+  revalidatePath(`/${locale}/dashboard/store/orders/${id}`);
 }
 
 export async function toggleWhatsappSent(formData: FormData): Promise<void> {
@@ -43,6 +43,6 @@ export async function toggleWhatsappSent(formData: FormData): Promise<void> {
   const supabase = await createClient();
   await supabase.from("part_orders").update({ whatsapp_sent: next }).eq("id", id);
 
-  revalidatePath(`/${locale}/dashboard/parts/orders`);
-  revalidatePath(`/${locale}/dashboard/parts/orders/${id}`);
+  revalidatePath(`/${locale}/dashboard/store/orders`);
+  revalidatePath(`/${locale}/dashboard/store/orders/${id}`);
 }

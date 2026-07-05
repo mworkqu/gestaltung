@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 
 import type { PartOrderStatus } from "@/lib/supabase/types";
 import { PART_ORDER_STATUSES } from "@/lib/parts/constants";
-import { updateOrderStatus } from "@/app/[locale]/dashboard/parts/orders/actions";
+import { updateOrderStatus } from "@/app/[locale]/dashboard/store/orders/actions";
 import { cn } from "@/lib/utils";
 
 // Inline status dropdown; changing it posts to the server action immediately.

@@ -71,7 +71,7 @@ export default async function OrderDetailPage({
           </h1>
         </div>
         <Button asChild variant="outline" className="rounded-full">
-          <Link href="/dashboard/parts/orders">
+          <Link href="/dashboard/store/orders">
             <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
             {t("backToOrders")}
           </Link>

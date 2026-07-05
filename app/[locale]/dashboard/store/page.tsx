@@ -57,19 +57,19 @@ export default async function PartsCatalogManager({
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild variant="outline" className="rounded-full">
-            <Link href="/dashboard/parts/orders">
+            <Link href="/dashboard/store/orders">
               <ClipboardList className="h-4 w-4" />
               {t("ordersLink")}
             </Link>
           </Button>
           <Button asChild variant="outline" className="rounded-full">
-            <Link href="/dashboard/parts/import">
+            <Link href="/dashboard/store/import">
               <FileSpreadsheet className="h-4 w-4" />
               {t("import_nav")}
             </Link>
           </Button>
           <Button asChild className="rounded-full">
-            <Link href="/dashboard/parts/new">
+            <Link href="/dashboard/store/new">
               <Plus className="h-4 w-4" />
               {t("addPart")}
             </Link>
@@ -93,7 +93,7 @@ export default async function PartsCatalogManager({
             <p className="mt-1 text-sm text-mutedtext">{t("emptyBody")}</p>
           </div>
           <Button asChild className="rounded-full">
-            <Link href="/dashboard/parts/new">
+            <Link href="/dashboard/store/new">
               <Plus className="h-4 w-4" />
               {t("addPart")}
             </Link>
@@ -146,7 +146,7 @@ export default async function PartsCatalogManager({
                         aria-label={t("edit")}
                         className="h-8 w-8 text-mutedtext hover:text-cobalt"
                       >
-                        <Link href={`/dashboard/parts/${p.id}/edit`}>
+                        <Link href={`/dashboard/store/${p.id}/edit`}>
                           <Pencil className="h-4 w-4" />
                         </Link>
                       </Button>

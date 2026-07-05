@@ -23,6 +23,8 @@
   "Nav": {
     "howItWorks": "كيف نعمل",
     "cadAssistance": "خدمة رسم CAD",
+    "store": "المتجر",
+    "design": "التصميم",
     "partsStore": "متجر القطع",
     "about": "من نحن",
     "contact": "تواصل معنا",
@@ -220,8 +222,8 @@
     "overview": "نظرة عامة",
     "inventory": "المخزون",
     "jobs": "الطلبات",
-    "partsCatalog": "كتالوج القطع",
-    "partsOrders": "طلبات القطع"
+    "partsCatalog": "المتجر",
+    "partsOrders": "طلبات المتجر"
   },
   "Admin": {
     "kicker": "مركز التحكم",

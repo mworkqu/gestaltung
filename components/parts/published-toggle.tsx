@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 
-import { togglePublished } from "@/app/[locale]/dashboard/parts/actions";
+import { togglePublished } from "@/app/[locale]/dashboard/store/actions";
 import { cn } from "@/lib/utils";
 
 // Inline publish/unpublish pill in the catalog table. Posts the next state to

@@ -59,6 +59,17 @@ const nextConfig = {
         destination: "/:locale/inventory/:path*",
         permanent: true,
       },
+      // Stage 5: admin parts store renamed dashboard/parts -> dashboard/store.
+      {
+        source: "/:locale(en|ar)/dashboard/parts",
+        destination: "/:locale/dashboard/store",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/dashboard/parts/:path*",
+        destination: "/:locale/dashboard/store/:path*",
+        permanent: true,
+      },
     ];
   },
 };

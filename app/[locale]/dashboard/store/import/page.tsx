@@ -38,7 +38,7 @@ export default async function StoreImportPage({
     <div className="space-y-8">
       <div>
         <Button asChild variant="ghost" size="sm" className="mb-3 rounded-full">
-          <Link href="/dashboard/parts">
+          <Link href="/dashboard/store">
             <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
             {t("import_back")}
           </Link>

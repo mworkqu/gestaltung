@@ -13,7 +13,7 @@ import {
   createPart,
   updatePart,
   type PartFormState,
-} from "@/app/[locale]/dashboard/parts/actions";
+} from "@/app/[locale]/dashboard/store/actions";
 
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -193,7 +193,7 @@ export function PartForm({
           {mode === "create" ? t("createSubmit") : t("saveSubmit")}
         </Button>
         <Button asChild variant="ghost" className="rounded-full">
-          <Link href="/dashboard/parts">{t("cancel")}</Link>
+          <Link href="/dashboard/store">{t("cancel")}</Link>
         </Button>
       </div>
     </form>

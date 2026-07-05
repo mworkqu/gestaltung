@@ -60,7 +60,7 @@ export default async function PartsOrdersPage({
           </p>
         </div>
         <Button asChild variant="outline" className="rounded-full">
-          <Link href="/dashboard/parts">
+          <Link href="/dashboard/store">
             <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
             {t("backToCatalog")}
           </Link>
@@ -113,7 +113,7 @@ export default async function PartsOrdersPage({
                   >
                     <td className="px-4 py-3">
                       <Link
-                        href={`/dashboard/parts/orders/${o.id}`}
+                        href={`/dashboard/store/orders/${o.id}`}
                         className="font-mono text-xs text-cobalt hover:underline"
                       >
                         {o.id.slice(0, 8)}

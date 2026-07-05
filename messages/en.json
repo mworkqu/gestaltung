@@ -23,6 +23,8 @@
   "Nav": {
     "howItWorks": "How it works",
     "cadAssistance": "CAD Assistance",
+    "store": "Store",
+    "design": "Design",
     "partsStore": "Parts Store",
     "about": "About",
     "contact": "Contact",
@@ -220,8 +222,8 @@
     "overview": "Overview",
     "inventory": "Inventory",
     "jobs": "Jobs",
-    "partsCatalog": "Parts Catalog",
-    "partsOrders": "Parts Orders"
+    "partsCatalog": "Store",
+    "partsOrders": "Store orders"
   },
   "Admin": {
     "kicker": "Command center",

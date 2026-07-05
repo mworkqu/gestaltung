@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Check } from "lucide-react";
 
-import { toggleWhatsappSent } from "@/app/[locale]/dashboard/parts/orders/actions";
+import { toggleWhatsappSent } from "@/app/[locale]/dashboard/store/orders/actions";
 import { cn } from "@/lib/utils";
 
 // Checkbox-style toggle for the "WhatsApp sent" flag on an order.

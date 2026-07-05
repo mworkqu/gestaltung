@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { deletePart } from "@/app/[locale]/dashboard/parts/actions";
+import { deletePart } from "@/app/[locale]/dashboard/store/actions";
 
 export function DeletePartButton({ id, name }: { id: string; name: string }) {
   const t = useTranslations("PartsDashboard");
