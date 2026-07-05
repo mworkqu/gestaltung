@@ -25,6 +25,29 @@ const nextConfig = {
         destination: "/:locale/store/:path*",
         permanent: true,
       },
+      // Stage 3: custom-manufacturing consolidated under /design.
+      {
+        source: "/:locale(en|ar)/cad-assistance",
+        destination: "/:locale/design/drawing",
+        permanent: true,
+      },
+      // Order matters: the specific /jobs/new -> /design/upload must precede the
+      // general /jobs/:path* rule (first match wins).
+      {
+        source: "/:locale(en|ar)/dashboard/jobs/new",
+        destination: "/:locale/design/upload",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/dashboard/jobs",
+        destination: "/:locale/design/jobs",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/dashboard/jobs/:path*",
+        destination: "/:locale/design/jobs/:path*",
+        permanent: true,
+      },
     ];
   },
 };

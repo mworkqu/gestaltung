@@ -146,7 +146,7 @@ export async function createJob(
     return { error: "error_unknown" };
   }
 
-  revalidatePath(`/${locale}/dashboard/jobs`);
+  revalidatePath(`/${locale}/design/jobs`);
   return { jobId: job.id };
 }
 
@@ -174,8 +174,8 @@ export async function assignWorkshop(input: {
 
   if (error) return { error: "error_assign" };
 
-  revalidatePath(`/${locale}/dashboard/jobs`);
-  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${locale}/design/jobs`);
+  revalidatePath(`/${locale}/design/jobs/${input.jobId}`);
   return { ok: true };
 }
 
@@ -204,8 +204,8 @@ export async function changeStatus(input: {
 
   if (error) return { error: "error_transition" };
 
-  revalidatePath(`/${locale}/dashboard/jobs`);
-  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${locale}/design/jobs`);
+  revalidatePath(`/${locale}/design/jobs/${input.jobId}`);
   return { ok: true };
 }
 
@@ -263,7 +263,7 @@ export async function createInternalJob(input: {
 
   if (error || !job) return { error: "error_unknown" };
 
-  revalidatePath(`/${locale}/dashboard/jobs`);
+  revalidatePath(`/${locale}/design/jobs`);
   return { jobId: job.id };
 }
 
@@ -291,7 +291,7 @@ export async function addBomRow(input: {
   });
   if (error) return { error: "error_unknown" };
 
-  revalidatePath(`/${input.locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${input.locale}/design/jobs/${input.jobId}`);
   return { ok: true };
 }
 
@@ -307,7 +307,7 @@ export async function deleteBomRow(input: {
   if (!session) return { error: "unauthorized" };
 
   await supabase.from("job_bom").delete().eq("id", input.bomId);
-  revalidatePath(`/${input.locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${input.locale}/design/jobs/${input.jobId}`);
   return { ok: true };
 }
 
@@ -368,7 +368,7 @@ export async function startJob(input: {
       .eq("id", row.inventory_item_id);
   }
 
-  revalidatePath(`/${input.locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${input.locale}/design/jobs/${input.jobId}`);
   revalidatePath(`/${input.locale}/dashboard/inventory`);
   return { ok: true };
 }
@@ -463,8 +463,8 @@ export async function updateJob(input: {
 
   await logVariation(supabase, input.jobId, session.profile.id, role, changes);
 
-  revalidatePath(`/${locale}/dashboard/jobs`);
-  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${locale}/design/jobs`);
+  revalidatePath(`/${locale}/design/jobs/${input.jobId}`);
   return { ok: true };
 }
 
@@ -530,7 +530,7 @@ export async function updateInternalJob(input: {
 
   await logVariation(supabase, input.jobId, session.profile.id, role, changes);
 
-  revalidatePath(`/${locale}/dashboard/jobs`);
-  revalidatePath(`/${locale}/dashboard/jobs/${input.jobId}`);
+  revalidatePath(`/${locale}/design/jobs`);
+  revalidatePath(`/${locale}/design/jobs/${input.jobId}`);
   return { ok: true };
 }

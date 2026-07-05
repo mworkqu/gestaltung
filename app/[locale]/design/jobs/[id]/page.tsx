@@ -272,7 +272,7 @@ export default async function JobDetailPage({
     <div className="mx-auto max-w-2xl">
       <div className="flex items-center justify-between gap-3">
         <Link
-          href="/dashboard/jobs"
+          href="/design/jobs"
           className="inline-flex items-center gap-2 text-sm text-mutedtext transition-colors hover:text-heading"
         >
           <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
@@ -281,7 +281,7 @@ export default async function JobDetailPage({
 
         {canEdit && (
           <Link
-            href={`/dashboard/jobs/${id}/edit`}
+            href={`/design/jobs/${id}/edit`}
             className="inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition hover:text-azure"
           >
             <Pencil className="h-3.5 w-3.5" />

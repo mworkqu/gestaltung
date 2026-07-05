@@ -6,7 +6,7 @@ import { Loader2, UploadCloud, FileBox, X } from "lucide-react";
 
 import { useRouter, Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createJob } from "@/app/[locale]/dashboard/jobs/actions";
+import { createJob } from "@/app/[locale]/design/jobs/actions";
 import {
   CAD_BUCKET,
   JOB_METHODS,
@@ -158,7 +158,7 @@ export function NewJobForm({ tenantId }: { tenantId: string }) {
         setLoading(false);
         return;
       }
-      router.push(`/dashboard/jobs/${res.jobId}`);
+      router.push(`/design/jobs/${res.jobId}`);
       router.refresh();
     } catch {
       setError(t("error_unknown"));
@@ -446,7 +446,7 @@ export function NewJobForm({ tenantId }: { tenantId: string }) {
           {loading ? t("uploading") : t("createSubmit")}
         </Button>
         <Button asChild variant="ghost" className="rounded-full">
-          <Link href="/dashboard/jobs">{t("cancel")}</Link>
+          <Link href="/design/jobs">{t("cancel")}</Link>
         </Button>
       </div>
     </form>

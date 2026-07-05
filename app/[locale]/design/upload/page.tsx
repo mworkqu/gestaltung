@@ -31,7 +31,7 @@ export default async function NewJobPage({
   return (
     <div className="mx-auto max-w-2xl">
       <Link
-        href="/dashboard/jobs"
+        href="/design/jobs"
         className="inline-flex items-center gap-2 text-sm text-mutedtext transition-colors hover:text-heading"
       >
         <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />

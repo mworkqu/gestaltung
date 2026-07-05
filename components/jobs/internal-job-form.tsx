@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Loader2, Plus, X } from "lucide-react";
 
 import { useRouter, Link } from "@/i18n/navigation";
-import { createInternalJob } from "@/app/[locale]/dashboard/jobs/actions";
+import { createInternalJob } from "@/app/[locale]/design/jobs/actions";
 import { JOB_METHODS } from "@/lib/jobs/constants";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -70,7 +70,7 @@ export function InternalJobForm() {
       setLoading(false);
       return;
     }
-    router.push(`/dashboard/jobs/${res.jobId}`);
+    router.push(`/design/jobs/${res.jobId}`);
     router.refresh();
   }
 
@@ -180,7 +180,7 @@ export function InternalJobForm() {
           {t("createInternalSubmit")}
         </Button>
         <Button asChild variant="ghost" className="rounded-full">
-          <Link href="/dashboard/jobs">{t("cancel")}</Link>
+          <Link href="/design/jobs">{t("cancel")}</Link>
         </Button>
       </div>
     </form>

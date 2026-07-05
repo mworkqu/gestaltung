@@ -34,7 +34,7 @@ export default async function DashboardLayout({
     ...(isClient
       ? []
       : [{ href: "/dashboard/inventory", label: t("inventory") }]),
-    { href: "/dashboard/jobs", label: t("jobs") },
+    { href: "/design/jobs", label: t("jobs") },
     // Parts catalog + orders are super_admin only.
     ...(isSuperAdmin
       ? [

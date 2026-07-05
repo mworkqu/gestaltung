@@ -699,5 +699,17 @@
     "callbackSubmit": "Request callback",
     "callbackDone": "Thanks! We'll contact you on WhatsApp shortly.",
     "callbackError": "Please enter your name and number and try again."
+  },
+  "DesignHub": {
+    "metaTitle": "Design your own part — Gestaltung",
+    "metaDescription": "Upload a CAD file for an instant quote, or hire our engineers to draw it for you. 3D printing, CNC, laser cutting and EDM across Qatar.",
+    "kicker": "Custom manufacturing",
+    "heading": "Design your own part",
+    "subheading": "Two ways to get a custom part made in Qatar — upload a ready CAD file, or let our team draw it for you.",
+    "uploadTitle": "Upload a file to manufacture",
+    "uploadCopy": "Already have a 3D or CAD file? Upload it for a quote and we'll match it to the right method — 3D printing, CNC machining, laser cutting or EDM — and a workshop across Qatar.",
+    "drawingTitle": "Hire us to draw your CAD",
+    "drawingCopy": "No CAD file yet? Our engineers turn your sketch, photo or idea into a production-ready technical drawing, then take it all the way to a finished part.",
+    "drawingMeta": "From a sketch, photo or idea"
   }
 }

@@ -41,7 +41,7 @@ export default async function EditJobPage({
 
   const backLink = (
     <Link
-      href={`/dashboard/jobs/${id}`}
+      href={`/design/jobs/${id}`}
       className="inline-flex items-center gap-2 text-sm text-mutedtext transition-colors hover:text-heading"
     >
       <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />

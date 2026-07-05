@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Loader2 } from "lucide-react";
 
 import { useRouter, Link } from "@/i18n/navigation";
-import { updateJob } from "@/app/[locale]/dashboard/jobs/actions";
+import { updateJob } from "@/app/[locale]/design/jobs/actions";
 import { JOB_METHODS } from "@/lib/jobs/constants";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ export function EditJobForm({ job }: { job: Job }) {
       return;
     }
 
-    router.push(`/dashboard/jobs/${job.id}`);
+    router.push(`/design/jobs/${job.id}`);
     router.refresh();
   }
 
@@ -136,7 +136,7 @@ export function EditJobForm({ job }: { job: Job }) {
           {t("editSubmit")}
         </Button>
         <Button asChild variant="ghost" className="rounded-full">
-          <Link href={`/dashboard/jobs/${job.id}`}>{t("cancel")}</Link>
+          <Link href={`/design/jobs/${job.id}`}>{t("cancel")}</Link>
         </Button>
       </div>
     </form>

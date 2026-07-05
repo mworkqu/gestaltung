@@ -162,7 +162,7 @@ export async function AdminOverview({ locale }: { locale: string }) {
         <div className="flex items-center justify-between px-4 pt-3">
           <p className={mono("text-[10px] text-azure")}>{t("recentTitle")}</p>
           <Link
-            href="/dashboard/jobs"
+            href="/design/jobs"
             className="text-xs font-semibold text-cobalt hover:text-cobalt-hover"
           >
             {t("viewAllJobs")}
@@ -189,7 +189,7 @@ export async function AdminOverview({ locale }: { locale: string }) {
                   >
                     <td className="px-4 py-3">
                       <Link
-                        href={`/dashboard/jobs/${j.id}`}
+                        href={`/design/jobs/${j.id}`}
                         className="font-medium text-heading hover:text-cobalt"
                       >
                         {j.title}

@@ -11,7 +11,7 @@ import {
   addBomRow,
   deleteBomRow,
   startJob,
-} from "@/app/[locale]/dashboard/jobs/actions";
+} from "@/app/[locale]/design/jobs/actions";
 
 type InvItem = { id: string; name: string; unit: string; quantity: number };
 type BomRow = {

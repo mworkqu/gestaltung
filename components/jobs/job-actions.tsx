@@ -8,7 +8,7 @@ import { useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { JOB_STATUSES, nextStatus } from "@/lib/jobs/constants";
-import { assignWorkshop, changeStatus } from "@/app/[locale]/dashboard/jobs/actions";
+import { assignWorkshop, changeStatus } from "@/app/[locale]/design/jobs/actions";
 import type { Role } from "@/lib/supabase/types";
 
 const controlClass =

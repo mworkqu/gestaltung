@@ -110,7 +110,7 @@ export default async function JobsPage({
           )}
           {isClient && (
             <Button asChild className="rounded-full">
-              <Link href="/dashboard/jobs/new">
+              <Link href="/design/upload">
                 <Plus className="h-4 w-4" />
                 {t("newJob")}
               </Link>
@@ -118,7 +118,7 @@ export default async function JobsPage({
           )}
           {isWorkshop && (
             <Button asChild className="rounded-full">
-              <Link href="/dashboard/jobs/new-internal">
+              <Link href="/design/jobs/new-internal">
                 <Plus className="h-4 w-4" />
                 {t("newInternalJob")}
               </Link>
@@ -148,7 +148,7 @@ export default async function JobsPage({
           </div>
           {isClient && (
             <Button asChild className="rounded-full">
-              <Link href="/dashboard/jobs/new">
+              <Link href="/design/upload">
                 <Plus className="h-4 w-4" />
                 {t("newJob")}
               </Link>
@@ -184,7 +184,7 @@ export default async function JobsPage({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Link
-                        href={`/dashboard/jobs/${job.id}`}
+                        href={`/design/jobs/${job.id}`}
                         className="font-medium text-heading hover:text-cobalt"
                       >
                         {job.title}
@@ -225,7 +225,7 @@ export default async function JobsPage({
                       job,
                     }) && (
                       <Link
-                        href={`/dashboard/jobs/${job.id}/edit`}
+                        href={`/design/jobs/${job.id}/edit`}
                         className="inline-flex items-center gap-1.5 rounded-full border border-white/40 bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition hover:text-azure"
                       >
                         <Pencil className="h-3.5 w-3.5" />
