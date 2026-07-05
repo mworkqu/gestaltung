@@ -305,6 +305,14 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     inquiries (super_admin). Env: RESEND_API_KEY (server-only), optional STORE_LEAD_EMAIL, RESEND_FROM
     (default "Gestaltung Store <onboarding@resend.dev>" — Resend's shared sender, works without domain
     verification on the free tier).
+  - CONTACT CASES UNIFIED (2026-07-05, owner: "any contact/contact-us should do the email thing, each case
+    separately"): /api/store-lead is now the single lead endpoint for ALL contact touchpoints, keyed by a
+    `source` (SOURCES map → per-case email subject): `contact_form` ("New contact message — <name>") and
+    `store_callback` ("New store callback request — <name>"). The /contact form (components/contact-form.tsx)
+    now POSTs to this API (was a direct browser Supabase insert) so it emails too — sends name/phone/email/
+    message. Other "Contact us" spots (design/drawing CAD CTA fallback, /store empty state, footer, marketing
+    pages) are just links to /contact, so they inherit the email flow. Both cases verified live
+    (saved+emailed true). To add a case: add to SOURCES + post its `source` from the form.
   - STORE FILLING via GOOGLE SHEET (owner chose the free Sheet path; STORE ≠ inventory): new super_admin
     page app/[locale]/dashboard/parts/import/page.tsx (guarded by the existing dashboard/parts layout) +
     "Import from sheet" button on the catalog. lib/parts/sheet-import.ts = pure CSV parser + validation
