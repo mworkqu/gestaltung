@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 
 import { getSessionContext } from "@/lib/auth/get-session";
+import { AccountBar } from "@/components/account-bar";
 
 // /design/upload = the CAD upload → job creation entry (was /dashboard/jobs/new).
 // Auth-gated like the rest of the job flow; provides the page container that
@@ -21,5 +22,10 @@ export default async function DesignUploadLayout({
   const session = await getSessionContext();
   if (!session) redirect(`/${locale}/sign-in`);
 
-  return <div className="container py-10">{children}</div>;
+  return (
+    <div className="container py-10">
+      <AccountBar locale={locale} />
+      {children}
+    </div>
+  );
 }

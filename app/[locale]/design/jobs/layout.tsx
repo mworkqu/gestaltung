@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 
 import { getSessionContext } from "@/lib/auth/get-session";
+import { AccountBar } from "@/components/account-bar";
 
 // Jobs moved out of /dashboard into the customer /design area (store-first
 // Stage 3). This layout restores the single auth gate + page container the
@@ -22,5 +23,10 @@ export default async function DesignJobsLayout({
   const session = await getSessionContext();
   if (!session) redirect(`/${locale}/sign-in`);
 
-  return <div className="container py-10">{children}</div>;
+  return (
+    <div className="container py-10">
+      <AccountBar locale={locale} />
+      {children}
+    </div>
+  );
 }
