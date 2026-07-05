@@ -327,6 +327,28 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     and stray punctuation the owner's headers contained. Import URL is pre-filled from STORE_SHEET_CSV_URL;
     the owner clicks "Import from sheet" on /dashboard/parts/import to populate the live store (that action
     is super_admin-gated, so it can't be run headlessly).
+- STORE-FIRST REBUILD — Stage 3 (/design custom-manufacturing hub): DONE (deployed + verified 2026-07-05).
+  No migration.
+  - NEW app/[locale]/design/page.tsx = public hub (the store landing's Design button already points here):
+    two cards — "Upload a file to manufacture" → /design/upload, "Hire us to draw your CAD" →
+    /design/drawing. New DesignHub namespace (en+ar, incl. meta). neu theme (marketing style, not the
+    store-landing tokens).
+  - MOVES (git-rename, history preserved): cad-assistance → design/drawing (public marketing page,
+    unchanged, still CadAssistance namespace). Job flow OUT of the dashboard: dashboard/jobs → design/jobs
+    (list, [id], [id]/edit, new-internal, actions.ts) and dashboard/jobs/new → design/upload. Every href +
+    the job components' `@/app/[locale]/dashboard/jobs/actions` imports + all revalidatePath('/…/dashboard/
+    jobs') strings rewritten to /design/jobs (design/jobs/page.tsx's "new job" buttons point to
+    /design/upload, "new internal" to /design/jobs/new-internal).
+  - AUTH: the jobs pages self-gate, but they relied on dashboard/layout for the auth gate + page container.
+    Restored via NEW app/[locale]/design/jobs/layout.tsx + design/upload/layout.tsx (getSessionContext →
+    redirect anon to sign-in; wrap children in `container py-10`). /design + /design/drawing stay PUBLIC (no
+    design-level layout). Verified on prod: /design/jobs + /design/upload 307→/sign-in when anon.
+  - Header "CAD Assistance" nav link now → /design/drawing.
+  - 308 redirects (next.config.mjs, both locales, verified live): /cad-assistance → /design/drawing;
+    /dashboard/jobs/new → /design/upload (ordered BEFORE the general rule); /dashboard/jobs → /design/jobs;
+    /dashboard/jobs/:path* → /design/jobs/:path*.
+  - NOTE: jobs are no longer under the dashboard sub-nav (Overview | Inventory | …). The dashboard's "Jobs"
+    nav link now points to /design/jobs (leaves the dashboard chrome). Stage 5 rebuilds the header/nav.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
