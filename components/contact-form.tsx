@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/phone-input";
 import { cn } from "@/lib/utils";
@@ -33,22 +32,27 @@ export function ContactForm() {
     setLoading(true);
 
     const data = new FormData(e.currentTarget);
+    const form = e.currentTarget;
     const payload = {
       name: String(data.get("name")).trim(),
       phone: String(data.get("phone")).trim(), // WhatsApp — primary contact
-      email: String(data.get("email") ?? "").trim() || null, // optional
+      email: String(data.get("email") ?? "").trim(), // optional
       message: String(data.get("message")).trim(),
       locale,
+      source: "contact_form",
     };
 
     try {
-      const supabase = createClient();
-      const { error: insertError } = await supabase
-        .from("inquiries")
-        .insert(payload);
-      if (insertError) throw insertError;
+      // Routes through /api/store-lead: saves the inquiry AND emails
+      // info@gestaltung360.com (server-side, where the Resend key lives).
+      const res = await fetch("/api/store-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("bad status");
       setSubmitted(true);
-      e.currentTarget.reset();
+      form.reset();
     } catch {
       setError(t("errorSubmit"));
     } finally {

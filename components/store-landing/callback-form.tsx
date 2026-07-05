@@ -39,7 +39,7 @@ export function HomeCallback() {
       const res = await fetch("/api/store-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, locale }),
+        body: JSON.stringify({ name, phone, locale, source: "store_callback" }),
       });
       if (!res.ok) throw new Error("bad status");
       setDone(true);
