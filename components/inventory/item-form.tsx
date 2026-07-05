@@ -12,7 +12,7 @@ import {
   createItem,
   updateItem,
   type ItemFormState,
-} from "@/app/[locale]/dashboard/inventory/actions";
+} from "@/app/[locale]/inventory/actions";
 
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -188,7 +188,7 @@ export function ItemForm({
           {mode === "create" ? t("createSubmit") : t("saveSubmit")}
         </Button>
         <Button asChild variant="ghost" className="rounded-full">
-          <Link href="/dashboard/inventory">{t("cancel")}</Link>
+          <Link href="/inventory">{t("cancel")}</Link>
         </Button>
       </div>
     </form>

@@ -33,7 +33,7 @@ export default async function DashboardLayout({
     // reserved for future use); workshops + super_admin keep it.
     ...(isClient
       ? []
-      : [{ href: "/dashboard/inventory", label: t("inventory") }]),
+      : [{ href: "/inventory", label: t("inventory") }]),
     { href: "/design/jobs", label: t("jobs") },
     // Parts catalog + orders are super_admin only.
     ...(isSuperAdmin

@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Loader2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { deleteItem } from "@/app/[locale]/dashboard/inventory/actions";
+import { deleteItem } from "@/app/[locale]/inventory/actions";
 
 // Small icon button that opens a themed confirm modal, then calls the delete
 // server action (RLS enforced server-side).

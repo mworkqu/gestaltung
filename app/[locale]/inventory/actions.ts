@@ -114,8 +114,8 @@ export async function createItem(
     return { error: t("error_unknown") };
   }
 
-  revalidatePath(`/${locale}/dashboard/inventory`);
-  redirect(`/${locale}/dashboard/inventory`);
+  revalidatePath(`/${locale}/inventory`);
+  redirect(`/${locale}/inventory`);
 }
 
 export async function updateItem(
@@ -145,8 +145,8 @@ export async function updateItem(
     return { error: t("error_unknown") };
   }
 
-  revalidatePath(`/${locale}/dashboard/inventory`);
-  redirect(`/${locale}/dashboard/inventory`);
+  revalidatePath(`/${locale}/inventory`);
+  redirect(`/${locale}/inventory`);
 }
 
 export async function deleteItem(formData: FormData): Promise<void> {
@@ -161,5 +161,5 @@ export async function deleteItem(formData: FormData): Promise<void> {
   // RLS ensures only permitted rows are deleted.
   await supabase.from("inventory_items").delete().eq("id", id);
 
-  revalidatePath(`/${locale}/dashboard/inventory`);
+  revalidatePath(`/${locale}/inventory`);
 }

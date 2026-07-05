@@ -93,7 +93,7 @@ export default async function InventoryPage({
             <TenantFilter tenants={tenants} selected={tenantFilter} />
           )}
           <Button asChild className="rounded-full">
-            <Link href="/dashboard/inventory/new">
+            <Link href="/inventory/new">
               <Plus className="h-4 w-4" />
               {t("addItem")}
             </Link>
@@ -120,7 +120,7 @@ export default async function InventoryPage({
             <p className="mt-1 text-sm text-mutedtext">{t("emptyBody")}</p>
           </div>
           <Button asChild className="rounded-full">
-            <Link href="/dashboard/inventory/new">
+            <Link href="/inventory/new">
               <Plus className="h-4 w-4" />
               {t("addItem")}
             </Link>
@@ -195,7 +195,7 @@ export default async function InventoryPage({
                           aria-label={t("edit")}
                           className="h-8 w-8 text-mutedtext hover:text-cobalt"
                         >
-                          <Link href={`/dashboard/inventory/${item.id}/edit`}>
+                          <Link href={`/inventory/${item.id}/edit`}>
                             <Pencil className="h-4 w-4" />
                           </Link>
                         </Button>

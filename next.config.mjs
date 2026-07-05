@@ -48,6 +48,17 @@ const nextConfig = {
         destination: "/:locale/design/jobs/:path*",
         permanent: true,
       },
+      // Stage 4: inventory is its own top-level signed-in area now.
+      {
+        source: "/:locale(en|ar)/dashboard/inventory",
+        destination: "/:locale/inventory",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/dashboard/inventory/:path*",
+        destination: "/:locale/inventory/:path*",
+        permanent: true,
+      },
     ];
   },
 };

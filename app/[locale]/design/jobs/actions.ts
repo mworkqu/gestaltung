@@ -369,7 +369,7 @@ export async function startJob(input: {
   }
 
   revalidatePath(`/${input.locale}/design/jobs/${input.jobId}`);
-  revalidatePath(`/${input.locale}/dashboard/inventory`);
+  revalidatePath(`/${input.locale}/inventory`);
   return { ok: true };
 }
 
