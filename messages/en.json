@@ -710,6 +710,11 @@
     "uploadCopy": "Already have a 3D or CAD file? Upload it for a quote and we'll match it to the right method — 3D printing, CNC machining, laser cutting or EDM — and a workshop across Qatar.",
     "drawingTitle": "Hire us to draw your CAD",
     "drawingCopy": "No CAD file yet? Our engineers turn your sketch, photo or idea into a production-ready technical drawing, then take it all the way to a finished part.",
-    "drawingMeta": "From a sketch, photo or idea"
+    "drawingMeta": "From a sketch, photo or idea",
+    "panelTag": "CUSTOM PATH",
+    "pathsTag": "Choose your path",
+    "ctaTag": "Not sure which?",
+    "ctaHeading": "Tell us what you need — we'll guide you.",
+    "ctaButton": "Talk to us"
   }
 }
