@@ -420,6 +420,15 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     "inventory" appear in HTML source everywhere) — an invisible bundle, not a UI mention; per-route
     message scoping is a possible future optimization.
 
+- SIGNED-IN CHROME (2026-07-05, owner: "on /inventory or when logged in, remove the top header, keep the
+  footer"): the public marketing <Header> is now HIDDEN on the authenticated app areas — /dashboard/*,
+  /inventory/*, /design/jobs/*, /design/upload/* — via components/header-gate.tsx (client; next-intl
+  usePathname, locale-stripped) wrapping <Header> in app/[locale]/layout.tsx. The <Footer> always renders.
+  Dashboard + Inventory already have their own top bars; the job-flow layouts (design/jobs, design/upload)
+  got components/account-bar.tsx (Dashboard link + SignOut) so they keep a nav/escape hatch. Public pages
+  (home, /store, /design, /design/drawing, marketing, sign-in) keep the header. To add/remove an area from
+  header-hiding, edit APP_PREFIXES in components/header-gate.tsx.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
