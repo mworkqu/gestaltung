@@ -353,9 +353,21 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     the /design hub was rebuilt in the marketing neu language — pill kicker, neu bento hero with the
     blueprint panel (GMark + bg-blueprint-grid + concentric circles + spec readouts), two prominent
     neu-hover path cards, ink CTA band. Reuses Home spec/CTA + Hero("formats"); DesignHub gained
-    panelTag/pathsTag/ctaTag/ctaHeading/ctaButton. RULE GOING FORWARD: new custom pages use the light neu
-    "precision" design system (how-it-works is the reference), NOT the store-landing --sl-* tokens. The
-    store landing itself keeps the store-first handoff design.
+    panelTag/pathsTag/ctaTag/ctaHeading/ctaButton. RULE GOING FORWARD: ALL pages use the light neu
+    "precision" design system (how-it-works is the reference). The store-first --sl-* / Space-Grotesk /
+    dark-toggle handoff visual is RETIRED.
+  - HOMEPAGE REBUILT IN NEU (2026-07-05, owner: "design is not updated" — the store landing was the only
+    page still on the store-first look): app/[locale]/page.tsx is now light-neu and uses the GLOBAL Header +
+    Footer (removed the homepage-only chrome gate in [locale]/layout.tsx). Keeps the store-first CONTENT +
+    behaviour — neu bento hero with a search box (→/store), category quick-links, a custom-manufacturing
+    panel (GMark + blueprint grid) with the ONE Design button → /design, a neu PartCard featured grid
+    (Supabase published parts), and the callback lead form (HomeCallback in components/store-landing/
+    callback-form.tsx, still POSTs /api/store-lead). Light-only (dark toggle dropped). DELETED now-unused
+    components/store-landing/{landing-header,theme-toggle,category-chips,featured-add-button}.tsx +
+    components/homepage-chrome-gate.tsx. The .store-landing/.sl-* block in globals.css is now DEAD CSS
+    (nothing uses it) — safe to prune later. StoreLanding namespace strings are still used by the neu
+    homepage. Verified live on gestaltung360.com + gestaltung.vercel.app (neu, global header, 1 Design
+    button, featured products load, no sl-dark).
 - STORE-FIRST REBUILD — Stage 4 (inventory as a standalone signed-in area + project planning): DONE
   (deployed + verified 2026-07-05). No migration.
   - MOVED app/[locale]/dashboard/inventory → app/[locale]/inventory (list, new, [id]/edit, actions.ts);
