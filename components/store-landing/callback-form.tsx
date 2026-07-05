@@ -4,17 +4,25 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CheckCircle2, Loader2, MessageCircle } from "lucide-react";
 
-// Footer lead capture on the store landing. Instead of opening WhatsApp, it
-// collects the visitor's name + number and tells them we'll contact them. On
-// submit it POSTs to /api/store-lead, which saves the lead (inquiries table)
-// and emails info@gestaltung360.com. Styled with the landing's --sl-* tokens.
-export function CallbackForm() {
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+// Homepage lead capture, neu style. Collects a name + number and tells the
+// visitor we'll contact them; POSTs to /api/store-lead which saves the lead
+// (inquiries table) and emails info@gestaltung360.com.
+const fieldClass =
+  "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset outline-none transition placeholder:text-faint focus:ring-2 focus:ring-cobalt/60";
+
+export function HomeCallback() {
   const t = useTranslations("StoreLanding");
   const locale = useLocale();
-  const [open, setOpen] = useState(false);
+  const isRtl = locale === "ar";
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const mono = (extra = "") =>
+    cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -42,65 +50,48 @@ export function CallbackForm() {
     }
   }
 
-  if (done) {
-    return (
-      <div className="flex items-start gap-3 self-start rounded-[10px] border border-[var(--sl-wa-border)] bg-[var(--sl-wa-bg)] px-[18px] py-[13px] text-sm text-[var(--sl-wa)]">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
-        <span className="max-w-[240px] leading-relaxed">{t("callbackDone")}</span>
-      </div>
-    );
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-[9px] self-start rounded-[10px] border border-[var(--sl-wa-border)] bg-[var(--sl-wa-bg)] px-[18px] py-[11px] text-sm font-medium text-[var(--sl-wa)]"
-      >
-        <MessageCircle className="h-4 w-4" strokeWidth={2} />
-        {t("footerCta")}
-      </button>
-    );
-  }
-
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="w-full max-w-[320px] space-y-2.5 self-start"
-    >
-      <p className="text-[13px] leading-relaxed text-[var(--sl-body)]">
-        {t("callbackPrompt")}
-      </p>
-      <input
-        name="name"
-        required
-        placeholder={t("callbackName")}
-        className="w-full rounded-lg border border-[var(--sl-search-border)] bg-[var(--sl-search-bg)] px-3.5 py-2.5 text-sm text-[var(--sl-heading)] outline-none placeholder:text-[var(--sl-faint)] focus:border-[var(--sl-accent)]"
-      />
-      <input
-        name="phone"
-        required
-        inputMode="tel"
-        dir="ltr"
-        placeholder={t("callbackPhone")}
-        className="w-full rounded-lg border border-[var(--sl-search-border)] bg-[var(--sl-search-bg)] px-3.5 py-2.5 text-sm text-[var(--sl-heading)] outline-none placeholder:text-[var(--sl-faint)] focus:border-[var(--sl-accent)] ltr:text-left rtl:text-right"
-      />
-      {error && (
-        <p className="text-[12px] font-medium text-[var(--sl-err)]">{error}</p>
+    <section className="neu animate-fade-up delay-3 grid gap-8 p-8 sm:p-10 md:grid-cols-2 md:items-center">
+      <div className="space-y-3">
+        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
+          <span className="h-2 w-2 rounded-full bg-[#25d366]" />
+          <span className={mono("text-[10px] text-mutedtext")}>{t("footerCta")}</span>
+        </span>
+        <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+          {t("callbackPrompt")}
+        </h2>
+      </div>
+
+      {done ? (
+        <div className="neu-inset flex items-start gap-4 p-6">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cobalt shadow-neu-sm">
+            <CheckCircle2 className="h-6 w-6 text-white" strokeWidth={1.5} />
+          </span>
+          <p className="text-sm leading-relaxed text-body">{t("callbackDone")}</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input name="name" placeholder={t("callbackName")} className={fieldClass} />
+            <input
+              name="phone"
+              inputMode="tel"
+              dir="ltr"
+              placeholder={t("callbackPhone")}
+              className={cn(fieldClass, isRtl && "text-right")}
+            />
+          </div>
+          {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+          <Button type="submit" size="lg" disabled={loading} className="w-full rounded-full sm:w-auto sm:px-8">
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MessageCircle className="h-4 w-4" />
+            )}
+            {t("callbackSubmit")}
+          </Button>
+        </form>
       )}
-      <button
-        type="submit"
-        disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-[10px] border border-[var(--sl-wa-border)] bg-[var(--sl-wa-bg)] px-[18px] py-[11px] text-sm font-medium text-[var(--sl-wa)] disabled:opacity-60"
-      >
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <MessageCircle className="h-4 w-4" strokeWidth={2} />
-        )}
-        {t("callbackSubmit")}
-      </button>
-    </form>
+    </section>
   );
 }

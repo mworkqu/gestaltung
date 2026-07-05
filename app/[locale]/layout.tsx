@@ -8,7 +8,6 @@ import { Outfit, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 import { routing, type Locale } from "@/i18n/routing";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { HomepageChromeGate } from "@/components/homepage-chrome-gate";
 import { CartProvider } from "@/components/parts/cart-provider";
 import "../globals.css";
 
@@ -77,13 +76,9 @@ export default async function LocaleLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <CartProvider>
             <div className="flex min-h-screen flex-col">
-              <HomepageChromeGate>
-                <Header locale={locale as Locale} />
-              </HomepageChromeGate>
+              <Header locale={locale as Locale} />
               <main className="flex-1">{children}</main>
-              <HomepageChromeGate>
-                <Footer />
-              </HomepageChromeGate>
+              <Footer />
             </div>
           </CartProvider>
         </NextIntlClientProvider>
