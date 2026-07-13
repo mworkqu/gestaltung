@@ -129,6 +129,19 @@ function parseBool(v: string, fallback: boolean): boolean {
   return fallback;
 }
 
+// Only keep image values that are real http(s) URLs. Guards the catalog against
+// junk in the sheet's image column (e.g. the literal "[link removed]" or a bare
+// filename) that would otherwise render as a broken image.
+function cleanImageUrl(v: string | null): string | null {
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function parseStock(v: string): StockStatus {
   const t = v.trim().toLowerCase().replace(/\s+/g, "_");
   if (["low", "low_stock"].includes(t)) return "low_stock";
@@ -221,7 +234,7 @@ export function parseSheet(text: string): SheetParseResult {
       unit_price,
       min_order_qty,
       stock_status: parseStock(cell(r, "stock_status")),
-      image_url: opt(r, "image_url"),
+      image_url: cleanImageUrl(opt(r, "image_url")),
       // Default to published so a freshly filled sheet shows up in the store.
       is_published: parseBool(cell(r, "is_published"), true),
     });

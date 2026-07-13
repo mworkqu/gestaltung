@@ -1,11 +1,11 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Search, ArrowUpRight } from "lucide-react";
+import { Search } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { GMark } from "@/components/g-mark";
+import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { cn } from "@/lib/utils";
@@ -108,36 +108,9 @@ export default async function Home({
           </div>
         </div>
 
-        {/* Custom manufacturing panel — the ONE Design button */}
-        <div className="neu animate-fade-up delay-1 flex flex-col justify-between gap-6 p-8 lg:col-span-5">
-          <div className={mono("flex items-center justify-between text-[10px] text-faint")}>
-            <span>{t("customKicker")}</span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> FIG·01
-            </span>
-          </div>
-
-          <div className="neu-inset relative flex flex-1 items-center justify-center overflow-hidden p-8">
-            <div aria-hidden className="bg-blueprint-grid absolute inset-0 opacity-70" />
-            <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-50">
-              <span className="absolute h-36 w-36 rounded-full border border-borderstrong" />
-              <span className="absolute h-52 w-52 rounded-full border border-dashed border-borderstrong/70" />
-            </div>
-            <div className="relative flex flex-col items-center">
-              <GMark className="h-20 w-20" />
-              <p className={mono("mt-4 text-[10px] text-faint")}>STL · STEP · DXF · IGES</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <p className="text-sm leading-relaxed text-body">{t("customText")}</p>
-            <Button asChild size="lg" className="w-full rounded-full">
-              <Link href="/design">
-                {t("customBtn")}
-                <ArrowUpRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
-              </Link>
-            </Button>
-          </div>
+        {/* Custom manufacturing panel — drag-and-drop CAD upload → quote */}
+        <div className="neu animate-fade-up delay-1 p-8 lg:col-span-5">
+          <DesignDropzone />
         </div>
       </section>
 

@@ -437,6 +437,37 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   (home, /store, /design, /design/drawing, marketing, sign-in) keep the header. To add/remove an area from
   header-hiding, edit APP_PREFIXES in components/header-gate.tsx.
 
+- WEBSITE FIXES + PUBLIC QUOTE FLOW (2026-07-14, owner requests): DONE (code) — needs migration 0012 run in Supabase.
+  1. STORE IMAGES were broken: the owner's Google Sheet `image` column held the literal text "[link removed]"
+     (not URLs), so every card requested /<locale>/[link removed] → 404. Fixes: (a) new lib/parts/format.ts
+     partImageUrl() only renders real http(s) URLs (else the GearPlaceholder shows) and rewrites Google Drive
+     share links (/file/d/<id>/view or ?id=) to drive.google.com/uc?export=view&id=<id>; used in
+     components/parts/part-card.tsx + app/[locale]/store/[sku]/page.tsx. (b) lib/parts/sheet-import.ts
+     cleanImageUrl() drops non-http image values to null on import, so re-importing scrubs the junk.
+     OWNER ACTION: put real direct image URLs in the sheet's image column (or leave blank) and re-import.
+  2. MIN ORDER = 1 now shows "No minimum" (Parts.noMinimum, en "No minimum" / ar "بدون حد أدنى") on the
+     part card + [sku] detail instead of hiding the line; 2+ still shows "Min. order: N".
+  3. HOMEPAGE custom-manufacturing box is now a drag-and-drop CAD dropzone (components/design/design-dropzone.tsx,
+     replaces the static blueprint+Design-button panel in app/[locale]/page.tsx; keeps the FIG·01 blueprint look).
+     Drop/browse a file → carried via lib/design/pending-upload.ts (module-level File, survives client nav) →
+     NEW PUBLIC page app/[locale]/design/quote (components/design/quote-request.tsx): email OR phone +
+     manufacturing method (3d_printing/cnc/laser/edm/not_sure) + optional notes. No sign-in (separate from the
+     authed job flow at /design/upload). The file uploads DIRECT from the browser to Supabase Storage bucket
+     `quote-uploads` (up to 50 MB, bypassing Vercel's ~4.5 MB body limit); metadata POSTs as JSON to
+     NEW app/api/design-quote/route.ts, which saves an inquiries row AND emails STORE_LEAD_EMAIL via Resend
+     with a 7-day signed download link minted by lib/supabase/service.ts (service-role client). Best-effort like
+     /api/store-lead. If the storage upload fails, the lead still sends and the success screen asks the visitor
+     to share the file via WhatsApp/email. New DesignQuote namespace + StoreLanding drop* keys (en+ar).
+  4. "Hire us to draw your CAD" → "Need help with drawing?" (DesignHub.drawingTitle en+ar); removed the other
+     "hire us" phrasings from StoreLanding.customText + DesignHub.metaDescription (en+ar).
+  - MIGRATION 0012_quote_uploads.sql (RUN AFTER 0001): creates the PRIVATE `quote-uploads` storage bucket
+     (50 MB limit) + storage.objects policies (anon INSERT for public quote uploads; super_admin SELECT/DELETE).
+     No new tables — leads land in `inquiries`, the file link is emailed. Uses SUPABASE_SERVICE_ROLE_KEY
+     (already set in Vercel) for the signed URL.
+  - NOTE: `npm run build` NOT run by Claude this session (the Cowork Linux sandbox's view of the repo lagged
+     behind the edits, so build/git from there was unsafe). All edits verified on disk via the editor; owner
+     to build + push from Windows.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -475,6 +506,8 @@ Prompt file: STAGE_9_AI_PROMPT.md (not yet written — create when ready to buil
 Check Supabase → Table Editor to confirm which tables exist before running:
 - 0010_job_upsells.sql — jobs upsell columns (speed_tier, post_processing, inspection_report, job_path, production_qty_range)
 - 0011_parts_store.sql — parts, part_orders, part_order_items tables + create_part_order RPC
+- 0012_quote_uploads.sql — private `quote-uploads` storage bucket + policies for the public /design/quote flow
+  (RUN THIS before the drag-and-drop quote upload works in production; needs SUPABASE_SERVICE_ROLE_KEY set)
 
 ## PERMANENT NOTES
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in

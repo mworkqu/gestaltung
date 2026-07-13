@@ -5,7 +5,12 @@ import { ChevronRight } from "lucide-react";
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatPrice, partName, partDescription } from "@/lib/parts/format";
+import {
+  formatPrice,
+  partName,
+  partDescription,
+  partImageUrl,
+} from "@/lib/parts/format";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { StockBadge } from "@/components/parts/stock-badge";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
@@ -39,6 +44,7 @@ export default async function PartDetailPage({
 
   const name = partName(part, locale);
   const description = partDescription(part, locale);
+  const imageUrl = partImageUrl(part);
 
   const spec = (label: string, value: string | null) =>
     value ? (
@@ -66,10 +72,10 @@ export default async function PartDetailPage({
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Image */}
         <div className="neu aspect-square overflow-hidden">
-          {part.image_url ? (
+          {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={part.image_url}
+              src={imageUrl}
               alt={name}
               className="h-full w-full object-cover"
             />
@@ -96,11 +102,11 @@ export default async function PartDetailPage({
                 {t("perUnit")}
               </span>
             </p>
-            {part.min_order_qty > 1 && (
-              <p className="text-sm text-mutedtext">
-                {t("minOrder", { qty: part.min_order_qty })}
-              </p>
-            )}
+            <p className="text-sm text-mutedtext">
+              {part.min_order_qty > 1
+                ? t("minOrder", { qty: part.min_order_qty })
+                : t("noMinimum")}
+            </p>
           </div>
 
           <PartDetailCart part={part} />

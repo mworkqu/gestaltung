@@ -2,7 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
-import { formatPrice, partName } from "@/lib/parts/format";
+import { formatPrice, partName, partImageUrl } from "@/lib/parts/format";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { StockBadge } from "@/components/parts/stock-badge";
 import { AddToCartButton } from "@/components/parts/add-to-cart-button";
@@ -19,6 +19,7 @@ export async function PartCard({
 }) {
   const t = await getTranslations("Parts");
   const name = partName(part, locale);
+  const imageUrl = partImageUrl(part);
 
   return (
     <div className="neu flex flex-col overflow-hidden">
@@ -26,10 +27,10 @@ export async function PartCard({
         href={`/store/${part.sku}`}
         className="block aspect-square overflow-hidden bg-panel"
       >
-        {part.image_url ? (
+        {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={part.image_url}
+            src={imageUrl}
             alt={name}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
@@ -58,11 +59,11 @@ export async function PartCard({
           <p className="text-base font-bold text-heading">
             {formatPrice(part.unit_price, locale)}
           </p>
-          {part.min_order_qty > 1 && (
-            <p className="text-[11px] text-mutedtext">
-              {t("minOrder", { qty: part.min_order_qty })}
-            </p>
-          )}
+          <p className="text-[11px] text-mutedtext">
+            {part.min_order_qty > 1
+              ? t("minOrder", { qty: part.min_order_qty })
+              : t("noMinimum")}
+          </p>
           <AddToCartButton part={part} className="w-full" />
         </div>
       </div>
