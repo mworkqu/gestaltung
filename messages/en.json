@@ -223,7 +223,8 @@
     "inventory": "Inventory",
     "jobs": "Jobs",
     "partsCatalog": "Store",
-    "partsOrders": "Store orders"
+    "partsOrders": "Store orders",
+    "leads": "Leads"
   },
   "Admin": {
     "kicker": "Command center",
@@ -796,5 +797,21 @@
     "ctaTag": "Not sure which?",
     "ctaHeading": "Tell us what you need — we'll guide you.",
     "ctaButton": "Talk to us"
+  },
+  "Leads": {
+    "kicker": "Leads",
+    "title": "Enquiries",
+    "count": "{count, plural, =0 {No enquiries} one {# enquiry} other {# enquiries}}",
+    "emptyTitle": "No enquiries yet",
+    "emptyBody": "Callback requests and quote enquiries from the website will appear here.",
+    "colMessage": "Message",
+    "colDate": "Received",
+    "status_new": "New",
+    "status_contacted": "Contacted",
+    "status_closed": "Closed",
+    "whatsapp": "WhatsApp",
+    "whatsappUnavailable": "Number not usable for WhatsApp",
+    "emailAction": "Email",
+    "noEmail": "No email given"
   }
 }

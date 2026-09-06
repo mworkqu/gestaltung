@@ -223,7 +223,8 @@
     "inventory": "المخزون",
     "jobs": "الطلبات",
     "partsCatalog": "المتجر",
-    "partsOrders": "طلبات المتجر"
+    "partsOrders": "طلبات المتجر",
+    "leads": "الاستفسارات"
   },
   "Admin": {
     "kicker": "مركز التحكم",
@@ -796,5 +797,21 @@
     "ctaTag": "غير متأكد؟",
     "ctaHeading": "أخبرنا بما تحتاجه — وسنرشدك.",
     "ctaButton": "تحدث إلينا"
+  },
+  "Leads": {
+    "kicker": "العملاء المحتملون",
+    "title": "الاستفسارات",
+    "count": "{count, plural, =0 {لا توجد استفسارات} one {استفسار واحد} two {استفساران} few {# استفسارات} many {# استفسارًا} other {# استفسار}}",
+    "emptyTitle": "لا توجد استفسارات بعد",
+    "emptyBody": "ستظهر هنا طلبات الاتصال وطلبات التسعير الواردة من الموقع.",
+    "colMessage": "الرسالة",
+    "colDate": "تاريخ الاستلام",
+    "status_new": "جديد",
+    "status_contacted": "تم التواصل",
+    "status_closed": "مغلق",
+    "whatsapp": "واتساب",
+    "whatsappUnavailable": "الرقم غير صالح للواتساب",
+    "emailAction": "بريد إلكتروني",
+    "noEmail": "لا يوجد بريد إلكتروني"
   }
 }

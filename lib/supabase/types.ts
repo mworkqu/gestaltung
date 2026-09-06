@@ -194,3 +194,18 @@ export type CartItem = {
   stockStatus: StockStatus;
   quantity: number;
 };
+
+// A lead captured by /api/store-lead or /api/design-quote. The public forms may
+// insert; only super_admin can read or manage (RLS, migration 0002).
+export type InquiryStatus = "new" | "contacted" | "closed";
+
+export type Inquiry = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  message: string;
+  locale: string;
+  status: InquiryStatus;
+  created_at: string;
+};
