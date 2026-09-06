@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizePhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { QUOTE_BUCKET } from "@/lib/design/constants";
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
   }
 
   const email = String(body.email ?? "").trim().slice(0, 160) || null;
-  const phone = String(body.phone ?? "").trim().slice(0, 40);
+  const phone = normalizePhone(String(body.phone ?? "")).slice(0, 40);
   const name = String(body.name ?? "").trim().slice(0, 120) || "Website visitor";
   const technique = String(body.technique ?? "").trim().slice(0, 40);
   const notes = String(body.message ?? "").trim().slice(0, 4000);

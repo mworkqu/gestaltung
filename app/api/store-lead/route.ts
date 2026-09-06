@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizePhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 // Single lead/contact endpoint. Every contact touchpoint on the site posts here
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   const name = String(body.name ?? "").trim().slice(0, 120);
-  const phone = String(body.phone ?? "").trim().slice(0, 40);
+  const phone = normalizePhone(String(body.phone ?? "")).slice(0, 40);
   const email = String(body.email ?? "").trim().slice(0, 160) || null;
   const locale = body.locale === "ar" ? "ar" : "en";
   const src = SOURCES[body.source ?? ""] ?? SOURCES.store_callback;
