@@ -812,6 +812,9 @@
     "whatsapp": "WhatsApp",
     "whatsappUnavailable": "Number not usable for WhatsApp",
     "emailAction": "Email",
-    "noEmail": "No email given"
+    "noEmail": "No email given",
+    "markNew": "Reopen",
+    "markContacted": "Mark contacted",
+    "markClosed": "Close"
   }
 }

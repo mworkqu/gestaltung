@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Inbox, Mail, MessageCircle } from "lucide-react";
 
-import type { Inquiry } from "@/lib/supabase/types";
+import type { Inquiry, InquiryStatus } from "@/lib/supabase/types";
+import { setLeadStatus } from "./actions";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { toWhatsAppDigits } from "@/lib/phone";
@@ -18,6 +19,20 @@ const STATUS_TONE: Record<string, string> = {
   new: "border-azure/40 bg-azure/10 text-azure",
   contacted: "border-borderstrong bg-panel text-body",
   closed: "border-borderstrong/60 bg-transparent text-faint",
+};
+
+// Offer the two statuses a lead isn't already in, so triage is one click either
+// way: advance it, or reopen something closed too early.
+const STATUS_ACTIONS: Record<InquiryStatus, InquiryStatus[]> = {
+  new: ["contacted", "closed"],
+  contacted: ["closed", "new"],
+  closed: ["new", "contacted"],
+};
+
+const ACTION_LABEL: Record<InquiryStatus, "markNew" | "markContacted" | "markClosed"> = {
+  new: "markNew",
+  contacted: "markContacted",
+  closed: "markClosed",
 };
 
 export default async function LeadsPage({
@@ -138,6 +153,22 @@ export default async function LeadsPage({
                   <p className="mt-2 whitespace-pre-line text-sm text-body">
                     {lead.message}
                   </p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-borderstrong/60 pt-4">
+                  {STATUS_ACTIONS[lead.status].map((next) => (
+                    <form key={next} action={setLeadStatus}>
+                      <input type="hidden" name="id" value={lead.id} />
+                      <input type="hidden" name="status" value={next} />
+                      <input type="hidden" name="locale" value={locale} />
+                      <button
+                        type="submit"
+                        className="rounded-full border border-borderstrong px-4 py-1.5 text-xs font-medium text-body transition hover:border-azure/40 hover:text-azure"
+                      >
+                        {t(ACTION_LABEL[next])}
+                      </button>
+                    </form>
+                  ))}
                 </div>
               </li>
             );

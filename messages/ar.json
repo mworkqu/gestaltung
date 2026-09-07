@@ -812,6 +812,9 @@
     "whatsapp": "واتساب",
     "whatsappUnavailable": "الرقم غير صالح للواتساب",
     "emailAction": "بريد إلكتروني",
-    "noEmail": "لا يوجد بريد إلكتروني"
+    "noEmail": "لا يوجد بريد إلكتروني",
+    "markNew": "إعادة فتح",
+    "markContacted": "تم التواصل",
+    "markClosed": "إغلاق"
   }
 }
