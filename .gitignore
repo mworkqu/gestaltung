@@ -48,3 +48,6 @@ claude-code-vercel-migration-prompt.md
 
 # high-res brand masters (kept locally; small served versions live in /public)
 brand-assets/
+
+# Local design/planning assets, kept out of the repo
+_archive/
