@@ -107,6 +107,31 @@ should cascade through `profiles` (already `on delete cascade` to `auth.users`)
 and any `user_id` foreign keys added from step 6 onward, so those must be
 declared `on delete cascade` from the start.
 
+### 8. CAPTCHA protection breaks ALL auth endpoints, not just anonymous
+**Found:** Step 4, 2026-09-18. **Caused a live outage of sign-in and sign-up.**
+Enabling Authentication -> Attack Protection -> CAPTCHA applies it to every auth
+endpoint. The existing `/sign-in` and `/sign-up` pages send no CAPTCHA token, so
+both immediately began failing with `captcha_failed` (400) — verified directly
+against `/auth/v1/token?grant_type=password` and `/auth/v1/signup`. Anonymous
+sign-in failed the same way, which is how it surfaced.
+**Resolved by** turning CAPTCHA back off. It is abuse protection worth having,
+but it cannot be enabled until the widget is wired into all three entry points
+at once — sign-in, sign-up, and anonymous guest creation — each passing
+`options.captchaToken`. Until then the anonymous sign-in rate limit is the
+abuse control.
+**Revisit as its own step**, after step 13, with the provider's public site key.
+
+### 9. Existing RLS is safe for anonymous users — audited, no changes needed
+**Found:** Step 4, prompted by Supabase's warning that anonymous users assume the
+`authenticated` role and are therefore subject to policies written for it.
+Audited every policy a guest can reach. None leak: `profiles_select` exposes only
+their own row (the same-tenant branch is guarded by `tenant_id is not null`, and
+a guest's is NULL), `tenants_select` and all four `inventory_items` policies
+return zero rows for the same reason, `part_orders_own_select` is keyed on
+`auth.uid()`, and `parts` exposes only published rows, which is intended.
+Every tenant-scoped policy fails closed on NULL — the accidental upside of the
+`handle_new_user` behaviour in note 3. **No policy changes required.**
+
 ---
 
 ## Resolved
