@@ -706,7 +706,15 @@
     "material_mdf": "MDF",
     "material_carbon_fibre": "Carbon fibre",
     "metaTitle": "Projects — Gestaltung",
-    "metaDescription": "Start a project, describe what you want to build, pick materials and add parts from the store."
+    "metaDescription": "Start a project, describe what you want to build, pick materials and add parts from the store.",
+    "tookFromInventory": "Taken from your inventory — nothing to buy.",
+    "addedToCart": "Added to your cart for this project.",
+    "yoursCount": "{count} yours",
+    "toBuyCount": "{count} to buy",
+    "cancelWithParts": "Cancel this project? {count} part(s) came off your inventory — do you want them back on your shelf?",
+    "returnParts": "Return parts and cancel",
+    "discardParts": "Cancel without returning",
+    "keepProject": "Keep project"
   },
   "Search": {
     "inInventory": "In your inventory",
@@ -717,7 +725,8 @@
     "youHave": "You have {count}",
     "noResults": "Nothing matched. Try a different word.",
     "placeholder": "Search your inventory and the store",
-    "signUpToTrack": "Sign up to track what you own"
+    "signUpToTrack": "Sign up to track what you own",
+    "useMine": "Use mine"
   },
   "ProjectCad": {
     "heading": "CAD file",

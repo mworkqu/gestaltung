@@ -35,12 +35,15 @@ export function UnifiedSearch({
   addedKey,
   autoFocus,
   placeholder,
+  reloadKey,
 }: {
   onAdd: (hit: SearchHit) => void | Promise<void>;
   addingKey?: string | null;
   addedKey?: string | null;
   autoFocus?: boolean;
   placeholder?: string;
+  /** Change this to make the search re-read the inventory it just changed. */
+  reloadKey?: number;
 }) {
   const t = useTranslations("Projects");
   const tSearch = useTranslations("Search");
@@ -69,7 +72,7 @@ export function UnifiedSearch({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const partsById = useMemo(
     () => new Map(parts.map((p) => [p.id, p])),
@@ -141,7 +144,7 @@ export function UnifiedSearch({
               adding={addingKey === hit.key}
               added={addedKey === hit.key}
               onAdd={onAdd}
-              actionLabel={hit.part ? tSearch("buyMore") : null}
+              actionLabel={hit.part ? tSearch("useMine") : null}
               ownedLabel={tSearch("youHave", { count: hit.owned })}
             />
           ))}

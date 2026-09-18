@@ -161,6 +161,9 @@ export type ProjectItem = {
   project_id: string;
   product_id: string;
   quantity: number;
+  // How many of these units came off the client's own shelf rather than the
+  // cart. The remainder is bought at checkout.
+  qty_from_inventory: number;
   note: string | null;
   created_at: string;
 };
