@@ -121,3 +121,66 @@ export type Inquiry = {
   status: InquiryStatus;
   created_at: string;
 };
+
+// ── Projects ────────────────────────────────────────────────────────────────
+// The client workspace. See supabase/migrations/0015_projects.sql.
+
+export type Project = {
+  id: string;
+  user_id: string;
+  tenant_id: string | null;
+  name: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectBlockType = "text" | "image";
+
+export type ProjectBlock = {
+  id: string;
+  project_id: string;
+  type: ProjectBlockType;
+  content: string | null;
+  storage_path: string | null;
+  position: number;
+  created_at: string;
+};
+
+export type ProjectMaterial = {
+  id: string;
+  project_id: string;
+  material: string;
+  created_at: string;
+};
+
+export type ProjectItem = {
+  id: string;
+  project_id: string;
+  product_id: string;
+  quantity: number;
+  note: string | null;
+  created_at: string;
+};
+
+export type CartRow = {
+  id: string;
+  user_id: string;
+  product_id: string;
+  project_id: string | null;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClientInventoryItem = {
+  id: string;
+  user_id: string;
+  product_id: string | null;
+  custom_name: string | null;
+  quantity: number;
+  image_path: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};

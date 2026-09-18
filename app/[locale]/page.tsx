@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
@@ -96,6 +96,17 @@ export default async function Home({
               {t("searchBtn")}
             </Button>
           </form>
+
+          {/* The primary action on this page: start a project. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button asChild size="lg" className="rounded-2xl px-6">
+              <Link href="/projects/new">
+                <Plus className="me-2 h-4 w-4" />
+                {t("newProjectCta")}
+              </Link>
+            </Button>
+            <span className="text-sm text-mutedtext">{t("newProjectSub")}</span>
+          </div>
 
           {/* Category quick-links */}
           <div className="flex flex-wrap gap-2">
