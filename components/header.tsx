@@ -19,6 +19,7 @@ export async function Header({ locale }: { locale: Locale }) {
   const navLinks = [
     { href: "/projects", label: t("projects") },
     { href: "/store", label: t("store") },
+    { href: "/my-inventory", label: t("myInventory") },
     { href: "/design", label: t("design") },
   ];
 

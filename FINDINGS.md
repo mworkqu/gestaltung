@@ -132,6 +132,29 @@ return zero rows for the same reason, `part_orders_own_select` is keyed on
 Every tenant-scoped policy fails closed on NULL — the accidental upside of the
 `handle_new_user` behaviour in note 3. **No policy changes required.**
 
+### 10. Catalogue categories have no Arabic
+**Found:** Step 15 (Arabic pass).
+`parts` carries `name_ar` and `description_ar` but no `category_ar`, so the
+category chips on the Arabic home page and the Arabic store filters render the
+raw English value — "Construction Materials", "Fasteners", "Microcontrollers".
+Everything around them is correctly translated, which makes it conspicuous.
+Two ways out: add a `category_ar` column and a column in the owner's import
+sheet, or keep a fixed key->label map in `messages/*.json` and store category
+keys rather than free text. The second is tidier but means re-keying the
+existing 121 rows. **Not guessed at here** — the categories are the owner's
+own words and should be translated by a person.
+**Revisit** with the owner before the Arabic store is promoted.
+
+### 11. Three marketing namespaces are orphaned, and were before this work
+**Found:** Step 16 (i18n sweep).
+`Features`, `LocalAdvantage` and `Social` are referenced nowhere. They were
+stranded by the earlier store-first homepage rebuild, not by the jobs removal.
+They hold written, translated Arabic marketing copy for sections that may be
+intended to return, so they were **left in place** rather than deleted — that
+is the owner's call, not a cleanup decision. The jobs namespaces (`Jobs`,
+`JobSpecs`, `PartsStore`, 159 keys per locale) were removed, since the code
+that used them is gone for good.
+
 ---
 
 ## Resolved
