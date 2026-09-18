@@ -68,6 +68,45 @@ holds a file (0012), and the exported `jobs` rows carry `speed_tier` /
 **Action:** update the CLAUDE.md status table during the next step that touches
 it, and add 0013 as applied once it is run.
 
+### 6. `handle_new_user` DOES fire for anonymous users — but don't change it
+**Found:** Step 4 investigation. **This answers the question raised in the plan.**
+
+The trigger is `after insert on auth.users` with no filter on `is_anonymous`,
+and an anonymous sign-in is a real `auth.users` row. So yes — every guest would
+get a `profiles` row with `role='client'`, and any naive "how many clients do we
+have" count becomes meaningless.
+
+**Recommendation: leave the trigger alone.** The obvious fix — a `'guest'` role —
+collides with `profiles_guard_privileges()` from 0009, which forbids a
+non-super_admin from changing their own `role`. A guest converting to a real
+account could not promote themselves out of `'guest'` without a SECURITY DEFINER
+escape hatch, which is exactly the kind of hole 0009 was written to close.
+
+Use Supabase's own authoritative flag instead. `is_anonymous` is a claim in the
+JWT, so it is available both in SQL and in RLS:
+
+    (auth.jwt() ->> 'is_anonymous')::boolean
+
+That gives clean guest detection with **no migration to `profiles`, no change to
+the role constraint, and no change to the 0009 guard** — and conversion to a
+permanent account needs no role change at all, since the guest was already
+`'client'`. The only cost is that raw `profiles` counts include guests, which is
+a reporting fix: the admin overview should count non-anonymous profiles.
+
+### 7. Anonymous-user cleanup rule (proposal, not built)
+**Found:** Step 4.
+Guests are real `auth.users` rows and never expire on their own. Left alone they
+accumulate forever and each one counts toward the project's MAU. Proposed rule,
+to be implemented as a scheduled job once the projects tables exist: **delete any
+anonymous user older than 30 days that owns no project, no cart line and no
+inventory row.** Thirty days is comfortably longer than a realistic "I'll come
+back and finish this build" window, and the ownership test means an abandoned
+empty session is the only thing ever removed — a guest who actually started
+something is preserved until they sign up or explicitly abandon it. The delete
+should cascade through `profiles` (already `on delete cascade` to `auth.users`)
+and any `user_id` foreign keys added from step 6 onward, so those must be
+declared `on delete cascade` from the start.
+
 ---
 
 ## Resolved
