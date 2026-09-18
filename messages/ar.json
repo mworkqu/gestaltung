@@ -706,7 +706,15 @@
     "material_mdf": "MDF",
     "material_carbon_fibre": "ألياف كربون",
     "metaTitle": "المشاريع — جِشتالتُونج",
-    "metaDescription": "ابدأ مشروعًا، وصِف ما تريد بناءه، واختر المواد، وأضف القطع من المتجر."
+    "metaDescription": "ابدأ مشروعًا، وصِف ما تريد بناءه، واختر المواد، وأضف القطع من المتجر.",
+    "tookFromInventory": "أُخذت من مخزونك — لا حاجة للشراء.",
+    "addedToCart": "أُضيفت إلى سلتك لهذا المشروع.",
+    "yoursCount": "{count} لديك",
+    "toBuyCount": "{count} للشراء",
+    "cancelWithParts": "إلغاء هذا المشروع؟ {count} من القطع أُخذت من مخزونك — هل تريد إعادتها إلى رفّك؟",
+    "returnParts": "أعد القطع وألغِ المشروع",
+    "discardParts": "ألغِ دون إعادة",
+    "keepProject": "الإبقاء على المشروع"
   },
   "Search": {
     "inInventory": "في مخزونك",
@@ -717,7 +725,8 @@
     "youHave": "لديك {count}",
     "noResults": "لا نتائج مطابقة. جرّب كلمة أخرى.",
     "placeholder": "ابحث في مخزونك وفي المتجر",
-    "signUpToTrack": "سجّل حسابًا لتتبّع ما تملك"
+    "signUpToTrack": "سجّل حسابًا لتتبّع ما تملك",
+    "useMine": "استخدم ما لديّ"
   },
   "ProjectCad": {
     "heading": "ملف CAD",

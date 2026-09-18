@@ -21,6 +21,14 @@ import {
   PROJECT_IMAGE_BUCKET,
   PROJECT_MATERIALS,
 } from "@/lib/projects/constants";
+import {
+  adjustCart,
+  ownedCount,
+  returnToInventory,
+  splitOnAdd,
+  splitOnRemove,
+  takeFromInventory,
+} from "@/lib/projects/allocation";
 import { ProjectCadCard } from "@/components/projects/project-cad-card";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Tag } from "@/components/ui/tag";
@@ -135,7 +143,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-6">
-      <ProjectHeader project={project} guest={guest} onDeleted={() => router.push("/projects")} />
+      <ProjectHeader
+        project={project}
+        guest={guest}
+        reclaimable={items.reduce((n, i) => n + i.qty_from_inventory, 0)}
+        onDeleted={() => router.push("/projects")}
+      />
       <NotesCard project={project} />
       <BlocksCard
         projectId={projectId}
@@ -155,15 +168,19 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 function ProjectHeader({
   project,
   guest,
+  reclaimable,
   onDeleted,
 }: {
   project: Project;
   guest: boolean;
+  /** Units on this project that came off the client's own shelf. */
+  reclaimable: number;
   onDeleted: () => void;
 }) {
   const t = useTranslations("Projects");
   const [name, setName] = useState(project.name);
   const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   async function saveName(next: string) {
     const trimmed = next.trim();
@@ -171,10 +188,33 @@ function ProjectHeader({
     await createClient().from("projects").update({ name: trimmed }).eq("id", project.id);
   }
 
-  async function remove() {
-    if (!window.confirm(t("deleteConfirm"))) return;
+  // Cancelling a project frees whatever it was holding. Anything that came off
+  // their own shelf can go back there — but that is their call, so we ask
+  // rather than assume. Everything else (the cart lines) is released either
+  // way, because the project that justified it no longer exists.
+  async function remove(putBack: boolean) {
     setDeleting(true);
-    await createClient().from("projects").delete().eq("id", project.id);
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (putBack && user) {
+      const { data: rows } = await supabase
+        .from("project_items")
+        .select("product_id, qty_from_inventory")
+        .eq("project_id", project.id)
+        .gt("qty_from_inventory", 0);
+
+      for (const row of rows ?? []) {
+        await returnToInventory(supabase, user.id, row.product_id, row.qty_from_inventory);
+      }
+    }
+
+    // cart_items.project_id is ON DELETE SET NULL, so lines would survive
+    // untagged. Clear them: they were only ever for this project.
+    await supabase.from("cart_items").delete().eq("project_id", project.id);
+    await supabase.from("projects").delete().eq("id", project.id);
     onDeleted();
   }
 
@@ -190,13 +230,51 @@ function ProjectHeader({
         />
         <button
           type="button"
-          onClick={remove}
-          disabled={deleting}
+          onClick={() => setConfirming(true)}
+          disabled={deleting || confirming}
           className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-mutedtext transition-colors hover:text-destructive"
         >
           {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : t("deleteProject")}
         </button>
       </div>
+
+      {confirming && (
+        <div className="space-y-3 rounded-xl bg-panel p-4 shadow-neu-inset">
+          <p className="text-sm text-heading">
+            {reclaimable > 0
+              ? t("cancelWithParts", { count: reclaimable })
+              : t("deleteConfirm")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {reclaimable > 0 && (
+              <button
+                type="button"
+                onClick={() => remove(true)}
+                disabled={deleting}
+                className="rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover disabled:opacity-60"
+              >
+                {t("returnParts")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => remove(false)}
+              disabled={deleting}
+              className="rounded-lg bg-surface px-3.5 py-2 text-xs font-semibold text-destructive shadow-neu-sm transition-colors disabled:opacity-60"
+            >
+              {reclaimable > 0 ? t("discardParts") : t("deleteProject")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={deleting}
+              className="rounded-lg px-3.5 py-2 text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
+            >
+              {t("keepProject")}
+            </button>
+          </div>
+        </div>
+      )}
 
       {guest && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-inventory-bg px-4 py-3">
@@ -539,9 +617,14 @@ function ItemsCard({
   const locale = useLocale();
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const [addedKey, setAddedKey] = useState<string | null>(null);
+  // Which way the last add went, so we can say so plainly.
+  const [lastMove, setLastMove] = useState<"inventory" | "cart" | null>(null);
+  // Bumped after every allocation so the search re-reads the inventory it
+  // just changed. items.length would miss a quantity-only move.
+  const [version, setVersion] = useState(0);
 
-  // Adding an item to a project ALSO puts it in the cart, tagged with this
-  // project. No order is placed — checkout stays a separate, deliberate step.
+  // A part is either on their shelf or on this project, never both. So take
+  // whatever they already own off the inventory, and only buy the shortfall.
   async function add(hit: SearchHit) {
     if (!hit.part) return;
     setAddingKey(hit.key);
@@ -550,9 +633,11 @@ function ItemsCard({
       const supabase = createClient();
       const part = hit.part;
 
+      const { fromInventory, toCart } = splitOnAdd(1, hit.owned);
+
       const { data: existing } = await supabase
         .from("project_items")
-        .select("id, quantity")
+        .select("id, quantity, qty_from_inventory")
         .eq("project_id", projectId)
         .eq("product_id", part.id)
         .maybeSingle();
@@ -560,65 +645,79 @@ function ItemsCard({
       if (existing) {
         await supabase
           .from("project_items")
-          .update({ quantity: existing.quantity + 1 })
+          .update({
+            quantity: existing.quantity + 1,
+            qty_from_inventory: existing.qty_from_inventory + fromInventory,
+          })
           .eq("id", existing.id);
       } else {
-        await supabase
-          .from("project_items")
-          .insert({ project_id: projectId, product_id: part.id, quantity: 1 });
-      }
-
-      const { data: cartLine } = await supabase
-        .from("cart_items")
-        .select("id, quantity")
-        .eq("user_id", user.id)
-        .eq("product_id", part.id)
-        .eq("project_id", projectId)
-        .maybeSingle();
-
-      if (cartLine) {
-        await supabase
-          .from("cart_items")
-          .update({ quantity: cartLine.quantity + 1 })
-          .eq("id", cartLine.id);
-      } else {
-        await supabase.from("cart_items").insert({
-          user_id: user.id,
-          product_id: part.id,
+        await supabase.from("project_items").insert({
           project_id: projectId,
+          product_id: part.id,
           quantity: 1,
+          qty_from_inventory: fromInventory,
         });
       }
 
+      await takeFromInventory(supabase, user.id, part.id, fromInventory);
+      await adjustCart(supabase, user.id, part.id, projectId, toCart);
+
+      setLastMove(fromInventory > 0 ? "inventory" : "cart");
+      setVersion((v) => v + 1);
       await onChanged();
       setAddedKey(hit.key);
-      setTimeout(() => setAddedKey(null), 1200);
+      setTimeout(() => setAddedKey(null), 1600);
     } finally {
       setAddingKey(null);
     }
   }
 
   async function setQuantity(item: ItemWithPart, quantity: number) {
+    const user = await ensureSession();
     const supabase = createClient();
-    if (quantity <= 0) {
-      await Promise.all([
-        supabase.from("project_items").delete().eq("id", item.id),
-        supabase
-          .from("cart_items")
-          .delete()
-          .eq("project_id", projectId)
-          .eq("product_id", item.product_id),
-      ]);
+    const target = Math.max(0, quantity);
+    const delta = target - item.quantity;
+    if (delta === 0) return;
+
+    if (delta > 0) {
+      // Growing the line: shelf first, then the cart, same as adding.
+      const owned = await ownedCount(supabase, user.id, item.product_id);
+      const { fromInventory, toCart } = splitOnAdd(delta, owned);
+      await supabase
+        .from("project_items")
+        .update({
+          quantity: target,
+          qty_from_inventory: item.qty_from_inventory + fromInventory,
+        })
+        .eq("id", item.id);
+      await takeFromInventory(supabase, user.id, item.product_id, fromInventory);
+      await adjustCart(supabase, user.id, item.product_id, projectId, toCart);
     } else {
-      await Promise.all([
-        supabase.from("project_items").update({ quantity }).eq("id", item.id),
-        supabase
-          .from("cart_items")
-          .update({ quantity })
-          .eq("project_id", projectId)
-          .eq("product_id", item.product_id),
-      ]);
+      // Shrinking: release cart units first — those were never theirs — and
+      // only then hand shelf units back.
+      const drop = -delta;
+      const { toCart, fromInventory } = splitOnRemove(
+        drop,
+        item.qty_from_inventory,
+        item.quantity
+      );
+      await adjustCart(supabase, user.id, item.product_id, projectId, -toCart);
+      await returnToInventory(supabase, user.id, item.product_id, fromInventory);
+
+      if (target === 0) {
+        await supabase.from("project_items").delete().eq("id", item.id);
+      } else {
+        await supabase
+          .from("project_items")
+          .update({
+            quantity: target,
+            qty_from_inventory: item.qty_from_inventory - fromInventory,
+          })
+          .eq("id", item.id);
+      }
     }
+
+    setVersion((v) => v + 1);
     await onChanged();
   }
 
@@ -634,7 +733,18 @@ function ItemsCard({
         <p className="mt-1 text-sm text-mutedtext">{t("itemsIntro")}</p>
       </div>
 
-      <UnifiedSearch onAdd={add} addingKey={addingKey} addedKey={addedKey} />
+      <UnifiedSearch
+        onAdd={add}
+        addingKey={addingKey}
+        addedKey={addedKey}
+        reloadKey={version}
+      />
+
+      {lastMove && (
+        <p className="text-sm text-buy">
+          {lastMove === "inventory" ? t("tookFromInventory") : t("addedToCart")}
+        </p>
+      )}
 
       {items.length === 0 ? (
         <p className="pt-1 text-sm text-mutedtext">{t("emptyProject")}</p>
@@ -656,6 +766,17 @@ function ItemsCard({
                     </span>
                   )}
                 </span>
+
+                {item.qty_from_inventory > 0 && (
+                  <Tag variant="inventory">
+                    {t("yoursCount", { count: item.qty_from_inventory })}
+                  </Tag>
+                )}
+                {item.quantity - item.qty_from_inventory > 0 && (
+                  <Tag variant="buy">
+                    {t("toBuyCount", { count: item.quantity - item.qty_from_inventory })}
+                  </Tag>
+                )}
 
                 <input
                   type="number"
