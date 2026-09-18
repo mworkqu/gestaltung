@@ -31,7 +31,8 @@
     "uploadFile": "Upload a file",
     "signIn": "Sign in",
     "dashboard": "Dashboard",
-    "projects": "Projects"
+    "projects": "Projects",
+    "myInventory": "My inventory"
   },
   "LanguageSwitcher": {
     "label": "Language",
@@ -902,5 +903,31 @@
     "wrongType": "That file type isn't supported. Use STL, STEP, DXF or IGES.",
     "tooLarge": "That file is over 50 MB.",
     "uploadFailed": "That file could not be uploaded."
+  },
+  "MyInventory": {
+    "kicker": "Inventory",
+    "heading": "Your inventory",
+    "intro": "Things you own or want to track. Independent of your cart — add anything, whether you bought it here or not.",
+    "empty": "Nothing tracked yet. Search the store, or add something of your own.",
+    "addCustom": "Add your own item",
+    "customName": "What is it?",
+    "customNamePlaceholder": "e.g. Stepper motor NEMA 17",
+    "quantity": "Quantity",
+    "photo": "Photo (optional)",
+    "add": "Add",
+    "adding": "Adding…",
+    "nameRequired": "Give the item a name.",
+    "remove": "Remove",
+    "fromStore": "Bought here",
+    "own": "My own",
+    "signInHeading": "Sign up to track what you own",
+    "signInBody": "Your inventory needs an account. Your projects and cart come with you — nothing is lost.",
+    "signInCta": "Sign up",
+    "addedToInventory": "Added to your inventory",
+    "addToInventory": "Add to inventory",
+    "metaTitle": "Your inventory — Gestaltung",
+    "metaDescription": "Track the parts and materials you own.",
+    "imageTooLarge": "That image is over 10 MB.",
+    "uploadFailed": "That image could not be uploaded."
   }
 }

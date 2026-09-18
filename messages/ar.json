@@ -31,7 +31,8 @@
     "uploadFile": "ارفع ملفًا",
     "signIn": "تسجيل الدخول",
     "dashboard": "لوحة التحكم",
-    "projects": "المشاريع"
+    "projects": "المشاريع",
+    "myInventory": "مخزوني"
   },
   "LanguageSwitcher": {
     "label": "اللغة",
@@ -902,5 +903,31 @@
     "wrongType": "نوع الملف غير مدعوم. استخدم STL أو STEP أو DXF أو IGES.",
     "tooLarge": "حجم الملف يتجاوز ٥٠ ميغابايت.",
     "uploadFailed": "تعذّر رفع الملف."
+  },
+  "MyInventory": {
+    "kicker": "المخزون",
+    "heading": "مخزونك",
+    "intro": "ما تملكه أو تريد تتبّعه. مستقل عن سلتك — أضف أي شيء، سواء اشتريته من هنا أم لا.",
+    "empty": "لا شيء متتبَّع بعد. ابحث في المتجر، أو أضف شيئًا من عندك.",
+    "addCustom": "أضف صنفًا خاصًا بك",
+    "customName": "ما هو؟",
+    "customNamePlaceholder": "مثال: محرك خطوي NEMA 17",
+    "quantity": "الكمية",
+    "photo": "صورة (اختياري)",
+    "add": "إضافة",
+    "adding": "جارٍ الإضافة…",
+    "nameRequired": "أعطِ الصنف اسمًا.",
+    "remove": "إزالة",
+    "fromStore": "مُشترى من هنا",
+    "own": "خاص بي",
+    "signInHeading": "سجّل حسابًا لتتبّع ما تملك",
+    "signInBody": "يحتاج المخزون إلى حساب. مشاريعك وسلتك تنتقل معك — لن يضيع شيء.",
+    "signInCta": "إنشاء حساب",
+    "addedToInventory": "أُضيف إلى مخزونك",
+    "addToInventory": "إضافة إلى المخزون",
+    "metaTitle": "مخزونك — جِشتالتُونج",
+    "metaDescription": "تتبّع القطع والمواد التي تملكها.",
+    "imageTooLarge": "حجم الصورة يتجاوز ١٠ ميغابايت.",
+    "uploadFailed": "تعذّر رفع الصورة."
   }
 }
