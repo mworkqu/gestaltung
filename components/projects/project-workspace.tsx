@@ -21,6 +21,7 @@ import {
   PROJECT_IMAGE_BUCKET,
   PROJECT_MATERIALS,
 } from "@/lib/projects/constants";
+import { ProjectCadCard } from "@/components/projects/project-cad-card";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
@@ -143,6 +144,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         onChanged={load}
       />
       <MaterialsCard projectId={projectId} materials={materials} onChanged={load} />
+      <ProjectCadCard projectId={projectId} />
       <ItemsCard projectId={projectId} items={items} onChanged={load} />
     </div>
   );

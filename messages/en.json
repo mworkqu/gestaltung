@@ -890,5 +890,17 @@
     "noResults": "Nothing matched. Try a different word.",
     "placeholder": "Search your inventory and the store",
     "signUpToTrack": "Sign up to track what you own"
+  },
+  "ProjectCad": {
+    "heading": "CAD file",
+    "intro": "Attach a 3D or CAD file and we'll quote it by hand. STL, STEP, DXF or IGES, up to 50 MB.",
+    "attach": "Attach a file",
+    "uploading": "Uploading…",
+    "notified": "Sent — we'll get back to you with a price.",
+    "empty": "No file attached yet.",
+    "remove": "Remove file",
+    "wrongType": "That file type isn't supported. Use STL, STEP, DXF or IGES.",
+    "tooLarge": "That file is over 50 MB.",
+    "uploadFailed": "That file could not be uploaded."
   }
 }

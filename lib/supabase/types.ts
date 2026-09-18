@@ -96,6 +96,8 @@ export type PartOrderItem = {
 // A single line in the localStorage cart. Carries the snapshot needed to render
 // the cart without re-fetching, keyed by the part's (unique) SKU.
 export type CartItem = {
+  // Null = bought straight from the store, not tied to any project.
+  projectId?: string | null;
   partId: string;
   sku: string;
   name: string;
