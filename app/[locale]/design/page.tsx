@@ -7,8 +7,9 @@ import { GMark } from "@/components/g-mark";
 import { cn } from "@/lib/utils";
 
 // The custom-manufacturing hub — the single destination the store landing's
-// "Design" button points to. Public. Two paths: upload a ready CAD file
-// (→ /design/upload) or hire us to draw it (→ /design/drawing).
+// "Design" button points to. Public. Two paths: send a ready CAD file for a
+// quote (→ /design/quote) or hire us to draw it (→ /design/drawing).
+// TODO(step 7): repoint the first card at /projects/new once it exists.
 // Design language matches the marketing site (how-it-works): neu bento +
 // blueprint panel + cobalt accents + ink CTA band.
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function DesignHubPage({
 
   const paths = [
     {
-      href: "/design/upload",
+      href: "/design/quote",
       icon: UploadCloud,
       title: t("uploadTitle"),
       copy: t("uploadCopy"),

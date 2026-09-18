@@ -7,7 +7,7 @@ import { UploadCloud, ArrowUpRight } from "lucide-react";
 import { useRouter, Link } from "@/i18n/navigation";
 import { GMark } from "@/components/g-mark";
 import { setPendingUpload } from "@/lib/design/pending-upload";
-import { ACCEPT_ATTR, ACCEPT_EXTENSIONS } from "@/lib/jobs/constants";
+import { ACCEPT_ATTR, ACCEPT_EXTENSIONS } from "@/lib/design/constants";
 import { cn } from "@/lib/utils";
 
 function extOf(name: string) {

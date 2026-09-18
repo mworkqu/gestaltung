@@ -8,8 +8,12 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { takePendingUpload } from "@/lib/design/pending-upload";
-import { QUOTE_BUCKET } from "@/lib/design/constants";
-import { ACCEPT_ATTR, ACCEPT_EXTENSIONS, MAX_FILE_BYTES } from "@/lib/jobs/constants";
+import {
+  ACCEPT_ATTR,
+  ACCEPT_EXTENSIONS,
+  MAX_FILE_BYTES,
+  QUOTE_BUCKET,
+} from "@/lib/design/constants";
 import { cn } from "@/lib/utils";
 
 const TECHNIQUES = [

@@ -4,7 +4,6 @@ import { LayoutDashboard } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
-import { InventoryNav } from "@/components/inventory/inventory-nav";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { cn } from "@/lib/utils";
 
@@ -34,7 +33,16 @@ export default async function InventoryLayout({
   return (
     <div className="container py-10">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderstrong/60 pb-4">
-        <InventoryNav />
+        <h1
+          className={cn(
+            "text-heading",
+            isRtl
+              ? "text-base font-bold"
+              : "font-mono text-[11px] uppercase tracking-wider"
+          )}
+        >
+          {t("title")}
+        </h1>
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard"

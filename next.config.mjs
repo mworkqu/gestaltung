@@ -31,21 +31,37 @@ const nextConfig = {
         destination: "/:locale/design/drawing",
         permanent: true,
       },
-      // Order matters: the specific /jobs/new -> /design/upload must precede the
-      // general /jobs/:path* rule (first match wins).
+      // The jobs pipeline was retired. Every legacy job URL — and the old
+      // authenticated /design/upload route — now lands on the public quote
+      // flow, which is the surviving way to send us a CAD file.
       {
-        source: "/:locale(en|ar)/dashboard/jobs/new",
-        destination: "/:locale/design/upload",
+        source: "/:locale(en|ar)/design/upload/:path*",
+        destination: "/:locale/design/quote",
         permanent: true,
       },
       {
-        source: "/:locale(en|ar)/dashboard/jobs",
-        destination: "/:locale/design/jobs",
+        source: "/:locale(en|ar)/design/upload",
+        destination: "/:locale/design/quote",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/design/jobs/:path*",
+        destination: "/:locale/design/quote",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/design/jobs",
+        destination: "/:locale/design/quote",
         permanent: true,
       },
       {
         source: "/:locale(en|ar)/dashboard/jobs/:path*",
-        destination: "/:locale/design/jobs/:path*",
+        destination: "/:locale/design/quote",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/dashboard/jobs",
+        destination: "/:locale/design/quote",
         permanent: true,
       },
       // Stage 4: inventory is its own top-level signed-in area now.
