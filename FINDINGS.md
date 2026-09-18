@@ -58,6 +58,16 @@ separate `client_inventory_items` table.
 **Revisit after step 12**, once the client inventory exists and the two are
 provably distinct in the UI and in the en/ar labels.
 
+### 5. CLAUDE.md's "PENDING MIGRATIONS" list is stale
+**Found:** Step B, commit 2.
+CLAUDE.md lists 0010, 0011 and 0012 as not yet run. A row-count sweep on
+2026-09-18 shows all twelve migrations had in fact been applied: `parts` holds
+121 rows (0011), `job_variations` existed (0008), the `quote-uploads` bucket
+holds a file (0012), and the exported `jobs` rows carry `speed_tier` /
+`job_path` (0010).
+**Action:** update the CLAUDE.md status table during the next step that touches
+it, and add 0013 as applied once it is run.
+
 ---
 
 ## Resolved
