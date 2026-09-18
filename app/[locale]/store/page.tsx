@@ -20,10 +20,15 @@ export default async function PartsStorePage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ category?: string; material?: string; stock?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    category?: string;
+    material?: string;
+    stock?: string;
+  }>;
 }) {
   const { locale } = await params;
-  const { category, material, stock } = await searchParams;
+  const { q, category, material, stock } = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations("Parts");
@@ -49,8 +54,18 @@ export default async function PartsStorePage({
     new Set(all.map((p) => p.material).filter((m): m is string => !!m))
   ).sort();
 
+  // The homepage hero posts here as ?q=. Match across both locales' names, the
+  // SKU, the description and the material, so an Arabic visitor searching an
+  // English part name (or a SKU off an invoice) still finds it.
+  const term = q?.trim().toLowerCase() ?? "";
+  const matchesTerm = (p: Part) =>
+    !term ||
+    [p.name, p.name_ar, p.sku, p.description, p.description_ar, p.material]
+      .some((field) => field?.toLowerCase().includes(term));
+
   const parts = all.filter(
     (p) =>
+      matchesTerm(p) &&
       (!category || p.category === category) &&
       (!material || p.material === material) &&
       (!stock || p.stock_status === stock)
@@ -75,7 +90,7 @@ export default async function PartsStorePage({
       <PartsFilters
         categories={categories}
         materials={materials}
-        current={{ category, material, stock }}
+        current={{ q, category, material, stock }}
       />
 
       {parts.length === 0 ? (

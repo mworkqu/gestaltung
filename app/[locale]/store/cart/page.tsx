@@ -7,7 +7,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/parts/cart-provider";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
-import { formatPrice, partName } from "@/lib/parts/format";
+import { formatPrice } from "@/lib/parts/format";
 
 export default function CartPage() {
   const t = useTranslations("Parts");

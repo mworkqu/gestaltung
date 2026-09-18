@@ -41,6 +41,7 @@ export default async function Home({
   // Published parts via the anon-safe RLS read; newest first as "featured".
   // Degrade to the empty state if Supabase env is absent (fresh local checkout).
   let products: Part[] = [];
+  let categories: string[] = [];
   if (
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -53,16 +54,18 @@ export default async function Home({
       .order("created_at", { ascending: false })
       .limit(8);
     products = (data ?? []) as Part[];
+
+    // Every published category, not just those in the featured eight, so the
+    // quick-links below cover the whole catalog.
+    const { data: catRows } = await supabase
+      .from("parts")
+      .select("category")
+      .eq("is_published", true);
+    categories = Array.from(
+      new Set((catRows ?? []).map((r) => r.category as string).filter(Boolean))
+    ).sort();
   }
 
-  const categories = [
-    t("cat1"),
-    t("cat2"),
-    t("cat3"),
-    t("cat4"),
-    t("cat5"),
-    t("cat6"),
-  ];
 
   return (
     <div className="container space-y-6 py-6">
@@ -96,13 +99,13 @@ export default async function Home({
 
           {/* Category quick-links */}
           <div className="flex flex-wrap gap-2">
-            {categories.map((label) => (
+            {categories.map((category) => (
               <Link
-                key={label}
-                href="/store"
+                key={category}
+                href={{ pathname: "/store", query: { category } }}
                 className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-medium text-mutedtext shadow-neu-sm transition-colors hover:text-cobalt"
               >
-                {label}
+                {category}
               </Link>
             ))}
           </div>
