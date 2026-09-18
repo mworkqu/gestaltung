@@ -17,6 +17,7 @@ export async function Header({ locale }: { locale: Locale }) {
   // deliberately absent from the public header — it lives behind the dashboard/
   // account menu — so it never appears on the store landing (hard rule).
   const navLinks = [
+    { href: "/projects", label: t("projects") },
     { href: "/store", label: t("store") },
     { href: "/design", label: t("design") },
   ];

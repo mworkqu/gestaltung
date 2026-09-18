@@ -7,13 +7,16 @@ import { STOCK_STATUSES } from "@/lib/parts/constants";
 import { cn } from "@/lib/utils";
 
 type Current = {
+  q?: string;
   category?: string;
   material?: string;
   stock?: string;
 };
 
-// Filter bar for the public catalog. Pushes ?category=&material=&stock= query
-// params; the server component re-reads them and filters. No client pagination.
+// Filter bar for the public catalog. Pushes ?q=&category=&material=&stock=
+// query params; the server component re-reads them and filters. The search term
+// is carried through untouched so filtering never silently discards it.
+// No client pagination.
 export function PartsFilters({
   categories,
   materials,
@@ -36,6 +39,7 @@ export function PartsFilters({
   function apply(patch: Current) {
     const next: Record<string, string> = {};
     const merged = { ...current, ...patch };
+    if (merged.q) next.q = merged.q;
     if (merged.category) next.category = merged.category;
     if (merged.material) next.material = merged.material;
     if (merged.stock) next.stock = merged.stock;

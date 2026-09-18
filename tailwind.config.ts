@@ -59,7 +59,16 @@ const config: Config = {
         panel: "#e6ebf2", // recessed surface
         heading: "#1c2434",
         body: "#475569",
-        mutedtext: "#64748b",
+        mutedtext: "#5a6677", // 5.19:1 on the canvas — WCAG AA for body text
+        // Signal colours — see the --buy / --inventory tokens in globals.css.
+        buy: {
+          DEFAULT: "hsl(var(--buy))",
+          bg: "hsl(var(--buy-bg))",
+        },
+        inventory: {
+          DEFAULT: "hsl(var(--inventory))",
+          bg: "hsl(var(--inventory-bg))",
+        },
         faint: "#94a3b8",
         borderstrong: "#d3dbe6",
         primary: {

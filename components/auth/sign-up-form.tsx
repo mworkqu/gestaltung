@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { isGuest } from "@/lib/supabase/guest";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
 import { PhoneInput } from "@/components/phone-input";
@@ -36,24 +37,53 @@ export function SignUpForm() {
     const password = String(data.get("password"));
 
     const supabase = createClient();
-    // full_name + phone + locale go into user metadata; the handle_new_user()
-    // trigger copies them into the auto-created profiles row.
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName, phone, locale } },
-    });
+    const metadata = { full_name: fullName, phone, locale };
 
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
+    // If they got here as a guest, UPGRADE that anonymous user instead of
+    // creating a second one. updateUser keeps the same auth.uid(), so the
+    // projects, cart and inventory already bound to it come along untouched —
+    // nothing is migrated because nothing moved. Signing up loses nothing.
+    const {
+      data: { user: existing },
+    } = await supabase.auth.getUser();
+
+    let hasSession = false;
+
+    if (isGuest(existing)) {
+      const { error: linkError } = await supabase.auth.updateUser({
+        email,
+        password,
+        data: metadata,
+      });
+      if (linkError) {
+        setError(linkError.message);
+        setLoading(false);
+        return;
+      }
+      // The password applies immediately, but the email needs confirming, so
+      // there is never a ready-to-use session on this path.
+      hasSession = false;
+    } else {
+      // full_name + phone + locale go into user metadata; the
+      // handle_new_user() trigger copies them into the new profiles row.
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: metadata },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+      hasSession = Boolean(signUpData.session);
     }
 
     // If email confirmation is ON, there's no session yet — tell them to check
     // their inbox. If it's OFF (recommended for local testing), we have a
     // session and can go straight to the dashboard.
-    if (signUpData.session) {
+    if (hasSession) {
       router.push(`/dashboard`);
       router.refresh();
       return;

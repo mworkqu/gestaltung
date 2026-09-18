@@ -21,94 +21,6 @@ export type Profile = {
   created_at: string;
 };
 
-export type JobMethod =
-  | "3d_printing"
-  | "cnc_machining"
-  | "laser_cutting"
-  | "edm";
-
-export type JobStatus =
-  | "submitted"
-  | "quoted"
-  | "in_production"
-  | "ready"
-  | "delivered"
-  | "cancelled";
-
-export type FileExt = "stl" | "step" | "dxf" | "iges";
-
-export type JobSource = "client" | "internal";
-
-export type JobPart = { name: string; quantity: number; unit: string };
-
-export type JobPath = "prototype" | "production";
-export type SpeedTier = "standard" | "express";
-export type ProductionQtyRange = "10-50" | "50-250" | "250-1000" | "1000+";
-export type PostProcessing = "bead_blast" | "anodize";
-
-export type Job = {
-  id: string;
-  client_tenant_id: string;
-  assigned_workshop_tenant_id: string | null;
-  title: string;
-  notes: string | null;
-  material: string | null;
-  quantity: number;
-  method: JobMethod;
-  status: JobStatus;
-  job_source: JobSource;
-  parts: JobPart[] | null;
-  job_path: JobPath;
-  production_qty_range: ProductionQtyRange | null;
-  speed_tier: SpeedTier;
-  post_processing: PostProcessing[];
-  inspection_report: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-export type JobBomRow = {
-  id: string;
-  job_id: string;
-  inventory_item_id: string;
-  quantity_needed: number;
-  created_at: string;
-};
-
-export type JobFile = {
-  id: string;
-  job_id: string;
-  storage_path: string;
-  file_name: string;
-  file_ext: FileExt;
-  size_bytes: number | null;
-  uploaded_at: string;
-};
-
-export type JobEvent = {
-  id: string;
-  job_id: string;
-  from_status: JobStatus | null;
-  to_status: JobStatus;
-  note: string | null;
-  actor: string | null;
-  created_at: string;
-};
-
-// One changed field in a variation. `field` is a job column key
-// (title | method | material | quantity | notes | parts); `from`/`to` are the
-// display strings before and after the change.
-export type JobVariationChange = { field: string; from: string; to: string };
-
-export type JobVariation = {
-  id: string;
-  job_id: string;
-  changed_by: string | null;
-  changed_by_role: string | null;
-  changes: JobVariationChange[];
-  created_at: string;
-};
-
 export type InventoryItem = {
   id: string;
   tenant_id: string;
@@ -184,6 +96,8 @@ export type PartOrderItem = {
 // A single line in the localStorage cart. Carries the snapshot needed to render
 // the cart without re-fetching, keyed by the part's (unique) SKU.
 export type CartItem = {
+  // Null = bought straight from the store, not tied to any project.
+  projectId?: string | null;
   partId: string;
   sku: string;
   name: string;
@@ -208,4 +122,67 @@ export type Inquiry = {
   locale: string;
   status: InquiryStatus;
   created_at: string;
+};
+
+// ── Projects ────────────────────────────────────────────────────────────────
+// The client workspace. See supabase/migrations/0015_projects.sql.
+
+export type Project = {
+  id: string;
+  user_id: string;
+  tenant_id: string | null;
+  name: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectBlockType = "text" | "image";
+
+export type ProjectBlock = {
+  id: string;
+  project_id: string;
+  type: ProjectBlockType;
+  content: string | null;
+  storage_path: string | null;
+  position: number;
+  created_at: string;
+};
+
+export type ProjectMaterial = {
+  id: string;
+  project_id: string;
+  material: string;
+  created_at: string;
+};
+
+export type ProjectItem = {
+  id: string;
+  project_id: string;
+  product_id: string;
+  quantity: number;
+  note: string | null;
+  created_at: string;
+};
+
+export type CartRow = {
+  id: string;
+  user_id: string;
+  product_id: string;
+  project_id: string | null;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClientInventoryItem = {
+  id: string;
+  user_id: string;
+  product_id: string | null;
+  custom_name: string | null;
+  quantity: number;
+  image_path: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
 };

@@ -24,7 +24,7 @@
     --secondary-foreground: 218 31% 16%;
 
     --muted: 214 32% 91%;
-    --muted-foreground: 215 16% 47%; /* #64748b */
+    --muted-foreground: 216 14% 41%; /* #5a6677 — 5.19:1 on canvas, WCAG AA */
 
     --accent: 214 87% 41%; /* cobalt */
     --accent-foreground: 0 0% 100%;
@@ -35,6 +35,17 @@
     --border: 214 30% 86%; /* #d3dbe6 hairline */
     --input: 214 30% 86%;
     --ring: 214 87% 41%; /* cobalt */
+
+    /* Semantic signal colours for the projects/store experience. Three
+       distinct meanings, none of them competing with the cobalt primary:
+         primary  (cobalt) = the one action on the screen
+         buy      (teal)   = this costs money, it comes from the store
+         inventory(ochre)  = you already own this
+       Every pair below is WCAG AA on both the canvas and a white card. */
+    --buy: 168 76% 24%; /* #0f6c59 — 5.64:1 on canvas, 6.35:1 on card */
+    --buy-bg: 168 38% 93%; /* #e6f4f1 — 5.61:1 with --buy */
+    --inventory: 38 72% 25%; /* #6e4c12 — 6.90:1 on canvas, 7.76:1 on card */
+    --inventory-bg: 38 55% 92%; /* #f6eedf — 6.73:1 with --inventory */
 
     --radius: 0.9rem;
   }

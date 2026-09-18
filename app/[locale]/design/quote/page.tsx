@@ -5,7 +5,8 @@ import { QuoteRequest } from "@/components/design/quote-request";
 
 // Public quote-request page. The homepage dropzone hands off a CAD file here;
 // this page collects the visitor's email/phone + preferred method and submits a
-// lead (no sign-in). Kept out of the authenticated job flow at /design/upload.
+// lead (no sign-in). Since the jobs pipeline was retired this is the only
+// CAD intake path: the file is stored and quoted manually.
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
