@@ -1,6 +1,6 @@
 # Project Creation Hub — prototype notes
 
-Open `gestaltung-project-creation-hub-prototype.html` directly in a browser. It is one self-contained file: no network, no frameworks, no backend. The fonts are embedded.
+Live at https://gestaltung360.com/prototypes/gestaltung-project-creation-hub-prototype.html (noindex; file in `public/prototypes/`). Or open the file directly in a browser. It is one self-contained file: no network, no frameworks, no backend. The fonts are embedded.
 
 ## Design tokens reused (nothing new invented)
 
