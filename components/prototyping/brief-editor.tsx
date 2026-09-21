@@ -49,6 +49,7 @@ export function BriefEditor({
     <div className="space-y-2">
       <textarea
         ref={ref}
+        id="brief-editor"
         value={value}
         onChange={(e) => onChange(e.target.value.slice(0, MAX_BRIEF_CHARS))}
         onBlur={onSave}

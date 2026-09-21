@@ -8,7 +8,7 @@
 // uses logical properties (ms-/ps-/border-s) so the tree mirrors in Arabic.
 
 import { useTranslations } from "next-intl";
-import { Cpu, Lightbulb, Plus, Receipt, SquareCode, Wrench, X } from "lucide-react";
+import { Cpu, Layers, Lightbulb, Plus, Receipt, SquareCode, Wrench, X } from "lucide-react";
 
 import type { Discipline } from "@/lib/prototyping/constants";
 import {
@@ -55,7 +55,8 @@ export function TreeNav({
   current: NodeId;
   collapsed: boolean;
   saveFailed: boolean;
-  onSelect: (n: NodeId) => void;
+  /** Go to a node, optionally focusing the control that resolves it. */
+  onSelect: (n: NodeId, focus?: string) => void;
   onBranch: (d: Discipline, on: boolean) => void;
 }) {
   const t = useTranslations("Prototyping");
@@ -68,6 +69,7 @@ export function TreeNav({
   if (collapsed) {
     const top: { id: string; icon: typeof Wrench; to: NodeId; open: number; label: string }[] = [
       { id: "brief", icon: Lightbulb, to: "brief", open: openAt("brief"), label: t("node_brief") },
+      { id: "parts", icon: Layers, to: "parts", open: openAt("parts"), label: t("node_parts") },
       ...active.map((b) => ({
         id: b.discipline,
         icon: BRANCH_ICON[b.discipline],
@@ -106,7 +108,7 @@ export function TreeNav({
     return (
       <button
         type="button"
-        onClick={() => onSelect(st.reason && st.target ? st.target : n)}
+        onClick={() => (st.reason && st.target ? onSelect(st.target, st.focus) : onSelect(n))}
         aria-current={here ? "page" : undefined}
         className={cn(
           "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start transition-colors",
@@ -134,6 +136,9 @@ export function TreeNav({
       <ul className="space-y-1">
         <li>
           <Node n="brief" icon={Lightbulb} />
+        </li>
+        <li>
+          <Node n="parts" icon={Layers} />
         </li>
 
         {active.map((b) => {

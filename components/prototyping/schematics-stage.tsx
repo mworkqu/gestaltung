@@ -27,7 +27,6 @@ import type { SchematicKind } from "@/lib/prototyping/constants";
 import { Tag } from "@/components/ui/tag";
 import {
   Card,
-  Confidence,
   GhostButton,
   PrimaryButton,
   SoftButton,
@@ -140,7 +139,8 @@ export async function createRevision({
       : features.noteKeys.includes("unrecognised") && prompt
         ? errorText("note_unrecognised", { prompt })
         : null,
-    confidence: blocked ? null : 70,
+    // Templates are drawn, not scored: no confidence figure is stored.
+    confidence: null,
   });
 
   return schematicId;
@@ -279,9 +279,6 @@ export function SchematicsStage({
                 status={shown.status === "generating" ? "generating" : shown.status}
                 label={t(`${shown.status}Tag`)}
               />
-              {shown.confidence != null && (
-                <Confidence value={shown.confidence} label={t("confidence")} />
-              )}
               {part && (
                 <span className="text-[11px] text-mutedtext">
                   {t("forPart", { code: part.code, name: part.name })}

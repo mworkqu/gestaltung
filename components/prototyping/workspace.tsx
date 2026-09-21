@@ -7,37 +7,34 @@
 // same arrangement the project workspace uses.
 //
 // Three panels: the project tree on the left, the selected node in the
-// middle, and the assistant on the right. Each side panel collapses, and the
-// whole thing mirrors in Arabic because the layout is built from logical
+// middle, and the next actions on the right. Each side panel collapses, and
+// the whole thing mirrors in Arabic because the layout is built from logical
 // properties and CSS grid.
 //
 // Every number on this page comes from lib/prototyping/readiness, mapped onto
 // the tree by lib/prototyping/tree — nothing here counts anything itself.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowLeft,
-  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  Cpu,
-  Factory,
+  ListChecks,
   Loader2,
-  Plus,
   Receipt,
-  Sparkles,
+  Send,
 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LEGACY_SUBJECT_CLAIMS, powerSource } from "@/lib/prototyping/engine";
-import { looksLikeSchema, projectReadiness } from "@/lib/prototyping/readiness";
+import { looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
+import { disciplineOf, isMakeable } from "@/lib/prototyping/parts";
+import type { Spec } from "@/lib/prototyping/spec";
 import {
   branches,
-  disciplineOf,
   nodeKey,
   nodeOf,
   nodeStates,
@@ -48,7 +45,9 @@ import {
 } from "@/lib/prototyping/tree";
 import type { Discipline, SchematicKind } from "@/lib/prototyping/constants";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
+import { PartsList } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
+import { AddExistingDialog } from "@/components/prototyping/part-dialogs";
 import { Recommendation } from "@/components/prototyping/recommendation";
 import {
   SchematicsStage,
@@ -57,22 +56,10 @@ import {
   type SchematicWithRevs,
 } from "@/components/prototyping/schematics-stage";
 import { TreeNav } from "@/components/prototyping/tree-nav";
-import { ComponentsCard, PowerCard, ScopeCard } from "@/components/prototyping/discipline-cards";
-import {
-  Card,
-  GhostButton,
-  PrimaryButton,
-  SoftButton,
-  Warn,
-  useMono,
-} from "@/components/prototyping/ui";
+import { ComponentsCard, PowerCard } from "@/components/prototyping/discipline-cards";
+import { Card, GhostButton, PrimaryButton, Warn, useMono } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
-import type {
-  Project,
-  ProjectClaim,
-  ProjectPart,
-  ProjectSchematicRevision,
-} from "@/lib/supabase/types";
+import type { Project, ProjectPart, ProjectSchematicRevision } from "@/lib/supabase/types";
 
 /** Which 2D template suits a part, from the process it is made by. */
 function kindFor(part: ProjectPart): SchematicKind {
@@ -84,16 +71,25 @@ function kindFor(part: ProjectPart): SchematicKind {
 
 /** Where a part's drawings are shown. */
 const drawingsNode = (p: ProjectPart): NodeId =>
-  partNode(p) === "electronics.board" ? "electronics.board" : "mechanical.drawings";
+  disciplineOf(p) === "electronics" ? "electronics.board" : "mechanical.drawings";
 
-export function PrototypingWorkspace({ projectId }: { projectId: string }) {
+/** How many open items the side panel offers as next actions. */
+const NEXT_ACTIONS = 4;
+
+export function PrototypingWorkspace({
+  projectId,
+  briefDestination,
+}: {
+  projectId: string;
+  /** Who receives the brief text for analysis; null = our own server only. */
+  briefDestination: string | null;
+}) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
   const mono = useMono();
   const isRtl = useLocale() === "ar";
 
   const [project, setProject] = useState<Project | null>(null);
-  const [claims, setClaims] = useState<ProjectClaim[]>([]);
   const [parts, setParts] = useState<ProjectPart[]>([]);
   const [schematics, setSchematics] = useState<SchematicWithRevs[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +99,9 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
   const [showOpen, setShowOpen] = useState(false);
   const [briefCleared, setBriefCleared] = useState(false);
   const [branchSaveFailed, setBranchSaveFailed] = useState(false);
+  const [specSaveFailed, setSpecSaveFailed] = useState(false);
+  const [addingExisting, setAddingExisting] = useState(false);
+  const specTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -121,24 +120,14 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
     let loaded = proj as Project;
     if (looksLikeSchema(loaded.brief)) {
       // Database code was once pasted into a brief. It describes nothing, so
-      // clear it, along with the unconfirmed claims that were read out of it.
-      await supabase.from("projects").update({ brief: null }).eq("id", projectId);
-      await supabase
-        .from("project_claims")
-        .delete()
-        .eq("project_id", projectId)
-        .eq("status", "pending");
-      loaded = { ...loaded, brief: null };
+      // clear it and the reading that was taken from it.
+      await supabase.from("projects").update({ brief: null, spec: null }).eq("id", projectId);
+      loaded = { ...loaded, brief: null, spec: null };
       setBriefCleared(true);
     }
     setProject(loaded);
 
-    const [claimRes, partRes, schRes] = await Promise.all([
-      supabase
-        .from("project_claims")
-        .select("*")
-        .eq("project_id", projectId)
-        .order("position", { ascending: true }),
+    const [partRes, schRes] = await Promise.all([
       supabase
         .from("project_parts")
         .select("*")
@@ -150,22 +139,6 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
         .eq("project_id", projectId)
         .order("created_at", { ascending: true }),
     ]);
-
-    // The retired "confirm the summary" claim pointed at a summary that never
-    // existed. Drop any rows written before it was removed.
-    let claimRows = (claimRes.data ?? []) as ProjectClaim[];
-    const legacy = claimRows.filter((c) => LEGACY_SUBJECT_CLAIMS.includes(c.text));
-    if (legacy.length) {
-      await supabase
-        .from("project_claims")
-        .delete()
-        .in(
-          "id",
-          legacy.map((c) => c.id)
-        );
-      claimRows = claimRows.filter((c) => !legacy.includes(c));
-    }
-    setClaims(claimRows);
     setParts((partRes.data ?? []) as ProjectPart[]);
 
     const schs = (schRes.data ?? []) as SchematicWithRevs[];
@@ -216,19 +189,17 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
     );
   }
 
+  const spec = project.spec ?? null;
   const routeAccepted = project.stages?.manufacturing === "complete";
-  const ready = projectReadiness(
-    { brief: project.brief, claims, parts, routeAccepted },
-    (k, p) => t(k, p)
-  );
-  const power = powerSource(project.brief ?? "");
+  const tr = (k: string, p?: Record<string, string | number>) => t(k, p);
+  const ready = projectReadiness({ brief: project.brief, spec, parts, routeAccepted }, tr);
   const bs = branches(project.disciplines, project.brief, parts);
   const visible = visibleNodes(bs);
-  const states = nodeStates(ready, parts, visible, power, (k, p) => t(k, p));
+  const states = nodeStates(ready, parts, spec, visible, tr);
   const node = toNode(project.stage, visible);
   const open = ready.requirements.filter((r) => !r.satisfied);
 
-  const partsOf = (d: Discipline) => parts.filter((p) => disciplineOf(p) === d);
+  const designOf = (d: Discipline) => parts.filter((p) => disciplineOf(p) === d);
   const schematicsOf = (ps: ProjectPart[]) =>
     schematics.filter((s) => ps.some((p) => p.id === s.part_id));
   const drawn = schematics
@@ -243,9 +214,31 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
     return createClient().from("projects").update(changes).eq("id", project!.id);
   }
 
-  async function goTo(n: NodeId) {
+  /** Go to a node; with `focus`, bring the control that resolves it into view. */
+  async function goTo(n: NodeId, focus?: string) {
     setShowOpen(false);
     await patchProject({ stage: n });
+    if (focus) {
+      setTimeout(() => {
+        const el = document.getElementById(focus);
+        el?.scrollIntoView({ block: "center", behavior: "smooth" });
+        el?.focus({ preventScroll: true });
+      }, 60);
+    }
+  }
+
+  const goToRequirement = (r: Requirement) => goTo(nodeOf(r, parts, visible), r.focus);
+
+  // Spec edits show at once; the write is debounced so typing a quantity
+  // doesn't send a request per keystroke.
+  function saveSpec(next: Spec) {
+    setProject((p) => (p ? { ...p, spec: next } : p));
+    setSpecSaveFailed(false);
+    if (specTimer.current) clearTimeout(specTimer.current);
+    specTimer.current = setTimeout(async () => {
+      const { error } = await createClient().from("projects").update({ spec: next }).eq("id", projectId);
+      if (error) setSpecSaveFailed(true);
+    }, 400);
   }
 
   // A manual choice is stored beside what the analysis detected and always
@@ -290,13 +283,12 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
 
   const blockers = states[node]?.open ?? [];
   const following = visible[visible.indexOf(node) + 1] ?? null;
-  const firstParts =
-    visible.find((n) => n === "mechanical.parts" || n === "electronics.board") ?? "brief";
 
-  const partsStage = (d: Discipline) => (
+  const designStage = (d: Discipline) => (
     <PartsStage
-      project={project}
-      parts={partsOf(d)}
+      projectId={project.id}
+      kind={d}
+      parts={designOf(d)}
       nextIndex={nextIndex}
       onChanged={load}
       onGenerateSchematic={generateSchematic}
@@ -355,7 +347,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                   <li key={r.id}>
                     <button
                       type="button"
-                      onClick={() => goTo(nodeOf(r, parts, visible))}
+                      onClick={() => goToRequirement(r)}
                       className="flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-start text-[12px] text-heading transition-colors hover:text-cobalt"
                     >
                       <CircleAlert className="mt-0.5 h-3 w-3 shrink-0 text-inventory" />
@@ -373,9 +365,9 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
         className={cn(
           "grid items-start gap-4",
           collapsed.left && collapsed.right && "lg:grid-cols-[56px_minmax(0,1fr)_56px]",
-          collapsed.left && !collapsed.right && "lg:grid-cols-[56px_minmax(0,1fr)_320px]",
+          collapsed.left && !collapsed.right && "lg:grid-cols-[56px_minmax(0,1fr)_300px]",
           !collapsed.left && collapsed.right && "lg:grid-cols-[248px_minmax(0,1fr)_56px]",
-          !collapsed.left && !collapsed.right && "lg:grid-cols-[248px_minmax(0,1fr)_320px]"
+          !collapsed.left && !collapsed.right && "lg:grid-cols-[248px_minmax(0,1fr)_300px]"
         )}
       >
         {/* Project tree */}
@@ -448,25 +440,37 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
               {t("briefCleared")}
             </Warn>
           )}
+          {specSaveFailed && <Warn blocking>{t("specSaveFailed")}</Warn>}
 
           {node === "brief" && (
             // Remounts when the brief is cleared, so the editor drops its copy.
             <IdeaStage
               key={briefCleared ? "cleared" : "brief"}
               project={project}
-              claims={claims}
+              parts={parts}
               onChanged={load}
+              onSpec={saveSpec}
             />
           )}
 
-          {node === "mechanical.parts" && partsStage("mechanical")}
+          {node === "parts" && (
+            <PartsList
+              projectId={project.id}
+              parts={parts}
+              nextIndex={nextIndex}
+              onChanged={load}
+              onOpen={(p) => goTo(partNode(p))}
+            />
+          )}
+
+          {node === "mechanical.parts" && designStage("mechanical")}
 
           {node === "mechanical.drawings" && (
             <>
               <SchematicsStage
                 projectId={project.id}
                 parts={parts}
-                schematics={schematicsOf(partsOf("mechanical"))}
+                schematics={schematicsOf(designOf("mechanical"))}
                 onChanged={load}
               />
               {/* 3D CAD is still a human service; say so where drawings live. */}
@@ -490,7 +494,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
 
           {node === "mechanical.process" && (
             <Recommendation
-              parts={partsOf("mechanical")}
+              parts={designOf("mechanical")}
               brief={project.brief ?? ""}
               accepted={routeAccepted}
             />
@@ -498,12 +502,12 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
 
           {node === "electronics.board" && (
             <>
-              {partsStage("electronics")}
-              {schematicsOf(partsOf("electronics")).length > 0 && (
+              {designStage("electronics")}
+              {schematicsOf(designOf("electronics")).length > 0 && (
                 <SchematicsStage
                   projectId={project.id}
                   parts={parts}
-                  schematics={schematicsOf(partsOf("electronics"))}
+                  schematics={schematicsOf(designOf("electronics"))}
                   onChanged={load}
                 />
               )}
@@ -511,17 +515,22 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
           )}
 
           {node === "electronics.power" && (
-            <PowerCard power={power} onEditBrief={() => goTo("brief")} />
+            <PowerCard spec={spec} onSet={() => goTo("brief", "fact-power")} />
           )}
 
-          {node === "electronics.components" && <ComponentsCard />}
+          {node === "electronics.components" && (
+            <ComponentsCard
+              onAddExisting={() => setAddingExisting(true)}
+              onOpenList={() => goTo("parts")}
+            />
+          )}
 
-          {node === "software.scope" && <ScopeCard onEditBrief={() => goTo("brief")} />}
+          {node === "software.scope" && designStage("software")}
 
           {node === "quote" && (
             <>
               <Recommendation
-                parts={parts}
+                parts={parts.filter(isMakeable)}
                 brief={project.brief ?? ""}
                 accepted={routeAccepted}
                 onAccept={acceptRoute}
@@ -541,7 +550,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
             </>
           )}
 
-          {/* Footer: the one forward action. */}
+          {/* Footer: the one forward action, named for where it goes. */}
           <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
             <button
               type="button"
@@ -567,7 +576,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                   onClick={() => goTo(following)}
                   disabled={blockers.length > 0 || working}
                 >
-                  {t("nextNode", { node: t(nodeKey(following)) })}
+                  {t("continueTo", { node: t(nodeKey(following)) })}
                   <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
                 </PrimaryButton>
               </span>
@@ -575,17 +584,14 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
           </div>
         </main>
 
-        {/* Assistant: honest about what it is */}
+        {/* Next actions */}
         <aside className="neu p-4">
           <div className="flex items-center justify-between gap-2">
             {!collapsed.right && (
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 text-sm font-bold text-heading">
-                  <Sparkles className="h-4 w-4 text-cobalt" />
-                  {t("assistantTitle")}
-                </p>
-                <p className="mt-0.5 text-[11px] text-mutedtext">{t("assistantSub")}</p>
-              </div>
+              <p className="flex items-center gap-1.5 text-sm font-bold text-heading">
+                <ListChecks className="h-4 w-4 text-cobalt" />
+                {t("nextActions")}
+              </p>
             )}
             <button
               type="button"
@@ -603,54 +609,66 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
 
           {!collapsed.right && (
             <div className="mt-4 space-y-4">
-              <p className="text-xs leading-relaxed text-mutedtext">{t("assistantIntro")}</p>
-
-              <div className="neu-inset space-y-2 p-3">
-                <p className={mono("text-[9px] text-faint")}>{t("whatIcanDo")}</p>
-                <ul className="space-y-1.5 text-[11.5px] text-heading">
-                  {["analyse", "spec", "route", "schematic"].map((k) => (
-                    <li key={k} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-3 w-3 shrink-0 text-buy" />
-                      {t(`cap_${k}`)}
+              {open.length ? (
+                <ul className="space-y-1.5">
+                  {open.slice(0, NEXT_ACTIONS).map((r) => (
+                    <li key={r.id}>
+                      <button
+                        type="button"
+                        onClick={() => goToRequirement(r)}
+                        className="flex w-full items-start gap-2 rounded-xl bg-panel px-3 py-2.5 text-start text-[12px] font-medium text-heading shadow-neu-sm transition-colors hover:text-cobalt"
+                      >
+                        <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-inventory" />
+                        <span className="min-w-0 flex-1">{r.blockingReason}</span>
+                        <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-50 rtl:rotate-180" />
+                      </button>
                     </li>
                   ))}
+                  {open.length > NEXT_ACTIONS && (
+                    <li>
+                      <GhostButton onClick={() => setShowOpen(true)} className="px-1">
+                        {t("moreOpen", { count: open.length - NEXT_ACTIONS })}
+                      </GhostButton>
+                    </li>
+                  )}
                 </ul>
-                <p className="pt-1 text-[11px] leading-relaxed text-mutedtext">{t("cannotDo")}</p>
-              </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-[12px] text-mutedtext">{t("allSatisfied")}</p>
+                  <PrimaryButton onClick={() => goTo("quote")}>
+                    <Receipt className="h-3.5 w-3.5" />
+                    {t("requestQuote")}
+                  </PrimaryButton>
+                </div>
+              )}
 
-              <div className="flex flex-col gap-2">
-                <SoftButton onClick={() => goTo("brief")} className="justify-start">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  {t("analyse")}
-                </SoftButton>
-                <SoftButton onClick={() => goTo(firstParts)} className="justify-start">
-                  <Plus className="h-3.5 w-3.5" />
-                  {t("addPart")}
-                </SoftButton>
-                <SoftButton onClick={() => goTo("quote")} className="justify-start">
-                  <Factory className="h-3.5 w-3.5" />
-                  {t("recHeading")}
-                </SoftButton>
-                <GhostButton onClick={() => goTo("quote")} className="justify-start">
-                  <Receipt className="h-3.5 w-3.5" />
-                  {t("requestQuote")}
-                </GhostButton>
-              </div>
-
-              <p className="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-faint">
-                <Cpu className="mt-0.5 h-3 w-3 shrink-0" />
-                {t("nothingApplied")}
+              <p className="flex items-start gap-1.5 border-t border-borderstrong/40 pt-3 text-[10.5px] leading-relaxed text-faint">
+                <Send className="mt-0.5 h-3 w-3 shrink-0 rtl:-scale-x-100" />
+                {briefDestination
+                  ? t("briefSentTo", { destination: briefDestination })
+                  : t("briefStaysHere")}
               </p>
             </div>
           )}
 
-          {collapsed.right && (
-            <div className="mt-3 flex flex-col items-center gap-2">
-              <Sparkles className="h-4 w-4 text-cobalt" />
+          {collapsed.right && open.length > 0 && (
+            <div className="mt-3 flex flex-col items-center">
+              <span className="grid h-5 min-w-5 place-items-center rounded-full bg-inventory-bg px-1.5 font-mono text-[10px] font-semibold text-inventory">
+                {open.length}
+              </span>
             </div>
           )}
         </aside>
       </div>
+
+      {addingExisting && (
+        <AddExistingDialog
+          projectId={project.id}
+          nextIndex={nextIndex}
+          onClose={() => setAddingExisting(false)}
+          onAdded={load}
+        />
+      )}
     </div>
   );
 }

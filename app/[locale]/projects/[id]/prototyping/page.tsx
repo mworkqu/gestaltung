@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { PrototypingWorkspace } from "@/components/prototyping/workspace";
+import { providerStatus } from "@/lib/prototyping/providers";
 
 export async function generateMetadata({
   params,
@@ -24,10 +25,12 @@ export default async function PrototypingPage({
 }) {
   const { locale, id } = await params;
   setRequestLocale(locale);
+  // Only the provider's public name crosses to the client — never its key.
+  const { destination } = await providerStatus();
 
   return (
     <div className="container py-6">
-      <PrototypingWorkspace projectId={id} />
+      <PrototypingWorkspace projectId={id} briefDestination={destination} />
     </div>
   );
 }

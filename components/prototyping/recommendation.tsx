@@ -2,15 +2,17 @@
 
 // Manufacturing recommendation. Recomputed from the current parts on every
 // render — there is nothing to refresh and nothing to go stale, because it is
-// a pure function of the rows above it.
+// a pure function of the rows above it. Deterministic rules only (engine.ts):
+// the route must be explainable and repeatable, so it never goes to a model.
+// It shows no lead times or scores: we have no measured figure for either.
 
 import { useTranslations } from "next-intl";
 import { Check, Undo2 } from "lucide-react";
 
 import { recommend } from "@/lib/prototyping/engine";
-import { PROCESS_LEAD_DAYS, processesFor, type Process } from "@/lib/prototyping/constants";
+import { processesFor, type Process } from "@/lib/prototyping/constants";
 import { Tag } from "@/components/ui/tag";
-import { Card, Confidence, GhostButton, PrimaryButton, Warn } from "@/components/prototyping/ui";
+import { Card, GhostButton, PrimaryButton, Warn } from "@/components/prototyping/ui";
 import type { ProjectPart } from "@/lib/supabase/types";
 
 // The five process colours, taken from the brand palette rather than invented:
@@ -56,7 +58,6 @@ export function Recommendation({
       kicker={t("recHeading")}
       title={t("stageTitle_manufacturing")}
       intro={t("recIntro")}
-      actions={<Confidence value={rec.confidence} label={t("confidence")} />}
     >
       {rec.routes.length === 0 ? (
         <p className="text-sm text-mutedtext">{t("recEmpty")}</p>
@@ -82,12 +83,6 @@ export function Recommendation({
                     {r.nestable && ` — ${t("nestable")}`}
                   </span>
                 </span>
-                <span className="shrink-0 font-mono text-[11px] tabular-nums text-mutedtext">
-                  {t("leadDays", { days: PROCESS_LEAD_DAYS[r.process] })}
-                </span>
-                {rec.criticalPath === r.process && (
-                  <Tag variant="neutral">{t("criticalPath")}</Tag>
-                )}
               </li>
             ))}
           </ul>

@@ -506,6 +506,40 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     ids mapped by toNode). Interim detection = rules (engine.detectDisciplines/powerSource) until Task 5.
     MIGRATION 0021_prototyping_disciplines.sql (RUN AFTER 0020): projects.disciplines jsonb {detected,
     manual}. Until it runs, branches still show (read from the brief) but add/remove can't save.
+    (0021 confirmed RUN by the owner 2026-09-21.)
+  - REWORK Tasks 3–5 (2026-09-21). "No invented numbers" rule applied everywhere: confidence bars, lead
+    days and critical path are GONE (PROCESS_LEAD_DAYS deleted; schematics store confidence null).
+    * Brief node = brief editor + "What we understood" spec SHEET (components/prototyping/spec-sheet.tsx;
+      table fact/value/source brief|assumed|you; inline edit; ONE confirm for the block) + "Needs your
+      input" real controls (quantity number, power mains/battery/solar, mounting fixed/portable,
+      environment indoor/outdoor/both, + provider questions; "Not decided yet" is a recorded answer).
+      Data = projects.spec jsonb (lib/prototyping/spec.ts). mergeAnalysis(): edited rows ALWAYS win,
+      analysis value kept beside them → "Kept your answer" marker; confirmation drops only if the reading
+      changed. project_claims is RETIRED (not dropped, not read).
+    * Standard facts + withStandardGaps(): lib/prototyping/analysis.ts (contract, no zod) — every provider's
+      output is normalised so the 4 standard facts end up as a valid fact or a question.
+    * Parts: project_parts.source catalog|to_design (+kind, sku, unit_price, stock_status, stock_qty,
+      catalog_part_id, inventory_item_id). New top-level tree node "Parts" = the one table
+      (components/prototyping/parts-list.tsx, Source + Status cols, filter). "Add existing part" picks from
+      Store `parts` / `client_inventory_items` (part-dialogs.tsx); "Create new part" asks kind first.
+      Branch leaves (Mechanical › Parts, Electronics › Board, Software › Scope) show ONLY to_design rows of
+      that kind via parts-stage.tsx — same rows, never copies. partNeeds() (lib/prototyping/parts.ts) is
+      the single "what's missing" for the Status column AND readiness. No lead time anywhere (no source has one).
+    * Analysis: POST /api/analyse (app/api/analyse/route.ts), NDJSON stream of real steps (reading →
+      disciplines → requirements; client marks gaps after merge; min 400 ms). Requires a Supabase session
+      (guest ok). Provider adapter lib/prototyping/providers/: one file per provider, loaded by name from
+      ANALYSIS_PROVIDER (default gemini) — adding one = new file only. gemini.ts: generateContent +
+      responseSchema, model gemini-3.5-flash-lite (stable, free tier; checked 2026-09-21; GEMINI_MODEL
+      overrides). Every response is zod-validated (analysis-schema.ts, strips unknown keys e.g. confidence).
+      Missing key / 429 / malformed / bad schema / network → basic reader (providers/rules.ts over
+      engine.ts) and the UI says so ("usedBasicReader"). Token counts logged per call: "[analyse] ...
+      tokens: in= out= total=". Material/process + route stay deterministic (engine.suggestSpec/recommend).
+    * Right panel = next actions (top open requirements, click → node + focus the input) + one line naming
+      where the brief goes (page.tsx passes providerStatus().destination; no key ever reaches the client).
+    MIGRATION 0022_prototyping_spec_and_sources.sql (RUN AFTER 0021): projects.spec + project_parts
+    source/kind/catalog columns. Until it runs, analysis and adding parts show a "couldn't save" error.
+    ENV (server-only, Vercel + .env.local): GEMINI_API_KEY (free key from Google AI Studio), optional
+    ANALYSIS_PROVIDER (gemini|rules), optional GEMINI_MODEL.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -549,8 +583,9 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   (RUN THIS before the drag-and-drop quote upload works in production; needs SUPABASE_SERVICE_ROLE_KEY set)
 - 0020_prototyping.sql — prototyping tables + projects.brief/stage/stages (RUN AFTER 0019; /projects/<id>/prototyping
   loads without it but cannot save an analysis until it runs)
-- 0021_prototyping_disciplines.sql — projects.disciplines jsonb (RUN AFTER 0020; needed to save manual
-  branch add/remove in the prototyping tree)
+- 0021_prototyping_disciplines.sql — projects.disciplines jsonb (RUN 2026-09-21 ✔)
+- 0022_prototyping_spec_and_sources.sql — projects.spec + project_parts source/kind/catalog columns (RUN
+  AFTER 0021; prototyping analysis and adding parts can't save until it runs)
 
 ## PERMANENT NOTES
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in

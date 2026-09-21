@@ -27,25 +27,6 @@ export function Kicker({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** A confidence read-out. Always paired with a way to disagree with it. */
-export function Confidence({ value, label }: { value: number; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-2 text-[11px] text-mutedtext" title={label}>
-      <span className="hidden sm:inline">{label}</span>
-      <span className="h-1.5 w-11 overflow-hidden rounded-full bg-panel shadow-neu-inset">
-        <span
-          className={cn(
-            "block h-full rounded-full transition-[width] duration-500",
-            value < 50 ? "bg-inventory" : "bg-cobalt"
-          )}
-          style={{ width: `${Math.max(4, value)}%` }}
-        />
-      </span>
-      <b className="font-mono text-[11px] font-medium tabular-nums text-heading">{value}%</b>
-    </span>
-  );
-}
-
 const STATUS_ICON = {
   generating: Loader2,
   ready: Check,

@@ -1,6 +1,9 @@
 // Shared row/role types for the auth + multi-tenant layer (Stage 4).
 // Kept hand-written for now; can be replaced by generated Supabase types later.
 
+import type { Discipline } from "@/lib/prototyping/constants";
+import type { PartSource } from "@/lib/prototyping/parts";
+import type { Spec } from "@/lib/prototyping/spec";
 import type { DisciplineState } from "@/lib/prototyping/tree";
 
 export type Role = "super_admin" | "workshop" | "client";
@@ -142,6 +145,8 @@ export type Project = {
   stages: Record<string, string>;
   // 0021. Absent until that migration runs, so always optional here.
   disciplines?: DisciplineState | null;
+  // 0022. The spec sheet ("What we understood"); null until first analysed.
+  spec?: Spec | null;
   created_at: string;
   updated_at: string;
 };
@@ -200,24 +205,8 @@ export type ClientInventoryItem = {
 };
 
 // ── Prototyping ─────────────────────────────────────────────────────────────
-// See supabase/migrations/0020_prototyping.sql. Every row here started as a
-// suggestion from the rules engine in lib/prototyping/ and is only acted on
-// once the client confirms it.
-
-export type ClaimStatus = "pending" | "confirmed" | "corrected" | "dismissed";
-
-export type ProjectClaim = {
-  id: string;
-  project_id: string;
-  text: string;
-  source: "engine" | "user";
-  status: ClaimStatus;
-  original_text: string | null;
-  confidence: number;
-  is_assumption: boolean;
-  position: number;
-  created_at: string;
-};
+// See supabase/migrations/0020_prototyping.sql and 0022. The brief's reading
+// lives in projects.spec; project_claims is retired and no longer typed.
 
 export type PartStatus = "suggested" | "confirmed" | "edited" | "added";
 
@@ -234,6 +223,15 @@ export type ProjectPart = {
   confidence: number;
   ai_material: string | null;
   ai_process: string | null;
+  // 0022. Absent on databases that have not run it; treated as to_design.
+  source?: PartSource;
+  kind?: Discipline | null;
+  catalog_part_id?: string | null;
+  inventory_item_id?: string | null;
+  sku?: string | null;
+  unit_price?: number | null;
+  stock_status?: string | null;
+  stock_qty?: number | null;
   position: number;
   created_at: string;
   updated_at: string;

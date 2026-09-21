@@ -1,57 +1,39 @@
-// The prototyping rules engine.
+// The prototyping rules — deterministic, free, and explainable.
 //
-// This is what stands in for a model: deterministic keyword rules over the
-// brief, with an explicit confidence on every output. It costs nothing to run,
-// it never leaves the server, and it is honest about being a guess — the UI
-// asks the client to confirm or correct every single thing it produces.
+// Two jobs live here:
+//   1. The BASIC READER: keyword rules over the brief. It is the fallback when
+//      the configured analysis provider is missing, rate-limited or returns
+//      something malformed (lib/prototyping/providers/rules.ts wraps it into
+//      the same contract a model returns).
+//   2. The MANUFACTURING RULES, which never go to a model: which material and
+//      process suit a part (suggestSpec), which pairs are makeable
+//      (constants.PROCESS_MATERIALS) and how the parts group into a route
+//      (recommend). These must be repeatable, so they are a fixed table.
 //
-// It is PURE and returns message KEYS, not sentences. Gestaltung is bilingual,
-// so the caller translates (Prototyping.claim_*, part_*, warn_*) and only then
-// writes text to the database. Keeping prose out of here is also what makes
-// the rules testable and what will let a real model replace this file behind
-// the same return types.
+// Nothing here scores itself. A keyword match is not a measurement, so no
+// output carries a confidence number.
+//
+// PURE, and returns message KEYS rather than sentences: the caller translates,
+// so every reading is bilingual.
 
 import {
-  type Discipline,
+  PROCESSES,
   isCompatible,
-  PROCESS_LEAD_DAYS,
   processesFor,
+  type Discipline,
   type Material,
   type Process,
-  type SchematicKind,
 } from "./constants";
-
-export type Claim = {
-  key: string;
-  params?: Record<string, string | number>;
-  confidence: number;
-  isAssumption?: boolean;
-};
-
-export type SuggestedPart = {
-  /** Message key under Prototyping.part_<key>_name / _desc. */
-  key: string;
-  quantity: number;
-  material: Material;
-  process: Process;
-  confidence: number;
-  kind: SchematicKind;
-};
-
-export type Analysis = {
-  claims: Claim[];
-  parts: SuggestedPart[];
-  disciplines: Discipline[];
-};
 
 // ── Feature detection ──────────────────────────────────────────────────────
 // One regex per idea we can recognise. Anything we don't recognise simply
 // doesn't fire, and the client fills the gap by hand — which is the honest
-// failure mode for a keyword engine.
+// failure mode for a keyword reader.
 
 const FEATURES = {
   outdoor: /\b(outdoor|outside|public|street|park|kerb|curb|garden|rain|sun|weather)\b/i,
-  heat: /\b(hot|heat|summer|thermal|50\s*°?\s*c|45\s*°?\s*c|doha|qatar|gulf)\b/i,
+  indoor: /\b(indoor|inside|office|kitchen|room|desk|shelf|home)\b/i,
+  heat: /\b(hot|heat|summer|thermal|doha|qatar|gulf)\b/i,
   water: /\b(water|liquid|pump|tank|drink|fluid|irrigat\w*)\b/i,
   food: /\b(food|feed\w*|dispens\w*|hopper|grain|pellet|kibble)\b/i,
   electronics: /\b(smart|sensor|app|wifi|wi-fi|bluetooth|schedule|monitor|report|microcontroller|esp32|arduino|pcb|circuit|electronic\w*)\b/i,
@@ -88,70 +70,9 @@ function batchSize(brief: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-// ── Claims ─────────────────────────────────────────────────────────────────
-
-export function readBrief(brief: string): Claim[] {
-  const f = detect(brief);
-  const claims: Claim[] = [];
-
-  // No "this is the product described above" claim: the engine cannot write a
-  // summary, and a confirm control for text nobody can see is worse than none.
-
-  if (f.has("outdoor"))
-    claims.push({ key: "outdoor", confidence: f.has("heat") ? 88 : 70 });
-  if (f.has("heat"))
-    claims.push({ key: "heat", confidence: 82 });
-  if (f.has("washdown"))
-    claims.push({ key: "washdown", confidence: 76 });
-
-  if (f.has("power")) {
-    const solar = /\bsolar|off-grid|offgrid\b/i.test(brief);
-    claims.push({
-      key: solar ? "solar" : "power",
-      confidence: solar ? 78 : 55,
-      isAssumption: !solar,
-    });
-  } else if (f.has("electronics")) {
-    // Nothing in the brief says how it is powered, but it clearly needs to be.
-    claims.push({ key: "power", confidence: 40, isAssumption: true });
-  }
-
-  if (f.has("electronics"))
-    claims.push({ key: "electronics", confidence: 80 });
-
-  const mass = firstQuantity(brief, /kg|g|grams?|kilograms?/);
-  const volume = firstQuantity(brief, /l|litres?|liters?|ml/);
-  if (mass || volume)
-    claims.push({
-      key: "capacity",
-      params: { mass: mass ?? "—", volume: volume ?? "—" },
-      confidence: 85,
-    });
-
-  const batch = batchSize(brief);
-  if (batch)
-    claims.push({ key: "batch", params: { count: batch }, confidence: 90 });
-  else
-    claims.push({ key: "batch_unknown", confidence: 30, isAssumption: true });
-
-  if (f.has("security")) claims.push({ key: "security", confidence: 72 });
-  if (f.has("mounting")) claims.push({ key: "mounting", confidence: 50, isAssumption: true });
-
-  return claims;
-}
-
-/**
- * The wording of the retired "subject" claim, in both locales. Rows with this
- * text were written before it was removed; the workspace deletes them on load.
- */
-export const LEGACY_SUBJECT_CLAIMS = [
-  "This is the product described in the brief above — confirm the summary is right.",
-  "هذا هو المنتج الموصوف أعلاه — أكّد أن الملخص صحيح.",
-];
-
 // ── Disciplines ────────────────────────────────────────────────────────────
-// Which engineering branches the product needs. A board is implied by anything
-// smart or powered; software only by something a person or system talks to.
+// A board is implied by anything smart or powered; software only by something
+// a person or system talks to.
 
 const SOFTWARE =
   /\b(apps?|website|web\s?app|dashboard|cloud|firmware|software|online|remote(?:ly)?|api|wi-?fi|bluetooth|iot)\b/i;
@@ -187,88 +108,96 @@ export function powerSource(brief: string): PowerSource | null {
   return null;
 }
 
-// ── Part breakdown ─────────────────────────────────────────────────────────
-// Each rule contributes one part when its feature fires. The catch-all at the
-// end means a brief we understood nothing from still produces something to
-// edit rather than an empty screen.
+// ── Facts ──────────────────────────────────────────────────────────────────
+// What the brief states. Standard facts (quantity / power / mounting /
+// environment) carry a raw option value; the rest carry a message key the
+// caller translates. A fact the brief does not state is simply absent — the
+// contract turns it into a question instead of a guess.
 
-type PartRule = {
-  when: (f: Set<Feature>, brief: string) => boolean;
-  part: Omit<SuggestedPart, "key"> & { key: string };
+export type Fact = {
+  id: string;
+  /** Raw value for standard facts. */
+  value?: string;
+  /** Message key (Prototyping.factValue_*) for descriptive facts. */
+  valueKey?: string;
+  params?: Record<string, string>;
 };
 
-const PART_RULES: PartRule[] = [
-  {
-    when: (f) => f.has("enclosure") || f.has("outdoor"),
-    part: { key: "enclosure", quantity: 1, material: "stainless_304", process: "laser_cutting", confidence: 82, kind: "flat_pattern" },
-  },
-  {
-    when: (f, brief) => f.has("outdoor") && /\bsolar\b/i.test(brief),
-    part: { key: "roof", quantity: 1, material: "aluminium_6061", process: "laser_cutting", confidence: 70, kind: "flat_pattern" },
-  },
-  {
-    when: (f) => f.has("food"),
-    part: { key: "dispenser", quantity: 1, material: "petg", process: "3d_printing", confidence: 74, kind: "outline" },
-  },
-  {
-    when: (f) => f.has("water"),
-    part: { key: "reservoir", quantity: 1, material: "petg", process: "3d_printing", confidence: 71, kind: "outline" },
-  },
-  {
-    when: (f) => f.has("mounting") || f.has("enclosure"),
-    part: { key: "bracket", quantity: 4, material: "aluminium_6061", process: "cnc_machining", confidence: 80, kind: "bracket" },
-  },
-  {
-    when: (f) => f.has("electronics"),
-    part: { key: "pcb", quantity: 1, material: "fr4", process: "pcb_manufacturing", confidence: 86, kind: "block_diagram" },
-  },
-  {
-    when: (f) => f.has("precision") || f.has("moving"),
-    part: { key: "coupling", quantity: 1, material: "stainless_304", process: "edm", confidence: 62, kind: "outline" },
-  },
+export function readFacts(brief: string): Fact[] {
+  const f = detect(brief);
+  const facts: Fact[] = [];
+
+  const batch = batchSize(brief);
+  if (batch) facts.push({ id: "quantity", value: String(batch) });
+
+  const power = powerSource(brief);
+  if (power) facts.push({ id: "power", value: power });
+
+  if (/\b(portable|handheld|carry|carried|mobile)\b/i.test(brief))
+    facts.push({ id: "mounting", value: "portable" });
+  else if (/\b(bolt\w*|mounted|wall|post|pole|anchor\w*|fixed)\b/i.test(brief))
+    facts.push({ id: "mounting", value: "fixed" });
+
+  if (f.has("outdoor") && f.has("indoor")) facts.push({ id: "environment", value: "both" });
+  else if (f.has("outdoor")) facts.push({ id: "environment", value: "outdoor" });
+  else if (f.has("indoor")) facts.push({ id: "environment", value: "indoor" });
+
+  if (f.has("heat")) facts.push({ id: "heat", valueKey: "heat" });
+  if (f.has("washdown")) facts.push({ id: "washdown", valueKey: "washdown" });
+  if (f.has("electronics")) facts.push({ id: "electronics", valueKey: "electronics" });
+  if (f.has("security")) facts.push({ id: "security", valueKey: "security" });
+
+  const mass = firstQuantity(brief, /kg|g|grams?|kilograms?/);
+  const volume = firstQuantity(brief, /l|litres?|liters?|ml/);
+  if (mass || volume)
+    facts.push({
+      id: "capacity",
+      valueKey: mass && volume ? "capacityBoth" : "capacityOne",
+      params: { mass: mass ?? "", volume: volume ?? "", amount: (mass ?? volume)! },
+    });
+
+  return facts;
+}
+
+// ── Part breakdown ─────────────────────────────────────────────────────────
+// Each rule contributes one part (Prototyping.part_<key>_name / _desc) when
+// its feature fires. Material and process are NOT decided here: every
+// suggested part, from any reader, goes through suggestSpec() below.
+
+const PART_RULES: { when: (f: Set<Feature>, brief: string) => boolean; key: string; kind: Discipline }[] = [
+  { when: (f) => f.has("enclosure") || f.has("outdoor"), key: "enclosure", kind: "mechanical" },
+  { when: (f, b) => f.has("outdoor") && /\bsolar\b/i.test(b), key: "roof", kind: "mechanical" },
+  { when: (f) => f.has("food"), key: "dispenser", kind: "mechanical" },
+  { when: (f) => f.has("water"), key: "reservoir", kind: "mechanical" },
+  { when: (f) => f.has("mounting") || f.has("enclosure"), key: "bracket", kind: "mechanical" },
+  { when: (f) => f.has("electronics"), key: "pcb", kind: "electronics" },
+  { when: (f) => f.has("precision") || f.has("moving"), key: "coupling", kind: "mechanical" },
 ];
 
-export function breakDown(brief: string): SuggestedPart[] {
+export function breakDown(brief: string): { key: string; kind: Discipline }[] {
   const f = detect(brief);
-  const parts = PART_RULES.filter((r) => r.when(f, brief)).map((r) => r.part);
-  if (parts.length) return parts;
-
-  // Understood nothing: offer the two parts almost everything has.
-  return [
-    { key: "body", quantity: 1, material: "aluminium_6061", process: "cnc_machining", confidence: 30, kind: "outline" },
-    { key: "plate", quantity: 1, material: "stainless_304", process: "laser_cutting", confidence: 30, kind: "flat_pattern" },
-  ];
+  return PART_RULES.filter((r) => r.when(f, brief)).map(({ key, kind }) => ({ key, kind }));
 }
 
-export const analyse = (brief: string): Analysis => ({
-  claims: readBrief(brief),
-  parts: breakDown(brief),
-  disciplines: detectDisciplines(brief),
-});
+// ── Manufacturing rules ────────────────────────────────────────────────────
 
 /**
- * Material + process for a part the client is adding by hand. Same rules, run
- * over the part's own name and description instead of the whole brief.
+ * Material + process for a part, from what the part is. A fixed table over
+ * the part's own name and description, so the same part always gets the same
+ * answer and the reason can be shown.
  */
-export function suggestSpec(text: string): {
-  material: Material;
-  process: Process;
-  confidence: number;
-  reasonKey: string;
-} {
+export function suggestSpec(text: string): { material: Material; process: Process; reasonKey: string } {
   const t = text.toLowerCase();
   if (/\b(pcb|board|circuit|sensor|electronic|controller)\b/.test(t))
-    return { material: "fr4", process: "pcb_manufacturing", confidence: 88, reasonKey: "electronics" };
+    return { material: "fr4", process: "pcb_manufacturing", reasonKey: "electronics" };
   if (/\b(key|keyway|coupling|spline|gear|tolerance|precision)\b/.test(t))
-    return { material: "stainless_304", process: "edm", confidence: 68, reasonKey: "precision" };
-  if (/\b(lid|hatch|door|panel|cover|shell|sheet|plate|bracket|frame)\b/.test(t))
-    return { material: "stainless_304", process: "laser_cutting", confidence: 78, reasonKey: "sheet" };
-  if (/\b(housing|bowl|clip|knob|cap|funnel|seal|gasket|spacer|mount)\b/.test(t))
-    return { material: "petg", process: "3d_printing", confidence: 72, reasonKey: "shaped" };
-  return { material: "aluminium_6061", process: "cnc_machining", confidence: 45, reasonKey: "generic" };
+    return { material: "stainless_304", process: "edm", reasonKey: "precision" };
+  if (/\b(lid|hatch|door|panel|cover|shell|sheet|plate|bracket|frame|enclosure|roof)\b/.test(t))
+    return { material: "stainless_304", process: "laser_cutting", reasonKey: "sheet" };
+  if (/\b(housing|bowl|clip|knob|cap|funnel|seal|gasket|spacer|mount|hopper|reservoir|dispenser)\b/.test(t))
+    return { material: "petg", process: "3d_printing", reasonKey: "shaped" };
+  return { material: "aluminium_6061", process: "cnc_machining", reasonKey: "generic" };
 }
-
-// ── Manufacturing recommendation ───────────────────────────────────────────
 
 export type PartLike = {
   code: string;
@@ -288,39 +217,24 @@ export type Warning = {
 export type Route = {
   process: Process;
   parts: PartLike[];
-  leadDays: number;
   /** Same material throughout, so the parts can be batched together. */
   nestable: boolean;
 };
 
-export type Recommendation = {
-  routes: Route[];
-  warnings: Warning[];
-  criticalPath: Process | null;
-  leadDays: number;
-  confidence: number;
-};
+export type Recommendation = { routes: Route[]; warnings: Warning[] };
 
 export function recommend(parts: PartLike[], brief = ""): Recommendation {
   const hot = FEATURES.heat.test(brief) || FEATURES.outdoor.test(brief);
   const wet = FEATURES.washdown.test(brief) || FEATURES.water.test(brief);
 
-  const byProcess = new Map<Process, PartLike[]>();
-  for (const p of parts) {
-    if (!p.process) continue;
-    const list = byProcess.get(p.process as Process) ?? [];
-    list.push(p);
-    byProcess.set(p.process as Process, list);
-  }
-
-  const routes: Route[] = [...byProcess.entries()]
-    .map(([process, list]) => ({
+  const routes: Route[] = PROCESSES.map((process) => {
+    const list = parts.filter((p) => p.process === process);
+    return {
       process,
       parts: list,
-      leadDays: PROCESS_LEAD_DAYS[process],
       nestable: list.length > 1 && new Set(list.map((p) => p.material)).size === 1,
-    }))
-    .sort((a, b) => b.leadDays - a.leadDays);
+    };
+  }).filter((r) => r.parts.length);
 
   const warnings: Warning[] = [];
   for (const p of parts) {
@@ -330,10 +244,14 @@ export function recommend(parts: PartLike[], brief = ""): Recommendation {
       continue;
     }
     if (!isCompatible(p.material, p.process)) {
-      const alt = processesFor(p.material);
       warnings.push({
         key: "incompatible",
-        params: { ...params, material: p.material, process: p.process, alt: alt.join(",") },
+        params: {
+          ...params,
+          material: p.material,
+          process: p.process,
+          alt: processesFor(p.material).join(","),
+        },
         blocking: true,
       });
       continue;
@@ -346,17 +264,5 @@ export function recommend(parts: PartLike[], brief = ""): Recommendation {
       warnings.push({ key: "wood_wet", params, blocking: false });
   }
 
-  const critical = routes[0]?.process ?? null;
-  const confidence = Math.max(
-    25,
-    92 - warnings.filter((w) => w.blocking).length * 25 - warnings.filter((w) => !w.blocking).length * 12
-  );
-
-  return {
-    routes,
-    warnings,
-    criticalPath: critical,
-    leadDays: critical ? PROCESS_LEAD_DAYS[critical] : 0,
-    confidence,
-  };
+  return { routes, warnings };
 }

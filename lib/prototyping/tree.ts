@@ -1,14 +1,19 @@
-// The workspace tree: Brief, one branch per discipline the project needs, and
-// Quote.
+// The workspace tree: Brief, the Parts list, one branch per discipline the
+// project needs, and Quote.
 //
 // Pure. Branches come from what the analysis detected plus the client's own
 // choices; a manual choice always wins and an analysis never overwrites it.
 // Open-item counts are the readiness requirements (./readiness) mapped onto
 // tree nodes — the tree never counts anything itself.
+//
+// The Parts list shows every part. A branch shows only the to-design parts of
+// its kind — the same rows, viewed for design work, never a second copy.
 
 import { DISCIPLINES, type Discipline } from "./constants";
 import { detectDisciplines } from "./engine";
-import type { Readiness, Requirement, Translate } from "./readiness";
+import { disciplineOf, type PartLike } from "./parts";
+import { factFocus, type Readiness, type Requirement, type Translate } from "./readiness";
+import { rowOf, type Spec } from "./spec";
 
 export const LEAVES = {
   mechanical: ["mechanical.parts", "mechanical.drawings", "mechanical.process"],
@@ -17,7 +22,7 @@ export const LEAVES = {
 } as const satisfies Record<Discipline, readonly string[]>;
 
 export type LeafId = (typeof LEAVES)[Discipline][number];
-export type NodeId = "brief" | "quote" | LeafId;
+export type NodeId = "brief" | "parts" | "quote" | LeafId;
 
 /** projects.disciplines (migration 0021). */
 export type DisciplineState = {
@@ -27,15 +32,18 @@ export type DisciplineState = {
   manual?: Partial<Record<Discipline, boolean>>;
 };
 
-type PartLike = { id: string; material: string | null; process: string | null };
+/** Where a to-design part of each kind is worked on. */
+export const DESIGN_NODE: Record<Discipline, NodeId> = {
+  mechanical: "mechanical.parts",
+  electronics: "electronics.board",
+  software: "software.scope",
+};
 
-/** A board is electronics; everything else we make is mechanical. */
-export const disciplineOf = (p: { process: string | null }): Discipline =>
-  p.process === "pcb_manufacturing" ? "electronics" : "mechanical";
-
-/** The leaf a part is listed under. */
-export const partNode = (p: { process: string | null }): NodeId =>
-  disciplineOf(p) === "electronics" ? "electronics.board" : "mechanical.parts";
+/** The node a part is resolved at: its design leaf, or the Parts list. */
+export const partNode = (p: PartLike): NodeId => {
+  const d = disciplineOf(p);
+  return d ? DESIGN_NODE[d] : "parts";
+};
 
 /** "mechanical.parts" → "node_mechanical_parts" (next-intl keys cannot hold dots). */
 export const nodeKey = (n: NodeId) => `node_${n.replace(".", "_")}`;
@@ -59,7 +67,7 @@ export function branches(
   return DISCIPLINES.map((d) => {
     const manual = state?.manual?.[d];
     const partCount = parts.filter((p) => disciplineOf(p) === d).length;
-    // A branch with parts in it always needs a home, even if the analysis
+    // A branch with parts to design always needs a home, even if the analysis
     // missed it — otherwise those parts would vanish from the tree.
     const active = manual ?? (detected.includes(d) || partCount > 0);
     return { discipline: d, detected: detected.includes(d), manual, partCount, active };
@@ -68,17 +76,21 @@ export function branches(
 
 /** Every node the client can see, in reading order. */
 export function visibleNodes(bs: Branch[]): NodeId[] {
-  return ["brief", ...bs.filter((b) => b.active).flatMap((b) => [...LEAVES[b.discipline]]), "quote"];
+  return [
+    "brief",
+    "parts",
+    ...bs.filter((b) => b.active).flatMap((b) => [...LEAVES[b.discipline]]),
+    "quote",
+  ];
 }
 
 /** Where a requirement is resolved. */
 export function nodeOf(r: Requirement, parts: PartLike[], visible: NodeId[]): NodeId {
-  if (r.group === "brief" || r.group === "understanding") return "brief";
+  if (r.group === "brief" || r.group === "understanding" || r.group === "inputs") return "brief";
   if (r.group === "route") return "quote";
   const part = r.id.startsWith("part:") ? parts.find((p) => `part:${p.id}` === r.id) : null;
-  if (part) return partNode(part);
-  // "No parts yet": the first parts list on screen.
-  return visible.find((n) => n === "mechanical.parts" || n === "electronics.board") ?? "brief";
+  const n = part ? partNode(part) : "parts";
+  return visible.includes(n) ? n : "parts";
 }
 
 export type NodeState = {
@@ -88,13 +100,15 @@ export type NodeState = {
   reason?: string;
   /** Where clicking the node goes to resolve `reason`. */
   target?: NodeId;
+  /** The control to focus there. */
+  focus?: string;
 };
 
 export function nodeStates(
   r: Readiness,
   parts: PartLike[],
+  spec: Spec | null | undefined,
   visible: NodeId[],
-  power: string | null,
   t: Translate
 ): Record<NodeId, NodeState> {
   const out = {} as Record<NodeId, NodeState>;
@@ -105,8 +119,13 @@ export function nodeStates(
     (out[n] ??= { open: [] }).open.push(req);
   }
 
-  const mech = parts.filter((p) => disciplineOf(p) === "mechanical");
-  const needs = (checkProcess: boolean): Omit<NodeState, "open"> =>
+  const set = (n: NodeId, extra: Omit<NodeState, "open">) => {
+    if (out[n] && extra.reason) out[n] = { ...out[n], ...extra };
+  };
+  const ofKind = (d: Discipline) => parts.filter((p) => disciplineOf(p) === d);
+
+  const mech = ofKind("mechanical");
+  const mechNeeds = (checkProcess: boolean): Omit<NodeState, "open"> =>
     !mech.length
       ? { reason: t("need_parts"), target: "mechanical.parts" }
       : mech.some((p) => !p.material)
@@ -114,29 +133,33 @@ export function nodeStates(
         : checkProcess && mech.some((p) => !p.process)
           ? { reason: t("need_process"), target: "mechanical.parts" }
           : {};
+  set("mechanical.drawings", mechNeeds(false));
+  set("mechanical.process", mechNeeds(true));
 
-  const set = (n: NodeId, extra: Omit<NodeState, "open">) => {
-    if (out[n]) out[n] = { ...out[n], ...extra };
-  };
-  set("mechanical.drawings", needs(false));
-  set("mechanical.process", needs(true));
-  if (!parts.some((p) => disciplineOf(p) === "electronics"))
+  if (!ofKind("electronics").length)
     set("electronics.board", { reason: t("need_board"), target: "electronics.board" });
-  if (!power) set("electronics.power", { reason: t("need_power"), target: "brief" });
+  if (!ofKind("software").length)
+    set("software.scope", { reason: t("need_scope"), target: "software.scope" });
 
+  const power = rowOf(spec, "power");
+  if (!power?.value)
+    set("electronics.power", { reason: t("need_power"), target: "brief", focus: factFocus("power") });
+
+  // Quote waits on parts first, then on an actual quantity.
   const openPart = r.requirements.find((x) => !x.satisfied && x.group === "parts");
-  if (openPart)
-    set("quote", { reason: t("need_partsConfirmed"), target: nodeOf(openPart, parts, visible) });
+  const qty = rowOf(spec, "quantity");
+  if (openPart) set("quote", { reason: t("need_partsConfirmed"), target: nodeOf(openPart, parts, visible) });
+  else if (!qty?.value)
+    set("quote", { reason: t("need_quantity"), target: "brief", focus: factFocus("quantity") });
 
   return out;
 }
 
-/** Map an old stage id (before the tree) onto a node. */
+/** Map a stored node — or an old stage id from before the tree — onto a visible node. */
 export function toNode(stored: string, visible: NodeId[]): NodeId {
   const legacy: Record<string, NodeId> = {
     idea: "brief",
     concepts: "brief",
-    parts: "mechanical.parts",
     design: "mechanical.drawings",
     engineering: "mechanical.drawings",
     manufacturing: "quote",

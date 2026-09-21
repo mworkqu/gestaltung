@@ -14,16 +14,8 @@ export const PROCESSES = [
 ] as const;
 export type Process = (typeof PROCESSES)[number];
 
-// Working days for a small batch, used for the critical-path line in the
-// manufacturing recommendation. Rough by design; a real figure comes from the
-// partner workshop when we quote.
-export const PROCESS_LEAD_DAYS: Record<Process, number> = {
-  "3d_printing": 2,
-  cnc_machining: 5,
-  laser_cutting: 3,
-  pcb_manufacturing: 10,
-  edm: 6,
-};
+// No lead times here: we have no measured figure per process, so the UI shows
+// none. A real lead time comes from the partner workshop when we quote.
 
 // Materials. The first twelve are PROJECT_MATERIALS from lib/projects — the
 // same keys and the same Projects.material_* translations, so a material
