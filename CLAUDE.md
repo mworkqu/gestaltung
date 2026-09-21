@@ -468,6 +468,29 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
      behind the edits, so build/git from there was unsafe). All edits verified on disk via the editor; owner
      to build + push from Windows.
 
+- PROTOTYPING (2026-09-21): DONE (code) — needs migration 0020 run in Supabase.
+  - Owner decisions: named "Prototyping" (sits BESIDE the project workspace, does not replace it);
+    ZERO COST — no paid AI/LLM, a deterministic rules engine instead; 2D schematics only, 3D CAD stays
+    the human service at /design/drawing. Layout from the design spike
+    (public/prototypes/gestaltung-project-creation-hub-prototype.html), decluttered: each stage shows only
+    its own content.
+  - Route: app/[locale]/projects/[id]/prototyping (client workspace, browser Supabase client + RLS, guest-safe
+    like /projects/[id]). Entry card "Open prototyping" added to components/projects/project-workspace.tsx.
+  - lib/prototyping/constants.ts: PROCESSES (adds pcb_manufacturing), MATERIALS (PROJECT_MATERIALS + fr4),
+    PROCESS_MATERIALS compatibility map, lead days, STAGES/stage statuses. lib/prototyping/engine.ts: PURE
+    keyword rules → claims, part breakdown, suggestSpec, recommend (routes/critical path/warnings), readiness.
+    Returns message KEYS, never prose (bilingual). lib/prototyping/schematic.ts: deterministic 2D SVG templates
+    (outline/flat_pattern/bracket/block_diagram) + refine-prompt parsing; a flat pattern for a non-sheet material
+    is recorded as a FAILED revision with the reason.
+  - components/prototyping/: workspace (3 collapsible panels, stage rail, readiness), idea-stage (brief +
+    confirm/correct claims), parts-stage (per-part material/process, edit-vs-suggestion tracking, add-part dialog
+    with opt-in suggestion), recommendation, schematics-stage (revisions never overwritten; superseded/failed kept;
+    view old + restore; SVG download; print→PDF), ui. Concepts + Engineering stages are honest cards pointing to
+    the human design/drawing service.
+  - MIGRATION 0020_prototyping.sql (RUN AFTER 0019): projects.brief/stage/stages; project_claims, project_parts,
+    project_schematics, project_schematic_revisions; RLS via owns_project() + new owns_schematic().
+  - i18n: new Prototyping namespace (en+ar, full parity) + Projects.material_fr4 / Projects.prototyping.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -508,6 +531,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0011_parts_store.sql — parts, part_orders, part_order_items tables + create_part_order RPC
 - 0012_quote_uploads.sql — private `quote-uploads` storage bucket + policies for the public /design/quote flow
   (RUN THIS before the drag-and-drop quote upload works in production; needs SUPABASE_SERVICE_ROLE_KEY set)
+- 0020_prototyping.sql — prototyping tables + projects.brief/stage/stages (RUN AFTER 0019; /projects/<id>/prototyping
+  loads without it but cannot save an analysis until it runs)
 
 ## PERMANENT NOTES
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in

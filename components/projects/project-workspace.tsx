@@ -7,6 +7,7 @@ import {
   ChevronUp,
   ImagePlus,
   Loader2,
+  Sparkles,
   Trash2,
   Type as TypeIcon,
 } from "lucide-react";
@@ -149,6 +150,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         reclaimable={items.reduce((n, i) => n + i.qty_from_inventory, 0)}
         onDeleted={() => router.push("/projects")}
       />
+      <PrototypingCard projectId={projectId} />
       <NotesCard project={project} />
       <BlocksCard
         projectId={projectId}
@@ -291,6 +293,30 @@ function ProjectHeader({
         </div>
       )}
     </div>
+  );
+}
+
+// ── Prototyping entry ───────────────────────────────────────────────────────
+// The assisted route from a brief to a part breakdown and 2D schematics. It
+// is a separate workspace (app/[locale]/projects/[id]/prototyping) rather than
+// part of this page: different job, different shape, and this page has to keep
+// working on its own.
+
+function PrototypingCard({ projectId }: { projectId: string }) {
+  const t = useTranslations("Prototyping");
+  return (
+    <section className="neu flex flex-wrap items-center gap-4 p-6 sm:p-8">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-surface shadow-neu-sm">
+        <Sparkles className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold text-heading">{t("kicker")}</h2>
+        <p className="mt-1 text-sm text-mutedtext">{t("openIntro")}</p>
+      </div>
+      <Button asChild>
+        <Link href={`/projects/${projectId}/prototyping`}>{t("open")}</Link>
+      </Button>
+    </section>
   );
 }
 

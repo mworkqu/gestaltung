@@ -133,6 +133,11 @@ export type Project = {
   tenant_id: string | null;
   name: string;
   notes: string | null;
+  // Prototyping (0020). `brief` is the prototyping input, kept separate from
+  // `notes` so saving a note never re-triggers an analysis.
+  brief: string | null;
+  stage: string;
+  stages: Record<string, string>;
   created_at: string;
   updated_at: string;
 };
@@ -188,4 +193,69 @@ export type ClientInventoryItem = {
   note: string | null;
   created_at: string;
   updated_at: string;
+};
+
+// ── Prototyping ─────────────────────────────────────────────────────────────
+// See supabase/migrations/0020_prototyping.sql. Every row here started as a
+// suggestion from the rules engine in lib/prototyping/ and is only acted on
+// once the client confirms it.
+
+export type ClaimStatus = "pending" | "confirmed" | "corrected" | "dismissed";
+
+export type ProjectClaim = {
+  id: string;
+  project_id: string;
+  text: string;
+  source: "engine" | "user";
+  status: ClaimStatus;
+  original_text: string | null;
+  confidence: number;
+  is_assumption: boolean;
+  position: number;
+  created_at: string;
+};
+
+export type PartStatus = "suggested" | "confirmed" | "edited" | "added";
+
+export type ProjectPart = {
+  id: string;
+  project_id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  quantity: number;
+  material: string | null;
+  process: string | null;
+  status: PartStatus;
+  confidence: number;
+  ai_material: string | null;
+  ai_process: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProjectSchematic = {
+  id: string;
+  project_id: string;
+  part_id: string | null;
+  code: string;
+  title: string;
+  kind: string;
+  created_at: string;
+};
+
+export type RevisionStatus = "generating" | "ready" | "failed" | "superseded";
+
+export type ProjectSchematicRevision = {
+  id: string;
+  schematic_id: string;
+  rev: number;
+  status: RevisionStatus;
+  prompt: string | null;
+  note: string | null;
+  svg: string | null;
+  error: string | null;
+  confidence: number | null;
+  created_at: string;
 };
