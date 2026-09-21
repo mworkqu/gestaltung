@@ -88,11 +88,9 @@ function batchSize(brief: string): number | null {
 export function readBrief(brief: string): Claim[] {
   const f = detect(brief);
   const claims: Claim[] = [];
-  const words = brief.trim().split(/\s+/).filter(Boolean).length;
 
-  // Always first: what we think the thing is. Low confidence on purpose — the
-  // engine cannot summarise, so it says so by asking for confirmation.
-  claims.push({ key: "subject", confidence: words > 40 ? 60 : 40 });
+  // No "this is the product described above" claim: the engine cannot write a
+  // summary, and a confirm control for text nobody can see is worse than none.
 
   if (f.has("outdoor"))
     claims.push({ key: "outdoor", confidence: f.has("heat") ? 88 : 70 });
@@ -136,6 +134,15 @@ export function readBrief(brief: string): Claim[] {
 
   return claims;
 }
+
+/**
+ * The wording of the retired "subject" claim, in both locales. Rows with this
+ * text were written before it was removed; the workspace deletes them on load.
+ */
+export const LEGACY_SUBJECT_CLAIMS = [
+  "This is the product described in the brief above — confirm the summary is right.",
+  "هذا هو المنتج الموصوف أعلاه — أكّد أن الملخص صحيح.",
+];
 
 // ── Part breakdown ─────────────────────────────────────────────────────────
 // Each rule contributes one part when its feature fires. The catch-all at the
@@ -308,42 +315,4 @@ export function recommend(parts: PartLike[], brief = ""): Recommendation {
     leadDays: critical ? PROCESS_LEAD_DAYS[critical] : 0,
     confidence,
   };
-}
-
-// ── Readiness ──────────────────────────────────────────────────────────────
-// One number the whole workspace agrees on. Weights are a judgement call, kept
-// here so the header, the sidebar and the bottom bar can never disagree.
-
-export type ReadinessInput = {
-  briefLength: number;
-  claims: { status: string }[];
-  parts: { status: string; material: string | null; process: string | null }[];
-  routeAccepted: boolean;
-  schematicsReady: number;
-  schematicsWanted: number;
-};
-
-export function readiness(i: ReadinessInput) {
-  const settled = (s: string) => s === "confirmed" || s === "corrected";
-  const claimScore = i.claims.length
-    ? i.claims.filter((c) => settled(c.status)).length / i.claims.length
-    : 0;
-  const partScore = i.parts.length
-    ? i.parts.filter((p) => p.status !== "suggested" && isCompatible(p.material, p.process)).length /
-      i.parts.length
-    : 0;
-  const schematicScore = i.schematicsWanted
-    ? Math.min(1, i.schematicsReady / i.schematicsWanted)
-    : 0;
-
-  const items = [
-    { key: "brief", value: Math.min(1, i.briefLength / 200), weight: 15 },
-    { key: "claims", value: claimScore, weight: 25, done: i.claims.filter((c) => settled(c.status)).length, total: i.claims.length },
-    { key: "parts", value: partScore, weight: 30, done: i.parts.filter((p) => p.status !== "suggested").length, total: i.parts.length },
-    { key: "route", value: i.routeAccepted ? 1 : 0, weight: 10 },
-    { key: "schematics", value: schematicScore, weight: 20, done: i.schematicsReady, total: i.schematicsWanted },
-  ];
-
-  const pct = Math.round(items.reduce((a, it) => a + it.value * it.weight, 0));
-  return { pct, items };
 }

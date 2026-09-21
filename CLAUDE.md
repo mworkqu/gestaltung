@@ -490,6 +490,13 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   - MIGRATION 0020_prototyping.sql (RUN AFTER 0019): projects.brief/stage/stages; project_claims, project_parts,
     project_schematics, project_schematic_revisions; RLS via owns_project() + new owns_schematic().
   - i18n: new Prototyping namespace (en+ar, full parity) + Projects.material_fr4 / Projects.prototyping.
+  - REWORK Task 1 (2026-09-21): lib/prototyping/readiness.ts is the SINGLE SOURCE for the header %,
+    sidebar counters, footer open-items count and every stage status (projectReadiness → named
+    requirements, percent = satisfied ÷ total; stageStatuses derives status from contents + prerequisite,
+    never stored). projects.stages now only holds the route-accepted decision (manufacturing:"complete").
+    Brief editor = components/prototyping/brief-editor.tsx (auto-grow, 12-row min, word count, save on
+    blur). The "confirm the summary" claim is removed (legacy rows deleted on load); a brief that looks
+    like SQL is cleared on load with a notice.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 

@@ -5,15 +5,19 @@
 // The analysis is a local, synchronous function call — no network, no model,
 // no cost. It writes claims and suggested parts as rows the client then
 // confirms or corrects; it never edits anything the client already settled.
+// Stage status is not written here: it is derived from these rows by
+// lib/prototyping/readiness.
 
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Loader2, Pencil, Sparkles } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 import { analyse } from "@/lib/prototyping/engine";
-import { MAX_BRIEF_CHARS } from "@/lib/prototyping/constants";
+import { MIN_BRIEF_CHARS } from "@/lib/prototyping/constants";
+import { looksLikeSchema } from "@/lib/prototyping/readiness";
 import { Tag } from "@/components/ui/tag";
+import { BriefEditor, type SaveState } from "@/components/prototyping/brief-editor";
 import {
   Card,
   Confidence,
@@ -36,35 +40,49 @@ export function IdeaStage({
 }) {
   const t = useTranslations("Prototyping");
   const [brief, setBrief] = useState(project.brief ?? "");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [savedBrief, setSavedBrief] = useState(project.brief ?? "");
+  const [saveState, setSaveState] = useState<SaveState>("clean");
   const [busy, setBusy] = useState(false);
-  const [tooShort, setTooShort] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [problem, setProblem] = useState<"short" | "schema" | "failed" | null>(null);
+
+  // Closing the tab skips blur, so warn while there is unsaved text.
+  useEffect(() => {
+    if (saveState !== "dirty" && saveState !== "error") return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [saveState]);
 
   function onBriefChange(value: string) {
-    setBrief(value.slice(0, MAX_BRIEF_CHARS));
-    setStatus("saving");
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      await createClient()
-        .from("projects")
-        .update({ brief: value })
-        .eq("id", project.id);
-      setStatus("saved");
-    }, 700);
+    setBrief(value);
+    setSaveState(value === savedBrief ? "clean" : "dirty");
+  }
+
+  /** Saves the brief if it changed. Resolves false if the write failed. */
+  async function saveBrief(): Promise<boolean> {
+    if (brief === savedBrief && saveState !== "error") return true;
+    setSaveState("saving");
+    const { error } = await createClient()
+      .from("projects")
+      .update({ brief: brief || null })
+      .eq("id", project.id);
+    if (error) {
+      setSaveState("error");
+      return false;
+    }
+    setSavedBrief(brief);
+    setSaveState("saved");
+    await onChanged();
+    return true;
   }
 
   // Runs the engine and writes what it found. Anything the client has already
   // confirmed, corrected or edited survives untouched — re-analysing must
   // never quietly undo a decision they made.
   async function runAnalysis() {
-    if (brief.trim().length < 40) {
-      setTooShort(true);
-      return;
-    }
-    setTooShort(false);
-    setFailed(false);
+    if (looksLikeSchema(brief)) return setProblem("schema");
+    if (brief.trim().length < MIN_BRIEF_CHARS) return setProblem("short");
+    setProblem(null);
     setBusy(true);
     const supabase = createClient();
 
@@ -76,11 +94,8 @@ export function IdeaStage({
     };
 
     try {
-      // Flush any pending brief save first, so the analysis reads what's on screen.
-      if (timer.current) clearTimeout(timer.current);
-      must(
-        await supabase.from("projects").update({ brief }).eq("id", project.id),
-      );
+      // Flush the brief first, so the analysis reads what's on screen.
+      if (!(await saveBrief())) throw new Error("brief not saved");
 
       const { claims: found, parts: suggested } = analyse(brief);
 
@@ -137,15 +152,8 @@ export function IdeaStage({
         }));
       if (partRows.length)
         must(await supabase.from("project_parts").insert(partRows));
-
-      // The idea is under way and parts now exist to confirm.
-      const stages = { ...project.stages, idea: "progress", parts: "needs" };
-      must(
-        await supabase.from("projects").update({ stages }).eq("id", project.id),
-      );
-      setStatus("saved");
     } catch {
-      setFailed(true);
+      setProblem("failed");
     }
 
     await onChanged();
@@ -160,29 +168,22 @@ export function IdeaStage({
         kicker={t("briefHeading")}
         title={t("stageTitle_idea")}
         intro={t("briefIntro")}
-        actions={
-          status !== "idle" && (
-            <span className="text-[11px] text-mutedtext">
-              {status === "saving" ? t("saving") : t("saved")}
-            </span>
-          )
-        }
       >
-        <textarea
+        <BriefEditor
           value={brief}
-          onChange={(e) => onBriefChange(e.target.value)}
-          rows={8}
-          placeholder={t("briefPlaceholder")}
-          className={cn(fieldClass, "resize-y")}
+          onChange={onBriefChange}
+          onSave={() => void saveBrief()}
+          state={saveState}
         />
-        {tooShort && (
+        {problem && (
           <p className="text-xs font-medium text-destructive">
-            {t("briefTooShort")}
-          </p>
-        )}
-        {failed && (
-          <p className="text-xs font-medium text-destructive">
-            {t("analyseFailed")}
+            {t(
+              problem === "short"
+                ? "briefTooShort"
+                : problem === "schema"
+                  ? "block_briefSchema"
+                  : "analyseFailed",
+            )}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3">

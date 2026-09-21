@@ -44,7 +44,7 @@ import type {
 export type SchematicWithRevs = ProjectSchematic & { revs: ProjectSchematicRevision[] };
 
 const current = (s: SchematicWithRevs) => s.revs[s.revs.length - 1];
-const latestReady = (s: SchematicWithRevs) =>
+export const latestReady = (s: SchematicWithRevs) =>
   [...s.revs].reverse().find((r) => r.status === "ready");
 
 /**

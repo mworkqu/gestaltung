@@ -10,12 +10,16 @@
 // panel on the right that says plainly what the assistant is and is not. Each
 // side panel collapses, and the whole thing mirrors in Arabic because the
 // layout is built from logical properties and CSS grid.
+//
+// Every number and every stage status on this page comes from
+// lib/prototyping/readiness — nothing here counts anything itself.
 
 import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
@@ -28,7 +32,6 @@ import {
   PencilRuler,
   Plus,
   Receipt,
-  Ruler,
   Sparkles,
   Truck,
   Wrench,
@@ -36,22 +39,29 @@ import {
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { readiness } from "@/lib/prototyping/engine";
+import { LEGACY_SUBJECT_CLAIMS } from "@/lib/prototyping/engine";
+import {
+  GROUP_STAGE,
+  STAGE_GROUPS,
+  looksLikeSchema,
+  projectReadiness,
+  stageStatuses,
+  type RequirementGroup,
+} from "@/lib/prototyping/readiness";
 import {
   STAGES,
   nextStage,
-  stageMap,
   type SchematicKind,
   type Stage,
   type StageStatus,
 } from "@/lib/prototyping/constants";
-import { Tag } from "@/components/ui/tag";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
 import { PartsStage } from "@/components/prototyping/parts-stage";
 import { Recommendation } from "@/components/prototyping/recommendation";
 import {
   SchematicsStage,
   createRevision,
+  latestReady,
   type SchematicWithRevs,
 } from "@/components/prototyping/schematics-stage";
 import {
@@ -59,6 +69,7 @@ import {
   GhostButton,
   PrimaryButton,
   SoftButton,
+  Warn,
   useMono,
 } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
@@ -78,6 +89,24 @@ const STAGE_ICON: Record<Stage, typeof Lightbulb> = {
   manufacturing: Factory,
   quote: Receipt,
   production: Truck,
+};
+
+const GROUPS: RequirementGroup[] = ["brief", "understanding", "parts", "route"];
+
+const STATUS_TEXT: Record<StageStatus, string> = {
+  complete: "text-buy",
+  progress: "text-cobalt",
+  needs: "text-inventory",
+  optional: "text-mutedtext",
+  locked: "text-faint",
+};
+
+const STATUS_DOT: Record<StageStatus, string> = {
+  complete: "bg-buy",
+  progress: "bg-cobalt",
+  needs: "bg-inventory",
+  optional: "bg-borderstrong",
+  locked: "bg-faint",
 };
 
 /** Which 2D template suits a part, from the process it is made by. */
@@ -102,6 +131,9 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
   const [missing, setMissing] = useState(false);
   const [collapsed, setCollapsed] = useState({ left: false, right: false });
   const [working, setWorking] = useState(false);
+  const [openAnyway, setOpenAnyway] = useState(false);
+  const [showOpen, setShowOpen] = useState(false);
+  const [briefCleared, setBriefCleared] = useState(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -116,7 +148,21 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
       setLoading(false);
       return;
     }
-    setProject(proj as Project);
+
+    let loaded = proj as Project;
+    if (looksLikeSchema(loaded.brief)) {
+      // Database code was once pasted into a brief. It describes nothing, so
+      // clear it, along with the unconfirmed claims that were read out of it.
+      await supabase.from("projects").update({ brief: null }).eq("id", projectId);
+      await supabase
+        .from("project_claims")
+        .delete()
+        .eq("project_id", projectId)
+        .eq("status", "pending");
+      loaded = { ...loaded, brief: null };
+      setBriefCleared(true);
+    }
+    setProject(loaded);
 
     const [claimRes, partRes, schRes] = await Promise.all([
       supabase
@@ -136,7 +182,21 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
         .order("created_at", { ascending: true }),
     ]);
 
-    setClaims((claimRes.data ?? []) as ProjectClaim[]);
+    // The retired "confirm the summary" claim pointed at a summary that never
+    // existed. Drop any rows written before it was removed.
+    let claimRows = (claimRes.data ?? []) as ProjectClaim[];
+    const legacy = claimRows.filter((c) => LEGACY_SUBJECT_CLAIMS.includes(c.text));
+    if (legacy.length) {
+      await supabase
+        .from("project_claims")
+        .delete()
+        .in(
+          "id",
+          legacy.map((c) => c.id)
+        );
+      claimRows = claimRows.filter((c) => !legacy.includes(c));
+    }
+    setClaims(claimRows);
     setParts((partRes.data ?? []) as ProjectPart[]);
 
     const schs = (schRes.data ?? []) as SchematicWithRevs[];
@@ -187,52 +247,46 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
     );
   }
 
-  const stages = stageMap(project.stages);
   const stage = (STAGES as readonly string[]).includes(project.stage)
     ? (project.stage as Stage)
     : "idea";
-  const routeAccepted = stages.manufacturing === "complete";
+  const routeAccepted = project.stages?.manufacturing === "complete";
 
-  const ready = readiness({
-    briefLength: (project.brief ?? "").length,
+  // Only schematics with a drawing we can actually show count as drawn.
+  const drawn = schematics
+    .map((s) => ({ s, rev: latestReady(s) }))
+    .filter((x) => x.rev?.svg);
+
+  const readinessInput = {
+    brief: project.brief,
     claims,
     parts,
     routeAccepted,
-    schematicsReady: schematics.filter((s) => s.revs.some((r) => r.status === "ready")).length,
-    schematicsWanted: Math.max(1, Math.min(3, parts.length)),
-  });
+    schematicPartIds: drawn.map((x) => x.s.part_id).filter((id): id is string => !!id),
+  };
+  const ready = projectReadiness(readinessInput, (k, p) => t(k, p));
+  const states = stageStatuses(readinessInput, ready);
+  const open = ready.requirements.filter((r) => !r.satisfied);
+  const partReqs = ready.requirements.filter((r) => r.group === "parts");
 
   async function patchProject(changes: Partial<Project>) {
     setProject((p) => (p ? { ...p, ...changes } : p));
     await createClient().from("projects").update(changes).eq("id", project!.id);
   }
 
-  async function goToStage(next: Stage) {
-    const map = { ...stages };
-    // Visiting a stage that was waiting on you starts it.
-    if (map[next] === "needs") map[next] = "progress";
-    await patchProject({ stage: next, stages: map });
-    await load();
+  /** `force` shows the stage even while it waits on a prerequisite. */
+  async function goToStage(next: Stage, force = false) {
+    setOpenAnyway(force);
+    setShowOpen(false);
+    await patchProject({ stage: next });
   }
 
-  async function completeStage() {
-    const map = { ...stages, [stage]: "complete" as StageStatus };
-    const nx = nextStage(stage);
-    if (nx && map[nx] === "locked") map[nx] = "needs";
-    await patchProject({ stage: nx ?? stage, stages: map });
-    await load();
-  }
-
-  async function unlockStage(s: Stage) {
-    await patchProject({ stage: s, stages: { ...stages, [s]: "progress" } });
-    await load();
-  }
-
+  // The one stage fact that is a decision rather than a derivation: the client
+  // accepting the route. It stays in projects.stages.
   async function acceptRoute(next: boolean) {
     await patchProject({
-      stages: { ...stages, manufacturing: next ? "complete" : "progress" },
+      stages: { ...project!.stages, manufacturing: next ? "complete" : "progress" },
     });
-    await load();
   }
 
   /** Draw a first schematic for a part, then jump to the design stage. */
@@ -249,16 +303,15 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
       projectId: project!.id,
       errorText: (k, p) => t(k, p),
     });
-    const map = { ...stages };
-    if (map.design === "locked") map.design = "progress";
-    await patchProject({ stage: "design", stages: map });
+    await goToStage("design", true);
     await load();
     setWorking(false);
   }
 
-  const stageStatus = stages[stage];
-  const locked = stageStatus === "locked";
-  const confirmedParts = parts.filter((p) => p.status !== "suggested").length;
+  const current = states[stage];
+  const locked = current.status === "locked" && !openAnyway;
+  const blockers = open.filter((r) => STAGE_GROUPS[stage].includes(r.group));
+  const following = nextStage(stage);
 
   return (
     <div className="space-y-4">
@@ -278,18 +331,52 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
             {project.name}
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowOpen((v) => !v)}
+          aria-expanded={showOpen}
+          aria-controls="readiness-open"
+          title={t("readinessCount", { done: ready.satisfiedCount, total: ready.totalCount })}
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-panel"
+        >
           <span className="hidden text-[11px] text-mutedtext sm:inline">{t("readiness")}</span>
           <span className="h-1.5 w-20 overflow-hidden rounded-full bg-panel shadow-neu-inset">
             <span
               className="block h-full rounded-full bg-cobalt transition-[width] duration-500"
-              style={{ width: `${ready.pct}%` }}
+              style={{ width: `${ready.percent}%` }}
             />
           </span>
           <b className="font-mono text-[11px] font-medium tabular-nums text-heading">
-            {ready.pct}%
+            {ready.percent}%
           </b>
-        </div>
+          <ChevronDown
+            className={cn("h-3.5 w-3.5 text-mutedtext transition-transform", showOpen && "rotate-180")}
+          />
+        </button>
+
+        {showOpen && (
+          <div id="readiness-open" className="neu-inset w-full space-y-2 p-4">
+            <p className="text-xs font-bold text-heading">
+              {open.length ? t("stillNeeded") : t("allSatisfied")}
+            </p>
+            {open.length > 0 && (
+              <ul className="space-y-1">
+                {open.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => goToStage(GROUP_STAGE[r.group])}
+                      className="flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-start text-[12px] text-heading transition-colors hover:text-cobalt"
+                    >
+                      <CircleAlert className="mt-0.5 h-3 w-3 shrink-0 text-inventory" />
+                      {r.blockingReason}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </header>
 
       <div
@@ -324,7 +411,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
           <ol className="space-y-1">
             {STAGES.map((s, i) => {
               const Icon = STAGE_ICON[s];
-              const st = stages[s];
+              const st = states[s].status;
               const activeStage = s === stage;
               return (
                 <li key={s}>
@@ -354,13 +441,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                           className={cn(
                             "absolute -top-0.5 h-2 w-2 rounded-full ring-2 ring-surface",
                             isRtl ? "-start-0.5" : "-end-0.5",
-                            st === "complete"
-                              ? "bg-buy"
-                              : st === "progress"
-                                ? "bg-cobalt"
-                                : st === "needs"
-                                  ? "bg-inventory"
-                                  : "bg-faint"
+                            STATUS_DOT[st]
                           )}
                         />
                       )}
@@ -376,13 +457,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                         <span
                           className={cn(
                             "mt-0.5 flex items-center gap-1 text-[11px] font-medium",
-                            st === "complete"
-                              ? "text-buy"
-                              : st === "progress"
-                                ? "text-cobalt"
-                                : st === "needs"
-                                  ? "text-inventory"
-                                  : "text-faint"
+                            STATUS_TEXT[st]
                           )}
                         >
                           {st === "complete" && <Check className="h-3 w-3" />}
@@ -405,28 +480,66 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                 <p className="mt-0.5 text-[11px] text-mutedtext">{t("readinessSub")}</p>
               </div>
               <ul className="space-y-1.5">
-                {ready.items.map((it) => (
-                  <li
-                    key={it.key}
-                    className={cn(
-                      "flex items-center gap-2 text-[11.5px]",
-                      it.value >= 1 ? "text-heading" : "text-mutedtext"
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "grid h-4 w-4 shrink-0 place-items-center rounded-full",
-                        it.value >= 1 ? "bg-buy-bg text-buy" : "bg-surface text-faint shadow-neu-sm"
-                      )}
+                {GROUPS.map((g) => {
+                  const rs = ready.requirements.filter((r) => r.group === g);
+                  const ok = rs.filter((r) => r.satisfied).length;
+                  const done = ok === rs.length;
+                  return (
+                    <li key={g}>
+                      <button
+                        type="button"
+                        onClick={() => goToStage(GROUP_STAGE[g])}
+                        className={cn(
+                          "flex w-full items-center gap-2 text-start text-[11.5px] transition-colors hover:text-cobalt",
+                          done ? "text-heading" : "text-mutedtext"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid h-4 w-4 shrink-0 place-items-center rounded-full",
+                            done ? "bg-buy-bg text-buy" : "bg-surface text-faint shadow-neu-sm"
+                          )}
+                        >
+                          {done && <Check className="h-2.5 w-2.5" />}
+                        </span>
+                        <span className="min-w-0 flex-1">{t(`ready_${g}`)}</span>
+                        {rs.length > 1 && (
+                          <span className="font-mono text-[10px] tabular-nums text-faint">
+                            {ok}/{rs.length}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {!collapsed.left && drawn.length > 0 && (
+            <div className="neu-inset mt-3 space-y-2 p-4">
+              <p className="text-xs font-bold text-heading">{t("schHeading")}</p>
+              <ul className="grid grid-cols-3 gap-2">
+                {drawn.map(({ s, rev }) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => goToStage("design", true)}
+                      title={`${s.code} · ${s.title}`}
+                      className="block w-full space-y-1 rounded-lg bg-surface p-1 shadow-neu-sm transition-shadow hover:ring-2 hover:ring-cobalt/40"
                     >
-                      {it.value >= 1 && <Check className="h-2.5 w-2.5" />}
-                    </span>
-                    <span className="min-w-0 flex-1">{t(`ready_${it.key}`)}</span>
-                    {it.total != null && (
-                      <span className="font-mono text-[10px] tabular-nums text-faint">
-                        {it.done}/{it.total}
+                      {/* Generated locally by lib/prototyping/schematic.ts. As an
+                          <img> data URI nothing inside the SVG can run. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(rev!.svg!)}`}
+                        alt={`${s.code} ${s.title}`}
+                        className="aspect-[4/3] w-full rounded bg-white object-contain"
+                      />
+                      <span className="block truncate font-mono text-[9px] text-faint">
+                        {s.code}
                       </span>
-                    )}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -436,6 +549,17 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
 
         {/* Active stage */}
         <main className="min-w-0 space-y-4">
+          {briefCleared && stage === "idea" && (
+            <Warn
+              blocking={false}
+              action={
+                <GhostButton onClick={() => setBriefCleared(false)}>{t("dismiss")}</GhostButton>
+              }
+            >
+              {t("briefCleared")}
+            </Warn>
+          )}
+
           {locked ? (
             <Card>
               <div className="flex flex-col items-center gap-3 py-10 text-center">
@@ -446,15 +570,23 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                   {t("lockedTitle", { stage: t(`stage_${stage}`) })}
                 </h2>
                 <p className="max-w-[46ch] text-sm text-mutedtext">
-                  {t(`stageDesc_${stage}`)} {t("lockedBody")}
+                  {t(`stageDesc_${stage}`)}{" "}
+                  {current.waitingOn &&
+                    t("waitingOn", { stage: t(`stage_${current.waitingOn}`) })}
                 </p>
-                <SoftButton onClick={() => unlockStage(stage)}>{t("unlockAnyway")}</SoftButton>
+                <SoftButton onClick={() => setOpenAnyway(true)}>{t("unlockAnyway")}</SoftButton>
               </div>
             </Card>
           ) : (
             <>
               {stage === "idea" && (
-                <IdeaStage project={project} claims={claims} onChanged={load} />
+                // Remounts when the brief is cleared, so the editor drops its copy.
+                <IdeaStage
+                  key={briefCleared ? "cleared" : "brief"}
+                  project={project}
+                  claims={claims}
+                  onChanged={load}
+                />
               )}
 
               {stage === "concepts" && (
@@ -535,7 +667,10 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                   intro={t("quoteIntro")}
                 >
                   <p className="text-sm text-mutedtext">
-                    {t("quoteParts", { confirmed: confirmedParts, total: parts.length })}
+                    {t("quoteParts", {
+                      confirmed: partReqs.filter((r) => r.satisfied).length,
+                      total: parts.length,
+                    })}
                   </p>
                   <div className="flex flex-wrap items-center gap-3">
                     <Link
@@ -562,22 +697,34 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
 
               {/* Stage footer: the one forward action. */}
               <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-                <span className="text-[11px] text-mutedtext">
-                  {t("openItems", { count: ready.items.filter((i) => i.value < 1).length })}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowOpen(true)}
+                  className="text-[11px] text-mutedtext transition-colors hover:text-cobalt"
+                >
+                  {t("openItems", { count: open.length })}
+                </button>
                 <span className="flex-1" />
-                {stageStatus === "complete" ? (
-                  nextStage(stage) && (
-                    <SoftButton onClick={() => goToStage(nextStage(stage)!)}>
+                {following && (
+                  // Disabled buttons swallow hover in some browsers, so the
+                  // reason sits on a wrapper.
+                  <span
+                    title={
+                      blockers.length
+                        ? t("continueBlocked", {
+                            items: blockers.map((b) => b.blockingReason).join(" · "),
+                          })
+                        : undefined
+                    }
+                  >
+                    <PrimaryButton
+                      onClick={() => goToStage(following)}
+                      disabled={blockers.length > 0 || working}
+                    >
                       {t("nextStage")}
                       <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-                    </SoftButton>
-                  )
-                ) : (
-                  <PrimaryButton onClick={completeStage} disabled={working}>
-                    <Check className="h-3.5 w-3.5" />
-                    {t("markComplete")}
-                  </PrimaryButton>
+                    </PrimaryButton>
+                  </span>
                 )}
               </div>
             </>
@@ -627,24 +774,6 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                 <p className="pt-1 text-[11px] leading-relaxed text-mutedtext">{t("cannotDo")}</p>
               </div>
 
-              <div className="space-y-2">
-                <p className={mono("text-[9px] text-faint")}>{t("activity")}</p>
-                <ul className="space-y-1.5 text-[11.5px]">
-                  <li className="flex items-center gap-2 text-mutedtext">
-                    <Sparkles className="h-3 w-3 text-cobalt" />
-                    {claims.filter((c) => c.status === "pending").length} · {t("claimsHeading")}
-                  </li>
-                  <li className="flex items-center gap-2 text-mutedtext">
-                    <Layers className="h-3 w-3 text-cobalt" />
-                    {confirmedParts}/{parts.length} · {t("ready_parts")}
-                  </li>
-                  <li className="flex items-center gap-2 text-mutedtext">
-                    <Ruler className="h-3 w-3 text-cobalt" />
-                    {schematics.length} · {t("schHeading")}
-                  </li>
-                </ul>
-              </div>
-
               <div className="flex flex-col gap-2">
                 <SoftButton onClick={() => goToStage("idea")} className="justify-start">
                   <Sparkles className="h-3.5 w-3.5" />
@@ -674,9 +803,6 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
           {collapsed.right && (
             <div className="mt-3 flex flex-col items-center gap-2">
               <Sparkles className="h-4 w-4 text-cobalt" />
-              {parts.filter((p) => p.status === "suggested").length > 0 && (
-                <Tag variant="neutral">{parts.filter((p) => p.status === "suggested").length}</Tag>
-              )}
             </div>
           )}
         </aside>

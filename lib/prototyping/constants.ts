@@ -104,30 +104,11 @@ export const STAGES = [
 ] as const;
 export type Stage = (typeof STAGES)[number];
 
-export const STAGE_STATUSES = ["locked", "needs", "progress", "complete"] as const;
+// A stage's status is never stored: it is derived from the project's contents
+// by stageStatuses() in ./readiness, so it cannot drift from what is actually
+// there. "optional" marks the stages handled by our human design service.
+export const STAGE_STATUSES = ["locked", "needs", "progress", "complete", "optional"] as const;
 export type StageStatus = (typeof STAGE_STATUSES)[number];
-
-/** The state a project starts in: describe the idea, everything else waits. */
-export const DEFAULT_STAGES: Record<Stage, StageStatus> = {
-  idea: "progress",
-  concepts: "locked",
-  parts: "locked",
-  design: "locked",
-  engineering: "locked",
-  manufacturing: "locked",
-  quote: "locked",
-  production: "locked",
-};
-
-export function stageMap(raw: unknown): Record<Stage, StageStatus> {
-  const stored = (raw ?? {}) as Record<string, string>;
-  const out = { ...DEFAULT_STAGES };
-  for (const s of STAGES) {
-    const v = stored[s];
-    if ((STAGE_STATUSES as readonly string[]).includes(v)) out[s] = v as StageStatus;
-  }
-  return out;
-}
 
 export const nextStage = (s: Stage): Stage | null =>
   STAGES[STAGES.indexOf(s) + 1] ?? null;
@@ -139,3 +120,5 @@ export type SchematicKind = (typeof SCHEMATIC_KINDS)[number];
 
 export const MAX_PARTS = 40;
 export const MAX_BRIEF_CHARS = 8000;
+/** Below this the brief can't describe a product, so it isn't analysed or counted. */
+export const MIN_BRIEF_CHARS = 40;
