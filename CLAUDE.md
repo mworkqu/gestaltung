@@ -497,6 +497,15 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     Brief editor = components/prototyping/brief-editor.tsx (auto-grow, 12-row min, word count, save on
     blur). The "confirm the summary" claim is removed (legacy rows deleted on load); a brief that looks
     like SQL is cleared on load with a notice.
+  - REWORK Task 2 (2026-09-21): the 8-stage rail is GONE. Left column = discipline tree (lib/prototyping/
+    tree.ts + components/prototyping/tree-nav.tsx): Brief · Mechanical(Parts/Drawings/Material & process) ·
+    Electronics(Board/Power/Components) · Software(Scope) · Quote. Branch active = manual choice ?? (detected
+    || has parts). A part's branch comes from its process (pcb_manufacturing → electronics, else mechanical).
+    Open counts = readiness requirements mapped onto nodes (nodeStates); no padlocks — a blocked node shows
+    its reason and clicking jumps to the fix. projects.stage now stores the selected node id (legacy stage
+    ids mapped by toNode). Interim detection = rules (engine.detectDisciplines/powerSource) until Task 5.
+    MIGRATION 0021_prototyping_disciplines.sql (RUN AFTER 0020): projects.disciplines jsonb {detected,
+    manual}. Until it runs, branches still show (read from the brief) but add/remove can't save.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -540,6 +549,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   (RUN THIS before the drag-and-drop quote upload works in production; needs SUPABASE_SERVICE_ROLE_KEY set)
 - 0020_prototyping.sql — prototyping tables + projects.brief/stage/stages (RUN AFTER 0019; /projects/<id>/prototyping
   loads without it but cannot save an analysis until it runs)
+- 0021_prototyping_disciplines.sql — projects.disciplines jsonb (RUN AFTER 0020; needed to save manual
+  branch add/remove in the prototyping tree)
 
 ## PERMANENT NOTES
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in

@@ -36,11 +36,15 @@ import type { Project, ProjectPart } from "@/lib/supabase/types";
 export function PartsStage({
   project,
   parts,
+  nextIndex,
   onChanged,
   onGenerateSchematic,
 }: {
   project: Project;
+  /** The parts shown here — one branch's parts, not necessarily all of them. */
   parts: ProjectPart[];
+  /** Next free P-NN number across the whole project, so codes never collide. */
+  nextIndex: number;
   onChanged: () => Promise<void>;
   onGenerateSchematic: (part: ProjectPart) => void;
 }) {
@@ -311,7 +315,7 @@ export function PartsStage({
       {adding && (
         <AddPartDialog
           projectId={project.id}
-          nextIndex={parts.length + 1}
+          nextIndex={nextIndex}
           onClose={() => setAdding(false)}
           onAdded={onChanged}
         />

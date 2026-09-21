@@ -6,13 +6,13 @@
 // client behave identically — RLS scopes both to their own auth.uid(), the
 // same arrangement the project workspace uses.
 //
-// Three panels: stages on the left, the active stage in the middle, and a
-// panel on the right that says plainly what the assistant is and is not. Each
-// side panel collapses, and the whole thing mirrors in Arabic because the
-// layout is built from logical properties and CSS grid.
+// Three panels: the project tree on the left, the selected node in the
+// middle, and the assistant on the right. Each side panel collapses, and the
+// whole thing mirrors in Arabic because the layout is built from logical
+// properties and CSS grid.
 //
-// Every number and every stage status on this page comes from
-// lib/prototyping/readiness — nothing here counts anything itself.
+// Every number on this page comes from lib/prototyping/readiness, mapped onto
+// the tree by lib/prototyping/tree — nothing here counts anything itself.
 
 import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -25,36 +25,28 @@ import {
   CircleAlert,
   Cpu,
   Factory,
-  Layers,
-  Lightbulb,
   Loader2,
-  Lock,
-  PencilRuler,
   Plus,
   Receipt,
   Sparkles,
-  Truck,
-  Wrench,
 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { LEGACY_SUBJECT_CLAIMS } from "@/lib/prototyping/engine";
+import { LEGACY_SUBJECT_CLAIMS, powerSource } from "@/lib/prototyping/engine";
+import { looksLikeSchema, projectReadiness } from "@/lib/prototyping/readiness";
 import {
-  GROUP_STAGE,
-  STAGE_GROUPS,
-  looksLikeSchema,
-  projectReadiness,
-  stageStatuses,
-  type RequirementGroup,
-} from "@/lib/prototyping/readiness";
-import {
-  STAGES,
-  nextStage,
-  type SchematicKind,
-  type Stage,
-  type StageStatus,
-} from "@/lib/prototyping/constants";
+  branches,
+  disciplineOf,
+  nodeKey,
+  nodeOf,
+  nodeStates,
+  partNode,
+  toNode,
+  visibleNodes,
+  type NodeId,
+} from "@/lib/prototyping/tree";
+import type { Discipline, SchematicKind } from "@/lib/prototyping/constants";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
 import { PartsStage } from "@/components/prototyping/parts-stage";
 import { Recommendation } from "@/components/prototyping/recommendation";
@@ -64,6 +56,8 @@ import {
   latestReady,
   type SchematicWithRevs,
 } from "@/components/prototyping/schematics-stage";
+import { TreeNav } from "@/components/prototyping/tree-nav";
+import { ComponentsCard, PowerCard, ScopeCard } from "@/components/prototyping/discipline-cards";
 import {
   Card,
   GhostButton,
@@ -80,35 +74,6 @@ import type {
   ProjectSchematicRevision,
 } from "@/lib/supabase/types";
 
-const STAGE_ICON: Record<Stage, typeof Lightbulb> = {
-  idea: Lightbulb,
-  concepts: Sparkles,
-  parts: Layers,
-  design: PencilRuler,
-  engineering: Wrench,
-  manufacturing: Factory,
-  quote: Receipt,
-  production: Truck,
-};
-
-const GROUPS: RequirementGroup[] = ["brief", "understanding", "parts", "route"];
-
-const STATUS_TEXT: Record<StageStatus, string> = {
-  complete: "text-buy",
-  progress: "text-cobalt",
-  needs: "text-inventory",
-  optional: "text-mutedtext",
-  locked: "text-faint",
-};
-
-const STATUS_DOT: Record<StageStatus, string> = {
-  complete: "bg-buy",
-  progress: "bg-cobalt",
-  needs: "bg-inventory",
-  optional: "bg-borderstrong",
-  locked: "bg-faint",
-};
-
 /** Which 2D template suits a part, from the process it is made by. */
 function kindFor(part: ProjectPart): SchematicKind {
   if (part.process === "pcb_manufacturing") return "block_diagram";
@@ -116,6 +81,10 @@ function kindFor(part: ProjectPart): SchematicKind {
   if (part.process === "cnc_machining") return "bracket";
   return "outline";
 }
+
+/** Where a part's drawings are shown. */
+const drawingsNode = (p: ProjectPart): NodeId =>
+  partNode(p) === "electronics.board" ? "electronics.board" : "mechanical.drawings";
 
 export function PrototypingWorkspace({ projectId }: { projectId: string }) {
   const t = useTranslations("Prototyping");
@@ -131,9 +100,9 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
   const [missing, setMissing] = useState(false);
   const [collapsed, setCollapsed] = useState({ left: false, right: false });
   const [working, setWorking] = useState(false);
-  const [openAnyway, setOpenAnyway] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
   const [briefCleared, setBriefCleared] = useState(false);
+  const [branchSaveFailed, setBranchSaveFailed] = useState(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -247,49 +216,60 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
     );
   }
 
-  const stage = (STAGES as readonly string[]).includes(project.stage)
-    ? (project.stage as Stage)
-    : "idea";
   const routeAccepted = project.stages?.manufacturing === "complete";
-
-  // Only schematics with a drawing we can actually show count as drawn.
-  const drawn = schematics
-    .map((s) => ({ s, rev: latestReady(s) }))
-    .filter((x) => x.rev?.svg);
-
-  const readinessInput = {
-    brief: project.brief,
-    claims,
-    parts,
-    routeAccepted,
-    schematicPartIds: drawn.map((x) => x.s.part_id).filter((id): id is string => !!id),
-  };
-  const ready = projectReadiness(readinessInput, (k, p) => t(k, p));
-  const states = stageStatuses(readinessInput, ready);
+  const ready = projectReadiness(
+    { brief: project.brief, claims, parts, routeAccepted },
+    (k, p) => t(k, p)
+  );
+  const power = powerSource(project.brief ?? "");
+  const bs = branches(project.disciplines, project.brief, parts);
+  const visible = visibleNodes(bs);
+  const states = nodeStates(ready, parts, visible, power, (k, p) => t(k, p));
+  const node = toNode(project.stage, visible);
   const open = ready.requirements.filter((r) => !r.satisfied);
-  const partReqs = ready.requirements.filter((r) => r.group === "parts");
+
+  const partsOf = (d: Discipline) => parts.filter((p) => disciplineOf(p) === d);
+  const schematicsOf = (ps: ProjectPart[]) =>
+    schematics.filter((s) => ps.some((p) => p.id === s.part_id));
+  const drawn = schematics
+    .map((s) => ({ s, rev: latestReady(s), part: parts.find((p) => p.id === s.part_id) }))
+    .filter((x) => x.rev?.svg);
+  // Codes are unique per project, so number past the highest one in use.
+  const nextIndex =
+    Math.max(0, ...parts.map((p) => parseInt(p.code.replace(/\D/g, ""), 10) || 0)) + 1;
 
   async function patchProject(changes: Partial<Project>) {
     setProject((p) => (p ? { ...p, ...changes } : p));
-    await createClient().from("projects").update(changes).eq("id", project!.id);
+    return createClient().from("projects").update(changes).eq("id", project!.id);
   }
 
-  /** `force` shows the stage even while it waits on a prerequisite. */
-  async function goToStage(next: Stage, force = false) {
-    setOpenAnyway(force);
+  async function goTo(n: NodeId) {
     setShowOpen(false);
-    await patchProject({ stage: next });
+    await patchProject({ stage: n });
   }
 
-  // The one stage fact that is a decision rather than a derivation: the client
-  // accepting the route. It stays in projects.stages.
+  // A manual choice is stored beside what the analysis detected and always
+  // wins over it; re-analysing only rewrites `detected`.
+  async function setBranch(d: Discipline, on: boolean) {
+    const before = project!.disciplines ?? null;
+    const next = { ...(before ?? {}), manual: { ...(before?.manual ?? {}), [d]: on } };
+    setBranchSaveFailed(false);
+    const { error } = await patchProject({ disciplines: next });
+    if (error) {
+      setProject((p) => (p ? { ...p, disciplines: before } : p));
+      setBranchSaveFailed(true);
+    }
+  }
+
+  // The one progress fact that is a decision rather than a derivation: the
+  // client accepting the route. It stays in projects.stages.
   async function acceptRoute(next: boolean) {
     await patchProject({
       stages: { ...project!.stages, manufacturing: next ? "complete" : "progress" },
     });
   }
 
-  /** Draw a first schematic for a part, then jump to the design stage. */
+  /** Draw a first schematic for a part, then show it. */
   async function generateSchematic(part: ProjectPart) {
     setWorking(true);
     const existing = schematics.find((s) => s.part_id === part.id) ?? null;
@@ -303,15 +283,25 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
       projectId: project!.id,
       errorText: (k, p) => t(k, p),
     });
-    await goToStage("design", true);
+    await goTo(drawingsNode(part));
     await load();
     setWorking(false);
   }
 
-  const current = states[stage];
-  const locked = current.status === "locked" && !openAnyway;
-  const blockers = open.filter((r) => STAGE_GROUPS[stage].includes(r.group));
-  const following = nextStage(stage);
+  const blockers = states[node]?.open ?? [];
+  const following = visible[visible.indexOf(node) + 1] ?? null;
+  const firstParts =
+    visible.find((n) => n === "mechanical.parts" || n === "electronics.board") ?? "brief";
+
+  const partsStage = (d: Discipline) => (
+    <PartsStage
+      project={project}
+      parts={partsOf(d)}
+      nextIndex={nextIndex}
+      onChanged={load}
+      onGenerateSchematic={generateSchematic}
+    />
+  );
 
   return (
     <div className="space-y-4">
@@ -365,7 +355,7 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
                   <li key={r.id}>
                     <button
                       type="button"
-                      onClick={() => goToStage(GROUP_STAGE[r.group])}
+                      onClick={() => goTo(nodeOf(r, parts, visible))}
                       className="flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-start text-[12px] text-heading transition-colors hover:text-cobalt"
                     >
                       <CircleAlert className="mt-0.5 h-3 w-3 shrink-0 text-inventory" />
@@ -388,12 +378,9 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
           !collapsed.left && !collapsed.right && "lg:grid-cols-[248px_minmax(0,1fr)_320px]"
         )}
       >
-        {/* Stages */}
+        {/* Project tree */}
         <aside className="neu p-3">
-          <div className="flex items-center justify-between gap-2 px-1 pb-2">
-            {!collapsed.left && (
-              <span className={mono("text-[10px] text-faint")}>{t("kicker")}</span>
-            )}
+          <div className="flex items-center justify-end pb-2">
             <button
               type="button"
               onClick={() => setCollapsed((c) => ({ ...c, left: !c.left }))}
@@ -408,123 +395,25 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
             </button>
           </div>
 
-          <ol className="space-y-1">
-            {STAGES.map((s, i) => {
-              const Icon = STAGE_ICON[s];
-              const st = states[s].status;
-              const activeStage = s === stage;
-              return (
-                <li key={s}>
-                  <button
-                    type="button"
-                    onClick={() => goToStage(s)}
-                    aria-current={activeStage ? "step" : undefined}
-                    title={`${t(`stage_${s}`)} — ${t(`status_${st}`)}`}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg p-2 text-start transition-colors",
-                      activeStage
-                        ? "bg-panel text-heading shadow-neu-inset"
-                        : "text-mutedtext hover:text-heading",
-                      collapsed.left && "justify-center"
-                    )}
-                  >
-                    <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-surface shadow-neu-sm">
-                      <Icon
-                        className={cn(
-                          "h-4 w-4",
-                          st === "locked" ? "text-faint" : "text-cobalt"
-                        )}
-                        strokeWidth={1.6}
-                      />
-                      {collapsed.left && (
-                        <span
-                          className={cn(
-                            "absolute -top-0.5 h-2 w-2 rounded-full ring-2 ring-surface",
-                            isRtl ? "-start-0.5" : "-end-0.5",
-                            STATUS_DOT[st]
-                          )}
-                        />
-                      )}
-                    </span>
-                    {!collapsed.left && (
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-baseline gap-1.5 text-sm font-semibold">
-                          {t(`stage_${s}`)}
-                          <span className="font-mono text-[10px] font-medium text-faint">
-                            {String(i + 1).padStart(2, "0")}
-                          </span>
-                        </span>
-                        <span
-                          className={cn(
-                            "mt-0.5 flex items-center gap-1 text-[11px] font-medium",
-                            STATUS_TEXT[st]
-                          )}
-                        >
-                          {st === "complete" && <Check className="h-3 w-3" />}
-                          {st === "needs" && <CircleAlert className="h-3 w-3" />}
-                          {st === "locked" && <Lock className="h-3 w-3" />}
-                          {t(`status_${st}`)}
-                        </span>
-                      </span>
-                    )}
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-
-          {!collapsed.left && (
-            <div className="neu-inset mt-3 space-y-3 p-4">
-              <div>
-                <p className="text-xs font-bold text-heading">{t("readinessTitle")}</p>
-                <p className="mt-0.5 text-[11px] text-mutedtext">{t("readinessSub")}</p>
-              </div>
-              <ul className="space-y-1.5">
-                {GROUPS.map((g) => {
-                  const rs = ready.requirements.filter((r) => r.group === g);
-                  const ok = rs.filter((r) => r.satisfied).length;
-                  const done = ok === rs.length;
-                  return (
-                    <li key={g}>
-                      <button
-                        type="button"
-                        onClick={() => goToStage(GROUP_STAGE[g])}
-                        className={cn(
-                          "flex w-full items-center gap-2 text-start text-[11.5px] transition-colors hover:text-cobalt",
-                          done ? "text-heading" : "text-mutedtext"
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "grid h-4 w-4 shrink-0 place-items-center rounded-full",
-                            done ? "bg-buy-bg text-buy" : "bg-surface text-faint shadow-neu-sm"
-                          )}
-                        >
-                          {done && <Check className="h-2.5 w-2.5" />}
-                        </span>
-                        <span className="min-w-0 flex-1">{t(`ready_${g}`)}</span>
-                        {rs.length > 1 && (
-                          <span className="font-mono text-[10px] tabular-nums text-faint">
-                            {ok}/{rs.length}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+          <TreeNav
+            branches={bs}
+            states={states}
+            current={node}
+            collapsed={collapsed.left}
+            saveFailed={branchSaveFailed}
+            onSelect={goTo}
+            onBranch={setBranch}
+          />
 
           {!collapsed.left && drawn.length > 0 && (
             <div className="neu-inset mt-3 space-y-2 p-4">
               <p className="text-xs font-bold text-heading">{t("schHeading")}</p>
               <ul className="grid grid-cols-3 gap-2">
-                {drawn.map(({ s, rev }) => (
+                {drawn.map(({ s, rev, part }) => (
                   <li key={s.id}>
                     <button
                       type="button"
-                      onClick={() => goToStage("design", true)}
+                      onClick={() => goTo(part ? drawingsNode(part) : "mechanical.drawings")}
                       title={`${s.code} · ${s.title}`}
                       className="block w-full space-y-1 rounded-lg bg-surface p-1 shadow-neu-sm transition-shadow hover:ring-2 hover:ring-cobalt/40"
                     >
@@ -547,9 +436,9 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
           )}
         </aside>
 
-        {/* Active stage */}
+        {/* Selected node */}
         <main className="min-w-0 space-y-4">
-          {briefCleared && stage === "idea" && (
+          {briefCleared && node === "brief" && (
             <Warn
               blocking={false}
               action={
@@ -560,175 +449,130 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
             </Warn>
           )}
 
-          {locked ? (
-            <Card>
-              <div className="flex flex-col items-center gap-3 py-10 text-center">
-                <span className="grid h-14 w-14 place-items-center rounded-2xl bg-surface text-faint shadow-neu-sm">
-                  <Lock className="h-6 w-6" strokeWidth={1.5} />
-                </span>
-                <h2 className="text-lg font-extrabold tracking-tight text-heading">
-                  {t("lockedTitle", { stage: t(`stage_${stage}`) })}
-                </h2>
-                <p className="max-w-[46ch] text-sm text-mutedtext">
-                  {t(`stageDesc_${stage}`)}{" "}
-                  {current.waitingOn &&
-                    t("waitingOn", { stage: t(`stage_${current.waitingOn}`) })}
-                </p>
-                <SoftButton onClick={() => setOpenAnyway(true)}>{t("unlockAnyway")}</SoftButton>
-              </div>
-            </Card>
-          ) : (
+          {node === "brief" && (
+            // Remounts when the brief is cleared, so the editor drops its copy.
+            <IdeaStage
+              key={briefCleared ? "cleared" : "brief"}
+              project={project}
+              claims={claims}
+              onChanged={load}
+            />
+          )}
+
+          {node === "mechanical.parts" && partsStage("mechanical")}
+
+          {node === "mechanical.drawings" && (
             <>
-              {stage === "idea" && (
-                // Remounts when the brief is cleared, so the editor drops its copy.
-                <IdeaStage
-                  key={briefCleared ? "cleared" : "brief"}
-                  project={project}
-                  claims={claims}
-                  onChanged={load}
-                />
-              )}
-
-              {stage === "concepts" && (
-                <Card
-                  kicker={t("stage_concepts")}
-                  title={t("stageTitle_concepts")}
-                  intro={t("stageDesc_concepts")}
-                >
-                  <p className="max-w-[62ch] text-sm leading-relaxed text-body">
-                    {t("conceptsBody")}
-                  </p>
-                  <Link
-                    href="/design/drawing"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-                  >
-                    {t("conceptsCta")}
-                  </Link>
-                </Card>
-              )}
-
-              {stage === "parts" && (
-                <PartsStage
-                  project={project}
-                  parts={parts}
-                  onChanged={load}
-                  onGenerateSchematic={generateSchematic}
-                />
-              )}
-
-              {stage === "design" && (
-                <SchematicsStage
-                  projectId={project.id}
-                  parts={parts}
-                  schematics={schematics}
-                  onChanged={load}
-                />
-              )}
-
-              {stage === "engineering" && (
-                <Card
-                  kicker={t("stage_engineering")}
-                  title={t("stageTitle_engineering")}
-                  intro={t("stageDesc_engineering")}
-                >
-                  <p className="max-w-[62ch] text-sm leading-relaxed text-body">
-                    {t("engineeringBody")}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Link
-                      href="/design/drawing"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-                    >
-                      {t("engineeringCta")}
-                    </Link>
-                    <Link
-                      href={`/projects/${project.id}`}
-                      className="text-xs font-semibold text-mutedtext hover:text-heading"
-                    >
-                      {t("haveCad")}
-                    </Link>
-                  </div>
-                </Card>
-              )}
-
-              {stage === "manufacturing" && (
-                <Recommendation
-                  parts={parts}
-                  brief={project.brief ?? ""}
-                  accepted={routeAccepted}
-                  onAccept={acceptRoute}
-                />
-              )}
-
-              {stage === "quote" && (
-                <Card
-                  kicker={t("stage_quote")}
-                  title={t("stageTitle_quote")}
-                  intro={t("quoteIntro")}
-                >
-                  <p className="text-sm text-mutedtext">
-                    {t("quoteParts", {
-                      confirmed: partReqs.filter((r) => r.satisfied).length,
-                      total: parts.length,
-                    })}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Link
-                      href="/design/quote"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-                    >
-                      <Receipt className="h-3.5 w-3.5" />
-                      {t("requestQuote")}
-                    </Link>
-                    <span className="text-[11px] text-mutedtext">{t("quoteNote")}</span>
-                  </div>
-                </Card>
-              )}
-
-              {stage === "production" && (
-                <Card
-                  kicker={t("stage_production")}
-                  title={t("stageTitle_production")}
-                  intro={t("stageDesc_production")}
-                >
-                  <p className="text-sm text-mutedtext">{t("productionBody")}</p>
-                </Card>
-              )}
-
-              {/* Stage footer: the one forward action. */}
+              <SchematicsStage
+                projectId={project.id}
+                parts={parts}
+                schematics={schematicsOf(partsOf("mechanical"))}
+                onChanged={load}
+              />
+              {/* 3D CAD is still a human service; say so where drawings live. */}
               <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-                <button
-                  type="button"
-                  onClick={() => setShowOpen(true)}
-                  className="text-[11px] text-mutedtext transition-colors hover:text-cobalt"
+                <p className="min-w-0 flex-1 text-[12px] text-mutedtext">{t("engineeringBody")}</p>
+                <Link
+                  href="/design/drawing"
+                  className="text-xs font-semibold text-cobalt hover:text-cobalt-hover"
                 >
-                  {t("openItems", { count: open.length })}
-                </button>
-                <span className="flex-1" />
-                {following && (
-                  // Disabled buttons swallow hover in some browsers, so the
-                  // reason sits on a wrapper.
-                  <span
-                    title={
-                      blockers.length
-                        ? t("continueBlocked", {
-                            items: blockers.map((b) => b.blockingReason).join(" · "),
-                          })
-                        : undefined
-                    }
-                  >
-                    <PrimaryButton
-                      onClick={() => goToStage(following)}
-                      disabled={blockers.length > 0 || working}
-                    >
-                      {t("nextStage")}
-                      <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-                    </PrimaryButton>
-                  </span>
-                )}
+                  {t("engineeringCta")}
+                </Link>
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="text-xs font-semibold text-mutedtext hover:text-heading"
+                >
+                  {t("haveCad")}
+                </Link>
               </div>
             </>
           )}
+
+          {node === "mechanical.process" && (
+            <Recommendation
+              parts={partsOf("mechanical")}
+              brief={project.brief ?? ""}
+              accepted={routeAccepted}
+            />
+          )}
+
+          {node === "electronics.board" && (
+            <>
+              {partsStage("electronics")}
+              {schematicsOf(partsOf("electronics")).length > 0 && (
+                <SchematicsStage
+                  projectId={project.id}
+                  parts={parts}
+                  schematics={schematicsOf(partsOf("electronics"))}
+                  onChanged={load}
+                />
+              )}
+            </>
+          )}
+
+          {node === "electronics.power" && (
+            <PowerCard power={power} onEditBrief={() => goTo("brief")} />
+          )}
+
+          {node === "electronics.components" && <ComponentsCard />}
+
+          {node === "software.scope" && <ScopeCard onEditBrief={() => goTo("brief")} />}
+
+          {node === "quote" && (
+            <>
+              <Recommendation
+                parts={parts}
+                brief={project.brief ?? ""}
+                accepted={routeAccepted}
+                onAccept={acceptRoute}
+              />
+              <Card kicker={t("node_quote")} title={t("stageTitle_quote")} intro={t("quoteIntro")}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href="/design/quote"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
+                  >
+                    <Receipt className="h-3.5 w-3.5" />
+                    {t("requestQuote")}
+                  </Link>
+                  <span className="text-[11px] text-mutedtext">{t("quoteNote")}</span>
+                </div>
+              </Card>
+            </>
+          )}
+
+          {/* Footer: the one forward action. */}
+          <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              onClick={() => setShowOpen(true)}
+              className="text-[11px] text-mutedtext transition-colors hover:text-cobalt"
+            >
+              {t("openItems", { count: open.length })}
+            </button>
+            <span className="flex-1" />
+            {following && (
+              // Disabled buttons swallow hover in some browsers, so the
+              // reason sits on a wrapper.
+              <span
+                title={
+                  blockers.length
+                    ? t("continueBlocked", {
+                        items: blockers.map((b) => b.blockingReason).join(" · "),
+                      })
+                    : undefined
+                }
+              >
+                <PrimaryButton
+                  onClick={() => goTo(following)}
+                  disabled={blockers.length > 0 || working}
+                >
+                  {t("nextNode", { node: t(nodeKey(following)) })}
+                  <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
+                </PrimaryButton>
+              </span>
+            )}
+          </div>
         </main>
 
         {/* Assistant: honest about what it is */}
@@ -775,19 +619,19 @@ export function PrototypingWorkspace({ projectId }: { projectId: string }) {
               </div>
 
               <div className="flex flex-col gap-2">
-                <SoftButton onClick={() => goToStage("idea")} className="justify-start">
+                <SoftButton onClick={() => goTo("brief")} className="justify-start">
                   <Sparkles className="h-3.5 w-3.5" />
                   {t("analyse")}
                 </SoftButton>
-                <SoftButton onClick={() => goToStage("parts")} className="justify-start">
+                <SoftButton onClick={() => goTo(firstParts)} className="justify-start">
                   <Plus className="h-3.5 w-3.5" />
                   {t("addPart")}
                 </SoftButton>
-                <SoftButton onClick={() => goToStage("manufacturing")} className="justify-start">
+                <SoftButton onClick={() => goTo("quote")} className="justify-start">
                   <Factory className="h-3.5 w-3.5" />
                   {t("recHeading")}
                 </SoftButton>
-                <GhostButton onClick={() => goToStage("quote")} className="justify-start">
+                <GhostButton onClick={() => goTo("quote")} className="justify-start">
                   <Receipt className="h-3.5 w-3.5" />
                   {t("requestQuote")}
                 </GhostButton>

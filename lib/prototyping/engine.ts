@@ -12,6 +12,7 @@
 // the same return types.
 
 import {
+  type Discipline,
   isCompatible,
   PROCESS_LEAD_DAYS,
   processesFor,
@@ -37,7 +38,11 @@ export type SuggestedPart = {
   kind: SchematicKind;
 };
 
-export type Analysis = { claims: Claim[]; parts: SuggestedPart[] };
+export type Analysis = {
+  claims: Claim[];
+  parts: SuggestedPart[];
+  disciplines: Discipline[];
+};
 
 // ── Feature detection ──────────────────────────────────────────────────────
 // One regex per idea we can recognise. Anything we don't recognise simply
@@ -144,6 +149,44 @@ export const LEGACY_SUBJECT_CLAIMS = [
   "هذا هو المنتج الموصوف أعلاه — أكّد أن الملخص صحيح.",
 ];
 
+// ── Disciplines ────────────────────────────────────────────────────────────
+// Which engineering branches the product needs. A board is implied by anything
+// smart or powered; software only by something a person or system talks to.
+
+const SOFTWARE =
+  /\b(apps?|website|web\s?app|dashboard|cloud|firmware|software|online|remote(?:ly)?|api|wi-?fi|bluetooth|iot)\b/i;
+
+const MECHANICAL: Feature[] = [
+  "enclosure",
+  "mounting",
+  "precision",
+  "moving",
+  "outdoor",
+  "food",
+  "water",
+  "security",
+  "washdown",
+];
+
+export function detectDisciplines(brief: string): Discipline[] {
+  const f = detect(brief);
+  const out: Discipline[] = [];
+  if (MECHANICAL.some((k) => f.has(k))) out.push("mechanical");
+  if (f.has("electronics") || f.has("power")) out.push("electronics");
+  if (SOFTWARE.test(brief)) out.push("software");
+  return out;
+}
+
+export type PowerSource = "solar" | "battery" | "mains";
+
+/** How the brief says the product is powered, or null if it doesn't say. */
+export function powerSource(brief: string): PowerSource | null {
+  if (/\b(solar|off-?grid)\b/i.test(brief)) return "solar";
+  if (/\b(batter(y|ies)|rechargeable)\b/i.test(brief)) return "battery";
+  if (/\b(mains|plug(ged)?\s+in|wall\s+socket|2[234]0\s?v)\b/i.test(brief)) return "mains";
+  return null;
+}
+
 // ── Part breakdown ─────────────────────────────────────────────────────────
 // Each rule contributes one part when its feature fires. The catch-all at the
 // end means a brief we understood nothing from still produces something to
@@ -200,6 +243,7 @@ export function breakDown(brief: string): SuggestedPart[] {
 export const analyse = (brief: string): Analysis => ({
   claims: readBrief(brief),
   parts: breakDown(brief),
+  disciplines: detectDisciplines(brief),
 });
 
 /**

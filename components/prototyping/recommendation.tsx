@@ -32,7 +32,8 @@ export function Recommendation({
   parts: ProjectPart[];
   brief: string;
   accepted: boolean;
-  onAccept: (next: boolean) => void;
+  /** Omit to show the route without the accept action (a read-only view). */
+  onAccept?: (next: boolean) => void;
 }) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
@@ -118,6 +119,7 @@ export function Recommendation({
             </div>
           )}
 
+          {onAccept && (
           <div className="flex flex-wrap items-center gap-3 border-t border-borderstrong/40 pt-4">
             {accepted ? (
               <>
@@ -144,6 +146,7 @@ export function Recommendation({
               <span className="text-[11px] text-destructive">{t("fixFirst")}</span>
             )}
           </div>
+          )}
         </>
       )}
     </Card>

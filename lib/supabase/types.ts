@@ -1,6 +1,8 @@
 // Shared row/role types for the auth + multi-tenant layer (Stage 4).
 // Kept hand-written for now; can be replaced by generated Supabase types later.
 
+import type { DisciplineState } from "@/lib/prototyping/tree";
+
 export type Role = "super_admin" | "workshop" | "client";
 export type TenantType = "workshop" | "client";
 
@@ -138,6 +140,8 @@ export type Project = {
   brief: string | null;
   stage: string;
   stages: Record<string, string>;
+  // 0021. Absent until that migration runs, so always optional here.
+  disciplines?: DisciplineState | null;
   created_at: string;
   updated_at: string;
 };

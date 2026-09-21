@@ -87,31 +87,12 @@ export function processesFor(material: string): Process[] {
   );
 }
 
-// ── Stages ─────────────────────────────────────────────────────────────────
-// The fixed spine of the prototyping flow. Quote is deliberately near the end
-// and deliberately small: this is a product-development workspace, not a
-// checkout.
+// ── Disciplines ────────────────────────────────────────────────────────────
+// The engineering disciplines a product can need. The workspace tree shows a
+// branch per discipline the project actually needs (see ./tree).
 
-export const STAGES = [
-  "idea",
-  "concepts",
-  "parts",
-  "design",
-  "engineering",
-  "manufacturing",
-  "quote",
-  "production",
-] as const;
-export type Stage = (typeof STAGES)[number];
-
-// A stage's status is never stored: it is derived from the project's contents
-// by stageStatuses() in ./readiness, so it cannot drift from what is actually
-// there. "optional" marks the stages handled by our human design service.
-export const STAGE_STATUSES = ["locked", "needs", "progress", "complete", "optional"] as const;
-export type StageStatus = (typeof STAGE_STATUSES)[number];
-
-export const nextStage = (s: Stage): Stage | null =>
-  STAGES[STAGES.indexOf(s) + 1] ?? null;
+export const DISCIPLINES = ["mechanical", "electronics", "software"] as const;
+export type Discipline = (typeof DISCIPLINES)[number];
 
 // Schematic templates we can draw. 2D only — solid CAD stays a human service
 // at /design/drawing, so nothing here pretends to produce STEP or STL.

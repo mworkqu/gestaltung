@@ -5,8 +5,8 @@
 // The analysis is a local, synchronous function call — no network, no model,
 // no cost. It writes claims and suggested parts as rows the client then
 // confirms or corrects; it never edits anything the client already settled.
-// Stage status is not written here: it is derived from these rows by
-// lib/prototyping/readiness.
+// Nothing here writes progress: readiness and the tree derive it from these
+// rows (lib/prototyping/readiness, lib/prototyping/tree).
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -97,7 +97,7 @@ export function IdeaStage({
       // Flush the brief first, so the analysis reads what's on screen.
       if (!(await saveBrief())) throw new Error("brief not saved");
 
-      const { claims: found, parts: suggested } = analyse(brief);
+      const { claims: found, parts: suggested, disciplines } = analyse(brief);
 
       must(
         await supabase
@@ -152,6 +152,15 @@ export function IdeaStage({
         }));
       if (partRows.length)
         must(await supabase.from("project_parts").insert(partRows));
+
+      // Record which branches the brief implies. Manual branch choices sit
+      // beside this and are carried over untouched. Not checked with must():
+      // before migration 0021 the column is missing, and the tree then reads
+      // the same answer from the brief itself.
+      await supabase
+        .from("projects")
+        .update({ disciplines: { ...(project.disciplines ?? {}), detected: disciplines } })
+        .eq("id", project.id);
     } catch {
       setProblem("failed");
     }
