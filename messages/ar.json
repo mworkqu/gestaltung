@@ -228,7 +228,8 @@
     "partsOrders": "طلبات المتجر",
     "leads": "الاستفسارات",
     "sourcingGaps": "فجوات التوريد",
-    "aiUsage": "استخدام الذكاء الاصطناعي"
+    "aiUsage": "استخدام الذكاء الاصطناعي",
+    "projects": "المشاريع"
   },
   "Admin": {
     "kicker": "مركز التحكم",
@@ -1242,5 +1243,34 @@
     "kind_electronics": "إلكترونيات",
     "kind_mechanical": "ميكانيكا",
     "kind_consumable": "مستهلكات"
+  },
+  "AdminProjects": {
+    "kicker": "الإدارة",
+    "title": "المشاريع",
+    "intro": "كل مشاريع المنصة لأغراض التشخيص. نزّل مشروعًا أو انسخه بصيغة JSON — بكل ما يحتويه، بما في ذلك ردود التحليل الخام. لا يُحذف سوى مفاتيح API.",
+    "filterOwner": "المالك",
+    "allOwners": "كل المالكين ({count} مشروعًا)",
+    "apply": "تصفية",
+    "error": "تعذّر تحميل المشاريع.",
+    "colProject": "المشروع",
+    "colOwner": "المالك",
+    "colCreated": "تاريخ الإنشاء",
+    "colStatus": "الحالة",
+    "colActivity": "آخر نشاط",
+    "colExport": "التصدير",
+    "download": "تنزيل JSON",
+    "copy": "نسخ كـ JSON",
+    "copied": "تم النسخ",
+    "copyFailed": "تعذّر النسخ",
+    "guest": "زائر (بلا حساب)",
+    "unknownOwner": "مالك غير معروف",
+    "empty": "لا توجد مشاريع.",
+    "noServiceKey": "عناوين البريد تحتاج SUPABASE_SERVICE_ROLE_KEY على هذا الخادم؛ تُعرض الأسماء من الملفات الشخصية بدلًا منها.",
+    "status_empty": "لا يوجد وصف بعد",
+    "status_brief_written": "الوصف مكتوب، لم يُحلَّل",
+    "status_analysed": "حُلِّل، لم يُؤكَّد",
+    "status_understanding_confirmed": "الفهم مؤكَّد",
+    "status_bom_ready": "قائمة المواد جاهزة",
+    "status_circuit_generated": "الدائرة مستخلصة"
   }
 }

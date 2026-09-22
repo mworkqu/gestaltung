@@ -11,7 +11,8 @@ export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flas
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const TIMEOUT_MS = 25_000;
 
-export type GeminiResult = { raw: unknown; usage?: TokenUsage; model: string; latencyMs: number };
+/** raw = the parsed JSON; rawText = the provider's reply exactly as received. */
+export type GeminiResult = { raw: unknown; rawText: string; usage?: TokenUsage; model: string; latencyMs: number };
 
 export const geminiConfigured = () => Boolean(process.env.GEMINI_API_KEY?.trim());
 
@@ -25,8 +26,8 @@ export async function callGemini(opts: {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) throw new ProviderError("missing_key");
   const started = Date.now();
-  const fail = (reason: ConstructorParameters<typeof ProviderError>[0], detail: string, usage?: TokenUsage) =>
-    Object.assign(new ProviderError(reason, detail), { usage, latencyMs: Date.now() - started, model: GEMINI_MODEL });
+  const fail = (reason: ConstructorParameters<typeof ProviderError>[0], detail: string, usage?: TokenUsage, rawText?: string) =>
+    Object.assign(new ProviderError(reason, detail), { usage, rawText, latencyMs: Date.now() - started, model: GEMINI_MODEL });
 
   let res: Response;
   try {
@@ -49,10 +50,17 @@ export async function callGemini(opts: {
     throw fail("unavailable", e instanceof Error ? e.message : String(e));
   }
 
-  if (res.status === 429) throw fail("rate_limited", "HTTP 429");
-  if (!res.ok) throw fail("unavailable", `HTTP ${res.status}`);
+  if (res.status === 429) throw fail("rate_limited", "HTTP 429", undefined, await res.text().catch(() => ""));
+  if (!res.ok) throw fail("unavailable", `HTTP ${res.status}`, undefined, await res.text().catch(() => ""));
 
-  const body = (await res.json().catch(() => null)) as {
+  const bodyText = await res.text();
+  const body = (() => {
+    try {
+      return JSON.parse(bodyText);
+    } catch {
+      return null;
+    }
+  })() as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
   } | null;
@@ -67,9 +75,9 @@ export async function callGemini(opts: {
 
   const text = body?.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
   try {
-    return { raw: JSON.parse(text), usage, model: GEMINI_MODEL, latencyMs: Date.now() - started };
+    return { raw: JSON.parse(text), rawText: text, usage, model: GEMINI_MODEL, latencyMs: Date.now() - started };
   } catch {
-    // Still report what the failed call cost.
-    throw fail("malformed", "response was not JSON", usage);
+    // Still report what the failed call cost, and what it actually said.
+    throw fail("malformed", "response was not JSON", usage, text || bodyText);
   }
 }

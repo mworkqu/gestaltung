@@ -14,6 +14,8 @@ export type ProviderResult = {
   usage?: TokenUsage;
   model?: string;
   latencyMs?: number;
+  /** The provider's reply exactly as received, for the diagnostic record. */
+  rawText?: string;
 };
 
 export interface AnalysisProvider {

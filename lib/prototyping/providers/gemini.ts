@@ -111,7 +111,7 @@ Brief:
 ${brief}
 """`;
     const r = await callGemini({ system: SYSTEM, prompt, schema: RESPONSE_SCHEMA });
-    return { raw: r.raw, usage: r.usage, model: r.model, latencyMs: r.latencyMs };
+    return { raw: r.raw, rawText: r.rawText, usage: r.usage, model: r.model, latencyMs: r.latencyMs };
   },
 };
 

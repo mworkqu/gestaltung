@@ -594,6 +594,23 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
       28,800 audio s/day. At the threshold: analyse → basic reader with fallback "paused"; netlist → 429
       paused; transcribe → paused (live dictation still works). Admin /dashboard/usage: today per provider,
       per feature, 30-day calls chart, per-project totals.
+  - PART 3 TASK 11 (2026-09-22): diagnostics. MIGRATION 0024_project_diagnostics.sql (RUN AFTER 0023):
+    analysis_runs (raw_text + raw_response beside parsed_response, per attempt; written by /api/analyse and
+    /api/netlist) and project_events (event log filled ONLY by triggers on projects / project_parts /
+    analysis_runs: brief edits, answers, confirmation, branches, BOM updates + product picks, circuit,
+    route, parts added/edited/confirmed/removed, runs). Both readable by owner + super_admin.
+    Admin /dashboard/projects (super_admin layout): all projects, owner (email via service key when set),
+    created, status (lib/admin/project-export.ts projectStatus), last activity, ?user= filter; per row
+    Download JSON + Copy as JSON (components/admin/project-export-buttons.tsx) → GET
+    /api/admin/projects/<id>/export (role checked in the route; buildProjectExport reuses the page's own
+    readiness/matcher/checks/drawings; redactKeys strips only API keys; `_notes` says what couldn't be
+    read). BOM matching shared via lib/prototyping/bom-server.ts. Dev-only hook EXPORT_DEV_OWNER=1 lets a
+    project owner export locally (never in production).
+    FIRST REAL EXPORT FINDINGS: the analysis writes BOM `function` as a verb phrase ("Stores energy
+    collected from the solar panel") and the text matcher accepts one generic shared word, so it matched
+    a Tempered Glass Panel (QAR 425) as a battery and diodes as fasteners; the store sheet has duplicate
+    products (GR-024/034/044, GR-028/038); rules suggestSpec gave stainless_304 + laser cutting to an
+    "Aluminium enclosure". To fix in Tasks 13/14 (or sooner if the owner asks).
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -641,7 +658,9 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0022_prototyping_spec_and_sources.sql — projects.spec + project_parts source/kind/catalog columns (RUN ✔ —
   confirmed 2026-09-22 by a live analysis saving spec + parts)
 - 0023_bom_netlist_drawings_usage.sql — projects.bom/netlist, part dimensions, parts.tags, sourcing_gaps,
-  ai_usage + RPCs (RUN AFTER 0022; BOM, circuit, dimension saving and metering need it)
+  ai_usage + RPCs (RUN ✔ — confirmed 2026-09-22)
+- 0024_project_diagnostics.sql — analysis_runs + project_events + event triggers (RUN AFTER 0023; the
+  export's raw responses and event log are empty until it runs)
 
 ## PERMANENT NOTES
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in

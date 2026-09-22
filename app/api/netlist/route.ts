@@ -90,6 +90,26 @@ Rules:
 
 type Attempt = { netlist: Netlist | null; errors: string[] };
 
+/** One row per attempt in analysis_runs (0024): raw reply beside the validated result. */
+async function recordRun(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  row: { projectId: string; model: string | null; attempt: number; rawText: string | null; raw: unknown; netlist: Netlist | null; outcome: "ok" | "invalid" | "error"; errors: string[] }
+) {
+  const { error } = await supabase.from("analysis_runs").insert({
+    project_id: row.projectId,
+    feature: "netlist",
+    provider: "gemini",
+    model: row.model,
+    attempt: row.attempt,
+    raw_text: row.rawText,
+    raw_response: row.raw ?? null,
+    parsed_response: row.netlist,
+    outcome: row.outcome,
+    error: row.errors.length ? row.errors.join("\n") : null,
+  });
+  if (error) console.warn(`[netlist] run not recorded (migration 0024?): ${error.message}`);
+}
+
 function validate(raw: unknown, bomIds: string[]): Attempt {
   const shaped = NetlistSchema.safeParse(raw);
   if (!shaped.success)
@@ -160,17 +180,23 @@ Your previous answer was rejected for these problems. Return a corrected netlist
 ${last.errors.map((e) => `- ${e}`).join("\n")}`;
     let usage: TokenUsage | undefined;
     let latencyMs: number | undefined;
+    let rawText: string | null = null;
+    let raw: unknown = null;
     try {
       const r = await callGemini({ system: SYSTEM, prompt, schema: SCHEMA, temperature: 0.1 });
       ({ usage, latencyMs } = r);
+      rawText = r.rawText;
+      raw = r.raw;
       model = r.model;
       last = validate(r.raw, bomIds);
     } catch (e) {
-      const err = e as ProviderError & { usage?: TokenUsage; latencyMs?: number };
+      const err = e as ProviderError & { usage?: TokenUsage; latencyMs?: number; rawText?: string };
       usage = err.usage;
       latencyMs = err.latencyMs;
+      rawText = err.rawText ?? null;
       last = { netlist: null, errors: [err.reason === "malformed" ? "the answer was not valid JSON" : err.message] };
       if (e instanceof ProviderError && e.reason !== "malformed") {
+        await recordRun(supabase, { projectId, model, attempt: attempt + 1, rawText, raw: null, netlist: null, outcome: "error", errors: last.errors });
         await logUsage(supabase, {
           provider: "gemini",
           model,
@@ -197,6 +223,16 @@ ${last.errors.map((e) => `- ${e}`).join("\n")}`;
       latencyMs,
       outcome: last.netlist ? "ok" : "error",
       errorCode: last.netlist ? null : "invalid",
+    });
+    await recordRun(supabase, {
+      projectId,
+      model,
+      attempt: attempt + 1,
+      rawText,
+      raw,
+      netlist: last.netlist,
+      outcome: last.netlist ? "ok" : "invalid",
+      errors: last.errors,
     });
     if (last.netlist) break;
     console.warn(`[netlist] attempt ${attempt + 1} rejected: ${last.errors.join("; ")}`);

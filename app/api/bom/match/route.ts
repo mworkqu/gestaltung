@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { matchLine, type InventoryRow } from "@/lib/prototyping/bom-match";
-import type { Candidate, LineMatch, ProjectBom } from "@/lib/prototyping/bom";
+import type { ProjectBom } from "@/lib/prototyping/bom";
+import { matchProjectBom } from "@/lib/prototyping/bom-server";
 
 // Matches a project's bill of materials against the store and the caller's
 // own inventory. Server-side so the whole catalogue never ships to the
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   // RLS: only the owner (or super_admin) gets the row.
   const { data: project, error } = await supabase
     .from("projects")
-    .select("id, bom")
+    .select("id, user_id, bom")
     .eq("id", projectId)
     .maybeSingle();
   if (error) return Response.json({ error: "not_ready" }, { status: 409 });
@@ -35,24 +35,7 @@ export async function POST(request: Request) {
   const bom = (project as { bom?: ProjectBom | null }).bom;
   if (!bom?.lines?.length) return Response.json({ matches: [] });
 
-  const [catRes, invRes] = await Promise.all([
-    supabase.from("parts").select("*").eq("is_published", true).limit(5000),
-    supabase
-      .from("client_inventory_items")
-      .select("product_id, custom_name, quantity, part:parts(name)")
-      .eq("user_id", user.id),
-  ]);
-  const catalogue = (catRes.data ?? []) as Candidate[];
-  type InvRow = { product_id: string | null; custom_name: string | null; quantity: number; part: { name: string } | null };
-  const inv = (invRes.data ?? []) as unknown as InvRow[];
-  const inventory: InventoryRow[] = inv.map((r) => ({
-    productId: r.product_id,
-    customName: r.custom_name,
-    quantity: r.quantity,
-  }));
-  const inventoryNames = new Map(inv.filter((r) => r.product_id).map((r) => [r.product_id!, r.part?.name ?? ""]));
-
-  const matches: LineMatch[] = bom.lines.map((l) => matchLine(l, catalogue, inventory, inventoryNames));
+  const matches = await matchProjectBom(supabase, bom, project.user_id as string);
 
   const gaps = bom.lines.filter((l, i) => matches[i].status === "not_stocked");
   const logged = await Promise.all(
@@ -67,7 +50,7 @@ export async function POST(request: Request) {
     )
   );
   const failed = logged.find((r) => r.error);
-  if (failed) console.warn(`[bom] sourcing gap not logged (run migration 0023?): ${failed.error!.message}`);
+  if (failed) console.warn(`[bom] sourcing gap not logged: ${failed.error!.message}`);
 
   return Response.json({ matches });
 }

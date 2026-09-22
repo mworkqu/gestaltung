@@ -37,6 +37,7 @@ export default async function DashboardLayout({
     // Parts catalog, orders + website leads are super_admin only.
     ...(isSuperAdmin
       ? [
+          { href: "/dashboard/projects", label: t("projects") },
           { href: "/dashboard/leads", label: t("leads") },
           { href: "/dashboard/store/orders", label: t("partsOrders") },
           { href: "/dashboard/store", label: t("partsCatalog") },

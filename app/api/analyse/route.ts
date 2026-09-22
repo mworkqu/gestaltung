@@ -32,7 +32,9 @@ import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/type
 // downgrade. So does the daily guard (lib/ai): at the configured share of the
 // free allowance the provider is not called at all ("paused").
 //
-// Every provider call is recorded in ai_usage (lib/ai/usage).
+// Every provider call is recorded in ai_usage (lib/ai/usage), and every run's
+// raw reply beside its parsed result in analysis_runs (0024) — so a wrong
+// answer can be traced to the model or to our parsing.
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +70,9 @@ export async function POST(request: Request) {
       let model: string | undefined;
       let usage: TokenUsage | undefined;
       let latencyMs: number | undefined;
+      let rawText: string | undefined;
+      let rawJson: unknown;
+      let errorText: string | null = null;
       try {
         const provider = await loadProvider(name);
         if (!provider) throw new ProviderError("unavailable", `unknown provider "${name}"`);
@@ -76,7 +81,8 @@ export async function POST(request: Request) {
 
         called = true;
         const result = await provider.analyse(req);
-        ({ model, usage, latencyMs } = result);
+        ({ model, usage, latencyMs, rawText } = result);
+        rawJson = result.raw;
         const raw = (result.raw ?? {}) as Record<string, unknown>;
 
         if (!DisciplinesSchema.safeParse(raw.disciplines).success)
@@ -93,7 +99,9 @@ export async function POST(request: Request) {
         analysis = full.data;
       } catch (e) {
         fallback = e instanceof ProviderError ? e.reason : "unavailable";
-        const err = e as { usage?: TokenUsage; latencyMs?: number; model?: string };
+        const err = e as { usage?: TokenUsage; latencyMs?: number; model?: string; rawText?: string };
+        rawText ??= err.rawText;
+        errorText = `${fallback}: ${e instanceof Error ? e.message : String(e)}`;
         usage ??= err.usage;
         latencyMs ??= err.latencyMs;
         model ??= err.model;
@@ -122,9 +130,24 @@ export async function POST(request: Request) {
           send({ type: "step", step: "disciplines" });
           send({ type: "step", step: "requirements" });
         }
+        const final = withStandardGaps(analysis);
+        if (req.projectId) {
+          const { error: runErr } = await supabase.from("analysis_runs").insert({
+            project_id: req.projectId,
+            feature: "analyse",
+            provider: called ? name : usedProvider,
+            model: model ?? null,
+            raw_text: rawText ?? null,
+            raw_response: rawJson ?? null,
+            parsed_response: final,
+            outcome: usedProvider === name ? "ok" : "fallback",
+            error: errorText,
+          });
+          if (runErr) console.warn(`[analyse] run not recorded (migration 0024?): ${runErr.message}`);
+        }
         send({
           type: "result",
-          analysis: withStandardGaps(analysis),
+          analysis: final,
           provider: usedProvider,
           fallback: usedProvider === name ? null : fallback,
         });

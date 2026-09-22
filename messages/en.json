@@ -228,7 +228,8 @@
     "partsOrders": "Store orders",
     "leads": "Leads",
     "sourcingGaps": "Sourcing gaps",
-    "aiUsage": "AI usage"
+    "aiUsage": "AI usage",
+    "projects": "Projects"
   },
   "Admin": {
     "kicker": "Command center",
@@ -1242,5 +1243,34 @@
     "kind_electronics": "Electronics",
     "kind_mechanical": "Mechanical",
     "kind_consumable": "Consumable"
+  },
+  "AdminProjects": {
+    "kicker": "Admin",
+    "title": "Projects",
+    "intro": "Every project on the platform, for diagnostics. Download or copy one project as JSON — everything it holds, including the raw analysis replies. Only API keys are removed.",
+    "filterOwner": "Owner",
+    "allOwners": "All owners ({count} projects)",
+    "apply": "Filter",
+    "error": "Projects couldn't be loaded.",
+    "colProject": "Project",
+    "colOwner": "Owner",
+    "colCreated": "Created",
+    "colStatus": "Status",
+    "colActivity": "Last activity",
+    "colExport": "Export",
+    "download": "Download JSON",
+    "copy": "Copy as JSON",
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "guest": "Guest (no account)",
+    "unknownOwner": "Unknown owner",
+    "empty": "No projects.",
+    "noServiceKey": "Owner emails need SUPABASE_SERVICE_ROLE_KEY on this server; names from profiles are shown instead.",
+    "status_empty": "No brief yet",
+    "status_brief_written": "Brief written, not analysed",
+    "status_analysed": "Analysed, not confirmed",
+    "status_understanding_confirmed": "Understanding confirmed",
+    "status_bom_ready": "Bill of materials ready",
+    "status_circuit_generated": "Circuit generated"
   }
 }
