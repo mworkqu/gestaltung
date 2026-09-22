@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 
+import { BOM_KINDS } from "./analysis";
 import { DISCIPLINES, MAX_BRIEF_CHARS } from "./constants";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -42,6 +43,23 @@ export const AnalysisSchema = RequirementsSchema.extend({
   suggestedParts: z
     .array(z.object({ name: text(80), kind, note: z.string().trim().max(300) }))
     .max(20),
+  // Function and spec only. z.object() drops any sku / price / brand a model
+  // adds, so nothing but these six fields can ever reach the UI.
+  bom: z
+    .array(
+      z.object({
+        id,
+        function: text(80),
+        spec: z.string().trim().max(200),
+        quantity: z.coerce.number().int().min(1).max(10000),
+        kind: z.enum(BOM_KINDS),
+        critical: z.boolean(),
+      })
+    )
+    .max(40)
+    .default([])
+    // Ids must be unique: choices and the netlist refer to lines by id.
+    .transform((lines) => lines.filter((l, i) => lines.findIndex((x) => x.id === l.id) === i)),
 });
 
 export const AnalysisRequestSchema = z.object({
@@ -50,4 +68,5 @@ export const AnalysisRequestSchema = z.object({
     .array(z.object({ id, label: text(120), value: z.string().max(200).nullable() }))
     .max(30),
   locale: z.enum(["en", "ar"]),
+  projectId: z.string().uuid().optional(),
 });

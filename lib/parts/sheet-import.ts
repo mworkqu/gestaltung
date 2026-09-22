@@ -20,6 +20,8 @@ export type SheetPart = {
   stock_status: StockStatus;
   image_url: string | null;
   is_published: boolean;
+  /** Matcher keywords (migration 0023). Only sent when the sheet has the column. */
+  tags?: string[];
 };
 
 export type SkippedRow = { row: number; sku: string; reason: string };
@@ -56,6 +58,8 @@ const HEADER_ALIASES: Record<string, string> = {
   stock: "stock_status",
   availability: "stock_status",
   image_url: "image_url",
+  tags: "tags",
+  keywords: "tags",
   image: "image_url",
   photo: "image_url",
   is_published: "is_published",
@@ -237,6 +241,18 @@ export function parseSheet(text: string): SheetParseResult {
       image_url: cleanImageUrl(opt(r, "image_url")),
       // Default to published so a freshly filled sheet shows up in the store.
       is_published: parseBool(cell(r, "is_published"), true),
+      // Comma- or semicolon-separated, e.g. "servo, 5v, 3kg". Only included
+      // when the column exists, so a sheet without it still imports into a
+      // database that has not run 0023.
+      ...("tags" in colIndex
+        ? {
+            tags: cell(r, "tags")
+              .split(/[,;،]/)
+              .map((x) => x.trim().toLowerCase())
+              .filter(Boolean)
+              .slice(0, 30),
+          }
+        : {}),
     });
   });
 
@@ -258,4 +274,5 @@ export const SHEET_COLUMNS = [
   { key: "stock_status", required: false },
   { key: "image_url", required: false },
   { key: "is_published", required: false },
+  { key: "tags", required: false },
 ] as const;

@@ -25,7 +25,9 @@ import {
   processesFor,
   type Discipline,
 } from "@/lib/prototyping/constants";
-import { partNeeds } from "@/lib/prototyping/parts";
+import { KEEPABLE_NEEDS, partNeeds } from "@/lib/prototyping/parts";
+import { REQUIRED, SHAPES, effectiveShape, type Dim } from "@/lib/prototyping/dimension-drawing";
+import { dimFocus } from "@/components/prototyping/dimension-drawings";
 import { Tag } from "@/components/ui/tag";
 import { CreatePartDialog } from "@/components/prototyping/part-dialogs";
 import {
@@ -47,7 +49,7 @@ export function PartsStage({
   nextIndex,
   designNode,
   onChanged,
-  onGenerateSchematic,
+  onOpenDrawing,
 }: {
   projectId: string;
   kind: Discipline;
@@ -60,7 +62,8 @@ export function PartsStage({
   /** The design leaf's name, for the empty Concepts state. */
   designNode: string;
   onChanged: () => Promise<void>;
-  onGenerateSchematic: (part: ProjectPart) => void;
+  /** Mechanical parts: go to the part's dimension drawing. */
+  onOpenDrawing?: (part: ProjectPart) => void;
 }) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
@@ -68,7 +71,7 @@ export function PartsStage({
   const [creating, setCreating] = useState(false);
   const concepts = view === "concepts";
 
-  const pending = parts.filter((p) => p.status === "suggested" && partNeeds(p).every((n) => n === "confirm"));
+  const pending = parts.filter((p) => p.status === "suggested" && partNeeds(p).every((n) => KEEPABLE_NEEDS.includes(n)));
 
   async function patch(part: ProjectPart, changes: Partial<ProjectPart>) {
     setBusy(true);
@@ -142,7 +145,7 @@ export function PartsStage({
           {parts.map((part) => {
             const needs = partNeeds(part);
             const edited = part.status === "edited" && part.ai_material && part.ai_process;
-            const canConfirm = needs.every((n) => n === "confirm");
+            const canConfirm = needs.every((n) => KEEPABLE_NEEDS.includes(n));
             return (
               <li key={part.id} className="flex flex-col gap-3 rounded-2xl bg-panel p-4 shadow-neu-sm">
                 <div className="flex flex-wrap items-center gap-2">
@@ -209,6 +212,58 @@ export function PartsStage({
                         ))}
                       </select>
                     </label>
+                  </div>
+                )}
+
+                {kind === "mechanical" && !concepts && (
+                  <div className="space-y-2 rounded-xl bg-surface/60 p-3">
+                    <label className="flex min-w-0 flex-col gap-1">
+                      <span className="text-[9px] uppercase tracking-wider text-faint">{t("dimShape")}</span>
+                      {part.process === "laser_cutting" ? (
+                        <span className="text-[12px] text-heading">{t("shape_sheet_laser")}</span>
+                      ) : (
+                        <select
+                          id={dimFocus(part.id, "shape")}
+                          value={part.shape ?? ""}
+                          onChange={(e) => void patch(part, { shape: e.target.value || null })}
+                          className={cn(selectClass, "w-full")}
+                        >
+                          <option value="">{t("unset")}</option>
+                          {SHAPES.map((sh) => (
+                            <option key={sh} value={sh}>
+                              {t(`shape_${sh}`)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </label>
+                    {effectiveShape(part) && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {REQUIRED[effectiveShape(part)!].map((d: Dim) => (
+                          <label key={d} className="flex min-w-0 flex-col gap-1">
+                            <span className="truncate text-[9px] uppercase tracking-wider text-faint">
+                              {t(`dim_${d}`)} (mm)
+                            </span>
+                            <input
+                              id={dimFocus(part.id, d)}
+                              type="number"
+                              inputMode="decimal"
+                              min={0}
+                              step="any"
+                              defaultValue={part[d] ?? ""}
+                              onBlur={(e) => {
+                                const v = e.target.value.trim();
+                                const n = v === "" ? null : Number(v);
+                                if (n !== null && !(n > 0)) return;
+                                if (n !== (part[d] == null ? null : Number(part[d]))) void patch(part, { [d]: n });
+                              }}
+                              className={cn(fieldClass, "py-1.5 text-[13px] tabular-nums")}
+                              dir="ltr"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -295,10 +350,10 @@ export function PartsStage({
                       {t("dropConcept")}
                     </SoftButton>
                   )}
-                  {!concepts && kind !== "software" && (
-                    <SoftButton onClick={() => onGenerateSchematic(part)} className="bg-surface">
+                  {!concepts && kind === "mechanical" && onOpenDrawing && (
+                    <SoftButton onClick={() => onOpenDrawing(part)} className="bg-surface">
                       <Ruler className="h-3 w-3" />
-                      {t("generate")}
+                      {t("openDrawing")}
                     </SoftButton>
                   )}
                 </div>

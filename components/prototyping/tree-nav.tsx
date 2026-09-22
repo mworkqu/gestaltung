@@ -8,7 +8,7 @@
 // uses logical properties (ms-/ps-/border-s) so the tree mirrors in Arabic.
 
 import { useTranslations } from "next-intl";
-import { Cpu, Factory, Layers, Lightbulb, Plus, Receipt, SquareCode, Wrench, X } from "lucide-react";
+import { ClipboardList, Cpu, Factory, Layers, Lightbulb, Plus, Receipt, SquareCode, Wrench, X } from "lucide-react";
 
 import type { Discipline } from "@/lib/prototyping/constants";
 import {
@@ -70,6 +70,7 @@ export function TreeNav({
     const top: { id: string; icon: typeof Wrench; to: NodeId; open: number; label: string }[] = [
       { id: "brief", icon: Lightbulb, to: "brief", open: openAt("brief"), label: t("node_brief") },
       { id: "parts", icon: Layers, to: "parts", open: openAt("parts"), label: t("node_parts") },
+      { id: "bom", icon: ClipboardList, to: "bom", open: openAt("bom"), label: t("node_bom") },
       ...active.map((b) => ({
         id: b.discipline,
         icon: BRANCH_ICON[b.discipline],
@@ -146,6 +147,9 @@ export function TreeNav({
         </li>
         <li>
           <Node n="parts" icon={Layers} />
+        </li>
+        <li>
+          <Node n="bom" icon={ClipboardList} />
         </li>
 
         {active.map((b) => {

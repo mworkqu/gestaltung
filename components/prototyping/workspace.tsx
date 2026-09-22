@@ -46,7 +46,8 @@ import {
   visibleNodes,
   type NodeId,
 } from "@/lib/prototyping/tree";
-import type { Discipline, SchematicKind } from "@/lib/prototyping/constants";
+import type { Discipline } from "@/lib/prototyping/constants";
+import type { LineMatch, ProjectBom } from "@/lib/prototyping/bom";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
 import { PartsList } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
@@ -54,23 +55,17 @@ import { AddExistingDialog } from "@/components/prototyping/part-dialogs";
 import { Recommendation } from "@/components/prototyping/recommendation";
 import {
   SchematicsStage,
-  createRevision,
   latestReady,
   type SchematicWithRevs,
 } from "@/components/prototyping/schematics-stage";
+import { BomTable } from "@/components/prototyping/bom-table";
+import { DimensionDrawings } from "@/components/prototyping/dimension-drawings";
+import { NetlistView } from "@/components/prototyping/netlist-view";
 import { TreeNav } from "@/components/prototyping/tree-nav";
 import { ComponentsCard, PowerCard } from "@/components/prototyping/discipline-cards";
 import { Card, GhostButton, PrimaryButton, Warn, useMono } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
 import type { Project, ProjectPart, ProjectSchematicRevision } from "@/lib/supabase/types";
-
-/** Which 2D template suits a part, from the process it is made by. */
-function kindFor(part: ProjectPart): SchematicKind {
-  if (part.process === "pcb_manufacturing") return "block_diagram";
-  if (part.process === "laser_cutting") return "flat_pattern";
-  if (part.process === "cnc_machining") return "bracket";
-  return "outline";
-}
 
 /** Where a part's drawings are shown. */
 const drawingsNode = (p: ProjectPart): NodeId =>
@@ -98,13 +93,32 @@ export function PrototypingWorkspace({
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [collapsed, setCollapsed] = useState({ left: false, right: false });
-  const [working, setWorking] = useState(false);
   const [showOpen, setShowOpen] = useState(false);
   const [briefCleared, setBriefCleared] = useState(false);
   const [branchSaveFailed, setBranchSaveFailed] = useState(false);
   const [specSaveFailed, setSpecSaveFailed] = useState(false);
   const [addingExisting, setAddingExisting] = useState(false);
+  // Live store matches for the bill of materials, by line id (/api/bom/match).
+  const [matches, setMatches] = useState<Map<string, LineMatch>>(new Map());
+  const [matchState, setMatchState] = useState<"idle" | "loading" | "failed">("idle");
   const specTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadMatches = useCallback(async () => {
+    setMatchState("loading");
+    try {
+      const res = await fetch("/api/bom/match", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ projectId }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { matches: list } = (await res.json()) as { matches: LineMatch[] };
+      setMatches(new Map(list.map((m) => [m.lineId, m])));
+      setMatchState("idle");
+    } catch {
+      setMatchState("failed");
+    }
+  }, [projectId]);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -129,6 +143,7 @@ export function PrototypingWorkspace({
       setBriefCleared(true);
     }
     setProject(loaded);
+    if (loaded.bom?.lines?.length) void loadMatches();
 
     const [partRes, schRes] = await Promise.all([
       supabase
@@ -164,7 +179,7 @@ export function PrototypingWorkspace({
     }
 
     setLoading(false);
-  }, [projectId]);
+  }, [projectId, loadMatches]);
 
   useEffect(() => {
     void load();
@@ -195,7 +210,11 @@ export function PrototypingWorkspace({
   const spec = project.spec ?? null;
   const routeAccepted = project.stages?.manufacturing === "complete";
   const tr = (k: string, p?: Record<string, string | number>) => t(k, p);
-  const ready = projectReadiness({ brief: project.brief, spec, parts, routeAccepted }, tr);
+  const bom: ProjectBom | null = project.bom?.lines ? project.bom : null;
+  const ready = projectReadiness(
+    { brief: project.brief, spec, parts, routeAccepted, bom: bom ? { lines: bom.lines, matches } : null },
+    tr
+  );
   const bs = branches(project.disciplines, project.brief, parts);
   const visible = visibleNodes(bs);
   const states = nodeStates(ready, parts, spec, visible, tr);
@@ -265,24 +284,46 @@ export function PrototypingWorkspace({
     });
   }
 
-  /** Draw a first schematic for a part, then show it. */
-  async function generateSchematic(part: ProjectPart) {
-    setWorking(true);
-    const existing = schematics.find((s) => s.part_id === part.id) ?? null;
-    await createRevision({
-      schematic: existing,
-      part,
-      code: existing?.code ?? `SCH-${String(schematics.length + 1).padStart(2, "0")}`,
-      title: part.name,
-      kind: kindFor(part),
-      materialLabel: part.material ? tProj(`material_${part.material}`) : "—",
-      projectId: project!.id,
-      errorText: (k, p) => t(k, p),
-    });
-    await goTo(drawingsNode(part));
-    await load();
-    setWorking(false);
+  /** Saves the client's pick for a BOM line; it survives re-analysis. */
+  async function chooseProduct(lineId: string, productId: string | null) {
+    if (!bom) return;
+    const next: ProjectBom = {
+      ...bom,
+      lines: bom.lines.map((l) => (l.id === lineId ? { ...l, choice: productId } : l)),
+    };
+    await patchProject({ bom: next });
+    await loadMatches();
   }
+
+  const bomTable = (kind: "all" | "electronics" | "mechanical") => {
+    const lines = (bom?.lines ?? []).filter((l) => kind === "all" || l.kind === kind);
+    if (kind !== "all" && !lines.length) return null;
+    return (
+      <BomTable
+        projectId={project.id}
+        lines={lines}
+        matches={matches}
+        loading={matchState === "loading"}
+        failed={matchState === "failed"}
+        onChoose={chooseProduct}
+        kicker={kind === "all" ? t("node_bom") : t(`discipline_${kind}`)}
+        title={kind === "all" ? t("bomTitle") : t(`bomTitle_${kind}`)}
+        intro={kind === "all" ? t("bomIntro") : t("bomBranchIntro")}
+        showTotal={kind === "all"}
+      />
+    );
+  };
+
+  /** Earlier template drawings stay viewable; new drawings are dimension-based. */
+  const earlier = (ps: ProjectPart[]) =>
+    schematicsOf(ps).length > 0 && (
+      <details className="neu px-4 py-3 sm:px-6">
+        <summary className="cursor-pointer text-xs font-semibold text-mutedtext">{t("earlierDrawings")}</summary>
+        <div className="mt-3">
+          <SchematicsStage projectId={project.id} parts={parts} schematics={schematicsOf(ps)} onChanged={load} />
+        </div>
+      </details>
+    );
 
   const blockers = states[node]?.open ?? [];
   const productionQty = rowOf(spec, "quantity")?.value;
@@ -297,7 +338,7 @@ export function PrototypingWorkspace({
       nextIndex={nextIndex}
       designNode={t(nodeKey(DESIGN_NODE[d]))}
       onChanged={load}
-      onGenerateSchematic={generateSchematic}
+      onOpenDrawing={() => goTo("mechanical.drawings")}
     />
   );
 
@@ -473,16 +514,22 @@ export function PrototypingWorkspace({
           {node === "electronics.concepts" && designStage("electronics", "concepts")}
           {node === "software.concepts" && designStage("software", "concepts")}
 
-          {node === "mechanical.parts" && designStage("mechanical")}
+          {node === "bom" && bomTable("all")}
+
+          {node === "mechanical.parts" && (
+            <>
+              {designStage("mechanical")}
+              {bomTable("mechanical")}
+            </>
+          )}
 
           {node === "mechanical.drawings" && (
             <>
-              <SchematicsStage
-                projectId={project.id}
-                parts={parts}
-                schematics={schematicsOf(designOf("mechanical"))}
-                onChanged={load}
+              <DimensionDrawings
+                parts={designOf("mechanical").filter((p) => !isConcept(p))}
+                onFix={(focus) => goTo("mechanical.parts", focus)}
               />
+              {earlier(designOf("mechanical"))}
               {/* 3D CAD is still a human service; say so where drawings live. */}
               <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
                 <p className="min-w-0 flex-1 text-[12px] text-mutedtext">{t("engineeringBody")}</p>
@@ -513,14 +560,14 @@ export function PrototypingWorkspace({
           {node === "electronics.board" && (
             <>
               {designStage("electronics")}
-              {schematicsOf(designOf("electronics")).length > 0 && (
-                <SchematicsStage
-                  projectId={project.id}
-                  parts={parts}
-                  schematics={schematicsOf(designOf("electronics"))}
-                  onChanged={load}
-                />
-              )}
+              <NetlistView
+                projectId={project.id}
+                netlist={project.netlist ?? null}
+                bom={bom}
+                matches={matches}
+                onSaved={load}
+              />
+              {earlier(designOf("electronics"))}
             </>
           )}
 
@@ -528,6 +575,7 @@ export function PrototypingWorkspace({
             <PowerCard spec={spec} onSet={() => goTo("brief", "fact-power")} />
           )}
 
+          {node === "electronics.components" && bomTable("electronics")}
           {node === "electronics.components" && (
             <ComponentsCard
               onAddExisting={() => setAddingExisting(true)}
@@ -602,7 +650,7 @@ export function PrototypingWorkspace({
               >
                 <PrimaryButton
                   onClick={() => goTo(following)}
-                  disabled={blockers.length > 0 || working}
+                  disabled={blockers.length > 0}
                 >
                   {t("continueTo", { node: t(nodeKey(following)) })}
                   <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />

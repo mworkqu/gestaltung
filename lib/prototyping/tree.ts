@@ -16,6 +16,7 @@
 import { DISCIPLINES, type Discipline } from "./constants";
 import { detectDisciplines } from "./engine";
 import { disciplineOf, isConcept, type PartLike } from "./parts";
+import { bomNode } from "./bom";
 import { factFocus, type Readiness, type Requirement, type Translate } from "./readiness";
 import { rowOf, type Spec } from "./spec";
 
@@ -26,7 +27,7 @@ export const LEAVES = {
 } as const satisfies Record<Discipline, readonly string[]>;
 
 export type LeafId = (typeof LEAVES)[Discipline][number];
-export type NodeId = "brief" | "parts" | "quote" | "production" | LeafId;
+export type NodeId = "brief" | "parts" | "bom" | "quote" | "production" | LeafId;
 
 /** projects.disciplines (migration 0021). */
 export type DisciplineState = {
@@ -91,6 +92,7 @@ export function visibleNodes(bs: Branch[]): NodeId[] {
   return [
     "brief",
     "parts",
+    "bom",
     ...bs.filter((b) => b.active).flatMap((b) => [...LEAVES[b.discipline]]),
     "quote",
     "production",
@@ -101,6 +103,10 @@ export function visibleNodes(bs: Branch[]): NodeId[] {
 export function nodeOf(r: Requirement, parts: PartLike[], visible: NodeId[]): NodeId {
   if (r.group === "brief" || r.group === "understanding" || r.group === "inputs") return "brief";
   if (r.group === "route") return "quote";
+  if (r.group === "bom") {
+    const n = r.bomKind ? (bomNode(r.bomKind) as NodeId) : "bom";
+    return visible.includes(n) ? n : "bom";
+  }
   const part = r.id.startsWith("part:") ? parts.find((p) => `part:${p.id}` === r.id) : null;
   const n = part ? partNode(part) : "parts";
   return visible.includes(n) ? n : "parts";

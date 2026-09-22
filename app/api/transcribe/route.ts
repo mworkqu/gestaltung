@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { logUsage, quota } from "@/lib/ai/usage";
 import { MAX_AUDIO_BYTES, WHISPER_LANGUAGES, type TranscribeError } from "@/lib/prototyping/voice";
 
 // Voice note → text, for the brief editor only.
@@ -10,6 +11,10 @@ import { MAX_AUDIO_BYTES, WHISPER_LANGUAGES, type TranscribeError } from "@/lib/
 //
 // Cancelling in the browser aborts this request, and the abort is passed on
 // to Groq so it stops too.
+//
+// Metered (lib/ai): every call is logged to ai_usage with the audio length
+// and Groq's x-ratelimit-remaining-* headers, and the daily guard stops calls
+// at the configured share of the free allowance.
 
 export const dynamic = "force-dynamic";
 
@@ -39,14 +44,41 @@ export async function POST(request: Request) {
     return fail("not_audio", 415);
 
   const lang = String(form?.get("language") ?? "");
+  const projectRaw = String(form?.get("projectId") ?? "");
+  const projectId = /^[0-9a-f-]{36}$/i.test(projectRaw) ? projectRaw : null;
+
+  if ((await quota(supabase, "groq")).paused) {
+    await logUsage(supabase, { provider: "groq", model: MODEL, projectId, feature: "transcribe", outcome: "blocked", errorCode: "paused" });
+    return fail("paused", 429);
+  }
   const upstream = new FormData();
   upstream.append("file", audio, audio.name || "voice-note.webm");
   upstream.append("model", MODEL);
-  upstream.append("response_format", "json");
+  // verbose_json carries the audio duration, which is what Groq meters.
+  upstream.append("response_format", "verbose_json");
   upstream.append("temperature", "0");
   if ((WHISPER_LANGUAGES as readonly string[]).includes(lang)) upstream.append("language", lang);
 
   const started = Date.now();
+  const meter = (res: Response | null, outcome: "ok" | "error", errorCode: string | null, audioSeconds?: number) => {
+    const h = (name: string) => {
+      const v = res?.headers.get(name);
+      return v != null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : null;
+    };
+    return logUsage(supabase, {
+      provider: "groq",
+      model: MODEL,
+      projectId,
+      feature: "transcribe",
+      audioSeconds: audioSeconds ?? null,
+      latencyMs: Date.now() - started,
+      outcome,
+      errorCode,
+      // Per Groq: remaining-requests counts per DAY, remaining-tokens per MINUTE.
+      remainingRequests: h("x-ratelimit-remaining-requests"),
+      remainingTokens: h("x-ratelimit-remaining-tokens"),
+    });
+  };
   try {
     const res = await fetch(GROQ_URL, {
       method: "POST",
@@ -54,24 +86,25 @@ export async function POST(request: Request) {
       body: upstream,
       signal: request.signal,
     });
-    if (res.status === 429) return fail("rate_limited", 429);
+    if (res.status === 429) {
+      await meter(res, "error", "rate_limited");
+      return fail("rate_limited", 429);
+    }
     if (!res.ok) {
       console.warn(`[transcribe] groq ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      await meter(res, "error", `http_${res.status}`);
       return fail("failed", 502);
     }
-    const data = (await res.json()) as { text?: unknown };
+    const data = (await res.json()) as { text?: unknown; duration?: unknown };
     const text = typeof data.text === "string" ? data.text.trim() : "";
-    // Server console only, so the owner can watch usage against the free tier.
-    console.info(
-      `[transcribe] groq (${MODEL}) ${Math.round(audio.size / 1024)} KB, lang=${lang || "auto"}, ${
-        Date.now() - started
-      } ms`
-    );
+    const seconds = typeof data.duration === "number" ? Math.round(data.duration * 100) / 100 : undefined;
+    await meter(res, "ok", null, seconds);
     if (!text) return fail("empty", 422);
     return Response.json({ text });
   } catch (e) {
     if (request.signal.aborted) return new Response(null, { status: 499 });
     console.warn("[transcribe] request failed:", e);
+    await meter(null, "error", "network");
     return fail("failed", 502);
   }
 }

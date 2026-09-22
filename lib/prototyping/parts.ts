@@ -6,6 +6,7 @@
 // parts table's Status column and the readiness requirements both read it.
 
 import { isCompatible, type Discipline } from "./constants";
+import { missingDims, type DimensionedPart } from "./dimension-drawing";
 
 export type PartSource = "catalog" | "to_design";
 
@@ -20,9 +21,19 @@ export type PartLike = {
   material: string | null;
   process: string | null;
   stock_status?: string | null;
+  quantity?: number;
+  shape?: string | null;
+  length_mm?: number | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  diameter_mm?: number | null;
+  thickness_mm?: number | null;
 };
 
-export type PartNeed = "material" | "process" | "mismatch" | "confirm" | "scope" | "outOfStock";
+export type PartNeed = "material" | "process" | "mismatch" | "dimensions" | "confirm" | "scope" | "outOfStock";
+
+/** Needs the client can settle after keeping a concept, so they don't block keeping it. */
+export const KEEPABLE_NEEDS: PartNeed[] = ["confirm", "dimensions"];
 
 export const isCatalog = (p: { source?: PartSource | null }) => p.source === "catalog";
 
@@ -49,6 +60,9 @@ export function partNeeds(p: PartLike): PartNeed[] {
     if (!p.material) needs.push("material");
     if (!p.process) needs.push("process");
     if (p.material && p.process && !isCompatible(p.material, p.process)) needs.push("mismatch");
+    // A mechanical part is drawn and quoted from real dimensions only.
+    if (disciplineOf(p) === "mechanical" && missingDims({ ...p, quantity: p.quantity ?? 1 } as DimensionedPart).length)
+      needs.push("dimensions");
   }
   // An analysis suggestion is only a suggestion until the client confirms it.
   if (p.status === "suggested") needs.push("confirm");

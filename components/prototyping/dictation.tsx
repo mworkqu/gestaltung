@@ -113,7 +113,10 @@ export function Dictation({
   onChange,
   onBusy,
   onDone,
+  projectId,
 }: {
+  /** For metering: which project the voice note is billed to. */
+  projectId?: string;
   value: string;
   onChange: (value: string) => void;
   /** True while dictated text is streaming in, so the editor can go read-only. */
@@ -259,6 +262,7 @@ export function Dictation({
     const body = new FormData();
     body.append("audio", audio, name ?? `voice-note.${ext}`);
     body.append("language", whisperLang(lang));
+    if (projectId) body.append("projectId", projectId);
     try {
       const res = await fetch("/api/transcribe", { method: "POST", body, signal: ctrl.signal });
       const data = (await res.json().catch(() => ({}))) as { text?: string; error?: TranscribeError };

@@ -1,6 +1,8 @@
 // Shared row/role types for the auth + multi-tenant layer (Stage 4).
 // Kept hand-written for now; can be replaced by generated Supabase types later.
 
+import type { ProjectBom } from "@/lib/prototyping/bom";
+import type { ProjectNetlist } from "@/lib/prototyping/netlist";
 import type { Discipline } from "@/lib/prototyping/constants";
 import type { PartSource } from "@/lib/prototyping/parts";
 import type { Spec } from "@/lib/prototyping/spec";
@@ -60,6 +62,8 @@ export type Part = {
   stock_status: StockStatus;
   image_url: string | null;
   is_published: boolean;
+  // 0023. Free keywords for the BOM matcher; absent before that migration.
+  tags?: string[] | null;
   created_at: string;
   updated_at: string;
 };
@@ -147,6 +151,9 @@ export type Project = {
   disciplines?: DisciplineState | null;
   // 0022. The spec sheet ("What we understood"); null until first analysed.
   spec?: Spec | null;
+  // 0023. Bill of materials (functions to buy) and the electronics netlist.
+  bom?: ProjectBom | null;
+  netlist?: ProjectNetlist | null;
   created_at: string;
   updated_at: string;
 };
@@ -232,6 +239,13 @@ export type ProjectPart = {
   unit_price?: number | null;
   stock_status?: string | null;
   stock_qty?: number | null;
+  // 0023. Shape + millimetre dimensions for the dimension drawing.
+  shape?: string | null;
+  length_mm?: number | null;
+  width_mm?: number | null;
+  height_mm?: number | null;
+  diameter_mm?: number | null;
+  thickness_mm?: number | null;
   position: number;
   created_at: string;
   updated_at: string;

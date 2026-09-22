@@ -12,9 +12,10 @@
 import { MIN_BRIEF_CHARS } from "./constants";
 import { isMakeable, partNeeds, type PartLike } from "./parts";
 import { rowOf, type Spec } from "./spec";
+import type { BomKind, LineStatus } from "./bom";
 
 /** Which area of the workspace a requirement belongs to. */
-export type RequirementGroup = "brief" | "understanding" | "inputs" | "parts" | "route";
+export type RequirementGroup = "brief" | "understanding" | "inputs" | "parts" | "bom" | "route";
 
 export type Requirement = {
   id: string;
@@ -25,6 +26,8 @@ export type Requirement = {
   blockingReason?: string;
   /** DOM id of the control that resolves it, when there is one. */
   focus?: string;
+  /** For a bill-of-materials line: which kind, so the tree puts it in the right branch. */
+  bomKind?: BomKind;
 };
 
 export type Readiness = {
@@ -39,6 +42,8 @@ export type ReadinessInput = {
   spec: Spec | null | undefined;
   parts: PartLike[];
   routeAccepted: boolean;
+  /** Bill of materials with its live store matches; absent until matched. */
+  bom?: { lines: { id: string; function: string; kind: BomKind }[]; matches: Map<string, { status: LineStatus }> } | null;
 };
 
 export type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -124,6 +129,16 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
       needs.length
         ? t("block_part", { code: part.code, name: part.name, need: t(`partNeed_${needs[0]}`) })
         : ""
+    );
+  }
+
+  // Bill of materials: a line with several store candidates waits on the
+  // client's pick. Matched, owned and not-stocked lines need nothing from them.
+  for (const l of p.bom?.lines ?? []) {
+    if (p.bom!.matches.get(l.id)?.status !== "choose") continue;
+    add(
+      { id: `bom:${l.id}`, group: "bom", label: l.function, satisfied: false, focus: `bom-${l.id}`, bomKind: l.kind },
+      t("block_bomChoose", { function: l.function })
     );
   }
 

@@ -18,6 +18,7 @@ export const whisperLang = (l: SpeechLang) => l.slice(0, 2);
 export type TranscribeError =
   | "not_configured"
   | "rate_limited"
+  | "paused"
   | "too_large"
   | "not_audio"
   | "empty"

@@ -18,6 +18,19 @@ export type Question = { id: string; label: string; type: QuestionType; options?
 
 export type SuggestedPart = { name: string; kind: Discipline; note: string };
 
+export const BOM_KINDS = ["electronics", "mechanical", "consumable"] as const;
+export type BomKind = (typeof BOM_KINDS)[number];
+
+/** A thing to buy, as a function and a spec — never a product, price or brand. */
+export type BomLine = {
+  id: string;
+  function: string;
+  spec: string;
+  quantity: number;
+  kind: BomKind;
+  critical: boolean;
+};
+
 export type Analysis = {
   /** One plain-language paragraph. Empty when the provider cannot summarise. */
   summary: string;
@@ -25,18 +38,26 @@ export type Analysis = {
   requirements: Requirement[];
   questions: Question[];
   suggestedParts: SuggestedPart[];
+  /** Empty from the basic reader: keyword rules cannot write a bill of materials. */
+  bom: BomLine[];
 };
 
 /** What the client already decided; a provider treats these as settled. */
 export type Answer = { id: string; label: string; value: string | null };
 
-export type AnalysisRequest = { brief: string; answers: Answer[]; locale: "en" | "ar" };
+export type AnalysisRequest = {
+  brief: string;
+  answers: Answer[];
+  locale: "en" | "ar";
+  /** For metering only: which project the call is billed to. */
+  projectId?: string;
+};
 
 export const ANALYSIS_STEPS = ["reading", "disciplines", "requirements", "gaps"] as const;
 export type AnalysisStep = (typeof ANALYSIS_STEPS)[number];
 
 /** Why the basic reader was used instead of the configured provider. */
-export type FallbackReason = "missing_key" | "rate_limited" | "malformed" | "unavailable";
+export type FallbackReason = "missing_key" | "rate_limited" | "malformed" | "unavailable" | "paused";
 
 /** One line of the /api/analyse NDJSON stream. */
 export type AnalysisEvent =

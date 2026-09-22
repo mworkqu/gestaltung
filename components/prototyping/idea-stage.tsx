@@ -23,6 +23,7 @@ import {
 import { MIN_BRIEF_CHARS } from "@/lib/prototyping/constants";
 import { suggestSpec } from "@/lib/prototyping/engine";
 import { disciplineOf } from "@/lib/prototyping/parts";
+import { mergeBom } from "@/lib/prototyping/bom";
 import { looksLikeSchema } from "@/lib/prototyping/readiness";
 import { answersOf, mergeAnalysis, type Spec } from "@/lib/prototyping/spec";
 import { BriefEditor, type SaveState } from "@/components/prototyping/brief-editor";
@@ -133,7 +134,7 @@ export function IdeaStage({
       const res = await fetch("/api/analyse", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ brief, answers: answersOf(spec), locale }),
+        body: JSON.stringify({ brief, answers: answersOf(spec), locale, projectId: project.id }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const result = await streamAnalysis(res, mark);
@@ -153,6 +154,17 @@ export function IdeaStage({
         })
         .eq("id", project.id);
       if (error) throw error;
+
+      // The bill of materials: functions to buy. A pick the client already
+      // made carries over to the same line. The basic reader returns none, so
+      // it never wipes a list a real analysis produced.
+      if (result.analysis.bom.length) {
+        const bomSave = await supabase
+          .from("projects")
+          .update({ bom: mergeBom(project.bom, result.analysis.bom) })
+          .eq("id", project.id);
+        if (bomSave.error) console.warn("Bill of materials not saved (migration 0023?):", bomSave.error.message);
+      }
 
       // Suggested parts become to-design concepts — but only for a discipline
       // that has no to-design parts yet. The model words a part differently
@@ -209,6 +221,7 @@ export function IdeaStage({
           onChange={onBriefChange}
           onSave={() => void saveBrief()}
           state={saveState}
+          projectId={project.id}
         />
         {problem && (
           <p className="text-xs font-medium text-destructive">

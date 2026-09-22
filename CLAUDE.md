@@ -557,6 +557,43 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
       Groq whisper-large-v3, GROQ_WHISPER_MODEL overrides; 4 MB cap for Vercel's body limit; audio in memory
       only; cancel aborts upstream; logs "[transcribe] ..."). Arabic speech language or no browser engine →
       Path B. Mic only requested on press; text appended + editor focused, never auto-analysed.
+  - PART 2 (2026-09-22): BOM, circuit, drawings, metering. MIGRATION 0023_bom_netlist_drawings_usage.sql
+    (RUN AFTER 0022) — until it runs the BOM/circuit routes answer 409 not_ready, dimension inputs don't
+    save, and usage/gaps aren't recorded (features degrade, pages still load).
+    * Rule: the model outputs STRUCTURE, never pixels (no image generation anywhere), and proposes a
+      FUNCTION, never a product — no SKU/price/brand/stock/lead time from a model (zod strips them).
+    * BOM: analysis contract gains bom[{id,function,spec,quantity,kind electronics|mechanical|consumable,
+      critical}] (analysis.ts/analysis-schema.ts/gemini.ts; rules reader returns []). Stored in projects.bom
+      via mergeBom() (lib/prototyping/bom.ts) — only the client's `choice` is a product ref and it survives
+      re-analysis (by id, else by function). Matcher lib/prototyping/bom-match.ts is deterministic (kind gate
+      by category/tags, voltage/M-size contradiction check, function words x2 + spec words, keep >= 75 % of
+      best, max 3, in stock first then price). POST /api/bom/match reads public.parts + client inventory
+      live and upserts each not-stocked line via log_sourcing_gap(). UI components/prototyping/bom-table.tsx:
+      tree node "Bill of materials" (all lines, total, Add all to cart) + electronics lines under
+      Electronics › Components, mechanical under Mechanical › Parts. "Choose one" lines are readiness
+      requirements. parts.tags (text[]) feeds matching; the Google Sheet import accepts a `tags` column.
+      Admin /dashboard/store/gaps = sourcing gaps grouped by function.
+    * Circuit: POST /api/netlist (Gemini, only with electronics BOM lines) → NetlistSchema (zod) +
+      crossValidate() (bomIds, refs, pins) → one retry with the problems → else 422 with them; nothing
+      unvalidated is saved. projects.netlist is the single source. sanityChecks() (ours): floating net,
+      unpowered component, shorted supplies, rail overcurrent — shown in words with refs. Renderers
+      lib/prototyping/wiring-svg.ts (store products per BOM line, placeholder box when no photo, links to
+      /store/<sku>) and schematic-svg.ts (symbol library, rails top/GND bottom, net labels). Viewer
+      components/prototyping/svg-frame.tsx (zoom, SVG download, print). Test hook NETLIST_TEST_BREAK=1
+      (dev only) corrupts a connection to force the retry + fallback.
+    * Drawings: project_parts.shape (block|disc|shaft|sheet) + length/width/height/diameter/thickness_mm;
+      lib/prototyping/dimension-drawing.ts draws only from real numbers, gaps are labelled boxes linked to
+      the input (dim-<partId>-<field>). Laser-cut = flat outline + thickness + "production DXF still
+      required". partNeeds adds "dimensions" (doesn't block keeping a concept). Template "Generate" removed;
+      old template drawings stay under "Earlier template drawings".
+    * Metering: lib/ai/limits.ts (config, env overrides AI_LIMIT_GEMINI_REQUESTS / _TOKENS /
+      AI_LIMIT_GROQ_REQUESTS / _AUDIO_SECONDS, AI_GUARD_THRESHOLD default 0.8, AI_RESET_TZ_*) and
+      lib/ai/usage.ts (logUsage via log_ai_usage RPC, quota via ai_usage_totals RPC — no service key).
+      Gemini day = midnight PACIFIC (Google's docs), Groq = UTC. Defaults: Gemini 500 req/day (third-party
+      figure — confirm at aistudio.google.com/rate-limit), no daily token cap; Groq Whisper 2,000 req +
+      28,800 audio s/day. At the threshold: analyse → basic reader with fallback "paused"; netlist → 429
+      paused; transcribe → paused (live dictation still works). Admin /dashboard/usage: today per provider,
+      per feature, 30-day calls chart, per-project totals.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -603,6 +640,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0021_prototyping_disciplines.sql — projects.disciplines jsonb (RUN 2026-09-21 ✔)
 - 0022_prototyping_spec_and_sources.sql — projects.spec + project_parts source/kind/catalog columns (RUN ✔ —
   confirmed 2026-09-22 by a live analysis saving spec + parts)
+- 0023_bom_netlist_drawings_usage.sql — projects.bom/netlist, part dimensions, parts.tags, sourcing_gaps,
+  ai_usage + RPCs (RUN AFTER 0022; BOM, circuit, dimension saving and metering need it)
 
 ## PERMANENT NOTES
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in

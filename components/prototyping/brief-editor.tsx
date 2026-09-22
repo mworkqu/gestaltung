@@ -30,7 +30,9 @@ export function BriefEditor({
   onChange,
   onSave,
   state,
+  projectId,
 }: {
+  projectId?: string;
   value: string;
   onChange: (value: string) => void;
   onSave: () => void;
@@ -66,6 +68,7 @@ export function BriefEditor({
         onChange={(v) => onChange(v.slice(0, MAX_BRIEF_CHARS))}
         onBusy={onBusy}
         onDone={focusEnd}
+        projectId={projectId}
       />
       <textarea
         ref={ref}

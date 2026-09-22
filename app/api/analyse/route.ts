@@ -12,6 +12,8 @@ import {
   DisciplinesSchema,
   RequirementsSchema,
 } from "@/lib/prototyping/analysis-schema";
+import { logUsage, quota } from "@/lib/ai/usage";
+import type { ProviderId } from "@/lib/ai/limits";
 import { configuredProviderName, loadProvider } from "@/lib/prototyping/providers";
 import { readWithRules } from "@/lib/prototyping/providers/rules";
 import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/types";
@@ -27,18 +29,15 @@ import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/type
 // Any failure of the configured provider — no key, 429, malformed JSON, a
 // response that fails validation, a network error — falls back to the basic
 // reader, and the result says so. Never a blank answer, never a silent
-// downgrade.
+// downgrade. So does the daily guard (lib/ai): at the configured share of the
+// free allowance the provider is not called at all ("paused").
+//
+// Every provider call is recorded in ai_usage (lib/ai/usage).
 
 export const dynamic = "force-dynamic";
 
-function logUsage(provider: string, model: string | undefined, usage: TokenUsage | undefined) {
-  // Server console only, so the owner can watch usage against the free tier.
-  console.info(
-    `[analyse] ${provider}${model ? ` (${model})` : ""} tokens: ${
-      usage ? `in=${usage.input} out=${usage.output} total=${usage.total}` : "not reported"
-    }`
-  );
-}
+/** Providers the daily guard meters. Others (the basic reader) cost nothing. */
+const METERED: Record<string, ProviderId> = { gemini: "gemini" };
 
 export async function POST(request: Request) {
   // Only someone with a session (a guest's anonymous session counts) may spend
@@ -64,13 +63,20 @@ export async function POST(request: Request) {
       let fallback: FallbackReason | null = null;
       let usedProvider = name;
 
+      const metered = METERED[name];
+      let called = false;
+      let model: string | undefined;
+      let usage: TokenUsage | undefined;
+      let latencyMs: number | undefined;
       try {
         const provider = await loadProvider(name);
         if (!provider) throw new ProviderError("unavailable", `unknown provider "${name}"`);
         if (!provider.configured()) throw new ProviderError("missing_key");
+        if (metered && (await quota(supabase, metered)).paused) throw new ProviderError("paused");
 
+        called = true;
         const result = await provider.analyse(req);
-        logUsage(provider.name, result.model, result.usage);
+        ({ model, usage, latencyMs } = result);
         const raw = (result.raw ?? {}) as Record<string, unknown>;
 
         if (!DisciplinesSchema.safeParse(raw.disciplines).success)
@@ -87,10 +93,27 @@ export async function POST(request: Request) {
         analysis = full.data;
       } catch (e) {
         fallback = e instanceof ProviderError ? e.reason : "unavailable";
-        const usage = (e as { usage?: TokenUsage }).usage;
-        if (usage) logUsage(name, undefined, usage);
+        const err = e as { usage?: TokenUsage; latencyMs?: number; model?: string };
+        usage ??= err.usage;
+        latencyMs ??= err.latencyMs;
+        model ??= err.model;
         console.warn(`[analyse] ${name} failed (${fallback}): ${e instanceof Error ? e.message : e}. Using the basic reader.`);
         usedProvider = "rules";
+      }
+
+      if (metered && (called || fallback === "paused")) {
+        await logUsage(supabase, {
+          provider: metered,
+          model,
+          projectId: req.projectId,
+          feature: "analyse",
+          promptTokens: usage?.input,
+          completionTokens: usage?.output,
+          totalTokens: usage?.total,
+          latencyMs,
+          outcome: fallback === "paused" ? "blocked" : fallback ? "error" : "ok",
+          errorCode: fallback,
+        });
       }
 
       try {

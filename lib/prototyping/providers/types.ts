@@ -13,6 +13,7 @@ export type ProviderResult = {
   raw: unknown;
   usage?: TokenUsage;
   model?: string;
+  latencyMs?: number;
 };
 
 export interface AnalysisProvider {

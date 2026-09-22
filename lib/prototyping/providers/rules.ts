@@ -29,6 +29,8 @@ export async function readWithRules({ brief, locale }: AnalysisRequest): Promise
       kind: p.kind,
       note: t(`part_${p.key}_desc`),
     })),
+    // Keywords cannot say what to buy or to what spec, so no bill of materials.
+    bom: [],
   };
 }
 
