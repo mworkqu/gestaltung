@@ -29,25 +29,33 @@ export async function callGemini(opts: {
   const fail = (reason: ConstructorParameters<typeof ProviderError>[0], detail: string, usage?: TokenUsage, rawText?: string) =>
     Object.assign(new ProviderError(reason, detail), { usage, rawText, latencyMs: Date.now() - started, model: GEMINI_MODEL });
 
-  let res: Response;
-  try {
-    res = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: opts.system }] },
-        contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: opts.schema,
-          temperature: opts.temperature ?? 0.2,
-        },
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      cache: "no-store",
-    });
-  } catch (e) {
-    throw fail("unavailable", e instanceof Error ? e.message : String(e));
+  const request = JSON.stringify({
+    systemInstruction: { parts: [{ text: opts.system }] },
+    contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: opts.schema,
+      temperature: opts.temperature ?? 0.2,
+    },
+  });
+
+  // Google answers 503 ("high demand") in short bursts; two quick retries
+  // ride most of them out. A 503 costs no tokens, so this spends nothing.
+  let res!: Response;
+  for (const wait of [0, 2000, 5000]) {
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    try {
+      res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": key },
+        body: request,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        cache: "no-store",
+      });
+    } catch (e) {
+      throw fail("unavailable", e instanceof Error ? e.message : String(e));
+    }
+    if (res.status !== 503) break;
   }
 
   if (res.status === 429) throw fail("rate_limited", "HTTP 429", undefined, await res.text().catch(() => ""));
