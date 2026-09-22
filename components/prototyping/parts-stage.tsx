@@ -1,7 +1,8 @@
 "use client";
 
 // A discipline branch's design view: the to-design parts of ONE kind, one card
-// each, with only the design decisions — material and process for mechanical,
+// each. It serves two leaves: Concepts (what the analysis suggests designing,
+// waiting to be kept or dropped) and the design leaf (kept parts), with only the design decisions — material and process for mechanical,
 // the board for electronics, the scope for software. Price, stock, source and
 // quantity live in the Parts list and are deliberately not repeated here.
 //
@@ -14,7 +15,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, Pencil, Plus, Ruler, Sparkles, Undo2 } from "lucide-react";
+import { Check, Pencil, Plus, Ruler, Sparkles, Trash2, Undo2 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -41,17 +42,23 @@ import type { ProjectPart } from "@/lib/supabase/types";
 export function PartsStage({
   projectId,
   kind,
+  view,
   parts,
   nextIndex,
+  designNode,
   onChanged,
   onGenerateSchematic,
 }: {
   projectId: string;
   kind: Discipline;
-  /** The to-design parts of this kind only. */
+  /** Concepts shows suggestions awaiting a decision; design shows kept parts. */
+  view: "concepts" | "design";
+  /** The to-design parts of this kind for this view only. */
   parts: ProjectPart[];
   /** Next free P-NN number across the whole project, so codes never collide. */
   nextIndex: number;
+  /** The design leaf's name, for the empty Concepts state. */
+  designNode: string;
   onChanged: () => Promise<void>;
   onGenerateSchematic: (part: ProjectPart) => void;
 }) {
@@ -59,6 +66,7 @@ export function PartsStage({
   const tProj = useTranslations("Projects");
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
+  const concepts = view === "concepts";
 
   const pending = parts.filter((p) => p.status === "suggested" && partNeeds(p).every((n) => n === "confirm"));
 
@@ -83,6 +91,14 @@ export function PartsStage({
     });
   }
 
+  /** Dropping a concept deletes the row: it was never more than a suggestion. */
+  async function drop(part: ProjectPart) {
+    setBusy(true);
+    await createClient().from("project_parts").delete().eq("id", part.id);
+    await onChanged();
+    setBusy(false);
+  }
+
   async function confirmAll() {
     setBusy(true);
     const supabase = createClient();
@@ -96,25 +112,31 @@ export function PartsStage({
   return (
     <Card
       kicker={t(`discipline_${kind}`)}
-      title={t(`designTitle_${kind}`)}
-      intro={t("designIntro")}
+      title={t(concepts ? `conceptsTitle_${kind}` : `designTitle_${kind}`)}
+      intro={t(concepts ? "conceptsIntro" : "designIntro")}
       actions={
         <>
-          {pending.length > 1 && (
+          {concepts && pending.length > 1 && (
             <SoftButton onClick={confirmAll} disabled={busy}>
               <Check className="h-3.5 w-3.5" />
               {t("confirmAll")}
             </SoftButton>
           )}
-          <PrimaryButton onClick={() => setCreating(true)}>
-            <Plus className="h-3.5 w-3.5" />
-            {t(`createKind_${kind}`)}
-          </PrimaryButton>
+          {!concepts && (
+            <PrimaryButton onClick={() => setCreating(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              {t(`createKind_${kind}`)}
+            </PrimaryButton>
+          )}
         </>
       }
     >
       {parts.length === 0 ? (
-        <p className="text-sm text-mutedtext">{t(`noDesign_${kind}`)}</p>
+        <p className="text-sm text-mutedtext">
+          {concepts
+            ? t("noConcepts", { branch: t(`discipline_${kind}`), node: designNode })
+            : t(`noDesign_${kind}`)}
+        </p>
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2">
           {parts.map((part) => {
@@ -264,10 +286,16 @@ export function PartsStage({
                       title={canConfirm ? undefined : t("fixFirst")}
                     >
                       <Check className="h-3 w-3" />
-                      {t("confirmPart")}
+                      {t(concepts ? "keepConcept" : "confirmPart")}
                     </PrimaryButton>
                   )}
-                  {kind !== "software" && (
+                  {concepts && (
+                    <SoftButton onClick={() => drop(part)} disabled={busy} className="bg-surface">
+                      <Trash2 className="h-3 w-3" />
+                      {t("dropConcept")}
+                    </SoftButton>
+                  )}
+                  {!concepts && kind !== "software" && (
                     <SoftButton onClick={() => onGenerateSchematic(part)} className="bg-surface">
                       <Ruler className="h-3 w-3" />
                       {t("generate")}

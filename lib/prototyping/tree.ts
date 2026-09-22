@@ -1,5 +1,6 @@
 // The workspace tree: Brief, the Parts list, one branch per discipline the
-// project needs, and Quote.
+// project needs, then Quote and Production — both project-level, because they
+// cover the whole project rather than one discipline.
 //
 // Pure. Branches come from what the analysis detected plus the client's own
 // choices; a manual choice always wins and an analysis never overwrites it.
@@ -7,22 +8,25 @@
 // tree nodes — the tree never counts anything itself.
 //
 // The Parts list shows every part. A branch shows only the to-design parts of
-// its kind — the same rows, viewed for design work, never a second copy.
+// its kind — the same rows, viewed for design work, never a second copy. Each
+// branch opens with Concepts: what the analysis suggests designing for that
+// discipline, waiting to be kept or dropped. A kept concept moves to the
+// branch's design leaf (Parts / Board / Scope).
 
 import { DISCIPLINES, type Discipline } from "./constants";
 import { detectDisciplines } from "./engine";
-import { disciplineOf, type PartLike } from "./parts";
+import { disciplineOf, isConcept, type PartLike } from "./parts";
 import { factFocus, type Readiness, type Requirement, type Translate } from "./readiness";
 import { rowOf, type Spec } from "./spec";
 
 export const LEAVES = {
-  mechanical: ["mechanical.parts", "mechanical.drawings", "mechanical.process"],
-  electronics: ["electronics.board", "electronics.power", "electronics.components"],
-  software: ["software.scope"],
+  mechanical: ["mechanical.concepts", "mechanical.parts", "mechanical.drawings", "mechanical.process"],
+  electronics: ["electronics.concepts", "electronics.board", "electronics.power", "electronics.components"],
+  software: ["software.concepts", "software.scope"],
 } as const satisfies Record<Discipline, readonly string[]>;
 
 export type LeafId = (typeof LEAVES)[Discipline][number];
-export type NodeId = "brief" | "parts" | "quote" | LeafId;
+export type NodeId = "brief" | "parts" | "quote" | "production" | LeafId;
 
 /** projects.disciplines (migration 0021). */
 export type DisciplineState = {
@@ -39,10 +43,18 @@ export const DESIGN_NODE: Record<Discipline, NodeId> = {
   software: "software.scope",
 };
 
-/** The node a part is resolved at: its design leaf, or the Parts list. */
+/** Where a suggested, not-yet-kept part of each kind waits. */
+export const CONCEPT_NODE: Record<Discipline, NodeId> = {
+  mechanical: "mechanical.concepts",
+  electronics: "electronics.concepts",
+  software: "software.concepts",
+};
+
+/** The node a part is resolved at: its concepts or design leaf, or the Parts list. */
 export const partNode = (p: PartLike): NodeId => {
   const d = disciplineOf(p);
-  return d ? DESIGN_NODE[d] : "parts";
+  if (!d) return "parts";
+  return isConcept(p) ? CONCEPT_NODE[d] : DESIGN_NODE[d];
 };
 
 /** "mechanical.parts" → "node_mechanical_parts" (next-intl keys cannot hold dots). */
@@ -81,6 +93,7 @@ export function visibleNodes(bs: Branch[]): NodeId[] {
     "parts",
     ...bs.filter((b) => b.active).flatMap((b) => [...LEAVES[b.discipline]]),
     "quote",
+    "production",
   ];
 }
 
@@ -123,11 +136,18 @@ export function nodeStates(
     if (out[n] && extra.reason) out[n] = { ...out[n], ...extra };
   };
   const ofKind = (d: Discipline) => parts.filter((p) => disciplineOf(p) === d);
+  // Kept parts are the design work; concepts still wait on a decision.
+  const kept = (d: Discipline) => ofKind(d).filter((p) => !isConcept(p));
+  /** Nothing kept yet: point at the waiting concepts, or at the empty design leaf. */
+  const nothingKept = (d: Discipline, missing: string): Omit<NodeState, "open"> =>
+    ofKind(d).length
+      ? { reason: t("need_concept"), target: CONCEPT_NODE[d] }
+      : { reason: missing, target: DESIGN_NODE[d] };
 
-  const mech = ofKind("mechanical");
+  const mech = kept("mechanical");
   const mechNeeds = (checkProcess: boolean): Omit<NodeState, "open"> =>
     !mech.length
-      ? { reason: t("need_parts"), target: "mechanical.parts" }
+      ? nothingKept("mechanical", t("need_parts"))
       : mech.some((p) => !p.material)
         ? { reason: t("need_material"), target: "mechanical.parts" }
         : checkProcess && mech.some((p) => !p.process)
@@ -136,10 +156,8 @@ export function nodeStates(
   set("mechanical.drawings", mechNeeds(false));
   set("mechanical.process", mechNeeds(true));
 
-  if (!ofKind("electronics").length)
-    set("electronics.board", { reason: t("need_board"), target: "electronics.board" });
-  if (!ofKind("software").length)
-    set("software.scope", { reason: t("need_scope"), target: "software.scope" });
+  if (!kept("electronics").length) set("electronics.board", nothingKept("electronics", t("need_board")));
+  if (!kept("software").length) set("software.scope", nothingKept("software", t("need_scope")));
 
   const power = rowOf(spec, "power");
   if (!power?.value)
@@ -152,6 +170,13 @@ export function nodeStates(
   else if (!qty?.value)
     set("quote", { reason: t("need_quantity"), target: "brief", focus: factFocus("quantity") });
 
+  // Production waits on whatever holds up the quote, then on the route.
+  const route = r.requirements.find((x) => x.id === "route");
+  if (out.quote?.reason) {
+    const { reason, target, focus } = out.quote;
+    set("production", { reason, target, focus });
+  } else if (route && !route.satisfied) set("production", { reason: t("need_route"), target: "quote" });
+
   return out;
 }
 
@@ -159,11 +184,10 @@ export function nodeStates(
 export function toNode(stored: string, visible: NodeId[]): NodeId {
   const legacy: Record<string, NodeId> = {
     idea: "brief",
-    concepts: "brief",
+    concepts: "mechanical.concepts",
     design: "mechanical.drawings",
-    engineering: "mechanical.drawings",
-    manufacturing: "quote",
-    production: "quote",
+    engineering: "mechanical.process",
+    manufacturing: "mechanical.process",
   };
   const n = (legacy[stored] ?? stored) as NodeId;
   return visible.includes(n) ? n : "brief";

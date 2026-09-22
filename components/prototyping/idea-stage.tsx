@@ -22,6 +22,7 @@ import {
 } from "@/lib/prototyping/analysis";
 import { MIN_BRIEF_CHARS } from "@/lib/prototyping/constants";
 import { suggestSpec } from "@/lib/prototyping/engine";
+import { disciplineOf } from "@/lib/prototyping/parts";
 import { looksLikeSchema } from "@/lib/prototyping/readiness";
 import { answersOf, mergeAnalysis, type Spec } from "@/lib/prototyping/spec";
 import { BriefEditor, type SaveState } from "@/components/prototyping/brief-editor";
@@ -153,12 +154,16 @@ export function IdeaStage({
         .eq("id", project.id);
       if (error) throw error;
 
-      // Suggested parts become to-design parts, unless one with that name
-      // exists already — a part the client touched is never replaced.
+      // Suggested parts become to-design concepts — but only for a discipline
+      // that has no to-design parts yet. The model words a part differently
+      // each time, so matching names would re-add a concept the client
+      // dropped, or duplicate one they kept. A part they touched is never
+      // replaced.
+      const kinds = new Set(parts.map(disciplineOf).filter(Boolean));
       const have = new Set(parts.map((p) => p.name.trim().toLowerCase()));
       let n = Math.max(0, ...parts.map((p) => parseInt(p.code.replace(/\D/g, ""), 10) || 0));
       const rows = result.analysis.suggestedParts
-        .filter((p) => !have.has(p.name.trim().toLowerCase()))
+        .filter((p) => !kinds.has(p.kind) && !have.has(p.name.trim().toLowerCase()))
         .map((p) => {
           const s = specFor(p);
           n += 1;

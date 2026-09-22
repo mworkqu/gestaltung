@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
+  Factory,
   ListChecks,
   Loader2,
   Receipt,
@@ -31,9 +32,11 @@ import {
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
-import { disciplineOf, isMakeable } from "@/lib/prototyping/parts";
+import { disciplineOf, isConcept, isMakeable } from "@/lib/prototyping/parts";
+import { rowOf } from "@/lib/prototyping/spec";
 import type { Spec } from "@/lib/prototyping/spec";
 import {
+  DESIGN_NODE,
   branches,
   nodeKey,
   nodeOf,
@@ -282,14 +285,17 @@ export function PrototypingWorkspace({
   }
 
   const blockers = states[node]?.open ?? [];
+  const productionQty = rowOf(spec, "quantity")?.value;
   const following = visible[visible.indexOf(node) + 1] ?? null;
 
-  const designStage = (d: Discipline) => (
+  const designStage = (d: Discipline, view: "concepts" | "design" = "design") => (
     <PartsStage
       projectId={project.id}
       kind={d}
-      parts={designOf(d)}
+      view={view}
+      parts={designOf(d).filter((p) => isConcept(p) === (view === "concepts"))}
       nextIndex={nextIndex}
+      designNode={t(nodeKey(DESIGN_NODE[d]))}
       onChanged={load}
       onGenerateSchematic={generateSchematic}
     />
@@ -463,6 +469,10 @@ export function PrototypingWorkspace({
             />
           )}
 
+          {node === "mechanical.concepts" && designStage("mechanical", "concepts")}
+          {node === "electronics.concepts" && designStage("electronics", "concepts")}
+          {node === "software.concepts" && designStage("software", "concepts")}
+
           {node === "mechanical.parts" && designStage("mechanical")}
 
           {node === "mechanical.drawings" && (
@@ -548,6 +558,24 @@ export function PrototypingWorkspace({
                 </div>
               </Card>
             </>
+          )}
+
+          {node === "production" && (
+            <Card kicker={t("node_production")} title={t("productionTitle")} intro={t("productionIntro")}>
+              <p className="text-sm text-heading">
+                {productionQty ? t("productionQty", { qty: productionQty }) : t("productionQtyUnknown")}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  href="/design/upload"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
+                >
+                  <Factory className="h-3.5 w-3.5" />
+                  {t("startProduction")}
+                </Link>
+                <span className="text-[11px] text-mutedtext">{t("productionNote")}</span>
+              </div>
+            </Card>
           )}
 
           {/* Footer: the one forward action, named for where it goes. */}

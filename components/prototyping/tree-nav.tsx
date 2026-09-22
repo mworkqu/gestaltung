@@ -8,7 +8,7 @@
 // uses logical properties (ms-/ps-/border-s) so the tree mirrors in Arabic.
 
 import { useTranslations } from "next-intl";
-import { Cpu, Layers, Lightbulb, Plus, Receipt, SquareCode, Wrench, X } from "lucide-react";
+import { Cpu, Factory, Layers, Lightbulb, Plus, Receipt, SquareCode, Wrench, X } from "lucide-react";
 
 import type { Discipline } from "@/lib/prototyping/constants";
 import {
@@ -78,6 +78,13 @@ export function TreeNav({
         label: t(`discipline_${b.discipline}`),
       })),
       { id: "quote", icon: Receipt, to: "quote", open: openAt("quote"), label: t("node_quote") },
+      {
+        id: "production",
+        icon: Factory,
+        to: "production",
+        open: openAt("production"),
+        label: t("node_production"),
+      },
     ];
     return (
       <ul className="flex flex-col items-center gap-1.5">
@@ -186,6 +193,9 @@ export function TreeNav({
 
         <li className="pt-1">
           <Node n="quote" icon={Receipt} />
+        </li>
+        <li>
+          <Node n="production" icon={Factory} />
         </li>
       </ul>
 

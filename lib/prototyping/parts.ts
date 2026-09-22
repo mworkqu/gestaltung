@@ -26,6 +26,10 @@ export type PartNeed = "material" | "process" | "mismatch" | "confirm" | "scope"
 
 export const isCatalog = (p: { source?: PartSource | null }) => p.source === "catalog";
 
+/** An analysis suggestion to design, not yet kept by the client. */
+export const isConcept = (p: { source?: PartSource | null; status: string }) =>
+  !isCatalog(p) && p.status === "suggested";
+
 /** A to-design part's discipline. Rows from before 0022 fall back to process. */
 export const disciplineOf = (p: PartLike): Discipline | null =>
   isCatalog(p) ? null : p.kind ?? (p.process === "pcb_manufacturing" ? "electronics" : "mechanical");

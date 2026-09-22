@@ -5,14 +5,17 @@
 // Plain text only. It grows with its content from a 12-row minimum and only
 // shows its own scrollbar once the text is taller than most of the viewport.
 // It saves when it loses focus; the parent owns the save so the analysis can
-// flush it first.
+// flush it first. The toolbar above it takes dictation (./dictation): spoken
+// words arrive as ordinary text, and the editor is read-only only while live
+// words are still streaming in.
 
-import { useLayoutEffect, useRef } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, CircleAlert, Loader2 } from "lucide-react";
 
 import { MAX_BRIEF_CHARS } from "@/lib/prototyping/constants";
 import { wordCount } from "@/lib/prototyping/readiness";
+import { Dictation } from "@/components/prototyping/dictation";
 import { fieldClass } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +38,17 @@ export function BriefEditor({
 }) {
   const t = useTranslations("Prototyping");
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [dictating, setDictating] = useState(false);
+  const onBusy = useCallback((b: boolean) => setDictating(b), []);
+
+  // Dictated text lands in the editor for the client to read and fix, so put
+  // the cursor at its end. Leaving the editor then saves it like typing does.
+  const focusEnd = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -47,12 +61,20 @@ export function BriefEditor({
 
   return (
     <div className="space-y-2">
+      <Dictation
+        value={value}
+        onChange={(v) => onChange(v.slice(0, MAX_BRIEF_CHARS))}
+        onBusy={onBusy}
+        onDone={focusEnd}
+      />
       <textarea
         ref={ref}
         id="brief-editor"
         value={value}
         onChange={(e) => onChange(e.target.value.slice(0, MAX_BRIEF_CHARS))}
         onBlur={onSave}
+        readOnly={dictating}
+        aria-busy={dictating}
         rows={MIN_ROWS}
         placeholder={t("briefPlaceholder")}
         aria-label={t("briefHeading")}

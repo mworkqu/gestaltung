@@ -540,6 +540,23 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     source/kind/catalog columns. Until it runs, analysis and adding parts show a "couldn't save" error.
     ENV (server-only, Vercel + .env.local): GEMINI_API_KEY (free key from Google AI Studio), optional
     ANALYSIS_PROVIDER (gemini|rules), optional GEMINI_MODEL.
+  - REWORK gap-fix + Task 6 (2026-09-22). Keys set in .env.local AND Vercel (all 3 envs, via the
+    vercel CLI — the Vercel MCP connector has no access to this team): ANALYSIS_PROVIDER=gemini,
+    GEMINI_API_KEY, GROQ_API_KEY. 0022 confirmed working (a live Gemini analysis saved spec + parts).
+    * Tree now matches the brief: each branch opens with a Concepts leaf (mechanical/electronics/
+      software.concepts) = that kind's to-design parts still status "suggested" (isConcept() in parts.ts);
+      "Keep and design" confirms → the row moves to the design leaf; "Drop" deletes it. Same rows, two
+      views (PartsStage view="concepts"|"design"). New project-level Production node after Quote (quantity
+      + "Start a production job" → /design/upload); its reason chains off Quote, then the route. Electronics'
+      "Material & process" equivalent is Board (FR-4 · PCB manufacturing), per the brief's tree.
+    * Re-analysis only suggests parts for disciplines with NO to-design parts yet (the model renames parts,
+      so name-matching re-added dropped concepts / duplicated kept ones).
+    * Voice (brief editor only): components/prototyping/dictation.tsx + lib/prototyping/voice.ts.
+      Path A = browser SpeechRecognition (live interim text, level meter, stop). Path B = MediaRecorder or an
+      uploaded audio file → POST /api/transcribe (app/api/transcribe/route.ts; session-gated like analyse;
+      Groq whisper-large-v3, GROQ_WHISPER_MODEL overrides; 4 MB cap for Vercel's body limit; audio in memory
+      only; cancel aborts upstream; logs "[transcribe] ..."). Arabic speech language or no browser engine →
+      Path B. Mic only requested on press; text appended + editor focused, never auto-analysed.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -584,8 +601,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0020_prototyping.sql — prototyping tables + projects.brief/stage/stages (RUN AFTER 0019; /projects/<id>/prototyping
   loads without it but cannot save an analysis until it runs)
 - 0021_prototyping_disciplines.sql — projects.disciplines jsonb (RUN 2026-09-21 ✔)
-- 0022_prototyping_spec_and_sources.sql — projects.spec + project_parts source/kind/catalog columns (RUN
-  AFTER 0021; prototyping analysis and adding parts can't save until it runs)
+- 0022_prototyping_spec_and_sources.sql — projects.spec + project_parts source/kind/catalog columns (RUN ✔ —
+  confirmed 2026-09-22 by a live analysis saving spec + parts)
 
 ## PERMANENT NOTES
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in
