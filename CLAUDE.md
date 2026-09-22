@@ -610,7 +610,43 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     collected from the solar panel") and the text matcher accepts one generic shared word, so it matched
     a Tempered Glass Panel (QAR 425) as a battery and diodes as fasteners; the store sheet has duplicate
     products (GR-024/034/044, GR-028/038); rules suggestSpec gave stainless_304 + laser cutting to an
-    "Aluminium enclosure". To fix in Tasks 13/14 (or sooner if the owner asks).
+    "Aluminium enclosure". FIXED in Part 3 (below).
+  - PART 3 TASKS 12–15 + matcher quick fix (2026-09-22). MIGRATION 0025_electronics_attributes_kits.sql
+    (RUN ✔ 2026-09-22): projects.build_route, parts.attributes + pack_size, client_inventory_items.attributes,
+    store_settings (kit_discount_pct), project_kits, cart_items.kit_id/bom_lines (new unique index incl. kit),
+    part_orders.discount_qar, part_order_items.project_id/kit_id/bom_lines, create_part_order v2 (kit discount
+    priced on the server; for the caller's own project: project_items += bought qty and BOM lines get
+    `fulfilled`), event trigger adds build_route_chosen / bom_line_fulfilled / bom_lines_dismissed, feature
+    'electronics' allowed in analysis_runs + ai_usage.
+    * Matcher (lib/prototyping/bom-match.ts): attributes first (lib/store/attributes.ts = the ONE class/field
+      definition, compare eq/min/max/includes/within, `why` per candidate). Class mismatch or contradiction
+      excludes; unknown fields = weak. Untyped products fall back to text needing ≥ 2/3 of the item-name words
+      (generic verbs ignored), no volt/M-size/ohm/farad contradiction, ALWAYS weak. Only a single distinct
+      STRONG match auto-resolves ("matched"); weak → "choose". Duplicate listings (same name+price+pack)
+      collapse. Analysis prompt: BOM `function` = 1–4-word noun; analysis BOM = mechanical hardware +
+      consumables only. engine.suggestSpec: a material named in the text wins.
+    * Build route (Task 12): components/prototyping/electronics-route.tsx BuildRouteCard in Electronics ›
+      Components; Prototype preselected, must be confirmed; spec.routeRecommendation shown as advice.
+      Analysis never suggests an electronics part to design; choosing Custom PCB adds a to-design "Custom PCB"
+      part. Readiness requirements electronics_route / electronics_list; Board needs a part only on custom_pcb.
+    * Electronics builder (Task 13): POST /api/bom/electronics → lib/prototyping/electronics-build.ts:
+      listElectronics (model, typed attributes, no passives/consumables) → generateNetlist (validated, one
+      retry; lib/prototyping/ai-call.ts validatedCall meters + records raw/parsed) → deriveElectronics
+      (lib/prototyping/electronics-rules.ts, OURS: LED resistor per LED from E12 at 10 mA, I2C + button
+      pull-ups, 100 nF per bare-IC supply pin, flyback diode per inductive load, level shifter for 5 V→3.3 V
+      nets + worded warning for 3.3 V→5 V, consumables, fabrication line on custom_pcb; merged lines, stable
+      ids, reason text). POST /api/netlist now redraws + re-derives (no relist). Lines carry origin
+      (analysis|electronics|rule), group, class, attributes, reason, fulfilled; bom.dismissed = removed ids.
+    * BOM UI (components/prototyping/bom-table.tsx): groups boards/sensors/discrete/consumables/hardware/
+      fabrication, collapsible with subtotals; weak labels + why; "needs 4, packs of 10"; remove/restore;
+      bought lines; CostSummary = three separate figures (available now QAR / not stocked count / fabrication
+      count) in the BOM and the right panel.
+    * Attributes admin (Task 14): /dashboard/store/attributes (completeness per store category, per-row edit,
+      bulk class/field/pack size, kit discount %). Sheet import accepts tags + pack_size columns. NOTE: the live
+      catalogue has 119 products, NONE attributed yet, many duplicated (e.g. 21 motor listings of 3 products)
+      → until attributes are filled every store match is weak/"choose".
+    * Kits (Task 15): cart-provider rows (rowId, kitId, bomLines, projectName, kit discount); cart page shows a
+      kit as one entry with parts underneath; checkout sends project_id/bom_lines/kit_id.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
