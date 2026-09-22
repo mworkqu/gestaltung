@@ -42,6 +42,8 @@ export type ReadinessInput = {
   spec: Spec | null | undefined;
   parts: PartLike[];
   routeAccepted: boolean;
+  /** Only when the Electronics branch is active: the build route and whether the list exists. */
+  electronics?: { route: string | null; built: boolean } | null;
   /** Bill of materials with its live store matches; absent until matched. */
   bom?: { lines: { id: string; function: string; kind: BomKind }[]; matches: Map<string, { status: LineStatus }> } | null;
 };
@@ -130,6 +132,20 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
         ? t("block_part", { code: part.code, name: part.name, need: t(`partNeed_${needs[0]}`) })
         : ""
     );
+  }
+
+  // Electronics: the client chooses how they are built before any list is
+  // made, then builds the list.
+  if (p.electronics) {
+    add(
+      { id: "electronics_route", group: "bom", label: t("req_electronicsRoute"), satisfied: !!p.electronics.route, focus: "route-card", bomKind: "electronics" },
+      t("block_electronicsRoute")
+    );
+    if (p.electronics.route)
+      add(
+        { id: "electronics_list", group: "bom", label: t("req_electronicsList"), satisfied: p.electronics.built, focus: "route-card", bomKind: "electronics" },
+        t("block_electronicsList")
+      );
   }
 
   // Bill of materials: a line with several store candidates waits on the

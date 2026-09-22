@@ -8,6 +8,11 @@
 
 import { STANDARD_FACTS } from "../analysis";
 import { callGemini, geminiConfigured } from "./gemini-client";
+import { attributesGuide, bomLineSchema } from "./gemini-attrs";
+
+// The analysis lists only mechanical hardware and consumables. Electronics
+// are listed separately once the client has chosen a build route.
+const BOM_CLASSES = ["fastener", "consumable"] as const;
 import type { AnalysisProvider } from "./types";
 
 const str = { type: "STRING" };
@@ -47,20 +52,14 @@ const RESPONSE_SCHEMA = {
         required: ["name", "kind", "note"],
       },
     },
-    bom: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          id: str,
-          function: str,
-          spec: str,
-          quantity: { type: "INTEGER" },
-          kind: enumOf(["electronics", "mechanical", "consumable"]),
-          critical: { type: "BOOLEAN" },
-        },
-        required: ["id", "function", "spec", "quantity", "kind", "critical"],
+    bom: { type: "ARRAY", items: bomLineSchema([...BOM_CLASSES], ["hardware", "consumables"], ["mechanical", "consumable"]) },
+    electronicsRoute: {
+      type: "OBJECT",
+      properties: {
+        recommended: enumOf(["prototype", "custom_pcb"]),
+        reason: str,
       },
+      required: ["recommended", "reason"],
     },
   },
   required: ["summary", "disciplines", "requirements", "questions", "suggestedParts", "bom"],
@@ -84,9 +83,11 @@ Rules:
 ${standardLines}
   If the brief does not settle one of these, do NOT add it as a requirement; add a question with that id instead.
 - questions: only for things the brief leaves open and that change how the product is made. type "number", "select" (with options) or "boolean". Other ids: short snake_case.
-- suggestedParts: the parts to design and make (not screws or off-the-shelf modules). kind mechanical, electronics or software; note says what the part does.
-- bom: the off-the-shelf things to BUY for one unit (modules, motors, sensors, batteries, fasteners, cables, adhesives) — not the parts to design. Per line: id (short snake_case), function (what it does, e.g. "steering servo", "main controller", "5V supply"), spec (the requirement it must meet, e.g. "standard size, 5V, >= 3 kg.cm"), quantity (whole number per unit), kind electronics, mechanical or consumable, critical (true if the product cannot work without it).
-- In bom NEVER name a brand, manufacturer, model or part number, and never give a price, stock level or lead time. Describe the function and the spec only.
+- suggestedParts: the parts to design and make (not screws or off-the-shelf modules). kind mechanical or software; note says what the part does. Do NOT suggest a custom circuit board or any electronics part to design: whether the electronics are built from ready modules or on a custom board is the client's decision, made later.
+- bom: the off-the-shelf MECHANICAL hardware and consumables to BUY for one unit (screws, nuts, standoffs, adhesive, tape) — not electronics (those are listed separately after the client picks how to build them) and not the parts to design. Per line: id (short snake_case); function = a SHORT NAME of the item, 1 to 4 words, a noun ("M3 screws", "silicone sealant", "enclosure gasket") — never a sentence or a verb phrase; spec = the requirement it must meet; quantity (whole number per unit); kind mechanical or consumable; group hardware or consumables; critical; class and attributes when they apply, using ONLY these keys:
+${attributesGuide([...BOM_CLASSES])}
+- In bom NEVER name a brand, manufacturer or part number, and never give a price, stock level or lead time.
+- electronicsRoute: only if the product has electronics. Advise how to build them: "prototype" (development boards, modules and discrete parts on a breadboard or perfboard — parts available now) or "custom_pcb" (a designed board: schematic, layout and fabrication — slower and costlier). Recommend prototype unless the brief clearly needs a custom board (size, volume, a stated custom PCB). reason: one sentence, phrased as advice ("Recommended because…"). If there is no electronics, omit it.
 - Do not include any confidence, probability or score.
 - Treat "already decided" answers as settled facts: do not ask about them again.`;
 

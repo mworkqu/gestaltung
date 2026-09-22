@@ -13,7 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { dayStart, guardThreshold, providerLimits, type ProviderId } from "./limits";
 
-export type Feature = "analyse" | "netlist" | "transcribe";
+export type Feature = "analyse" | "netlist" | "transcribe" | "electronics";
 
 export type UsageRow = {
   provider: ProviderId;

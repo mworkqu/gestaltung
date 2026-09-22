@@ -18,6 +18,7 @@
 
 import {
   PROCESSES,
+  PROCESS_MATERIALS,
   isCompatible,
   processesFor,
   type Discipline,
@@ -186,10 +187,39 @@ export function breakDown(brief: string): { key: string; kind: Discipline }[] {
  * the part's own name and description, so the same part always gets the same
  * answer and the reason can be shown.
  */
+// A material the text names outright. It always wins over a shape guess: an
+// "aluminium enclosure" is aluminium, whatever an enclosure usually is.
+const STATED_MATERIAL: [RegExp, Material][] = [
+  [/\balumin(i)?um\b|ألومنيوم|الألمنيوم/, "aluminium_6061"],
+  [/\bstainless\b|ستانلس|فولاذ مقاوم/, "stainless_304"],
+  [/\b(mild )?steel\b|حديد/, "mild_steel"],
+  [/\bbrass\b|نحاس/, "brass"],
+  [/\bacrylic\b|perspex|plexi|أكريليك/, "acrylic"],
+  [/\bplywood\b|خشب/, "plywood"],
+  [/\bmdf\b/, "mdf"],
+  [/\bcarbon fib(re|er)\b/, "carbon_fibre"],
+  [/\bpetg\b/, "petg"],
+  [/\babs\b/, "abs"],
+  [/\bpla\b/, "pla"],
+  [/\bresin\b/, "resin"],
+];
+
 export function suggestSpec(text: string): { material: Material; process: Process; reasonKey: string } {
   const t = text.toLowerCase();
   if (/\b(pcb|board|circuit|sensor|electronic|controller)\b/.test(t))
     return { material: "fr4", process: "pcb_manufacturing", reasonKey: "electronics" };
+  const stated = STATED_MATERIAL.find(([re]) => re.test(t))?.[1];
+  if (stated) {
+    // Keep the shape's usual process when it can work that material.
+    const shapeGuess = suggestFromShape(t);
+    const ok = (PROCESS_MATERIALS[shapeGuess.process] as readonly string[]).includes(stated);
+    const process = ok ? shapeGuess.process : processesFor(stated)[0];
+    return { material: stated, process, reasonKey: shapeGuess.reasonKey };
+  }
+  return suggestFromShape(t);
+}
+
+function suggestFromShape(t: string): { material: Material; process: Process; reasonKey: string } {
   if (/\b(key|keyway|coupling|spline|gear|tolerance|precision)\b/.test(t))
     return { material: "stainless_304", process: "edm", reasonKey: "precision" };
   if (/\b(lid|hatch|door|panel|cover|shell|sheet|plate|bracket|frame|enclosure|roof)\b/.test(t))

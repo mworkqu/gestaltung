@@ -20,7 +20,8 @@ export default function CheckoutPage() {
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
-  const { items, totalQar, clearCart, ready } = useCart();
+  const { items, totalQar, kitDiscountQar, clearCart, ready } = useCart();
+  const tParts = useTranslations("Parts");
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -71,7 +72,15 @@ export default function CheckoutPage() {
       p_customer_email: customerEmail || null,
       p_delivery_area: deliveryArea,
       p_delivery_notes: deliveryNotes || null,
-      p_items: items.map((i) => ({ part_id: i.partId, quantity: i.quantity })),
+      // Project, BOM lines and kit let the server price kits and mark the
+      // project's lines bought (0025); older databases ignore the extra keys.
+      p_items: items.map((i) => ({
+        part_id: i.partId,
+        quantity: i.quantity,
+        project_id: i.projectId ?? null,
+        bom_lines: i.bomLines ?? [],
+        kit_id: i.kitId ?? null,
+      })),
     });
 
     if (rpcError || !data) {
@@ -197,7 +206,7 @@ export default function CheckoutPage() {
           <h2 className="text-sm font-bold text-heading">{t("summaryTitle")}</h2>
           <ul className="space-y-2">
             {items.map((i) => (
-              <li key={i.sku} className="flex justify-between gap-3 text-sm">
+              <li key={i.rowId ?? i.sku} className="flex justify-between gap-3 text-sm">
                 <span className="min-w-0 truncate text-body">
                   {(locale === "ar" && i.nameAr ? i.nameAr : i.name)}
                   <span className="text-mutedtext"> × {i.quantity}</span>
@@ -208,6 +217,12 @@ export default function CheckoutPage() {
               </li>
             ))}
           </ul>
+          {kitDiscountQar > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-mutedtext">{tParts("kitDiscount")}</span>
+              <span className="tabular-nums text-buy">−{formatPrice(kitDiscountQar, locale)}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between border-t border-borderstrong/40 pt-3 text-sm">
             <span className="font-semibold text-heading">{t("total")}</span>
             <span className="font-bold tabular-nums text-heading">

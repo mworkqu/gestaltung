@@ -102,13 +102,17 @@ export async function adjustCart(
 ): Promise<void> {
   if (delta === 0) return;
 
-  const { data: line } = await supabase
-    .from("cart_items")
-    .select("id, quantity")
-    .eq("user_id", userId)
-    .eq("product_id", productId)
-    .eq("project_id", projectId)
-    .maybeSingle();
+  // Loose lines only: a kit's lines are managed with the kit (0025).
+  const base = () =>
+    supabase
+      .from("cart_items")
+      .select("id, quantity")
+      .eq("user_id", userId)
+      .eq("product_id", productId)
+      .eq("project_id", projectId);
+  let found = await base().is("kit_id", null).limit(1).maybeSingle();
+  if (found.error) found = await base().limit(1).maybeSingle();
+  const line = found.data;
 
   if (!line) {
     if (delta > 0) {

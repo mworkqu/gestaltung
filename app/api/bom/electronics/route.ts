@@ -1,18 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { buildElectronics } from "@/lib/prototyping/electronics-build";
 
-// POST /api/netlist — redraw the circuit for the electronics lines already in
-// the bill of materials, then re-derive the rule lines (passives, level
-// shifters, consumables) from the new circuit.
+// POST /api/bom/electronics — build the electronics bill of materials for the
+// build route the client chose (projects.build_route). Refuses to run before
+// a route is chosen: no electronics list is generated until then.
 //
-// The model returns structure — components, pins, nets, rails — never a
-// picture. Its answer must pass zod (shape) AND crossValidate() (every bomId
-// is a BOM line, every connection names a real component and pin). A failure
-// is sent back once with the problems; a second failure returns them and
-// nothing is saved or drawn (lib/prototyping/ai-call.ts).
-//
-// Test hook (never active in production): NETLIST_TEST_BREAK=1 points one
-// connection at a component that does not exist, on every attempt.
+// Lists the parts (model), wires them (model, validated), then derives the
+// passives, level shifters, consumables and fabrication line (our rules).
 
 export const dynamic = "force-dynamic";
 
@@ -35,13 +29,14 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (error) return Response.json({ error: "not_ready" }, { status: 409 });
   if (!project) return new Response(null, { status: 404 });
+  if (!project.build_route) return Response.json({ error: "no_route" }, { status: 409 });
+  if (!project.brief?.trim()) return Response.json({ error: "no_brief" }, { status: 409 });
 
-  const r = await buildElectronics({ supabase, project, locale, relist: false });
+  const r = await buildElectronics({ supabase, project, locale, relist: true });
   if (!r.ok)
     return Response.json(
       { error: r.error, problems: r.problems },
-      { status: r.error === "no_electronics" ? 422 : r.error === "paused" || r.error === "rate_limited" ? 429 : 502 }
+      { status: r.error === "paused" || r.error === "rate_limited" ? 429 : r.error === "invalid" ? 422 : 502 }
     );
-  if (r.circuit === "failed") return Response.json({ error: "invalid", problems: r.problems.slice(0, 6) }, { status: 422 });
-  return Response.json({ netlist: r.netlist });
+  return Response.json({ circuit: r.circuit, problems: r.problems });
 }

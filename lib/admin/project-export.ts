@@ -98,7 +98,7 @@ export async function buildProjectExport(
     return data;
   };
 
-  const [parts, runs, events, usage, schematics, profile] = await Promise.all([
+  const [parts, runs, events, usage, schematics, profile, kits, orderLines] = await Promise.all([
     soft<ProjectPart[]>("parts", db.from("project_parts").select("*").eq("project_id", projectId).order("position")),
     soft<Row[]>("analysis runs", db.from("analysis_runs").select("*").eq("project_id", projectId).order("created_at")),
     soft<Row[]>("event log", db.from("project_events").select("*").eq("project_id", projectId).order("created_at")),
@@ -108,6 +108,11 @@ export async function buildProjectExport(
       db.from("project_schematics").select("*, revisions:project_schematic_revisions(*)").eq("project_id", projectId)
     ),
     soft<Row>("owner profile", db.from("profiles").select("id, full_name, role, phone, locale").eq("id", project.user_id).maybeSingle()),
+    soft<Row[]>("kits", db.from("project_kits").select("*").eq("project_id", projectId).order("created_at")),
+    soft<Row[]>(
+      "orders",
+      db.from("part_order_items").select("*, order:part_orders(id, status, total_qar, discount_qar, created_at)").eq("project_id", projectId)
+    ),
   ]);
   const allParts = parts ?? [];
 
@@ -200,6 +205,7 @@ export async function buildProjectExport(
       updatedAt: project.updated_at,
       status: projectStatus(project),
       selectedNode: project.stage,
+      buildRoute: (project as { build_route?: string | null }).build_route ?? null,
       stages: project.stages,
       notes: project.notes,
     },
@@ -253,7 +259,7 @@ export async function buildProjectExport(
     bom: (bom?.lines ?? []).map((l) => {
       const m = matchOf.get(l.id);
       const prod = m?.product ?? null;
-      const qty = prod ? orderQty(l.quantity, prod.min_order_qty) : l.quantity;
+      const qty = prod ? orderQty(l.quantity, prod) : l.quantity;
       return {
         ...l,
         status: m?.status ?? null,
@@ -262,11 +268,30 @@ export async function buildProjectExport(
           : null,
         orderQuantity: qty,
         lineTotal: prod && !m?.have ? Math.round(Number(prod.unit_price) * qty * 100) / 100 : null,
-        candidates: (m?.candidates ?? []).map((c) => ({ id: c.id, sku: c.sku, name: c.name, unitPrice: Number(c.unit_price), stockStatus: c.stock_status })),
+        candidates: (m?.candidates ?? []).map((c) => ({
+          id: c.id,
+          sku: c.sku,
+          name: c.name,
+          unitPrice: Number(c.unit_price),
+          stockStatus: c.stock_status,
+          packSize: c.pack_size ?? 1,
+          strength: c.strength,
+          why: c.why,
+        })),
         alreadyHave: m?.have ?? null,
       };
     }),
     bomAnalysedAt: bom?.analysedAt ?? null,
+    bomDismissed: bom?.dismissed ?? [],
+    electronics: {
+      builtAt: bom?.electronicsBuiltAt ?? null,
+      builtForRoute: bom?.route ?? null,
+      routeRecommendation: spec?.routeRecommendation ?? null,
+      levelFlags: bom?.levelFlags ?? [],
+      assumptions: bom?.assumptions ?? [],
+    },
+    kits: kits ?? [],
+    orderLines: orderLines ?? [],
     netlist: netlist ? { ...netlist, checks: sanityChecks(netlist) } : null,
     drawings: {
       dimensionDrawings: allParts

@@ -22,6 +22,8 @@ export type SheetPart = {
   is_published: boolean;
   /** Matcher keywords (migration 0023). Only sent when the sheet has the column. */
   tags?: string[];
+  /** Pieces per sold unit (0025). Only sent when the sheet has the column. */
+  pack_size?: number;
 };
 
 export type SkippedRow = { row: number; sku: string; reason: string };
@@ -59,6 +61,8 @@ const HEADER_ALIASES: Record<string, string> = {
   availability: "stock_status",
   image_url: "image_url",
   tags: "tags",
+  pack_size: "pack_size",
+  pack: "pack_size",
   keywords: "tags",
   image: "image_url",
   photo: "image_url",
@@ -244,6 +248,9 @@ export function parseSheet(text: string): SheetParseResult {
       // Comma- or semicolon-separated, e.g. "servo, 5v, 3kg". Only included
       // when the column exists, so a sheet without it still imports into a
       // database that has not run 0023.
+      ...("pack_size" in colIndex && Number(cell(r, "pack_size")) >= 1
+        ? { pack_size: Math.trunc(Number(cell(r, "pack_size"))) }
+        : {}),
       ...("tags" in colIndex
         ? {
             tags: cell(r, "tags")
@@ -275,4 +282,5 @@ export const SHEET_COLUMNS = [
   { key: "image_url", required: false },
   { key: "is_published", required: false },
   { key: "tags", required: false },
+  { key: "pack_size", required: false },
 ] as const;

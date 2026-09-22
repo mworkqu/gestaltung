@@ -6,7 +6,7 @@
 // refresh facts, but an edited row keeps the client's value and only records
 // what the analysis said beside it, so the UI can show "kept your answer".
 
-import type { Analysis, Answer, FallbackReason, Question } from "./analysis";
+import type { Analysis, Answer, FallbackReason, Question, RouteRecommendation } from "./analysis";
 
 export type RowSource = "brief" | "assumed" | "you";
 
@@ -31,6 +31,8 @@ export type Spec = {
   /** Which reader produced the facts, and why the basic one was used if it was. */
   provider: string;
   fallback: FallbackReason | null;
+  /** The analysis's advice on how to build the electronics (advice only). */
+  routeRecommendation?: RouteRecommendation | null;
 };
 
 export const rowOf = (spec: Spec | null | undefined, id: string) =>
@@ -86,6 +88,8 @@ export function mergeAnalysis(
     confirmed: Boolean(prev?.confirmed) && same,
     provider: meta.provider,
     fallback: meta.fallback,
+    // A basic-reader run cannot advise, so it keeps the earlier advice.
+    routeRecommendation: a.electronicsRoute ?? prev?.routeRecommendation ?? null,
   };
 }
 

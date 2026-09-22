@@ -4,10 +4,27 @@
 
 import { z } from "zod";
 
-import { BOM_KINDS } from "./analysis";
+import { BOM_KINDS, BUILD_ROUTES } from "./analysis";
+import { ATTR_CLASSES, BOM_GROUPS } from "@/lib/store/attributes";
 import { DISCIPLINES, MAX_BRIEF_CHARS } from "./constants";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
+
+/**
+ * Target attribute values for a BOM line: flat, numbers or short strings or
+ * short string lists. Anything else is dropped (a price or a SKU cannot hide
+ * in here — only keys the attribute class knows are ever compared).
+ */
+export const AttributesSchema = z
+  .record(z.string(), z.union([z.number(), z.string().max(60), z.array(z.string().max(30)).max(8)]))
+  .transform((a) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(a)) {
+      if (/price|sku|brand|stock|lead|cost|part_?number|manufacturer/i.test(k)) continue;
+      out[k] = v;
+    }
+    return out;
+  });
 const id = z.string().trim().regex(/^[a-z][a-z0-9_]{0,39}$/);
 const kind = z.enum(DISCIPLINES);
 
@@ -54,12 +71,21 @@ export const AnalysisSchema = RequirementsSchema.extend({
         quantity: z.coerce.number().int().min(1).max(10000),
         kind: z.enum(BOM_KINDS),
         critical: z.boolean(),
+        // An unknown class is dropped rather than failing the whole answer.
+        class: z.string().optional().transform((c) => (c && (ATTR_CLASSES as string[]).includes(c) ? c : undefined)),
+        attributes: AttributesSchema.optional(),
+        group: z.string().optional().transform((g) => (g && (BOM_GROUPS as readonly string[]).includes(g) ? g : undefined)),
       })
     )
     .max(40)
     .default([])
     // Ids must be unique: choices and the netlist refer to lines by id.
     .transform((lines) => lines.filter((l, i) => lines.findIndex((x) => x.id === l.id) === i)),
+  electronicsRoute: z
+    .object({ recommended: z.enum(BUILD_ROUTES), reason: z.string().trim().min(1).max(300) })
+    .nullable()
+    .optional()
+    .catch(null),
 });
 
 export const AnalysisRequestSchema = z.object({

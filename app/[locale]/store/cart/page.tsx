@@ -1,20 +1,25 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
-import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
+import { Minus, Package, Plus, Trash2, ShoppingCart } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/parts/cart-provider";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { formatPrice } from "@/lib/parts/format";
+import type { CartItem } from "@/lib/supabase/types";
+
+// A project kit (lines sharing a kit_id) is one entry: one kit price, with its
+// components listed underneath. Loose lines keep their own quantity controls.
 
 export default function CartPage() {
   const t = useTranslations("Parts");
   const locale = useLocale();
-  const { items, updateQty, removeItem, totalQar, ready } = useCart();
+  const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready } =
+    useCart();
 
-  // Avoid a hydration flash before localStorage is read.
+  // Avoid a hydration flash before the cart is read.
   if (!ready) {
     return <div className="container py-16" />;
   }
@@ -36,6 +41,11 @@ export default function CartPage() {
     );
   }
 
+  const nameOf = (i: CartItem) => (locale === "ar" && i.nameAr ? i.nameAr : i.name);
+  const kits = new Map<string, CartItem[]>();
+  for (const i of items) if (i.kitId) kits.set(i.kitId, [...(kits.get(i.kitId) ?? []), i]);
+  const loose = items.filter((i) => !i.kitId);
+
   return (
     <div className="container space-y-8 py-8">
       <h1 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
@@ -43,27 +53,67 @@ export default function CartPage() {
       </h1>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        {/* Items */}
         <ul className="space-y-3">
-          {items.map((item) => {
-            const name =
-              locale === "ar" && item.nameAr ? item.nameAr : item.name;
+          {[...kits.entries()].map(([kitId, lines]) => {
+            const sum = lines.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+            const price = sum - Math.round(((sum * kitDiscountPct) / 100) * 100) / 100;
             return (
-              <li
-                key={item.sku}
-                className="neu flex items-center gap-4 p-3 sm:p-4"
-              >
+              <li key={kitId} className="neu space-y-3 p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-panel shadow-neu-sm">
+                    <Package className="h-6 w-6 text-cobalt" strokeWidth={1.5} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-heading">
+                      {t("kitTitle", { project: lines[0].projectName ?? "" })}
+                    </p>
+                    <p className="text-[11px] text-mutedtext">{t("kitCount", { count: lines.length })}</p>
+                  </div>
+                  <div className="text-end">
+                    {kitDiscountPct > 0 && (
+                      <p className="text-[11px] text-mutedtext line-through tabular-nums">{formatPrice(sum, locale)}</p>
+                    )}
+                    <p className="text-sm font-bold tabular-nums text-heading">{formatPrice(price, locale)}</p>
+                    {kitDiscountPct > 0 && (
+                      <p className="text-[10.5px] font-semibold text-buy">{t("kitSaving", { pct: kitDiscountPct })}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeKit(kitId)}
+                    aria-label={t("removeKit")}
+                    className="text-mutedtext transition-colors hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <ul className="divide-y divide-borderstrong/40 rounded-xl bg-panel/60 px-3 text-[12.5px]">
+                  {lines.map((i) => (
+                    <li key={i.rowId} className="flex items-center justify-between gap-3 py-1.5">
+                      <span className="min-w-0 truncate text-heading">
+                        {nameOf(i)} <span className="font-mono text-[10.5px] text-faint">{i.sku}</span>
+                      </span>
+                      <span className="shrink-0 tabular-nums text-mutedtext">
+                        × {i.quantity} · {formatPrice(i.unitPrice * i.quantity, locale)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
+
+          {loose.map((item) => {
+            const name = nameOf(item);
+            return (
+              <li key={item.rowId ?? item.sku} className="neu flex items-center gap-4 p-3 sm:p-4">
                 <Link
                   href={`/store/${item.sku}`}
                   className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-panel"
                 >
                   {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={item.imageUrl}
-                      alt={name}
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={item.imageUrl} alt={name} className="h-full w-full object-cover" />
                   ) : (
                     <GearPlaceholder className="h-full w-full" />
                   )}
@@ -77,9 +127,10 @@ export default function CartPage() {
                     {name}
                   </Link>
                   <p className="font-mono text-[11px] text-mutedtext">{item.sku}</p>
-                  <p className="mt-1 text-sm font-medium text-body">
-                    {formatPrice(item.unitPrice, locale)}
-                  </p>
+                  {item.projectName && (
+                    <p className="text-[11px] text-mutedtext">{t("forProject", { project: item.projectName })}</p>
+                  )}
+                  <p className="mt-1 text-sm font-medium text-body">{formatPrice(item.unitPrice, locale)}</p>
                 </div>
 
                 <div className="flex flex-col items-end gap-2">
@@ -87,7 +138,7 @@ export default function CartPage() {
                     <button
                       type="button"
                       aria-label={t("decrease")}
-                      onClick={() => updateQty(item.sku, item.quantity - 1)}
+                      onClick={() => item.rowId && updateQty(item.rowId, item.quantity - 1)}
                       disabled={item.quantity <= item.minOrderQty}
                       className="flex h-8 w-8 items-center justify-center rounded-full text-mutedtext hover:text-heading disabled:opacity-40"
                     >
@@ -99,7 +150,7 @@ export default function CartPage() {
                     <button
                       type="button"
                       aria-label={t("increase")}
-                      onClick={() => updateQty(item.sku, item.quantity + 1)}
+                      onClick={() => item.rowId && updateQty(item.rowId, item.quantity + 1)}
                       className="flex h-8 w-8 items-center justify-center rounded-full text-mutedtext hover:text-heading"
                     >
                       <Plus className="h-3.5 w-3.5" />
@@ -110,7 +161,7 @@ export default function CartPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => removeItem(item.sku)}
+                    onClick={() => item.rowId && removeItem(item.rowId)}
                     aria-label={t("remove")}
                     className="text-mutedtext transition-colors hover:text-destructive"
                   >
@@ -122,15 +173,24 @@ export default function CartPage() {
           })}
         </ul>
 
-        {/* Summary */}
         <aside className="neu h-fit space-y-4 p-5 lg:sticky lg:top-24">
           <h2 className="text-sm font-bold text-heading">{t("summaryTitle")}</h2>
           <div className="flex items-center justify-between text-sm">
             <span className="text-mutedtext">{t("subtotal")}</span>
-            <span className="font-bold tabular-nums text-heading">
-              {formatPrice(totalQar, locale)}
-            </span>
+            <span className="font-bold tabular-nums text-heading">{formatPrice(subtotalQar, locale)}</span>
           </div>
+          {kitDiscountQar > 0 && (
+            <>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-mutedtext">{t("kitDiscount")}</span>
+                <span className="tabular-nums text-buy">−{formatPrice(kitDiscountQar, locale)}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-borderstrong/40 pt-2 text-sm">
+                <span className="font-semibold text-heading">{t("total")}</span>
+                <span className="font-bold tabular-nums text-heading">{formatPrice(totalQar, locale)}</span>
+              </div>
+            </>
+          )}
           <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>
           <Button asChild size="lg" className="w-full rounded-full">
             <Link href="/store/checkout">{t("checkoutCta")}</Link>

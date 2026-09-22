@@ -47,7 +47,7 @@ import {
   type NodeId,
 } from "@/lib/prototyping/tree";
 import type { Discipline } from "@/lib/prototyping/constants";
-import type { LineMatch, ProjectBom } from "@/lib/prototyping/bom";
+import { activeLines, originOf, type LineMatch, type ProjectBom } from "@/lib/prototyping/bom";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
 import { PartsList } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
@@ -58,7 +58,9 @@ import {
   latestReady,
   type SchematicWithRevs,
 } from "@/components/prototyping/schematics-stage";
-import { BomTable } from "@/components/prototyping/bom-table";
+import { BomTable, CostSummary } from "@/components/prototyping/bom-table";
+import { BuildRouteCard, LevelFlags } from "@/components/prototyping/electronics-route";
+import type { BuildRoute } from "@/lib/prototyping/analysis";
 import { DimensionDrawings } from "@/components/prototyping/dimension-drawings";
 import { NetlistView } from "@/components/prototyping/netlist-view";
 import { TreeNav } from "@/components/prototyping/tree-nav";
@@ -211,13 +213,25 @@ export function PrototypingWorkspace({
   const routeAccepted = project.stages?.manufacturing === "complete";
   const tr = (k: string, p?: Record<string, string | number>) => t(k, p);
   const bom: ProjectBom | null = project.bom?.lines ? project.bom : null;
+  const bs = branches(project.disciplines, project.brief, parts);
+  const electronicsActive = bs.some((b) => b.discipline === "electronics" && b.active);
+  const buildRoute = (project.build_route ?? null) as BuildRoute | null;
+  const liveLines = activeLines(bom);
   const ready = projectReadiness(
-    { brief: project.brief, spec, parts, routeAccepted, bom: bom ? { lines: bom.lines, matches } : null },
+    {
+      brief: project.brief,
+      spec,
+      parts,
+      routeAccepted,
+      bom: bom ? { lines: liveLines, matches } : null,
+      electronics: electronicsActive
+        ? { route: buildRoute, built: Boolean(bom?.electronicsBuiltAt) || liveLines.some((l) => originOf(l) === "electronics") }
+        : null,
+    },
     tr
   );
-  const bs = branches(project.disciplines, project.brief, parts);
   const visible = visibleNodes(bs);
-  const states = nodeStates(ready, parts, spec, visible, tr);
+  const states = nodeStates(ready, parts, spec, visible, tr, buildRoute);
   const node = toNode(project.stage, visible);
   const open = ready.requirements.filter((r) => !r.satisfied);
 
@@ -295,24 +309,69 @@ export function PrototypingWorkspace({
     await loadMatches();
   }
 
-  const bomTable = (kind: "all" | "electronics" | "mechanical") => {
-    const lines = (bom?.lines ?? []).filter((l) => kind === "all" || l.kind === kind);
-    if (kind !== "all" && !lines.length) return null;
+  /** Removes lines from the BOM (or brings them back). Rules never re-add them. */
+  async function dismissLines(ids: string[], removed: boolean) {
+    if (!bom) return;
+    const now = new Set(bom.dismissed ?? []);
+    for (const id of ids) {
+      if (removed) now.add(id);
+      else now.delete(id);
+    }
+    await patchProject({ bom: { ...bom, dismissed: [...now] } });
+    await loadMatches();
+  }
+
+  /** Saves the build route; a Custom PCB also gets a board to design. */
+  async function chooseRoute(r: BuildRoute): Promise<boolean> {
+    const { error } = await patchProject({ build_route: r });
+    if (error) {
+      setProject((p) => (p ? { ...p, build_route: buildRoute } : p));
+      return false;
+    }
+    if (r === "custom_pcb" && !designOf("electronics").length) {
+      await createClient().from("project_parts").insert({
+        project_id: project!.id,
+        code: `P-${String(nextIndex).padStart(2, "0")}`,
+        position: nextIndex,
+        name: t("customPcbPart"),
+        description: t("customPcbPartDesc"),
+        quantity: 1,
+        source: "to_design",
+        kind: "electronics",
+        material: "fr4",
+        process: "pcb_manufacturing",
+        status: "added",
+      });
+      await load();
+    }
+    return true;
+  }
+
+  const bomTable = (kind: "all" | "electronics" | "mechanical", before?: React.ReactNode) => {
+    const dismissedIds = new Set(bom?.dismissed ?? []);
+    const inKind = (bom?.lines ?? []).filter((l) => kind === "all" || l.kind === kind);
+    const lines = inKind.filter((l) => !dismissedIds.has(l.id));
+    if (kind !== "all" && !inKind.length && !before) return null;
     return (
       <BomTable
         projectId={project.id}
         lines={lines}
+        dismissed={inKind.filter((l) => dismissedIds.has(l.id))}
         matches={matches}
         loading={matchState === "loading"}
         failed={matchState === "failed"}
         onChoose={chooseProduct}
+        onDismiss={dismissLines}
         kicker={kind === "all" ? t("node_bom") : t(`discipline_${kind}`)}
         title={kind === "all" ? t("bomTitle") : t(`bomTitle_${kind}`)}
         intro={kind === "all" ? t("bomIntro") : t("bomBranchIntro")}
         showTotal={kind === "all"}
+        before={before}
       />
     );
   };
+
+  const levelFlags = <LevelFlags flags={bom?.levelFlags ?? []} assumptions={bom?.assumptions ?? []} />;
 
   /** Earlier template drawings stay viewable; new drawings are dimension-based. */
   const earlier = (ps: ProjectPart[]) =>
@@ -566,6 +625,7 @@ export function PrototypingWorkspace({
                 bom={bom}
                 matches={matches}
                 onSaved={load}
+                extra={levelFlags}
               />
               {earlier(designOf("electronics"))}
             </>
@@ -575,7 +635,19 @@ export function PrototypingWorkspace({
             <PowerCard spec={spec} onSet={() => goTo("brief", "fact-power")} />
           )}
 
-          {node === "electronics.components" && bomTable("electronics")}
+          {node === "electronics.components" && (
+            <div id="route-card" tabIndex={-1} className="outline-none">
+              <BuildRouteCard
+                projectId={project.id}
+                route={buildRoute}
+                builtFor={(bom?.route as BuildRoute | undefined) ?? null}
+                recommendation={spec?.routeRecommendation ?? null}
+                onRoute={chooseRoute}
+                onBuilt={load}
+              />
+            </div>
+          )}
+          {node === "electronics.components" && bomTable("electronics", levelFlags)}
           {node === "electronics.components" && (
             <ComponentsCard
               onAddExisting={() => setAddingExisting(true)}
@@ -685,6 +757,16 @@ export function PrototypingWorkspace({
 
           {!collapsed.right && (
             <div className="mt-4 space-y-4">
+              {liveLines.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => goTo("bom")}
+                  className="block w-full rounded-xl bg-panel/60 p-3 text-start shadow-neu-inset transition-colors hover:ring-1 hover:ring-cobalt/30"
+                >
+                  <p className="mb-1.5 text-[11px] font-bold text-heading">{t("costTitle")}</p>
+                  <CostSummary lines={liveLines} matches={matches} compact />
+                </button>
+              )}
               {open.length ? (
                 <ul className="space-y-1.5">
                   {open.slice(0, NEXT_ACTIONS).map((r) => (

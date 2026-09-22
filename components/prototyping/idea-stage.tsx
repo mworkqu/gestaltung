@@ -175,6 +175,9 @@ export function IdeaStage({
       const have = new Set(parts.map((p) => p.name.trim().toLowerCase()));
       let n = Math.max(0, ...parts.map((p) => parseInt(p.code.replace(/\D/g, ""), 10) || 0));
       const rows = result.analysis.suggestedParts
+        // A board to design is the client's choice (the Custom PCB route), never
+        // the analysis's, so electronics are not suggested as parts to design.
+        .filter((p) => p.kind !== "electronics")
         .filter((p) => !kinds.has(p.kind) && !have.has(p.name.trim().toLowerCase()))
         .map((p) => {
           const s = specFor(p);

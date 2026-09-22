@@ -105,8 +105,15 @@ export type PartOrderItem = {
 // A single line in the localStorage cart. Carries the snapshot needed to render
 // the cart without re-fetching, keyed by the part's (unique) SKU.
 export type CartItem = {
+  /** The cart_items row; absent for the legacy localStorage cart. */
+  rowId?: string;
   // Null = bought straight from the store, not tied to any project.
   projectId?: string | null;
+  projectName?: string | null;
+  /** Lines bought together as a project kit share this (0025). */
+  kitId?: string | null;
+  /** The BOM lines this cart line fulfils (0025). */
+  bomLines?: string[];
   partId: string;
   sku: string;
   name: string;
@@ -154,6 +161,8 @@ export type Project = {
   // 0023. Bill of materials (functions to buy) and the electronics netlist.
   bom?: ProjectBom | null;
   netlist?: ProjectNetlist | null;
+  // 0025. How the electronics are built; null until the client chooses.
+  build_route?: "prototype" | "custom_pcb" | null;
   created_at: string;
   updated_at: string;
 };

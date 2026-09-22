@@ -37,7 +37,8 @@ export async function POST(request: Request) {
 
   const matches = await matchProjectBom(supabase, bom, project.user_id as string);
 
-  const gaps = bom.lines.filter((l, i) => matches[i].status === "not_stocked");
+  const notStocked = new Set(matches.filter((m) => m.status === "not_stocked").map((m) => m.lineId));
+  const gaps = bom.lines.filter((l) => notStocked.has(l.id));
   const logged = await Promise.all(
     gaps.map((l) =>
       supabase.rpc("log_sourcing_gap", {

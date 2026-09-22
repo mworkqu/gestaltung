@@ -24,12 +24,24 @@ export type BomKind = (typeof BOM_KINDS)[number];
 /** A thing to buy, as a function and a spec — never a product, price or brand. */
 export type BomLine = {
   id: string;
+  /** A short name for the item ("rechargeable battery"), not a sentence. */
   function: string;
   spec: string;
   quantity: number;
   kind: BomKind;
   critical: boolean;
+  /** Attribute class and target values (lib/store/attributes), when known. */
+  class?: string;
+  attributes?: Record<string, unknown>;
+  /** Display group (boards, sensors, discrete, consumables, hardware, fabrication). */
+  group?: string;
 };
+
+export const BUILD_ROUTES = ["prototype", "custom_pcb"] as const;
+export type BuildRoute = (typeof BUILD_ROUTES)[number];
+
+/** The analysis's advice on how to build the electronics — advice, never a decision. */
+export type RouteRecommendation = { recommended: BuildRoute; reason: string };
 
 export type Analysis = {
   /** One plain-language paragraph. Empty when the provider cannot summarise. */
@@ -40,6 +52,8 @@ export type Analysis = {
   suggestedParts: SuggestedPart[];
   /** Empty from the basic reader: keyword rules cannot write a bill of materials. */
   bom: BomLine[];
+  /** Only when the product has electronics. */
+  electronicsRoute?: RouteRecommendation | null;
 };
 
 /** What the client already decided; a provider treats these as settled. */

@@ -31,7 +31,10 @@ export function NetlistView({
   bom,
   matches,
   onSaved,
+  extra,
 }: {
+  /** Shown above the diagrams (our rules' level-shift warnings). */
+  extra?: React.ReactNode;
   projectId: string;
   netlist: ProjectNetlist | null;
   bom: ProjectBom | null;
@@ -131,6 +134,7 @@ export function NetlistView({
 
       {netlist && (
         <>
+          {extra}
           {flags.length > 0 && (
             <ul className="space-y-1 rounded-xl bg-destructive/5 p-3" aria-label={t("circuitWarnings")}>
               {flags.map((f, i) => (

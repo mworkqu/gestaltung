@@ -128,7 +128,9 @@ export function nodeStates(
   parts: PartLike[],
   spec: Spec | null | undefined,
   visible: NodeId[],
-  t: Translate
+  t: Translate,
+  /** The electronics build route: a board to design is only needed for a custom PCB. */
+  buildRoute: string | null = null
 ): Record<NodeId, NodeState> {
   const out = {} as Record<NodeId, NodeState>;
   for (const n of visible) out[n] = { open: [] };
@@ -162,7 +164,8 @@ export function nodeStates(
   set("mechanical.drawings", mechNeeds(false));
   set("mechanical.process", mechNeeds(true));
 
-  if (!kept("electronics").length) set("electronics.board", nothingKept("electronics", t("need_board")));
+  if (buildRoute === "custom_pcb" && !kept("electronics").length)
+    set("electronics.board", nothingKept("electronics", t("need_board")));
   if (!kept("software").length) set("software.scope", nothingKept("software", t("need_scope")));
 
   const power = rowOf(spec, "power");
