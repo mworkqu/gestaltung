@@ -15,6 +15,8 @@ import { buildElectronics } from "@/lib/prototyping/electronics-build";
 // connection at a component that does not exist, on every attempt.
 
 export const dynamic = "force-dynamic";
+// One model call with one possible retry.
+export const maxDuration = 120;
 
 export async function POST(request: Request) {
   const supabase = await createClient();

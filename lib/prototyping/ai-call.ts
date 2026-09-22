@@ -63,7 +63,7 @@ export async function validatedCall<T>(opts: {
     let raw: unknown = null;
     let value: T | null = null;
     try {
-      const r = await callGemini({ system: opts.system, prompt, schema: opts.schema, temperature: 0.1 });
+      const r = await callGemini({ system: opts.system, prompt, schema: opts.schema, temperature: 0.1, timeoutMs: 55_000 });
       ({ usage, latencyMs } = r);
       rawText = r.rawText;
       raw = r.raw;

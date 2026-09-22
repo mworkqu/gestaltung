@@ -695,6 +695,9 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   confirmed 2026-09-22 by a live analysis saving spec + parts)
 - 0023_bom_netlist_drawings_usage.sql — projects.bom/netlist, part dimensions, parts.tags, sourcing_gaps,
   ai_usage + RPCs (RUN ✔ — confirmed 2026-09-22)
+- 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER
+  0025; the owner ran an early 0025 without it — until 0026 runs, electronics-builder calls work but aren't
+  metered or recorded)
 - 0024_project_diagnostics.sql — analysis_runs + project_events + event triggers (RUN AFTER 0023; the
   export's raw responses and event log are empty until it runs)
 

@@ -22,6 +22,8 @@ export async function callGemini(opts: {
   prompt: string;
   schema: object;
   temperature?: number;
+  /** Long structured answers (parts lists, circuits) need more than the default. */
+  timeoutMs?: number;
 }): Promise<GeminiResult> {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) throw new ProviderError("missing_key");
@@ -49,7 +51,7 @@ export async function callGemini(opts: {
         method: "POST",
         headers: { "content-type": "application/json", "x-goog-api-key": key },
         body: request,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS),
         cache: "no-store",
       });
     } catch (e) {

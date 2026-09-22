@@ -28,8 +28,8 @@
 --    later re-analysis never adds them again.
 --
 -- 6. The event trigger (0024) also records build-route choices, fulfilled and
---    removed BOM lines; analysis_runs / ai_usage accept the new
---    'electronics' feature (the electronics builder's model call).
+--    removed BOM lines. (The 'electronics' feature for analysis_runs /
+--    ai_usage is migration 0026.)
 --
 -- Run after 0024. Safe to re-run.
 -- ============================================================================
@@ -58,14 +58,6 @@ end $$;
 
 alter table public.client_inventory_items
   add column if not exists attributes jsonb not null default '{}'::jsonb;
-
--- The electronics builder is its own metered, recorded feature.
-alter table public.analysis_runs drop constraint if exists analysis_runs_feature_check;
-alter table public.analysis_runs add constraint analysis_runs_feature_check
-  check (feature in ('analyse', 'netlist', 'electronics'));
-alter table public.ai_usage drop constraint if exists ai_usage_feature_check;
-alter table public.ai_usage add constraint ai_usage_feature_check
-  check (feature in ('analyse', 'netlist', 'transcribe', 'electronics'));
 
 -- ── Store settings ───────────────────────────────────────────────────────────
 create table if not exists public.store_settings (

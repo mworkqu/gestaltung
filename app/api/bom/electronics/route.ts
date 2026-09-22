@@ -9,6 +9,8 @@ import { buildElectronics } from "@/lib/prototyping/electronics-build";
 // passives, level shifters, consumables and fabrication line (our rules).
 
 export const dynamic = "force-dynamic";
+// Two model calls in a row (list, then circuit), each up to ~55 s on a busy day.
+export const maxDuration = 180;
 
 export async function POST(request: Request) {
   const supabase = await createClient();
