@@ -645,6 +645,12 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
       bulk class/field/pack size, kit discount %). Sheet import accepts tags + pack_size columns. NOTE: the live
       catalogue has 119 products, NONE attributed yet, many duplicated (e.g. 21 motor listings of 3 products)
       → until attributes are filled every store match is weak/"choose".
+    * VERIFIED END TO END 2026-09-23 on a test project (brief → analyse → Prototype route → build →
+      pick products → Buy as project kit → checkout → Bought): 4 LEDs gave 4x120 Ω resistors at the ESP32's
+      3.3 V, I2C + button pull-ups, flyback diode, consumables; kit = one cart entry; after checkout 7 lines
+      show "Bought", units land on the project and a REBUILD does not re-add them. EN + AR, no overflow at
+      1280 or 375 px. Gemini was flapping 503 all day: callGemini now retries and falls through to
+      GEMINI_FALLBACK_MODEL (default gemini-3.5-flash), structured calls get 90 s, routes 120-300 s.
     * Kits (Task 15): cart-provider rows (rowId, kitId, bomLines, projectName, kit discount); cart page shows a
       kit as one entry with parts underneath; checkout sends project_id/bom_lines/kit_id.
 
@@ -695,6 +701,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   confirmed 2026-09-22 by a live analysis saving spec + parts)
 - 0023_bom_netlist_drawings_usage.sql — projects.bom/netlist, part dimensions, parts.tags, sourcing_gaps,
   ai_usage + RPCs (RUN ✔ — confirmed 2026-09-22)
+- 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
+  bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER
   0025; the owner ran an early 0025 without it — until 0026 runs, electronics-builder calls work but aren't
   metered or recorded)
