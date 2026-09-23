@@ -36,7 +36,13 @@ export function attributesGuide(classes: AttrClass[]): string {
     .join("\n");
 }
 
-export const bomLineSchema = (classes: AttrClass[], groups: readonly string[], kinds: readonly string[]) => ({
+export const bomLineSchema = (
+  classes: AttrClass[],
+  groups: readonly string[],
+  kinds: readonly string[],
+  /** Extra keys the model must always send (the electronics list needs class + group). */
+  alsoRequired: readonly string[] = []
+) => ({
   type: "OBJECT",
   properties: {
     id: { type: "STRING" },
@@ -49,5 +55,5 @@ export const bomLineSchema = (classes: AttrClass[], groups: readonly string[], k
     group: enumOf(groups),
     attributes: attributesSchema(classes),
   },
-  required: ["id", "function", "spec", "quantity", "kind", "critical"],
+  required: ["id", "function", "spec", "quantity", "kind", "critical", ...alsoRequired],
 });

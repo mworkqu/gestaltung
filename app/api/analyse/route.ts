@@ -37,7 +37,7 @@ import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/type
 // answer can be traced to the model or to our parsing.
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 /** Providers the daily guard meters. Others (the basic reader) cost nothing. */
 const METERED: Record<string, ProviderId> = { gemini: "gemini" };

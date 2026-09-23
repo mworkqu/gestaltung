@@ -143,6 +143,66 @@ function scoreAttributes(line: BomLine, p: Candidate): Scored | null {
   };
 }
 
+// What each class is called in a shop. A typed line may match an untyped
+// product on these ("status LED" → "LED Red 5mm"), always weakly, and never
+// when a stated value contradicts.
+const CLASS_WORDS: Record<string, RegExp> = {
+  board: /\b(board|arduino|esp32|esp8266|raspberry|pico|stm32|microcontroller|mcu|uno|nano|mega)\b/i,
+  module: /\b(module|driver|relay|display|lcd|oled|charger|regulator|shield)\b/i,
+  ic: /\b(ic|chip|timer|op-?amp|amplifier)\b/i,
+  sensor: /\b(sensor|probe|detector|dht\d*|hc-?sr\d*|thermistor)\b/i,
+  actuator: /\b(motor|servo|stepper|pump|buzzer|solenoid|fan|vibration)\b/i,
+  led: /\b(led|light emitting)\b/i,
+  resistor: /\b(resistor|resistors)\b/i,
+  capacitor: /\b(capacitor|cap)\b/i,
+  diode: /\b(diode|rectifier|zener|schottky)\b/i,
+  transistor: /\b(transistor|mosfet|npn|pnp)\b/i,
+  switch: /\b(switch|button|tactile|toggle)\b/i,
+  header: /\b(header|connector|terminal|jst|dupont|socket)\b/i,
+  power: /\b(battery|batteries|holder|adapter|supply|psu|solar|charger|usb cable)\b/i,
+  consumable: /\b(breadboard|jumper|perfboard|stripboard|wire|heat.?shrink|solder|tape|cable)\b/i,
+  fastener: /\b(screw|bolt|nut|washer|standoff|rivet)\b/i,
+};
+
+// Some classes cover very different products, and the line's own attribute
+// says which ("consumable" is a breadboard or heat-shrink, never both), so the
+// attribute picks the words rather than the class.
+const TYPE_WORDS: Record<string, Record<string, RegExp>> = {
+  consumable: {
+    breadboard: /\bbreadboard|solderless\b/i,
+    jumper_wires: /\bjumper\b/i,
+    perfboard: /\b(perfboard|strip ?board|proto ?board)\b/i,
+    hookup_wire: /\b(hook-?up|awg|solid core)\b/i,
+    heat_shrink: /\bheat.?shrink\b/i,
+    solder: /\bsolder(?!less)\w*\b/i,
+    usb_cable: /\busb\b/i,
+    cable_ties: /\bcable tie\b/i,
+    adhesive: /\b(glue|adhesive|epoxy)\b/i,
+  },
+  power: {
+    battery: /\bbatter(y|ies)|cell\b/i,
+    battery_holder: /\b(holder|clip|connector)\b/i,
+    adapter: /\b(adapter|adaptor|power supply|psu)\b/i,
+    solar_panel: /\bsolar\b/i,
+    regulator: /\bregulator|buck|boost\b/i,
+    charger: /\bcharger|charging\b/i,
+    usb_cable: /\busb\b/i,
+  },
+};
+
+/** The words an untyped product must contain to be even a weak candidate. */
+function classWordsFor(line: BomLine): RegExp | null {
+  if (!isAttrClass(line.class)) return null;
+  const byType = TYPE_WORDS[line.class];
+  if (byType) {
+    const key = String(
+      (line.attributes as Record<string, unknown> | undefined)?.[line.class === "consumable" ? "consumable_type" : "power_type"] ?? ""
+    );
+    return byType[key] ?? null;
+  }
+  return CLASS_WORDS[line.class] ?? null;
+}
+
 const STOCK_ORDER: Record<string, number> = { in_stock: 0, low_stock: 1, out_of_stock: 2 };
 
 /** Same product listed twice (same name and price): keep the best-stocked one. */
@@ -175,14 +235,19 @@ export function matchLine(
     // Untyped product (or untyped line): text, and never better than weak.
     const k = productKind(p);
     if (k && k !== line.kind) continue;
-    if (valueContradicts(line, productText(p))) continue;
-    const t = scoreText(line, productText(p));
-    if (t.score > 0)
+    const text = productText(p);
+    if (valueContradicts(line, text)) continue;
+    const t = scoreText(line, text);
+    const byClass = classWordsFor(line)?.test(text) ?? false;
+    if (t.score > 0 || byClass)
       scored.push({
         p,
         strength: "weak",
-        score: t.score,
-        why: [isAttrClass(cls) ? "line has no attributes" : "product has no attributes", ...t.why],
+        score: t.score || 1,
+        why: [
+          isAttrClass(cls) ? "line has no attributes" : "product has no attributes",
+          ...(t.why.length ? t.why : [`a ${line.class} by its name`]),
+        ],
       });
   }
 

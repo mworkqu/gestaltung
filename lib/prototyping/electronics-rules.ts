@@ -56,6 +56,20 @@ export function parseVolts(name: string): number | null {
   return Number.isFinite(v) && v > 0 && v < 60 ? v : null;
 }
 
+// What a board family runs its IO at. Used when the line doesn't state
+// logic_v, so an ESP32's LED resistor is sized for 3.3 V, not the 5 V rail
+// that feeds the board.
+const PLATFORM_LOGIC_V: Record<string, number> = {
+  esp32: 3.3,
+  esp8266: 3.3,
+  raspberry_pi: 3.3,
+  raspberry_pi_pico: 3.3,
+  stm32: 3.3,
+  arduino_uno: 5,
+  arduino_nano: 5,
+  arduino_mega: 5,
+};
+
 const LED_VF: Record<string, number> = { red: 2.0, yellow: 2.1, green: 2.2, blue: 3.0, white: 3.0 };
 const LED_MA = 10;
 
@@ -123,8 +137,11 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
     // A component's logic voltage: its line's logic_v, else the rail its
     // supply pin sits on.
     const logicV = (c: NetComponent): number | null => {
-      const lv = Number(lineOf(c)?.attributes?.logic_v);
+      const l = lineOf(c);
+      const lv = Number(l?.attributes?.logic_v);
       if (lv > 0) return lv;
+      const platform = PLATFORM_LOGIC_V[String(l?.attributes?.platform ?? "")];
+      if (platform) return platform;
       for (const p of c.pins.filter((p) => p.type === "power_in")) {
         const net = n.nets.find((x) => x.connections.some((k) => k.ref === c.ref && k.pin === p.id));
         const v = net ? parseVolts(net.name) : null;

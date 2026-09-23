@@ -56,7 +56,7 @@ Rules:
 - Do NOT list resistors, capacitors, diodes or transistors: they are derived from the circuit by our own rules.
 - Do NOT list breadboards, jumper wires, cables or tools: they are added by our own rules.
 - group: boards (boards and modules, motor drivers, relay and display modules), sensors (sensors, actuators, servos, motors, pumps, buzzers, LEDs), discrete (switches, headers, connectors, bare ICs), consumables (batteries, solar panels, power supplies).
-- class and attributes, using ONLY these keys:
+- EVERY line must carry class, group and attributes. class and attributes use ONLY these keys:
 ${attributesGuide(MODEL_CLASSES)}
 - Do not include any confidence, probability or score.`;
 
@@ -86,7 +86,9 @@ ${opts.summary.slice(0, 2000)}
     prompt,
     schema: {
       type: "OBJECT",
-      properties: { lines: { type: "ARRAY", items: bomLineSchema(MODEL_CLASSES, MODEL_GROUPS, ["electronics"]) } },
+      properties: {
+        lines: { type: "ARRAY", items: bomLineSchema(MODEL_CLASSES, MODEL_GROUPS, ["electronics"], ["class", "group", "attributes"]) },
+      },
       required: ["lines"],
     },
     validate: (raw) => {
@@ -176,6 +178,7 @@ Rules:
 - ref: a standard designator — U (ICs, boards, modules), LED (LEDs), J (connectors, batteries, panels), M (motors, servos, pumps), SW (switches, buttons), BT. Unique.
 - pins: the pins that are actually used. id short (e.g. "1", "VCC", "SIG"); name as printed; type one of power_in, power_out, ground, input, output, bidirectional, passive.
 - currentMa: the component's typical current draw in mA (0 for passives and sources).
+- Declare under each component EVERY pin you are going to connect, and connect ONLY pins you declared. Never invent a pin (no "NC", no pin that is not in that component's own pins list), and never leave a pin id empty. A pin that is not used is simply left out.
 - nets: every electrical connection. Each connection names a ref and a pin id that exist. A pin is on at most one net. Name power nets after their rail voltage ("5V", "3V3", "12V") and the ground net "GND". Name I2C nets SDA and SCL.
 - Connect LEDs and buttons directly to the board pins they use: the series resistors and pull-ups are added by our own rules afterwards.
 - powerRails: each supply voltage — name, the ref of the component that supplies it (its pin must be type power_out), and the most current it can supply in mA.
