@@ -653,6 +653,19 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
       GEMINI_FALLBACK_MODEL (default gemini-3.5-flash), structured calls get 90 s, routes 120-300 s.
     * Kits (Task 15): cart-provider rows (rowId, kitId, bomLines, projectName, kit discount); cart page shows a
       kit as one entry with parts underneath; checkout sends project_id/bom_lines/kit_id.
+  - PART 4 (store/inventory, zero-stock catalog) — TASK 16 DONE (code, 2026-09-24). MIGRATION
+    0028_suppliers_and_offers.sql (NOT RUN YET): suppliers (seeded voltaat[mirror, 10% commission, QAR],
+    mouser/digikey[15% overhead], alibaba[25%], aliexpress[10%]), supplier_offers (many per part: sku, url,
+    cost, retail_price, currency, pack_size, moq, availability, lead_time_days, last_checked_at, active),
+    parts.pricing_mode/pinned_offer_id + DERIVED preferred_offer_id, landed_cost_qar, expected_income_qar,
+    income_pct, below_floor, lead_time_class — all maintained IN THE DB by refresh_part_sourcing() via triggers
+    on offers / suppliers / parts(pricing_mode, pinned_offer_id, unit_price, pack_size). Rule: in stock first,
+    shortest lead, lowest landed cost; pinned active offer wins. mirror → unit_price := offer retail × fx and
+    income = price × commission; markup → income = price − landed. store_settings margin_floor_pct (15) +
+    fx_to_qar. Lead class: ≤2d in_stock, ≤5 3_5_days, ≤14 1_2_weeks, else 2_4_weeks; no offer → null
+    ("available on request"). Sourced data may only write lib/store/sourcing.ts SOURCED_OFFER_FIELDS.
+    UI: SourcingPanel on /dashboard/store/[id]/edit, /dashboard/store/suppliers (suppliers + floor + FX,
+    save → refresh_all_part_sourcing), catalog list shows lead time + income % (red ⚠ below floor).
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -701,6 +714,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   confirmed 2026-09-22 by a live analysis saving spec + parts)
 - 0023_bom_netlist_drawings_usage.sql — projects.bom/netlist, part dimensions, parts.tags, sourcing_gaps,
   ai_usage + RPCs (RUN ✔ — confirmed 2026-09-22)
+- 0028_suppliers_and_offers.sql — suppliers, supplier_offers, pricing modes, derived sourcing (RUN AFTER 0027;
+  /dashboard/store/suppliers and the product Sourcing panel show "run 0028" until it runs)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER

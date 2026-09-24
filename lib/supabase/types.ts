@@ -64,6 +64,11 @@ export type Part = {
   is_published: boolean;
   // 0023. Free keywords for the BOM matcher; absent before that migration.
   tags?: string[] | null;
+  // 0028. Derived sourcing; absent before that migration.
+  pricing_mode?: "markup" | "mirror";
+  income_pct?: number | null;
+  below_floor?: boolean;
+  lead_time_class?: "in_stock" | "3_5_days" | "1_2_weeks" | "2_4_weeks" | null;
   created_at: string;
   updated_at: string;
 };

@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Package, Plus, Pencil, ClipboardList, FileSpreadsheet } from "lucide-react";
+import { Package, Plus, Pencil, ClipboardList, FileSpreadsheet, Truck } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
@@ -25,6 +25,7 @@ export default async function PartsCatalogManager({
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
+  const ts = await getTranslations("Sourcing");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -60,6 +61,12 @@ export default async function PartsCatalogManager({
             <Link href="/dashboard/store/orders">
               <ClipboardList className="h-4 w-4" />
               {t("ordersLink")}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-full">
+            <Link href="/dashboard/store/suppliers">
+              <Truck className="h-4 w-4" />
+              {ts("suppliersTitle")}
             </Link>
           </Button>
           <Button asChild variant="outline" className="rounded-full">
@@ -103,7 +110,7 @@ export default async function PartsCatalogManager({
 
       {!error && all.length > 0 && (
         <div className="neu mt-8 overflow-x-auto p-2">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="w-full min-w-[920px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-borderstrong/60">
                 <Th mono={mono}>{t("colSku")}</Th>
@@ -113,6 +120,10 @@ export default async function PartsCatalogManager({
                   {t("colPrice")}
                 </Th>
                 <Th mono={mono}>{t("colStock")}</Th>
+                <Th mono={mono}>{ts("leadTime")}</Th>
+                <Th mono={mono} numeric>
+                  {ts("incomePct")}
+                </Th>
                 <Th mono={mono}>{t("colPublished")}</Th>
                 <Th mono={mono}>
                   <span className="sr-only">{t("colActions")}</span>
@@ -133,6 +144,19 @@ export default async function PartsCatalogManager({
                   </td>
                   <td className="px-4 py-3">
                     <StockBadge status={p.stock_status} />
+                  </td>
+                  <td className="px-4 py-3 text-xs text-body">
+                    {p.lead_time_class ? ts(`lt_${p.lead_time_class}`) : ts("onRequest")}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-3 text-end tabular-nums",
+                      p.below_floor ? "font-bold text-red-700" : "text-body"
+                    )}
+                    title={p.below_floor ? ts("belowFloorShort") : undefined}
+                  >
+                    {p.income_pct === null || p.income_pct === undefined ? "—" : `${p.income_pct}%`}
+                    {p.below_floor && " ⚠"}
                   </td>
                   <td className="px-4 py-3">
                     <PublishedToggle id={p.id} published={p.is_published} />
