@@ -12,7 +12,10 @@ import {
   partImageUrl,
 } from "@/lib/parts/format";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
-import { StockBadge } from "@/components/parts/stock-badge";
+import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
+import { RequestItemButton } from "@/components/parts/request-item-button";
+import { DemandBeacon } from "@/components/parts/demand-beacon";
+import { formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +44,14 @@ export default async function PartDetailPage({
 
   const part = data as Part | null;
   if (!part) notFound();
+
+  // Honest delivery estimate: the same quote checkout will record (0029).
+  const tDelivery = await getTranslations("Delivery");
+  const { data: quoteData } = await supabase.rpc("order_delivery_quote", {
+    p_items: [{ part_id: part.id, quantity: part.min_order_qty }],
+  });
+  const quote = (quoteData ?? null) as DeliveryQuote | null;
+  const onRequest = !part.lead_time_class;
 
   const name = partName(part, locale);
   const description = partDescription(part, locale);
@@ -91,7 +102,7 @@ export default async function PartDetailPage({
               <span className="rounded-md bg-panel px-2 py-0.5 font-mono text-[11px] text-mutedtext">
                 {part.sku}
               </span>
-              <StockBadge status={part.stock_status} />
+              <LeadTimeBadge leadClass={part.lead_time_class} />
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
               {name}
@@ -109,7 +120,29 @@ export default async function PartDetailPage({
             </p>
           </div>
 
-          <PartDetailCart part={part} />
+          {onRequest ? (
+            <p className="text-sm text-body">{tDelivery("onRequestBody")}</p>
+          ) : (
+            quote?.tiers?.standard?.date && (
+              <div className="rounded-xl bg-panel p-3 text-sm shadow-neu-inset">
+                <p className="font-semibold text-heading">
+                  {tDelivery("arrivesBy", { date: formatDeliveryDate(quote.tiers.standard.date, locale) })}
+                  <span className="font-normal text-mutedtext"> · {tDelivery("tier_standard")}</span>
+                </p>
+                <p className="mt-1 text-xs text-mutedtext">
+                  {SHIPPING_TIERS.filter((k) => k !== "standard" && quote.tiers[k]?.date)
+                    .map((k) => `${tDelivery(`tier_${k}`)}: ${formatDeliveryDate(quote.tiers[k]!.date, locale)}`)
+                    .join(" · ")}
+                </p>
+              </div>
+            )
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            {!onRequest && <PartDetailCart part={part} />}
+            <RequestItemButton partId={part.id} partName={name} variant={onRequest ? "default" : "outline"} />
+          </div>
+          <DemandBeacon kind="view" partId={part.id} />
 
           {description && (
             <div className="space-y-2">

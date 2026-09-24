@@ -8,9 +8,11 @@ import type { Part } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/parts/cart-provider";
 import { cn } from "@/lib/utils";
+import { RequestItemButton } from "@/components/parts/request-item-button";
 
 // "Add to Cart" used on the product card. Adds the part's minimum order qty and
-// flashes a confirmation. Disabled when the part is out of stock.
+// flashes a confirmation. A product available on request gets the request
+// button instead.
 export function AddToCartButton({
   part,
   className,
@@ -23,7 +25,10 @@ export function AddToCartButton({
   const t = useTranslations("Parts");
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
-  const out = part.stock_status === "out_of_stock";
+  // No supplier offer → no date we can promise → request it instead.
+  if (!part.lead_time_class) {
+    return <RequestItemButton partId={part.id} partName={part.name} size={size} className={className} />;
+  }
 
   function handleAdd() {
     addItem(part, part.min_order_qty);
@@ -35,7 +40,6 @@ export function AddToCartButton({
     <Button
       type="button"
       size={size}
-      disabled={out}
       onClick={handleAdd}
       className={cn("rounded-full", className)}
     >
@@ -47,7 +51,7 @@ export function AddToCartButton({
       ) : (
         <>
           <Plus className="h-4 w-4" />
-          {out ? t("outOfStockShort") : t("addToCart")}
+          {t("addToCart")}
         </>
       )}
     </Button>

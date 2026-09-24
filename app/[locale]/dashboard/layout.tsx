@@ -41,6 +41,7 @@ export default async function DashboardLayout({
           { href: "/dashboard/leads", label: t("leads") },
           { href: "/dashboard/store/orders", label: t("partsOrders") },
           { href: "/dashboard/store", label: t("partsCatalog") },
+          { href: "/dashboard/store/quick", label: t("quickAdd") },
           { href: "/dashboard/store/attributes", label: t("storeAttributes") },
           { href: "/dashboard/store/suppliers", label: t("suppliers") },
           { href: "/dashboard/store/gaps", label: t("sourcingGaps") },

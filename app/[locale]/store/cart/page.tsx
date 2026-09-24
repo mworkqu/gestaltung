@@ -9,15 +9,21 @@ import { useCart } from "@/components/parts/cart-provider";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { formatPrice } from "@/lib/parts/format";
 import type { CartItem } from "@/lib/supabase/types";
+import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
+import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
+import { formatDeliveryDate } from "@/lib/store/delivery";
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
 
 export default function CartPage() {
   const t = useTranslations("Parts");
+  const tD = useTranslations("Delivery");
   const locale = useLocale();
   const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready } =
     useCart();
+  const { quote } = useDeliveryQuote(items);
+  const onRequest = new Set(quote?.on_request ?? []);
 
   // Avoid a hydration flash before the cart is read.
   if (!ready) {
@@ -91,7 +97,8 @@ export default function CartPage() {
                   {lines.map((i) => (
                     <li key={i.rowId} className="flex items-center justify-between gap-3 py-1.5">
                       <span className="min-w-0 truncate text-heading">
-                        {nameOf(i)} <span className="font-mono text-[10.5px] text-faint">{i.sku}</span>
+                        {nameOf(i)} <span className="font-mono text-[10.5px] text-faint">{i.sku}</span>{" "}
+                        <LeadTimeBadge leadClass={i.leadTimeClass} />
                       </span>
                       <span className="shrink-0 tabular-nums text-mutedtext">
                         × {i.quantity} · {formatPrice(i.unitPrice * i.quantity, locale)}
@@ -126,7 +133,12 @@ export default function CartPage() {
                   >
                     {name}
                   </Link>
-                  <p className="font-mono text-[11px] text-mutedtext">{item.sku}</p>
+                  <p className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-mutedtext">
+                    {item.sku} <LeadTimeBadge leadClass={item.leadTimeClass} />
+                  </p>
+                  {onRequest.has(item.partId) && (
+                    <p className="text-[11px] font-medium text-amber-700">{tD("cartOnRequest")}</p>
+                  )}
                   {item.projectName && (
                     <p className="text-[11px] text-mutedtext">{t("forProject", { project: item.projectName })}</p>
                   )}
@@ -191,10 +203,24 @@ export default function CartPage() {
               </div>
             </>
           )}
+          {quote?.tiers?.standard?.date && (
+            <div className="rounded-xl bg-panel p-3 text-[12.5px] shadow-neu-inset">
+              <p className="font-semibold text-heading">
+                {tD("arrivesBy", { date: formatDeliveryDate(quote.tiers.standard.date, locale) })}
+                <span className="font-normal text-mutedtext"> · {tD("tier_standard")}</span>
+              </p>
+              {quote.held_by && <p className="mt-1 text-mutedtext">{tD("heldBy", { item: quote.held_by })}</p>}
+              <p className="mt-1 text-faint">{tD("shippingAtCheckout")}</p>
+            </div>
+          )}
           <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>
-          <Button asChild size="lg" className="w-full rounded-full">
-            <Link href="/store/checkout">{t("checkoutCta")}</Link>
-          </Button>
+          {onRequest.size > 0 ? (
+            <p className="text-[12px] font-medium text-amber-700">{tD("cartBlocked")}</p>
+          ) : (
+            <Button asChild size="lg" className="w-full rounded-full">
+              <Link href="/store/checkout">{t("checkoutCta")}</Link>
+            </Button>
+          )}
           <Button asChild variant="ghost" className="w-full rounded-full">
             <Link href="/store">{t("continueShopping")}</Link>
           </Button>

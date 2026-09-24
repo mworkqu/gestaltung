@@ -13,6 +13,7 @@ import type { CartItem, Part } from "@/lib/supabase/types";
 import { cartItemCount, cartTotal, getCart, saveCart, toCartItem } from "@/lib/parts/cart";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession } from "@/lib/supabase/guest";
+import { trackDemand } from "@/lib/store/demand-client";
 
 // ── The cart ────────────────────────────────────────────────────────────────
 //
@@ -174,6 +175,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     async (part: Part, qty: number, projectId: string | null = null, opts: AddOptions = {}) => {
       const quantity = Math.max(part.min_order_qty, Math.trunc(qty) || part.min_order_qty);
       const user = await ensureSession();
+      trackDemand("add_to_cart", { partId: part.id });
       const supabase = createClient();
       const kitId = opts.kitId ?? null;
 

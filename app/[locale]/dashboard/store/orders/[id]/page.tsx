@@ -11,6 +11,7 @@ import { DELIVERY_AREAS } from "@/lib/parts/constants";
 import { OrderStatusSelect } from "@/components/parts/order-status-select";
 import { WhatsappSentToggle } from "@/components/parts/whatsapp-sent-toggle";
 import { cn } from "@/lib/utils";
+import { formatDeliveryDate } from "@/lib/store/delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,18 @@ export default async function OrderDetailPage({
     minute: "2-digit",
   });
 
+  // Shipping + promise (0029); absent on older orders.
+  const tD = await getTranslations("Delivery");
+  const ship = order as unknown as {
+    shipping_tier?: string | null;
+    split_shipments?: boolean;
+    shipping_qar?: number | null;
+    handling_fee_qar?: number | null;
+    promised_date?: string | null;
+    early_promised_date?: string | null;
+    held_by?: string | null;
+    delay_notified_at?: string | null;
+  };
   const areaLabel = (DELIVERY_AREAS as readonly string[]).includes(order.delivery_area)
     ? t(`area_${order.delivery_area}`)
     : order.delivery_area;
@@ -147,6 +160,17 @@ export default async function OrderDetailPage({
             {field(t("colArea"), areaLabel)}
             {order.delivery_notes && field(t("notesLabel"), order.delivery_notes)}
             {field(t("colDate"), dateFmt.format(new Date(order.created_at)))}
+            {ship.shipping_tier &&
+              field(
+                tD("shippingLabel"),
+                `${tD(`tier_${ship.shipping_tier}`)}${ship.split_shipments ? ` · ${tD("twoShipments")}` : ""} · ${formatPrice(Number(ship.shipping_qar ?? 0), locale)} + ${formatPrice(Number(ship.handling_fee_qar ?? 0), locale)}`
+              )}
+            {ship.promised_date &&
+              field(
+                tD("promised"),
+                `${ship.early_promised_date ? `${formatDeliveryDate(ship.early_promised_date, locale)} / ` : ""}${formatDeliveryDate(ship.promised_date, locale)}${ship.held_by ? ` · ${tD("heldBy", { item: ship.held_by })}` : ""}`
+              )}
+            {ship.delay_notified_at && field(tD("delayNotified"), dateFmt.format(new Date(ship.delay_notified_at)))}
           </dl>
 
           <div className="neu space-y-4 p-5">

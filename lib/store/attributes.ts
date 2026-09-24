@@ -254,3 +254,21 @@ export function parseEng(s: string): number | null {
   const n = Number(m[1]);
   return Number.isFinite(n) ? n * mult[m[2]] : null;
 }
+
+/** Keeps only the class's own fields, with numbers parsed ("10k" → 10000). */
+export function cleanAttributes(raw: Attributes): Attributes {
+  if (!isAttrClass(raw.class)) return {};
+  const out: Attributes = { class: raw.class };
+  for (const f of fieldsOf(raw.class)) {
+    const v = raw[f.key];
+    if (v === undefined || v === null || v === "") continue;
+    if (f.type === "number") {
+      const n = typeof v === "number" ? v : parseEng(String(v));
+      if (n !== null && Number.isFinite(n)) out[f.key] = n;
+    } else if (f.type === "list") {
+      const list = (Array.isArray(v) ? v : String(v).split(",")).map((x) => String(x).trim().toLowerCase()).filter(Boolean);
+      if (list.length) out[f.key] = list;
+    } else out[f.key] = String(v).trim();
+  }
+  return out;
+}

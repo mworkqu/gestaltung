@@ -11,6 +11,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/parts/format";
 import { DELIVERY_AREAS, LAST_ORDER_KEY } from "@/lib/parts/constants";
 import { cn } from "@/lib/utils";
+import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
+import { formatDeliveryDate, shippingTotal, SHIPPING_TIERS, type ShippingTier } from "@/lib/store/delivery";
 
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -22,6 +24,17 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, totalQar, kitDiscountQar, clearCart, ready } = useCart();
   const tParts = useTranslations("Parts");
+  const tD = useTranslations("Delivery");
+  const { quote, legacy } = useDeliveryQuote(items);
+  const [tier, setTier] = useState<ShippingTier>("standard");
+  const [split, setSplit] = useState(false);
+  const canSplit = Boolean(quote?.can_split);
+  const doSplit = split && canSplit;
+  const shippingQar = quote ? shippingTotal(quote, tier, doSplit) : 0;
+  const handlingQar = quote?.handling_fee_qar ?? 0;
+  const grandTotal = Math.round((totalQar + shippingQar + handlingQar) * 100) / 100;
+  const chosen = quote?.tiers[tier];
+  const blocked = !legacy && (!quote || (quote.on_request?.length ?? 0) > 0 || !chosen?.date);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +75,10 @@ export default function CheckoutPage() {
       setError(t("errorEmpty"));
       return;
     }
+    if (blocked) {
+      setError(tD("errorNoDate"));
+      return;
+    }
 
     setSubmitting(true);
     const supabase = createClient();
@@ -81,6 +98,8 @@ export default function CheckoutPage() {
         bom_lines: i.bomLines ?? [],
         kit_id: i.kitId ?? null,
       })),
+      // Before migration 0029 the RPC has no shipping parameters.
+      ...(legacy ? {} : { p_shipping_tier: tier, p_split: doSplit }),
     });
 
     if (rpcError || !data) {
@@ -99,19 +118,35 @@ export default function CheckoutPage() {
         JSON.stringify({
           id: orderId,
           customerName,
-          total: totalQar,
+          total: grandTotal,
+          shippingQar,
+          handlingQar,
+          tier,
+          split: doSplit,
+          promisedDate: chosen?.date ?? null,
+          earlyDate: doSplit ? chosen?.early_date ?? null : null,
+          heldBy: quote?.held_by ?? null,
           items: items.map((i) => ({
             sku: i.sku,
             name: i.name,
             nameAr: i.nameAr,
             quantity: i.quantity,
             unitPrice: i.unitPrice,
+            leadTimeClass: i.leadTimeClass ?? null,
           })),
         })
       );
     } catch {
       // sessionStorage unavailable — the success page falls back gracefully.
     }
+
+    // Confirmation email with the promised date(s); sent once, server-side.
+    void fetch("/api/orders/confirmation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId, locale }),
+      keepalive: true,
+    }).catch(() => {});
 
     clearCart();
     router.push({ pathname: "/store/checkout/success", query: { order: orderId } });
@@ -175,6 +210,50 @@ export default function CheckoutPage() {
             </select>
           </div>
 
+          <fieldset className="space-y-2">
+            <legend className={mono("block text-[10px] text-mutedtext")}>{tD("shippingLabel")}</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {SHIPPING_TIERS.filter((k) => quote?.tiers[k]).map((k) => {
+                const q = quote!.tiers[k]!;
+                return (
+                  <label
+                    key={k}
+                    className={cn(
+                      "cursor-pointer rounded-xl border bg-panel p-3 text-sm shadow-neu-sm transition",
+                      tier === k ? "border-cobalt ring-2 ring-cobalt/40" : "border-white/60"
+                    )}
+                  >
+                    <input type="radio" name="tier" value={k} checked={tier === k} onChange={() => setTier(k)} className="sr-only" />
+                    <span className="block font-semibold text-heading">{tD(`tier_${k}`)}</span>
+                    <span className="block tabular-nums text-body">{formatPrice(q.carrier_cost_qar * (doSplit ? 2 : 1), locale)}</span>
+                    <span className="block text-[12px] text-mutedtext">
+                      {q.date ? tD("arrivesBy", { date: formatDeliveryDate(q.date, locale) }) : "—"}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            {quote?.held_by && (
+              <div className="rounded-xl bg-panel p-3 text-[12.5px] shadow-neu-inset">
+                <p className="text-body">
+                  {doSplit
+                    ? tD("splitSummary", {
+                        early: formatDeliveryDate(chosen?.early_date, locale),
+                        late: formatDeliveryDate(chosen?.date, locale),
+                      })
+                    : tD("oneShipment", { date: formatDeliveryDate(chosen?.date, locale), item: quote.held_by })}
+                </p>
+                {canSplit && (
+                  <label className="mt-2 flex items-center gap-2 text-heading">
+                    <input type="checkbox" checked={split} onChange={(e) => setSplit(e.target.checked)} />
+                    {tD("splitOption", { cost: formatPrice(chosen?.carrier_cost_qar ?? 0, locale) })}
+                  </label>
+                )}
+              </div>
+            )}
+            <p className="text-[11px] text-faint">{tD("promiseNote")}</p>
+          </fieldset>
+
           <div className="space-y-2">
             {label("delivery_notes", t("notesLabel"))}
             <textarea
@@ -191,7 +270,7 @@ export default function CheckoutPage() {
           )}
 
           <div className="flex items-center gap-3">
-            <Button type="submit" size="lg" disabled={submitting} className="rounded-full">
+            <Button type="submit" size="lg" disabled={submitting || blocked} className="rounded-full">
               {submitting && <Loader2 className="animate-spin" />}
               {t("placeOrder")}
             </Button>
@@ -210,6 +289,9 @@ export default function CheckoutPage() {
                 <span className="min-w-0 truncate text-body">
                   {(locale === "ar" && i.nameAr ? i.nameAr : i.name)}
                   <span className="text-mutedtext"> × {i.quantity}</span>
+                  {i.leadTimeClass && (
+                    <span className="block text-[11px] text-faint">{tD(`lt_${i.leadTimeClass}`)}</span>
+                  )}
                 </span>
                 <span className="shrink-0 tabular-nums text-heading">
                   {formatPrice(i.unitPrice * i.quantity, locale)}
@@ -223,12 +305,28 @@ export default function CheckoutPage() {
               <span className="tabular-nums text-buy">−{formatPrice(kitDiscountQar, locale)}</span>
             </div>
           )}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-mutedtext">
+              {tD("shippingLine", { tier: tD(`tier_${tier}`) })}
+              {doSplit && " × 2"}
+            </span>
+            <span className="tabular-nums text-heading">{formatPrice(shippingQar, locale)}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-mutedtext">{tD("handlingLine")}</span>
+            <span className="tabular-nums text-heading">{formatPrice(handlingQar, locale)}</span>
+          </div>
           <div className="flex items-center justify-between border-t border-borderstrong/40 pt-3 text-sm">
             <span className="font-semibold text-heading">{t("total")}</span>
             <span className="font-bold tabular-nums text-heading">
-              {formatPrice(totalQar, locale)}
+              {formatPrice(grandTotal, locale)}
             </span>
           </div>
+          {chosen?.date && (
+            <p className="text-[12.5px] font-semibold text-heading">
+              {tD("arrivesBy", { date: formatDeliveryDate(chosen.date, locale) })}
+            </p>
+          )}
           <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>
         </aside>
       </div>

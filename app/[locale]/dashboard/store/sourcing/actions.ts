@@ -165,3 +165,34 @@ export async function saveSourcingSettings(locale: string, floorPct: number, fx:
   revalidate(locale);
   return { ok: true };
 }
+
+export type ShippingSettings = {
+  handling_fee_qar: number;
+  handling_days: number;
+  buffer_days: number;
+  tiers: Record<"express" | "standard" | "economy", { carrier_cost_qar: number; transit_days: number }>;
+};
+
+/** Shipping tiers (real carrier cost + transit), handling fee/days, buffer (Task 18f). */
+export async function saveShippingSettings(locale: string, s: ShippingSettings) {
+  await requireAdmin();
+  const n = (v: unknown, min = 0) => Math.max(min, Number.isFinite(Number(v)) ? Number(v) : min);
+  const d = (v: unknown) => Math.trunc(n(v));
+  const tier = (k: "express" | "standard" | "economy") => ({
+    carrier_cost_qar: n(s.tiers?.[k]?.carrier_cost_qar),
+    transit_days: d(s.tiers?.[k]?.transit_days),
+  });
+  const value = {
+    handling_fee_qar: n(s.handling_fee_qar),
+    handling_days: d(s.handling_days),
+    buffer_days: d(s.buffer_days),
+    tiers: { express: tier("express"), standard: tier("standard"), economy: tier("economy") },
+  };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("store_settings")
+    .upsert({ key: "shipping", value, updated_at: new Date().toISOString() });
+  if (error) return { error: error.message };
+  revalidate(locale);
+  return { ok: true };
+}

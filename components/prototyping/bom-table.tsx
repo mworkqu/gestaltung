@@ -36,7 +36,7 @@ import {
 
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/components/parts/cart-provider";
-import { StockBadge } from "@/components/parts/stock-badge";
+import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { Tag } from "@/components/ui/tag";
 import { Card, PrimaryButton, SoftButton, selectClass } from "@/components/prototyping/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -317,6 +317,7 @@ function Row({
   onDismiss: () => void;
 }) {
   const t = useTranslations("Prototyping");
+  const tD = useTranslations("Delivery");
   const locale = useLocale();
   const p = m?.product ?? null;
   const packs = p ? orderQty(l.quantity, p) : null;
@@ -385,7 +386,7 @@ function Row({
               <option value="">{t("bomChoosePlaceholder", { count: m!.candidates.length })}</option>
               {m!.candidates.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {`${c.strength === "weak" ? `${t("weakPrefix")} ` : ""}${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)} · ${t(`bomStock_${c.stock_status}`)}`}
+                  {`${c.strength === "weak" ? `${t("weakPrefix")} ` : ""}${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)} · ${tD(`lt_${c.lead_time_class ?? "on_request"}`)}`}
                 </option>
               ))}
             </select>
@@ -443,7 +444,7 @@ function Row({
           ) : m?.status === "not_stocked" ? (
             <Tag variant="neutral">{t("bomNotStocked")}</Tag>
           ) : null}
-          {p && !m?.have && !l.fulfilled && <StockBadge status={p.stock_status} />}
+          {p && !m?.have && !l.fulfilled && <LeadTimeBadge leadClass={p.lead_time_class} />}
           {canBuy ? (
             <SoftButton onClick={onAdd} disabled={adding !== null} className="bg-surface">
               {adding === l.id ? (

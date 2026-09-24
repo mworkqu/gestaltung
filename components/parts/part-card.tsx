@@ -4,7 +4,7 @@ import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
 import { formatPrice, partName, partImageUrl } from "@/lib/parts/format";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
-import { StockBadge } from "@/components/parts/stock-badge";
+import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { AddToCartButton } from "@/components/parts/add-to-cart-button";
 
 // Catalog grid card. Server component; the cart action lives in the client
@@ -48,7 +48,7 @@ export async function PartCard({
           >
             {name}
           </Link>
-          <StockBadge status={part.stock_status} className="shrink-0" />
+          <LeadTimeBadge leadClass={part.lead_time_class} className="shrink-0" />
         </div>
 
         <span className="w-fit rounded-md bg-panel px-2 py-0.5 font-mono text-[10px] text-mutedtext">

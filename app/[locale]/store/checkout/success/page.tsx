@@ -8,6 +8,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/parts/format";
 import { LAST_ORDER_KEY } from "@/lib/parts/constants";
+import { formatDeliveryDate } from "@/lib/store/delivery";
 
 const WHATSAPP_DIGITS =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
@@ -16,6 +17,13 @@ type OrderSnapshot = {
   id: string;
   customerName: string;
   total: number;
+  shippingQar?: number;
+  handlingQar?: number;
+  tier?: string;
+  split?: boolean;
+  promisedDate?: string | null;
+  earlyDate?: string | null;
+  heldBy?: string | null;
   items: {
     sku: string;
     name: string;
@@ -27,6 +35,7 @@ type OrderSnapshot = {
 
 export default function CheckoutSuccessPage() {
   const t = useTranslations("Checkout");
+  const tD = useTranslations("Delivery");
   const locale = useLocale();
   const [order, setOrder] = useState<OrderSnapshot | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -92,12 +101,42 @@ export default function CheckoutSuccessPage() {
                 </li>
               ))}
             </ul>
+            {order.tier && (
+              <>
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-mutedtext">{tD("shippingLine", { tier: tD(`tier_${order.tier}`) })}</span>
+                  <span className="tabular-nums text-heading">{formatPrice(order.shippingQar ?? 0, locale)}</span>
+                </div>
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="text-mutedtext">{tD("handlingLine")}</span>
+                  <span className="tabular-nums text-heading">{formatPrice(order.handlingQar ?? 0, locale)}</span>
+                </div>
+              </>
+            )}
             <div className="flex items-center justify-between border-t border-borderstrong/40 pt-3 text-sm">
               <span className="font-semibold text-heading">{t("total")}</span>
               <span className="font-bold tabular-nums text-heading">
                 {formatPrice(order.total, locale)}
               </span>
             </div>
+          </div>
+        )}
+
+        {order?.promisedDate && (
+          <div className="rounded-xl bg-panel p-4 text-start text-sm shadow-neu-inset">
+            {order.split && order.earlyDate ? (
+              <p className="font-semibold text-heading">
+                {tD("splitSummary", {
+                  early: formatDeliveryDate(order.earlyDate, locale),
+                  late: formatDeliveryDate(order.promisedDate, locale),
+                })}
+              </p>
+            ) : (
+              <p className="font-semibold text-heading">
+                {tD("arrivesBy", { date: formatDeliveryDate(order.promisedDate, locale) })}
+              </p>
+            )}
+            <p className="mt-1 text-[12px] text-mutedtext">{tD("promiseKept")}</p>
           </div>
         )}
 

@@ -2,6 +2,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { SuppliersEditor } from "@/components/admin/suppliers-editor";
+import { ShippingSettingsEditor } from "@/components/admin/shipping-settings";
+import type { ShippingSettings } from "@/app/[locale]/dashboard/store/sourcing/actions";
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +22,7 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
   const [suppliersRes, offersRes, settingsRes] = await Promise.all([
     supabase.from("suppliers").select("*").order("name"),
     supabase.from("supplier_offers").select("supplier_id").limit(20000),
-    supabase.from("store_settings").select("key, value").in("key", ["margin_floor_pct", "fx_to_qar"]),
+    supabase.from("store_settings").select("key, value").in("key", ["margin_floor_pct", "fx_to_qar", "shipping"]),
   ]);
 
   const counts: Record<string, number> = {};
@@ -44,6 +46,9 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
           floorPct={Number(setting("margin_floor_pct") ?? 15)}
           fx={(setting("fx_to_qar") as Record<string, number>) ?? { QAR: 1 }}
         />
+      )}
+      {Boolean(setting("shipping")) && (
+        <ShippingSettingsEditor locale={locale} initial={setting("shipping") as ShippingSettings} />
       )}
     </div>
   );

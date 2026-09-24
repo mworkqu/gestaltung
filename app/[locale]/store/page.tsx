@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { PartCard } from "@/components/parts/part-card";
 import { PartsFilters } from "@/components/parts/parts-filters";
+import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { cn } from "@/lib/utils";
 
 // Published catalog reflects admin publish toggles immediately.
@@ -68,7 +69,8 @@ export default async function PartsStorePage({
       matchesTerm(p) &&
       (!category || p.category === category) &&
       (!material || p.material === material) &&
-      (!stock || p.stock_status === stock)
+      (!stock ||
+        (stock === "on_request" ? !p.lead_time_class : p.lead_time_class === stock))
   );
 
   const waHref = WHATSAPP_DIGITS
@@ -95,6 +97,7 @@ export default async function PartsStorePage({
 
       {parts.length === 0 ? (
         <div className="neu flex flex-col items-center gap-4 p-12 text-center">
+          {term && <DemandBeacon kind="zero_search" searchTerm={q!.trim()} />}
           <p className="text-base font-semibold text-heading">{t("emptyTitle")}</p>
           <p className="max-w-md text-sm text-mutedtext">{t("emptyBody")}</p>
           {waHref ? (

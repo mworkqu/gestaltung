@@ -8,7 +8,7 @@ import { matchProjectBom } from "@/lib/prototyping/bom-server";
 //
 // Each "not stocked" line is written to sourcing_gaps (0023) — the restocking
 // list, written by demand. One row per project and function, refreshed on
-// every match.
+// every match. They are also recorded as `bom_unmatched` demand signals.
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +52,16 @@ export async function POST(request: Request) {
   );
   const failed = logged.find((r) => r.error);
   if (failed) console.warn(`[bom] sourcing gap not logged: ${failed.error!.message}`);
+
+  // The same lines as demand signals (0029): a part a customer needs to finish
+  // a project. One row per project + line, however often it is matched.
+  if (gaps.length) {
+    const { error: demandError } = await supabase.rpc("record_bom_demand", {
+      p_project: projectId,
+      p_lines: gaps.map((l) => ({ id: l.id, label: [l.function, l.spec].filter(Boolean).join(" — "), quantity: l.quantity })),
+    });
+    if (demandError) console.warn(`[bom] demand not recorded: ${demandError.message}`);
+  }
 
   return Response.json({ matches });
 }

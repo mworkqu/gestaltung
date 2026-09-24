@@ -127,6 +127,8 @@ export type CartItem = {
   imageUrl: string | null;
   minOrderQty: number;
   stockStatus: StockStatus;
+  /** 0028; null = available on request (cannot be ordered). */
+  leadTimeClass?: "in_stock" | "3_5_days" | "1_2_weeks" | "2_4_weeks" | null;
   quantity: number;
 };
 

@@ -3,7 +3,7 @@
 import { useTranslations, useLocale } from "next-intl";
 
 import { useRouter, usePathname } from "@/i18n/navigation";
-import { STOCK_STATUSES } from "@/lib/parts/constants";
+import { LEAD_TIME_CLASSES } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
 
 type Current = {
@@ -27,6 +27,7 @@ export function PartsFilters({
   current: Current;
 }) {
   const t = useTranslations("Parts");
+  const tD = useTranslations("Delivery");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
@@ -108,10 +109,10 @@ export function PartsFilters({
           </div>
         )}
 
-        {/* Stock status select */}
+        {/* Lead-time select (never "out of stock") */}
         <div className="space-y-2">
           <label htmlFor="stock" className={mono("block text-[10px] text-mutedtext")}>
-            {t("filterStock")}
+            {tD("filterLead")}
           </label>
           <select
             id="stock"
@@ -119,10 +120,10 @@ export function PartsFilters({
             onChange={(e) => apply({ stock: e.target.value })}
             className={cn(fieldClass, isRtl && "text-right")}
           >
-            <option value="">{t("filterAllStock")}</option>
-            {STOCK_STATUSES.map((s) => (
+            <option value="">{tD("filterAllLead")}</option>
+            {[...LEAD_TIME_CLASSES, "on_request" as const].map((s) => (
               <option key={s} value={s}>
-                {t(`stock_${s}`)}
+                {tD(`lt_${s}`)}
               </option>
             ))}
           </select>

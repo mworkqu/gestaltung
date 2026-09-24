@@ -666,6 +666,29 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     ("available on request"). Sourced data may only write lib/store/sourcing.ts SOURCED_OFFER_FIELDS.
     UI: SourcingPanel on /dashboard/store/[id]/edit, /dashboard/store/suppliers (suppliers + floor + FX,
     save → refresh_all_part_sourcing), catalog list shows lead time + income % (red ⚠ below floor).
+  - PART 4 TASKS 17 + 18 DONE (code, 2026-09-24). MIGRATION 0029_intake_demand_delivery.sql (NOT RUN YET):
+    parts.images jsonb + public `product-images` bucket (super_admin writes); demand_signals (view | add_to_cart |
+    request | zero_search | bom_unmatched; served_at for Task 20; writes ONLY via record_demand() [anon ok] and
+    record_bom_demand() [project owner]); store_settings.shipping (tiers express/standard/economy = carrier cost +
+    transit days, handling fee + days, buffer 3); part_orders shipping_tier/split_shipments/shipping_qar/
+    handling_fee_qar/promised_date/early_promised_date/held_by/confirmation_emailed_at/delay_notified_at;
+    part_order_items.lead_time_class/promised_date; lead_class_days(); order_delivery_quote(items) (the ONE date
+    computation — cart/checkout/product page all call it); create_part_order v3 (+p_shipping_tier, p_split; old
+    6-arg version DROPPED; rejects on-request items; total_qar now includes shipping + handling).
+    * Task 17: /dashboard/store/quick (components/admin/quick-entry.tsx) single (Enter saves, sticky category/
+      class/supplier/lead/publish, Alt+I opens picker) + bulk (row per image, filename → name, Ctrl+Enter).
+      lib/google/drive-picker.ts (GIS token, drive.file scope, Picker) → POST /api/admin/drive-import (sharp:
+      1600px + 400px WebP → product-images, returns drive_file_id). quick/actions.ts saveQuickProducts creates
+      part + one supplier offer; lib/store/similar.ts warns on similar names in the same category (numbers must
+      match). Env: NEXT_PUBLIC_GOOGLE_CLIENT_ID / _API_KEY / _APP_ID. cleanAttributes moved to lib/store/attributes.ts.
+    * Task 18: LeadTimeBadge replaces StockBadge on the storefront + BOM table (stock_status no longer shown
+      publicly); filter ?stock= now takes lead classes | on_request. No offer → "Available on request": no add to
+      cart, cart blocks checkout. RequestItemButton on every product (+ owner email). DemandBeacon (view,
+      zero_search), cart-provider addItem → add_to_cart, /api/bom/match → record_bom_demand. Checkout: tier
+      cards (cost + date), split option when lead times differ, handling fee line. /api/orders/confirmation
+      (bilingual email, once, fresh orders only, service key). /api/cron/delivery-promises (vercel.json cron
+      04:00 UTC; needs CRON_SECRET) emails customers before the promised date when an item's lead class changes,
+      moves the promise if later, emails the owner a summary. Shipping settings on /dashboard/store/suppliers.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -716,6 +739,9 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   ai_usage + RPCs (RUN ✔ — confirmed 2026-09-22)
 - 0028_suppliers_and_offers.sql — suppliers, supplier_offers, pricing modes, derived sourcing (RUN AFTER 0027;
   /dashboard/store/suppliers and the product Sourcing panel show "run 0028" until it runs)
+- 0029_intake_demand_delivery.sql — images bucket, demand signals, shipping tiers, promised dates,
+  create_part_order v3 (RUN AFTER 0028; until it runs, checkout detects the missing quote function (PGRST202)
+  and keeps the old no-shipping flow)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER
