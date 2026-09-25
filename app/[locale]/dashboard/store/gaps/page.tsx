@@ -4,11 +4,14 @@ import { ArrowLeft, PackageSearch } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { TestBadge, TestDataToggle, showsTestData } from "@/components/admin/test-data-toggle";
 import { cn } from "@/lib/utils";
 
 // Sourcing gaps: every bill-of-materials line the store could not supply,
 // grouped by function with a count of projects asking for it. The restocking
 // list, written by demand. super_admin only (store layout + RLS).
+// Gaps from test projects (projects.is_test, 0031) are hidden unless ?test=1,
+// and then listed apart from real demand.
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +23,21 @@ type Gap = {
   quantity: number | null;
   project_id: string;
   last_seen: string;
+  project: { is_test: boolean } | null;
 };
 
-export default async function SourcingGapsPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function SourcingGapsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ test?: string }>;
+}) {
   const { locale } = await params;
+  const showTest = showsTestData((await searchParams).test);
   setRequestLocale(locale);
   const t = await getTranslations("SourcingGaps");
+  const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
@@ -35,24 +47,34 @@ export default async function SourcingGapsPage({ params }: { params: Promise<{ l
   });
 
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("sourcing_gaps")
-    .select("function, function_key, spec, kind, quantity, project_id, last_seen")
+    .select("function, function_key, spec, kind, quantity, project_id, last_seen, project:projects!inner(is_test)")
     .order("last_seen", { ascending: false })
     .limit(5000);
-  const gaps = (data ?? []) as Gap[];
+  if (!showTest) query = query.eq("project.is_test", false);
+  const { data, error } = await query;
+  // 42703: is_test does not exist yet — migration 0031 has not run.
+  const needsMigration = error?.code === "42703";
+  const gaps = (data ?? []) as unknown as Gap[];
 
-  const groups = new Map<string, { label: string; projects: Set<string>; specs: Set<string>; kinds: Set<string>; units: number; last: string }>();
+  // Test gaps never merge into real demand: they get their own rows.
+  const groups = new Map<
+    string,
+    { label: string; test: boolean; projects: Set<string>; specs: Set<string>; kinds: Set<string>; units: number; last: string }
+  >();
   for (const g of gaps) {
+    const test = Boolean(g.project?.is_test);
+    const key = `${test ? "test:" : ""}${g.function_key}`;
     const e =
-      groups.get(g.function_key) ??
-      { label: g.function, projects: new Set<string>(), specs: new Set<string>(), kinds: new Set<string>(), units: 0, last: g.last_seen };
+      groups.get(key) ??
+      { label: g.function, test, projects: new Set<string>(), specs: new Set<string>(), kinds: new Set<string>(), units: 0, last: g.last_seen };
     e.projects.add(g.project_id);
     if (g.spec) e.specs.add(g.spec);
     if (g.kind) e.kinds.add(g.kind);
     e.units += g.quantity ?? 0;
     if (g.last_seen > e.last) e.last = g.last_seen;
-    groups.set(g.function_key, e);
+    groups.set(key, e);
   }
   const rows = [...groups.values()].sort((a, b) => b.projects.size - a.projects.size || b.last.localeCompare(a.last));
 
@@ -64,15 +86,20 @@ export default async function SourcingGapsPage({ params }: { params: Promise<{ l
           <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("title")}</h1>
           <p className="mt-1 max-w-[70ch] text-sm text-mutedtext">{t("intro")}</p>
         </div>
-        <Button asChild variant="outline" className="rounded-full">
-          <Link href="/dashboard/store">
-            <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
-            {t("back")}
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <TestDataToggle pathname="/dashboard/store/gaps" showing={showTest} />
+          <Button asChild variant="outline" className="rounded-full">
+            <Link href="/dashboard/store">
+              <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
+              {t("back")}
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {error && <p className="mt-8 text-sm font-medium text-destructive">{t("notReady")}</p>}
+      {error && (
+        <p className="mt-8 text-sm font-medium text-destructive">{needsMigration ? tt("needsMigration") : t("notReady")}</p>
+      )}
 
       {!error && rows.length === 0 && (
         <div className="neu mt-8 flex flex-col items-center gap-4 p-12 text-center">
@@ -97,9 +124,12 @@ export default async function SourcingGapsPage({ params }: { params: Promise<{ l
             </thead>
             <tbody className="divide-y divide-borderstrong/40">
               {rows.map((r) => (
-                <tr key={r.label} className="align-top">
+                <tr key={`${r.test ? "test:" : ""}${r.label}`} className="align-top">
                   <td className="px-3 py-2.5">
-                    <span className="block font-semibold text-heading">{r.label}</span>
+                    <span className="block font-semibold text-heading">
+                      {r.label}
+                      {r.test && <TestBadge />}
+                    </span>
                     <span className="text-[11px] text-mutedtext">{[...r.kinds].map((k) => t(`kind_${k}`)).join(" · ")}</span>
                   </td>
                   <td className="px-3 py-2.5 text-end font-mono tabular-nums text-heading">{r.projects.size}</td>

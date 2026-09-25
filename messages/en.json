@@ -493,6 +493,7 @@
     "error_min_qty": "Minimum order quantity must be a whole number of 1 or more.",
     "error_stock": "Choose a valid stock status.",
     "error_sku_taken": "That SKU is already in use.",
+    "error_duplicate_product": "This product already exists: another product has the same name, material and pack size.",
     "error_unknown": "Something went wrong. Please try again.",
     "import_nav": "Import from sheet",
     "import_kicker": "Store filling",
@@ -516,6 +517,8 @@
     "import_skip_missing_required": "missing SKU, name or category",
     "import_skip_duplicate_sku": "duplicate SKU in the sheet",
     "import_skip_bad_price": "invalid price",
+    "import_skip_duplicate_of": "duplicate of {sku} in the sheet (same name, material and pack size)",
+    "import_skip_exists_as": "exists as {sku} in the store",
     "import_view_store": "View store",
     "import_back": "Back to catalog",
     "import_err_missing": "Your sheet is missing required columns: {cols}.",
@@ -526,6 +529,7 @@
     "import_err_no_header": "The sheet appears to be empty.",
     "import_err_no_rows": "The sheet has headers but no product rows.",
     "import_err_empty": "No valid products were found in the sheet.",
+    "import_err_duplicate": "A row matches a product already in the store under another SKU, so nothing was saved. Check the product names for unusual characters and import again.",
     "import_err_db": "Couldn't save the products. Please try again."
   },
   "StoreLanding": {
@@ -1608,6 +1612,13 @@
     "error_required": "Name and category are required.",
     "error_supplier": "Choose a supplier.",
     "error_price": "Enter a price.",
-    "error_sku": "Couldn't create a unique SKU — try again."
+    "error_sku": "Couldn't create a unique SKU — try again.",
+    "error_duplicate_name": "Already in the store (same name, material and pack size)."
+  },
+  "TestData": {
+    "show": "Show test data",
+    "hide": "Hide test data",
+    "badge": "Test",
+    "needsMigration": "The test-data filter needs migration 0031 — run it in Supabase."
   }
 }

@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 // allowance and where the guard stops calls. Then per feature, a 30-day chart
 // of calls per day, and a per-project total — the figure subscriptions will
 // be billed against. Every number here is counted from logged calls; limits
-// come from lib/ai/limits.
+// come from lib/ai/limits. Calls on test projects (ai_usage.is_test, 0031)
+// are left out, as the daily guard leaves them out.
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("AiUsage");
+  const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const num = new Intl.NumberFormat(locale === "ar" ? "ar-QA" : "en-GB");
@@ -50,6 +52,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
     .from("ai_usage")
     .select("created_at, provider, feature, project_id, total_tokens, audio_seconds, outcome")
     .gte("created_at", since.toISOString())
+    .eq("is_test", false)
     .order("created_at", { ascending: true })
     .limit(20000);
   const rows = (data ?? []) as Row[];
@@ -129,7 +132,12 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
         </p>
       </div>
 
-      {error && <p className="text-sm font-medium text-destructive">{t("notReady")}</p>}
+      {error && (
+        <p className="text-sm font-medium text-destructive">
+          {/* 42703: is_test does not exist yet — migration 0031 has not run. */}
+          {error.code === "42703" ? tt("needsMigration") : t("notReady")}
+        </p>
+      )}
 
       <section className="grid gap-4 md:grid-cols-2">
         {today.map((p) => (
