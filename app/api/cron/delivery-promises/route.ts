@@ -1,8 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { dateChangeEmail, type OrderForEmail } from "@/lib/store/order-email";
-import { LEAD_CLASS_DAYS } from "@/lib/store/delivery";
-import type { LeadTimeClass } from "@/lib/store/sourcing";
+import { reviewPromise } from "@/lib/store/delivery";
 
 // Daily (vercel.json cron): for every open order whose promised date hasn't
 // passed, compare each item's lead-time class now with the one it was sold
@@ -11,19 +10,15 @@ import type { LeadTimeClass } from "@/lib/store/sourcing";
 //   later date   → "new date is …" and the order's promise moves;
 //   same/earlier → "your date still holds";
 //   no offer now → "we can't date it yet, we'll contact you".
-// Item snapshots are updated so each change is emailed once. The owner gets a
-// summary of what was sent.
+// Lines sold "on request" (no lead-time class, 0032) never had a date and are
+// skipped; an order with only such lines has no promised date and isn't
+// selected at all. Item snapshots are updated so each change is emailed once.
+// The owner gets a summary of what was sent.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const OPEN = ["pending", "confirmed", "processing"];
-
-function addDays(iso: string, days: number) {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -56,17 +51,20 @@ export async function GET(request: Request) {
       .eq("order_id", order.id);
     type Row = { id: string; part_name: string; lead_time_class: string | null; part: { lead_time_class: string | null } | null };
     const rows = (items ?? []) as unknown as Row[];
-    const changed = rows.filter((r) => r.part && r.part.lead_time_class !== r.lead_time_class);
-    if (!changed.length) continue;
-
-    const current = rows.map((r) => (r.part ? r.part.lead_time_class : r.lead_time_class));
-    const undatable = current.some((c) => !c);
-    const orderDate = String(order.created_at).slice(0, 10);
-    const transit = cfg.tiers?.[order.shipping_tier ?? "standard"]?.transit_days ?? 0;
-    const lead = Math.max(...current.map((c) => (c ? LEAD_CLASS_DAYS[c as LeadTimeClass] ?? 28 : 0)));
-    const recomputed = undatable ? null : addDays(orderDate, lead + (cfg.handling_days ?? 1) + transit + (cfg.buffer_days ?? 3));
     const oldDate = order.promised_date as string;
-    const newDate = recomputed === null ? null : recomputed > oldDate ? recomputed : oldDate;
+    const review = reviewPromise(
+      rows.map((r) => ({ sold: r.lead_time_class, current: r.part ? r.part.lead_time_class : r.lead_time_class })),
+      {
+        orderDate: String(order.created_at).slice(0, 10),
+        oldDate,
+        handlingDays: cfg.handling_days ?? 1,
+        transitDays: cfg.tiers?.[order.shipping_tier ?? "standard"]?.transit_days ?? 0,
+        bufferDays: cfg.buffer_days ?? 3,
+      }
+    );
+    if (!review) continue;
+    const changed = review.changed.map((i) => rows[i]);
+    const newDate = review.newDate;
 
     let sent = false;
     if (order.customer_email) {

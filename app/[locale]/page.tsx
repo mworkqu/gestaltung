@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
+import { isListed, listedCategories } from "@/lib/store/categories";
 import { cn } from "@/lib/utils";
 
 // Featured products reflect admin publish toggles immediately.
@@ -53,17 +54,17 @@ export default async function Home({
       .eq("is_published", true)
       .order("created_at", { ascending: false })
       .limit(8);
-    products = (data ?? []) as Part[];
+    products = ((data ?? []) as Part[]).filter(isListed);
 
-    // Every published category, not just those in the featured eight, so the
-    // quick-links below cover the whole catalog.
+    // Every category with a listed product (published, not a merged duplicate),
+    // not just those in the featured eight, so the quick-links cover the whole
+    // catalog and never lead to an empty page (audit #15). `*` rather than a
+    // column list so this still works before merged_into exists (0030).
     const { data: catRows } = await supabase
       .from("parts")
-      .select("category")
+      .select("*")
       .eq("is_published", true);
-    categories = Array.from(
-      new Set((catRows ?? []).map((r) => r.category as string).filter(Boolean))
-    ).sort();
+    categories = listedCategories((catRows ?? []) as Part[]);
   }
 
 
@@ -135,7 +136,7 @@ export default async function Home({
             <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
               {t("featured")}
             </h2>
-            <p className="mt-1 text-sm text-mutedtext">{t("featuredSub")}</p>
+            <p className="mt-1 text-sm text-mutedtext">{t("featuredSubOrderable")}</p>
           </div>
           <Link
             href="/store"

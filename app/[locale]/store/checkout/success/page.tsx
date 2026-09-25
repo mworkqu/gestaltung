@@ -24,12 +24,15 @@ type OrderSnapshot = {
   promisedDate?: string | null;
   earlyDate?: string | null;
   heldBy?: string | null;
+  /** Some lines were "available on request": date to be confirmed (0032). */
+  hasOnRequest?: boolean;
   items: {
     sku: string;
     name: string;
     nameAr: string | null;
     quantity: number;
     unitPrice: number;
+    onRequest?: boolean;
   }[];
 };
 
@@ -94,6 +97,7 @@ export default function CheckoutSuccessPage() {
                   <span className="min-w-0 truncate text-body">
                     {(locale === "ar" && i.nameAr ? i.nameAr : i.name)}
                     <span className="text-mutedtext"> × {i.quantity}</span>
+                    {i.onRequest && <span className="block text-[11px] text-faint">{tD("dateTbc")}</span>}
                   </span>
                   <span className="shrink-0 tabular-nums text-heading">
                     {formatPrice(i.unitPrice * i.quantity, locale)}
@@ -122,9 +126,11 @@ export default function CheckoutSuccessPage() {
           </div>
         )}
 
-        {order?.promisedDate && (
+        {(order?.promisedDate || order?.hasOnRequest) && (
           <div className="rounded-xl bg-panel p-4 text-start text-sm shadow-neu-inset">
-            {order.split && order.earlyDate ? (
+            {!order.promisedDate ? (
+              <p className="font-semibold text-heading">{tD("dateTbc")}</p>
+            ) : order.split && order.earlyDate ? (
               <p className="font-semibold text-heading">
                 {tD("splitSummary", {
                   early: formatDeliveryDate(order.earlyDate, locale),
@@ -136,7 +142,8 @@ export default function CheckoutSuccessPage() {
                 {tD("arrivesBy", { date: formatDeliveryDate(order.promisedDate, locale) })}
               </p>
             )}
-            <p className="mt-1 text-[12px] text-mutedtext">{tD("promiseKept")}</p>
+            {order.hasOnRequest && <p className="mt-1 text-[12px] text-mutedtext">{tD("tbcNote")}</p>}
+            {order.promisedDate && <p className="mt-1 text-[12px] text-mutedtext">{tD("promiseKept")}</p>}
           </div>
         )}
 

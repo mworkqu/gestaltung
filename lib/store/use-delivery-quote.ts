@@ -9,10 +9,13 @@ import type { DeliveryQuote } from "@/lib/store/delivery";
  * The server's delivery quote for these cart lines (public.order_delivery_quote).
  * `legacy` is true when the database predates migration 0029 (the function
  * doesn't exist) — checkout then keeps the old flow instead of blocking.
+ * `error` is true when the quote failed for any other reason, so the page can
+ * say so instead of silently showing no delivery options.
  */
 export function useDeliveryQuote(items: { partId: string; quantity: number }[]) {
   const [quote, setQuote] = useState<DeliveryQuote | null>(null);
   const [legacy, setLegacy] = useState(false);
+  const [error, setError] = useState(false);
   const key = items.map((i) => `${i.partId}:${i.quantity}`).join(",");
 
   useEffect(() => {
@@ -30,6 +33,7 @@ export function useDeliveryQuote(items: { partId: string; quantity: number }[]) 
       .then(({ data, error }) => {
         if (cancelled) return;
         setLegacy(error?.code === "PGRST202");
+        setError(Boolean(error) && error?.code !== "PGRST202");
         setQuote((data ?? null) as DeliveryQuote | null);
       });
     return () => {
@@ -37,5 +41,5 @@ export function useDeliveryQuote(items: { partId: string; quantity: number }[]) 
     };
   }, [key]);
 
-  return { quote, legacy };
+  return { quote, legacy, error };
 }

@@ -11,10 +11,12 @@ import { formatPrice } from "@/lib/parts/format";
 import type { CartItem } from "@/lib/supabase/types";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
-import { formatDeliveryDate } from "@/lib/store/delivery";
+import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
+// Lines "available on request" can be checked out at their listed price; their
+// delivery date is to be confirmed after the order (0032).
 
 export default function CartPage() {
   const t = useTranslations("Parts");
@@ -23,7 +25,7 @@ export default function CartPage() {
   const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready } =
     useCart();
   const { quote } = useDeliveryQuote(items);
-  const onRequest = new Set(quote?.on_request ?? []);
+  const toConfirm = (i: CartItem) => isOnRequest(i, quote ? quote.on_request : null);
 
   // Avoid a hydration flash before the cart is read.
   if (!ready) {
@@ -51,6 +53,8 @@ export default function CartPage() {
   const kits = new Map<string, CartItem[]>();
   for (const i of items) if (i.kitId) kits.set(i.kitId, [...(kits.get(i.kitId) ?? []), i]);
   const loose = items.filter((i) => !i.kitId);
+  const anyToConfirm = items.some(toConfirm);
+  const standardDate = quote?.tiers?.standard?.date ?? null;
 
   return (
     <div className="container space-y-8 py-8">
@@ -99,6 +103,7 @@ export default function CartPage() {
                       <span className="min-w-0 truncate text-heading">
                         {nameOf(i)} <span className="font-mono text-[10.5px] text-faint">{i.sku}</span>{" "}
                         <LeadTimeBadge leadClass={i.leadTimeClass} />
+                        {toConfirm(i) && <span className="ms-1 text-[10.5px] text-mutedtext">{tD("dateTbc")}</span>}
                       </span>
                       <span className="shrink-0 tabular-nums text-mutedtext">
                         × {i.quantity} · {formatPrice(i.unitPrice * i.quantity, locale)}
@@ -136,8 +141,8 @@ export default function CartPage() {
                   <p className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-mutedtext">
                     {item.sku} <LeadTimeBadge leadClass={item.leadTimeClass} />
                   </p>
-                  {onRequest.has(item.partId) && (
-                    <p className="text-[11px] font-medium text-amber-700">{tD("cartOnRequest")}</p>
+                  {toConfirm(item) && (
+                    <p className="text-[11px] font-medium text-mutedtext">{tD("dateTbc")}</p>
                   )}
                   {item.projectName && (
                     <p className="text-[11px] text-mutedtext">{t("forProject", { project: item.projectName })}</p>
@@ -203,24 +208,23 @@ export default function CartPage() {
               </div>
             </>
           )}
-          {quote?.tiers?.standard?.date && (
+          {(standardDate || anyToConfirm) && (
             <div className="rounded-xl bg-panel p-3 text-[12.5px] shadow-neu-inset">
-              <p className="font-semibold text-heading">
-                {tD("arrivesBy", { date: formatDeliveryDate(quote.tiers.standard.date, locale) })}
-                <span className="font-normal text-mutedtext"> · {tD("tier_standard")}</span>
-              </p>
-              {quote.held_by && <p className="mt-1 text-mutedtext">{tD("heldBy", { item: quote.held_by })}</p>}
+              {standardDate && (
+                <p className="font-semibold text-heading">
+                  {tD("arrivesBy", { date: formatDeliveryDate(standardDate, locale) })}
+                  <span className="font-normal text-mutedtext"> · {tD("tier_standard")}</span>
+                </p>
+              )}
+              {quote?.held_by && <p className="mt-1 text-mutedtext">{tD("heldBy", { item: quote.held_by })}</p>}
+              {anyToConfirm && <p className="mt-1 text-mutedtext">{tD("tbcNote")}</p>}
               <p className="mt-1 text-faint">{tD("shippingAtCheckout")}</p>
             </div>
           )}
           <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>
-          {onRequest.size > 0 ? (
-            <p className="text-[12px] font-medium text-amber-700">{tD("cartBlocked")}</p>
-          ) : (
-            <Button asChild size="lg" className="w-full rounded-full">
-              <Link href="/store/checkout">{t("checkoutCta")}</Link>
-            </Button>
-          )}
+          <Button asChild size="lg" className="w-full rounded-full">
+            <Link href="/store/checkout">{t("checkoutCta")}</Link>
+          </Button>
           <Button asChild variant="ghost" className="w-full rounded-full">
             <Link href="/store">{t("continueShopping")}</Link>
           </Button>

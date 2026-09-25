@@ -2,11 +2,13 @@
 // table). All functions are pure transforms over a CartItem[] except the
 // read/save pair that touch storage. Items are keyed by SKU (unique per part).
 
-import type { CartItem, Part, StockStatus } from "@/lib/supabase/types";
+import type { CartItem, Part } from "@/lib/supabase/types";
 import { CART_KEY } from "@/lib/parts/constants";
 import type { LeadTimeClass } from "@/lib/store/sourcing";
 
 // A minimal shape (Part or a cart-stored snapshot) that addToCart accepts.
+// stock_status is admin-only and deliberately not carried into the cart
+// (owner decision 4b): the storefront speaks in lead times only.
 type PartLike = {
   id: string;
   sku: string;
@@ -15,7 +17,6 @@ type PartLike = {
   unit_price: number;
   image_url: string | null;
   min_order_qty: number;
-  stock_status: StockStatus;
   lead_time_class?: LeadTimeClass | null;
 };
 
@@ -28,7 +29,6 @@ export function toCartItem(part: PartLike, quantity: number): CartItem {
     unitPrice: part.unit_price,
     imageUrl: part.image_url,
     minOrderQty: part.min_order_qty,
-    stockStatus: part.stock_status,
     leadTimeClass: part.lead_time_class ?? null,
     quantity,
   };

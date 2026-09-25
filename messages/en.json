@@ -326,8 +326,8 @@
   },
   "Parts": {
     "kicker": "Parts store",
-    "heading": "Mechanical Parts Store",
-    "subtext": "Screws, nuts, washers, bolts, and precision fasteners — sourced locally, delivered fast across Qatar.",
+    "heading": "Parts for prototypes and small builds",
+    "subtext": "Sensors, boards, motors, passive components and selected construction supplies, delivered across Qatar. Can't find what you need? Request it and we'll tell you whether we can supply it, and when.",
     "filterCategory": "Category",
     "filterAll": "All",
     "filterMaterial": "Material",
@@ -348,7 +348,7 @@
     "emptyBody": "No parts match your filters yet. Check back soon, or reach out and we'll source it for you.",
     "emptyCta": "Ask on WhatsApp",
     "emptyCtaFallback": "Contact us",
-    "emptyWhatsapp": "Hi, I'm looking for a mechanical part in your store.",
+    "emptyWhatsapp": "Hi, I'm looking for a part that isn't in your store.",
     "breadcrumbStore": "Parts Store",
     "perUnit": "/ unit",
     "descriptionLabel": "Description",
@@ -494,6 +494,11 @@
     "error_stock": "Choose a valid stock status.",
     "error_sku_taken": "That SKU is already in use.",
     "error_duplicate_product": "This product already exists: another product has the same name, material and pack size.",
+    "error_publish_merged": "This product was merged into {sku} and can't be published. Publish {sku} instead.",
+    "error_delete_in_use": "This product can't be deleted because existing orders or projects use it. Unpublish it instead to hide it from the store.",
+    "filter_show_merged": "Show merged",
+    "filter_hide_merged": "Hide merged",
+    "merged_into_badge": "Merged into {sku}",
     "error_unknown": "Something went wrong. Please try again.",
     "import_nav": "Import from sheet",
     "import_kicker": "Store filling",
@@ -517,8 +522,8 @@
     "import_skip_missing_required": "missing SKU, name or category",
     "import_skip_duplicate_sku": "duplicate SKU in the sheet",
     "import_skip_bad_price": "invalid price",
-    "import_skip_duplicate_of": "duplicate of {sku} in the sheet (same name, material and pack size)",
-    "import_skip_exists_as": "exists as {sku} in the store",
+    "import_skip_duplicate_of": "same product as {sku} in the sheet (same name, material and pack size)",
+    "import_skip_exists_as": "already in the store as {sku}",
     "import_view_store": "View store",
     "import_back": "Back to catalog",
     "import_err_missing": "Your sheet is missing required columns: {cols}.",
@@ -529,7 +534,7 @@
     "import_err_no_header": "The sheet appears to be empty.",
     "import_err_no_rows": "The sheet has headers but no product rows.",
     "import_err_empty": "No valid products were found in the sheet.",
-    "import_err_duplicate": "A row matches a product already in the store under another SKU, so nothing was saved. Check the product names for unusual characters and import again.",
+    "import_err_duplicate": "A row matches a product that is already in the store under a different SKU, so nothing was saved. Check the product names for stray or unusual characters, then import again.",
     "import_err_db": "Couldn't save the products. Please try again."
   },
   "StoreLanding": {
@@ -553,7 +558,7 @@
     "cat5": "Fasteners",
     "cat6": "Materials",
     "featured": "Featured products",
-    "featuredSub": "In stock and ready to ship across Qatar",
+    "featuredSubOrderable": "Order at the listed price. Each product shows its delivery time.",
     "viewAll": "View all →",
     "addToCart": "Add",
     "added": "Added",
@@ -807,6 +812,9 @@
     "reanalyse": "Re-analyse",
     "analysing": "Reading the brief…",
     "briefTooShort": "Write a little more first — a sentence or two about what it is.",
+    "aiConsentLabel": "Send my brief to {destination} for analysis. It runs on a free tier, so Google may use the text to improve its services. Don't include anything confidential.",
+    "aiConsentHint": "To withdraw, just don't analyse again. Text already sent can't be recalled.",
+    "aiConsentGiven": "Analysis consent given on {date}",
     "saving": "Saving…",
     "saved": "Saved",
     "claimsHeading": "What we understood",
@@ -1521,7 +1529,19 @@
     "fxLabel": "Exchange rates to QAR",
     "fxHelp": "One per line: USD=3.64. Used for landed cost.",
     "saveSettings": "Save and recalculate",
-    "saved": "Saved — all products recalculated."
+    "saved": "Saved — all products recalculated.",
+    "cov_title": "Offer coverage",
+    "cov_activeOffers": "Active supplier offers",
+    "cov_withOffer": "Published products with an offer",
+    "cov_withoutOffer": "Published products without an offer",
+    "cov_emptyTitle": "No supplier offers yet",
+    "cov_emptyBody": "A product only gets a delivery time from an active supplier offer. With none, every product shows “Available on request” to customers: they can still order it at the listed price, but no delivery date is promised until you confirm one.",
+    "cov_emptyHow": "To publish delivery times, open each product and add an offer in its Sourcing panel.",
+    "cov_openCatalog": "Open the catalog",
+    "cov_openFirst": "Add an offer to {name}",
+    "cov_gapBody": "{count, plural, one {{n} published product has no active offer and shows “Available on request”.} other {{n} published products have no active offer and show “Available on request”.}}",
+    "cov_gapLink": "Show products without an offer",
+    "cov_error": "Couldn't load supplier offers or products, so offer coverage is unknown. Refresh the page to try again."
   },
   "Delivery": {
     "lt_in_stock": "In stock",
@@ -1540,14 +1560,12 @@
     "requestSent": "Thanks — we've got your request and will email you.",
     "requestEmailError": "Please enter a valid email.",
     "requestError": "Couldn't send. Please try again.",
-    "onRequestBody": "We don't have a supplier lined up for this yet, so we can't promise a date. Request it and we'll come back to you with one.",
     "arrivesBy": "Arrives by {date}",
     "tier_express": "Express",
     "tier_standard": "Standard",
     "tier_economy": "Economy",
     "filterLead": "Delivery",
     "filterAllLead": "Any delivery time",
-    "cartOnRequest": "Available on request only — remove it to check out, or request it from its page.",
     "heldBy": "Held back by {item}",
     "shippingAtCheckout": "Choose faster or cheaper shipping at checkout.",
     "cartBlocked": "Some items are available on request only. Remove them to check out.",
@@ -1571,7 +1589,11 @@
     "s_carrier_cost_qar": "Carrier cost (QAR)",
     "s_transit_days": "Transit days",
     "save": "Save",
-    "saved": "Saved."
+    "saved": "Saved.",
+    "dateTbc": "Date to be confirmed",
+    "onRequestOrderable": "You can order it now. We'll confirm the delivery date with you on WhatsApp after you order.",
+    "tbcNote": "Items marked “Date to be confirmed” aren't included in the delivery date shown. We'll confirm their date with you on WhatsApp after you order.",
+    "quoteError": "We couldn't load delivery options. Refresh the page to try again."
   },
   "QuickEntry": {
     "kicker": "Store · fast entry",
@@ -1613,12 +1635,12 @@
     "error_supplier": "Choose a supplier.",
     "error_price": "Enter a price.",
     "error_sku": "Couldn't create a unique SKU — try again.",
-    "error_duplicate_name": "Already in the store (same name, material and pack size)."
+    "error_duplicate_name": "Already in the store: a product with the same name, material and pack size exists."
   },
   "TestData": {
     "show": "Show test data",
     "hide": "Hide test data",
     "badge": "Test",
-    "needsMigration": "The test-data filter needs migration 0031 — run it in Supabase."
+    "needsMigration": "Run migration 0031 in Supabase to enable the test-data filter."
   }
 }

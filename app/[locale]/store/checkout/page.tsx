@@ -11,8 +11,15 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/parts/format";
 import { DELIVERY_AREAS, LAST_ORDER_KEY } from "@/lib/parts/constants";
 import { cn } from "@/lib/utils";
+import type { CartItem } from "@/lib/supabase/types";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
-import { formatDeliveryDate, shippingTotal, SHIPPING_TIERS, type ShippingTier } from "@/lib/store/delivery";
+import {
+  formatDeliveryDate,
+  isOnRequest,
+  shippingTotal,
+  SHIPPING_TIERS,
+  type ShippingTier,
+} from "@/lib/store/delivery";
 
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -25,7 +32,7 @@ export default function CheckoutPage() {
   const { items, totalQar, kitDiscountQar, clearCart, ready } = useCart();
   const tParts = useTranslations("Parts");
   const tD = useTranslations("Delivery");
-  const { quote, legacy } = useDeliveryQuote(items);
+  const { quote, legacy, error: quoteError } = useDeliveryQuote(items);
   const [tier, setTier] = useState<ShippingTier>("standard");
   const [split, setSplit] = useState(false);
   const canSplit = Boolean(quote?.can_split);
@@ -34,7 +41,12 @@ export default function CheckoutPage() {
   const handlingQar = quote?.handling_fee_qar ?? 0;
   const grandTotal = Math.round((totalQar + shippingQar + handlingQar) * 100) / 100;
   const chosen = quote?.tiers[tier];
-  const blocked = !legacy && (!quote || (quote.on_request?.length ?? 0) > 0 || !chosen?.date);
+  // "Available on request" lines are sold at the listed price with the date to
+  // be confirmed (0032); they no longer block checkout. Only a missing quote does.
+  const onRequestIds = quote ? quote.on_request ?? [] : null;
+  const toConfirm = (i: CartItem) => isOnRequest(i, onRequestIds);
+  const anyToConfirm = items.some(toConfirm);
+  const blocked = !legacy && (!quote || !chosen);
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -76,7 +88,7 @@ export default function CheckoutPage() {
       return;
     }
     if (blocked) {
-      setError(tD("errorNoDate"));
+      setError(quoteError ? tD("quoteError") : tD("errorNoDate"));
       return;
     }
 
@@ -104,7 +116,8 @@ export default function CheckoutPage() {
 
     if (rpcError || !data) {
       setSubmitting(false);
-      setError(t("errorSubmit"));
+      // A database without 0032 still refuses on-request items.
+      setError(rpcError?.message?.includes("available on request only") ? tD("cartBlocked") : t("errorSubmit"));
       return;
     }
 
@@ -126,6 +139,7 @@ export default function CheckoutPage() {
           promisedDate: chosen?.date ?? null,
           earlyDate: doSplit ? chosen?.early_date ?? null : null,
           heldBy: quote?.held_by ?? null,
+          hasOnRequest: anyToConfirm,
           items: items.map((i) => ({
             sku: i.sku,
             name: i.name,
@@ -133,6 +147,7 @@ export default function CheckoutPage() {
             quantity: i.quantity,
             unitPrice: i.unitPrice,
             leadTimeClass: i.leadTimeClass ?? null,
+            onRequest: toConfirm(i),
           })),
         })
       );
@@ -227,7 +242,7 @@ export default function CheckoutPage() {
                     <span className="block font-semibold text-heading">{tD(`tier_${k}`)}</span>
                     <span className="block tabular-nums text-body">{formatPrice(q.carrier_cost_qar * (doSplit ? 2 : 1), locale)}</span>
                     <span className="block text-[12px] text-mutedtext">
-                      {q.date ? tD("arrivesBy", { date: formatDeliveryDate(q.date, locale) }) : "—"}
+                      {q.date ? tD("arrivesBy", { date: formatDeliveryDate(q.date, locale) }) : tD("dateTbc")}
                     </span>
                   </label>
                 );
@@ -251,6 +266,8 @@ export default function CheckoutPage() {
                 )}
               </div>
             )}
+            {anyToConfirm && <p className="text-[12px] text-mutedtext">{tD("tbcNote")}</p>}
+            {quoteError && <p className="text-[12px] font-medium text-destructive">{tD("quoteError")}</p>}
             <p className="text-[11px] text-faint">{tD("promiseNote")}</p>
           </fieldset>
 
@@ -289,8 +306,12 @@ export default function CheckoutPage() {
                 <span className="min-w-0 truncate text-body">
                   {(locale === "ar" && i.nameAr ? i.nameAr : i.name)}
                   <span className="text-mutedtext"> × {i.quantity}</span>
-                  {i.leadTimeClass && (
-                    <span className="block text-[11px] text-faint">{tD(`lt_${i.leadTimeClass}`)}</span>
+                  {toConfirm(i) ? (
+                    <span className="block text-[11px] text-faint">{tD("dateTbc")}</span>
+                  ) : (
+                    i.leadTimeClass && (
+                      <span className="block text-[11px] text-faint">{tD(`lt_${i.leadTimeClass}`)}</span>
+                    )
                   )}
                 </span>
                 <span className="shrink-0 tabular-nums text-heading">

@@ -8,9 +8,9 @@ import type { Part } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/parts/cart-provider";
 
-// Quantity stepper + add-to-cart for the product detail page. Products that
-// are only "available on request" never render this (the page shows the
-// request button instead).
+// Quantity stepper + add-to-cart for the product detail page. Products
+// "available on request" use it too: they sell at the listed price and their
+// delivery date is confirmed after the order (0032).
 export function PartDetailCart({ part }: { part: Part }) {
   const t = useTranslations("Parts");
   const { addItem } = useCart();

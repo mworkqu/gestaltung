@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PartCard } from "@/components/parts/part-card";
 import { PartsFilters } from "@/components/parts/parts-filters";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
+import { isListed, listedCategories } from "@/lib/store/categories";
 import { cn } from "@/lib/utils";
 
 // Published catalog reflects admin publish toggles immediately.
@@ -48,9 +49,11 @@ export default async function PartsStorePage({
     .eq("is_published", true)
     .order("name", { ascending: true });
 
-  const all = (data ?? []) as Part[];
+  // A merged duplicate (0030) is never published, but guard anyway so a
+  // category can't be listed for a product nobody can open (audit #15).
+  const all = ((data ?? []) as Part[]).filter(isListed);
 
-  const categories = Array.from(new Set(all.map((p) => p.category))).sort();
+  const categories = listedCategories(all);
   const materials = Array.from(
     new Set(all.map((p) => p.material).filter((m): m is string => !!m))
   ).sort();
