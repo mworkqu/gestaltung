@@ -7,7 +7,8 @@ import { getTranslations } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { STOCK_STATUSES } from "@/lib/parts/constants";
-import { parseSheet, type SkippedRow } from "@/lib/parts/sheet-import";
+import { isDuplicateProductError } from "@/lib/parts/part-key";
+import { parseSheet, type ExistingPart, type SkippedRow } from "@/lib/parts/sheet-import";
 import type { StockStatus } from "@/lib/supabase/types";
 
 export type PartFormState = { error?: string };
@@ -104,6 +105,7 @@ export async function createPart(
   const { error } = await supabase.from("parts").insert(parsed);
 
   if (error) {
+    if (isDuplicateProductError(error)) return { error: t("error_duplicate_product") };
     if (error.code === "23505") return { error: t("error_sku_taken") };
     return { error: t("error_unknown") };
   }
@@ -132,6 +134,7 @@ export async function updatePart(
   const { error } = await supabase.from("parts").update(parsed).eq("id", id);
 
   if (error) {
+    if (isDuplicateProductError(error)) return { error: t("error_duplicate_product") };
     if (error.code === "23505") return { error: t("error_sku_taken") };
     return { error: t("error_unknown") };
   }
@@ -159,7 +162,10 @@ export async function deletePart(formData: FormData): Promise<void> {
 // Fetches a published Google-Sheet CSV and upserts its rows into the STORE
 // catalog (`parts`) by SKU. This is the store the owner sells from — separate
 // from the production inventory. Re-importing treats the sheet as the source of
-// truth (existing SKUs are overwritten). super_admin only; RLS enforces it too.
+// truth (existing SKUs are overwritten), except that it never creates a second
+// copy of a product: rows that duplicate one (same normalised name + material
+// + pack size) in the sheet or in the store are skipped with a reason
+// (audit #7). super_admin only; RLS enforces it too.
 export type ImportResult = {
   ok?: boolean;
   error?:
@@ -171,6 +177,7 @@ export type ImportResult = {
     | "no_rows"
     | "missing_columns"
     | "db"
+    | "duplicate"
     | "empty";
   missing?: string[];
   imported?: number;
@@ -221,7 +228,11 @@ export async function importPartsFromSheet(
     return { error: "fetch_failed" };
   }
 
-  const parsed = parseSheet(text);
+  const supabase = await createClient();
+  const existing = await loadExistingParts(supabase);
+  if (!existing) return { error: "db" };
+
+  const parsed = parseSheet(text, existing);
   if (parsed.error) {
     return { error: parsed.error, missing: parsed.missing };
   }
@@ -229,11 +240,17 @@ export async function importPartsFromSheet(
     return { error: "empty", skipped: parsed.skipped, totalRows: parsed.totalRows };
   }
 
-  const supabase = await createClient();
   const { error } = await supabase
     .from("parts")
     .upsert(parsed.valid, { onConflict: "sku" });
-  if (error) return { error: "db" };
+  if (error) {
+    // Only reachable if the database's normalisation disagrees with ours
+    // (e.g. unusual Unicode); the whole batch is rolled back.
+    if (isDuplicateProductError(error)) {
+      return { error: "duplicate", skipped: parsed.skipped, totalRows: parsed.totalRows };
+    }
+    return { error: "db" };
+  }
 
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/store`);
@@ -243,6 +260,51 @@ export async function importPartsFromSheet(
     skipped: parsed.skipped,
     totalRows: parsed.totalRows,
   };
+}
+
+// Every product in the store (published or not), for the import's duplicate
+// check. Paged: PostgREST returns at most 1000 rows per request. Before
+// migration 0030 there is no merged_into column (Postgres 42703), so nothing
+// counts as merged. Returns null on any other error — the import must not run
+// blind.
+async function loadExistingParts(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<ExistingPart[] | null> {
+  type Row = { id: string; sku: string; name: string; material: string | null; pack_size: number | null; merged_into?: string | null };
+  const rows: Row[] = [];
+  let withMerged = true;
+  const PAGE = 1000;
+  for (let from = 0; ; ) {
+    const cols = withMerged
+      ? "id, sku, name, material, pack_size, merged_into"
+      : "id, sku, name, material, pack_size";
+    const { data, error } = await supabase
+      .from("parts")
+      .select(cols)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) {
+      if (withMerged && error.code === "42703") {
+        withMerged = false;
+        rows.length = 0;
+        from = 0;
+        continue;
+      }
+      return null;
+    }
+    const page = (data ?? []) as unknown as Row[];
+    rows.push(...page);
+    if (page.length < PAGE) break;
+    from += PAGE;
+  }
+  const skuById = new Map(rows.map((r) => [r.id, r.sku]));
+  return rows.map((r) => ({
+    sku: r.sku,
+    name: r.name,
+    material: r.material,
+    pack_size: r.pack_size,
+    merged_into_sku: r.merged_into ? skuById.get(r.merged_into) ?? r.merged_into : null,
+  }));
 }
 
 // Inline publish/unpublish toggle from the catalog table.

@@ -579,7 +579,7 @@ function BulkEntry({
   );
 }
 
-const KNOWN_ERRORS = ["required", "supplier", "price", "sku"] as const;
+const KNOWN_ERRORS = ["required", "supplier", "price", "sku", "duplicate_name"] as const;
 function errorText(t: ReturnType<typeof useTranslations>, e: string) {
   return (KNOWN_ERRORS as readonly string[]).includes(e) ? t(`error_${e}`) : e;
 }

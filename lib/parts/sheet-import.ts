@@ -1,10 +1,17 @@
 import type { StockStatus } from "@/lib/supabase/types";
+import { compareSku, normalizeMaterial, partKey } from "@/lib/parts/part-key";
 
 // Google-Sheet → store catalog import (Stage "store filling"). The owner keeps a
 // spreadsheet on Google Drive, publishes it to the web as CSV, and the admin
 // import page upserts those rows into the `parts` table (the STORE catalog — a
 // completely separate thing from the production `inventory_items`). Pure /
 // dependency-free so it stays easy to reason about and test.
+//
+// One product per normalised name + material + pack size (audit #7, migration
+// 0030). Rows that would create a second copy are skipped with a reason:
+//   duplicate_of <sku>  the sheet already has this product on another row
+//   exists_as <sku>     the store already has it under another SKU (or this
+//                       SKU was merged into <sku>)
 
 export type SheetPart = {
   sku: string;
@@ -26,7 +33,20 @@ export type SheetPart = {
   pack_size?: number;
 };
 
-export type SkippedRow = { row: number; sku: string; reason: string };
+export type SkipReason = "missing_required" | "duplicate_sku" | "bad_price" | "duplicate_of" | "exists_as";
+
+/** `ref` is the SKU the row duplicates (duplicate_of / exists_as). */
+export type SkippedRow = { row: number; sku: string; reason: SkipReason; ref?: string };
+
+/** A product already in the store, as the import needs to see it. */
+export type ExistingPart = {
+  sku: string;
+  name: string;
+  material: string | null;
+  pack_size: number | null;
+  /** SKU of the product this row was merged into (0030), else null. */
+  merged_into_sku: string | null;
+};
 
 export type SheetParseResult = {
   valid: SheetPart[];
@@ -158,8 +178,10 @@ function parseStock(v: string): StockStatus {
 }
 
 // Turn raw CSV text into validated catalog rows. Blank lines are ignored; rows
-// missing a required field are collected in `skipped` with a reason.
-export function parseSheet(text: string): SheetParseResult {
+// missing a required field, or that would duplicate a product (in the sheet or
+// in `existing`, the store as it is now), are collected in `skipped` with a
+// reason, in row order.
+export function parseSheet(text: string, existing: ExistingPart[] = []): SheetParseResult {
   const rows = parseCsv(text).filter((r) => r.some((c) => c.trim() !== ""));
   if (rows.length === 0) {
     return { valid: [], skipped: [], totalRows: 0, error: "no_header" };
@@ -188,7 +210,7 @@ export function parseSheet(text: string): SheetParseResult {
     return { valid: [], skipped: [], totalRows: 0, error: "no_rows" };
   }
 
-  const valid: SheetPart[] = [];
+  const candidates: { row: number; part: SheetPart }[] = [];
   const skipped: SkippedRow[] = [];
   const seen = new Set<string>();
 
@@ -230,14 +252,15 @@ export function parseSheet(text: string): SheetParseResult {
     }
 
     seen.add(sku.toLowerCase());
-    valid.push({
+    candidates.push({ row: rowNum, part: {
       sku,
       name,
       name_ar: opt(r, "name_ar"),
       description: opt(r, "description"),
       description_ar: opt(r, "description_ar"),
       category,
-      material: opt(r, "material"),
+      // Stored lower snake_case ("Aluminum" → "aluminum"), as 0030 does.
+      material: normalizeMaterial(opt(r, "material")),
       standard: opt(r, "standard"),
       unit_price,
       min_order_qty,
@@ -260,10 +283,67 @@ export function parseSheet(text: string): SheetParseResult {
               .slice(0, 30),
           }
         : {}),
-    });
+    } });
   });
 
+  const { valid, skipped: dupes } = collapseDuplicates(candidates, existing);
+  skipped.push(...dupes);
+  skipped.sort((a, b) => a.row - b.row);
+
   return { valid, skipped, totalRows: dataRows.length };
+}
+
+// One product per key. Within a key group:
+//   * a row whose SKU was merged into another product → exists_as <survivor>
+//   * the store already has the key under SKU S:
+//       the row with SKU S (if any) is imported, the rest → duplicate_of S;
+//       with no row for S, every row → exists_as S
+//   * otherwise the first row is imported, the rest → duplicate_of <first>
+// A row without a pack_size column is keyed with the stored pack size for its
+// SKU (the upsert leaves that column alone), else 1.
+function collapseDuplicates(
+  candidates: { row: number; part: SheetPart }[],
+  existing: ExistingPart[]
+): { valid: SheetPart[]; skipped: SkippedRow[] } {
+  const bySku = new Map(existing.map((e) => [e.sku.toLowerCase(), e]));
+  // Key → SKU of the live (unmerged) product. With several (a store that has
+  // not run 0030 yet), the one 0030 would keep: lowest SKU in natural order.
+  const liveByKey = new Map<string, string>();
+  for (const e of existing) {
+    if (e.merged_into_sku) continue;
+    const k = partKey(e.name, e.material, e.pack_size);
+    const cur = liveByKey.get(k);
+    if (cur === undefined || compareSku(e.sku, cur) < 0) liveByKey.set(k, e.sku);
+  }
+
+  const groups = new Map<string, { row: number; part: SheetPart }[]>();
+  const skipped: SkippedRow[] = [];
+  for (const c of candidates) {
+    const stored = bySku.get(c.part.sku.toLowerCase());
+    if (stored?.merged_into_sku) {
+      skipped.push({ row: c.row, sku: c.part.sku, reason: "exists_as", ref: stored.merged_into_sku });
+      continue;
+    }
+    const k = partKey(c.part.name, c.part.material, c.part.pack_size ?? stored?.pack_size ?? 1);
+    const g = groups.get(k);
+    if (g) g.push(c);
+    else groups.set(k, [c]);
+  }
+
+  const keep = new Set<{ row: number; part: SheetPart }>();
+  for (const [k, rows] of groups) {
+    const liveSku = liveByKey.get(k);
+    const winner = liveSku
+      ? rows.find((c) => c.part.sku.toLowerCase() === liveSku.toLowerCase())
+      : rows[0];
+    for (const c of rows) {
+      if (c === winner) keep.add(c);
+      else if (winner) skipped.push({ row: c.row, sku: c.part.sku, reason: "duplicate_of", ref: winner.part.sku });
+      else skipped.push({ row: c.row, sku: c.part.sku, reason: "exists_as", ref: liveSku });
+    }
+  }
+
+  return { valid: candidates.filter((c) => keep.has(c)).map((c) => c.part), skipped };
 }
 
 // The canonical column list, shown to the owner on the import page.

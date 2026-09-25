@@ -17,6 +17,7 @@ import { RequestItemButton } from "@/components/parts/request-item-button";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
+import { materialLabel } from "@/lib/parts/part-key";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -157,7 +158,7 @@ export default async function PartDetailPage({
 
           <dl className="neu p-4">
             {spec(t("specCategory"), part.category)}
-            {spec(t("specMaterial"), part.material)}
+            {spec(t("specMaterial"), materialLabel(part.material) || null)}
             {spec(t("specStandard"), part.standard)}
             {spec(t("specMinOrder"), String(part.min_order_qty))}
           </dl>

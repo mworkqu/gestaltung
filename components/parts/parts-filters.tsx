@@ -4,6 +4,7 @@ import { useTranslations, useLocale } from "next-intl";
 
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { LEAD_TIME_CLASSES } from "@/lib/store/sourcing";
+import { materialLabel } from "@/lib/parts/part-key";
 import { cn } from "@/lib/utils";
 
 type Current = {
@@ -102,7 +103,7 @@ export function PartsFilters({
               <option value="">{t("filterAllMaterials")}</option>
               {materials.map((m) => (
                 <option key={m} value={m}>
-                  {m}
+                  {materialLabel(m)}
                 </option>
               ))}
             </select>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
+import { isDuplicateProductError } from "@/lib/parts/part-key";
 import { cleanAttributes, type Attributes } from "@/lib/store/attributes";
 import { findSimilar } from "@/lib/store/similar";
 import type { ProductImage } from "@/lib/google/drive-picker";
@@ -112,7 +113,12 @@ export async function saveQuickProducts(locale: string, rows: QuickRow[]): Promi
         .select("id, sku")
         .single();
       if (data) inserted = data;
-      else if (error?.code !== "23505") {
+      else if (isDuplicateProductError(error)) {
+        // Same normalised name + material + pack size as a product we have
+        // (0030's unique guard) — a new SKU would not help.
+        results.push({ key: r.key, error: "duplicate_name" });
+        break;
+      } else if (error?.code !== "23505") {
         results.push({ key: r.key, error: error?.message ?? "insert" });
         break;
       }

@@ -10,6 +10,7 @@ import {
   importPartsFromSheet,
   type ImportResult,
 } from "@/app/[locale]/dashboard/store/actions";
+import type { SkippedRow } from "@/lib/parts/sheet-import";
 import { cn } from "@/lib/utils";
 
 const fieldClass =
@@ -60,6 +61,8 @@ export function SheetImportForm({
         return t("import_err_no_rows");
       case "empty":
         return t("import_err_empty");
+      case "duplicate":
+        return t("import_err_duplicate");
       case "db":
       default:
         return t("import_err_db");
@@ -101,21 +104,7 @@ export function SheetImportForm({
               {t("import_result_ok", { count: result.imported ?? 0 })}
             </p>
           </div>
-          {result.skipped && result.skipped.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-sm text-mutedtext">
-                {t("import_result_skipped", { count: result.skipped.length })}
-              </p>
-              <ul className="max-h-40 space-y-1 overflow-y-auto font-mono text-[11px] text-faint">
-                {result.skipped.map((s, i) => (
-                  <li key={`${s.row}-${i}`}>
-                    {t("import_skip_row", { row: s.row })}
-                    {s.sku ? ` (${s.sku})` : ""} — {t(`import_skip_${s.reason}`)}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <SkippedList skipped={result.skipped} />
           <div className="flex flex-wrap gap-3 pt-1">
             <Button asChild variant="outline" size="sm" className="rounded-full">
               <Link href="/dashboard/store">{t("import_back")}</Link>
@@ -128,15 +117,40 @@ export function SheetImportForm({
       )}
 
       {result && !result.ok && (
-        <div
-          className={cn(
-            "flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
-          )}
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>{errorText(result)}</span>
+        <div className="space-y-3">
+          <div
+            className={cn(
+              "flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+            )}
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{errorText(result)}</span>
+          </div>
+          <SkippedList skipped={result.skipped} />
         </div>
       )}
     </form>
+  );
+}
+
+// Every row the import did not save, with the reason. duplicate_of /
+// exists_as name the SKU that holds the product.
+function SkippedList({ skipped }: { skipped?: SkippedRow[] }) {
+  const t = useTranslations("PartsDashboard");
+  if (!skipped || skipped.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-sm text-mutedtext">
+        {t("import_result_skipped", { count: skipped.length })}
+      </p>
+      <ul className="max-h-60 space-y-1 overflow-y-auto font-mono text-[11px] text-faint">
+        {skipped.map((s, i) => (
+          <li key={`${s.row}-${i}`}>
+            {t("import_skip_row", { row: s.row })}
+            {s.sku ? ` (${s.sku})` : ""} — {t(`import_skip_${s.reason}`, { sku: s.ref ?? "" })}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -69,6 +69,10 @@ export type Part = {
   income_pct?: number | null;
   below_floor?: boolean;
   lead_time_class?: "in_stock" | "3_5_days" | "1_2_weeks" | "2_4_weeks" | null;
+  // 0030. Normalised name (trigger-maintained) and, on a merged duplicate, the
+  // product it was merged into; absent before that migration.
+  name_key?: string | null;
+  merged_into?: string | null;
   created_at: string;
   updated_at: string;
 };
