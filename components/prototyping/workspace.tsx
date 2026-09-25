@@ -4,7 +4,9 @@
 //
 // Reads and writes through the browser client so a guest and a signed-in
 // client behave identically — RLS scopes both to their own auth.uid(), the
-// same arrangement the project workspace uses.
+// same arrangement the project workspace uses. On top of RLS the project is
+// read with an explicit user_id filter: this is a customer page, so even a
+// super admin sees only their own projects here (audit #8, decision 6a).
 //
 // Three panels: the project tree on the left, the selected node in the
 // middle, and the next actions on the right. Each side panel collapses, and
@@ -29,6 +31,8 @@ import {
   Send,
 } from "lucide-react";
 
+import { isAuthSessionMissingError } from "@supabase/supabase-js";
+
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
@@ -49,7 +53,7 @@ import {
 import type { Discipline } from "@/lib/prototyping/constants";
 import { activeLines, originOf, type LineMatch, type ProjectBom } from "@/lib/prototyping/bom";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
-import { PartsList } from "@/components/prototyping/parts-list";
+import { PartsList, type StoreLine } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
 import { AddExistingDialog } from "@/components/prototyping/part-dialogs";
 import { Recommendation } from "@/components/prototyping/recommendation";
@@ -86,14 +90,20 @@ export function PrototypingWorkspace({
 }) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
+  const tNav = useTranslations("Nav");
   const mono = useMono();
   const isRtl = useLocale() === "ar";
 
   const [project, setProject] = useState<Project | null>(null);
   const [parts, setParts] = useState<ProjectPart[]>([]);
+  // Store products added on the project page. Shown in the Parts list only —
+  // readiness and the tree read `parts` alone.
+  const [storeLines, setStoreLines] = useState<StoreLine[]>([]);
+  const [storeFailed, setStoreFailed] = useState(false);
   const [schematics, setSchematics] = useState<SchematicWithRevs[]>([]);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [collapsed, setCollapsed] = useState({ left: false, right: false });
   const [showOpen, setShowOpen] = useState(false);
   const [briefCleared, setBriefCleared] = useState(false);
@@ -124,17 +134,45 @@ export function PrototypingWorkspace({
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const { data: proj } = await supabase
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    // A failed auth check (network, auth server) is not "sign in". getUser()
+    // also reports a plain missing session as an error; that one is the
+    // signed-out visitor below.
+    if (authError && !isAuthSessionMissingError(authError)) {
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
+    if (!user) {
+      // No session at all (not even a guest one): nothing here can be theirs.
+      setMissing(true);
+      setLoading(false);
+      return;
+    }
+
+    const { data: proj, error: projError } = await supabase
       .from("projects")
       .select("*")
       .eq("id", projectId)
+      .eq("user_id", user.id)
       .maybeSingle();
 
+    // 22P02: the id in the URL is not a uuid — the same as no such project.
+    if (projError && projError.code !== "22P02") {
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
     if (!proj) {
       setMissing(true);
       setLoading(false);
       return;
     }
+    setMissing(false);
+    setLoadFailed(false);
 
     let loaded = proj as Project;
     if (looksLikeSchema(loaded.brief)) {
@@ -147,7 +185,7 @@ export function PrototypingWorkspace({
     setProject(loaded);
     if (loaded.bom?.lines?.length) void loadMatches();
 
-    const [partRes, schRes] = await Promise.all([
+    const [partRes, schRes, itemRes] = await Promise.all([
       supabase
         .from("project_parts")
         .select("*")
@@ -158,8 +196,21 @@ export function PrototypingWorkspace({
         .select("*")
         .eq("project_id", projectId)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("project_items")
+        .select("*, part:parts(*)")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: true }),
     ]);
+    if (partRes.error) {
+      // Without the parts every count on the page would be wrong; say so.
+      setLoadFailed(true);
+      setLoading(false);
+      return;
+    }
     setParts((partRes.data ?? []) as ProjectPart[]);
+    setStoreFailed(Boolean(itemRes.error));
+    setStoreLines(itemRes.error ? [] : ((itemRes.data ?? []) as StoreLine[]));
 
     const schs = (schRes.data ?? []) as SchematicWithRevs[];
     if (schs.length) {
@@ -195,16 +246,33 @@ export function PrototypingWorkspace({
     );
   }
 
+  if (loadFailed) {
+    return (
+      <div className="neu space-y-4 p-10 text-center">
+        <p className="text-base text-destructive">{t("loadFailed")}</p>
+      </div>
+    );
+  }
+
+  // Not theirs, not there, or no session: one honest message (audit #8/#9).
   if (missing || !project) {
     return (
       <div className="neu space-y-4 p-10 text-center">
-        <p className="text-base text-mutedtext">{tProj("emptyList")}</p>
-        <Link
-          href="/projects"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-        >
-          {tProj("listHeading")}
-        </Link>
+        <p className="text-base text-mutedtext">{t("notAvailable")}</p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/sign-in"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
+          >
+            {tNav("signIn")}
+          </Link>
+          <Link
+            href="/projects"
+            className="text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
+          >
+            {tProj("listHeading")}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -564,6 +632,8 @@ export function PrototypingWorkspace({
             <PartsList
               projectId={project.id}
               parts={parts}
+              storeLines={storeLines}
+              storeFailed={storeFailed}
               nextIndex={nextIndex}
               onChanged={load}
               onOpen={(p) => goTo(partNode(p))}

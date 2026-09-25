@@ -68,3 +68,48 @@ export function partNeeds(p: PartLike): PartNeed[] {
   if (p.status === "suggested") needs.push("confirm");
   return needs;
 }
+
+// ── The Parts list: project_parts + the project's store lines ───────────────
+//
+// A project holds parts in two tables: project_parts (what prototyping adds —
+// catalog picks and parts to design) and project_items (store products added
+// on the project page). The Parts list shows both as one table, so its
+// "Catalog" filter finds the store lines too (audit #4).
+//
+// Store lines are display-only here: they are edited on the project page, and
+// they are never design requirements — readiness and the tree counts read
+// project_parts alone, so nothing below feeds them.
+
+/** A project_items row with its store product, as the Parts list needs it. */
+export type StoreLineLike = {
+  id: string;
+  quantity: number;
+  part: { name: string; name_ar?: string | null; sku: string; unit_price: number | string | null } | null;
+};
+
+export type PartsListRow<P, I> =
+  | { origin: "part"; id: string; part: P }
+  | { origin: "store"; id: string; item: I };
+
+export type PartsListFilter = "all" | "catalog" | "to_design";
+
+/** One list: project_parts first (in their own order), then the store lines. */
+export function mergePartsForList<P extends { id: string }, I extends StoreLineLike>(
+  projectParts: readonly P[],
+  projectItems: readonly I[]
+): PartsListRow<P, I>[] {
+  return [
+    ...projectParts.map((part) => ({ origin: "part" as const, id: `part:${part.id}`, part })),
+    ...projectItems.map((item) => ({ origin: "store" as const, id: `item:${item.id}`, item })),
+  ];
+}
+
+/** "Catalog" is everything orderable: catalog project_parts and every store line. */
+export function rowMatchesFilter<P extends { source?: PartSource | null }, I>(
+  row: PartsListRow<P, I>,
+  filter: PartsListFilter
+): boolean {
+  if (filter === "all") return true;
+  const orderable = row.origin === "store" || isCatalog(row.part);
+  return filter === "catalog" ? orderable : !orderable;
+}

@@ -6,32 +6,52 @@
 // of their kind, for design work — the same records, never a copy — so this
 // table is where price, stock and source live and the branches don't repeat
 // them. Status reads partNeeds(), the same function readiness uses.
+//
+// Store products added on the project page (project_items) are listed here
+// too, read-only, so the project has one parts list (audit #4). They are
+// edited on the project page and are never design requirements.
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ChevronRight, PackagePlus, Plus, Trash2 } from "lucide-react";
 
+import { Link } from "@/i18n/navigation";
+
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice } from "@/lib/parts/format";
-import { disciplineOf, isCatalog, partNeeds } from "@/lib/prototyping/parts";
+import { formatPrice, partName } from "@/lib/parts/format";
+import {
+  disciplineOf,
+  isCatalog,
+  mergePartsForList,
+  partNeeds,
+  rowMatchesFilter,
+  type PartsListFilter,
+} from "@/lib/prototyping/parts";
 import { MAX_PARTS } from "@/lib/prototyping/constants";
 import { Tag } from "@/components/ui/tag";
 import { AddExistingDialog, CreatePartDialog } from "@/components/prototyping/part-dialogs";
-import { Card, PrimaryButton, SoftButton, selectClass } from "@/components/prototyping/ui";
+import { Card, PrimaryButton, SoftButton, Warn, selectClass } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
-import type { ProjectPart } from "@/lib/supabase/types";
+import type { Part, ProjectItem, ProjectPart } from "@/lib/supabase/types";
 
-type Filter = "all" | "catalog" | "to_design";
+/** A store product added to the project on the project page. */
+export type StoreLine = ProjectItem & { part: Part | null };
 
 export function PartsList({
   projectId,
   parts,
+  storeLines,
+  storeFailed,
   nextIndex,
   onChanged,
   onOpen,
 }: {
   projectId: string;
   parts: ProjectPart[];
+  /** project_items rows. Shown read-only; never counted as design work. */
+  storeLines: StoreLine[];
+  /** The store lines could not be read, so the list is incomplete. */
+  storeFailed: boolean;
   nextIndex: number;
   onChanged: () => Promise<void>;
   /** Opens a to-design part where it is designed. */
@@ -40,13 +60,14 @@ export function PartsList({
   const t = useTranslations("Prototyping");
   const tParts = useTranslations("Parts");
   const locale = useLocale();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<PartsListFilter>("all");
   const [dialog, setDialog] = useState<"existing" | "new" | null>(null);
 
-  const shown = parts.filter(
-    (p) => filter === "all" || (filter === "catalog" ? isCatalog(p) : !isCatalog(p))
-  );
+  const rows = mergePartsForList(parts, storeLines);
+  const shown = rows.filter((r) => rowMatchesFilter(r, filter));
+  // The limit is on project_parts; store lines live in their own table.
   const full = parts.length >= MAX_PARTS;
+  const projectPartsHref = `/projects/${projectId}#parts`;
 
   async function setQty(part: ProjectPart, quantity: number) {
     await createClient().from("project_parts").update({ quantity }).eq("id", part.id);
@@ -116,8 +137,10 @@ export function PartsList({
         ))}
       </div>
 
+      {storeFailed && <Warn blocking>{t("storeLinesFailed")}</Warn>}
+
       {shown.length === 0 ? (
-        <p className="text-sm text-mutedtext">{parts.length ? t("noPartsFiltered") : t("noParts")}</p>
+        <p className="text-sm text-mutedtext">{rows.length ? t("noPartsFiltered") : t("noParts")}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
@@ -135,10 +158,50 @@ export function PartsList({
               </tr>
             </thead>
             <tbody className="divide-y divide-borderstrong/40">
-              {shown.map((part) => {
+              {shown.map((row) => {
+                if (row.origin === "store") {
+                  const { item } = row;
+                  return (
+                    <tr key={row.id} className="align-middle">
+                      <td className="px-2 py-2.5 font-mono text-[11px] text-faint">—</td>
+                      <td className="px-2 py-2.5">
+                        <span className="text-[13px] font-semibold text-heading">
+                          {item.part ? partName(item.part, locale) : "—"}
+                        </span>
+                        {item.part?.sku && (
+                          <span className="block font-mono text-[11px] text-mutedtext">{item.part.sku}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2.5">
+                        <Tag variant="buy">{t("source_store")}</Tag>
+                      </td>
+                      <td className="px-2 py-2.5 text-[12px] tabular-nums text-heading">
+                        <span className="inline-block w-16 text-center">{item.quantity}</span>
+                      </td>
+                      <td className="px-2 py-2.5 text-[12px] tabular-nums text-heading">
+                        {item.part?.unit_price != null ? (
+                          formatPrice(Number(item.part.unit_price), locale)
+                        ) : (
+                          <span className="text-mutedtext">—</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2.5">
+                        <Link
+                          href={projectPartsHref}
+                          className="text-[11.5px] font-semibold text-cobalt hover:text-cobalt-hover"
+                        >
+                          {t("storeOnProjectPage", { count: item.quantity })}
+                        </Link>
+                      </td>
+                      {/* Removed on the project page, where the cart and inventory are kept in step. */}
+                      <td className="px-2 py-2.5" />
+                    </tr>
+                  );
+                }
+                const { part } = row;
                 const kind = disciplineOf(part);
                 return (
-                  <tr key={part.id} className="align-middle">
+                  <tr key={row.id} className="align-middle">
                     <td className="px-2 py-2.5 font-mono text-[11px] text-faint">{part.code}</td>
                     <td className="px-2 py-2.5">
                       {kind ? (
