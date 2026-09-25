@@ -689,6 +689,24 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
       (bilingual email, once, fresh orders only, service key). /api/cron/delivery-promises (vercel.json cron
       04:00 UTC; needs CRON_SECRET) emails customers before the promised date when an item's lead class changes,
       moves the promise if later, emails the owner a summary. Shipping settings on /dashboard/store/suppliers.
+  - SITE AUDIT FIX — Phase 1 (2026-09-26), "Data truth and cleanup" (SITE_AUDIT.md #6, #7, #10, #15, #17).
+    Branch fix/site-audit, NOT MERGED to main. Log: CHANGELOG-audit.md. Migrations 0030/0031/0032 NOT RUN.
+    * #7: 0030 merges duplicate products by normalised name+material+pack (lowest SKU survives, references
+      repointed, losers soft-deleted via merged_into, unique guard, material casing normalised; dry-run/backup/
+      rollback blocks at the top). Sheet import de-duplicates and lists skipped rows. 0031 adds is_test;
+      supabase/scripts/test_data_candidates.sql (read-only) + test_data_delete.sql (explicit ids, dry-run by
+      default, refuses GESTALTUNG RASHWAN orders); admin gaps/projects/usage hide test rows (?test=1 shows).
+      Admin catalog hides merged rows (?merged=1), shows publish/delete errors; old SKUs redirect via
+      part_merged_redirect_sku().
+    * #6/#15: 0032 lets on-request items (no supplier offer) be ordered at the listed price, "Date to be
+      confirmed" on product/cart/checkout/success/email; storefront never reads stock_status; empty categories
+      hidden on home + store filter; new store heading/intro; home "In stock and ready to ship" removed.
+      Suppliers page shows offer coverage + empty state.
+    * #10: consent checkbox before the first AI analysis (text in messages). #17: GearPlaceholder label prop
+      (not yet used by callers).
+    * Tests: vitest added — `npm run test`.
+    * Owner still to do: run 0030 → 0031 → 0032, approve the test-data id list, add supplier offers, upload
+      product photos (/dashboard/store/quick).
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -742,6 +760,11 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0029_intake_demand_delivery.sql — images bucket, demand signals, shipping tiers, promised dates,
   create_part_order v3 (RUN AFTER 0028; until it runs, checkout detects the missing quote function (PGRST202)
   and keeps the old no-shipping flow)
+- 0030_merge_duplicate_parts.sql — merges duplicate store products, repoints references, soft-deletes losers via
+  merged_into, unique guard (RUN AFTER 0029; dry-run/backup blocks at the top)
+- 0031_is_test_flag.sql — is_test on projects, inquiries, part_orders, parts, ai_usage (RUN AFTER 0030)
+- 0032_on_request_checkout.sql — on-request items orderable at the listed price, "Date to be confirmed"
+  (RUN AFTER 0031)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER

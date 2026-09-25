@@ -7,6 +7,16 @@ Test project used: **TEST — Plant monitor** (`fdd2a6c7-397f-4ca7-adc5-f4dcbb45
 Priority: **P0** = wrong data / broken promise / safety; **P1** = confusing, blocks a flow; **P2** = polish.
 Fix one section at a time and re-test with the checklist at the bottom.
 
+**Owner decisions (26 Sept 2026)** — fix branch `fix/site-audit`, log in CHANGELOG-audit.md.
+- 1a — All work on branch fix/site-audit from main; the owner merges. Never push main.
+- 2a — Project is the one spine: every "make a part" path (CAD drop, help-me-draw, quote form) creates or attaches to a project (#11, Phase 5).
+- 3a — "Available on request" items can be ordered at the listed price; delivery date shows "to be confirmed" (#6).
+- 4b — Admin stock_status is never shown or used on the storefront; delivery times come only from supplier offers (#6).
+- 5b — Stay on the Gemini free tier for now; consent checkbox before the first analysis; notice text kept in messages/*.json so it's easy to change (#10).
+- 6a — Customer pages show only the signed-in user's own projects, even for super admin; everyone's projects live in /dashboard/projects (#8).
+- 7a — Western digits everywhere, in Arabic too (#51).
+- 8a — Navigation: Shop parts · Make a part · How it works, plus My projects · Inventory after sign-in (#13).
+
 ---
 
 ## P0 — Wrong, broken or unsafe
@@ -52,6 +62,7 @@ Fix one section at a time and re-test with the checklist at the bottom.
 - Cause: Admin → Suppliers: Alibaba, AliExpress, DigiKey, Mouser, Voltaat all have **0 offers**, so no product has a lead time.
 - Checkout still accepted an order for these items at a fixed price (order `159b5246`).
 - **Fix:** attach supplier offers (or treat admin "In stock" as ships in 1–2 days). Change the home copy until true. Decide whether "on request" items can be checked out at a fixed price or only requested.
+- **Status:** Fixed in code (Phase 1, commits 4627347, a2fde3d) — pending: owner adds supplier offers; migration 0032 not run.
 
 ### 7. Catalog is 74 % duplicates + test data is live
 - Admin catalog: **121 parts, 31 unique names, 90 duplicate rows** — 10 products × 10 copies each (9V Battery, AA Battery Holder, Capacitor 100uF, Diode 1N4148, Push Button, Slide Switch, DC Motor, Resistor 10K, Stepper 28BYJ-48, NPN 2N2222). Seed script ran 10×.
@@ -60,6 +71,8 @@ Fix one section at a time and re-test with the checklist at the bottom.
 - Material filter lists both "Aluminum" and "aluminum".
 - Test records in production: projects "TEST — …", "QA test — prototyping (delete me)", "1", "product"; leads "TEST contact/callback/LEAD (please ignore)"; order "TEST ORDER - please delete" (phone `00000000`). These also feed **Sourcing gaps** demand.
 - **Fix:** migration to merge duplicates (repoint `project_items`/`cart_items`/order lines to the survivor), delete the test product, normalise material casing, add a unique constraint on normalised name+spec. Add an `is_test` flag or a cleanup script for test data.
+- **Status:** Fixed in code (Phase 1, commits 4265b8b, 58874eb, 6b1b517) — pending: owner runs migrations 0030 and 0031, then approves the test-data id list before `test_data_delete.sql` runs.
+- The 'aluminum'/SKU 123 product is matched by test_data_candidates.sql (sku = '123') and goes in the delete list once approved.
 
 ### 8. Admin browsing the customer pages sees and can edit everyone's projects
 - Signed in as admin, **/projects "Your projects"** lists all 12 platform projects, including guests' and `mm099282@gmail.com`'s ("Swabery"). The admin can open, edit and **Delete** them from the customer UI.
@@ -73,6 +86,7 @@ Fix one section at a time and re-test with the checklist at the bottom.
 - Footer note says briefs are sent to Google Gemini. AI usage page confirms free-tier limits. Google's free tier may use prompts to improve its products — a problem for customers' unreleased product ideas.
 - When the allowance runs out, the app "falls back to the basic reader" — check the customer is told the result is lower quality.
 - **Fix:** move to a paid tier (or disclose clearly before analysis, with a checkbox). Show a notice when the fallback reader was used.
+- **Status:** Fixed in code (Phase 1, commit 33792b2) — consent checkbox before the first analysis; fallback notice already existed. Pending: nothing.
 
 ---
 
@@ -84,8 +98,10 @@ Fix one section at a time and re-test with the checklist at the bottom.
 13. **Menu wording:** "Design" means *get a part made*; "Projects" is jargon; "My inventory" is a sign-up wall for visitors. → *Shop parts · Make a part · How it works*; show My projects / Inventory after sign-in.
 14. **How it works** explains only the upload path — nothing about projects, prototyping or the store.
 15. **Store heading** "Mechanical Parts Store — screws, nuts, washers, bolts…" but it sells electronics + construction (Masonry, Glazing, Acoustic Ceiling Tile). There are **no screws**: the BOM reports M3 screws/nuts as "Not in our store". → Fix heading; hide empty categories; stock M3 hardware (demand already in Sourcing gaps).
+    - **Status:** Fixed in code (Phase 1, commit 4627347) — new heading and intro, empty categories hidden. Pending: owner stocks M3 hardware.
 16. **Product page has no "Add to project"**, although the projects empty state tells users to "search the store to add parts".
 17. No product photos anywhere — every card is the same gear icon.
+    - **Status:** Partly in code (Phase 1, commit 33792b2) — GearPlaceholder takes a label, not yet used by callers. Pending: owner uploads product photos at /dashboard/store/quick.
 
 ### Project page
 18. **"Delete project"** sits right next to the title at the top — move it to a settings/danger area at the bottom.
