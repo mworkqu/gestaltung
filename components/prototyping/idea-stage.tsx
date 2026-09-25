@@ -25,7 +25,13 @@ import { suggestSpec } from "@/lib/prototyping/engine";
 import { disciplineOf } from "@/lib/prototyping/parts";
 import { mergeBom } from "@/lib/prototyping/bom";
 import { looksLikeSchema } from "@/lib/prototyping/readiness";
-import { answersOf, mergeAnalysis, type Spec } from "@/lib/prototyping/spec";
+import {
+  aiConsentOf,
+  answersOf,
+  mergeAnalysis,
+  type AiConsent,
+  type Spec,
+} from "@/lib/prototyping/spec";
 import { BriefEditor, type SaveState } from "@/components/prototyping/brief-editor";
 import { NeedsInput, SpecSheet } from "@/components/prototyping/spec-sheet";
 import { Card, PrimaryButton, Warn } from "@/components/prototyping/ui";
@@ -66,16 +72,31 @@ function specFor(p: Analysis["suggestedParts"][number]) {
   return { material: s.material, process: s.process };
 }
 
+/**
+ * A consent date in the page's language, e.g. "26 Sept 2026" / "26 سبتمبر 2026".
+ * Arabic keeps Western digits (owner decision 7a), hence the nu-latn extension.
+ */
+function formatConsentDate(iso: string, locale: "en" | "ar") {
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
 export function IdeaStage({
   project,
   parts,
   onChanged,
   onSpec,
+  briefDestination,
 }: {
   project: Project;
   parts: ProjectPart[];
   onChanged: () => Promise<void>;
   onSpec: (next: Spec) => void;
+  /** Who receives the brief for analysis; null = the rules reader on our server. */
+  briefDestination: string | null;
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale() === "ar" ? "ar" : "en";
@@ -86,6 +107,12 @@ export function IdeaStage({
   const [done, setDone] = useState<AnalysisStep[]>([]);
   const [problem, setProblem] = useState<"short" | "schema" | "failed" | null>(null);
   const spec = project.spec ?? null;
+  // Before the first analysis with an outside provider, the client must agree
+  // to send their brief there (audit #10). The rules reader never leaves our
+  // server, so it asks nothing.
+  const consent = briefDestination ? aiConsentOf(spec, briefDestination) : null;
+  const needsConsent = !!briefDestination && !consent;
+  const [consentTicked, setConsentTicked] = useState(false);
 
   // Closing the tab skips blur, so warn while there is unsaved text.
   useEffect(() => {
@@ -119,6 +146,7 @@ export function IdeaStage({
   }
 
   async function runAnalysis() {
+    if (needsConsent && !consentTicked) return;
     if (looksLikeSchema(brief)) return setProblem("schema");
     if (brief.trim().length < MIN_BRIEF_CHARS) return setProblem("short");
     setProblem(null);
@@ -131,10 +159,27 @@ export function IdeaStage({
     try {
       if (!(await saveBrief())) throw new Error("brief not saved");
 
+      // The consent covers this send, so it is stamped as the request leaves.
+      // It is stored with the analysis's spec below (the one spec write), and
+      // mergeAnalysis keeps it through every later re-analysis.
+      const newConsent: AiConsent | null =
+        needsConsent && briefDestination
+          ? { at: new Date().toISOString(), destination: briefDestination }
+          : null;
+      const consentAt = (newConsent ?? consent)?.at;
+
       const res = await fetch("/api/analyse", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ brief, answers: answersOf(spec), locale, projectId: project.id }),
+        // The route validates its body with a non-strict schema, so it accepts
+        // (and for now ignores) the consent timestamp.
+        body: JSON.stringify({
+          brief,
+          answers: answersOf(spec),
+          locale,
+          projectId: project.id,
+          ...(consentAt ? { consentAt } : {}),
+        }),
       });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const result = await streamAnalysis(res, mark);
@@ -145,6 +190,7 @@ export function IdeaStage({
         provider: result.provider,
         fallback: result.fallback,
       });
+      if (newConsent) merged.aiConsent = newConsent;
       const { error } = await supabase
         .from("projects")
         .update({
@@ -237,8 +283,35 @@ export function IdeaStage({
             )}
           </p>
         )}
+        {needsConsent && briefDestination && (
+          <div className="space-y-1">
+            <label className="flex items-start gap-2 text-[12px] leading-relaxed text-heading">
+              <input
+                type="checkbox"
+                checked={consentTicked}
+                onChange={(e) => setConsentTicked(e.target.checked)}
+                disabled={running}
+                aria-describedby="ai-consent-hint"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-cobalt"
+              />
+              <span id="ai-consent-label">
+                {t("aiConsentLabel", { destination: briefDestination })}
+              </span>
+            </label>
+            <p id="ai-consent-hint" className="ps-[1.375rem] text-[11px] text-mutedtext">
+              {t("aiConsentHint")}
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-3">
-          <PrimaryButton onClick={runAnalysis} disabled={running}>
+          <PrimaryButton
+            onClick={runAnalysis}
+            disabled={running || (needsConsent && !consentTicked)}
+            // Tells screen-reader users why the button is disabled.
+            aria-describedby={
+              needsConsent && !consentTicked ? "ai-consent-label ai-consent-hint" : undefined
+            }
+          >
             {running ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
@@ -250,6 +323,11 @@ export function IdeaStage({
             <span className="text-[11px] text-mutedtext">{t("reanalyseKeeps")}</span>
           )}
         </div>
+        {consent && (
+          <p className="text-[11px] text-mutedtext">
+            {t("aiConsentGiven", { date: formatConsentDate(consent.at, locale) })}
+          </p>
+        )}
 
         {running && (
           <ol className="space-y-1.5" aria-live="polite">

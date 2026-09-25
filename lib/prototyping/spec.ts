@@ -22,6 +22,13 @@ export type SpecRow = {
   analysisValue?: string;
 };
 
+/**
+ * The client's consent to send their brief to an outside analysis provider,
+ * recorded the first time they analyse with one (audit #10). `destination` is
+ * the provider's public name at that moment, so switching provider asks again.
+ */
+export type AiConsent = { at: string; destination: string };
+
 export type Spec = {
   summary: string;
   rows: SpecRow[];
@@ -33,7 +40,30 @@ export type Spec = {
   fallback: FallbackReason | null;
   /** The analysis's advice on how to build the electronics (advice only). */
   routeRecommendation?: RouteRecommendation | null;
+  /** Set once the client agreed to send their brief to an outside provider. */
+  aiConsent?: AiConsent | null;
 };
+
+/**
+ * The consent on record for this project, or null. With a destination, only a
+ * consent given for that same provider counts. A malformed value never counts.
+ */
+export function aiConsentOf(
+  spec: Pick<Spec, "aiConsent"> | null | undefined,
+  destination?: string | null
+): AiConsent | null {
+  const c = spec?.aiConsent;
+  if (!c || typeof c.at !== "string" || typeof c.destination !== "string") return null;
+  if (Number.isNaN(Date.parse(c.at))) return null;
+  if (destination != null && c.destination !== destination) return null;
+  return c;
+}
+
+/** Whether the client already agreed to send this project's brief out. */
+export const hasAiConsent = (
+  spec: Pick<Spec, "aiConsent"> | null | undefined,
+  destination?: string | null
+): boolean => aiConsentOf(spec, destination) !== null;
 
 export const rowOf = (spec: Spec | null | undefined, id: string) =>
   spec?.rows.find((r) => r.id === id);
@@ -90,6 +120,8 @@ export function mergeAnalysis(
     fallback: meta.fallback,
     // A basic-reader run cannot advise, so it keeps the earlier advice.
     routeRecommendation: a.electronicsRoute ?? prev?.routeRecommendation ?? null,
+    // Consent is the client's, not the analysis's: it survives every re-analysis.
+    aiConsent: prev?.aiConsent ?? null,
   };
 }
 

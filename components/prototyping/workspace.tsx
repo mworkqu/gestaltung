@@ -556,6 +556,7 @@ export function PrototypingWorkspace({
               parts={parts}
               onChanged={load}
               onSpec={saveSpec}
+              briefDestination={briefDestination}
             />
           )}
 
