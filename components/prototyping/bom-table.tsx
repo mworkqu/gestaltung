@@ -14,11 +14,14 @@
 //   not stocked  no product; "request a quote", never a made-up item
 //   have         already in the client's inventory; left out of every total
 //   fabrication  made to order; priced by quote
-//   bought       fulfilled by an order; never re-added
+//   ordered      fulfilled by an order; never re-added. Shows the order and its
+//                live status ("Ordered #1a2b3c4d · Shipped", "Delivered"), read
+//                from part_orders (own orders only, RLS); the plain "Bought"
+//                when the marker has no order id or the status cannot be read
 // The three money figures are kept apart (CostSummary): available now, not
 // stocked, fabrication.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   Check,
@@ -51,6 +54,7 @@ import {
   type LineMatch,
   type ProjectLine,
 } from "@/lib/prototyping/bom";
+import { fulfilledLabel, fulfilledOrderIds } from "@/lib/prototyping/fulfilled";
 import { BOM_GROUPS, type BomGroup } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
 
@@ -88,7 +92,7 @@ export function CostSummary({
           {[
             c.toChoose ? t("costToChoose", { count: c.toChoose }) : null,
             c.have ? t("costHave", { count: c.have }) : null,
-            c.bought ? t("costBought", { count: c.bought }) : null,
+            c.bought ? t("costOrdered", { count: c.bought }) : null,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -137,6 +141,32 @@ export function BomTable({
   const [kitDone, setKitDone] = useState(false);
   const [kitFailed, setKitFailed] = useState(false);
   const [closed, setClosed] = useState<Set<BomGroup>>(new Set());
+  // Order id → status for the lines an order fulfilled; null until read or
+  // when the read fails (those lines then keep the plain label).
+  const [orderStatuses, setOrderStatuses] = useState<Map<string, string> | null>(null);
+  const orderIdsKey = fulfilledOrderIds(lines).join(",");
+
+  useEffect(() => {
+    const ids = orderIdsKey ? orderIdsKey.split(",") : [];
+    if (!ids.length) return;
+    let cancelled = false;
+    void createClient()
+      .from("part_orders")
+      .select("id, status")
+      .in("id", ids)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("bom: order status lookup failed", error);
+          setOrderStatuses(null);
+          return;
+        }
+        setOrderStatuses(new Map((data ?? []).map((o) => [o.id as string, o.status as string])));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orderIdsKey]);
 
   const toBuy = lines.filter((l) => buyable(l, matches.get(l.id)));
 
@@ -144,18 +174,19 @@ export function BomTable({
     const p = buyable(l, matches.get(l.id));
     if (!p) return;
     setAdding(l.id);
-    await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id] });
-    setAdded((s) => new Set(s).add(l.id));
+    // A failed add is shown by the cart (useCart().error); only mark saved lines.
+    if (await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id] })) setAdded((s) => new Set(s).add(l.id));
     setAdding(null);
   }
 
   async function addAll() {
     setAdding("all");
+    const saved = new Set<string>();
     for (const l of toBuy) {
       const p = buyable(l, matches.get(l.id))!;
-      await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id] });
+      if (await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id] })) saved.add(l.id);
     }
-    setAdded(new Set(toBuy.map((l) => l.id)));
+    setAdded(saved);
     setAdding(null);
   }
 
@@ -173,7 +204,8 @@ export function BomTable({
       if (error || !data) throw error ?? new Error("no kit");
       for (const l of toBuy) {
         const p = buyable(l, matches.get(l.id))!;
-        await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id], kitId: data.id as string });
+        const ok = await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id], kitId: data.id as string });
+        if (!ok) throw new Error("kit line not saved");
       }
       setKitDone(true);
     } catch {
@@ -243,6 +275,7 @@ export function BomTable({
                             loading={loading}
                             adding={adding}
                             added={added.has(l.id)}
+                            orderStatuses={orderStatuses}
                             onAdd={() => add(l)}
                             onChoose={onChoose}
                             onDismiss={() => onDismiss([l.id], true)}
@@ -303,6 +336,7 @@ function Row({
   loading,
   adding,
   added,
+  orderStatuses,
   onAdd,
   onChoose,
   onDismiss,
@@ -312,14 +346,17 @@ function Row({
   loading: boolean;
   adding: string | null;
   added: boolean;
+  orderStatuses: Map<string, string> | null;
   onAdd: () => void;
   onChoose: (lineId: string, productId: string | null) => Promise<void>;
   onDismiss: () => void;
 }) {
   const t = useTranslations("Prototyping");
   const tD = useTranslations("Delivery");
+  const tO = useTranslations("PartsDashboard");
   const locale = useLocale();
   const p = m?.product ?? null;
+  const done = fulfilledLabel(l.fulfilled, orderStatuses);
   const packs = p ? orderQty(l.quantity, p) : null;
   const pack = p ? packOf(p) : 1;
   const img = p ? partImageUrl(p) : null;
@@ -428,10 +465,14 @@ function Row({
       </td>
       <td className="px-3 py-2.5">
         <div className="flex flex-col items-start gap-1.5">
-          {l.fulfilled ? (
-            <Tag variant="buy">
+          {done ? (
+            <Tag variant={done.kind === "ordered" && done.status === "cancelled" ? "neutral" : "buy"}>
               <PackageCheck className="h-3 w-3" />
-              {t("bomBought")}
+              {done.kind === "ordered"
+                ? t("bomOrdered", { id: done.ref, status: tO(`order_status_${done.status}`) })
+                : done.kind === "delivered"
+                  ? t("bomDelivered")
+                  : t("bomBought")}
             </Tag>
           ) : groupOf(l) === "fabrication" ? (
             <Tag variant="neutral">{t("bomFabrication")}</Tag>

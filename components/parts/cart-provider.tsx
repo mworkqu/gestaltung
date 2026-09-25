@@ -34,17 +34,26 @@ import { trackDemand } from "@/lib/store/demand-client";
 //
 // A cart left in localStorage by the old build is migrated once, on first load,
 // so nobody loses what they had.
+//
+// Errors are never swallowed (SITE_AUDIT #3). A failed read keeps the last
+// good lines and sets `error` to "load"; a failed write sets it to "save" and
+// the mutation resolves false. The mutations never throw (some callers fire
+// and forget); `retry()` reads the cart again.
 
 type AddOptions = { bomLines?: string[]; kitId?: string | null };
 
+/** "load": the cart could not be read; "save": a change was not saved. */
+export type CartError = "load" | "save";
+
 type CartContextValue = {
   items: CartItem[];
-  addItem: (part: Part, qty: number, projectId?: string | null, opts?: AddOptions) => Promise<void>;
+  /** Resolves false when the line was not saved (and `error` is "save"). */
+  addItem: (part: Part, qty: number, projectId?: string | null, opts?: AddOptions) => Promise<boolean>;
   /** Row-level: a product can sit on several lines (loose, per project, in a kit). */
-  updateQty: (rowId: string, qty: number) => Promise<void>;
-  removeItem: (rowId: string) => Promise<void>;
-  removeKit: (kitId: string) => Promise<void>;
-  clearCart: () => Promise<void>;
+  updateQty: (rowId: string, qty: number) => Promise<boolean>;
+  removeItem: (rowId: string) => Promise<boolean>;
+  removeKit: (kitId: string) => Promise<boolean>;
+  clearCart: () => Promise<boolean>;
   itemCount: number;
   /** Before any kit discount. */
   subtotalQar: number;
@@ -53,6 +62,10 @@ type CartContextValue = {
   totalQar: number;
   kitDiscountPct: number;
   ready: boolean;
+  /** The last read or write failure; the lines shown are the last good read. */
+  error: CartError | null;
+  /** Read the cart again (clears `error` when it succeeds). */
+  retry: () => Promise<void>;
   reload: () => Promise<void>;
 };
 
@@ -72,6 +85,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [kitDiscountPct, setKitDiscountPct] = useState(0);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<CartError | null>(null);
 
   const reload = useCallback(async () => {
     const supabase = createClient();
@@ -81,6 +95,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
     if (!user) {
       setItems([]);
+      setError(null);
       setReady(true);
       return;
     }
@@ -90,16 +105,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       .from("cart_items")
       .select("id, quantity, project_id, kit_id, bom_lines, part:parts(*), project:projects(name)")
       .order("created_at", { ascending: true });
-    const data = full.error
-      ? (
-          await supabase
-            .from("cart_items")
-            .select("id, quantity, project_id, part:parts(*)")
-            .order("created_at", { ascending: true })
-        ).data
-      : full.data;
+    const res = full.error
+      ? await supabase
+          .from("cart_items")
+          .select("id, quantity, project_id, part:parts(*)")
+          .order("created_at", { ascending: true })
+      : full;
 
-    const rows = (data ?? []) as unknown as Row[];
+    if (res.error) {
+      // Keep the last good lines: showing an empty cart here would be wrong.
+      console.error("cart: load failed", full.error, res.error);
+      setError("load");
+      setReady(true);
+      return;
+    }
+
+    const rows = (res.data ?? []) as unknown as Row[];
     setItems(
       rows
         .filter((r): r is Row & { part: Part } => Boolean(r.part))
@@ -113,15 +134,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }))
     );
 
-    const { data: setting } = await supabase
+    const { data: setting, error: settingError } = await supabase
       .from("store_settings")
       .select("value")
       .eq("key", "kit_discount_pct")
       .maybeSingle();
-    const pct = Number(setting?.value);
-    setKitDiscountPct(Number.isFinite(pct) ? Math.min(Math.max(pct, 0), 90) : 0);
+    if (settingError) {
+      // The kit price shown would be wrong; keep the last known discount.
+      console.error("cart: kit discount load failed", settingError);
+      setError("load");
+    } else {
+      const pct = Number(setting?.value);
+      setKitDiscountPct(Number.isFinite(pct) ? Math.min(Math.max(pct, 0), 90) : 0);
+      setError(null);
+    }
     setReady(true);
   }, []);
+
+  /** A failed write: re-read so the lines shown match what is saved, then say so. */
+  const failed = useCallback(
+    async (what: string, e: unknown) => {
+      console.error(`cart: ${what} failed`, e);
+      await reload();
+      setError("save");
+      return false;
+    },
+    [reload]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -174,7 +213,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const addItem = useCallback(
     async (part: Part, qty: number, projectId: string | null = null, opts: AddOptions = {}) => {
       const quantity = Math.max(part.min_order_qty, Math.trunc(qty) || part.min_order_qty);
-      const user = await ensureSession();
+      let user: Awaited<ReturnType<typeof ensureSession>>;
+      try {
+        user = await ensureSession();
+      } catch (e) {
+        return failed("add (session)", e);
+      }
       trackDemand("add_to_cart", { partId: part.id });
       const supabase = createClient();
       const kitId = opts.kitId ?? null;
@@ -195,56 +239,64 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         p = projectId === null ? p.is("project_id", null) : p.eq("project_id", projectId);
         found = (await p.limit(1).maybeSingle()) as typeof found;
       }
+      if (found.error) return failed("add (lookup)", found.error);
       const existing = found.data as { id: string; quantity: number; bom_lines?: string[] } | null;
       const lines = [...new Set([...(existing?.bom_lines ?? []), ...(opts.bomLines ?? [])])];
 
-      if (existing) {
-        await supabase
-          .from("cart_items")
-          .update({ quantity: existing.quantity + quantity, ...(opts.bomLines?.length ? { bom_lines: lines } : {}) })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("cart_items").insert({
-          user_id: user.id,
-          product_id: part.id,
-          project_id: projectId,
-          quantity,
-          ...(opts.bomLines?.length ? { bom_lines: lines } : {}),
-          ...(kitId ? { kit_id: kitId } : {}),
-        });
-      }
+      const { error: saveError } = existing
+        ? await supabase
+            .from("cart_items")
+            .update({ quantity: existing.quantity + quantity, ...(opts.bomLines?.length ? { bom_lines: lines } : {}) })
+            .eq("id", existing.id)
+        : await supabase.from("cart_items").insert({
+            user_id: user.id,
+            product_id: part.id,
+            project_id: projectId,
+            quantity,
+            ...(opts.bomLines?.length ? { bom_lines: lines } : {}),
+            ...(kitId ? { kit_id: kitId } : {}),
+          });
+      if (saveError) return failed("add", saveError);
       await reload();
+      return true;
     },
-    [reload]
+    [reload, failed]
   );
 
   const updateQty = useCallback(
     async (rowId: string, qty: number) => {
       const line = items.find((i) => i.rowId === rowId);
-      if (!line) return;
+      if (!line) return false;
       const quantity = Math.max(line.minOrderQty, Math.trunc(qty) || line.minOrderQty);
-      await createClient().from("cart_items").update({ quantity }).eq("id", rowId);
+      const { error: e } = await createClient().from("cart_items").update({ quantity }).eq("id", rowId);
+      if (e) return failed("update quantity", e);
       await reload();
+      return true;
     },
-    [items, reload]
+    [items, reload, failed]
   );
 
   const removeItem = useCallback(
     async (rowId: string) => {
-      await createClient().from("cart_items").delete().eq("id", rowId);
+      const { error: e } = await createClient().from("cart_items").delete().eq("id", rowId);
+      if (e) return failed("remove", e);
       await reload();
+      return true;
     },
-    [reload]
+    [reload, failed]
   );
 
   const removeKit = useCallback(
     async (kitId: string) => {
       const supabase = createClient();
-      await supabase.from("cart_items").delete().eq("kit_id", kitId);
-      await supabase.from("project_kits").delete().eq("id", kitId);
+      const lines = await supabase.from("cart_items").delete().eq("kit_id", kitId);
+      if (lines.error) return failed("remove kit (lines)", lines.error);
+      const kit = await supabase.from("project_kits").delete().eq("id", kitId);
+      if (kit.error) return failed("remove kit", kit.error);
       await reload();
+      return true;
     },
-    [reload]
+    [reload, failed]
   );
 
   const clearCart = useCallback(async () => {
@@ -252,9 +304,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (user) await supabase.from("cart_items").delete().eq("user_id", user.id);
+    if (user) {
+      const { error: e } = await supabase.from("cart_items").delete().eq("user_id", user.id);
+      if (e) return failed("clear", e);
+    }
     setItems([]);
-  }, []);
+    return true;
+  }, [failed]);
 
   const value = useMemo<CartContextValue>(() => {
     const subtotal = cartTotal(items);
@@ -273,9 +329,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       totalQar: Math.round((subtotal - discount) * 100) / 100,
       kitDiscountPct,
       ready,
+      error,
+      retry: reload,
       reload,
     };
-  }, [items, addItem, updateQty, removeItem, removeKit, clearCart, kitDiscountPct, ready, reload]);
+  }, [items, addItem, updateQty, removeItem, removeKit, clearCart, kitDiscountPct, ready, error, reload]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

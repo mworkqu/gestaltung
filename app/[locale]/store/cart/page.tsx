@@ -21,8 +21,9 @@ import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
 export default function CartPage() {
   const t = useTranslations("Parts");
   const tD = useTranslations("Delivery");
+  const tC = useTranslations("Cart");
   const locale = useLocale();
-  const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready } =
+  const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready, error, retry } =
     useCart();
   const { quote } = useDeliveryQuote(items);
   const toConfirm = (i: CartItem) => isOnRequest(i, quote ? quote.on_request : null);
@@ -31,6 +32,17 @@ export default function CartPage() {
   if (!ready) {
     return <div className="container py-16" />;
   }
+
+  // A failed read or write: say so; never an empty cart that is not empty (#3).
+  const errorBar = error && (
+    <div role="alert" className="neu flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-destructive">
+      <span>{tC(error === "save" ? "saveError" : "loadError")}</span>
+      <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => void retry()}>
+        {tC("retry")}
+      </Button>
+    </div>
+  );
+  if (error && items.length === 0) return <div className="container py-12">{errorBar}</div>;
 
   if (items.length === 0) {
     return (
@@ -61,6 +73,7 @@ export default function CartPage() {
       <h1 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
         {t("cartTitle")}
       </h1>
+      {errorBar}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <ul className="space-y-3">

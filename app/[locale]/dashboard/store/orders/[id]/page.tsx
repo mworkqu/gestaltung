@@ -41,7 +41,20 @@ export default async function OrderDetailPage({
     .from("part_order_items")
     .select("*")
     .eq("order_id", id);
-  const items = (itemData ?? []) as PartOrderItem[];
+  // project_id arrives with 0025 (set only for a customer's own project).
+  const items = (itemData ?? []) as (PartOrderItem & { project_id?: string | null })[];
+
+  // Order <-> project (SITE_AUDIT #47): each line bought for a project links to
+  // it (/projects/<id>; super_admin can open any project under RLS).
+  const projectIds = [...new Set(items.map((it) => it.project_id).filter((v): v is string => Boolean(v)))];
+  const projectNames = new Map<string, string>();
+  if (projectIds.length) {
+    const { data: projData, error: projError } = await supabase.from("projects").select("id, name").in("id", projectIds);
+    // Without names the links still work; they show the generic label.
+    if (projError) console.error("order detail: project names", projError);
+    for (const pr of projData ?? []) projectNames.set(pr.id as string, pr.name as string);
+  }
+  const soleProject = projectIds.length === 1 && items.every((it) => it.project_id === projectIds[0]) ? projectIds[0] : null;
 
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
     day: "2-digit",
@@ -82,6 +95,14 @@ export default async function OrderDetailPage({
           <h1 className="mt-2 text-2xl font-extrabold text-heading">
             {t("orderRef", { id: order.id.slice(0, 8) })}
           </h1>
+          {soleProject && (
+            <p className="mt-1 text-sm text-mutedtext">
+              <span className={mono("me-2 text-[10px]")}>{t("orderProjectLink")}</span>
+              <Link href={`/projects/${soleProject}`} className="font-semibold text-cobalt hover:text-cobalt-hover">
+                {projectNames.get(soleProject) ?? soleProject.slice(0, 8)}
+              </Link>
+            </p>
+          )}
         </div>
         <Button asChild variant="outline" className="rounded-full">
           <Link href="/dashboard/store/orders">
@@ -117,7 +138,18 @@ export default async function OrderDetailPage({
             <tbody>
               {items.map((it) => (
                 <tr key={it.id} className="border-b border-borderstrong/40 last:border-0">
-                  <td className="px-4 py-3 font-medium text-heading">{it.part_name}</td>
+                  <td className="px-4 py-3 font-medium text-heading">
+                    {it.part_name}
+                    {it.project_id && (
+                      <Link
+                        href={`/projects/${it.project_id}`}
+                        className="block text-[11px] font-semibold text-cobalt hover:text-cobalt-hover"
+                      >
+                        {t("orderProjectLink")}
+                        {!soleProject && projectNames.has(it.project_id) ? ` · ${projectNames.get(it.project_id)}` : ""}
+                      </Link>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-mutedtext">{it.part_sku}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-body">{it.quantity}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-body">
