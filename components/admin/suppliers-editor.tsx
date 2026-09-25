@@ -35,7 +35,8 @@ export function SuppliersEditor({
 }: {
   locale: string;
   suppliers: Supplier[];
-  offerCounts: Record<string, number>;
+  /** Offers per supplier; null when the offers query failed (cell shows "—"). */
+  offerCounts: Record<string, number> | null;
   floorPct: number;
   fx: Record<string, number>;
 }) {
@@ -57,7 +58,7 @@ export function SuppliersEditor({
           </thead>
           <tbody>
             {suppliers.map((s) => (
-              <SupplierRow key={s.id} locale={locale} initial={{ ...s, commission_percent: s.commission_percent ?? "" }} offers={offerCounts[s.id] ?? 0} />
+              <SupplierRow key={s.id} locale={locale} initial={{ ...s, commission_percent: s.commission_percent ?? "" }} offers={offerCounts ? offerCounts[s.id] ?? 0 : undefined} />
             ))}
             {adding && <SupplierRow locale={locale} initial={blank} onDone={() => setAdding(false)} />}
           </tbody>
@@ -132,7 +133,9 @@ function SupplierRow({
       <td className="px-1 py-2">
         <input value={v.default_currency} onChange={set("default_currency")} maxLength={3} className={cn(input, "uppercase")} dir="ltr" />
       </td>
-      <td className="px-2 py-2 tabular-nums text-mutedtext">{offers ?? "—"}</td>
+      <td className={cn("px-2 py-2 tabular-nums", offers === 0 ? "font-semibold text-amber-700" : "text-mutedtext")}>
+        {offers ?? "—"}
+      </td>
       <td className="px-2 py-2">
         <input type="checkbox" checked={v.active} onChange={set("active")} aria-label={t("active")} />
       </td>
