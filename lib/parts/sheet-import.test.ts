@@ -27,6 +27,23 @@ describe("normalizeName", () => {
     expect(normalizeName("")).toBe("");
     expect(normalizeName(null)).toBe("");
   });
+
+  // Postgres' \s matches Unicode spaces in a UTF-8 database; the twin must too.
+  it("treats an em space (U+2003) like a normal space", () => {
+    expect(normalizeName("Cap 100nF")).toBe(normalizeName("Cap 100nF"));
+    expect(normalizeMaterial("Stainless Steel")).toBe("stainless_steel");
+    expect(partKey("Cap 100nF", "Stainless Steel", 1)).toBe(
+      partKey("Cap 100nF", "Stainless Steel", 1)
+    );
+  });
+
+  it("treats an ideographic space (U+3000) like a normal space", () => {
+    expect(normalizeName("Servo　SG90")).toBe(normalizeName("Servo SG90"));
+    expect(normalizeMaterial("Stainless　Steel")).toBe("stainless_steel");
+    expect(partKey("Servo　SG90", "Stainless　Steel", 1)).toBe(
+      partKey("Servo SG90", "Stainless Steel", 1)
+    );
+  });
 });
 
 describe("normalizeMaterial / materialLabel", () => {

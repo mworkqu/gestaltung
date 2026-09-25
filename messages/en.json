@@ -495,7 +495,7 @@
     "error_sku_taken": "That SKU is already in use.",
     "error_duplicate_product": "This product already exists: another product has the same name, material and pack size.",
     "error_publish_merged": "This product was merged into {sku} and can't be published. Publish {sku} instead.",
-    "error_delete_in_use": "This product can't be deleted because existing orders or projects use it. Unpublish it instead to hide it from the store.",
+    "error_delete_in_use": "This product can't be deleted because orders, projects or customer inventories use it. Unpublish it instead to hide it from the store.",
     "filter_show_merged": "Show merged",
     "filter_hide_merged": "Hide merged",
     "merged_into_badge": "Merged into {sku}",

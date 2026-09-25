@@ -31,9 +31,9 @@
 --    The survivor keeps its own data; empty attributes / tags / images /
 --    Arabic name / descriptions / standard / image are filled from the
 --    richest duplicate, and it stays published if any copy was published.
---    Duplicates are SOFT-deleted: is_published = false, merged_into = survivor.
---    Nothing is hard-deleted from parts. A merged row can never be published
---    again (the trigger forces is_published = false while merged_into is set).
+--    Duplicates are SOFT-deleted: is_published = false, merged_into = survivor
+--    (never published again: the trigger forces it). Deleting a survivor later
+--    deletes its merged rows too (merged_into is ON DELETE CASCADE).
 -- 4. Unique index parts_name_key_uniq on (name_key, material, pack_size)
 --    where merged_into is null, so it cannot recur.
 --
@@ -158,6 +158,7 @@
 -- drop function if exists public.parts_normalise_trg();
 -- drop function if exists public.part_name_key(text);
 -- drop function if exists public.part_material_key(text);
+-- drop function if exists public.part_merged_redirect_sku(text);
 -- commit;
 -- -- once happy: drop schema private_backup cascade;
 -- ============================================================================
@@ -191,10 +192,24 @@ $$;
 -- ── 2. Columns ───────────────────────────────────────────────────────────────
 alter table public.parts
   add column if not exists name_key    text,
-  add column if not exists merged_into uuid references public.parts (id) on delete set null;
+  add column if not exists merged_into uuid;
 
+-- merged_into → parts(id) ON DELETE CASCADE: deleting a survivor deletes the
+-- rows merged into it. (SET NULL would turn them back into live duplicates and
+-- trip parts_name_key_uniq, so the delete would fail.) Re-created if an older
+-- draft of this migration left a different ON DELETE rule.
 do $$
 begin
+  if exists (select 1 from pg_constraint
+             where conname = 'parts_merged_into_fkey' and conrelid = 'public.parts'::regclass
+               and confdeltype <> 'c') then
+    alter table public.parts drop constraint parts_merged_into_fkey;
+  end if;
+  if not exists (select 1 from pg_constraint
+                 where conname = 'parts_merged_into_fkey' and conrelid = 'public.parts'::regclass) then
+    alter table public.parts add constraint parts_merged_into_fkey
+      foreign key (merged_into) references public.parts (id) on delete cascade;
+  end if;
   if not exists (select 1 from pg_constraint where conname = 'parts_merged_into_not_self') then
     alter table public.parts add constraint parts_merged_into_not_self check (merged_into is null or merged_into <> id);
   end if;
@@ -226,6 +241,36 @@ drop trigger if exists parts_normalise on public.parts;
 create trigger parts_normalise
   before insert or update on public.parts
   for each row execute function public.parts_normalise_trg();
+
+-- ── 3b. Old-SKU redirect for the public store ───────────────────────────────
+-- /store/<merged sku> should land on the surviving product, but merged rows
+-- are unpublished and RLS hides them from visitors. This returns only the
+-- SKU of the final PUBLISHED survivor (something visitors can already see),
+-- or null. Follows chains (a survivor merged again later).
+create or replace function public.part_merged_redirect_sku(p_sku text)
+returns text
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with recursive chain as (
+    select p.merged_into as target, 1 as depth
+    from public.parts p
+    where p.sku = p_sku and p.merged_into is not null
+    union all
+    select p.merged_into, c.depth + 1
+    from chain c join public.parts p on p.id = c.target
+    where p.merged_into is not null and c.depth < 20
+  )
+  select s.sku
+  from chain c join public.parts s on s.id = c.target
+  where s.merged_into is null and s.is_published
+  limit 1;
+$$;
+
+revoke all on function public.part_merged_redirect_sku(text) from public;
+grant execute on function public.part_merged_redirect_sku(text) to anon, authenticated;
 
 -- ── 4. Backfill + merge ──────────────────────────────────────────────────────
 drop table if exists pg_temp._m0030_stats;

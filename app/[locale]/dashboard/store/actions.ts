@@ -143,19 +143,33 @@ export async function updatePart(
   redirect(`/${locale}/dashboard/store`);
 }
 
-export async function deletePart(formData: FormData): Promise<void> {
+// Deleting a product also deletes the duplicates merged into it (0030,
+// merged_into ON DELETE CASCADE). A product that orders or projects still use
+// cannot be deleted (ON DELETE RESTRICT → 23001; NO ACTION → 23503), nor one
+// in a customer's My inventory (client_inventory_identity check from 0017 →
+// 23514 when ON DELETE SET NULL empties product_id); say so
+// instead of silently doing nothing.
+export async function deletePart(formData: FormData): Promise<PartFormState> {
   const locale = safeLocale(formData);
   const id = String(formData.get("id") ?? "");
+  const t = await getTranslations({ locale, namespace: "PartsDashboard" });
 
   const session = await getSessionContext();
   if (!session) redirect(`/${locale}/sign-in`);
   if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
-  if (!id) return;
+  if (!id) return { error: t("error_unknown") };
 
   const supabase = await createClient();
-  await supabase.from("parts").delete().eq("id", id);
+  const { error } = await supabase.from("parts").delete().eq("id", id);
+  if (error) {
+    if (error.code === "23001" || error.code === "23503" || error.code === "23514") {
+      return { error: t("error_delete_in_use") };
+    }
+    return { error: t("error_unknown") };
+  }
 
   revalidatePath(`/${locale}/dashboard/store`);
+  return {};
 }
 
 // ─── Google Sheet import ("store filling") ──────────────────────────────────
@@ -307,19 +321,49 @@ async function loadExistingParts(
   }));
 }
 
-// Inline publish/unpublish toggle from the catalog table.
-export async function togglePublished(formData: FormData): Promise<void> {
+// Inline publish/unpublish toggle from the catalog table. A merged duplicate
+// (0030) can never be published — the parts_normalise trigger forces it back
+// to draft — so refuse up front and name the product to publish instead.
+export async function togglePublished(formData: FormData): Promise<PartFormState> {
   const locale = safeLocale(formData);
   const id = String(formData.get("id") ?? "");
   const next = formData.get("is_published") === "true";
+  const t = await getTranslations({ locale, namespace: "PartsDashboard" });
 
   const session = await getSessionContext();
   if (!session) redirect(`/${locale}/sign-in`);
   if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
-  if (!id) return;
+  if (!id) return { error: t("error_unknown") };
 
   const supabase = await createClient();
-  await supabase.from("parts").update({ is_published: next }).eq("id", id);
+
+  if (next) {
+    // select("*") so this still works before 0030 (no merged_into column).
+    const { data: row, error: readError } = await supabase
+      .from("parts")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (readError) return { error: t("error_unknown") };
+    const mergedInto = (row as { merged_into?: string | null } | null)?.merged_into ?? null;
+    if (mergedInto) {
+      const { data: survivor, error: survivorError } = await supabase
+        .from("parts")
+        .select("sku")
+        .eq("id", mergedInto)
+        .maybeSingle();
+      if (survivorError) return { error: t("error_unknown") };
+      return {
+        error: t("error_publish_merged", {
+          sku: (survivor as { sku: string } | null)?.sku ?? mergedInto,
+        }),
+      };
+    }
+  }
+
+  const { error } = await supabase.from("parts").update({ is_published: next }).eq("id", id);
+  if (error) return { error: t("error_unknown") };
 
   revalidatePath(`/${locale}/dashboard/store`);
+  return {};
 }

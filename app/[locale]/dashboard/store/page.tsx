@@ -18,10 +18,16 @@ export default async function PartsCatalogManager({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ category?: string; stock?: string; published?: string }>;
+  searchParams: Promise<{
+    category?: string;
+    stock?: string;
+    published?: string;
+    merged?: string;
+  }>;
 }) {
   const { locale } = await params;
-  const { category, stock, published } = await searchParams;
+  const { category, stock, published, merged } = await searchParams;
+  const showMerged = merged === "1";
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
@@ -39,8 +45,13 @@ export default async function PartsCatalogManager({
     .order("created_at", { ascending: false });
 
   const all = (data ?? []) as Part[];
+  // Duplicates merged by 0030 (merged_into set) are hidden unless ?merged=1.
+  // Before 0030 the column does not exist, so nothing counts as merged.
+  const skuById = new Map(all.map((p) => [p.id, p.sku]));
+  const mergedCount = all.filter((p) => p.merged_into).length;
   const parts = all.filter(
     (p) =>
+      (showMerged || !p.merged_into) &&
       (!category || p.category === category) &&
       (!stock || p.stock_status === stock) &&
       (!published ||
@@ -53,9 +64,25 @@ export default async function PartsCatalogManager({
         <div>
           <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
           <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("title")}</h1>
-          <p className="mt-1 text-sm text-mutedtext">
-            {t("count", { count: parts.length })}
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-mutedtext">
+            <span>{t("count", { count: parts.length })}</span>
+            {(mergedCount > 0 || showMerged) && (
+              <Link
+                href={{
+                  pathname: "/dashboard/store",
+                  query: {
+                    ...(category ? { category } : {}),
+                    ...(stock ? { stock } : {}),
+                    ...(published ? { published } : {}),
+                    ...(showMerged ? {} : { merged: "1" }),
+                  },
+                }}
+                className="text-xs font-semibold text-azure hover:underline"
+              >
+                {showMerged ? t("filter_hide_merged") : t("filter_show_merged")}
+              </Link>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button asChild variant="outline" className="rounded-full">
@@ -144,7 +171,16 @@ export default async function PartsCatalogManager({
                   className="border-b border-borderstrong/40 last:border-0 hover:bg-panel/50"
                 >
                   <td className="px-4 py-3 font-mono text-xs text-mutedtext">{p.sku}</td>
-                  <td className="px-4 py-3 font-medium text-heading">{p.name}</td>
+                  <td className="px-4 py-3 font-medium text-heading">
+                    {p.name}
+                    {p.merged_into && (
+                      <span className="ms-2 inline-block rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                        {t("merged_into_badge", {
+                          sku: skuById.get(p.merged_into) ?? p.merged_into,
+                        })}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-body">{p.category}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-body">
                     {formatPrice(p.unit_price, locale)}

@@ -10,10 +10,11 @@
 // digits in any script are kept. Listed explicitly (not \p{P}) so Postgres
 // gives the same answer whatever its locale.
 const PUNCT = /[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\u2010-\u2015\u2018-\u201f\u2026\u2212]/g;
-// The same set as Postgres' \s in the C locale, plus the no-break space that
-// spreadsheets like to paste in.
-const SPACE_RUN = /[ \t\n\v\f\r\u00a0]+/g;
-const MATERIAL_SEP = /[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\u2010-\u2015\u2018-\u201f\u2026\u2212 \t\n\v\f\r\u00a0]+/g;
+// Whitespace: \s, like the SQL twin, so Unicode spaces (em space U+2003,
+// ideographic space U+3000, ...) collapse the same way Postgres' \s does in a
+// UTF-8 database; plus the no-break space that spreadsheets like to paste in.
+const SPACE_RUN = /[\s\u00a0]+/g;
+const MATERIAL_SEP = /[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e\u2010-\u2015\u2018-\u201f\u2026\u2212\s\u00a0]+/g;
 
 /** "Diode, 1N4148 (x10)" → "diode 1n4148 x10". Same as public.part_name_key(). */
 export function normalizeName(name: string | null | undefined): string {

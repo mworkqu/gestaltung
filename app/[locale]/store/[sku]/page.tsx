@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronRight } from "lucide-react";
 
@@ -44,9 +44,19 @@ export default async function PartDetailPage({
     .maybeSingle();
 
   const part = data as Part | null;
-  if (!part) notFound();
+  if (!part) {
+    // Audit #7: an old SKU merged into another product (0030) → that product.
+    // Before 0030 the RPC does not exist; fall through to 404 as before.
+    const { data: survivorSku } = await supabase.rpc("part_merged_redirect_sku", { p_sku: sku });
+    if (typeof survivorSku === "string" && survivorSku && survivorSku !== sku) {
+      permanentRedirect(`/${locale === "ar" ? "ar" : "en"}/store/${encodeURIComponent(survivorSku)}`);
+    }
+    notFound();
+  }
 
   // Honest delivery estimate: the same quote checkout will record (0029).
+  // A product with no supplier offer is still sold at its listed price; its
+  // date is confirmed after the order (0032).
   const tDelivery = await getTranslations("Delivery");
   const { data: quoteData } = await supabase.rpc("order_delivery_quote", {
     p_items: [{ part_id: part.id, quantity: part.min_order_qty }],
@@ -122,7 +132,7 @@ export default async function PartDetailPage({
           </div>
 
           {onRequest ? (
-            <p className="text-sm text-body">{tDelivery("onRequestBody")}</p>
+            <p className="text-sm text-body">{tDelivery("onRequestOrderable")}</p>
           ) : (
             quote?.tiers?.standard?.date && (
               <div className="rounded-xl bg-panel p-3 text-sm shadow-neu-inset">
@@ -140,8 +150,8 @@ export default async function PartDetailPage({
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            {!onRequest && <PartDetailCart part={part} />}
-            <RequestItemButton partId={part.id} partName={name} variant={onRequest ? "default" : "outline"} />
+            <PartDetailCart part={part} />
+            <RequestItemButton partId={part.id} partName={name} variant="outline" />
           </div>
           <DemandBeacon kind="view" partId={part.id} />
 
