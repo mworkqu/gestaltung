@@ -1,6 +1,47 @@
-import { setRequestLocale } from "next-intl/server";
+import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { createClient } from "@/lib/supabase/server";
 import { ProjectWorkspace } from "@/components/projects/project-workspace";
+
+// Tab title = the project's name (audit #23). Read with the request's own
+// session, scoped to the signed-in owner exactly like the workspace, so a
+// foreign project's name never reaches the title. Anything else falls back to
+// the generic Projects title.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; id: string }>;
+}): Promise<Metadata> {
+  const { locale, id } = await params;
+  const t = await getTranslations({ locale, namespace: "Projects" });
+  const tBrand = await getTranslations({ locale, namespace: "Brand" });
+  const fallback = { title: t("metaTitle"), description: t("metaDescription") };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return fallback;
+
+  const { data } = await supabase
+    .from("projects")
+    .select("name, brief")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!data?.name) return fallback;
+
+  const brief = typeof data.brief === "string" ? data.brief.replace(/\s+/g, " ").trim() : "";
+  return {
+    title: `${data.name} · ${tBrand("name")}`,
+    description: brief
+      ? brief.length > 150
+        ? `${brief.slice(0, 149).trimEnd()}…`
+        : brief
+      : fallback.description,
+  };
+}
 
 // The workspace loads its own data through the browser client so that a guest
 // (whose session cookie is written client-side) and a signed-in client behave

@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Plus } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { ProjectList } from "@/components/projects/project-list";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,10 @@ export async function generateMetadata({
   const t = await getTranslations({ locale, namespace: "Projects" });
   return { title: t("metaTitle"), description: t("metaDescription") };
 }
+
+// Reads the session to decide on the guest line, so it must not be
+// prerendered: a static build would always see "no user".
+export const dynamic = "force-dynamic";
 
 // Public. A visitor can land here with no account at all and start building.
 export default async function ProjectsPage({
@@ -30,6 +35,13 @@ export default async function ProjectsPage({
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
+  // "Start one without an account" is for visitors and guests only (audit #21).
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const hasAccount = !!user && user.is_anonymous !== true;
+
   return (
     <div className="container space-y-8 py-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -38,7 +50,9 @@ export default async function ProjectsPage({
           <h1 className="text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
             {t("listHeading")}
           </h1>
-          <p className="max-w-xl text-base leading-relaxed text-body">{t("listIntro")}</p>
+          {!hasAccount && (
+            <p className="max-w-xl text-base leading-relaxed text-body">{t("listIntro")}</p>
+          )}
         </div>
         <Button asChild size="lg">
           <Link href="/projects/new">

@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   ImagePlus,
   Loader2,
@@ -30,6 +31,12 @@ import {
   splitOnRemove,
   takeFromInventory,
 } from "@/lib/projects/allocation";
+import {
+  deriveItemStatus,
+  type ItemStatus,
+  type StatusCartRow,
+  type StatusOrderLine,
+} from "@/lib/projects/item-status";
 import { ProjectCadCard } from "@/components/projects/project-cad-card";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Tag } from "@/components/ui/tag";
@@ -45,22 +52,39 @@ import type {
 
 // The project workspace. Everything reads and writes through the browser
 // client so a guest and a signed-in client behave identically — RLS scopes both
-// to their own auth.uid().
+// to their own auth.uid(). On top of RLS the project is read with
+// user_id = the signed-in user: a super_admin's RLS read of everyone's
+// projects belongs to /dashboard/projects, not here (decision 6a).
 
 type ItemWithPart = ProjectItem & { part: Part | null };
+
+type OrderLineRow = {
+  part_id: string;
+  quantity: number;
+  order: StatusOrderLine["order"] | StatusOrderLine["order"][];
+};
 
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const t = useTranslations("Projects");
   const router = useRouter();
+  const isRtl = useLocale() === "ar";
 
   const [project, setProject] = useState<Project | null>(null);
   const [blocks, setBlocks] = useState<ProjectBlock[]>([]);
   const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
   const [items, setItems] = useState<ItemWithPart[]>([]);
+  const [cartRows, setCartRows] = useState<StatusCartRow[]>([]);
+  const [orderLines, setOrderLines] = useState<StatusOrderLine[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [guest, setGuest] = useState(false);
+  // No session, or an anonymous one: the not-available state offers sign-in.
+  const [signedIn, setSignedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // The project row itself failed to load (not "not yours" — a real error).
+  const [fatalError, setFatalError] = useState(false);
+  // Something around the project (items, cart, orders…) failed to load.
+  const [partialError, setPartialError] = useState(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -68,13 +92,27 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       data: { user },
     } = await supabase.auth.getUser();
     setGuest(isGuest(user));
+    setSignedIn(!!user && !isGuest(user));
 
-    const { data: proj } = await supabase
+    // No session at all: nothing can be theirs. Don't mint one just to read.
+    if (!user) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
+    const { data: proj, error: projErr } = await supabase
       .from("projects")
       .select("*")
       .eq("id", projectId)
+      .eq("user_id", user.id)
       .maybeSingle();
 
+    if (projErr) {
+      setFatalError(true);
+      setLoading(false);
+      return;
+    }
     if (!proj) {
       setNotFound(true);
       setLoading(false);
@@ -82,7 +120,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
     setProject(proj as Project);
 
-    const [blockRes, matRes, itemRes] = await Promise.all([
+    const [blockRes, matRes, itemRes, cartRes, orderRes] = await Promise.all([
       supabase
         .from("project_blocks")
         .select("*")
@@ -94,21 +132,46 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         .select("*, part:parts(*)")
         .eq("project_id", projectId)
         .order("created_at", { ascending: true }),
+      // Cart lines tagged with this project (RLS: own cart only).
+      supabase
+        .from("cart_items")
+        .select("product_id, quantity")
+        .eq("user_id", user.id)
+        .eq("project_id", projectId),
+      // Order lines placed for this project (0025). RLS only returns lines of
+      // orders the caller placed (part_orders.profile_id = auth.uid()).
+      supabase
+        .from("part_order_items")
+        .select("part_id, quantity, order:part_orders(id, status, created_at)")
+        .eq("project_id", projectId),
     ]);
+
+    setPartialError(
+      !!(blockRes.error || matRes.error || itemRes.error || cartRes.error || orderRes.error)
+    );
 
     const loadedBlocks = (blockRes.data ?? []) as ProjectBlock[];
     setBlocks(loadedBlocks);
     setMaterials((matRes.data ?? []) as ProjectMaterial[]);
     setItems((itemRes.data ?? []) as ItemWithPart[]);
+    setCartRows((cartRes.data ?? []) as StatusCartRow[]);
+    setOrderLines(
+      ((orderRes.data ?? []) as unknown as OrderLineRow[]).map((l) => ({
+        part_id: l.part_id,
+        quantity: l.quantity,
+        order: Array.isArray(l.order) ? (l.order[0] ?? null) : l.order,
+      }))
+    );
 
     // The bucket is private, so every image needs a short-lived signed URL.
     const paths = loadedBlocks
       .filter((b) => b.type === "image" && b.storage_path)
       .map((b) => b.storage_path as string);
     if (paths.length) {
-      const { data: signed } = await supabase.storage
+      const { data: signed, error: signErr } = await supabase.storage
         .from(PROJECT_IMAGE_BUCKET)
         .createSignedUrls(paths, 3600);
+      if (signErr) setPartialError(true);
       const map: Record<string, string> = {};
       (signed ?? []).forEach((s) => {
         if (s.path && s.signedUrl) map[s.path] = s.signedUrl;
@@ -131,27 +194,71 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     );
   }
 
-  if (notFound || !project) {
+  if (fatalError) {
     return (
-      <div className="neu p-10 text-center">
-        <p className="text-base text-mutedtext">{t("emptyList")}</p>
-        <Button asChild className="mt-5">
+      <div role="alert" className="neu space-y-5 p-10 text-center">
+        <p className="text-base text-destructive">{t("loadFailed")}</p>
+        <Button asChild>
           <Link href="/projects">{t("listHeading")}</Link>
         </Button>
       </div>
     );
   }
 
+  // Not theirs, deleted, or never existed — RLS makes these look the same, and
+  // they should: a foreign project must not be confirmed to exist (audit #9).
+  if (notFound || !project) {
+    return (
+      <div className="neu space-y-3 p-10 text-center">
+        <h1 className="text-xl font-bold text-heading">{t("notAvailableTitle")}</h1>
+        <p className="mx-auto max-w-md text-base text-mutedtext">{t("notAvailableBody")}</p>
+        <div className="flex flex-wrap justify-center gap-3 pt-3">
+          {!signedIn && (
+            <Button asChild>
+              <Link href="/sign-in">{t("signInCta")}</Link>
+            </Button>
+          )}
+          <Button asChild variant={signedIn ? "default" : "outline"}>
+            <Link href="/projects">{t("listHeading")}</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const statuses: Record<string, ItemStatus> = {};
+  for (const item of items) {
+    statuses[item.id] = deriveItemStatus({ item, cartRows, orderLines });
+  }
+
   return (
     <div className="space-y-6">
+      <nav
+        aria-label={t("breadcrumbLabel")}
+        className="flex flex-wrap items-center gap-1.5 text-xs text-mutedtext"
+      >
+        <Link href="/projects" className="hover:text-heading">
+          {t("navProjects")}
+        </Link>
+        <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} aria-hidden />
+        <span aria-current="page" className="min-w-0 truncate text-heading">
+          {project.name}
+        </span>
+      </nav>
+
+      {partialError && (
+        <p role="alert" className="rounded-xl bg-panel px-4 py-3 text-sm text-destructive shadow-neu-inset">
+          {t("loadFailed")}
+        </p>
+      )}
+
       <ProjectHeader
         project={project}
         guest={guest}
-        reclaimable={items.reduce((n, i) => n + i.qty_from_inventory, 0)}
-        onDeleted={() => router.push("/projects")}
+        onRenamed={(name) => setProject((p) => (p ? { ...p, name } : p))}
       />
       <PrototypingCard projectId={projectId} />
-      <NotesCard project={project} />
+      <BriefCard project={project} />
       <BlocksCard
         projectId={projectId}
         blocks={blocks}
@@ -160,7 +267,14 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       />
       <MaterialsCard projectId={projectId} materials={materials} onChanged={load} />
       <ProjectCadCard projectId={projectId} />
-      <ItemsCard projectId={projectId} items={items} onChanged={load} />
+      <ItemsCard projectId={projectId} items={items} statuses={statuses} onChanged={load} />
+      <DangerZoneCard
+        project={project}
+        // Own-shelf units only (bought units are not "returned"), the same
+        // count delete_project (0035) puts back.
+        reclaimable={items.reduce((n, i) => n + (statuses[i.id]?.shelfQty ?? 0), 0)}
+        onDeleted={() => router.push("/projects")}
+      />
     </div>
   );
 }
@@ -170,112 +284,40 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 function ProjectHeader({
   project,
   guest,
-  reclaimable,
-  onDeleted,
+  onRenamed,
 }: {
   project: Project;
   guest: boolean;
-  /** Units on this project that came off the client's own shelf. */
-  reclaimable: number;
-  onDeleted: () => void;
+  onRenamed: (name: string) => void;
 }) {
   const t = useTranslations("Projects");
   const [name, setName] = useState(project.name);
-  const [deleting, setDeleting] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState(false);
 
   async function saveName(next: string) {
     const trimmed = next.trim();
     if (!trimmed || trimmed === project.name) return;
-    await createClient().from("projects").update({ name: trimmed }).eq("id", project.id);
-  }
-
-  // Cancelling a project frees whatever it was holding. Anything that came off
-  // their own shelf can go back there — but that is their call, so we ask
-  // rather than assume. Everything else (the cart lines) is released either
-  // way, because the project that justified it no longer exists.
-  async function remove(putBack: boolean) {
-    setDeleting(true);
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (putBack && user) {
-      const { data: rows } = await supabase
-        .from("project_items")
-        .select("product_id, qty_from_inventory")
-        .eq("project_id", project.id)
-        .gt("qty_from_inventory", 0);
-
-      for (const row of rows ?? []) {
-        await returnToInventory(supabase, user.id, row.product_id, row.qty_from_inventory);
-      }
-    }
-
-    // cart_items.project_id is ON DELETE SET NULL, so lines would survive
-    // untagged. Clear them: they were only ever for this project.
-    await supabase.from("cart_items").delete().eq("project_id", project.id);
-    await supabase.from("projects").delete().eq("id", project.id);
-    onDeleted();
+    const { error: err } = await createClient()
+      .from("projects")
+      .update({ name: trimmed })
+      .eq("id", project.id);
+    setError(!!err);
+    if (!err) onRenamed(trimmed);
   }
 
   return (
     <div className="neu space-y-4 p-6 sm:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={(e) => saveName(e.target.value)}
-          aria-label={t("nameLabel")}
-          className="min-w-0 flex-1 rounded-lg bg-transparent text-2xl font-extrabold tracking-tight text-heading outline-none focus:bg-panel focus:px-3 focus:py-1 focus:shadow-neu-inset sm:text-3xl"
-        />
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          disabled={deleting || confirming}
-          className="shrink-0 rounded-lg px-3 py-2 text-xs font-semibold text-mutedtext transition-colors hover:text-destructive"
-        >
-          {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : t("deleteProject")}
-        </button>
-      </div>
-
-      {confirming && (
-        <div className="space-y-3 rounded-xl bg-panel p-4 shadow-neu-inset">
-          <p className="text-sm text-heading">
-            {reclaimable > 0
-              ? t("cancelWithParts", { count: reclaimable })
-              : t("deleteConfirm")}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {reclaimable > 0 && (
-              <button
-                type="button"
-                onClick={() => remove(true)}
-                disabled={deleting}
-                className="rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover disabled:opacity-60"
-              >
-                {t("returnParts")}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => remove(false)}
-              disabled={deleting}
-              className="rounded-lg bg-surface px-3.5 py-2 text-xs font-semibold text-destructive shadow-neu-sm transition-colors disabled:opacity-60"
-            >
-              {reclaimable > 0 ? t("discardParts") : t("deleteProject")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              disabled={deleting}
-              className="rounded-lg px-3.5 py-2 text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
-            >
-              {t("keepProject")}
-            </button>
-          </div>
-        </div>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={(e) => saveName(e.target.value)}
+        aria-label={t("nameLabel")}
+        className="w-full min-w-0 rounded-lg bg-transparent text-2xl font-extrabold tracking-tight text-heading outline-none focus:bg-panel focus:px-3 focus:py-1 focus:shadow-neu-inset sm:text-3xl"
+      />
+      {error && (
+        <p role="alert" className="text-sm font-medium text-destructive">
+          {t("saveFailed")}
+        </p>
       )}
 
       {guest && (
@@ -320,40 +362,73 @@ function PrototypingCard({ projectId }: { projectId: string }) {
   );
 }
 
-// ── Notes ───────────────────────────────────────────────────────────────────
+// ── Brief ───────────────────────────────────────────────────────────────────
+// One brief per project (audit #19): this edits projects.brief, the same field
+// the prototyping Brief stage reads and writes. projects.notes is no longer
+// shown (0033 copies notes into an empty brief).
 
-function NotesCard({ project }: { project: Project }) {
+function BriefCard({ project }: { project: Project }) {
   const t = useTranslations("Projects");
-  const [notes, setNotes] = useState(project.notes ?? "");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [brief, setBrief] = useState(project.brief ?? "");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const areaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow with the text instead of scrolling inside a fixed box.
+  useLayoutEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [brief]);
+
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    []
+  );
 
   function onChange(value: string) {
-    setNotes(value);
+    setBrief(value);
     setStatus("saving");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
-      await createClient().from("projects").update({ notes: value }).eq("id", project.id);
-      setStatus("saved");
+      const { error } = await createClient()
+        .from("projects")
+        .update({ brief: value.trim() ? value : null })
+        .eq("id", project.id);
+      setStatus(error ? "error" : "saved");
     }, 700);
   }
 
   return (
     <section className="neu space-y-3 p-6 sm:p-8">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-heading">{t("notesHeading")}</h2>
+        <h2 className="text-sm font-semibold text-heading">
+          <label htmlFor="project-brief">{t("briefHeading")}</label>
+        </h2>
         {status !== "idle" && (
-          <span className="text-[11px] text-mutedtext">
-            {status === "saving" ? t("saving") : t("saved")}
+          <span
+            role={status === "error" ? "alert" : undefined}
+            className={cn(
+              "text-[11px]",
+              status === "error" ? "font-medium text-destructive" : "text-mutedtext"
+            )}
+          >
+            {status === "saving" ? t("saving") : status === "saved" ? t("saved") : t("saveFailed")}
           </span>
         )}
       </div>
+      <p className="text-sm text-mutedtext">{t("briefHint")}</p>
       <textarea
-        value={notes}
+        id="project-brief"
+        ref={areaRef}
+        value={brief}
         onChange={(e) => onChange(e.target.value)}
-        rows={6}
-        placeholder={t("notesPlaceholder")}
-        className="w-full resize-y rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm leading-relaxed text-heading shadow-neu-inset outline-none placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
+        rows={4}
+        placeholder={t("briefPlaceholder")}
+        className="min-h-[7rem] w-full resize-none overflow-hidden rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm leading-relaxed text-heading shadow-neu-inset outline-none placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
       />
     </section>
   );
@@ -633,10 +708,12 @@ function MaterialsCard({
 function ItemsCard({
   projectId,
   items,
+  statuses,
   onChanged,
 }: {
   projectId: string;
   items: ItemWithPart[];
+  statuses: Record<string, ItemStatus>;
   onChanged: () => Promise<void>;
 }) {
   const t = useTranslations("Projects");
@@ -756,7 +833,7 @@ function ItemsCard({
     <section className="neu space-y-4 p-6 sm:p-8">
       <div>
         <h2 className="text-sm font-semibold text-heading">{t("itemsHeading")}</h2>
-        <p className="mt-1 text-sm text-mutedtext">{t("itemsIntro")}</p>
+        <p className="mt-1 text-sm text-mutedtext">{t("itemsIntroStatus")}</p>
       </div>
 
       <UnifiedSearch
@@ -793,15 +870,8 @@ function ItemsCard({
                   )}
                 </span>
 
-                {item.qty_from_inventory > 0 && (
-                  <Tag variant="inventory">
-                    {t("yoursCount", { count: item.qty_from_inventory })}
-                  </Tag>
-                )}
-                {item.quantity - item.qty_from_inventory > 0 && (
-                  <Tag variant="buy">
-                    {t("toBuyCount", { count: item.quantity - item.qty_from_inventory })}
-                  </Tag>
+                {statuses[item.id] && (
+                  <ItemStatusTags status={statuses[item.id]} />
                 )}
 
                 <input
@@ -841,6 +911,154 @@ function ItemsCard({
             </span>
           </div>
         </>
+      )}
+    </section>
+  );
+}
+
+// Where each line actually is (audit #3): ordered / delivered / in cart / to
+// buy, plus any units that came off the client's own shelf.
+function ItemStatusTags({ status }: { status: ItemStatus }) {
+  const t = useTranslations("Projects");
+  const tOrders = useTranslations("PartsDashboard");
+
+  const orderStatusLabel = (s: string | undefined) => {
+    if (!s) return "";
+    const key = `order_status_${s}`;
+    return tOrders.has(key) ? tOrders(key) : s;
+  };
+
+  return (
+    <>
+      {status.shelfQty > 0 && (
+        <Tag variant="inventory">{t("yoursCount", { count: status.shelfQty })}</Tag>
+      )}
+      {status.kind === "ordered" && status.shortId && (
+        <Tag variant="neutral">
+          {t("itemOrdered", { id: status.shortId, status: orderStatusLabel(status.orderStatus) })}
+        </Tag>
+      )}
+      {status.kind === "delivered" && (
+        <Tag variant="inventory">{orderStatusLabel("delivered")}</Tag>
+      )}
+      {status.cartQty > 0 && (
+        <Tag variant="buy">{t("itemInCart", { count: status.cartQty })}</Tag>
+      )}
+      {/* Whatever the kind: a part-delivered line can still be short. */}
+      {status.missingQty > 0 && (
+        <Tag variant="buy">{t("toBuyCount", { count: status.missingQty })}</Tag>
+      )}
+    </>
+  );
+}
+
+// ── Danger zone ─────────────────────────────────────────────────────────────
+// Deleting sits at the bottom, away from the title (audit #18).
+
+function DangerZoneCard({
+  project,
+  reclaimable,
+  onDeleted,
+}: {
+  project: Project;
+  /** Units on this project that came off the client's own shelf. */
+  reclaimable: number;
+  onDeleted: () => void;
+}) {
+  const t = useTranslations("Projects");
+  const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState(false);
+
+  // Cancelling a project frees whatever it was holding. Anything that came off
+  // their own shelf can go back there — but that is their call, so we ask
+  // rather than assume. The cart lines are released either way, because the
+  // project that justified them no longer exists.
+  //
+  // One RPC = one transaction (0035): the ownership check, the put-back, the
+  // cart clean-up and the delete all happen or none do, so "nothing was
+  // changed" on failure is true.
+  async function remove(putBack: boolean) {
+    setDeleting(true);
+    setError(false);
+    const { error: rpcErr } = await createClient().rpc("delete_project", {
+      p_id: project.id,
+      p_put_back: putBack,
+    });
+    if (rpcErr) {
+      setError(true);
+      setDeleting(false);
+      return;
+    }
+    onDeleted();
+  }
+
+  return (
+    <section
+      aria-labelledby="project-danger-zone"
+      className="neu space-y-4 border border-destructive/20 p-6 sm:p-8"
+    >
+      <div>
+        <h2 id="project-danger-zone" className="text-sm font-semibold text-destructive">
+          {t("dangerZone")}
+        </h2>
+        <p className="mt-1 text-sm text-mutedtext">{t("deleteHint")}</p>
+      </div>
+
+      {!confirming && (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          disabled={deleting}
+          className="rounded-lg bg-surface px-3.5 py-2 text-xs font-semibold text-destructive shadow-neu-sm transition-colors disabled:opacity-60"
+        >
+          {t("deleteProject")}
+        </button>
+      )}
+
+      {confirming && (
+        <div className="space-y-3 rounded-xl bg-panel p-4 shadow-neu-inset">
+          <p className="text-sm text-heading">
+            {reclaimable > 0
+              ? t("cancelWithParts", { count: reclaimable })
+              : t("deleteConfirm")}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {reclaimable > 0 && (
+              <button
+                type="button"
+                onClick={() => remove(true)}
+                disabled={deleting}
+                className="rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover disabled:opacity-60"
+              >
+                {t("returnParts")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => remove(false)}
+              disabled={deleting}
+              className="rounded-lg bg-surface px-3.5 py-2 text-xs font-semibold text-destructive shadow-neu-sm transition-colors disabled:opacity-60"
+            >
+              {reclaimable > 0 ? t("discardParts") : t("deleteProject")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={deleting}
+              className="rounded-lg px-3.5 py-2 text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
+            >
+              {t("keepProject")}
+            </button>
+            {deleting && <Loader2 className="h-4 w-4 animate-spin text-mutedtext" />}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="text-sm font-medium text-destructive">
+          {t("deleteFailed")}
+        </p>
       )}
     </section>
   );
