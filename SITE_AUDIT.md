@@ -41,12 +41,14 @@ Fix one section at a time and re-test with the checklist at the bottom.
 - Prototyping BOM labels the same items **"Bought"** (they're only an unconfirmed pending order).
 - **Fix:** project items need a status from the order: *In cart → Ordered (#159b5246, Pending) → Delivered*. Rename "Bought" accordingly. Link the order from the project.
 - Related: `components/parts/cart-provider.tsx` `reload()` ignores both query errors and falls back to `[]` — a failed query silently shows an empty cart. Surface an error state.
+- **Status:** Fixed in code (Phase 2, commits dbaea1d, 392ffa2, 88352d1) — cart keeps last good lines and shows an error + Retry; items read In cart / Ordered #id · status / Delivered / to buy; migration 0034 stops checkout doubling a project line's quantity (ESP32 × 2) and repairs doubled lines once. Pending: owner runs 0033 → 0034 → 0035, re-tests on Plant monitor, decides by hand on lines with cancelled orders.
 
 ### 4. Two "parts" lists in one project that disagree
 - Project page → 7 store parts (ESP32, DHT11, button, motor, resistor, breadboard, jumpers).
 - Prototyping → Parts ("**Every part in this project**") → only 4 to-design parts; **Catalog tab: "No parts match this filter."**
 - Prototyping → Bill of materials shows the store parts again, with different quantities (ESP32 "1 · GR-011 × 2").
 - **Fix:** one parts model per project. Prototyping "Parts" must include catalog/store lines, or be renamed "Parts to design".
+- **Status:** Fixed in code (Phase 2, commit 81518ec) — prototyping Parts lists the project's store lines in one merged list; Catalog filter works. Pending: owner re-tests on Plant monitor.
 
 ### 5. The brief is contradicted by the generated design
 - Brief: "…in a small **3D-printed case**… Powered from a **USB adapter**… desk…"
@@ -77,10 +79,12 @@ Fix one section at a time and re-test with the checklist at the bottom.
 ### 8. Admin browsing the customer pages sees and can edit everyone's projects
 - Signed in as admin, **/projects "Your projects"** lists all 12 platform projects, including guests' and `mm099282@gmail.com`'s ("Swabery"). The admin can open, edit and **Delete** them from the customer UI.
 - **Fix:** customer pages filter `user_id = auth.uid()` explicitly, even for super admin; admin-wide view lives only in /dashboard/projects (read-only, or an explicit "act as" mode).
+- **Status:** Fixed in code (Phase 2, commits 81518ec, 392ffa2) — customer project pages and the prototyping workspace show only the signed-in user's own projects. Pending: owner re-tests signed in as admin.
 
 ### 9. Shared or cross-device project links show a false message
 - Opening a project URL that belongs to another session shows *"No projects yet — start one and search the store to add parts."* with a "Your projects" button.
 - **Fix:** "This project isn't available here. It may belong to another account or browser — sign in to see it." Encourage guests to sign up to save their project to an account.
+- **Status:** Fixed in code (Phase 2, commits 81518ec, 392ffa2) — project page and prototyping show a real not-available state. Pending: owner re-tests with a link from another account.
 
 ### 10. Privacy: customer briefs go to the Gemini **free tier**
 - Footer note says briefs are sent to Google Gemini. AI usage page confirms free-tier limits. Google's free tier may use prompts to improve its products — a problem for customers' unreleased product ideas.
@@ -105,11 +109,16 @@ Fix one section at a time and re-test with the checklist at the bottom.
 
 ### Project page
 18. **"Delete project"** sits right next to the title at the top — move it to a settings/danger area at the bottom.
+    - **Status:** Fixed in code (Phase 2, commit 392ffa2) — Delete moved to a danger zone; runs through delete_project() in one transaction (migration 0035; 0033 fixes the 0024 trigger bug). Pending: owner runs 0033 and 0035.
 19. **Two brief fields:** project page "What are you building?" is **empty**, while prototyping Brief holds the 49-word brief. Pick one and show it in both places.
+    - **Status:** Fixed in code (Phase 2, commits dbaea1d, 392ffa2) — one brief shared by the project page and prototyping; 0033 copies notes into empty briefs. Pending: owner runs 0033.
 20. Project page "Materials" chips (PLA, PETG…) are separate from each part's material in prototyping — unclear what they do.
 21. Signed-in user still sees "Start one without an account — it stays with you when you sign up."
+    - **Status:** Fixed in code (Phase 2, commit 392ffa2) — guest line hidden for signed-in users. Pending: nothing.
 22. Project cards on /projects show only the name — no status, stage, date, part count or thumbnail. Two projects are both called "saoud"; one is called "1".
+    - **Status:** Fixed in code (Phase 2, commit 392ffa2) — cards show date, part count and status. Pending: no thumbnail; duplicate/test names go with the Phase 1 test-data cleanup.
 23. Project page `<title>` is the generic site title; no breadcrumb back to Projects.
+    - **Status:** Fixed in code (Phase 2, commit 392ffa2) — per-project `<title>` and breadcrumb. Pending: nothing.
 
 ### Prototyping workspace
 24. **Four navigation layers** (site header, back bar, left tree, right Next-actions panel) leave a narrow centre column; tables need horizontal scroll and the Status column is cut off (Parts, BOM).
@@ -138,6 +147,7 @@ Fix one section at a time and re-test with the checklist at the bottom.
 45. **Leads:** a quote request's CAD file shows only as a storage path (`433c184e…/smalhaj_safety_helmet.stl`), not a download link. Closed leads show both "Reopen" and "Mark contacted"; contacted leads show "Reopen" too. There's no filter by status or source, and leads don't link to a project.
 46. **Phone validation:** leads accepted `+97497466567410` (duplicated prefix) and `66567410`, and checkout accepted `00000000`. → Validate and normalise to E.164 (+974 + 8 digits) on every form.
 47. **Store orders:** there's no link from an order to its project, and no order-detail view in the list.
+    - **Status:** Fixed in code (Phase 2, commit dbaea1d) — admin side fixed in code (dbaea1d), order detail links each line to its project; customer side shows order id + status, no customer order page exists yet. Pending: customer order page.
 48. **Sourcing gaps:** mixes short names ("USB adapter") with sentence-style names ("Seals the enclosure against dust…") from older analyses. The 120 Ω resistor demand (4 units) is missing — only 4.7 kΩ shows. Two tabs are highlighted at once (Store + Sourcing gaps).
 
 ### Arabic

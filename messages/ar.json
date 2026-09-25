@@ -708,7 +708,7 @@
     "remove": "إزالة",
     "emptyBlocks": "لا شيء هنا بعد. أضف ملاحظة أو صورة.",
     "uploading": "جارٍ الرفع…",
-    "imageTooLarge": "حجم الصورة يتجاوز ١٠ ميغابايت.",
+    "imageTooLarge": "حجم الصورة يتجاوز 10 ميغابايت.",
     "uploadFailed": "تعذّر رفع الصورة.",
     "materialsHeading": "المواد",
     "materialsIntro": "مِمَّ يُصنع؟",
@@ -758,7 +758,7 @@
     "deleteHint": "يؤدي الحذف إلى إزالة المشروع وملاحظاته وصوره وأسطره في السلة. الطلبات التي قُدّمت مسبقًا لا تتأثر.",
     "deleteFailed": "تعذّر حذف المشروع. لم يتغيّر شيء — حاول مرة أخرى.",
     "card_created": "بدأ في {date}",
-    "card_parts": "{count, plural, zero {لا أجزاء} one {جزء واحد} two {جزآن} few {# أجزاء} many {# جزءًا} other {# جزء}}",
+    "card_parts": "{count, plural, zero {لا قطع} one {قطعة واحدة} two {قطعتان} few {# قطع} many {# قطعة} other {# قطعة}}",
     "card_status_planning": "قيد التخطيط",
     "card_status_in_cart": "في السلة",
     "card_status_ordered": "تم الطلب"

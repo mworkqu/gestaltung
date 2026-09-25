@@ -707,6 +707,23 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     * Tests: vitest added — `npm run test`.
     * Owner still to do: run 0030 → 0031 → 0032, approve the test-data id list, add supplier offers, upload
       product photos (/dashboard/store/quick).
+  - SITE AUDIT FIX — Phase 2 (2026-09-26), "Project ↔ cart ↔ order truth" (SITE_AUDIT.md #3, #4, #8, #9, #18, #19,
+    #21, #22, #23, #47). Branch fix/site-audit, NOT MERGED to main. Log: CHANGELOG-audit.md. Migrations
+    0033/0034/0035 NOT RUN.
+    * #3/#47: cart provider keeps last good lines, shows error + Retry (never a silent empty cart). Project items
+      read In cart / Ordered #id · status / Delivered / to buy; admin order detail links each line to its project
+      (no customer order page yet). 0034: create_part_order v5 stops doubling a project line's quantity at
+      checkout (ESP32 × 2) and repairs doubled lines once (DRY RUN block; header lists lines with cancelled
+      orders for the owner to decide by hand).
+    * #4: prototyping Parts lists the project's store lines too (one merged list; Catalog filter works).
+    * #8/#9: customer project pages + prototyping workspace show only the signed-in user's projects; real
+      not-available state otherwise.
+    * #18/#19: Delete in a danger zone, runs delete_project() in one transaction (0035); 0033 fixes the 0024
+      trigger that broke project delete and copies notes into empty briefs; one brief shared with prototyping.
+    * #21/#22/#23: guest line hidden when signed in; cards show date, part count, status; per-project <title>
+      and breadcrumb.
+    * Owner still to do: run 0033 → 0034 → 0035 (after 0030–0032), re-test checklist items 3–6 on the Plant
+      monitor project, decide on lines with cancelled orders.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -765,6 +782,11 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0031_is_test_flag.sql — is_test on projects, inquiries, part_orders, parts, ai_usage (RUN AFTER 0030)
 - 0032_on_request_checkout.sql — on-request items orderable at the listed price, "Date to be confirmed"
   (RUN AFTER 0031)
+- 0033_order_links_and_delete_fix.sql — fixes the 0024 trigger that broke project delete; copies notes into empty briefs (RUN AFTER 0032)
+- 0034_checkout_quantity_fix.sql — create_part_order v5 stops doubling project-line quantities at checkout;
+  one-time repair of doubled lines with a DRY RUN block (RUN AFTER 0033; the repair runs once — never drop its
+  log table)
+- 0035_delete_project.sql — delete_project(): transactional project delete (RUN AFTER 0034)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER
