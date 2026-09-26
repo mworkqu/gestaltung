@@ -7,8 +7,10 @@
 //   Schematic — the engineering view: symbols, rails top and bottom.
 //
 // Both are regenerated from projects.netlist on every render; the netlist is
-// the single source of truth. Electrical warnings come from our own checks
-// (lib/prototyping/netlist sanityChecks), in words, naming the component.
+// the single source of truth. Electrical problems come from our own checks, in
+// words, naming the component: hardRules() first, as a red "Blocking" list —
+// while any stands the circuit is never called checked or validated — then
+// sanityChecks()'s remaining warnings (floating nets, unpowered parts).
 
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -16,11 +18,17 @@ import { CircleAlert, Cpu, Loader2, RefreshCw } from "lucide-react";
 
 import { Card, PrimaryButton, SoftButton, Warn } from "@/components/prototyping/ui";
 import { SvgFrame } from "@/components/prototyping/svg-frame";
-import { partImageUrl, partName } from "@/lib/parts/format";
 import type { LineMatch, ProjectBom } from "@/lib/prototyping/bom";
-import { sanityChecks, type Flag, type ProjectNetlist } from "@/lib/prototyping/netlist";
+import {
+  describeHard,
+  hardRules,
+  sanityChecks,
+  type Flag,
+  type ProjectNetlist,
+  type SanityFlag,
+} from "@/lib/prototyping/netlist";
 import { renderSchematic } from "@/lib/prototyping/schematic-svg";
-import { renderWiring, type WiringProduct } from "@/lib/prototyping/wiring-svg";
+import { renderWiring, wiringProducts } from "@/lib/prototyping/wiring-svg";
 import { cn } from "@/lib/utils";
 
 type ErrorCode = "paused" | "invalid" | "no_electronics" | "unavailable" | "rate_limited" | "not_ready" | "failed";
@@ -48,19 +56,18 @@ export function NetlistView({
   const [error, setError] = useState<{ code: ErrorCode; problems?: string[] } | null>(null);
 
   const hasElectronics = (bom?.lines ?? []).some((l) => l.kind === "electronics");
-  const flags = useMemo(() => (netlist ? sanityChecks(netlist) : []), [netlist]);
+  const hard = useMemo(() => (netlist ? hardRules(netlist) : []), [netlist]);
+  // Supply conflicts and budgets are already in the blocking list.
+  const warnings = useMemo(
+    () => (netlist ? sanityChecks(netlist).filter((f) => f.code === "floating" || f.code === "unpowered") : []),
+    [netlist]
+  );
+  const flags = useMemo<Flag[]>(() => [...hard, ...warnings], [hard, warnings]);
 
   const svg = useMemo(() => {
     if (!netlist) return "";
     if (view === "schematic") return renderSchematic({ netlist, flags });
-    const products = new Map<string, WiringProduct | null>();
-    for (const l of bom?.lines ?? []) {
-      const p = matches.get(l.id)?.product ?? null;
-      products.set(
-        l.id,
-        p ? { name: partName(p, locale), href: `/${locale}/store/${encodeURIComponent(p.sku)}`, image: partImageUrl(p) } : null
-      );
-    }
+    const products = wiringProducts(bom?.lines ?? [], matches, locale);
     return renderWiring({ netlist, flags, products, labels: { noPhoto: t("noPhoto"), noProduct: t("wiringNoProduct") } });
   }, [netlist, view, flags, bom, matches, locale, t]);
 
@@ -87,7 +94,7 @@ export function NetlistView({
     const c = component(ref);
     return c ? `${ref} (${c.function})` : ref;
   };
-  const flagText = (f: Flag) =>
+  const flagText = (f: SanityFlag) =>
     f.code === "floating"
       ? t("flag_floating", { net: f.net, ref: f.ref ? who(f.ref) : "—" })
       : f.code === "unpowered"
@@ -135,9 +142,22 @@ export function NetlistView({
       {netlist && (
         <>
           {extra}
-          {flags.length > 0 && (
+          {hard.length > 0 && (
+            <div className="space-y-1.5 rounded-xl bg-destructive/10 p-3" role="alert">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-destructive">{t("circuitBlocking")}</p>
+              <ul className="space-y-1">
+                {hard.map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[12px] font-semibold text-destructive">
+                    <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    {describeHard(f, netlist, t)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {warnings.length > 0 && (
             <ul className="space-y-1 rounded-xl bg-destructive/5 p-3" aria-label={t("circuitWarnings")}>
-              {flags.map((f, i) => (
+              {warnings.map((f, i) => (
                 <li key={i} className="flex items-start gap-2 text-[12px] font-medium text-destructive">
                   <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   {flagText(f)}
@@ -174,7 +194,9 @@ export function NetlistView({
               ))}
             </ul>
           )}
-          <p className="text-[10.5px] text-faint">{t("circuitProvenance")}</p>
+          <p className={cn("text-[10.5px]", hard.length ? "font-semibold text-destructive" : "text-faint")}>
+            {hard.length ? t("circuitUnvalidated") : t("circuitChecked")}
+          </p>
         </>
       )}
     </Card>

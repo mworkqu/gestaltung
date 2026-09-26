@@ -1,28 +1,50 @@
 // Our rules for the electronics bill of materials — not the model's.
 //
 // Walking the validated netlist, they add what a real build needs and a model
-// is unreliable at, each line with the reason it exists:
-//   * a current-limiting resistor for every LED without one
+// is unreliable at, each with the reason it exists:
+//   * a current-limiting resistor in series with every LED without one
+//   * a driver for every inductive load (DC motor, pump, solenoid, relay coil,
+//     fan) switched straight from a board pin: an NPN transistor as a low-side
+//     switch, its base resistor, and a flyback diode across the load
+//   * a flyback diode across an inductive load already switched on its low side
 //   * a pull-up on every I2C line and every button signal without one
 //   * a decoupling capacitor on every bare IC power pin
-//   * a flyback diode across every inductive load (DC motor, pump, solenoid, fan)
 //   * a logic level shifter where a 5 V output drives a 3.3 V input, and a
 //     warning in words where 3.3 V drives 5 V (it may or may not read reliably)
 // plus the build consumables the route needs (breadboard, jumper wires,
 // perfboard, USB cable, power, wire, heat-shrink) and, on the Custom PCB
 // route, the board-fabrication line.
 //
+// ONE model (audit #1): every part a rule adds to the circuit is inserted
+// INTO the netlist as a component (R_LED1, Q1, R_B1, D1, R_PU1, C1) whose
+// bomId is the id of the BOM line that buys it, and that line lists the refs
+// it covers. The augmented netlist is what gets stored, so the schematic, the
+// wiring diagram and the bill of materials all show the same circuit.
+//
 // Identical lines are merged: four LEDs give ONE line of four resistors,
-// with every LED named in its reason. Line ids are stable, so a line the client
-// removed (bom.dismissed) is never added back. Values are orderable: "330 Ω,
-// 1/4 W, ±5 %, through-hole", chosen from the E12 series.
+// with every LED named in its reason and every resistor in `refs`. Line ids
+// are stable, so a line the client removed (bom.dismissed) is never added
+// back. Values are orderable: "330 Ω, 1/4 W, ±5 %, through-hole", chosen from
+// the E12 series. The level shifter stays a line only: where it goes depends
+// on the board's pin-out.
 //
 // Pure. Text comes through the injected `t`, so lines read in either language.
 
 import type { BuildRoute } from "./analysis";
 import type { ProjectLine } from "./bom";
-import { powerNets, type NetComponent, type Netlist } from "./netlist";
-import { symbolKind } from "./schematic-svg";
+import {
+  DEFAULT_LOAD_MA,
+  crossValidate,
+  gpioDrives,
+  isInductiveLoad,
+  lacksResistor,
+  powerNets,
+  symbolKind,
+  type ComponentRole,
+  type NetComponent,
+  type Netlist,
+  type Pin,
+} from "./netlist";
 import { CLASSES, formatValue, type AttrClass } from "@/lib/store/attributes";
 
 type T = (key: string, params?: Record<string, string | number>) => string;
@@ -33,6 +55,9 @@ export type LevelFlag = {
   drivers: string[];
   receivers: string[];
 };
+
+/** A rule line, with the netlist refs it buys (bomId of each is this line's id). */
+export type RuleLine = ProjectLine & { refs?: string[] };
 
 const E12 = [1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2];
 
@@ -73,6 +98,33 @@ const PLATFORM_LOGIC_V: Record<string, number> = {
 const LED_VF: Record<string, number> = { red: 2.0, yellow: 2.1, green: 2.2, blue: 3.0, white: 3.0 };
 const LED_MA = 10;
 
+/** Actuator types that are a coil: they need a driver and a flyback diode. */
+const INDUCTIVE_TYPES = ["dc_motor", "pump", "solenoid", "fan", "vibration"];
+/** Base-emitter drop of a small NPN in saturation. */
+const VBE = 0.7;
+/** Most base current we ask of a board pin, in mA. */
+const GPIO_MAX_MA = 10;
+/** Above this a small TO-92 NPN is the wrong part; we say so. */
+const HEAVY_LOAD_MA = 500;
+
+const passive = (...ids: string[]): Pin[] => ids.map((id) => ({ id, name: id, type: "passive" as const }));
+
+/** What a component's BOM line says it is; undefined lets the function text decide. */
+function roleFromLine(l: ProjectLine | undefined): ComponentRole | undefined {
+  if (!l) return undefined;
+  const a = l.attributes ?? {};
+  if (l.class === "actuator") {
+    const type = String(a.actuator_type ?? "");
+    if (!type) return undefined;
+    return INDUCTIVE_TYPES.includes(type) ? "inductive_load" : "other";
+  }
+  if (l.class === "module")
+    return ["motor_driver", "relay"].includes(String(a.module_type ?? "")) ? "driver" : "other";
+  // A switch-class line may still be a bare relay: its text decides.
+  if (["board", "sensor", "led", "header", "power"].includes(String(l.class ?? ""))) return "other";
+  return undefined;
+}
+
 type Ctx = {
   netlist: Netlist | null;
   /** The model's electronics lines (boards, modules, sensors, actuators). */
@@ -83,11 +135,24 @@ type Ctx = {
   t: T;
 };
 
-export type RulesResult = { lines: ProjectLine[]; levelFlags: LevelFlag[]; assumptions: string[] };
+export type RulesResult = {
+  lines: RuleLine[];
+  /** The model's netlist with every rule-added part inserted; null when there was none. */
+  netlist: Netlist | null;
+  levelFlags: LevelFlag[];
+  assumptions: string[];
+};
 
-export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): RulesResult {
-  const out = new Map<string, ProjectLine>();
+/**
+ * Derive the rule lines and the augmented netlist. The input MUST be the
+ * model's raw netlist, never a stored (already augmented) one: the checks for
+ * LED resistors, drivers, pull-ups and diodes see our own parts and skip, but
+ * decoupling capacitors do not — re-deriving would add a second one per pin.
+ */
+export function deriveElectronics({ netlist: model, lines, route, power, t }: Ctx): RulesResult {
+  const out = new Map<string, RuleLine>();
   const reasons = new Map<string, string[]>();
+  const covered = new Map<string, string[]>();
   const assumptions: string[] = [];
   const lineOf = (c: NetComponent) => lines.find((l) => l.id === c.bomId);
 
@@ -99,7 +164,7 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
     spec: string,
     qty: number,
     reason: string,
-    extra: Partial<ProjectLine> = {}
+    opts: { extra?: Partial<ProjectLine>; ref?: string } = {}
   ) => {
     const prev = out.get(id);
     if (prev) prev.quantity += qty;
@@ -115,24 +180,73 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
         attributes: { class: cls, ...attributes },
         group: CLASSES[cls].group,
         origin: "rule",
-        ...extra,
+        ...opts.extra,
       });
     reasons.set(id, [...(reasons.get(id) ?? []), reason]);
+    if (opts.ref) covered.set(id, [...(covered.get(id) ?? []), opts.ref]);
   };
 
   const levelFlags: LevelFlag[] = [];
+  // Our copy: the model's netlist is never mutated.
+  const n: Netlist | null = model ? structuredClone(model) : null;
 
   if (n) {
+    for (const c of n.components) {
+      const role = roleFromLine(lineOf(c));
+      if (role) c.role = role;
+    }
+
     const { power: powerSet, ground } = powerNets(n);
+    const byRef = (ref: string) => n.components.find((c) => c.ref === ref);
     const netsOf = (ref: string) => n.nets.filter((x) => x.connections.some((c) => c.ref === ref));
-    const byRef = new Map(n.components.map((c) => [c.ref, c]));
+    const netOfPin = (ref: string, pin: string) =>
+      n.nets.find((x) => x.connections.some((k) => k.ref === ref && k.pin === pin))?.name ?? null;
     const hasResistor = (netName: string) =>
       n.nets
         .find((x) => x.name === netName)
         ?.connections.some((c) => {
-          const k = byRef.get(c.ref);
+          const k = byRef(c.ref);
           return k ? symbolKind(k) === "resistor" : false;
         }) ?? false;
+
+    // Editing the circuit.
+    const nextRef = (prefix: string) => {
+      let i = 1;
+      while (byRef(`${prefix}${i}`)) i++;
+      return `${prefix}${i}`;
+    };
+    const freeNet = (base: string) => {
+      let name = base.slice(0, 24);
+      for (let i = 2; n.nets.some((x) => x.name === name); i++) name = `${base.slice(0, 20)}_${i}`;
+      return name;
+    };
+    const detach = (ref: string, pin: string) => {
+      for (const x of n.nets) x.connections = x.connections.filter((k) => !(k.ref === ref && k.pin === pin));
+    };
+    const attach = (net: string, ref: string, pin: string) => {
+      const x = n.nets.find((k) => k.name === net);
+      if (x) x.connections.push({ ref, pin });
+      else n.nets.push({ name: net, connections: [{ ref, pin }] });
+    };
+    const place = (c: NetComponent) => n.components.push({ currentMa: 0, ...c });
+    const gndNet = () => [...ground][0] ?? "GND";
+    const resistorPart = (ref: string, r: number): NetComponent => ({
+      ref,
+      function: `${t("rule_resistorName")} ${formatValue(r, "Ω")}`,
+      bomId: `rule_res_${r}`,
+      pins: passive("1", "2"),
+    });
+    const resistorLine = (r: number, reason: string, ref?: string) =>
+      add(
+        `rule_res_${r}`,
+        "resistor",
+        { resistance_ohm: r, tolerance_pct: 5, power_w: 0.25, package: "through_hole" },
+        t("rule_resistorName"),
+        t("rule_resistorSpec", { value: formatValue(r, "Ω") }),
+        1,
+        reason,
+        { ref }
+      );
 
     // A component's logic voltage: its line's logic_v, else the rail its
     // supply pin sits on.
@@ -143,26 +257,30 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
       const platform = PLATFORM_LOGIC_V[String(l?.attributes?.platform ?? "")];
       if (platform) return platform;
       for (const p of c.pins.filter((p) => p.type === "power_in")) {
-        const net = n.nets.find((x) => x.connections.some((k) => k.ref === c.ref && k.pin === p.id));
-        const v = net ? parseVolts(net.name) : null;
+        const net = netOfPin(c.ref, p.id);
+        const v = net ? parseVolts(net) : null;
         if (v) return v;
       }
       return null;
     };
     const boardV =
       n.components.map((c) => (lineOf(c)?.class === "board" ? logicV(c) : null)).find((v) => v) ?? null;
+    /** The supply net at a voltage, if the circuit has one. */
+    const railAt = (v: number | null) =>
+      v ? [...powerSet].find((name) => Math.abs((parseVolts(name) ?? 0) - v) < 0.05 * v) ?? null : null;
 
-    // LEDs: one current-limiting resistor each.
+    // LEDs: one current-limiting resistor each, in series on the drive side.
     for (const c of n.components.filter((c) => symbolKind(c) === "led")) {
+      if (!lacksResistor(n, c)) continue;
       const nets = netsOf(c.ref);
-      if (nets.some((x) => hasResistor(x.name))) continue;
       let v: number | null = null;
       for (const x of nets) {
         if (powerSet.has(x.name)) v = Math.max(v ?? 0, parseVolts(x.name) ?? 0) || v;
         else if (!ground.has(x.name))
           for (const k of x.connections)
             if (k.ref !== c.ref) {
-              const kv = byRef.get(k.ref) ? logicV(byRef.get(k.ref)!) : null;
+              const other = byRef(k.ref);
+              const kv = other ? logicV(other) : null;
               if (kv) v = Math.max(v ?? 0, kv);
             }
       }
@@ -177,32 +295,50 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
         continue;
       }
       const r = nextE12((v - vf) / (LED_MA / 1000));
-      add(
-        `rule_res_${r}`,
-        "resistor",
-        { resistance_ohm: r, tolerance_pct: 5, power_w: 0.25, package: "through_hole" },
-        t("rule_resistorName"),
-        t("rule_resistorSpec", { value: formatValue(r, "Ω") }),
-        1,
-        t("rule_ledReason", { ref: c.ref, v, ma: LED_MA })
-      );
+      // The drive side: the board pin's net, else the supply side; never ground.
+      const sides = nets.filter((x) => !ground.has(x.name));
+      const side = sides.find((x) => !powerSet.has(x.name)) ?? sides[0];
+      let ref: string | undefined;
+      if (side) {
+        const pin = side.connections.find((k) => k.ref === c.ref)!.pin;
+        ref = nextRef("R_LED");
+        const between = freeNet(`${c.ref}_${pin}`);
+        detach(c.ref, pin);
+        attach(side.name, ref, "1");
+        attach(between, ref, "2");
+        attach(between, c.ref, pin);
+        place(resistorPart(ref, r));
+      }
+      resistorLine(r, t("rule_ledReason", { ref: c.ref, v, ma: LED_MA }), ref);
     }
 
+    // Pull-ups: from the signal to the logic supply, when the circuit has it.
+    const pullUp = (net: string, r: number, reason: string, v: number | null) => {
+      const rail = railAt(v ?? boardV);
+      let ref: string | undefined;
+      if (rail) {
+        ref = nextRef("R_PU");
+        attach(net, ref, "1");
+        attach(rail, ref, "2");
+        place(resistorPart(ref, r));
+      }
+      resistorLine(r, reason, ref);
+    };
+    const netLogicV = (net: string) =>
+      n.nets
+        .find((x) => x.name === net)
+        ?.connections.map((k) => byRef(k.ref))
+        .filter((c): c is NetComponent => !!c && lineOf(c)?.class === "board")
+        .map(logicV)
+        .find((v) => v) ?? null;
+
     // I2C: a pull-up on each SDA / SCL line that has none.
-    for (const x of n.nets) {
+    for (const x of [...n.nets]) {
       const isI2C =
         /\b(sda|scl)\b/i.test(x.name.replace(/_/g, " ")) ||
-        x.connections.some((k) => /^(sda|scl)$/i.test(byRef.get(k.ref)?.pins.find((p) => p.id === k.pin)?.name ?? ""));
+        x.connections.some((k) => /^(sda|scl)$/i.test(byRef(k.ref)?.pins.find((p) => p.id === k.pin)?.name ?? ""));
       if (!isI2C || hasResistor(x.name) || powerSet.has(x.name) || ground.has(x.name)) continue;
-      add(
-        "rule_res_4700",
-        "resistor",
-        { resistance_ohm: 4700, tolerance_pct: 5, power_w: 0.25, package: "through_hole" },
-        t("rule_resistorName"),
-        t("rule_resistorSpec", { value: formatValue(4700, "Ω") }),
-        1,
-        t("rule_i2cReason", { net: x.name })
-      );
+      pullUp(x.name, 4700, t("rule_i2cReason", { net: x.name }), netLogicV(x.name));
     }
 
     // Buttons: a pull-up on each switch signal that has none.
@@ -211,22 +347,22 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
     )) {
       for (const x of netsOf(c.ref)) {
         if (powerSet.has(x.name) || ground.has(x.name) || hasResistor(x.name)) continue;
-        add(
-          "rule_res_10000",
-          "resistor",
-          { resistance_ohm: 10000, tolerance_pct: 5, power_w: 0.25, package: "through_hole" },
-          t("rule_resistorName"),
-          t("rule_resistorSpec", { value: formatValue(10000, "Ω") }),
-          1,
-          t("rule_buttonReason", { ref: c.ref, net: x.name })
-        );
+        pullUp(x.name, 10000, t("rule_buttonReason", { ref: c.ref, net: x.name }), netLogicV(x.name));
       }
     }
 
-    // Bare ICs: a 100 nF decoupling capacitor per supply pin. Boards and
-    // modules already carry their own.
+    // Bare ICs: a 100 nF decoupling capacitor per supply pin, to ground.
+    // Boards and modules already carry their own.
     for (const c of n.components.filter((c) => lineOf(c)?.class === "ic")) {
       for (const p of c.pins.filter((p) => p.type === "power_in")) {
+        const net = netOfPin(c.ref, p.id);
+        let ref: string | undefined;
+        if (net) {
+          ref = nextRef("C");
+          attach(net, ref, "1");
+          attach(gndNet(), ref, "2");
+          place({ ref, function: `${t("rule_capName")} ${formatValue(1e-7, "F")}`, bomId: "rule_cap_100n", pins: passive("1", "2") });
+        }
         add(
           "rule_cap_100n",
           "capacitor",
@@ -234,29 +370,149 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
           t("rule_capName"),
           t("rule_capSpec", { value: formatValue(1e-7, "F") }),
           1,
-          t("rule_decouplingReason", { ref: c.ref, pin: p.name })
+          t("rule_decouplingReason", { ref: c.ref, pin: p.name }),
+          { ref }
         );
       }
     }
 
-    // Inductive loads: a flyback diode each.
-    for (const c of n.components) {
-      const l = lineOf(c);
-      const type = String(l?.attributes?.actuator_type ?? "");
-      const inductive =
-        ["dc_motor", "pump", "solenoid", "fan"].includes(type) ||
-        (!type && /\b(dc motor|motor|pump|solenoid|fan)\b/i.test(c.function) && !/servo|stepper/i.test(c.function));
-      if (!inductive) continue;
+    // Inductive loads.
+    const flyback = (load: NetComponent, low: string, high: string | null, ma: number) => {
+      const amps = Math.max(1, Math.ceil(ma / 1000));
+      const id = amps === 1 ? "rule_diode_flyback" : `rule_diode_flyback_${amps}a`;
+      // Anode on the switched (low) side, cathode on the supply.
+      const ref = nextRef("D");
+      attach(low, ref, "A");
+      if (high) attach(high, ref, "K");
+      place({ ref, function: t("rule_diodeName"), bomId: id, pins: passive("A", "K") });
       add(
-        "rule_diode_flyback",
+        id,
         "diode",
-        { diode_type: "rectifier", current_a: 1, voltage_v: 400, package: "through_hole" },
+        { diode_type: "rectifier", current_a: amps, voltage_v: 400, package: "through_hole" },
         t("rule_diodeName"),
-        t("rule_diodeSpec"),
+        amps === 1 ? t("rule_diodeSpec") : t("rule_diodeSpecA", { a: amps }),
         1,
-        t("rule_flybackReason", { ref: c.ref })
+        t("rule_flybackReason", { ref: load.ref }),
+        { ref }
       );
+    };
+    const diodeAcross = (c: NetComponent) => {
+      const mine = netsOf(c.ref).map((x) => x.name);
+      return (
+        mine.length >= 2 &&
+        n.components.some(
+          (d) => symbolKind(d) === "diode" && netsOf(d.ref).filter((x) => mine.includes(x.name)).length >= 2
+        )
+      );
+    };
+
+    for (const c of n.components.filter(isInductiveLoad)) {
+      const l = lineOf(c);
+      const hasDiode = diodeAcross(c);
+      const drives = gpioDrives(n, c);
+      const statedMa =
+        c.currentMa && c.currentMa > 0
+          ? c.currentMa
+          : Number(l?.attributes?.current_a) > 0
+            ? Number(l?.attributes?.current_a) * 1000
+            : null;
+      const ma = statedMa ?? DEFAULT_LOAD_MA;
+
+      if (drives.length) {
+        // Switched straight from a board pin: a low-side NPN switch.
+        //   pin → R_B → base; emitter → GND; collector → load low side;
+        //   load high side → its supply rail; flyback diode across the load.
+        if (!statedMa) assumptions.push(t("rule_assumedLoad", { ref: c.ref, ma }));
+        if (ma > HEAVY_LOAD_MA) assumptions.push(t("rule_driverHeavy", { ref: c.ref, ma }));
+        const d = drives[0];
+        const controller = byRef(d.controller);
+        const vGpio = (controller && logicV(controller)) || boardV || 3.3;
+        const ibMa = Math.min(ma / 10, GPIO_MAX_MA);
+        const rb = nextE12((vGpio - VBE) / (ibMa / 1000));
+
+        const wantV = Number(l?.attributes?.voltage_v) || null;
+        const supply =
+          railAt(wantV) ??
+          [...powerSet].sort((a, b) => (parseVolts(b) ?? 0) - (parseVolts(a) ?? 0))[0] ??
+          null;
+        const railV = (supply ? parseVolts(supply) : null) ?? wantV ?? 5;
+
+        const q = nextRef("Q");
+        const baseNet = freeNet(`${q}_B`);
+        const lowNet = freeNet(`${q}_C`);
+        const others = c.pins
+          .filter((p) => p.id !== d.pin)
+          .map((p) => ({ pin: p.id, net: netOfPin(c.ref, p.id) }));
+        const onSupply = others.find((o) => o.net && powerSet.has(o.net));
+
+        // A moved pin takes the type of where it now sits, so the collector
+        // net is never mistaken for ground, nor the supply side for a signal.
+        const retype = (pin: string, type: Pin["type"]) => {
+          const p = c.pins.find((x) => x.id === pin);
+          if (p) p.type = type;
+        };
+        let high: string | null;
+        detach(c.ref, d.pin);
+        if (onSupply) {
+          // Already fed from a rail: the board pin was its low side.
+          attach(lowNet, c.ref, d.pin);
+          retype(d.pin, "passive");
+          high = onSupply.net;
+        } else {
+          const low = others.find((o) => o.net && ground.has(o.net)) ?? others[0];
+          high = supply ?? `${railV}V`;
+          if (low) {
+            attach(high, c.ref, d.pin);
+            retype(d.pin, "power_in");
+            detach(c.ref, low.pin);
+            attach(lowNet, c.ref, low.pin);
+            retype(low.pin, "passive");
+          } else {
+            attach(lowNet, c.ref, d.pin);
+            retype(d.pin, "passive");
+          }
+        }
+
+        const rbRef = nextRef("R_B");
+        attach(d.net, rbRef, "1");
+        attach(baseNet, rbRef, "2");
+        attach(baseNet, q, "B");
+        attach(lowNet, q, "C");
+        attach(gndNet(), q, "E");
+
+        const icMa = Math.max(100, Math.ceil((2 * ma) / 100) * 100);
+        const vce = Math.max(10, Math.ceil(2 * railV));
+        const npnId = `rule_npn_${icMa}ma_${vce}v`;
+        place({ ref: q, function: t("rule_npnName"), bomId: npnId, pins: passive("B", "C", "E"), role: "driver" });
+        place(resistorPart(rbRef, rb));
+        add(
+          npnId,
+          "transistor",
+          { transistor_type: "npn", current_a: icMa / 1000, voltage_v: vce, package: "to92" },
+          t("rule_npnName"),
+          t("rule_npnSpec", { ma: icMa, v: vce }),
+          1,
+          t("rule_driverReason", { ref: c.ref, net: d.net }),
+          { ref: q }
+        );
+        resistorLine(rb, t("rule_baseReason", { q, ref: c.ref }), rbRef);
+        if (!hasDiode) flyback(c, lowNet, high, ma);
+        continue;
+      }
+
+      // Already switched on its low side (by a transistor or a driver): a
+      // flyback diode across it. A load between two driver outputs (an
+      // H-bridge) gets none — a single diode would short the bridge, and
+      // driver modules carry their own. A load straight across a supply is
+      // never switched, so it needs none either.
+      if (hasDiode) continue;
+      const mine = netsOf(c.ref);
+      const high = mine.find((x) => powerSet.has(x.name));
+      const low = mine.find((x) => x !== high && !ground.has(x.name) && !powerSet.has(x.name));
+      if (high && low) flyback(c, low.name, high.name, statedMa ?? DEFAULT_LOAD_MA);
     }
+
+    n.nets = n.nets.filter((x) => x.connections.length > 0);
 
     // Logic levels across each signal net.
     const shifterNets: string[] = [];
@@ -265,7 +521,7 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
       type End = { ref: string; type: string; v: number | null };
       const ends = x.connections
         .map((k): End | null => {
-          const c = byRef.get(k.ref);
+          const c = byRef(k.ref);
           const pin = c?.pins.find((p) => p.id === k.pin);
           return c && pin ? { ref: c.ref, type: pin.type, v: logicV(c) } : null;
         })
@@ -298,7 +554,7 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
 
   // Build consumables: what a prototype cannot be built without.
   const c = (id: string, type: string, size: string, critical = true) =>
-    add(`rule_${id}`, "consumable", { consumable_type: type, size }, t(`rule_${id}_name`), t(`rule_${id}_spec`), 1, t(`rule_${id}_reason`), { critical });
+    add(`rule_${id}`, "consumable", { consumable_type: type, size }, t(`rule_${id}_name`), t(`rule_${id}_spec`), 1, t(`rule_${id}_reason`), { extra: { critical } });
   c("breadboard", "breadboard", "830");
   c("jumpers", "jumper_wires", "M-M/M-F/F-F");
   c("perfboard", "perfboard", "", false);
@@ -336,8 +592,30 @@ export function deriveElectronics({ netlist: n, lines, route, power, t }: Ctx): 
 
   const lim = (xs: string[]) => (xs.length > 6 ? `${xs.slice(0, 6).join("; ")}; +${xs.length - 6}` : xs.join("; "));
   return {
-    lines: [...out.values()].map((l) => ({ ...l, reason: lim(reasons.get(l.id) ?? []) })),
+    lines: [...out.values()].map((l) => ({
+      ...l,
+      reason: lim(reasons.get(l.id) ?? []),
+      ...(covered.get(l.id)?.length ? { refs: covered.get(l.id) } : {}),
+    })),
+    netlist: n,
     levelFlags,
     assumptions,
   };
+}
+
+/**
+ * The netlist to store: our rules' augmented copy, which must pass the same
+ * reference check as the model's (its added parts point at rule line ids).
+ * Should our own insertion ever break a reference, the model's netlist is kept
+ * instead — its hard-rule flags then block readiness, so nothing is hidden —
+ * and the problems are returned for the log.
+ */
+export function augmentedCircuit(
+  model: Netlist | null,
+  augmented: Netlist | null,
+  lineIds: string[]
+): { netlist: Netlist | null; problems: string[] } {
+  if (!augmented) return { netlist: model, problems: [] };
+  const problems = crossValidate(augmented, lineIds);
+  return problems.length ? { netlist: model, problems } : { netlist: augmented, problems: [] };
 }

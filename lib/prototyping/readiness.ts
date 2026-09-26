@@ -10,9 +10,10 @@
 // same result renders in English and Arabic.
 
 import { MIN_BRIEF_CHARS } from "./constants";
-import { isMakeable, partNeeds, type PartLike } from "./parts";
+import { isMakeable, partNeeds, type PartContext, type PartLike } from "./parts";
 import { rowOf, type Spec } from "./spec";
 import type { BomKind, LineStatus } from "./bom";
+import { describeHard, hardFlagId, hardRules, type Netlist } from "./netlist";
 
 /** Which area of the workspace a requirement belongs to. */
 export type RequirementGroup = "brief" | "understanding" | "inputs" | "parts" | "bom" | "route";
@@ -42,8 +43,23 @@ export type ReadinessInput = {
   spec: Spec | null | undefined;
   parts: PartLike[];
   routeAccepted: boolean;
-  /** Only when the Electronics branch is active: the build route and whether the list exists. */
-  electronics?: { route: string | null; built: boolean } | null;
+  /**
+   * Known boards the project uses (footprints.projectBoards over its BOM,
+   * catalog parts and store lines), so an enclosure too small for its board
+   * ("tooSmall") blocks like any other part need (audit #5).
+   */
+  boards?: PartContext["boards"];
+  /**
+   * Only when the Electronics branch is active: the build route, whether the
+   * list exists, and the stored circuit (projects.netlist) our hard rules check.
+   */
+  electronics?: {
+    route: string | null;
+    built: boolean;
+    netlist?: Netlist | null;
+    /** Ids of the BOM lines still on the list (not removed): every circuit part must point at one. */
+    lineIds?: string[];
+  } | null;
   /** Bill of materials with its live store matches; absent until matched. */
   bom?: { lines: { id: string; function: string; kind: BomKind }[]; matches: Map<string, { status: LineStatus }> } | null;
 };
@@ -76,8 +92,16 @@ export const factLabel = (id: string, label: string, t: Translate) =>
 
 export const factFocus = (id: string) => `fact-${id}`;
 
+/** DOM id of the circuit card under Electronics › Board. */
+export const CIRCUIT_FOCUS = "circuit-card";
+
+/** A circuit requirement: resolved on the Board, where the circuit is drawn. */
+export const isCircuitRequirement = (r: Pick<Requirement, "id">) =>
+  r.id === "circuit_clean" || r.id.startsWith("circuit:");
+
 export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
   const req: Requirement[] = [];
+  const partCtx: PartContext = { boards: p.boards ?? [] };
   const add = (r: Omit<Requirement, "blockingReason">, reason: string) =>
     req.push(r.satisfied ? r : { ...r, blockingReason: reason });
 
@@ -125,7 +149,7 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
     add({ id: "parts", group: "parts", label: t("req_parts"), satisfied: false }, t("block_noParts"));
   }
   for (const part of p.parts) {
-    const needs = partNeeds(part);
+    const needs = partNeeds(part, partCtx);
     add(
       { id: `part:${part.id}`, group: "parts", label: `${part.code} ${part.name}`, satisfied: !needs.length },
       needs.length
@@ -146,6 +170,42 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
         { id: "electronics_list", group: "bom", label: t("req_electronicsList"), satisfied: p.electronics.built, focus: "route-card", bomKind: "electronics" },
         t("block_electronicsList")
       );
+
+    // The circuit must pass our hard rules (audit #1): an inductive load
+    // without a driver, an LED without a resistor, two supplies on one net or
+    // a rail over budget each block on their own, by name. The tree places
+    // these on Electronics › Board, where the circuit is drawn.
+    if (p.electronics.route) {
+      const n = p.electronics.netlist ?? null;
+      const hard = n ? hardRules(n) : [];
+      // A part drawn in the circuit whose line was removed from the list: the
+      // diagrams and the bill of materials would disagree.
+      const live = p.electronics.lineIds ? new Set(p.electronics.lineIds) : null;
+      const orphans = n && live ? n.components.filter((c) => !live.has(c.bomId)) : [];
+      add(
+        {
+          id: "circuit_clean",
+          group: "bom",
+          label: t("req_circuitClean"),
+          satisfied: !!n && !hard.length && !orphans.length,
+          focus: CIRCUIT_FOCUS,
+          bomKind: "electronics",
+        },
+        n ? t("block_circuitClean") : t("block_circuitMissing")
+      );
+      for (const c of orphans) {
+        const text = t("block_circuitOrphan", { ref: `${c.ref} (${c.function})` });
+        add({ id: `circuit:orphan:${c.ref}`, group: "bom", label: text, satisfied: false, focus: CIRCUIT_FOCUS, bomKind: "electronics" }, text);
+      }
+      const seen = new Set<string>();
+      for (const f of hard) {
+        const id = hardFlagId(f);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const text = describeHard(f, n!, t);
+        add({ id, group: "bom", label: text, satisfied: false, focus: CIRCUIT_FOCUS, bomKind: "electronics" }, text);
+      }
+    }
   }
 
   // Bill of materials: a line with several store candidates waits on the
@@ -162,7 +222,7 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
   // while every part it was built from is still valid.
   const makeable = p.parts.filter(isMakeable);
   if (makeable.length) {
-    const ok = makeable.every((x) => !partNeeds(x).length);
+    const ok = makeable.every((x) => !partNeeds(x, partCtx).length);
     add(
       { id: "route", group: "route", label: t("req_route"), satisfied: p.routeAccepted && ok },
       p.routeAccepted ? t("block_routeStale") : t("block_route")

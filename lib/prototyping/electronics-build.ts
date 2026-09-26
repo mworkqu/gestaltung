@@ -3,10 +3,13 @@
 //   1. the model lists boards, modules, sensors, actuators (listElectronics),
 //      unless we are only redrawing the circuit for the lines already there;
 //   2. the model wires them (generateNetlist) — validated, one retry;
-//   3. OUR rules derive the passives, level shifters, build consumables and,
-//      on the Custom PCB route, the fabrication line (deriveElectronics);
+//   3. OUR rules derive the passives, drivers, flyback diodes, level shifters,
+//      build consumables and, on the Custom PCB route, the fabrication line
+//      (deriveElectronics) — and insert every circuit part into the netlist;
 //   4. each source replaces only its own lines; picks, bought lines and the
-//      client's removals are kept (replaceLines).
+//      client's removals are kept (replaceLines);
+//   5. the AUGMENTED netlist is saved as projects.netlist, so the schematic,
+//      the wiring diagram and the bill of materials show one circuit (audit #1).
 //
 // If the circuit cannot be validated, the list is still saved with its
 // consumables, and the caller is told the passives could not be derived.
@@ -16,7 +19,7 @@ import { getTranslations } from "next-intl/server";
 
 import type { BuildRoute } from "./analysis";
 import { originOf, replaceLines, type ProjectBom, type ProjectLine } from "./bom";
-import { deriveElectronics } from "./electronics-rules";
+import { augmentedCircuit, deriveElectronics } from "./electronics-rules";
 import { generateNetlist, listElectronics } from "./electronics-gen";
 import type { Netlist, ProjectNetlist } from "./netlist";
 import type { Spec } from "./spec";
@@ -86,8 +89,10 @@ export async function buildElectronics(opts: {
     levelFlags: derived.levelFlags,
     assumptions: derived.assumptions,
   };
-  const savedNetlist: ProjectNetlist | null = netlist
-    ? { ...netlist, generatedAt: new Date().toISOString(), model: drawn.ok ? drawn.model : null }
+  const circuit = augmentedCircuit(netlist, derived.netlist, [...lines, ...derived.lines].map((l) => l.id));
+  if (circuit.problems.length) console.error("electronics-build: augmented netlist failed crossValidate", circuit.problems);
+  const savedNetlist: ProjectNetlist | null = circuit.netlist
+    ? { ...circuit.netlist, generatedAt: new Date().toISOString(), model: drawn.ok ? drawn.model : null }
     : project.netlist;
 
   const { error } = await supabase

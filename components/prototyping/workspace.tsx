@@ -35,10 +35,12 @@ import { isAuthSessionMissingError } from "@supabase/supabase-js";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
+import { CIRCUIT_FOCUS, looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
 import { disciplineOf, isConcept, isMakeable } from "@/lib/prototyping/parts";
 import { rowOf } from "@/lib/prototyping/spec";
 import type { Spec } from "@/lib/prototyping/spec";
+import { projectBoards } from "@/lib/prototyping/footprints";
+import { circuitBomIds } from "@/lib/prototyping/netlist";
 import {
   DESIGN_NODE,
   branches,
@@ -291,9 +293,20 @@ export function PrototypingWorkspace({
       spec,
       parts,
       routeAccepted,
+      // The same boards the Parts list checks enclosures against (audit #5).
+      boards: projectBoards({
+        bom,
+        partNames: parts.map((p) => p.name),
+        itemNames: storeLines.map((l) => l.part?.name),
+      }),
       bom: bom ? { lines: liveLines, matches } : null,
       electronics: electronicsActive
-        ? { route: buildRoute, built: Boolean(bom?.electronicsBuiltAt) || liveLines.some((l) => originOf(l) === "electronics") }
+        ? {
+            route: buildRoute,
+            built: Boolean(bom?.electronicsBuiltAt) || liveLines.some((l) => originOf(l) === "electronics"),
+            netlist: project.netlist ?? null,
+            lineIds: liveLines.map((l) => l.id),
+          }
         : null,
     },
     tr
@@ -415,6 +428,10 @@ export function PrototypingWorkspace({
     return true;
   }
 
+  // BOM lines a drawn circuit part points at: removing one would leave the
+  // diagrams and the list disagreeing, so the table won't offer it.
+  const inCircuit = circuitBomIds(project.netlist);
+
   const bomTable = (kind: "all" | "electronics" | "mechanical", before?: React.ReactNode) => {
     const dismissedIds = new Set(bom?.dismissed ?? []);
     const inKind = (bom?.lines ?? []).filter((l) => kind === "all" || l.kind === kind);
@@ -430,6 +447,7 @@ export function PrototypingWorkspace({
         failed={matchState === "failed"}
         onChoose={chooseProduct}
         onDismiss={dismissLines}
+        inCircuit={inCircuit}
         kicker={kind === "all" ? t("node_bom") : t(`discipline_${kind}`)}
         title={kind === "all" ? t("bomTitle") : t(`bomTitle_${kind}`)}
         intro={kind === "all" ? t("bomIntro") : t("bomBranchIntro")}
@@ -690,20 +708,28 @@ export function PrototypingWorkspace({
           {node === "electronics.board" && (
             <>
               {designStage("electronics")}
-              <NetlistView
-                projectId={project.id}
-                netlist={project.netlist ?? null}
-                bom={bom}
-                matches={matches}
-                onSaved={load}
-                extra={levelFlags}
-              />
+              {/* Circuit requirements focus here (readiness CIRCUIT_FOCUS). */}
+              <div id={CIRCUIT_FOCUS} tabIndex={-1} className="outline-none">
+                <NetlistView
+                  projectId={project.id}
+                  netlist={project.netlist ?? null}
+                  bom={bom}
+                  matches={matches}
+                  onSaved={load}
+                  extra={levelFlags}
+                />
+              </div>
               {earlier(designOf("electronics"))}
             </>
           )}
 
           {node === "electronics.power" && (
-            <PowerCard spec={spec} onSet={() => goTo("brief", "fact-power")} />
+            <PowerCard
+              spec={spec}
+              netlist={project.netlist ?? null}
+              onSet={() => goTo("brief", "fact-power")}
+              onCircuit={() => goTo("electronics.board", CIRCUIT_FOCUS)}
+            />
           )}
 
           {node === "electronics.components" && (

@@ -153,6 +153,7 @@ export function BomTable({
   intro,
   showTotal,
   before,
+  inCircuit,
 }: {
   projectId: string;
   lines: ProjectLine[];
@@ -169,6 +170,8 @@ export function BomTable({
   /** The project-level view: cost summary, Add all to cart, Buy as kit. */
   showTotal: boolean;
   before?: React.ReactNode;
+  /** Line ids a part of the stored circuit points at (netlist bomIds): these can't be removed. */
+  inCircuit?: ReadonlySet<string>;
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale();
@@ -318,6 +321,7 @@ export function BomTable({
                             onAdd={() => add(l)}
                             onChoose={onChoose}
                             onDismiss={() => onDismiss([l.id], true)}
+                            dismissBlocked={!!inCircuit?.has(l.id)}
                           />
                         ))}
                       </tbody>
@@ -380,6 +384,7 @@ function Row({
   onAdd,
   onChoose,
   onDismiss,
+  dismissBlocked,
 }: {
   l: ProjectLine;
   m: LineMatch | undefined;
@@ -392,6 +397,8 @@ function Row({
   onAdd: () => void;
   onChoose: (lineId: string, productId: string | null) => Promise<void>;
   onDismiss: () => void;
+  /** The line's part is drawn in the circuit: removing it would split the views (audit #1). */
+  dismissBlocked: boolean;
 }) {
   const t = useTranslations("Prototyping");
   const tD = useTranslations("Delivery");
@@ -458,17 +465,30 @@ function Row({
               </span>
             )}
           </span>
-          {!l.fulfilled && (
-            <button
-              type="button"
-              onClick={onDismiss}
-              title={t("bomRemove")}
-              aria-label={t("bomRemove")}
-              className="mt-0.5 rounded p-0.5 text-faint transition-colors hover:text-destructive"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
+          {!l.fulfilled &&
+            (dismissBlocked ? (
+              // Disabled buttons swallow hover in some browsers: the reason sits on a wrapper.
+              <span title={t("dismissBlockedCircuit")} className="mt-0.5 inline-flex">
+                <button
+                  type="button"
+                  disabled
+                  aria-label={t("dismissBlockedCircuit")}
+                  className="cursor-not-allowed rounded p-0.5 text-faint opacity-40"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={onDismiss}
+                title={t("bomRemove")}
+                aria-label={t("bomRemove")}
+                className="mt-0.5 rounded p-0.5 text-faint transition-colors hover:text-destructive"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            ))}
         </span>
       </td>
       <td className="max-w-[200px] px-3 py-2.5 text-[12px] text-mutedtext">{l.spec}</td>

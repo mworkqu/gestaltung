@@ -18,7 +18,7 @@ import type { BuildRoute } from "./analysis";
 import { AttributesSchema } from "./analysis-schema";
 import type { ProjectLine } from "./bom";
 import { validatedCall, type CallResult } from "./ai-call";
-import { crossValidate, type Netlist } from "./netlist";
+import { crossValidate, supplyConflictErrors, type Netlist } from "./netlist";
 import { NetlistSchema } from "./netlist-schema";
 import { attributesGuide, bomLineSchema } from "./providers/gemini-attrs";
 import type { AttrClass } from "@/lib/store/attributes";
@@ -181,6 +181,8 @@ Rules:
 - Declare under each component EVERY pin you are going to connect, and connect ONLY pins you declared. Never invent a pin (no "NC", no pin that is not in that component's own pins list), and never leave a pin id empty. A pin that is not used is simply left out.
 - nets: every electrical connection. Each connection names a ref and a pin id that exist. A pin is on at most one net. Name power nets after their rail voltage ("5V", "3V3", "12V") and the ground net "GND". Name I2C nets SDA and SCL.
 - Connect LEDs and buttons directly to the board pins they use: the series resistors and pull-ups are added by our own rules afterwards.
+- Connect a DC motor, pump, solenoid, bare relay or fan between the board pin that switches it and GND: the driver transistor, its base resistor and the flyback diode are added by our own rules afterwards. Servos, steppers and driver modules connect as they are.
+- Each net has at most ONE power_out pin. A board fed from a USB connector, adapter or battery takes that supply on a power_in pin (VIN, 5V); only the supply itself is power_out on that net.
 - powerRails: each supply voltage — name, the ref of the component that supplies it (its pin must be type power_out), and the most current it can supply in mA.
 - notes: short practical cautions only.
 - Never name a brand, manufacturer, model or part number. Never give a price.
@@ -194,6 +196,7 @@ export async function generateNetlist(opts: {
   locale: "en" | "ar";
 }): Promise<CallResult<Netlist>> {
   const bomIds = opts.lines.map((l) => l.id);
+  let answers = 0;
   const prompt = `Write function and notes text in ${opts.locale === "ar" ? "Arabic" : "English"}; ids, refs, pin ids and net names stay in English.
 
 Product:
@@ -210,16 +213,32 @@ ${opts.lines.map((l) => `- id "${l.id}": ${l.function} — ${l.spec} (quantity $
     system: NETLIST_SYSTEM,
     prompt,
     schema: NETLIST_SCHEMA,
-    validate: (raw) => {
-      const shaped = NetlistSchema.safeParse(raw);
-      if (!shaped.success)
-        return { value: null, errors: shaped.error.issues.slice(0, 12).map((i) => `${i.path.join(".")}: ${i.message}`) };
-      const n: Netlist = shaped.data;
-      // Test hook, never in production: point one connection at nothing.
-      if (process.env.NETLIST_TEST_BREAK === "1" && process.env.NODE_ENV !== "production" && n.nets[0]?.connections[0])
-        n.nets[0].connections[0] = { ref: "X99", pin: "1" };
-      const errors = crossValidate(n, bomIds);
-      return errors.length ? { value: null, errors } : { value: n, errors };
-    },
+    // Supply conflicts are sent back on the first answer only. A second answer
+    // that still has one is kept: drawn, with the conflict as a named blocker
+    // (readiness), rather than thrown away with the rest of the circuit.
+    validate: (raw) => checkModelNetlist(raw, bomIds, { supplies: answers++ === 0 }),
   });
+}
+
+/**
+ * The gate on the model's netlist, and the words sent back on its one retry:
+ * shape (zod), references (crossValidate), then supply conflicts — two
+ * power_out pins on one net is a short our rules cannot fix, so the model is
+ * asked to rewire it rather than it reaching the client as a blocker.
+ */
+export function checkModelNetlist(
+  raw: unknown,
+  bomIds: string[],
+  opts: { supplies: boolean } = { supplies: true }
+): { value: Netlist | null; errors: string[] } {
+  const shaped = NetlistSchema.safeParse(raw);
+  if (!shaped.success)
+    return { value: null, errors: shaped.error.issues.slice(0, 12).map((i) => `${i.path.join(".")}: ${i.message}`) };
+  const n: Netlist = shaped.data;
+  // Test hook, never in production: point one connection at nothing.
+  if (process.env.NETLIST_TEST_BREAK === "1" && process.env.NODE_ENV !== "production" && n.nets[0]?.connections[0])
+    n.nets[0].connections[0] = { ref: "X99", pin: "1" };
+  const refErrors = crossValidate(n, bomIds);
+  const errors = refErrors.length ? refErrors : opts.supplies ? supplyConflictErrors(n) : [];
+  return errors.length ? { value: null, errors } : { value: n, errors };
 }

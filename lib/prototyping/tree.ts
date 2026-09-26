@@ -17,7 +17,7 @@ import { DISCIPLINES, type Discipline } from "./constants";
 import { detectDisciplines } from "./engine";
 import { disciplineOf, isConcept, type PartLike } from "./parts";
 import { bomNode } from "./bom";
-import { factFocus, type Readiness, type Requirement, type Translate } from "./readiness";
+import { factFocus, isCircuitRequirement, type Readiness, type Requirement, type Translate } from "./readiness";
 import { rowOf, type Spec } from "./spec";
 
 export const LEAVES = {
@@ -103,6 +103,7 @@ export function visibleNodes(bs: Branch[]): NodeId[] {
 export function nodeOf(r: Requirement, parts: PartLike[], visible: NodeId[]): NodeId {
   if (r.group === "brief" || r.group === "understanding" || r.group === "inputs") return "brief";
   if (r.group === "route") return "quote";
+  if (isCircuitRequirement(r) && visible.includes("electronics.board")) return "electronics.board";
   if (r.group === "bom") {
     const n = r.bomKind ? (bomNode(r.bomKind) as NodeId) : "bom";
     return visible.includes(n) ? n : "bom";

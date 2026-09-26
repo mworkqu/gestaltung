@@ -6,7 +6,7 @@
 //
 // Pure string building from a validated netlist: same input, same SVG.
 
-import { esc, flaggedRefs, powerNets, type Flag, type NetComponent, type Netlist } from "./netlist";
+import { esc, flaggedRefs, powerNets, symbolKind, type Flag, type NetComponent, type Netlist, type SymbolKind } from "./netlist";
 
 const INK = "#1c2434";
 const MUTED = "#64748b";
@@ -19,30 +19,9 @@ const PAD = 60;
 // A white outline behind label text, so a wire passing under it stays legible.
 const HALO = `stroke="#ffffff" stroke-width="4" paint-order="stroke" stroke-linejoin="round"`;
 
-export type SymbolKind = "resistor" | "capacitor" | "led" | "diode" | "transistor" | "connector" | "motor" | "ic";
-
-export function symbolKind(c: NetComponent): SymbolKind {
-  // The designator is the most reliable signal, so it decides first.
-  const ref = c.ref.toUpperCase();
-  if (/^LED\d/.test(ref)) return "led";
-  if (/^R\d/.test(ref)) return "resistor";
-  if (/^C\d/.test(ref)) return "capacitor";
-  if (/^D\d/.test(ref)) return "diode";
-  if (/^Q\d/.test(ref)) return "transistor";
-  if (/^M\d/.test(ref)) return "motor";
-  if (/^(J|BT|P)\d/.test(ref)) return "connector";
-  if (/^U\d/.test(ref)) return "ic";
-  // Otherwise the function, most specific words first ("LED resistor" is a resistor).
-  const t = c.function.toLowerCase();
-  if (/resist/.test(t)) return "resistor";
-  if (/capacit/.test(t)) return "capacitor";
-  if (/\bled\b|light.emitting/.test(t)) return "led";
-  if (/diode/.test(t)) return "diode";
-  if (/transistor|mosfet|\bbjt\b/.test(t)) return "transistor";
-  if (/motor|servo|\bfan\b|pump/.test(t)) return "motor";
-  if (/connector|header|terminal|jack|plug|socket|battery|cell|panel/.test(t)) return "connector";
-  return "ic";
-}
+// The symbol library is chosen by symbolKind(), which lives beside the
+// netlist so our electrical rules read components the same way.
+export { symbolKind, type SymbolKind } from "./netlist";
 
 type End = { x: number; y: number; dx: number; dy: number };
 
@@ -176,6 +155,7 @@ function drawSymbol(kind: SymbolKind, c: NetComponent, cx: number, cy: number, s
       };
     }
     case "transistor": {
+      // NPN: pins in order base, collector, emitter (arrow on the emitter).
       const ends: End[] = [
         { x: cx - 34, y: cy, dx: -1, dy: 0 },
         { x: cx + 10, y: cy - 30, dx: 0, dy: -1 },
@@ -186,7 +166,8 @@ function drawSymbol(kind: SymbolKind, c: NetComponent, cx: number, cy: number, s
         body: `<circle cx="${cx}" cy="${cy}" r="20" fill="#fff" stroke="${s}" stroke-width="1.5"/>
           <line x1="${cx - 34}" y1="${cy}" x2="${cx - 6}" y2="${cy}" stroke="${s}" stroke-width="1.5"/>
           <line x1="${cx - 6}" y1="${cy - 11}" x2="${cx - 6}" y2="${cy + 11}" stroke="${s}" stroke-width="2"/>
-          <path d="M${cx - 6} ${cy - 5} L${cx + 10} ${cy - 16} V${cy - 30} M${cx - 6} ${cy + 5} L${cx + 10} ${cy + 16} V${cy + 30}" fill="none" stroke="${s}" stroke-width="1.5"/>`,
+          <path d="M${cx - 6} ${cy - 5} L${cx + 10} ${cy - 16} V${cy - 30} M${cx - 6} ${cy + 5} L${cx + 10} ${cy + 16} V${cy + 30}" fill="none" stroke="${s}" stroke-width="1.5"/>
+          <path d="M${cx + 9} ${cy + 15.3} L${cx + 2.4} ${cy + 14.4} L${cx + 5.8} ${cy + 9.4} Z" fill="${s}"/>`,
         ends,
       };
     }
