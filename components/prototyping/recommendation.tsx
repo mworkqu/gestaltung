@@ -5,12 +5,16 @@
 // a pure function of the rows above it. Deterministic rules only (engine.ts):
 // the route must be explainable and repeatable, so it never goes to a model.
 // It shows no lead times or scores: we have no measured figure for either.
+//
+// With `materialsFor` it also lists each of those parts with its material and
+// process (audit #35), so the Material & process leaf shows what the route is
+// built from and can be accepted right there.
 
 import { useTranslations } from "next-intl";
-import { Check, Undo2 } from "lucide-react";
+import { Check, CircleAlert, Undo2 } from "lucide-react";
 
 import { recommend } from "@/lib/prototyping/engine";
-import { processesFor, type Process } from "@/lib/prototyping/constants";
+import { isCompatible, processesFor, type Process } from "@/lib/prototyping/constants";
 import { Tag } from "@/components/ui/tag";
 import { Card, GhostButton, PrimaryButton, Warn } from "@/components/prototyping/ui";
 import type { ProjectPart } from "@/lib/supabase/types";
@@ -30,12 +34,18 @@ export function Recommendation({
   brief,
   accepted,
   onAccept,
+  materialsFor,
+  onEditParts,
 }: {
   parts: ProjectPart[];
   brief: string;
   accepted: boolean;
   /** Omit to show the route without the accept action (a read-only view). */
   onAccept?: (next: boolean) => void;
+  /** Parts to list with their material and process; omit for no list. */
+  materialsFor?: ProjectPart[];
+  /** Where a missing or clashing material/process is changed. */
+  onEditParts?: () => void;
 }) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
@@ -52,6 +62,66 @@ export function Recommendation({
   );
 
   const blocking = rec.warnings.filter((w) => w.blocking);
+  const needsEdit = (materialsFor ?? []).some(
+    (p) => !p.material || !p.process || !isCompatible(p.material, p.process)
+  );
+
+  const materials = materialsFor && materialsFor.length > 0 && (
+    <div className="space-y-2">
+      <div className="min-w-0 overflow-x-auto rounded-xl bg-panel shadow-neu-inset">
+        <table className="w-full min-w-[480px] text-start text-sm">
+          <thead>
+            <tr className="text-[11px] text-mutedtext">
+              <th scope="col" className="px-3 py-2 text-start font-semibold">{t("colCode")}</th>
+              <th scope="col" className="px-3 py-2 text-start font-semibold">{t("colPart")}</th>
+              <th scope="col" className="px-3 py-2 text-start font-semibold">{t("material")}</th>
+              <th scope="col" className="px-3 py-2 text-start font-semibold">{t("process")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {materialsFor.map((p) => {
+              const clash = Boolean(p.material && p.process && !isCompatible(p.material, p.process));
+              return (
+                <tr key={p.id} className="border-t border-borderstrong/40 align-top">
+                  <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-faint">{p.code}</td>
+                  <td className="px-3 py-2 font-medium text-heading">{p.name}</td>
+                  <td className="px-3 py-2">
+                    {p.material ? (
+                      <span className={clash ? "text-destructive" : "text-heading"}>
+                        {tProj(`material_${p.material}`)}
+                      </span>
+                    ) : (
+                      <span className="text-inventory">{t("partNeed_material")}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {p.process ? (
+                      <span className={clash ? "text-destructive" : "text-heading"}>
+                        {t(`process_${p.process}`)}
+                      </span>
+                    ) : (
+                      <span className="text-inventory">{t("partNeed_process")}</span>
+                    )}
+                    {clash && (
+                      <span className="mt-0.5 flex items-center gap-1 text-[11px] text-destructive">
+                        <CircleAlert className="h-3 w-3 shrink-0" />
+                        {t("partNeed_mismatch")}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {onEditParts && needsEdit && (
+        <GhostButton onClick={onEditParts} className="px-1">
+          {t("editMaterials")}
+        </GhostButton>
+      )}
+    </div>
+  );
 
   return (
     <Card
@@ -59,6 +129,7 @@ export function Recommendation({
       title={t("stageTitle_manufacturing")}
       intro={t("recIntro")}
     >
+      {materials}
       {rec.routes.length === 0 ? (
         <p className="text-sm text-mutedtext">{t("recEmpty")}</p>
       ) : (

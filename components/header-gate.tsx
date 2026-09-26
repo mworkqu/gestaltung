@@ -12,9 +12,10 @@ const APP_PREFIXES = [
 
 export function HeaderGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isApp = APP_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/")
-  );
+  const isApp =
+    APP_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
+    // The prototyping workspace carries its own bar (logo, back, language).
+    /^\/projects\/[^/]+\/prototyping(\/|$)/.test(pathname);
   if (isApp) return null;
   return <>{children}</>;
 }

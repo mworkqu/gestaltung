@@ -87,6 +87,22 @@ export function branches(
   });
 }
 
+/**
+ * The client adds (true) or removes (false) a branch, or "restore" drops their
+ * choice so the branch goes back to what the analysis and the parts say — the
+ * honest undo of a removal, rather than a forced "on".
+ */
+export function withBranchChoice(
+  state: DisciplineState | null | undefined,
+  d: Discipline,
+  choice: boolean | "restore"
+): DisciplineState {
+  const manual = { ...(state?.manual ?? {}) };
+  if (choice === "restore") delete manual[d];
+  else manual[d] = choice;
+  return { ...(state ?? {}), manual };
+}
+
 /** Every node the client can see, in reading order. */
 export function visibleNodes(bs: Branch[]): NodeId[] {
   return [
@@ -201,4 +217,28 @@ export function toNode(stored: string, visible: NodeId[]): NodeId {
   };
   const n = (legacy[stored] ?? stored) as NodeId;
   return visible.includes(n) ? n : "brief";
+}
+
+/** What initialNode reads from a project. */
+export type Opening = {
+  /** projects.stage: the node last opened (written on every navigation). */
+  stage: string | null | undefined;
+  /** projects.spec: null until the brief is first analysed. */
+  spec?: unknown;
+  disciplines?: DisciplineState | null;
+  parts?: readonly unknown[];
+};
+
+/**
+ * Where the workspace opens (audit #32): on Brief while there is nothing past
+ * the brief yet, otherwise where the client left off. A project counts as
+ * started once it has been analysed, or has parts or detected disciplines
+ * (projects analysed before the spec was stored have parts but no spec). A
+ * stored node that no longer exists — a removed branch, an unknown id — falls
+ * back to Brief, never to Quote.
+ */
+export function initialNode(p: Opening, visible: NodeId[]): NodeId {
+  const started = p.spec != null || Boolean(p.disciplines?.detected?.length) || Boolean(p.parts?.length);
+  if (!started) return "brief";
+  return toNode(p.stage ?? "", visible);
 }

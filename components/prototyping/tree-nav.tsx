@@ -91,6 +91,7 @@ export function TreeNav({
   saveFailed,
   onSelect,
   onBranch,
+  onRestore,
 }: {
   branches: Branch[];
   states: Record<NodeId, NodeState>;
@@ -100,6 +101,8 @@ export function TreeNav({
   /** Go to a node, optionally focusing the control that resolves it. */
   onSelect: (n: NodeId, focus?: string) => void;
   onBranch: (d: Discipline, on: boolean) => void;
+  /** Drop the client's own choice for a branch, so detection decides again. */
+  onRestore?: (d: Discipline) => void;
 }) {
   const t = useTranslations("Prototyping");
   const mono = useMono();
@@ -144,6 +147,9 @@ export function TreeNav({
   const undoRef = useRef<HTMLButtonElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const undoMsgId = useId();
+  // The branch's own manual choice before the removal, so Undo puts back
+  // exactly that: no choice (it was detected) or a hand-added "on".
+  const manualBefore = useRef<boolean | undefined>(undefined);
 
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -162,6 +168,7 @@ export function TreeNav({
 
   function confirmRemove(d: Discipline) {
     setConfirming(null);
+    manualBefore.current = branches.find((b) => b.discipline === d)?.manual;
     onBranch(d, false);
     setRemoved(d);
     if (undoTimer.current) clearTimeout(undoTimer.current);
@@ -176,10 +183,11 @@ export function TreeNav({
   function undoRemove(d: Discipline) {
     if (undoTimer.current) clearTimeout(undoTimer.current);
     setRemoved(null);
-    // The only way back the workspace offers is "add": it records a manual
-    // "on", which shows the branch exactly as before (a removable branch holds
-    // no parts, so it was on because it was detected or added by hand).
-    onBranch(d, true);
+    // A removable branch holds no parts, so it was on because it was detected
+    // or added by hand. Detected: drop the removal so detection decides again
+    // (onRestore). Added by hand — or no onRestore given — record "on" again.
+    if (onRestore && manualBefore.current === undefined) onRestore(d);
+    else onBranch(d, true);
     setTimeout(() => removeRefs.current[d]?.focus(), 0);
   }
 

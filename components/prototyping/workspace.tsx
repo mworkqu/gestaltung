@@ -9,9 +9,14 @@
 // super admin sees only their own projects here (audit #8, decision 6a).
 //
 // Three panels: the project tree on the left, the selected node in the
-// middle, and the next actions on the right. Each side panel collapses, and
-// the whole thing mirrors in Arabic because the layout is built from logical
-// properties and CSS grid.
+// middle, and the next actions on the right. Each side panel collapses — and
+// starts collapsed below 1440 px unless the client chose otherwise — and the
+// whole thing mirrors in Arabic because the layout is built from logical
+// properties and CSS grid. The site header is hidden here; the workspace's own
+// bar carries the logo, the way back and the language switch (audit #24).
+//
+// It opens where the client left off, or on Brief for a project that hasn't
+// got past its brief (audit #32, initialNode).
 //
 // Every number on this page comes from lib/prototyping/readiness, mapped onto
 // the tree by lib/prototyping/tree — nothing here counts anything itself.
@@ -34,7 +39,12 @@ import {
 import { isAuthSessionMissingError } from "@supabase/supabase-js";
 
 import { Link } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/client";
+import { LogoMark } from "@/components/logo-mark";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { HeaderAuthLink } from "@/components/header-auth-link";
+import { CartIcon } from "@/components/parts/cart-icon";
 import { CIRCUIT_FOCUS, looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
 import { disciplineOf, isConcept, isMakeable } from "@/lib/prototyping/parts";
 import { rowOf } from "@/lib/prototyping/spec";
@@ -44,16 +54,26 @@ import { circuitBomIds } from "@/lib/prototyping/netlist";
 import {
   DESIGN_NODE,
   branches,
+  initialNode,
   nodeKey,
   nodeOf,
   nodeStates,
   partNode,
   toNode,
   visibleNodes,
+  withBranchChoice,
   type NodeId,
 } from "@/lib/prototyping/tree";
+import { nodeClick } from "@/lib/prototyping/node-click";
 import type { Discipline } from "@/lib/prototyping/constants";
-import { activeLines, originOf, type LineMatch, type ProjectBom } from "@/lib/prototyping/bom";
+import {
+  activeLines,
+  originOf,
+  viewLines,
+  type BomView,
+  type LineMatch,
+  type ProjectBom,
+} from "@/lib/prototyping/bom";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
 import { PartsList, type StoreLine } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
@@ -82,6 +102,23 @@ const drawingsNode = (p: ProjectPart): NodeId =>
 /** How many open items the side panel offers as next actions. */
 const NEXT_ACTIONS = 4;
 
+/** The client's own open/closed choice for the side panels, per browser. */
+const PANELS_KEY = "gestaltung:proto-panels";
+/** Where both side panels would squeeze the centre: start them collapsed. */
+const NARROW = "(min-width: 1024px) and (max-width: 1439px)";
+
+type Panels = { left: boolean; right: boolean };
+
+function savedPanels(): Panels | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(PANELS_KEY) ?? "null") as Partial<Panels> | null;
+    return typeof v?.left === "boolean" && typeof v?.right === "boolean" ? { left: v.left, right: v.right } : null;
+  } catch {
+    // Storage blocked or the value is corrupt: the width rule decides instead.
+    return null;
+  }
+}
+
 export function PrototypingWorkspace({
   projectId,
   briefDestination,
@@ -93,8 +130,10 @@ export function PrototypingWorkspace({
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
   const tNav = useTranslations("Nav");
+  const tBrand = useTranslations("Brand");
   const mono = useMono();
-  const isRtl = useLocale() === "ar";
+  const locale = useLocale() as Locale;
+  const isRtl = locale === "ar";
 
   const [project, setProject] = useState<Project | null>(null);
   const [parts, setParts] = useState<ProjectPart[]>([]);
@@ -106,7 +145,10 @@ export function PrototypingWorkspace({
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [collapsed, setCollapsed] = useState({ left: false, right: false });
+  const [collapsed, setCollapsed] = useState<Panels>({ left: false, right: false });
+  // The open node. Chosen once per visit by initialNode; a reload after an
+  // edit keeps the client where they are.
+  const [current, setCurrent] = useState<string | null>(null);
   const [showOpen, setShowOpen] = useState(false);
   const [briefCleared, setBriefCleared] = useState(false);
   const [branchSaveFailed, setBranchSaveFailed] = useState(false);
@@ -210,7 +252,16 @@ export function PrototypingWorkspace({
       setLoading(false);
       return;
     }
-    setParts((partRes.data ?? []) as ProjectPart[]);
+    const loadedParts = (partRes.data ?? []) as ProjectPart[];
+    setParts(loadedParts);
+    setCurrent(
+      (c) =>
+        c ??
+        initialNode(
+          { stage: loaded.stage, spec: loaded.spec, disciplines: loaded.disciplines, parts: loadedParts },
+          visibleNodes(branches(loaded.disciplines, loaded.brief, loadedParts))
+        )
+    );
     setStoreFailed(Boolean(itemRes.error));
     setStoreLines(itemRes.error ? [] : ((itemRes.data ?? []) as StoreLine[]));
 
@@ -240,18 +291,71 @@ export function PrototypingWorkspace({
     void load();
   }, [load]);
 
+  // A saved choice wins; otherwise both panels start collapsed where they
+  // would squeeze the centre. Read after mount: the server has no window.
+  useEffect(() => {
+    const saved = savedPanels();
+    if (saved) setCollapsed(saved);
+    else if (window.matchMedia(NARROW).matches) setCollapsed({ left: true, right: true });
+  }, []);
+
+  function togglePanel(side: keyof Panels) {
+    const next = { ...collapsed, [side]: !collapsed[side] };
+    setCollapsed(next);
+    try {
+      localStorage.setItem(PANELS_KEY, JSON.stringify(next));
+    } catch {
+      // Storage blocked: the panel still toggles, it just isn't remembered.
+    }
+  }
+
+  /** The workspace's own top bar: the site header is hidden on this page. */
+  const bar = (back: React.ReactNode, rest?: React.ReactNode, below?: React.ReactNode) => (
+    <header className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
+      <Link href="/" aria-label={tBrand("name")} className="shrink-0">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink shadow-neu-sm">
+          <LogoMark title={tBrand("name")} className="h-4 w-4" gradientId="proto-logo" />
+        </span>
+      </Link>
+      {back}
+      {rest ?? <span className="flex-1" />}
+      <div className="flex items-center gap-2">
+        <CartIcon />
+        <LanguageSwitcher currentLocale={locale} />
+        <HeaderAuthLink isRtl={isRtl} />
+      </div>
+      {below}
+    </header>
+  );
+
+  const backTo = (href: string, label: string) => (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
+    >
+      <ArrowLeft className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
+      {label}
+    </Link>
+  );
+
   if (loading) {
     return (
-      <div className="neu flex items-center justify-center p-16">
-        <Loader2 className="h-5 w-5 animate-spin text-mutedtext" />
+      <div className="space-y-4">
+        {bar(backTo(`/projects/${projectId}`, t("backToProject")))}
+        <div className="neu flex items-center justify-center p-16">
+          <Loader2 className="h-5 w-5 animate-spin text-mutedtext" />
+        </div>
       </div>
     );
   }
 
   if (loadFailed) {
     return (
-      <div className="neu space-y-4 p-10 text-center">
-        <p className="text-base text-destructive">{t("loadFailed")}</p>
+      <div className="space-y-4">
+        {bar(backTo("/projects", tProj("listHeading")))}
+        <div className="neu space-y-4 p-10 text-center">
+          <p className="text-base text-destructive">{t("loadFailed")}</p>
+        </div>
       </div>
     );
   }
@@ -259,21 +363,24 @@ export function PrototypingWorkspace({
   // Not theirs, not there, or no session: one honest message (audit #8/#9).
   if (missing || !project) {
     return (
-      <div className="neu space-y-4 p-10 text-center">
-        <p className="text-base text-mutedtext">{t("notAvailable")}</p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/sign-in"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-          >
-            {tNav("signIn")}
-          </Link>
-          <Link
-            href="/projects"
-            className="text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
-          >
-            {tProj("listHeading")}
-          </Link>
+      <div className="space-y-4">
+        {bar(backTo("/projects", tProj("listHeading")))}
+        <div className="neu space-y-4 p-10 text-center">
+          <p className="text-base text-mutedtext">{t("notAvailable")}</p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/sign-in"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
+            >
+              {tNav("signIn")}
+            </Link>
+            <Link
+              href="/projects"
+              className="text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
+            >
+              {tProj("listHeading")}
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -313,7 +420,7 @@ export function PrototypingWorkspace({
   );
   const visible = visibleNodes(bs);
   const states = nodeStates(ready, parts, spec, visible, tr, buildRoute);
-  const node = toNode(project.stage, visible);
+  const node = toNode(current ?? project.stage, visible);
   const open = ready.requirements.filter((r) => !r.satisfied);
 
   const designOf = (d: Discipline) => parts.filter((p) => disciplineOf(p) === d);
@@ -334,6 +441,8 @@ export function PrototypingWorkspace({
   /** Go to a node; with `focus`, bring the control that resolves it into view. */
   async function goTo(n: NodeId, focus?: string) {
     setShowOpen(false);
+    setCurrent(n);
+    // Remembered so the next visit opens here (audit #32).
     await patchProject({ stage: n });
     if (focus) {
       setTimeout(() => {
@@ -359,10 +468,11 @@ export function PrototypingWorkspace({
   }
 
   // A manual choice is stored beside what the analysis detected and always
-  // wins over it; re-analysing only rewrites `detected`.
-  async function setBranch(d: Discipline, on: boolean) {
+  // wins over it; re-analysing only rewrites `detected`. "restore" drops the
+  // choice again — the undo of a removal (withBranchChoice).
+  async function setBranch(d: Discipline, choice: boolean | "restore") {
     const before = project!.disciplines ?? null;
-    const next = { ...(before ?? {}), manual: { ...(before?.manual ?? {}), [d]: on } };
+    const next = withBranchChoice(before, d, choice);
     setBranchSaveFailed(false);
     const { error } = await patchProject({ disciplines: next });
     if (error) {
@@ -432,16 +542,16 @@ export function PrototypingWorkspace({
   // diagrams and the list disagreeing, so the table won't offer it.
   const inCircuit = circuitBomIds(project.netlist);
 
-  const bomTable = (kind: "all" | "electronics" | "mechanical", before?: React.ReactNode) => {
-    const dismissedIds = new Set(bom?.dismissed ?? []);
-    const inKind = (bom?.lines ?? []).filter((l) => kind === "all" || l.kind === kind);
-    const lines = inKind.filter((l) => !dismissedIds.has(l.id));
-    if (kind !== "all" && !inKind.length && !before) return null;
+  const bomTable = (kind: BomView, before?: React.ReactNode) => {
+    // The one selector for every table's lines (audit #29): same count in the
+    // project BOM and the branch views.
+    const { lines, dismissed } = viewLines(bom, kind, inCircuit);
+    if (kind !== "all" && !lines.length && !dismissed.length && !before) return null;
     return (
       <BomTable
         projectId={project.id}
         lines={lines}
-        dismissed={inKind.filter((l) => dismissedIds.has(l.id))}
+        dismissed={dismissed}
         matches={matches}
         loading={matchState === "loading"}
         failed={matchState === "failed"}
@@ -474,6 +584,64 @@ export function PrototypingWorkspace({
   const productionQty = rowOf(spec, "quantity")?.value;
   const following = visible[visible.indexOf(node) + 1] ?? null;
 
+  /** "Concepts" alone is ambiguous across branches, so leaves name their branch (as the tree does). */
+  const nodeLabel = (n: NodeId) => {
+    const [d, leaf] = n.split(".");
+    return leaf ? `${t(`discipline_${d}`)} · ${t(nodeKey(n))}` : t(nodeKey(n));
+  };
+
+  /** A way to the fix for a blocked node — the same target the tree's click uses. */
+  const fixButton = (n: NodeId) => {
+    const go = nodeClick(n, states[n], n);
+    if (go.to === n) return null;
+    return (
+      <GhostButton onClick={() => goTo(go.to, go.focus)} className="px-1 text-cobalt hover:text-cobalt-hover">
+        {t("goFix", { target: nodeLabel(go.to) })}
+        <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
+      </GhostButton>
+    );
+  };
+
+  // The node's own reason for not going ahead, when its cause lives elsewhere
+  // (audit #30): the same words the tree shows, with the way to the fix.
+  const here = states[node];
+  const blockedBanner = here?.reason ? (
+    <Warn blocking={false} action={fixButton(node)}>
+      {t("nodeBlocked", { label: nodeLabel(node), reason: here.reason })}
+    </Warn>
+  ) : null;
+
+  /**
+   * The Quote / Production action. One rule with the tree (audit #31): while
+   * the node is blocked the button is disabled and says why beside it.
+   */
+  const stageAction = (n: "quote" | "production", href: string, icon: React.ReactNode, label: string) => {
+    const reason = states[n]?.reason;
+    if (!reason) {
+      return (
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
+        >
+          {icon}
+          {label}
+        </Link>
+      );
+    }
+    return (
+      <>
+        <PrimaryButton disabled aria-describedby={`${n}-blocked`} className="cursor-not-allowed">
+          {icon}
+          {label}
+        </PrimaryButton>
+        <span id={`${n}-blocked`} className="text-[11px] font-medium text-inventory">
+          {t("nodeBlocked", { label: t(nodeKey(n)), reason })}
+        </span>
+        {fixButton(n)}
+      </>
+    );
+  };
+
   const designStage = (d: Discipline, view: "concepts" | "design" = "design") => (
     <PartsStage
       projectId={project.id}
@@ -490,45 +658,40 @@ export function PrototypingWorkspace({
   return (
     <div className="space-y-4">
       {/* Top bar */}
-      <header className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-        <Link
-          href={`/projects/${project.id}`}
-          className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
-        >
-          <ArrowLeft className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-          {t("backToProject")}
-        </Link>
-        <span className="hidden h-6 w-px bg-borderstrong sm:block" />
-        <div className="min-w-0 flex-1">
-          <p className={mono("text-[10px] text-faint")}>{t("kicker")}</p>
-          <h1 className="truncate text-base font-extrabold tracking-tight text-heading">
-            {project.name}
-          </h1>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowOpen((v) => !v)}
-          aria-expanded={showOpen}
-          aria-controls="readiness-open"
-          title={t("readinessCount", { done: ready.satisfiedCount, total: ready.totalCount })}
-          className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-panel"
-        >
-          <span className="hidden text-[11px] text-mutedtext sm:inline">{t("readiness")}</span>
-          <span className="h-1.5 w-20 overflow-hidden rounded-full bg-panel shadow-neu-inset">
-            <span
-              className="block h-full rounded-full bg-cobalt transition-[width] duration-500"
-              style={{ width: `${ready.percent}%` }}
+      {bar(
+        backTo(`/projects/${project.id}`, t("backToProject")),
+        <>
+          <span className="hidden h-6 w-px bg-borderstrong sm:block" />
+          <div className="min-w-0 flex-1">
+            <p className={mono("text-[10px] text-faint")}>{t("kicker")}</p>
+            <h1 className="truncate text-base font-extrabold tracking-tight text-heading">
+              {project.name}
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOpen((v) => !v)}
+            aria-expanded={showOpen}
+            aria-controls="readiness-open"
+            title={t("readinessCount", { done: ready.satisfiedCount, total: ready.totalCount })}
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-panel"
+          >
+            <span className="hidden text-[11px] text-mutedtext sm:inline">{t("readiness")}</span>
+            <span className="h-1.5 w-20 overflow-hidden rounded-full bg-panel shadow-neu-inset">
+              <span
+                className="block h-full rounded-full bg-cobalt transition-[width] duration-500"
+                style={{ width: `${ready.percent}%` }}
+              />
+            </span>
+            <b className="font-mono text-[11px] font-medium tabular-nums text-heading">
+              {ready.percent}%
+            </b>
+            <ChevronDown
+              className={cn("h-3.5 w-3.5 text-mutedtext transition-transform", showOpen && "rotate-180")}
             />
-          </span>
-          <b className="font-mono text-[11px] font-medium tabular-nums text-heading">
-            {ready.percent}%
-          </b>
-          <ChevronDown
-            className={cn("h-3.5 w-3.5 text-mutedtext transition-transform", showOpen && "rotate-180")}
-          />
-        </button>
-
-        {showOpen && (
+          </button>
+        </>,
+        showOpen && (
           <div id="readiness-open" className="neu-inset w-full space-y-2 p-4">
             <p className="text-xs font-bold text-heading">
               {open.length ? t("stillNeeded") : t("allSatisfied")}
@@ -550,8 +713,8 @@ export function PrototypingWorkspace({
               </ul>
             )}
           </div>
-        )}
-      </header>
+        )
+      )}
 
       <div
         className={cn(
@@ -567,7 +730,7 @@ export function PrototypingWorkspace({
           <div className="flex items-center justify-end pb-2">
             <button
               type="button"
-              onClick={() => setCollapsed((c) => ({ ...c, left: !c.left }))}
+              onClick={() => togglePanel("left")}
               aria-label={collapsed.left ? t("expand") : t("collapse")}
               className="rounded-md p-1 text-mutedtext transition-colors hover:text-cobalt"
             >
@@ -587,6 +750,7 @@ export function PrototypingWorkspace({
             saveFailed={branchSaveFailed}
             onSelect={goTo}
             onBranch={setBranch}
+            onRestore={(d) => setBranch(d, "restore")}
           />
 
           {!collapsed.left && drawn.length > 0 && (
@@ -633,6 +797,7 @@ export function PrototypingWorkspace({
             </Warn>
           )}
           {specSaveFailed && <Warn blocking>{t("specSaveFailed")}</Warn>}
+          {blockedBanner}
 
           {node === "brief" && (
             // Remounts when the brief is cleared, so the editor drops its copy.
@@ -698,10 +863,16 @@ export function PrototypingWorkspace({
           )}
 
           {node === "mechanical.process" && (
+            // The same route, and the same Accept, as the Quote view — so
+            // "Manufacturing route not accepted" is resolved here too (audit
+            // #35) — plus each mechanical part with its material and process.
             <Recommendation
-              parts={designOf("mechanical")}
+              parts={parts.filter(isMakeable)}
               brief={project.brief ?? ""}
               accepted={routeAccepted}
+              onAccept={acceptRoute}
+              materialsFor={designOf("mechanical").filter((p) => !isConcept(p))}
+              onEditParts={() => goTo("mechanical.parts")}
             />
           )}
 
@@ -764,15 +935,9 @@ export function PrototypingWorkspace({
               />
               <Card kicker={t("node_quote")} title={t("stageTitle_quote")} intro={t("quoteIntro")}>
                 <div className="flex flex-wrap items-center gap-3">
-                  <Link
-                    href="/design/quote"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-                  >
-                    <Receipt className="h-3.5 w-3.5" />
-                    {t("requestQuote")}
-                  </Link>
-                  <span className="text-[11px] text-mutedtext">{t("quoteNote")}</span>
+                  {stageAction("quote", "/design/quote", <Receipt className="h-3.5 w-3.5" />, t("requestQuote"))}
                 </div>
+                <p className="text-[11px] text-mutedtext">{t("quoteNote")}</p>
               </Card>
             </>
           )}
@@ -783,15 +948,9 @@ export function PrototypingWorkspace({
                 {productionQty ? t("productionQty", { qty: productionQty }) : t("productionQtyUnknown")}
               </p>
               <div className="flex flex-wrap items-center gap-3">
-                <Link
-                  href="/design/upload"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-                >
-                  <Factory className="h-3.5 w-3.5" />
-                  {t("startProduction")}
-                </Link>
-                <span className="text-[11px] text-mutedtext">{t("productionNote")}</span>
+                {stageAction("production", "/design/upload", <Factory className="h-3.5 w-3.5" />, t("startProduction"))}
               </div>
+              <p className="text-[11px] text-mutedtext">{t("productionNote")}</p>
             </Card>
           )}
 
@@ -805,26 +964,23 @@ export function PrototypingWorkspace({
               {t("openItems", { count: open.length })}
             </button>
             <span className="flex-1" />
-            {following && (
-              // Disabled buttons swallow hover in some browsers, so the
-              // reason sits on a wrapper.
-              <span
-                title={
-                  blockers.length
-                    ? t("continueBlocked", {
-                        items: blockers.map((b) => b.blockingReason).join(" · "),
-                      })
-                    : undefined
-                }
-              >
-                <PrimaryButton
-                  onClick={() => goTo(following)}
-                  disabled={blockers.length > 0}
-                >
-                  {t("continueTo", { node: t(nodeKey(following)) })}
-                  <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-                </PrimaryButton>
+            {following && blockers.length > 0 && (
+              // Why Continue is disabled, in words beside it — not only on hover.
+              <span id="continue-blocked" className="min-w-0 text-[11px] font-medium text-inventory">
+                {t("continueBlocked", {
+                  items: blockers.map((b) => b.blockingReason).join(" · "),
+                })}
               </span>
+            )}
+            {following && (
+              <PrimaryButton
+                onClick={() => goTo(following)}
+                disabled={blockers.length > 0}
+                aria-describedby={blockers.length ? "continue-blocked" : undefined}
+              >
+                {t("continueTo", { node: t(nodeKey(following)) })}
+                <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
+              </PrimaryButton>
             )}
           </div>
         </main>
@@ -840,7 +996,7 @@ export function PrototypingWorkspace({
             )}
             <button
               type="button"
-              onClick={() => setCollapsed((c) => ({ ...c, right: !c.right }))}
+              onClick={() => togglePanel("right")}
               aria-label={collapsed.right ? t("expand") : t("collapse")}
               className="rounded-md p-1 text-mutedtext transition-colors hover:text-cobalt"
             >
