@@ -27,12 +27,14 @@ Fix one section at a time and re-test with the checklist at the bottom.
 - LEDs in the schematic have **no series resistors**, but the BOM lists 4× 120 Ω "current limit for LED1–4". Schematic and BOM disagree.
 - Wiring check reports "Two supplies drive net 5V: J1 and U1 — they would short together", yet the footer says "Drawn from a validated netlist" and this error is **not** in Next actions and does not lower Readiness (67 %).
 - **Fix:** hard-fail rules in the netlist validator (inductive load on GPIO → require driver + flyback; LED without resistor; supply conflict). Any failure → blocking item in Next actions, Readiness capped, "validated" wording removed until clean. Schematic must be generated from the same BOM lines (resistors, driver) or both regenerated together.
+- **Status:** Fixed in code (Phase 3, commit 2f40e2f — Card 3.1) — hard rules (inductive load on a GPIO, LED without resistor, shorted supplies, power budget) insert the driver transistor + base resistor + flyback diode and the LED resistors into the netlist, so schematic, wiring and BOM come from one model; each failing rule is a blocking item and lowers Readiness; the footer never says "validated" while flags exist. Pending: owner opens Plant monitor → Electronics › Board → Regenerate and re-tests checklist item 2; projects saved before this change show as blocking until regenerated.
 
 ### 2. Wrong part auto-matched and priced
 - BOM line "Flyback diode — rectifier, 1 A, 400 V+" is matched to **Diode 1N4148** (small-signal, ~100 V / 200 mA). Needs 1N4004/1N4007-class.
 - The UI even shows the debug reason: *"Weak match: product has no attributes · a diode by its name"*.
 - Qty 1 needed, "sold in 100" → line total **QAR 30.00**, and that single wrong line is the entire "Available now QAR 30.00" in the cost panel.
 - **Fix:** weak matches must never auto-select; show "No confident match" + suggestion. Hide matcher debug text from customers (admin only). For pack-size items show "you need 1, sold in packs of 100" clearly and don't count it as the project cost.
+- **Status:** Fixed in code (Phase 3, commit ade6320) — weak matches show "No confident match" with a confirm button and are never pre-selected; matcher debug text is admin-only; pack lines read "need N · sold in packs of P · price per pack" with a "To buy now" summary. Pending: owner re-tests on Plant monitor.
 
 ### 3. Project page says parts are "in your cart" — cart is empty
 - Project page, Parts: "Added to this project and to your cart. Nothing is ordered until you check out." Lists 7 items, QAR 366.
@@ -56,6 +58,7 @@ Fix one section at a time and re-test with the checklist at the bottom.
 - "What we understood": Power source **Mains**, Mounting **Portable** — both labelled "From your brief", neither is what the brief says (USB 5 V, desk).
 - Reservoir template text is from the cat-feeder parts library ("Holds the liquid side…"), shape set to **Shaft**.
 - **Fix:** material/process suggestion must honour explicit words in the brief (3D-printed → FDM/PLA/PETG). Size sanity check against the electronics footprint. Facts the AI inferred must say "Inferred", not "From your brief". "Ready to make" only after dimensions are plausible and confirmed.
+- **Status:** Fixed in code (Phase 3, commit e4e42c2) — process words in the part or brief win ("3D-printed case" → PLA + 3D printing); any fact the brief doesn't state is labelled "Inferred", for every AI provider; an enclosure smaller than its board is flagged too small and can't be kept; implausible dimensions block "Ready to make"; template descriptions attach only to matching part names. Pending: owner re-analyses Plant monitor and re-tests.
 
 ### 6. Store shows everything "Available on request" while claiming "In stock"
 - Home: "Featured products — **In stock and ready to ship** across Qatar". Every card: "Available on request".
@@ -125,17 +128,21 @@ Fix one section at a time and re-test with the checklist at the bottom.
 25. **Three different "Parts" views** (Parts, Bill of materials, Mechanical → Parts) plus Electronics → Components, which repeats the whole BOM. In Components "Build consumables" = **7** lines, in BOM = **8** (a USB cable disappears).
 26. **Cost panel mixes units:** "Available now QAR 30.00 · Not stocked **11** · Fabrication **0** · 7 bought" — money next to line counts. The project page says QAR 366 for the same project. → One total, with counts labelled as counts.
 27. BOM group subtotals show **QAR 0.00** for groups whose items are "Bought", and unit prices show "—" even though the store price is known (ESP32 QAR 35).
+    - **Status:** Partly in code (Phase 3, commit ade6320) — unit prices show whenever the product is known. Pending: group subtotals for "Bought" groups still read QAR 0.00.
 28. **11 separate "Request a quote" buttons**, one per not-stocked line, plus "Buy as project kit" and "Add all to cart" side by side. → One "Request quote for 11 unstocked items".
 29. The BOM lists both a breadboard **and** a perfboard/hookup wire/heat-shrink for a single unit — choose one build route. The **USB cable is listed twice**.
 30. **Locked steps look clickable:** Quote / Production / Scope in the sidebar do nothing when clicked ("needs confirmed parts"). "Continue to Scope" is disabled with no explanation. → Tooltip or inline "Keep a concept first", or navigate and show the blocker.
 31. **Quote stage contradicts itself:** the landing view shows an active **"Request a quote"** button while the sidebar says Quote "needs confirmed parts" and the text says "Priced from confirmed parts only".
 32. The workspace opens on "How this gets made" + Quote rather than where the user left off (or on Brief for a new project).
 33. The Readiness badge (67 % = "6 of 9 requirements met") ignores the P0 electrical and dimension problems above.
+    - **Status:** Fixed in code (Phase 3, commits e4e42c2, 2f40e2f — Card 3.1) — new "Circuit passes our checks" requirement plus one blocking item per failing rule; implausible dimensions block "Ready to make". Pending: owner regenerates Plant monitor and checks Readiness drops while any rule fails.
 34. **Software concept P-04** shows as a *Suggestion* (not kept) but already appears in Parts with qty 1 and "To design". Its name is a raw id, **`monitor_firmware`**. "What it must do" sits in a 3-line textarea you have to scroll.
 35. **Material & process** page shows processes only, no materials, and no "Accept this route" button, even though "Manufacturing route not accepted" is an open item. The button only appears on the landing view.
 36. **Power** page is a single line ("Power source: Mains") — no power budget (pump current vs adapter rating), which is the key check for this project.
+    - **Status:** Fixed in code (Phase 3, commit 2f40e2f — Card 3.1) — Power shows a budget per rail: source, loads, total, headroom, and an over-budget flag. Pending: owner regenerates Plant monitor and re-tests.
 37. **Drawings:** the label collision "FLAT PAT**Material thickness: 1 mm**" overlaps. The "Outline only…not a cut file" warning is printed twice per drawing. P-03 renders an empty frame.
 38. **Circuit wiring view** is too small to read at normal width (tiny labels, overlapping wires). Every block says **"No store product"** although the text above says "Each part is the store product its line matched" and the BOM did match GR-011/012/029.
+    - **Status:** Partly in code (Phase 3, commit ade6320) — bought lines now carry their product, so wiring blocks show name + SKU (the cause was server-side). Pending: the wiring view is still small at normal width.
 39. The Brief hint says "nothing is analysed until you press **Analyse brief**", but the button is labelled "**Re-analyse**".
 40. The **"×" next to Mechanical / Electronics / Software** removes the whole discipline in one tap. It sits beside the count badge and has no confirm or undo.
 

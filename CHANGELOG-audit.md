@@ -22,3 +22,11 @@ Pending owner steps: run 0030 → 0031 → 0032 (after 0029); approve the test-d
 - 88352d1 — Card 2.4 — #3 — Migration 0034 (create_part_order v5) stops checkout doubling a project line's quantity and repairs doubled lines once, with a DRY RUN.
 
 Pending owner steps: run 0033 → 0034 → 0035 (after 0030–0032); re-test checklist items 3–6 on the Plant monitor project; decide by hand on lines with cancelled orders (listed in the 0034 header).
+
+## Phase 3 — Prototyping correctness
+
+- ade6320 — Card 3.2 — #2, #27, #38 — Weak matches show "No confident match" and are never pre-selected, matcher debug is admin-only, pack lines show need / pack size / price per pack, unit prices show when the product is known, and wiring blocks show the bought product.
+- e4e42c2 — Card 3.3 — #5 — Brief words set material and process, unstated facts read "Inferred", an enclosure too small for its board can't be kept, and implausible dimensions block "Ready to make".
+- 2f40e2f — Card 3.1 — #1, #33, #36 — Hard circuit rules insert the pump driver, flyback diode and LED resistors into the netlist (one model for schematic, wiring and BOM), block Readiness while any fails, and the Power leaf shows a per-rail budget; Phase 3 copy in en + ar (parity 1630/1630).
+
+No migrations. Pending owner steps: after 0030–0035, open Plant monitor → Electronics › Board → Regenerate and re-test checklist item 2; projects saved before Card 3.1 show as blocking until regenerated. Still open: bought-group subtotals read QAR 0.00 (#27); wiring view too small (#38).

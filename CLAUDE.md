@@ -724,6 +724,26 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
       and breadcrumb.
     * Owner still to do: run 0033 → 0034 → 0035 (after 0030–0032), re-test checklist items 3–6 on the Plant
       monitor project, decide on lines with cancelled orders.
+  - SITE AUDIT FIX — Phase 3 (2026-09-26), "Prototyping correctness" (SITE_AUDIT.md #1, #2, #5, #27, #33, #36,
+    #38). Branch fix/site-audit, NOT MERGED to main. Log: CHANGELOG-audit.md. No migrations.
+    * #1/#33/#36 (Card 3.1): hardRules() — inductive load on a GPIO, LED without resistor, shorted supplies,
+      power budget — insert the driver transistor + base resistor + flyback diode and LED resistors into the
+      netlist itself (schematic, wiring, BOM from one model). Readiness adds "Circuit passes our checks" + one
+      blocking item per hard flag; footer never says "validated" while flags exist; Power leaf shows a per-rail
+      budget (source, loads, total, headroom, over-budget).
+    * #2/#27/#38 (Card 3.2): weak matches show "No confident match" + confirm, never pre-selected; matcher debug
+      admin-only; pack lines "need N · sold in packs of P · price per pack" + "To buy now" summary; unit prices
+      shown when the product is known (bought-group subtotals still QAR 0.00); bought lines carry their product
+      so wiring blocks show name + SKU (cause was server-side).
+    * #5 (Card 3.3): suggestSpec honours process words in part + brief; honestSources() marks unstated facts
+      "Inferred" for every provider, server-side; board footprint table flags an enclosure too small for its
+      board (can't be kept); implausible dimensions block "Ready to make"; templates attach only to matching
+      part names.
+    * Behaviour change: netlists saved before Card 3.1 show as blocking until Electronics › Board → Regenerate.
+    * Tests: `npm run test` now 147+ tests (Plant-monitor fixture for rules, netlist, readiness). Copy en + ar
+      parity 1630/1630.
+    * Owner still to do: after 0030–0035, open Plant monitor → Electronics › Board → Regenerate and re-test
+      checklist item 2.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
