@@ -3,12 +3,16 @@
 // diagnostic export, so both report exactly the same matches.
 //
 // Bought lines report "fulfilled" and fabrication lines "fabrication" — those
-// are never matched against the store. Removed (dismissed) lines are skipped.
+// are never matched against the store. A bought line still carries the store
+// product it was bought as (by the order's product id, else its sku) so its
+// unit price and the wiring view can name it; it is never re-bought or totalled
+// (bom.ts buyable/bomCost skip fulfilled lines). Removed (dismissed) lines are
+// skipped.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { matchLine, type InventoryRow } from "./bom-match";
-import { groupOf, type Candidate, type LineMatch, type ProjectBom } from "./bom";
+import { groupOf, type Candidate, type LineMatch, type ProjectBom, type ProjectLine, type ScoredCandidate } from "./bom";
 import type { Attributes } from "@/lib/store/attributes";
 
 export async function matchProjectBom(
@@ -40,12 +44,19 @@ export async function matchProjectBom(
     quantity: r.quantity,
     attributes: r.attributes ?? null,
   }));
+  const byId = new Map(catalogue.map((p) => [p.id, p]));
+  const bySku = new Map(catalogue.map((p) => [p.sku, p]));
+  const boughtAs = (l: ProjectLine): ScoredCandidate | null => {
+    const f = l.fulfilled;
+    const p = (f?.productId ? byId.get(f.productId) : undefined) ?? (f?.sku ? bySku.get(f.sku) : undefined);
+    return p ? { ...p, strength: "strong", why: ["ordered"] } : null;
+  };
   const names = new Map(inv.filter((r) => r.product_id).map((r) => [r.product_id!, r.part?.name ?? ""]));
 
   return bom.lines
     .filter((l) => !dismissed.has(l.id))
     .map((l): LineMatch => {
-      if (l.fulfilled) return { lineId: l.id, status: "fulfilled", candidates: [], product: null, have: null };
+      if (l.fulfilled) return { lineId: l.id, status: "fulfilled", candidates: [], product: boughtAs(l), have: null };
       if (groupOf(l) === "fabrication")
         return { lineId: l.id, status: "fabrication", candidates: [], product: null, have: null };
       return matchLine(l, catalogue, inventory, names);

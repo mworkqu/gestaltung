@@ -267,7 +267,8 @@ export async function buildProjectExport(
           ? { id: prod.id, sku: prod.sku, name: prod.name, unitPrice: Number(prod.unit_price), stockStatus: prod.stock_status, minOrderQty: prod.min_order_qty }
           : null,
         orderQuantity: qty,
-        lineTotal: prod && !m?.have ? Math.round(Number(prod.unit_price) * qty * 100) / 100 : null,
+        // A bought line carries its product (bom-server) but is never totalled again.
+        lineTotal: prod && !m?.have && !l.fulfilled ? Math.round(Number(prod.unit_price) * qty * 100) / 100 : null,
         candidates: (m?.candidates ?? []).map((c) => ({
           id: c.id,
           sku: c.sku,

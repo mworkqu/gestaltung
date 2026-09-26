@@ -1,15 +1,60 @@
 // Renderer A — the wiring diagram the customer sees.
 //
 // Every component is drawn as a card showing the actual store product its BOM
-// line matched (photo, name, link to its store page), with labelled wires
-// between named pins. A component without a matched product, or a product
-// without a photo, gets a labelled placeholder box — never a generated image.
+// line resolved to — matched, picked, or already bought (photo, name, sku, link
+// to its store page) — with labelled wires between named pins. "No store
+// product" only when the line has neither a product nor a bought sku. A
+// product without a photo gets a labelled placeholder box — never a generated
+// image.
 //
 // Pure string building from a validated netlist: same input, same SVG.
 
+import { partImageUrl, partName } from "@/lib/parts/format";
+import type { LineMatch, ProjectLine } from "./bom";
 import { esc, flaggedRefs, powerNets, type Flag, type Netlist, type PinType } from "./netlist";
 
-export type WiringProduct = { name: string; href: string; image: string | null };
+/** `sku` is shown under the name; when absent it is read from `href` (…/store/<sku>). */
+export type WiringProduct = { name: string; href: string; image: string | null; sku?: string };
+
+/**
+ * The products map for renderWiring, by BOM line id: the line's store product
+ * (matched, picked, or the one it was bought as), else — for a bought line
+ * whose product is no longer listed — its sku alone.
+ */
+export function wiringProducts(
+  lines: ProjectLine[],
+  matches: Map<string, LineMatch>,
+  locale: string
+): Map<string, WiringProduct | null> {
+  const out = new Map<string, WiringProduct | null>();
+  for (const l of lines) {
+    const p = matches.get(l.id)?.product ?? null;
+    const sku = p?.sku ?? l.fulfilled?.sku ?? null;
+    out.set(
+      l.id,
+      sku
+        ? {
+            name: p ? partName(p, locale) : sku,
+            sku,
+            href: `/${locale}/store/${encodeURIComponent(sku)}`,
+            image: p ? partImageUrl(p) : null,
+          }
+        : null
+    );
+  }
+  return out;
+}
+
+function skuOf(p: WiringProduct): string {
+  if (p.sku) return p.sku;
+  const m = p.href.match(/\/store\/([^/?#]+)/);
+  if (!m) return "";
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
 
 export type WiringInput = {
   netlist: Netlist;
@@ -28,7 +73,7 @@ const ALERT = "#dc2626";
 
 const BOX_W = 210;
 const IMG_H = 86;
-const HEAD = IMG_H + 52;
+const HEAD = IMG_H + 64;
 const PIN_H = 18;
 const GUT_X = 150;
 const GUT_Y = 110;
@@ -75,6 +120,7 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
       const h = heightOf(c);
       const bad = flagged.has(c.ref);
       const prod = products.get(c.bomId) ?? null;
+      const sku = prod ? skuOf(prod) : "";
       const s = sides(c);
 
       const photo = prod?.image
@@ -99,6 +145,7 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
         <text x="${x + 10}" y="${y + IMG_H + 18}" font-size="13" font-weight="700" fill="${bad ? ALERT : INK}">${esc(c.ref)}${bad ? " ⚠" : ""}</text>
         <text x="${x + 10}" y="${y + IMG_H + 32}" font-size="11" fill="${MUTED}">${esc(clip(c.function, 30))}</text>
         <text x="${x + 10}" y="${y + IMG_H + 46}" font-size="10.5" fill="${prod ? COBALT : MUTED}">${esc(clip(prod ? prod.name : labels.noProduct, 32))}</text>
+        ${sku ? `<text x="${x + 10}" y="${y + IMG_H + 59}" font-size="10" font-family="ui-monospace, monospace" fill="${MUTED}">${esc(clip(sku, 34))}</text>` : ""}
         <line x1="${x}" x2="${x + BOX_W}" y1="${y + HEAD - 4}" y2="${y + HEAD - 4}" stroke="${LINE}"/>
         ${pinRows(s.left, -1)}${pinRows(s.right, 1)}
       </g>`;

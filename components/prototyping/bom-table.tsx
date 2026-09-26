@@ -9,8 +9,10 @@
 // build consumables, hardware, fabrication), each group collapsible with a
 // subtotal. States:
 //   matched      one clear, attribute-checked product; price, stock, add to cart
-//   choose       several candidates, or only weak (text / incomplete) matches:
-//                the client picks, and the pick is saved on the line
+//   choose       several candidates: the client picks, and the pick is saved
+//                on the line. Only weak (text / incomplete) matches: "No
+//                confident match" and "Suggested: … — confirm?"; a weak product
+//                is never shown as the line's product until the client picks it
 //   not stocked  no product; "request a quote", never a made-up item
 //   have         already in the client's inventory; left out of every total
 //   fabrication  made to order; priced by quote
@@ -18,8 +20,10 @@
 //                live status ("Ordered #1a2b3c4d · Shipped", "Delivered"), read
 //                from part_orders (own orders only, RLS); the plain "Bought"
 //                when the marker has no order id or the status cannot be read
-// The three money figures are kept apart (CostSummary): available now, not
-// stocked, fabrication.
+// The three figures are kept apart (CostSummary): to buy now (what the client
+// would pay — whole packs, so a line sold in packs larger than it needs counts
+// at the pack price, and the summary says so), not stocked, fabrication.
+// The matcher's reasons (`why`) are debug text: shown to super_admin only.
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -54,6 +58,7 @@ import {
   type LineMatch,
   type ProjectLine,
 } from "@/lib/prototyping/bom";
+import { packLineCount, weakSuggestion } from "@/lib/prototyping/bom-match";
 import { fulfilledLabel, fulfilledOrderIds } from "@/lib/prototyping/fulfilled";
 import { BOM_GROUPS, type BomGroup } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
@@ -71,8 +76,9 @@ export function CostSummary({
   const t = useTranslations("Prototyping");
   const locale = useLocale();
   const c = bomCost(lines, matches);
+  const packLines = packLineCount(lines, matches);
   const cells = [
-    { label: t("costNow"), value: formatPrice(c.availableNow, locale), note: t("costNowNote", { count: c.availableLines }) },
+    { label: t("costToBuyNow"), value: formatPrice(c.availableNow, locale), note: t("costNowNote", { count: c.availableLines }) },
     { label: t("costNotStocked"), value: String(c.notStocked), note: t("costNotStockedNote") },
     { label: t("costFabrication"), value: String(c.fabrication), note: t("costFabricationNote") },
   ];
@@ -87,6 +93,7 @@ export function CostSummary({
           </div>
         ))}
       </div>
+      {packLines > 0 && <p className="text-[10.5px] text-inventory">{t("costPacksNote", { count: packLines })}</p>}
       {(c.toChoose > 0 || c.have > 0 || c.bought > 0) && (
         <p className="text-[10.5px] text-mutedtext">
           {[
@@ -100,6 +107,36 @@ export function CostSummary({
       )}
     </div>
   );
+}
+
+/**
+ * Whether the signed-in caller is a super_admin (own profile row, RLS), read
+ * once. False until known, for guests, and when the read fails (logged).
+ */
+function useIsSuperAdmin(): boolean {
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createClient();
+    void supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user || cancelled) return;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle<{ role: string }>();
+      if (cancelled) return;
+      if (error) {
+        console.error("bom: role lookup failed", error);
+        return;
+      }
+      setAdmin(data?.role === "super_admin");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return admin;
 }
 
 export function BomTable({
@@ -136,6 +173,7 @@ export function BomTable({
   const t = useTranslations("Prototyping");
   const locale = useLocale();
   const { addItem, kitDiscountPct } = useCart();
+  const admin = useIsSuperAdmin();
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [kitDone, setKitDone] = useState(false);
@@ -276,6 +314,7 @@ export function BomTable({
                             adding={adding}
                             added={added.has(l.id)}
                             orderStatuses={orderStatuses}
+                            admin={admin}
                             onAdd={() => add(l)}
                             onChoose={onChoose}
                             onDismiss={() => onDismiss([l.id], true)}
@@ -337,6 +376,7 @@ function Row({
   adding,
   added,
   orderStatuses,
+  admin,
   onAdd,
   onChoose,
   onDismiss,
@@ -347,6 +387,8 @@ function Row({
   adding: string | null;
   added: boolean;
   orderStatuses: Map<string, string> | null;
+  /** super_admin: show the matcher's reasons. */
+  admin: boolean;
   onAdd: () => void;
   onChoose: (lineId: string, productId: string | null) => Promise<void>;
   onDismiss: () => void;
@@ -361,7 +403,42 @@ function Row({
   const pack = p ? packOf(p) : 1;
   const img = p ? partImageUrl(p) : null;
   const canBuy = buyable(l, m);
-  const showPicker = !l.fulfilled && m && !m.have && m.candidates.length > 0 && (m.candidates.length > 1 || m.status === "choose");
+  const [confirming, setConfirming] = useState(false);
+  // Only weak matches and no pick: a suggestion to confirm, never the product.
+  const suggestion = l.fulfilled ? null : weakSuggestion(m);
+  // A weak product the client picked stays un-pickable from the list.
+  const weakPick = !!(p && l.choice && p.strength === "weak");
+  const showPicker =
+    !l.fulfilled &&
+    !!m &&
+    !m.have &&
+    m.candidates.length > 0 &&
+    (m.candidates.length > 1 || m.status === "choose" || weakPick);
+  // A line the client would still pay for (whole packs).
+  const buying = p && !m?.have && !l.fulfilled ? p : null;
+
+  async function confirm(id: string) {
+    setConfirming(true);
+    await onChoose(l.id, id);
+    setConfirming(false);
+  }
+
+  const picker =
+    showPicker && m ? (
+      <select
+        value={l.choice && m.candidates.some((c) => c.id === l.choice) ? l.choice : ""}
+        onChange={(e) => void onChoose(l.id, e.target.value || null)}
+        aria-label={t("bomChooseFor", { function: l.function })}
+        className={cn(selectClass, "w-full text-[12px]")}
+      >
+        <option value="">{t("bomChoosePlaceholder", { count: m.candidates.length })}</option>
+        {m.candidates.map((c) => (
+          <option key={c.id} value={c.id}>
+            {`${c.strength === "weak" ? `${t("weakPrefix")} ` : ""}${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)} · ${tD(`lt_${c.lead_time_class ?? "on_request"}`)}`}
+          </option>
+        ))}
+      </select>
+    ) : null;
 
   return (
     <tr id={`bom-${l.id}`} tabIndex={-1} className="align-top outline-none focus:bg-panel">
@@ -397,10 +474,8 @@ function Row({
       <td className="max-w-[200px] px-3 py-2.5 text-[12px] text-mutedtext">{l.spec}</td>
       <td className="px-3 py-2.5 text-end font-mono text-[12px] tabular-nums text-heading">
         {l.quantity}
-        {p && (pack > 1 || (packs ?? 0) * pack !== l.quantity) && (
-          <span className="block whitespace-nowrap font-sans text-[10px] text-faint">
-            {pack > 1 ? t("bomPacks", { needs: l.quantity, pack, packs: packs ?? 0 }) : t("bomMinOrder", { qty: packs ?? 0 })}
-          </span>
+        {buying && pack === 1 && packs !== l.quantity && (
+          <span className="block whitespace-nowrap font-sans text-[10px] text-faint">{t("bomMinOrder", { qty: packs ?? 0 })}</span>
         )}
       </td>
       <td className="min-w-[210px] px-3 py-2.5">
@@ -412,22 +487,25 @@ function Row({
           <span className="text-[12px] text-mutedtext">{t("bomMadeToOrder")}</span>
         ) : loading && !m ? (
           <span className="block h-3 w-32 animate-pulse rounded bg-borderstrong/40" />
+        ) : suggestion ? (
+          <div className="space-y-1">
+            <span className="block text-[12px] font-medium text-inventory">{t("noConfidentMatch")}</span>
+            <button
+              type="button"
+              onClick={() => void confirm(suggestion.id)}
+              disabled={confirming}
+              className="inline-flex items-center gap-1 text-start text-[11.5px] font-semibold text-cobalt hover:text-cobalt-hover disabled:opacity-60"
+            >
+              {confirming && <Loader2 className="h-3 w-3 animate-spin" />}
+              {t("suggestedConfirm", { name: partName(suggestion, locale) })}
+            </button>
+            {m!.candidates.length > 1 && picker}
+            {admin && <Why c={suggestion} />}
+          </div>
         ) : showPicker ? (
           <div className="space-y-1">
-            <select
-              value={l.choice && m!.candidates.some((c) => c.id === l.choice) ? l.choice : ""}
-              onChange={(e) => void onChoose(l.id, e.target.value || null)}
-              aria-label={t("bomChooseFor", { function: l.function })}
-              className={cn(selectClass, "w-full text-[12px]")}
-            >
-              <option value="">{t("bomChoosePlaceholder", { count: m!.candidates.length })}</option>
-              {m!.candidates.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {`${c.strength === "weak" ? `${t("weakPrefix")} ` : ""}${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)} · ${tD(`lt_${c.lead_time_class ?? "on_request"}`)}`}
-                </option>
-              ))}
-            </select>
-            {p && <Why c={p} />}
+            {picker}
+            {p && admin && <Why c={p} />}
           </div>
         ) : p ? (
           <div className="space-y-1">
@@ -449,19 +527,25 @@ function Row({
                 <span className="block font-mono text-[10px] text-faint">{p.sku}</span>
               </span>
             </Link>
-            <Why c={p} />
+            {admin && <Why c={p} />}
           </div>
         ) : m?.have ? (
           <span className="text-[12px] text-heading">{m.have.name}</span>
         ) : m ? (
           <span className="text-[12px] text-mutedtext">{t("bomNoMatch")}</span>
         ) : null}
+        {buying && pack > 1 && (
+          <span className="mt-1 block text-[10.5px] leading-snug text-inventory">
+            {t("packLine", { need: l.quantity, pack, price: formatPrice(Number(buying.unit_price), locale) })}
+          </span>
+        )}
       </td>
       <td className="px-3 py-2.5 text-end font-mono text-[12px] tabular-nums text-heading">
-        {p && !m?.have && !l.fulfilled ? formatPrice(Number(p.unit_price), locale) : "—"}
+        {/* The store's unit price whenever the product is known, bought lines too. */}
+        {p ? formatPrice(Number(p.unit_price), locale) : "—"}
       </td>
       <td className="px-3 py-2.5 text-end font-mono text-[12px] tabular-nums text-heading">
-        {p && !m?.have && !l.fulfilled && packs ? formatPrice(Number(p.unit_price) * packs, locale) : "—"}
+        {buying && packs ? formatPrice(Number(buying.unit_price) * packs, locale) : "—"}
       </td>
       <td className="px-3 py-2.5">
         <div className="flex flex-col items-start gap-1.5">
@@ -512,7 +596,7 @@ function Row({
   );
 }
 
-/** Why a product matched: attribute checks, or a weak text match, in words. */
+/** Why a product matched: attribute checks, or a weak text match, in words. super_admin only. */
 function Why({ c }: { c: NonNullable<LineMatch["product"]> }) {
   const t = useTranslations("Prototyping");
   return (

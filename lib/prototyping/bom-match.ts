@@ -18,7 +18,7 @@
 // Every product field comes from public.parts. Nothing is invented here.
 
 import type { BomKind, BomLine } from "./analysis";
-import type { Candidate, LineMatch, ScoredCandidate, Strength } from "./bom";
+import { orderQty, packOf, type Candidate, type LineMatch, type ProjectLine, type ScoredCandidate, type Strength } from "./bom";
 import { compareField, fieldsOf, isAttrClass, type Attributes } from "@/lib/store/attributes";
 
 export type InventoryRow = {
@@ -290,4 +290,34 @@ export function matchLine(
 
   const status = have ? "have" : candidates.length === 0 ? "not_stocked" : product ? "matched" : "choose";
   return { lineId: line.id, status, candidates, product, have };
+}
+
+/**
+ * The best weak candidate of a line that has no strong one and no pick of the
+ * client's: offered as "Suggested: … — confirm?", never shown as the line's
+ * product. Null when the line resolved, is owned, or has a strong candidate.
+ */
+export function weakSuggestion(m: LineMatch | undefined): ScoredCandidate | null {
+  if (!m || m.product || m.have || m.status !== "choose") return null;
+  if (!m.candidates.length || m.candidates.some((c) => c.strength === "strong")) return null;
+  return m.candidates[0];
+}
+
+/** Whole packs bring more pieces than the line needs ("need 1, sold in 100"). */
+export const packExceedsNeed = (needed: number, p: Pick<Candidate, "pack_size" | "min_order_qty">) =>
+  packOf(p) > 1 && orderQty(needed, p) * packOf(p) > needed;
+
+/**
+ * Of the lines counted in "To buy now" (bomCost's availableNow: resolved, not
+ * owned, not bought, not fabrication), how many are sold in packs larger than
+ * the line needs.
+ */
+export function packLineCount(lines: ProjectLine[], matches: Map<string, LineMatch>): number {
+  return lines.filter((l) => {
+    if (l.fulfilled) return false;
+    const m = matches.get(l.id);
+    if (!m?.product || m.have || m.status === "not_stocked" || m.status === "choose" || m.status === "fabrication")
+      return false;
+    return packExceedsNeed(l.quantity, m.product);
+  }).length;
 }
