@@ -125,26 +125,39 @@ Fix one section at a time and re-test with the checklist at the bottom.
 
 ### Prototyping workspace
 24. **Four navigation layers** (site header, back bar, left tree, right Next-actions panel) leave a narrow centre column; tables need horizontal scroll and the Status column is cut off (Parts, BOM).
+    - **Status:** Fixed in code (Phase 4, e18104e — Card 4.4) — side panels start collapsed under 1440 px (saved choice wins); site header hidden inside the workspace, the workspace bar carries logo/back/cart/language/sign-in; page width up to 1760 px. Pending: owner checks for clipped tables at 1280 px and 1920 px.
 25. **Three different "Parts" views** (Parts, Bill of materials, Mechanical → Parts) plus Electronics → Components, which repeats the whole BOM. In Components "Build consumables" = **7** lines, in BOM = **8** (a USB cable disappears).
+    - **Status:** Fixed in code (Phase 4, 4.3/4.4) — Components and BOM share one selector so their counts match; the USB cable is deduped across sources. Pending: owner checks Components count = BOM count on Plant monitor.
 26. **Cost panel mixes units:** "Available now QAR 30.00 · Not stocked **11** · Fabrication **0** · 7 bought" — money next to line counts. The project page says QAR 366 for the same project. → One total, with counts labelled as counts.
+    - **Status:** Fixed in code (Phase 4, 55f2c7d — Card 4.3) — one QAR figure ("To buy now") and a separate counts line. Pending: the project page's QAR total and the BOM's "To buy now" are still different figures (documented, later phase).
 27. BOM group subtotals show **QAR 0.00** for groups whose items are "Bought", and unit prices show "—" even though the store price is known (ESP32 QAR 35).
-    - **Status:** Partly in code (Phase 3, commit ade6320) — unit prices show whenever the product is known. Pending: group subtotals for "Bought" groups still read QAR 0.00.
+    - **Status:** Fixed in code (Phase 3, commit ade6320; Phase 4, 55f2c7d — Card 4.3) — unit prices show whenever the product is known; group headers show the to-buy subtotal and "ordered: QAR Y", never QAR 0.00 for priced lines. Pending: owner re-tests on Plant monitor.
 28. **11 separate "Request a quote" buttons**, one per not-stocked line, plus "Buy as project kit" and "Add all to cart" side by side. → One "Request quote for 11 unstocked items".
+    - **Status:** Fixed in code (Phase 4, 55f2c7d — Card 4.3) — one "Request a quote for N unstocked items" button sends one bom_quote lead with the item list and project link; one kit button replaces "Buy as project kit" + "Add all to cart". Pending: owner re-tests on Plant monitor.
 29. The BOM lists both a breadboard **and** a perfboard/hookup wire/heat-shrink for a single unit — choose one build route. The **USB cable is listed twice**.
+    - **Status:** Fixed in code (Phase 4, 55f2c7d — Card 4.3) — consumables follow one build route (breadboard for prototype; perfboard/hookup wire/heat-shrink for custom PCB); USB cable deduped. Pending: owner re-tests on Plant monitor.
 30. **Locked steps look clickable:** Quote / Production / Scope in the sidebar do nothing when clicked ("needs confirmed parts"). "Continue to Scope" is disabled with no explanation. → Tooltip or inline "Keep a concept first", or navigate and show the blocker.
+    - **Status:** Fixed in code (Phase 4, commit fb94ef1 — Card 4.1; e18104e — Card 4.4) — blocked rows show the reason inline + tooltip and a click goes to the fix, scrolls to the control, or opens the node; blocked node views show a banner with a fix link; Continue buttons show their reason inline. Pending: owner checks for dead clicks at 1280 px, 1920 px and in /ar.
 31. **Quote stage contradicts itself:** the landing view shows an active **"Request a quote"** button while the sidebar says Quote "needs confirmed parts" and the text says "Priced from confirmed parts only".
+    - **Status:** Fixed in code (Phase 4, e18104e — Card 4.4) — Quote/Production buttons are disabled with the reason inline when the sidebar says blocked. Pending: owner re-tests on Plant monitor.
 32. The workspace opens on "How this gets made" + Quote rather than where the user left off (or on Brief for a new project).
+    - **Status:** Fixed in code (Phase 4, e18104e — Card 4.4) — opens on Brief for a new project, otherwise where the user left off (unit-tested). Pending: nothing.
 33. The Readiness badge (67 % = "6 of 9 requirements met") ignores the P0 electrical and dimension problems above.
     - **Status:** Fixed in code (Phase 3, commits e4e42c2, 2f40e2f — Card 3.1) — new "Circuit passes our checks" requirement plus one blocking item per failing rule; implausible dimensions block "Ready to make". Pending: owner regenerates Plant monitor and checks Readiness drops while any rule fails.
 34. **Software concept P-04** shows as a *Suggestion* (not kept) but already appears in Parts with qty 1 and "To design". Its name is a raw id, **`monitor_firmware`**. "What it must do" sits in a 3-line textarea you have to scroll.
+    - **Status:** Fixed in code (Phase 4, commit 787ab03 — Card 4.2) — suggested concepts stay under Concepts until Keep; snake_case ids display as human names ("Monitor firmware"); "What it must do" grows 3–16 rows. Pending: Readiness labels still show raw concept ids (later phase).
 35. **Material & process** page shows processes only, no materials, and no "Accept this route" button, even though "Manufacturing route not accepted" is an open item. The button only appears on the landing view.
+    - **Status:** Fixed in code (Phase 4, e18104e — Card 4.4) — the leaf shows each part's material and process with "Accept this route". Pending: owner re-tests on Plant monitor.
 36. **Power** page is a single line ("Power source: Mains") — no power budget (pump current vs adapter rating), which is the key check for this project.
     - **Status:** Fixed in code (Phase 3, commit 2f40e2f — Card 3.1) — Power shows a budget per rail: source, loads, total, headroom, and an over-budget flag. Pending: owner regenerates Plant monitor and re-tests.
 37. **Drawings:** the label collision "FLAT PAT**Material thickness: 1 mm**" overlaps. The "Outline only…not a cut file" warning is printed twice per drawing. P-03 renders an empty frame.
+    - **Status:** Fixed in code (Phase 4, commit 787ab03 — Card 4.2) — one "not a cut file" warning per drawing; title, view name and thickness on separate baselines (unit-tested); parts without drawable dimensions get a link instead of an empty frame. Pending: title-block values clip at ~26+ chars (pre-existing, later phase).
 38. **Circuit wiring view** is too small to read at normal width (tiny labels, overlapping wires). Every block says **"No store product"** although the text above says "Each part is the store product its line matched" and the BOM did match GR-011/012/029.
     - **Status:** Partly in code (Phase 3, commit ade6320) — bought lines now carry their product, so wiring blocks show name + SKU (the cause was server-side). Pending: the wiring view is still small at normal width.
 39. The Brief hint says "nothing is analysed until you press **Analyse brief**", but the button is labelled "**Re-analyse**".
+    - **Status:** Fixed in code (Phase 4, commits fb94ef1 — Card 4.1, 787ab03 — Card 4.2) — button reads "Analyse brief" / "Re-analyse brief" and the hints match. Pending: nothing.
 40. The **"×" next to Mechanical / Electronics / Software** removes the whole discipline in one tap. It sits beside the count badge and has no confirm or undo.
+    - **Status:** Fixed in code (Phase 4, commit fb94ef1 — Card 4.1; e18104e — Card 4.4) — "×" moved to the row end with an inline confirm and a 6-second Undo; Undo restores detected branches properly. Pending: owner re-tests on Plant monitor.
 
 ### Admin dashboard
 41. The dashboard drops the site header (no logo or link back except the footer). **Sign out exists only inside the dashboard**; the public header has no account menu.
@@ -175,6 +188,7 @@ Fix one section at a time and re-test with the checklist at the bottom.
 56. Page titles: Store, How it works, About, Contact, product pages, cart and dashboard all share *"Gestaltung — Manufacturing, made simple in Qatar"*. Give each page its own (SEO and tabs).
 57. The decorative labels **FIG·01 / FIG·02 / GRID V4.1 / "Method: Auto-matched · Network: Qatar · Output: Finished part"** repeat across Home, Design, How it works and About, and read like placeholders. FIG·02 is used on two pages.
 58. **Accessibility:** project cards on /projects are links with no accessible name. Prototyping sidebar items are non-semantic `div`s (not reachable by keyboard; screen readers get unnamed buttons). Add names and roles.
+    - **Status:** Fixed in code (Phase 2, commit 392ffa2 — Card 2.2: /projects cards carry aria-label = project name; Phase 4, commit fb94ef1 — Card 4.1: sidebar rows are named buttons with arrow-key navigation). Pending: owner checks with a screen reader.
 59. **Loading states:** the prototyping cost panel briefly shows **QAR 0.00 / 0 / 0** before real values arrive. The project page shows a bare spinner. Use skeletons instead of fake zeros.
 60. `/my-inventory` list doesn't show quantities; user data like "M3 scroews" / "klj" suggests there's no edit/delete affordance, or it's hard to find.
 61. Orphaned i18n keys (FINDINGS #2) — still pending the step-16 sweep.

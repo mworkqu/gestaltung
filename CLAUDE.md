@@ -640,7 +640,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     * BOM UI (components/prototyping/bom-table.tsx): groups boards/sensors/discrete/consumables/hardware/
       fabrication, collapsible with subtotals; weak labels + why; "needs 4, packs of 10"; remove/restore;
       bought lines; CostSummary = three separate figures (available now QAR / not stocked count / fabrication
-      count) in the BOM and the right panel.
+      count) in the BOM and the right panel. (Superseded by site audit Phase 4: one QAR figure "To buy now" +
+      a separate counts line.)
     * Attributes admin (Task 14): /dashboard/store/attributes (completeness per store category, per-row edit,
       bulk class/field/pack size, kit discount %). Sheet import accepts tags + pack_size columns. NOTE: the live
       catalogue has 119 products, NONE attributed yet, many duplicated (e.g. 21 motor listings of 3 products)
@@ -744,6 +745,32 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
       parity 1630/1630.
     * Owner still to do: after 0030–0035, open Plant monitor → Electronics › Board → Regenerate and re-test
       checklist item 2.
+  - SITE AUDIT FIX — Phase 4 (2026-09-26), "Prototyping UX" (SITE_AUDIT.md #24–#32, #34, #35, #37, #39, #40, #58).
+    Branch fix/site-audit, NOT MERGED to main. Log: CHANGELOG-audit.md. No migrations. Cards 4.3/4.4 in final
+    review (4.3 55f2c7d, 4.4 e18104e).
+    * #30/#40/#58/#39 (Card 4.1, fb94ef1): blocked sidebar rows show the reason inline + tooltip; a click goes to
+      the fix, scrolls to the control, or opens the node (no dead clicks). Discipline "×" at the row end with
+      inline confirm + 6-second Undo. Rows are real buttons with accessible names and arrow-key navigation
+      (#58's other half, /projects cards with aria-label = project name, landed in Phase 2, 392ffa2). Button reads "Analyse brief" / "Re-analyse brief"; hints match.
+    * #34/#37/#39 (Card 4.2, 787ab03): one "not a cut file" warning per drawing; title, view name, thickness on
+      separate baselines (unit-tested); no drawable dimensions → link, not an empty frame; snake_case concept ids
+      display as human names; "What it must do" grows 3–16 rows; suggested concepts stay under Concepts until Keep.
+    * #25–#29 (Card 4.3): cost panel = one QAR figure ("To buy now") + a counts line; group headers show to-buy
+      subtotal + "ordered: QAR Y"; ONE "Request a quote for N unstocked items" → one bom_quote lead (item list +
+      project link); one kit button; consumables follow one build route (breadboard | perfboard/hookup wire/
+      heat-shrink); USB cable deduped; Components and BOM share one selector.
+    * #24/#30/#31/#32/#35/#40 (Card 4.4): side panels collapsed under 1440 px (saved choice wins); site header
+      hidden in the workspace, workspace bar carries logo/back/cart/language/sign-in; width up to 1760 px; opens
+      on Brief for a new project, else where the user left off (unit-tested); Quote/Production disabled with the
+      reason inline when blocked; Material & process leaf shows material + process per part with "Accept this
+      route"; blocked node views show a banner + fix link; Continue buttons show their reason; Undo of a branch
+      removal restores detected branches.
+    * Copy en + ar parity 1683/1683.
+    * Owner still to do: after 0030–0035, walk Plant monitor at 1280 px, 1920 px and in /ar — no dead clicks, no
+      clipped tables, one cost figure, one quote button, one kit button, Components count = BOM count, drawings
+      without overlap.
+    * Leftovers: #38 wiring view small at normal width; drawing title-block values clip at ~26+ chars
+      (pre-existing); Readiness labels show raw concept ids; project page QAR total ≠ BOM "To buy now" (documented).
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
