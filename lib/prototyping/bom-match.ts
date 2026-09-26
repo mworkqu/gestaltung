@@ -18,7 +18,7 @@
 // Every product field comes from public.parts. Nothing is invented here.
 
 import type { BomKind, BomLine } from "./analysis";
-import { orderQty, packOf, type Candidate, type LineMatch, type ProjectLine, type ScoredCandidate, type Strength } from "./bom";
+import { buyable, orderQty, packOf, type Candidate, type LineMatch, type ProjectLine, type ScoredCandidate, type Strength } from "./bom";
 import { compareField, fieldsOf, isAttrClass, type Attributes } from "@/lib/store/attributes";
 
 export type InventoryRow = {
@@ -308,16 +308,13 @@ export const packExceedsNeed = (needed: number, p: Pick<Candidate, "pack_size" |
   packOf(p) > 1 && orderQty(needed, p) * packOf(p) > needed;
 
 /**
- * Of the lines counted in "To buy now" (bomCost's availableNow: resolved, not
- * owned, not bought, not fabrication), how many are sold in packs larger than
- * the line needs.
+ * Of the lines counted in "To buy now" (bomCost's availableNow: the buyable()
+ * lines — resolved, not owned, not bought, in stock), how many are sold in
+ * packs larger than the line needs.
  */
 export function packLineCount(lines: ProjectLine[], matches: Map<string, LineMatch>): number {
   return lines.filter((l) => {
-    if (l.fulfilled) return false;
-    const m = matches.get(l.id);
-    if (!m?.product || m.have || m.status === "not_stocked" || m.status === "choose" || m.status === "fabrication")
-      return false;
-    return packExceedsNeed(l.quantity, m.product);
+    const p = buyable(l, matches.get(l.id));
+    return p ? packExceedsNeed(l.quantity, p) : false;
   }).length;
 }

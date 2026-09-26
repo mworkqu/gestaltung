@@ -11,8 +11,9 @@
 //   * a decoupling capacitor on every bare IC power pin
 //   * a logic level shifter where a 5 V output drives a 3.3 V input, and a
 //     warning in words where 3.3 V drives 5 V (it may or may not read reliably)
-// plus the build consumables the route needs (breadboard, jumper wires,
-// perfboard, USB cable, power, wire, heat-shrink) and, on the Custom PCB
+// plus the build consumables of the chosen route only (Prototype: breadboard
+// and jumper wires; Custom PCB: perfboard, hookup wire and heat-shrink for the
+// soldered prototype), a USB cable per board, power, and, on the Custom PCB
 // route, the board-fabrication line.
 //
 // ONE model (audit #1): every part a rule adds to the circuit is inserted
@@ -106,6 +107,23 @@ const VBE = 0.7;
 const GPIO_MAX_MA = 10;
 /** Above this a small TO-92 NPN is the wrong part; we say so. */
 const HEAVY_LOAD_MA = 500;
+
+/**
+ * The build consumables of each route: [id, consumable_type, size, critical].
+ * One route's set only — a breadboard build and a soldered build never share
+ * a bill of materials.
+ */
+export const BUILD_CONSUMABLES: Record<BuildRoute, readonly (readonly [string, string, string, boolean])[]> = {
+  prototype: [
+    ["breadboard", "breadboard", "830", true],
+    ["jumpers", "jumper_wires", "M-M/M-F/F-F", true],
+  ],
+  custom_pcb: [
+    ["perfboard", "perfboard", "", true],
+    ["hookup_wire", "hookup_wire", "22 AWG", true],
+    ["heat_shrink", "heat_shrink", "assortment", false],
+  ],
+};
 
 const passive = (...ids: string[]): Pin[] => ids.map((id) => ({ id, name: id, type: "passive" as const }));
 
@@ -552,14 +570,13 @@ export function deriveElectronics({ netlist: model, lines, route, power, t }: Ct
     }
   }
 
-  // Build consumables: what a prototype cannot be built without.
+  // Build consumables: what the prototype cannot be built without — for ONE
+  // build route, never both (audit #29). The Prototype route is a breadboard
+  // build; the Custom PCB route is still prototyped first, soldered (perfboard,
+  // hookup wire, heat-shrink), and the board itself is the fabrication line.
   const c = (id: string, type: string, size: string, critical = true) =>
     add(`rule_${id}`, "consumable", { consumable_type: type, size }, t(`rule_${id}_name`), t(`rule_${id}_spec`), 1, t(`rule_${id}_reason`), { extra: { critical } });
-  c("breadboard", "breadboard", "830");
-  c("jumpers", "jumper_wires", "M-M/M-F/F-F");
-  c("perfboard", "perfboard", "", false);
-  c("hookup_wire", "hookup_wire", "22 AWG");
-  c("heat_shrink", "heat_shrink", "assortment", false);
+  for (const [id, type, size, critical] of BUILD_CONSUMABLES[route] ?? BUILD_CONSUMABLES.prototype) c(id, type, size, critical);
 
   const boards = lines.filter((l) => l.class === "board");
   for (const b of boards)

@@ -13,16 +13,21 @@
 //                on the line. Only weak (text / incomplete) matches: "No
 //                confident match" and "Suggested: … — confirm?"; a weak product
 //                is never shown as the line's product until the client picks it
-//   not stocked  no product; "request a quote", never a made-up item
+//   not stocked  no product, never a made-up item. All of a table's
+//                not-stocked lines go in ONE quote request (QuoteRequest)
 //   have         already in the client's inventory; left out of every total
 //   fabrication  made to order; priced by quote
 //   ordered      fulfilled by an order; never re-added. Shows the order and its
 //                live status ("Ordered #1a2b3c4d · Shipped", "Delivered"), read
 //                from part_orders (own orders only, RLS); the plain "Bought"
 //                when the marker has no order id or the status cannot be read
-// The three figures are kept apart (CostSummary): to buy now (what the client
-// would pay — whole packs, so a line sold in packs larger than it needs counts
-// at the pack price, and the summary says so), not stocked, fabrication.
+// CostSummary shows ONE money figure — to buy now (what the client would pay,
+// whole packs, so a line sold in packs larger than it needs counts at the pack
+// price, and the summary says so) — and, apart from it, a line of counts (audit
+// #26). Group subtotals are the still-to-buy lines, plus what the group's
+// ordered lines cost (audit #27). One buy action: the whole buyable list as a
+// project kit (audit #28). Lines two sources both listed show once
+// (dedupeLines, audit #29); group counts come from the shared groupLines.
 // The matcher's reasons (`why`) are debug text: shown to super_admin only.
 
 import { useEffect, useState } from "react";
@@ -44,6 +49,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/components/parts/cart-provider";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
+import { PhoneInput } from "@/components/phone-input";
 import { Tag } from "@/components/ui/tag";
 import { Card, PrimaryButton, SoftButton, selectClass } from "@/components/prototyping/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -52,20 +58,26 @@ import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
 import {
   bomCost,
   buyable,
+  dedupeLines,
+  groupLines,
   groupOf,
   orderQty,
   packOf,
+  unstockedLines,
   type LineMatch,
   type ProjectLine,
 } from "@/lib/prototyping/bom";
 import { packLineCount, weakSuggestion } from "@/lib/prototyping/bom-match";
 import { fulfilledLabel, fulfilledOrderIds } from "@/lib/prototyping/fulfilled";
-import { BOM_GROUPS, type BomGroup } from "@/lib/store/attributes";
+import type { BomGroup } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
 
-/** Money now / not stocked / fabrication — three figures, never one total. */
+/**
+ * ONE money figure — to buy now — and, on its own line, the counts: not
+ * stocked, to fabricate, ordered (audit #26). Money and counts never share a row.
+ */
 export function CostSummary({
-  lines,
+  lines: given,
   matches,
   compact = false,
 }: {
@@ -75,37 +87,166 @@ export function CostSummary({
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale();
+  const lines = dedupeLines(given);
   const c = bomCost(lines, matches);
   const packLines = packLineCount(lines, matches);
-  const cells = [
-    { label: t("costToBuyNow"), value: formatPrice(c.availableNow, locale), note: t("costNowNote", { count: c.availableLines }) },
-    { label: t("costNotStocked"), value: String(c.notStocked), note: t("costNotStockedNote") },
-    { label: t("costFabrication"), value: String(c.fabrication), note: t("costFabricationNote") },
-  ];
+  const counts = [
+    t("costCounts", { notStocked: c.notStocked, fabrication: c.fabrication, ordered: c.bought }),
+    c.toChoose ? t("costToChoose", { count: c.toChoose }) : null,
+    c.have ? t("costHave", { count: c.have }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <div className={cn("space-y-1.5", !compact && "rounded-xl bg-panel/60 p-3 shadow-neu-inset")}>
-      <div className={cn("grid gap-2", compact ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3")}>
-        {cells.map((x) => (
-          <div key={x.label} className={cn(compact ? "flex items-baseline justify-between gap-2" : "space-y-0.5")}>
-            <p className="text-[10px] uppercase tracking-wider text-faint">{x.label}</p>
-            <p className="font-mono text-sm font-bold tabular-nums text-heading">{x.value}</p>
-            {!compact && <p className="text-[10.5px] text-mutedtext">{x.note}</p>}
-          </div>
-        ))}
+      <div className={cn("flex items-baseline gap-2", compact ? "justify-between" : "flex-wrap")}>
+        <p className="text-[10px] uppercase tracking-wider text-faint">{t("costToBuyNow")}</p>
+        <p className="font-mono text-sm font-bold tabular-nums text-heading">{formatPrice(c.availableNow, locale)}</p>
+        {!compact && <p className="text-[10.5px] text-mutedtext">{t("costNowNote", { count: c.availableLines })}</p>}
       </div>
       {packLines > 0 && <p className="text-[10.5px] text-inventory">{t("costPacksNote", { count: packLines })}</p>}
-      {(c.toChoose > 0 || c.have > 0 || c.bought > 0) && (
-        <p className="text-[10.5px] text-mutedtext">
-          {[
-            c.toChoose ? t("costToChoose", { count: c.toChoose }) : null,
-            c.have ? t("costHave", { count: c.have }) : null,
-            c.bought ? t("costOrdered", { count: c.bought }) : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      )}
+      <p className="border-t border-dashed border-borderstrong/50 pt-1.5 text-[10.5px] text-mutedtext">{counts}</p>
     </div>
+  );
+}
+
+/**
+ * One quote request for every line we don't stock (audit #28): the list goes
+ * to the owner once, through the lead path the contact form uses
+ * (/api/store-lead, source bom_quote: saved to inquiries and emailed with the
+ * items, the note and a link to the project), with a single confirmation and
+ * a single success message.
+ */
+function QuoteRequest({ projectId, lines }: { projectId: string; lines: ProjectLine[] }) {
+  const t = useTranslations("Prototyping");
+  const tC = useTranslations("Contact");
+  const tD = useTranslations("Delivery");
+  const locale = useLocale();
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    setState("sending");
+    try {
+      // The route writes the message (items, note, project link and name).
+      const res = await fetch("/api/store-lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(f.get("name") ?? "").trim(),
+          phone: String(f.get("phone") ?? "").trim(),
+          email: String(f.get("email") ?? "").trim(),
+          note: String(f.get("note") ?? "").trim(),
+          items: lines.map((l) => ({ function: l.function, spec: l.spec, quantity: l.quantity })),
+          projectId,
+          locale,
+          source: "bom_quote",
+        }),
+      });
+      if (!res.ok) throw new Error(`store-lead ${res.status}`);
+      setState("sent");
+    } catch (err) {
+      console.error("bom: quote request failed", err);
+      setState("error");
+    }
+  }
+
+  const field =
+    "w-full rounded-xl border border-white/60 bg-panel px-3 py-2 text-sm text-heading shadow-neu-inset focus:outline-none focus:ring-2 focus:ring-cobalt/60";
+
+  return (
+    <>
+      {state === "sent" ? (
+        <p className="flex items-center gap-1.5 text-[12px] font-medium text-buy">
+          <Check className="h-3.5 w-3.5" />
+          {tC("success")}
+        </p>
+      ) : (
+        <SoftButton onClick={() => setOpen(true)}>
+          <MessageSquareQuote className="h-3.5 w-3.5" />
+          {t("bomRequestQuoteAll", { count: lines.length })}
+        </SoftButton>
+      )}
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          onClick={() => setOpen(false)}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("bomRequestQuote")}
+            className="neu max-h-[90vh] w-full max-w-md space-y-4 overflow-y-auto bg-surface p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-heading">{t("bomRequestQuote")}</h2>
+                <p className="mt-1 text-xs text-mutedtext">{t("bomQuoteHelp")}</p>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} aria-label={tD("close")} className="text-mutedtext hover:text-heading">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <ul className="max-h-40 space-y-1 overflow-y-auto rounded-xl bg-panel/60 p-3 text-[12px] shadow-neu-inset">
+              {lines.map((l) => (
+                <li key={l.id} className="flex justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="font-semibold text-heading">{l.function}</span>
+                    {l.spec && <span className="block text-[11px] text-mutedtext">{l.spec}</span>}
+                  </span>
+                  <span className="shrink-0 font-mono tabular-nums text-heading">× {l.quantity}</span>
+                </li>
+              ))}
+            </ul>
+            {state === "sent" ? (
+              <p className="flex items-center gap-2 text-sm font-medium text-buy">
+                <Check className="h-4 w-4" />
+                {tC("success")}
+              </p>
+            ) : (
+              <form onSubmit={submit} className="space-y-3">
+                <label className="block space-y-1">
+                  <span className="text-[11px] font-semibold text-mutedtext">{tC("nameLabel")}</span>
+                  <input name="name" required autoFocus placeholder={tC("namePlaceholder")} className={field} />
+                </label>
+                <div className="space-y-1">
+                  <label htmlFor="bom-quote-phone" className="block text-[11px] font-semibold text-mutedtext">
+                    {tC("whatsappLabel")}
+                  </label>
+                  <PhoneInput
+                    id="bom-quote-phone"
+                    name="phone"
+                    placeholder={tC("whatsappPlaceholder")}
+                    codeAriaLabel={tC("countryCode")}
+                  />
+                </div>
+                <label className="block space-y-1">
+                  <span className="text-[11px] font-semibold text-mutedtext">{tC("emailOptional")}</span>
+                  <input name="email" type="email" dir="ltr" placeholder={tC("emailPlaceholder")} className={field} />
+                </label>
+                <textarea name="note" rows={2} placeholder={t("bomQuoteNote")} className={cn(field, "resize-y")} />
+                {state === "error" && <p className="text-sm text-destructive">{tC("errorSubmit")}</p>}
+                <PrimaryButton type="submit" disabled={state === "sending"} className="w-full justify-center">
+                  {state === "sending" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {t("bomQuoteSubmit")}
+                </PrimaryButton>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -141,7 +282,7 @@ function useIsSuperAdmin(): boolean {
 
 export function BomTable({
   projectId,
-  lines,
+  lines: given,
   dismissed,
   matches,
   loading,
@@ -167,7 +308,7 @@ export function BomTable({
   kicker: string;
   title: string;
   intro: string;
-  /** The project-level view: cost summary, Add all to cart, Buy as kit. */
+  /** The project-level view: cost summary and the one kit button. */
   showTotal: boolean;
   before?: React.ReactNode;
   /** Line ids a part of the stored circuit points at (netlist bomIds): these can't be removed. */
@@ -177,6 +318,8 @@ export function BomTable({
   const locale = useLocale();
   const { addItem, kitDiscountPct } = useCart();
   const admin = useIsSuperAdmin();
+  // One line per item, whichever view renders this table (audit #29).
+  const lines = dedupeLines(given, { keep: inCircuit });
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [kitDone, setKitDone] = useState(false);
@@ -210,6 +353,7 @@ export function BomTable({
   }, [orderIdsKey]);
 
   const toBuy = lines.filter((l) => buyable(l, matches.get(l.id)));
+  const unstocked = unstockedLines(lines, matches);
 
   async function add(l: ProjectLine) {
     const p = buyable(l, matches.get(l.id));
@@ -220,18 +364,10 @@ export function BomTable({
     setAdding(null);
   }
 
-  async function addAll() {
-    setAdding("all");
-    const saved = new Set<string>();
-    for (const l of toBuy) {
-      const p = buyable(l, matches.get(l.id))!;
-      if (await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id] })) saved.add(l.id);
-    }
-    setAdded(saved);
-    setAdding(null);
-  }
-
-  /** The whole buyable BOM as one kit: one cart entry, one kit price. */
+  /**
+   * The ONE buy action (audit #28): the whole buyable BOM as a project kit —
+   * one cart entry, the kit discount, fulfilment tracked per line.
+   */
   async function buyKit() {
     setAdding("kit");
     setKitFailed(false);
@@ -249,13 +385,27 @@ export function BomTable({
         if (!ok) throw new Error("kit line not saved");
       }
       setKitDone(true);
-    } catch {
+    } catch (err) {
+      console.error("bom: kit not added", err);
       setKitFailed(true);
     }
     setAdding(null);
   }
 
-  const groups = BOM_GROUPS.map((g) => ({ g, lines: lines.filter((l) => groupOf(l) === g) })).filter((x) => x.lines.length);
+  // The same grouping (and so the same counts) in every view (audit #29).
+  const groups = groupLines(lines);
+
+  /** A group's money: its still-to-buy lines, and what its ordered lines cost — never a bare QAR 0.00. */
+  const groupMoney = (g: BomGroup, gl: ProjectLine[]) => {
+    if (g === "fabrication") return t("byQuote");
+    const c = bomCost(gl, matches);
+    const parts = [
+      c.availableLines > 0 ? t("subtotal", { value: formatPrice(c.availableNow, locale) }) : null,
+      c.orderedPriced > 0 ? t("groupOrdered", { amount: formatPrice(c.ordered, locale) }) : null,
+    ].filter(Boolean);
+    if (!parts.length && c.notStocked > 0) return t("byQuote");
+    return parts.join(" · ");
+  };
 
   return (
     <Card kicker={kicker} title={title} intro={intro}>
@@ -267,9 +417,13 @@ export function BomTable({
       ) : (
         <>
           {failed && <p className="text-xs font-medium text-destructive">{t("bomMatchFailed")}</p>}
+          {unstocked.length > 0 && (
+            <div className="flex justify-end">
+              <QuoteRequest projectId={projectId} lines={unstocked} />
+            </div>
+          )}
           {groups.map(({ g, lines: gl }) => {
             const open = !closed.has(g);
-            const sub = bomCost(gl, matches).availableNow;
             return (
               <section key={g} className="space-y-2">
                 <button
@@ -289,9 +443,7 @@ export function BomTable({
                   <span className="flex-1 text-[13px] font-bold text-heading">
                     {t(`bomGroup_${g}`)} <span className="font-normal text-mutedtext">({gl.length})</span>
                   </span>
-                  <span className="text-[11px] text-mutedtext">
-                    {g === "fabrication" ? t("byQuote") : t("subtotal", { value: formatPrice(sub, locale) })}
-                  </span>
+                  <span className="text-[11px] text-mutedtext">{groupMoney(g, gl)}</span>
                 </button>
                 {open && (
                   <div className="overflow-x-auto">
@@ -355,15 +507,12 @@ export function BomTable({
                   {t("kitAdded")}
                 </Link>
               ) : (
-                <SoftButton onClick={buyKit} disabled={!toBuy.length || adding !== null} title={t("kitHint")}>
+                <PrimaryButton onClick={buyKit} disabled={!toBuy.length || adding !== null} title={t("kitHint")}>
                   {adding === "kit" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}
-                  {kitDiscountPct > 0 ? t("buyKitDiscount", { pct: kitDiscountPct }) : t("buyKit")}
-                </SoftButton>
+                  {t("addKit", { count: toBuy.length })}
+                  {kitDiscountPct > 0 && ` ${t("kitDiscountNote", { pct: kitDiscountPct })}`}
+                </PrimaryButton>
               )}
-              <PrimaryButton onClick={addAll} disabled={!toBuy.length || adding !== null}>
-                {adding === "all" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5" />}
-                {t("bomAddAll")}
-              </PrimaryButton>
               {kitFailed && <p className="w-full text-end text-[11.5px] text-destructive">{t("kitFailed")}</p>}
             </div>
           )}
@@ -601,9 +750,11 @@ function Row({
               )}
               {added ? t("bomAdded") : t("bomAddToCart")}
             </SoftButton>
-          ) : !l.fulfilled && (m?.status === "not_stocked" || groupOf(l) === "fabrication") ? (
+          ) : !l.fulfilled && groupOf(l) === "fabrication" ? (
+            // Made to order: the design-quote path (files, fabrication). Lines we
+            // don't stock go in the table's one quote request instead (audit #28).
             <Link
-              href={groupOf(l) === "fabrication" ? "/design/quote" : "/contact"}
+              href="/design/quote"
               className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-cobalt hover:text-cobalt-hover"
             >
               <MessageSquareQuote className="h-3 w-3" />
