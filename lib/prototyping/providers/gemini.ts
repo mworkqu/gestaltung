@@ -78,7 +78,7 @@ const SYSTEM = `You read product briefs for a manufacturing workshop in Qatar an
 Rules:
 - summary: one short paragraph, plain language, describing the product. No marketing tone.
 - disciplines: which of mechanical, electronics, software the product needs. Include software only if the product has an app, website, firmware, dashboard or network connection. A custom circuit board means electronics.
-- requirements: facts about the product. source "brief" if the brief states it, "assumed" if you inferred it. Never invent numbers the brief does not give; if you would have to invent one, ask a question instead.
+- requirements: facts about the product. source "brief" if the brief states it, "assumed" if you inferred it. Mark a fact "assumed" unless the brief states that exact thing in words: a USB adapter is not "mains", a desk is not "portable" or "fixed". Never invent numbers the brief does not give; if you would have to invent one, ask a question instead.
 - Four facts use fixed ids and values when the brief settles them:
 ${standardLines}
   If the brief does not settle one of these, do NOT add it as a requirement; add a question with that id instead.

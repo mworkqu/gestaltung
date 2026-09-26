@@ -7,7 +7,7 @@
 import { getTranslations } from "next-intl/server";
 
 import type { Analysis, AnalysisRequest } from "../analysis";
-import { breakDown, detectDisciplines, readFacts } from "../engine";
+import { breakDown, detectDisciplines, readFacts, templateAppliesTo } from "../engine";
 import type { AnalysisProvider } from "./types";
 
 export async function readWithRules({ brief, locale }: AnalysisRequest): Promise<Analysis> {
@@ -20,15 +20,18 @@ export async function readWithRules({ brief, locale }: AnalysisRequest): Promise
       id: f.id,
       label: t(`fact_${f.id}`),
       value: f.value ?? t(`factValue_${f.valueKey}`, f.params ?? {}),
+      // Keyword hits are claims about the brief; honestSources() (run on every
+      // provider's answer in the route) downgrades any the text doesn't bear out.
       source: "brief",
     })),
     // The standard gaps are added by withStandardGaps() for every provider.
     questions: [],
-    suggestedParts: breakDown(brief).map((p) => ({
-      name: t(`part_${p.key}_name`),
-      kind: p.kind,
-      note: t(`part_${p.key}_desc`),
-    })),
+    // A template's description goes only on a part whose name carries that
+    // template's own trigger words (audit #5: no reservoir text on a mount).
+    suggestedParts: breakDown(brief).map((p) => {
+      const name = t(`part_${p.key}_name`);
+      return { name, kind: p.kind, note: templateAppliesTo(p.key, name) ? t(`part_${p.key}_desc`) : "" };
+    }),
     // Keywords cannot say what to buy or to what spec, so no bill of materials.
     bom: [],
   };

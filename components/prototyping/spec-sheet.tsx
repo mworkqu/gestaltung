@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Pencil, RotateCcw } from "lucide-react";
 
-import { STANDARD_FACTS, isStandardFact, type Question } from "@/lib/prototyping/analysis";
+import { STANDARD_FACTS, briefStates, isStandardFact, type Question } from "@/lib/prototyping/analysis";
 import { factFocus, factLabel, type Translate } from "@/lib/prototyping/readiness";
 import { keptAnswer, rowOf, setFact, type Spec, type SpecRow } from "@/lib/prototyping/spec";
 import { Tag } from "@/components/ui/tag";
@@ -116,19 +116,29 @@ function controlType(row: { id: string }): "number" | "select" | "text" {
   return STANDARD_FACTS[row.id].type === "number" ? "number" : "select";
 }
 
-function SourceTag({ row }: { row: SpecRow }) {
+/**
+ * Where a fact came from. "From your brief" is shown only while the brief
+ * still says it: a row saved before the source check (or a brief edited
+ * since) reads as inferred rather than claiming words that aren't there.
+ */
+function SourceTag({ row, brief }: { row: SpecRow; brief?: string }) {
   const t = useTranslations("Prototyping");
   if (row.source === "you") return <Tag variant="inventory">{t("sourceYou")}</Tag>;
-  if (row.source === "assumed") return <Tag variant="neutral">{t("sourceAssumed")}</Tag>;
+  const fromBrief =
+    row.source === "brief" && (brief === undefined || (row.value !== null && briefStates(row.id, row.value, brief)));
+  if (!fromBrief) return <Tag variant="neutral">{t("sourceAssumed")}</Tag>;
   return <Tag variant="buy">{t("sourceBrief")}</Tag>;
 }
 
 export function SpecSheet({
   spec,
+  brief,
   running,
   onChange,
 }: {
   spec: Spec | null;
+  /** The saved brief, to check each "from your brief" against. */
+  brief?: string;
   running: boolean;
   onChange: (next: Spec) => void;
 }) {
@@ -203,7 +213,7 @@ export function SpecSheet({
                     </td>
                     <td className="px-3 py-2.5">
                       <span className="flex flex-wrap items-center gap-1.5">
-                        <SourceTag row={row} />
+                        <SourceTag row={row} brief={brief} />
                         {keptAnswer(row) && (
                           <span
                             className="inline-flex items-center gap-1 text-[10.5px] font-medium text-inventory"

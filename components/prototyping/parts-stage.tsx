@@ -25,9 +25,16 @@ import {
   processesFor,
   type Discipline,
 } from "@/lib/prototyping/constants";
-import { KEEPABLE_NEEDS, partNeeds } from "@/lib/prototyping/parts";
+import {
+  KEEPABLE_NEEDS,
+  enclosureMisfit,
+  implausibleDims,
+  partNeeds,
+  type PartNeed,
+} from "@/lib/prototyping/parts";
 import { REQUIRED, SHAPES, effectiveShape, type Dim } from "@/lib/prototyping/dimension-drawing";
 import { dimFocus } from "@/components/prototyping/dimension-drawings";
+import { partsKey, useProjectBoards } from "@/components/prototyping/use-project-boards";
 import { Tag } from "@/components/ui/tag";
 import { CreatePartDialog } from "@/components/prototyping/part-dialogs";
 import {
@@ -70,8 +77,31 @@ export function PartsStage({
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const concepts = view === "concepts";
+  // The boards that go inside: an enclosure too small for them is not ready.
+  const { boards, failed: boardsFailed } = useProjectBoards(projectId, partsKey(parts));
+  const needsOf = (p: ProjectPart) => partNeeds(p, { boards });
 
-  const pending = parts.filter((p) => p.status === "suggested" && partNeeds(p).every((n) => KEEPABLE_NEEDS.includes(n)));
+  const pending = parts.filter((p) => p.status === "suggested" && needsOf(p).every((n) => KEEPABLE_NEEDS.includes(n)));
+
+  /** A need in words; a wrong number says which number and why. */
+  function needText(part: ProjectPart, n: PartNeed): string {
+    if (n === "implausible")
+      return t("partNeedDetail_implausible", {
+        fields: implausibleDims(part)
+          .map((d) => t(`dim_${d}`))
+          .join(", "),
+      });
+    if (n === "tooSmall") {
+      const m = enclosureMisfit(part, boards);
+      if (m)
+        return t("partNeedDetail_tooSmall", {
+          board: m.board.label,
+          inner: `${m.inner[0]} × ${m.inner[1]}`,
+          needed: `${m.needed[0]} × ${m.needed[1]}`,
+        });
+    }
+    return t(`partNeed_${n}`);
+  }
 
   async function patch(part: ProjectPart, changes: Partial<ProjectPart>) {
     setBusy(true);
@@ -134,6 +164,8 @@ export function PartsStage({
         </>
       }
     >
+      {kind === "mechanical" && boardsFailed && <Warn blocking={false}>{t("boardsCheckFailed")}</Warn>}
+
       {parts.length === 0 ? (
         <p className="text-sm text-mutedtext">
           {concepts
@@ -143,7 +175,7 @@ export function PartsStage({
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2">
           {parts.map((part) => {
-            const needs = partNeeds(part);
+            const needs = needsOf(part);
             const edited = part.status === "edited" && part.ai_material && part.ai_process;
             const canConfirm = needs.every((n) => KEEPABLE_NEEDS.includes(n));
             return (
@@ -329,7 +361,7 @@ export function PartsStage({
 
                 {needs.some((n) => n !== "confirm") && (
                   <p className="text-[11.5px] text-inventory">
-                    {needs.filter((n) => n !== "confirm").map((n) => t(`partNeed_${n}`)).join(" · ")}
+                    {needs.filter((n) => n !== "confirm").map((n) => needText(part, n)).join(" · ")}
                   </p>
                 )}
 

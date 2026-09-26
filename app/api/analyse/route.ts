@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import {
+  honestSources,
   withStandardGaps,
   type Analysis,
   type AnalysisEvent,
@@ -131,7 +132,10 @@ export async function POST(request: Request) {
           send({ type: "step", step: "disciplines" });
           send({ type: "step", step: "requirements" });
         }
-        const final = withStandardGaps(analysis);
+        // Every provider's "from your brief" is checked against the brief's own
+        // words before anyone sees it (audit #5).
+        const normalised = withStandardGaps(analysis);
+        const final = { ...normalised, requirements: honestSources(normalised.requirements, req.brief) };
         if (req.projectId) {
           const { error: runErr } = await supabase.from("analysis_runs").insert({
             project_id: req.projectId,

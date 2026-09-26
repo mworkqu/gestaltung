@@ -30,6 +30,7 @@ import {
 import { MAX_PARTS } from "@/lib/prototyping/constants";
 import { Tag } from "@/components/ui/tag";
 import { AddExistingDialog, CreatePartDialog } from "@/components/prototyping/part-dialogs";
+import { partsKey, useProjectBoards } from "@/components/prototyping/use-project-boards";
 import { Card, PrimaryButton, SoftButton, Warn, selectClass } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
 import type { Part, ProjectItem, ProjectPart } from "@/lib/supabase/types";
@@ -63,6 +64,9 @@ export function PartsList({
   const [filter, setFilter] = useState<PartsListFilter>("all");
   const [dialog, setDialog] = useState<"existing" | "new" | null>(null);
 
+  // Known boards, so a too-small enclosure is never "Ready to make" (audit #5).
+  const { boards, failed: boardsFailed } = useProjectBoards(projectId, partsKey(parts));
+
   const rows = mergePartsForList(parts, storeLines);
   const shown = rows.filter((r) => rowMatchesFilter(r, filter));
   // The limit is on project_parts; store lines live in their own table.
@@ -92,7 +96,7 @@ export function PartsList({
         <Tag variant={part.stock_status === "out_of_stock" ? "inventory" : "buy"}>{label}</Tag>
       );
     }
-    const needs = partNeeds(part);
+    const needs = partNeeds(part, { boards });
     return needs.length ? (
       <span className="text-[11.5px] text-inventory">
         {needs.map((n) => t(`partNeed_${n}`)).join(" · ")}
@@ -138,6 +142,7 @@ export function PartsList({
       </div>
 
       {storeFailed && <Warn blocking>{t("storeLinesFailed")}</Warn>}
+      {boardsFailed && <Warn blocking={false}>{t("boardsCheckFailed")}</Warn>}
 
       {shown.length === 0 ? (
         <p className="text-sm text-mutedtext">{rows.length ? t("noPartsFiltered") : t("noParts")}</p>

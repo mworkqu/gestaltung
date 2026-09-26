@@ -133,3 +133,102 @@ export function withStandardGaps(a: Analysis): Analysis {
       }),
   };
 }
+
+// ── Source honesty ─────────────────────────────────────────────────────────
+// A provider says where each fact came from, and it can be wrong: a model read
+// "USB adapter, on a desk" and reported Mains + Portable "from your brief"
+// (audit #5). So the claim is checked against the brief's own words, the same
+// way for every provider: a fact keeps source "brief" only if the brief
+// actually says it. Anything else is "assumed" (shown as inferred). Values are
+// never changed here — only the label on where they came from.
+
+/**
+ * Words that settle a standard fact's value, EN + AR, over lower-case text.
+ * Deliberately narrower than the keyword reader's: "inside the case", "post
+ * data" or "mobile app" say nothing about where the product lives. A desk says
+ * indoor; it does not say fixed or portable.
+ */
+const STANDARD_WORDS: Record<string, RegExp> = {
+  "power:mains":
+    /\bmains\b|\bplug(ged|s)?\b(\s+[\w']+){0,3}?\s+in(to)?\b|\bwall (socket|outlet|plug)\b|\b2[234]0\s?v\b|\bac power\b|مقبس|قابس|كهرباء المنزل|الكهرباء المنزلية|الشبكة الكهربائية|تيار متردد/,
+  "power:battery": /\bbatter(y|ies)\b|\brechargeable\b|\bli-?ion\b|\blipo\b|\b18650\b|بطارية|بطاريات|قابلة? لإعادة الشحن/,
+  "power:solar": /\bsolar\b|\boff-?grid\b|شمسي|شمسية/,
+  "mounting:fixed":
+    /\bfixed\b|\bmounted\b|\bwall[- ]mount\w*|\bon (a|the) wall\b|\bbolt\w*|\bscrewed (to|on)\b|\bpole\b|\banchor\w*|ثابت|مثبت|مثبّت|على الجدار|على الحائط|جداري|حائطي/,
+  "mounting:portable": /\bportable\b|\bhand-?held\b|\bcarried\b|\bcarry (it|around)\b|\bpocket\b|محمول|متنقل|يحمل باليد/,
+  "environment:indoor":
+    /\bindoors?\b|\boffice\b|\bkitchen\b|\b(bed)?rooms?\b|\bdesk\w*\b|\bshelf\b|\bhome\b|داخلي|مكتب|غرفة|منزل|بيت|مطبخ/,
+  "environment:outdoor":
+    /\boutdoors?\b|\bpublic\b|\bstreet\b|\bpark\b|\bgarden\b|\brain\b|\bsun\b|\bweather\w*\b|\byard\b|\bbalcon\w*|\bterraces?\b|\bpatios?\b|\broof(top)?s?\b|خارجي|حديقة|شارع|مطر|شرفة|بلكونة/,
+};
+
+/** Western digits, lower case, one space: the form both sides are compared in. */
+function normalise(s: string): string {
+  return s
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+    // Thousands separators go: "1,000 units" is 1000.
+    .replace(/(\d)[,٬](?=\d{3}(?!\d))/g, "$1")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const hasNumber = (text: string, n: string) =>
+  // Not part of a longer number, and not a model number: "ESP32" is no "32".
+  new RegExp(`(^|[^a-z\\u0600-\\u06ff\\d.,])${n.replace(/[.,]/g, "[.,]")}(?!\\d|[.,]\\d)`).test(text);
+
+const STOP = new Set(
+  "with from that this have will must should into about each which their there when where what than then also only very more less some such other used uses using need needs product device unit units the and for per".split(
+    " "
+  )
+);
+
+/** A word's comparable stem: Arabic loses its article, both are cut short. */
+function stem(w: string): string {
+  if (/[؀-ۿ]/.test(w)) return w.replace(/^(و?(بال|لل|ال))/, "").slice(0, 4);
+  return w.slice(0, 5);
+}
+
+/**
+ * Whether the brief says a free-text value: the value appears whole, or every
+ * number in it appears and at least half its content words do.
+ */
+function briefMentions(brief: string, value: string): boolean {
+  const b = normalise(brief);
+  const v = normalise(value);
+  if (!v) return false;
+  if (b.includes(v)) return true;
+  const numbers = v.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  if (numbers.some((n) => !hasNumber(b, n))) return false;
+  const words = v
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => !STOP.has(w) && !/^\d/.test(w) && w.length >= (/[؀-ۿ]/.test(w) ? 3 : 4));
+  if (!words.length) return numbers.length > 0;
+  const hits = words.filter((w) => {
+    const s = stem(w);
+    return s.length >= 3 && b.includes(s);
+  }).length;
+  return hits * 2 >= words.length;
+}
+
+/** Whether the brief itself states this fact's value. */
+export function briefStates(id: string, value: string, brief: string): boolean {
+  const b = normalise(brief);
+  const v = value.trim().toLowerCase();
+  if (id === "quantity") return /^\d+$/.test(v) && hasNumber(b, String(Number(v)));
+  if (id === "environment" && v === "both")
+    return STANDARD_WORDS["environment:indoor"].test(b) && STANDARD_WORDS["environment:outdoor"].test(b);
+  const words = STANDARD_WORDS[`${id}:${v}`];
+  if (words) return words.test(b);
+  // A standard fact with a value we have no words for is never "from the brief".
+  if (isStandardFact(id)) return false;
+  return briefMentions(brief, value);
+}
+
+/** Every fact claimed "from the brief" that the brief doesn't state becomes "assumed". */
+export function honestSources(requirements: Requirement[], brief: string): Requirement[] {
+  return requirements.map((r) =>
+    r.source === "brief" && !briefStates(r.id, r.value, brief) ? { ...r, source: "assumed" } : r
+  );
+}

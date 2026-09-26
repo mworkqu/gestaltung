@@ -64,11 +64,14 @@ async function streamAnalysis(res: Response, onStep: (s: AnalysisStep) => void):
   }
 }
 
-/** Material + process for a suggested part: deterministic rules, not a model. */
-function specFor(p: Analysis["suggestedParts"][number]) {
+/**
+ * Material + process for a suggested part: deterministic rules, not a model.
+ * The brief goes too, so "a small 3D-printed case" decides the enclosure.
+ */
+function specFor(p: Analysis["suggestedParts"][number], brief: string) {
   if (p.kind === "software") return { material: null, process: null };
   if (p.kind === "electronics") return { material: "fr4", process: "pcb_manufacturing" };
-  const s = suggestSpec(`${p.name} ${p.note}`);
+  const s = suggestSpec(`${p.name} ${p.note}`, brief);
   return { material: s.material, process: s.process };
 }
 
@@ -226,7 +229,7 @@ export function IdeaStage({
         .filter((p) => p.kind !== "electronics")
         .filter((p) => !kinds.has(p.kind) && !have.has(p.name.trim().toLowerCase()))
         .map((p) => {
-          const s = specFor(p);
+          const s = specFor(p, brief);
           n += 1;
           return {
             project_id: project.id,
@@ -366,7 +369,7 @@ export function IdeaStage({
         )}
       </Card>
 
-      <SpecSheet spec={spec} running={running} onChange={onSpec} />
+      <SpecSheet spec={spec} brief={savedBrief} running={running} onChange={onSpec} />
       {!running && <NeedsInput spec={spec} onChange={onSpec} />}
     </>
   );
