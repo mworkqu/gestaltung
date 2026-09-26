@@ -61,6 +61,28 @@ export const isCatalog = (p: { source?: PartSource | null }) => p.source === "ca
 export const isConcept = (p: { source?: PartSource | null; status: string }) =>
   !isCatalog(p) && p.status === "suggested";
 
+/**
+ * The parts the Parts list shows: everything but concepts. A suggestion lives
+ * under its branch's Concepts leaf until the client keeps it (audit #34).
+ */
+export const partsForList = <P extends { source?: PartSource | null; status: string }>(parts: readonly P[]): P[] =>
+  parts.filter((p) => !isConcept(p));
+
+/** An identifier-style name the analysis sometimes returns, e.g. monitor_firmware. */
+const IDENTIFIER_NAME = /^[a-z0-9]+(_[a-z0-9]+)+$/;
+
+/**
+ * A part's name as people read it. An identifier ("monitor_firmware") shows
+ * as "Monitor firmware"; any other name is shown exactly as stored. Display
+ * only — the stored name never changes (audit #34).
+ */
+export function humanPartName(name: string): string {
+  const trimmed = name.trim();
+  if (!IDENTIFIER_NAME.test(trimmed)) return name;
+  const words = trimmed.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 /** A to-design part's discipline. Rows from before 0022 fall back to process. */
 export const disciplineOf = (p: PartLike): Discipline | null =>
   isCatalog(p) ? null : p.kind ?? (p.process === "pcb_manufacturing" ? "electronics" : "mechanical");

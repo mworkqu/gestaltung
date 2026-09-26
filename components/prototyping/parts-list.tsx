@@ -10,6 +10,9 @@
 // Store products added on the project page (project_items) are listed here
 // too, read-only, so the project has one parts list (audit #4). They are
 // edited on the project page and are never design requirements.
+//
+// Concepts (analysis suggestions not yet kept) are not listed: they live under
+// their branch's Concepts leaf until the client keeps them (audit #34).
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -21,9 +24,11 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPrice, partName } from "@/lib/parts/format";
 import {
   disciplineOf,
+  humanPartName,
   isCatalog,
   mergePartsForList,
   partNeeds,
+  partsForList,
   rowMatchesFilter,
   type PartsListFilter,
 } from "@/lib/prototyping/parts";
@@ -67,7 +72,10 @@ export function PartsList({
   // Known boards, so a too-small enclosure is never "Ready to make" (audit #5).
   const { boards, failed: boardsFailed } = useProjectBoards(projectId, partsKey(parts));
 
-  const rows = mergePartsForList(parts, storeLines);
+  const listed = partsForList(parts);
+  // Said out loud, so an empty list never reads as "nothing suggested".
+  const waiting = parts.length - listed.length;
+  const rows = mergePartsForList(listed, storeLines);
   const shown = rows.filter((r) => rowMatchesFilter(r, filter));
   // The limit is on project_parts; store lines live in their own table.
   const full = parts.length >= MAX_PARTS;
@@ -144,8 +152,14 @@ export function PartsList({
       {storeFailed && <Warn blocking>{t("storeLinesFailed")}</Warn>}
       {boardsFailed && <Warn blocking={false}>{t("boardsCheckFailed")}</Warn>}
 
+      {waiting > 0 && <p className="text-[12px] text-mutedtext">{t("partsConceptsWaiting", { count: waiting })}</p>}
+
       {shown.length === 0 ? (
-        <p className="text-sm text-mutedtext">{rows.length ? t("noPartsFiltered") : t("noParts")}</p>
+        rows.length ? (
+          <p className="text-sm text-mutedtext">{t("noPartsFiltered")}</p>
+        ) : (
+          waiting === 0 && <p className="text-sm text-mutedtext">{t("noParts")}</p>
+        )
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
@@ -215,11 +229,11 @@ export function PartsList({
                           onClick={() => onOpen(part)}
                           className="group inline-flex items-center gap-1 text-start text-[13px] font-semibold text-heading hover:text-cobalt"
                         >
-                          {part.name}
+                          {humanPartName(part.name)}
                           <ChevronRight className="h-3 w-3 opacity-50 rtl:rotate-180" />
                         </button>
                       ) : (
-                        <span className="text-[13px] font-semibold text-heading">{part.name}</span>
+                        <span className="text-[13px] font-semibold text-heading">{humanPartName(part.name)}</span>
                       )}
                       <span className="block text-[11px] text-mutedtext">
                         {kind ? t(`kind_${kind}`) : part.sku && <span className="font-mono">{part.sku}</span>}

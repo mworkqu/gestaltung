@@ -13,7 +13,7 @@
 // lib/prototyping/engine; an edit keeps the original suggestion on the row so
 // "we suggested X" and "revert" stay honest however many times it changes.
 
-import { useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Pencil, Plus, Ruler, Sparkles, Trash2, Undo2 } from "lucide-react";
 
@@ -28,6 +28,7 @@ import {
 import {
   KEEPABLE_NEEDS,
   enclosureMisfit,
+  humanPartName,
   implausibleDims,
   partNeeds,
   type PartNeed,
@@ -47,6 +48,59 @@ import {
 } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
 import type { ProjectPart } from "@/lib/supabase/types";
+
+/** The scope field grows with its text between these, then scrolls. */
+const SCOPE_MIN_ROWS = 3;
+const SCOPE_MAX_ROWS = 16;
+
+/**
+ * "What it must do": a plain textarea that grows with its content from
+ * SCOPE_MIN_ROWS to SCOPE_MAX_ROWS lines and only scrolls past that — the same
+ * approach as the brief editor. Uncontrolled: it saves on blur.
+ */
+function ScopeField({
+  defaultValue,
+  label,
+  onSave,
+}: {
+  defaultValue: string;
+  label: string;
+  onSave: (value: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  const fit = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto"; // collapse to `rows`, then measure the content
+    const cs = window.getComputedStyle(el);
+    const fontSize = parseFloat(cs.fontSize) || 13;
+    const line = parseFloat(cs.lineHeight) || fontSize * 1.5; // "normal" parses as NaN
+    const padding = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const border = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    // scrollHeight includes padding but not border; height is border-box.
+    const max = line * SCOPE_MAX_ROWS + padding;
+    el.style.height = `${Math.min(el.scrollHeight, max) + border}px`;
+    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
+  }, []);
+
+  // Fit the saved text on first paint, before the client sees a cramped box.
+  useLayoutEffect(() => fit(), [fit]);
+
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[9px] uppercase tracking-wider text-faint">{label}</span>
+      <textarea
+        ref={ref}
+        defaultValue={defaultValue}
+        rows={SCOPE_MIN_ROWS}
+        onInput={fit}
+        onBlur={(e) => onSave(e.target.value.trim())}
+        className={cn(fieldClass, "resize-none overflow-hidden py-2 text-[13px]")}
+      />
+    </label>
+  );
+}
 
 export function PartsStage({
   projectId,
@@ -204,7 +258,7 @@ export function PartsStage({
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-bold text-heading">{part.name}</h3>
+                  <h3 className="text-sm font-bold text-heading">{humanPartName(part.name)}</h3>
                   {kind !== "software" && part.description && (
                     <p className="mt-1 text-xs leading-relaxed text-mutedtext">{part.description}</p>
                   )}
@@ -306,25 +360,20 @@ export function PartsStage({
                 )}
 
                 {kind === "software" && (
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[9px] uppercase tracking-wider text-faint">{t("scopeField")}</span>
-                    <textarea
-                      defaultValue={part.description ?? ""}
-                      rows={3}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v !== (part.description ?? "")) void patch(part, { description: v || null });
-                      }}
-                      className={cn(fieldClass, "resize-y py-2 text-[13px]")}
-                    />
-                  </label>
+                  <ScopeField
+                    defaultValue={part.description ?? ""}
+                    label={t("scopeField")}
+                    onSave={(v) => {
+                      if (v !== (part.description ?? "")) void patch(part, { description: v || null });
+                    }}
+                  />
                 )}
 
                 {part.material && part.process && !isCompatible(part.material, part.process) && (
                   <Warn blocking>
                     {t("warn_incompatible", {
                       code: part.code,
-                      name: part.name,
+                      name: humanPartName(part.name),
                       material: tProj(`material_${part.material}`),
                       process: t(`process_${part.process}`),
                     })}{" "}

@@ -46,6 +46,19 @@ const val = (p: DimensionedPart, d: Dim): number | null => {
   return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : null;
 };
 
+/**
+ * Whether the part has anything to draw: a known shape and the numbers for its
+ * main view. Without them the drawing would be an empty frame, so the page
+ * shows a link to the inputs instead.
+ */
+export function hasDrawableView(p: DimensionedPart): boolean {
+  const s = effectiveShape(p);
+  if (!s) return false;
+  if (s === "disc") return val(p, "diameter_mm") !== null;
+  if (s === "shaft") return val(p, "diameter_mm") !== null && val(p, "length_mm") !== null;
+  return val(p, "length_mm") !== null && val(p, "width_mm") !== null;
+}
+
 /** What the drawing still lacks: the shape, or named dimensions. */
 export function missingDims(p: DimensionedPart): ("shape" | Dim)[] {
   const s = effectiveShape(p);
@@ -96,7 +109,17 @@ const gapBox = (x: number, y: number, w: number, h: number, text: string) =>
    <text x="${x + w / 2}" y="${y + h / 2 + 4}" text-anchor="middle" font-size="12" font-weight="600" fill="${GAP}">${esc(text)}</text>`;
 
 const viewLabel = (x: number, y: number, t: string) =>
-  `<text x="${x}" y="${y}" font-size="10" fill="${MUTED}" letter-spacing="0.08em">${esc(t.toUpperCase())}</text>`;
+  `<text data-role="view" x="${x}" y="${y}" font-size="10" fill="${MUTED}" letter-spacing="0.08em">${esc(t.toUpperCase())}</text>`;
+
+/**
+ * Text lines above the views, one baseline each and never shared: the
+ * drawing's title, then the view name, then (for a sheet) the material
+ * thickness. LINE_GAP is at least the tallest of these fonts plus clearance.
+ */
+export const TITLE_Y = 30;
+export const LINE_GAP = 16;
+
+const clip = (v: string, n: number) => (v.length > n ? `${v.slice(0, n - 1)}…` : v);
 
 export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): string {
   const W = 640;
@@ -108,6 +131,13 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
   const unit = "mm";
   const d = (k: Dim) => val(p, k);
   const miss = (k: Dim) => L.missing(L.dim[k]);
+  const viewY = area.y + 10;
+
+  parts.push(
+    `<text data-role="title" x="${area.x - 10}" y="${TITLE_Y}" font-size="13" font-weight="700" fill="${INK}">${esc(
+      clip(`${p.code} ${p.name}`, 70)
+    )}</text>`
+  );
 
   if (!s) {
     parts.push(gapBox(area.x, area.y, area.w, area.h, L.noShape));
@@ -118,29 +148,33 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
     // Plan view (length × width) on the left; front view (length × height or
     // thickness) on the right. One scale for both, from the real numbers.
     // A block shows two views side by side, so each gets half the width.
+    // A sheet has its thickness on its own line under the view name, so its
+    // view starts one line lower and is a line shorter.
     const maxW = s === "block" ? 180 : 440;
-    const k = len && wid ? Math.min(maxW / len, 180 / Math.max(wid, second ?? 0), 10) : 1;
+    const maxH = s === "block" ? 180 : 170;
+    const k = len && wid ? Math.min(maxW / len, maxH / Math.max(wid, second ?? 0), 10) : 1;
     if (len && wid) {
       const w = len * k;
       const h = wid * k;
       const x = area.x + 30;
-      const y = area.y + 24;
-      parts.push(viewLabel(x, area.y + 10, s === "sheet" ? L.flat : L.top));
+      const y = s === "sheet" ? viewY + LINE_GAP + 12 : area.y + 24;
+      parts.push(viewLabel(x, viewY, s === "sheet" ? L.flat : L.top));
       parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#f8fafc" stroke="${INK}" stroke-width="1.6"/>`);
       parts.push(dimLine(x, y + h, x + w, y + h, `${fmt(len)} ${unit}`, 26));
       parts.push(dimLine(x + w, y, x + w, y + h, `${fmt(wid)} ${unit}`, 22));
       if (s === "sheet") {
-        // Thickness callout on the view's title line, clear of every dimension.
+        // Thickness callout on its own line under the view name, clear of
+        // every dimension (audit #37: it used to share the view name's line).
         const t = d("thickness_mm");
         parts.push(
-          `<text x="${x + w}" y="${area.y + 10}" text-anchor="end" font-size="12" font-weight="600" fill="${t ? INK : GAP}">${esc(
+          `<text data-role="thickness" x="${x}" y="${viewY + LINE_GAP}" font-size="12" font-weight="600" fill="${t ? INK : GAP}">${esc(
             t ? L.thickness(`${fmt(t)} ${unit}`) : miss("thickness_mm")
           )}</text>`
         );
       } else if (second) {
         // Room on the right for the front view's own height dimension.
         const fx = area.x + area.w - 80 - w;
-        parts.push(viewLabel(fx, area.y + 10, L.front));
+        parts.push(viewLabel(fx, viewY, L.front));
         parts.push(`<rect x="${fx}" y="${y}" width="${w}" height="${second * k}" fill="#f8fafc" stroke="${INK}" stroke-width="1.6"/>`);
         parts.push(dimLine(fx + w, y, fx + w, y + second * k, `${fmt(second)} ${unit}`, 22));
       } else {
@@ -157,7 +191,7 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
       const r = (dia * k) / 2;
       const cx = area.x + 40 + r;
       const cy = area.y + 30 + r;
-      parts.push(viewLabel(area.x + 30, area.y + 10, L.front));
+      parts.push(viewLabel(area.x + 30, viewY, L.front));
       parts.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#f8fafc" stroke="${INK}" stroke-width="1.6"/>
         <line x1="${cx - r - 8}" y1="${cy}" x2="${cx + r + 8}" y2="${cy}" stroke="${MUTED}" stroke-dasharray="8 3 2 3"/>
         <line x1="${cx}" y1="${cy - r - 8}" x2="${cx}" y2="${cy + r + 8}" stroke="${MUTED}" stroke-dasharray="8 3 2 3"/>`);
@@ -165,9 +199,10 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
       const sx = area.x + area.w - 140;
       if (t) {
         const tw = Math.max(t * k, 3);
-        parts.push(viewLabel(sx, area.y + 10, L.side));
+        parts.push(viewLabel(sx, viewY, L.side));
         parts.push(`<rect x="${sx}" y="${cy - r}" width="${tw}" height="${2 * r}" fill="#f8fafc" stroke="${INK}" stroke-width="1.6"/>`);
-        parts.push(dimLine(sx, cy - r, sx + tw, cy - r, `${fmt(t)} ${unit}`, -18));
+        // Dimensioned below the view: above it, the value would sit on the view name.
+        parts.push(dimLine(sx, cy + r, sx + tw, cy + r, `${fmt(t)} ${unit}`, 28));
       } else parts.push(gapBox(sx - 40, cy - 45, 170, 90, miss("thickness_mm")));
     } else parts.push(gapBox(area.x, area.y, area.w, area.h, miss("diameter_mm")));
   } else {
@@ -180,12 +215,12 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
       const h = dia * k;
       const x = area.x + 30;
       const y = area.y + 40;
-      parts.push(viewLabel(x, area.y + 10, L.side));
+      parts.push(viewLabel(x, viewY, L.side));
       parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${Math.min(3, h / 4)}" fill="#f8fafc" stroke="${INK}" stroke-width="1.6"/>
         <line x1="${x - 8}" y1="${y + h / 2}" x2="${x + w + 8}" y2="${y + h / 2}" stroke="${MUTED}" stroke-dasharray="8 3 2 3"/>`);
       parts.push(dimLine(x, y + h, x + w, y + h, `${fmt(len)} ${unit}`, 26));
       const ex = area.x + area.w - 30 - h / 2;
-      parts.push(viewLabel(ex - h / 2, area.y + 10, L.front));
+      parts.push(viewLabel(ex - h / 2, viewY, L.front));
       parts.push(`<circle cx="${ex}" cy="${y + h / 2}" r="${h / 2}" fill="#f8fafc" stroke="${INK}" stroke-width="1.6"/>`);
       parts.push(dimLine(ex - h / 2, y + h, ex + h / 2, y + h, `Ø ${fmt(dia)} ${unit}`, 26));
     } else {
@@ -214,9 +249,11 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
     })
     .join("");
 
+  // The one place the not-a-cut-file warning is printed: it travels with the
+  // downloaded and printed drawing, so the page does not repeat it (audit #37).
   const note =
     s === "sheet"
-      ? `<text x="20" y="${ty - 12}" font-size="11" font-weight="600" fill="${GAP}">${esc(L.dxfNote)}</text>`
+      ? `<text data-role="dxf-note" x="20" y="${ty - 12}" font-size="11" font-weight="600" fill="${GAP}">${esc(L.dxfNote)}</text>`
       : "";
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
