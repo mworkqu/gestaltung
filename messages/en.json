@@ -232,7 +232,8 @@
     "projects": "Projects",
     "storeAttributes": "Product attributes",
     "suppliers": "Suppliers",
-    "quickAdd": "Quick add"
+    "quickAdd": "Quick add",
+    "findParts": "Find parts"
   },
   "Admin": {
     "kicker": "Command center",
@@ -1619,7 +1620,9 @@
     "cov_gapBody": "{count, plural, one {{n} published product has no active offer and shows “Available on request”.} other {{n} published products have no active offer and show “Available on request”.}}",
     "cov_gapLink": "Show products without an offer",
     "cov_error": "Couldn't load supplier offers or products, so offer coverage is unknown. Refresh the page to try again.",
-    "importPriceList": "Import a price list"
+    "importPriceList": "Import a price list",
+    "refreshFromSupplier": "Refresh from supplier",
+    "findParts": "Find parts at Mouser / DigiKey"
   },
   "Delivery": {
     "lt_in_stock": "In stock",
@@ -1769,5 +1772,43 @@
     "f_url": "Product link",
     "f_ourSku": "Our SKU",
     "f_category": "Category"
+  },
+  "SupplierLookup": {
+    "kicker": "Store · suppliers",
+    "title": "Find parts at Mouser and DigiKey",
+    "intro": "Search by part number or keyword. Add a result as a new product (name, description, photo and specifications come from the supplier; you set the category and price), or link it to a product you already sell as another supplier offer. Existing products never get their name, description or photos changed.",
+    "placeholder": "Part number or keyword, e.g. 1N4148, 10k resistor 1/4W, ESP32",
+    "search": "Search",
+    "sources": "Mouser: {mouser} · DigiKey: {digikey}",
+    "on": "connected",
+    "off": "not connected",
+    "supplierError": "{supplier} didn't answer: {message}",
+    "noResults": "No results. Try the exact manufacturer part number.",
+    "openAtSupplier": "Open at supplier",
+    "noPrice": "no price",
+    "landed": "≈ QAR {qar} landed",
+    "av_in_stock": "in stock at supplier",
+    "av_limited": "limited",
+    "av_backorder": "on backorder",
+    "av_unavailable": "unavailable",
+    "av_unknown": "unknown",
+    "moq": "min. order {n}",
+    "specs": "{cls}: {list}",
+    "inStore": "In your store as {sku}",
+    "addNew": "Add as new product",
+    "linkExisting": "Link to a product I sell",
+    "category": "Category",
+    "price": "Our price (QAR)",
+    "publish": "Publish now",
+    "ourSku": "Our SKU",
+    "add": "Add",
+    "link": "Link",
+    "cancel": "Cancel",
+    "priceHint": "Suggested price = landed cost + {markup}%. Change it before adding.",
+    "err_not_found": "The supplier no longer lists this part.",
+    "err_product_not_found": "No product with that SKU.",
+    "err_already_linked": "That product already has this offer.",
+    "err_price": "Enter a price.",
+    "err_supplier": "Unknown supplier."
   }
 }

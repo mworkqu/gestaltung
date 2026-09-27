@@ -787,6 +787,23 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     from the supplier's file. Mapping saved in store_settings key csv_mapping:<supplier code>. The approval
     queue (19f) and daily refresh (19e) are NOT built yet — the preview is the review step for now.
 
+  - PART 4 TASK 19b DONE (code, 2026-09-27): Mouser + DigiKey adapters. Owner says there will be NO CSV files
+    (19a importer stays but is unused). Keys (server-only, Vercel all envs + .env.local, --sensitive):
+    MOUSER_API_KEY (Search API, 30/min, 1,000/day; app "Gestaltung catalogue sync", host IP 76.76.21.21 =
+    Vercel), DIGIKEY_CLIENT_ID/_SECRET (org "Gestaltung Qatar", production app "Gestaltung catalogue sync",
+    Product Information V4, 2-legged client_credentials, never expires). lib/sourcing/adapters/mouser.ts +
+    digikey.ts → SupplierProduct (lib/sourcing/types.ts): cost at qty 1, availability, lead time (in stock →
+    7 days, else Mouser LeadTime / DigiKey ManufacturerLeadWeeks×7), MOQ (DigiKey picks the variation with the
+    smallest MOQ = cut tape), parameters. lib/sourcing/spec-map.ts parametersToAttributes (class from category +
+    description; resistor/capacitor/diode/transistor/led/switch/header; SI parsing; tests) + fillMissing (never
+    overwrites). /dashboard/store/suppliers/lookup (components/admin/supplier-lookup.tsx; actions in
+    suppliers/lookup/actions.ts): search both, "Add as new product" (name/description/photo/specs from the API,
+    owner sets category + price [suggested landed+40%], draft unless Publish; photo copied via
+    lib/store/store-image.ts, hosts limited to mouser.com/digikey.com) or "Link to a product I sell" (offer +
+    missing attributes only). Sourcing panel: RefreshCw button on Mouser/DigiKey offers → refreshApiOffer
+    (numbers + missing attributes). NOTE: supplier_offers↔parts has 2 FKs — embeds must name
+    parts!supplier_offers_part_id_fkey.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |

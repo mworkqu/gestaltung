@@ -14,7 +14,7 @@ import type { ShippingSettings } from "@/app/[locale]/dashboard/store/sourcing/a
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
-import { FileUp } from "lucide-react";
+import { FileUp, Search } from "lucide-react";
 
 // Suppliers and sourcing settings (Task 16). super_admin only (store layout).
 
@@ -108,6 +108,13 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
         >
           <FileUp className="h-4 w-4" />
           {t("importPriceList")}
+        </Link>
+        <Link
+          href="/dashboard/store/suppliers/lookup"
+          className="ms-2 mt-3 inline-flex items-center gap-1.5 rounded-full bg-cobalt px-4 py-1.5 text-sm font-semibold text-white"
+        >
+          <Search className="h-4 w-4" />
+          {t("findParts")}
         </Link>
       </div>
       {suppliersRes.error ? (

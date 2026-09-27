@@ -8,7 +8,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { AlertTriangle, ExternalLink, Loader2, Pencil, Pin, PinOff, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, Loader2, Pencil, Pin, PinOff, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { refreshApiOffer } from "@/app/[locale]/dashboard/store/suppliers/lookup/actions";
 
 import {
   deleteOffer,
@@ -162,6 +163,11 @@ export function SourcingPanel({ locale, partId, unitPrice, sourcing, offers, sup
                   <td className="px-2 py-2 text-mutedtext">{o.last_checked_at ? new Date(o.last_checked_at).toLocaleDateString(locale) : "—"}</td>
                   <td className="px-2 py-2">
                     <div className="flex justify-end gap-1">
+                      {["mouser", "digikey"].includes(supplierById.get(o.supplier_id)?.code ?? "") && (
+                        <IconBtn label={t("refreshFromSupplier")} onClick={() => run(() => refreshApiOffer(locale, o.id))} disabled={pending}>
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </IconBtn>
+                      )}
                       <IconBtn label={t("edit")} onClick={() => setEditing(o.id)} disabled={pending}>
                         <Pencil className="h-3.5 w-3.5" />
                       </IconBtn>

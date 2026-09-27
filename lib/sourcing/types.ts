@@ -33,3 +33,25 @@ export interface SupplierAdapter {
   code: string;
   kind: "file" | "api";
 }
+
+/** A supplier's catalogue entry, as an API adapter returns it (Mouser, DigiKey). */
+export type SupplierProduct = {
+  supplierCode: string;
+  supplierSku: string;
+  mpn: string | null;
+  manufacturer: string | null;
+  /** Catalogue content from the supplier's API — used only to create a new product. */
+  name: string;
+  description: string | null;
+  category: string | null;
+  imageUrl: string | null;
+  url: string | null;
+  datasheetUrl: string | null;
+  /** Unit price at quantity 1 (or the lowest break), in `currency`. */
+  cost: number | null;
+  currency: string;
+  availability: Availability;
+  leadTimeDays: number | null;
+  moq: number;
+  parameters: { name: string; value: string }[];
+};
