@@ -97,7 +97,7 @@ async function plan(supplierId: string, raw: SourcedOffer[]): Promise<ImportPlan
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from("supplier_offers")
-      .select("id, part_id, supplier_sku, cost, retail_price, currency, availability, lead_time_days, part:parts(name)")
+      .select("id, part_id, supplier_sku, cost, retail_price, currency, availability, lead_time_days, part:parts!supplier_offers_part_id_fkey(name)")
       .eq("supplier_id", supplier.id)
       .order("id")
       .range(from, from + 999);
