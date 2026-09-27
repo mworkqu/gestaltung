@@ -772,6 +772,21 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     * Leftovers: #38 wiring view small at normal width; drawing title-block values clip at ~26+ chars
       (pre-existing); Readiness labels show raw concept ids; project page QAR total ≠ BOM "To buy now" (documented).
 
+  - 2026-09-27: fix/site-audit (Phases 1–4) MERGED to main (fast-forward, 216 tests + build green). Owner ran
+    0030–0035 (0030's final report block errored "_m0030_stats does not exist" but the merge had completed: 29
+    published products, no duplicate names). Shipping = 50 QAR all tiers, handling fee 0. Google Drive picker
+    live (NEXT_PUBLIC_GOOGLE_* in Vercel; OAuth app Internal to gestaltung360.com; Cloud project
+    dazzling-card-506200-g5). CRON_SECRET set in Vercel.
+  - PART 4 TASK 19a DONE (code, 2026-09-27): supplier price-list CSV import. No migration. lib/sourcing/types.ts
+    (SourcedOffer, SupplierAdapter), lib/sourcing/adapters/csv.ts (pure: readCsv, guessMapping [saved mapping
+    wins], parseAmount, parseAvailability [quantities read, never stored], toOffers; tests in csv.test.ts).
+    /dashboard/store/suppliers/import (components/admin/price-list-import.tsx): supplier + file → column
+    mapping → server preview (suppliers/import/actions.ts re-plans from DB: updates with old→new + cost %,
+    unchanged, attach via "our SKU", unmatched) → apply. Existing offers get ONLY cost/retail/currency/
+    availability/lead time (+ last_checked_at); unmatched rows optionally become UNPUBLISHED draft products
+    from the supplier's file. Mapping saved in store_settings key csv_mapping:<supplier code>. The approval
+    queue (19f) and daily refresh (19e) are NOT built yet — the preview is the review step for now.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |

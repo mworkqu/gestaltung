@@ -13,6 +13,8 @@ import { ShippingSettingsEditor } from "@/components/admin/shipping-settings";
 import type { ShippingSettings } from "@/app/[locale]/dashboard/store/sourcing/actions";
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
+import { Link } from "@/i18n/navigation";
+import { FileUp } from "lucide-react";
 
 // Suppliers and sourcing settings (Task 16). super_admin only (store layout).
 
@@ -100,6 +102,13 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
         <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("suppliersTitle")}</h1>
         <p className="mt-1 max-w-3xl text-sm text-mutedtext">{t("suppliersIntro")}</p>
+        <Link
+          href="/dashboard/store/suppliers/import"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-borderstrong px-4 py-1.5 text-sm font-medium text-heading hover:border-cobalt hover:text-cobalt"
+        >
+          <FileUp className="h-4 w-4" />
+          {t("importPriceList")}
+        </Link>
       </div>
       {suppliersRes.error ? (
         <p className="neu p-6 text-sm text-mutedtext">{t("needsMigration")}</p>
