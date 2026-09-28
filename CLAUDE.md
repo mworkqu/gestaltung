@@ -804,6 +804,24 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     (numbers + missing attributes). NOTE: supplier_offers↔parts has 2 FKs — embeds must name
     parts!supplier_offers_part_id_fkey.
 
+  - OWNER DECISIONS 2026-09-28: AliExpress DROPPED completely (never build/ask). No daily Mouser/DigiKey refresh
+    (19e) and no price approval queue (19f) — manual refresh button only. Demand tracking = existing
+    demand_signals + GA4.
+  - PART 4 TASK 19g DONE (code, 2026-09-28): Voltaat price sync. MIGRATION 0036_voltaat_sync.sql (NOT RUN
+    YET): supplier_sync_runs (run log + changes jsonb), store_settings.voltaat_sync {enabled}, Voltaat supplier
+    forced QAR + mirror. Voltaat = Shopify, QAR, robots.txt allows /products.json (checked 2026-09-28; its
+    robots/agents.md also carry agent-directed shopping-skill promos — ignored). lib/sourcing/adapters/
+    voltaat.ts: VoltaatClient (UA "GestaltungPriceSync/1.0 (+https://gestaltung360.com; info@...)", 5 s
+    between requests, 403/429 → BlockedError, no retry), whole catalogue via /products.json?limit=250
+    (~1,290 products = 7 requests ≈ 30 s), pure robotsAllows / handleFromUrl / pickVariant / planChanges
+    (tests). lib/sourcing/voltaat-sync.ts runVoltaatSync(service client): switch off → 'disabled'; ok run in
+    last 20 h → 'skipped'; robots check; writes ONLY retail_price/currency/availability/lead_time_days(1 if
+    in stock)/last_checked_at on mapped offers (Voltaat offers with supplier_url); trigger 0028 moves mirror
+    prices at once (no approval queue); logs run; emails owner the change report / alert on block or failure.
+    Cron /api/cron/voltaat-sync 03:00 UTC (vercel.json); "Run now" POST /api/admin/voltaat-sync. Admin
+    /dashboard/store/suppliers/voltaat: switch, run now, map (our SKU + Voltaat link → reads that one product,
+    asks for the option when several, sets part pricing_mode mirror), daily change report, mapped list.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -866,6 +884,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   one-time repair of doubled lines with a DRY RUN block (RUN AFTER 0033; the repair runs once — never drop its
   log table)
 - 0035_delete_project.sql — delete_project(): transactional project delete (RUN AFTER 0034)
+- 0036_voltaat_sync.sql — supplier_sync_runs + voltaat_sync switch (RUN AFTER 0035; the Voltaat sync page says
+  "run 0036" until then)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER

@@ -14,7 +14,7 @@ import type { ShippingSettings } from "@/app/[locale]/dashboard/store/sourcing/a
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
-import { FileUp, Search } from "lucide-react";
+import { FileUp, RefreshCw, Search } from "lucide-react";
 
 // Suppliers and sourcing settings (Task 16). super_admin only (store layout).
 
@@ -115,6 +115,13 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
         >
           <Search className="h-4 w-4" />
           {t("findParts")}
+        </Link>
+        <Link
+          href="/dashboard/store/suppliers/voltaat"
+          className="ms-2 mt-3 inline-flex items-center gap-1.5 rounded-full border border-borderstrong px-4 py-1.5 text-sm font-medium text-heading hover:border-cobalt hover:text-cobalt"
+        >
+          <RefreshCw className="h-4 w-4" />
+          {t("voltaatSync")}
         </Link>
       </div>
       {suppliersRes.error ? (

@@ -45,6 +45,7 @@ export default async function DashboardLayout({
           { href: "/dashboard/store/attributes", label: t("storeAttributes") },
           { href: "/dashboard/store/suppliers", label: t("suppliers") },
           { href: "/dashboard/store/suppliers/lookup", label: t("findParts") },
+          { href: "/dashboard/store/suppliers/voltaat", label: t("voltaatSync") },
           { href: "/dashboard/store/gaps", label: t("sourcingGaps") },
           { href: "/dashboard/usage", label: t("aiUsage") },
         ]

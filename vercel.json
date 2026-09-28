@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/delivery-promises",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/voltaat-sync",
+      "schedule": "0 3 * * *"
     }
   ]
 }
