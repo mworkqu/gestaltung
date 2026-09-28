@@ -43,6 +43,7 @@ export default async function DashboardLayout({
           { href: "/dashboard/store", label: t("partsCatalog") },
           { href: "/dashboard/store/quick", label: t("quickAdd") },
           { href: "/dashboard/store/attributes", label: t("storeAttributes") },
+          { href: "/dashboard/store/restock", label: t("restock") },
           { href: "/dashboard/store/suppliers", label: t("suppliers") },
           { href: "/dashboard/store/suppliers/lookup", label: t("findParts") },
           { href: "/dashboard/store/suppliers/voltaat", label: t("voltaatSync") },

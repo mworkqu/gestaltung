@@ -822,6 +822,24 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     /dashboard/store/suppliers/voltaat: switch, run now, map (our SKU + Voltaat link → reads that one product,
     asks for the option when several, sets part pricing_mode mirror), daily change report, mapped list.
 
+  - 2026-09-28: 0036 RUN ✔ by owner. Owner then asked for the daily Mouser/DigiKey refresh after all (commit 8bc825a):
+    lib/sourcing/api-refresh.ts + /api/cron/supplier-refresh (02:00 UTC): one lookup per linked offer/day,
+    oldest-checked first, Mouser 2.1 s / DigiKey 0.6 s apart, 250 s budget, stops on rate limit (no retry),
+    numbers only, applied directly, runs logged in supplier_sync_runs, owner emailed changes.
+  - PART 4 TASK 20 DONE (code, 2026-09-28): restock dashboard. MIGRATION 0037_restock.sql (NOT RUN YET):
+    store_settings.restock_weights (request 10, bom_unmatched 8, add_to_cart 5, view 1), suppliers.min_order_value_qar,
+    restock_receipts, restock_summary() (open signals per product + zero searches + unmatched BOM labels +
+    receipts with carts/sold since), mark_restock_received() (receipt + served_at on open signals, never deleted).
+    lib/store/restock.ts (scores, units = requested qty + carts, groupDraft vs minimum, draftCsv; tests).
+    /dashboard/store/restock (components/admin/restock-dashboard.tsx): weights editor, ranked table with raw
+    counts beside the score, best offer/cost/price/margin/MOQ/lead/est. revenue, draft order grouped by supplier
+    with per-supplier minimum (editable inline), CSV export, "Received", searches + BOM lists, "did it sell".
+  - REVIEWER FEEDBACK on prototyping (2026-09-28, tracked in the owner's checklist artifact
+    WYoFNdQ24cPEsk2XZpespP): Brief first then Concepts under it; BOM + Parts at the very end; fewer Continue
+    clicks on Concepts; CR number + company location in header/banner (owner to supply); payments: cards incl.
+    foreign + pay in person at the office after a free chat; 10 QAR per generation. Owner: build payment
+    CALCULATION now, no gateway, everything free for now. NOT STARTED.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -886,6 +904,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0035_delete_project.sql — delete_project(): transactional project delete (RUN AFTER 0034)
 - 0036_voltaat_sync.sql — supplier_sync_runs + voltaat_sync switch (RUN AFTER 0035; the Voltaat sync page says
   "run 0036" until then)
+- 0037_restock.sql — restock weights, supplier minimum order value, receipts, restock_summary() (RUN AFTER 0036)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER
