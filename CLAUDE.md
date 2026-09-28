@@ -869,6 +869,13 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     order ref; confirmation email paymentBlock() (bilingual; tests); admin order detail shows the method;
     prototyping PaymentCard lists the methods; home page HomeTrust section (company + CR + ways to pay). Card
     still "coming soon".
+  - 2026-09-29 STORE CLEANUP (owner): 0039 confirmed live. Voltaat import is now ONE product per Voltaat product
+    (first option in stock; other options listed in the description "Options: … tell us in the order notes").
+    /api/admin/store-cleanup {step: dedupe|placeholders|translate} (super_admin): merged 146 variant groups
+    (370 option products removed), 29 placeholder products (123, GR-…) deleted — 13 tied to old orders/projects
+    are unpublished instead; Arabic names for all 1,318 published products via Gemini (run translate again after
+    new imports). Starter set now DigiKey + Mouser (+8 DK, +10 MS parts, SKUs DK-/MS-). Arabic category labels:
+    lib/store/category-label.ts. Test order #945ea389 ("TEST ORDER — please delete", Fawran, 53.50 QAR) placed.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -937,7 +944,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0037_restock.sql — restock weights, supplier minimum order value, receipts, restock_summary() (RUN AFTER 0036)
 - 0038_ai_pricing.sql — ai_pricing setting + project_ai_charges() (RUN AFTER 0037; the Payment box on the Quote
   step stays hidden until then)
-- 0039_payment_method.sql — part_orders.payment_method + set_order_payment_method() (RUN AFTER 0038; until then
+- 0039_payment_method.sql — (RUN ✔ 2026-09-29) part_orders.payment_method + set_order_payment_method() (RUN AFTER 0038; until then
   orders are placed without a recorded method but the success page still shows the chosen one)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
