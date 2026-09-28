@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 // Published catalog reflects admin publish toggles immediately.
 export const dynamic = "force-dynamic";
 
+const PAGE_SIZE = 48;
+
 const WHATSAPP_DIGITS =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
 
@@ -27,10 +29,11 @@ export default async function PartsStorePage({
     category?: string;
     material?: string;
     stock?: string;
+    page?: string;
   }>;
 }) {
   const { locale } = await params;
-  const { q, category, material, stock } = await searchParams;
+  const { q, category, material, stock, page: pageParam } = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations("Parts");
@@ -40,41 +43,59 @@ export default async function PartsStorePage({
 
   const supabase = await createClient();
 
-  // Public RLS policy returns only published rows for anon visitors. Fetch the
-  // full published set once so we can both derive filter options and apply the
-  // (small-catalog) filters in memory.
-  const { data } = await supabase
-    .from("parts")
-    .select("*")
-    .eq("is_published", true)
-    .order("name", { ascending: true });
-
-  // A merged duplicate (0030) is never published, but guard anyway so a
-  // category can't be listed for a product nobody can open (audit #15).
-  const all = ((data ?? []) as Part[]).filter(isListed);
-
-  const categories = listedCategories(all);
+  // Filter options: every listed category and material. Two light columns,
+  // paged because a response is capped at 1,000 rows.
+  const facetRows: { category: string | null; material: string | null; is_published: boolean; merged_into: string | null }[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data: page } = await supabase
+      .from("parts")
+      .select("category, material, is_published, merged_into")
+      .eq("is_published", true)
+      .order("id")
+      .range(from, from + 999);
+    facetRows.push(...((page ?? []) as typeof facetRows));
+    if ((page ?? []).length < 1000) break;
+  }
+  const categories = listedCategories(facetRows);
   const materials = Array.from(
-    new Set(all.map((p) => p.material).filter((m): m is string => !!m))
+    new Set(facetRows.filter(isListed).map((p) => p.material).filter((m): m is string => !!m))
   ).sort();
 
-  // The homepage hero posts here as ?q=. Match across both locales' names, the
-  // SKU, the description and the material, so an Arabic visitor searching an
+  // The catalogue itself: filtered, searched and paged in the database. The
+  // homepage hero posts here as ?q=; it matches both locales' names, the SKU,
+  // the description and the material, so an Arabic visitor searching an
   // English part name (or a SKU off an invoice) still finds it.
-  const term = q?.trim().toLowerCase() ?? "";
-  const matchesTerm = (p: Part) =>
-    !term ||
-    [p.name, p.name_ar, p.sku, p.description, p.description_ar, p.material]
-      .some((field) => field?.toLowerCase().includes(term));
-
-  const parts = all.filter(
-    (p) =>
-      matchesTerm(p) &&
-      (!category || p.category === category) &&
-      (!material || p.material === material) &&
-      (!stock ||
-        (stock === "on_request" ? !p.lead_time_class : p.lead_time_class === stock))
-  );
+  const term = q?.trim() ?? "";
+  const pageNo = Math.max(1, Math.trunc(Number(pageParam)) || 1);
+  let query = supabase
+    .from("parts")
+    .select("*", { count: "exact" })
+    .eq("is_published", true)
+    .is("merged_into", null);
+  if (category) query = query.eq("category", category);
+  if (material) query = query.eq("material", material);
+  if (stock) query = stock === "on_request" ? query.is("lead_time_class", null) : query.eq("lead_time_class", stock);
+  if (term) {
+    // PostgREST .or() syntax: commas, parentheses and wildcards in the term would break it.
+    const safe = term.replace(/[,()%*\\]/g, " ").trim();
+    if (safe) {
+      const like = `%${safe}%`;
+      query = query.or(
+        ["name", "name_ar", "sku", "description", "description_ar", "material"].map((c) => `${c}.ilike.${like}`).join(",")
+      );
+    }
+  }
+  const { data, count } = await query
+    .order("name", { ascending: true })
+    .order("id", { ascending: true })
+    .range((pageNo - 1) * PAGE_SIZE, pageNo * PAGE_SIZE - 1);
+  const parts = ((data ?? []) as Part[]).filter(isListed);
+  const total = count ?? parts.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageHref = (n: number) => ({
+    pathname: "/store" as const,
+    query: { ...(q ? { q } : {}), ...(category ? { category } : {}), ...(material ? { material } : {}), ...(stock ? { stock } : {}), ...(n > 1 ? { page: String(n) } : {}) },
+  });
 
   const waHref = WHATSAPP_DIGITS
     ? `https://wa.me/${WHATSAPP_DIGITS}?text=${encodeURIComponent(t("emptyWhatsapp"))}`
@@ -100,7 +121,7 @@ export default async function PartsStorePage({
 
       {parts.length === 0 ? (
         <div className="neu flex flex-col items-center gap-4 p-12 text-center">
-          {term && <DemandBeacon kind="zero_search" searchTerm={q!.trim()} />}
+          {term && pageNo === 1 && <DemandBeacon kind="zero_search" searchTerm={term} />}
           <p className="text-base font-semibold text-heading">{t("emptyTitle")}</p>
           <p className="max-w-md text-sm text-mutedtext">{t("emptyBody")}</p>
           {waHref ? (
@@ -117,11 +138,29 @@ export default async function PartsStorePage({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {parts.map((part) => (
-            <PartCard key={part.id} part={part} locale={locale} />
-          ))}
-        </div>
+        <>
+          <p className="text-sm text-mutedtext">{t("resultCount", { count: total })}</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            {parts.map((part) => (
+              <PartCard key={part.id} part={part} locale={locale} />
+            ))}
+          </div>
+          {pages > 1 && (
+            <nav className="flex items-center justify-center gap-3 text-sm" aria-label={t("pagination")}>
+              {pageNo > 1 ? (
+                <Link href={pageHref(pageNo - 1)} className="rounded-full border border-borderstrong px-4 py-1.5 text-heading hover:border-cobalt">
+                  {t("prevPage")}
+                </Link>
+              ) : null}
+              <span className="tabular-nums text-mutedtext">{t("pageOf", { page: pageNo, pages })}</span>
+              {pageNo < pages ? (
+                <Link href={pageHref(pageNo + 1)} className="rounded-full border border-borderstrong px-4 py-1.5 text-heading hover:border-cobalt">
+                  {t("nextPage")}
+                </Link>
+              ) : null}
+            </nav>
+          )}
+        </>
       )}
     </div>
   );

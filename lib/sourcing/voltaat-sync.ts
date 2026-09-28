@@ -74,13 +74,12 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
   };
 
   try {
-    // Mapped offers: Voltaat offers with a product link. Nothing else is touched.
+    // Mapped offers: Voltaat offers with a product link (in or out of stock). Nothing else is touched.
     const { data: sup } = await db.from("suppliers").select("id").eq("code", "voltaat").single();
     const { data: rows } = await db
       .from("supplier_offers")
       .select("id, part_id, supplier_sku, supplier_url, retail_price, availability, lead_time_days, part:parts!supplier_offers_part_id_fkey(name, unit_price)")
       .eq("supplier_id", sup!.id)
-      .eq("active", true)
       .not("supplier_url", "is", null);
     type Row = Omit<MappedOffer, "part_name" | "our_price"> & { part: { name: string; unit_price: number } | null };
     const offers: MappedOffer[] = ((rows ?? []) as unknown as Row[]).map((r) => ({
@@ -112,6 +111,8 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
           retail_price: c.newRetail,
           currency: "QAR",
           availability: c.newAvailability,
+          // Out of stock at Voltaat → offer inactive → "available on request"; back in stock → active again.
+          active: c.newAvailability === "in_stock",
           ...(c.newAvailability === "in_stock" ? { lead_time_days: VOLTAAT_IN_STOCK_DAYS } : {}),
           last_checked_at: now,
         })

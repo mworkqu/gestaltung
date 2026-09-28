@@ -73,6 +73,16 @@ export function robotsAllows(robots: string, path: string): boolean {
   return best ? best.allow : true;
 }
 
+/** A product exactly as /products.json returns it (used only by the catalogue import). */
+export type RawProductFull = RawProduct & {
+  id: number;
+  body_html?: string | null;
+  product_type?: string | null;
+  tags?: string[] | string | null;
+  images?: { src: string; variant_ids?: number[] }[];
+  variants: (RawProduct["variants"][number] & { featured_image?: { src: string } | null })[];
+};
+
 type RawProduct = { handle: string; title: string; variants: { id: number; sku: string | null; title: string; price: string; available: boolean }[] };
 
 export function parseProducts(json: unknown): VoltaatProduct[] {
@@ -203,16 +213,23 @@ export class VoltaatClient {
     return res.text();
   }
 
-  /** The whole public catalogue, 250 products per request. */
-  async catalogue(): Promise<Map<string, VoltaatProduct>> {
-    const out = new Map<string, VoltaatProduct>();
+  /** The whole public catalogue as Voltaat returns it, 250 products per request. */
+  async rawCatalogue(): Promise<RawProductFull[]> {
+    const out: RawProductFull[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
       const res = await this.get(`/products.json?limit=${PAGE_SIZE}&page=${page}`);
       if (!res.ok) throw new Error(`catalogue_${res.status}`);
-      const products = parseProducts(await res.json());
-      for (const p of products) out.set(p.handle, p);
+      const products = ((await res.json()) as { products?: RawProductFull[] }).products ?? [];
+      out.push(...products);
       if (products.length < PAGE_SIZE) break;
     }
+    return out;
+  }
+
+  /** The whole public catalogue, numbers only, keyed by handle. */
+  async catalogue(): Promise<Map<string, VoltaatProduct>> {
+    const out = new Map<string, VoltaatProduct>();
+    for (const p of parseProducts({ products: await this.rawCatalogue() })) out.set(p.handle, p);
     return out;
   }
 

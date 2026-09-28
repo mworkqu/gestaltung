@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { QuickEntry } from "@/components/admin/quick-entry";
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
@@ -20,12 +21,14 @@ export default async function QuickEntryPage({ params }: { params: Promise<{ loc
   const supabase = await createClient();
   const [suppliersRes, partsRes] = await Promise.all([
     supabase.from("suppliers").select("*").order("name"),
-    supabase.from("parts").select("category, attributes").limit(10000),
+    fetchAllRows<{ category: string; attributes: { class?: string } | null }>((from, to) =>
+      supabase.from("parts").select("category, attributes").is("merged_into", null).order("id").range(from, to)
+    ),
   ]);
 
   // The attribute class most used in each category pre-selects the class.
   const counts = new Map<string, Map<string, number>>();
-  for (const p of (partsRes.data ?? []) as { category: string; attributes: { class?: string } | null }[]) {
+  for (const p of partsRes.rows) {
     const m = counts.get(p.category) ?? new Map<string, number>();
     const c = p.attributes?.class;
     if (c) m.set(c, (m.get(c) ?? 0) + 1);

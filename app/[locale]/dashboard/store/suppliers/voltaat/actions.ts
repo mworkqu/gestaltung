@@ -71,7 +71,7 @@ export async function mapVoltaatProduct(locale: string, ourSku: string, url: str
     availability: v.available ? "in_stock" : "unavailable",
     ...(v.available ? { lead_time_days: VOLTAAT_IN_STOCK_DAYS } : {}),
     last_checked_at: new Date().toISOString(),
-    active: true,
+    active: v.available,
   };
   // One Voltaat offer per product: update it if it exists, else create it.
   const { data: existing } = await supabase

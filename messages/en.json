@@ -379,7 +379,12 @@
     "removeKit": "Remove kit",
     "forProject": "for {project}",
     "kitDiscount": "Kit discount",
-    "total": "Total"
+    "total": "Total",
+    "resultCount": "{count, plural, one {# product} other {# products}}",
+    "pagination": "Pages",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "pageOf": "Page {page} of {pages}"
   },
   "Cart": {
     "loadError": "We couldn't load your cart. Please try again.",
@@ -1867,7 +1872,11 @@
     "av_limited": "limited",
     "av_backorder": "backorder",
     "av_unavailable": "out of stock at Voltaat",
-    "av_unknown": "unknown"
+    "av_unknown": "unknown",
+    "importCatalogue": "Import Voltaat catalogue",
+    "importing": "Importing… about a minute",
+    "imported": "Added {created} products. Skipped {mapped} already linked and {dup} already in the store; {failed} failed.",
+    "importFailed": "Import failed ({error}). Nothing was changed."
   },
   "Restock": {
     "kicker": "Store · restock",

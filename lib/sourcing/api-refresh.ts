@@ -1,6 +1,8 @@
-// Server-only: daily refresh of Mouser and DigiKey offers (Task 19e). One
-// lookup per linked offer per day, oldest-checked first, paced under each
-// API's per-minute limit and stopped well inside the daily one. Writes
+// Server-only: daily refresh of Mouser and DigiKey offers (Task 19e), kept to
+// the fewest API calls: an offer is looked up only when its numbers are over
+// a week old, oldest first, at most MAX_PER_RUN lookups per supplier per day
+// (so a big catalogue is covered in rotation, never in one burst), and paced
+// under each API's per-minute limit. Writes
 // NUMBERS ONLY (cost, currency, availability, lead time) and applies them
 // directly — the owner chose no approval queue. Each supplier's run is
 // logged in supplier_sync_runs; the owner is emailed what moved.
@@ -16,13 +18,15 @@ type Code = "mouser" | "digikey";
 
 const CONFIG: Record<Code, { gapMs: number; maxPerRun: number; lookup: (sku: string) => Promise<SupplierProduct | null>; ready: () => boolean }> = {
   // Mouser: 30 calls/minute, 1,000/day.
-  mouser: { gapMs: 2100, maxPerRun: 800, lookup: mouserPart, ready: mouserConfigured },
+  mouser: { gapMs: 2100, maxPerRun: 25, lookup: mouserPart, ready: mouserConfigured },
   // DigiKey: 120 calls/minute on the free tier.
-  digikey: { gapMs: 600, maxPerRun: 800, lookup: digikeyPart, ready: digikeyConfigured },
+  digikey: { gapMs: 600, maxPerRun: 25, lookup: digikeyPart, ready: digikeyConfigured },
 };
 
 const TIME_BUDGET_MS = 250_000; // stay inside the 300 s function limit
 const MIN_HOURS_BETWEEN_RUNS = 20;
+/** An offer checked more recently than this is left alone. */
+const STALE_AFTER_DAYS = 7;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Change = { partName: string; sku: string; field: string; from: string | number | null; to: string | number | null };
@@ -62,6 +66,7 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       .eq("supplier_id", sup.id)
       .eq("active", true)
       .not("supplier_sku", "is", null)
+      .or(`last_checked_at.is.null,last_checked_at.lt.${new Date(Date.now() - STALE_AFTER_DAYS * 86400_000).toISOString()}`)
       .order("last_checked_at", { ascending: true, nullsFirst: true })
       .limit(cfg.maxPerRun);
     type Row = {
@@ -74,6 +79,10 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       part: { name: string } | null;
     };
     const rows = (offers ?? []) as unknown as Row[];
+    if (!rows.length) {
+      summary[code] = "nothing_stale";
+      continue;
+    }
 
     const { data: run } = await db.from("supplier_sync_runs").insert({ supplier_code: code, trigger, status: "running" }).select("id").single();
     let requests = 0;

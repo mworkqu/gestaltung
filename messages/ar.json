@@ -379,7 +379,12 @@
     "removeKit": "احذف الحزمة",
     "forProject": "لمشروع {project}",
     "kitDiscount": "خصم الحزمة",
-    "total": "الإجمالي"
+    "total": "الإجمالي",
+    "resultCount": "{count, plural, zero {لا منتجات} one {منتج واحد} two {منتجان} few {# منتجات} many {# منتجاً} other {# منتج}}",
+    "pagination": "الصفحات",
+    "prevPage": "السابق",
+    "nextPage": "التالي",
+    "pageOf": "صفحة {page} من {pages}"
   },
   "Cart": {
     "loadError": "تعذّر تحميل سلّتك. يرجى المحاولة مرة أخرى.",
@@ -1867,7 +1872,11 @@
     "av_limited": "محدود",
     "av_backorder": "طلب مسبق",
     "av_unavailable": "غير متوفر لدى فولتات",
-    "av_unknown": "غير معروف"
+    "av_unknown": "غير معروف",
+    "importCatalogue": "استيراد كتالوج فولتات",
+    "importing": "جارٍ الاستيراد… نحو دقيقة",
+    "imported": "أُضيف {created} منتجاً. تُخطّي {mapped} مربوط مسبقاً و{dup} موجود في المتجر؛ فشل {failed}.",
+    "importFailed": "فشل الاستيراد ({error}). لم يتغير شيء."
   },
   "Restock": {
     "kicker": "المتجر · إعادة التخزين",

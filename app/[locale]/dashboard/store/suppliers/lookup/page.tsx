@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { SupplierLookup } from "@/components/admin/supplier-lookup";
 import { digikeyConfigured } from "@/lib/sourcing/adapters/digikey";
 import { mouserConfigured } from "@/lib/sourcing/adapters/mouser";
@@ -22,11 +23,13 @@ export default async function SupplierLookupPage({ params }: { params: Promise<{
 
   const supabase = await createClient();
   const [cats, sups, fx] = await Promise.all([
-    supabase.from("parts").select("category").is("merged_into", null).limit(5000),
+    fetchAllRows<{ category: string }>((from, to) =>
+      supabase.from("parts").select("category").is("merged_into", null).order("id").range(from, to)
+    ),
     supabase.from("suppliers").select("code, landed_overhead_pct").in("code", ["mouser", "digikey"]),
     supabase.from("store_settings").select("value").eq("key", "fx_to_qar").maybeSingle(),
   ]);
-  const categories = [...new Set((cats.data ?? []).map((r) => r.category as string))].sort();
+  const categories = [...new Set(cats.rows.map((r) => r.category))].sort();
   const overheadPct: Record<string, number> = {};
   for (const s of sups.data ?? []) overheadPct[s.code as string] = Number(s.landed_overhead_pct) || 0;
   const usdToQar = Number((fx.data?.value as Record<string, number> | null)?.USD) || 3.64;

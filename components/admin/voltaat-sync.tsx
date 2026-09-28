@@ -6,7 +6,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2, Play, Plus } from "lucide-react";
+import { Download, Loader2, Play, Plus } from "lucide-react";
 
 import { mapVoltaatProduct, setVoltaatSync } from "@/app/[locale]/dashboard/store/suppliers/voltaat/actions";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,25 @@ export function VoltaatControls({ locale, enabled }: { locale: string; enabled: 
       if (!("error" in r)) setOn(!on);
       router.refresh();
     });
+
+  const [importing, setImporting] = useState(false);
+  const importAll = async () => {
+    setImporting(true);
+    setMsg(null);
+    const res = await fetch("/api/admin/voltaat-import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publish: true }),
+    }).catch(() => null);
+    const d = res ? ((await res.json().catch(() => null)) as { created?: number; skippedMapped?: number; skippedDuplicate?: number; failed?: number; error?: string } | null) : null;
+    setImporting(false);
+    setMsg(
+      d && !d.error
+        ? t("imported", { created: d.created ?? 0, mapped: d.skippedMapped ?? 0, dup: d.skippedDuplicate ?? 0, failed: d.failed ?? 0 })
+        : t("importFailed", { error: d?.error ?? "network" })
+    );
+    router.refresh();
+  };
 
   const runNow = async () => {
     setRunning(true);
@@ -60,6 +79,15 @@ export function VoltaatControls({ locale, enabled }: { locale: string; enabled: 
       >
         {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
         {running ? t("running") : t("runNow")}
+      </button>
+      <button
+        type="button"
+        onClick={importAll}
+        disabled={importing}
+        className="inline-flex items-center gap-1.5 rounded-full bg-cobalt px-4 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+      >
+        {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+        {importing ? t("importing") : t("importCatalogue")}
       </button>
       <p className="w-full text-xs text-mutedtext">{t("rules")}</p>
       {msg && <p className="w-full text-sm text-heading">{msg}</p>}

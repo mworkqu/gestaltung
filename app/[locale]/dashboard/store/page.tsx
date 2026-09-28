@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Package, Plus, Pencil, ClipboardList, FileSpreadsheet, Truck, Zap } from "lucide-react";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
@@ -39,12 +40,9 @@ export default async function PartsCatalogManager({
 
   const supabase = await createClient();
   // super_admin RLS returns every row (published or draft).
-  const { data, error } = await supabase
-    .from("parts")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  const all = (data ?? []) as Part[];
+  const { rows: all, error } = await fetchAllRows<Part>((from, to) =>
+    supabase.from("parts").select("*").order("created_at", { ascending: false }).order("id").range(from, to)
+  );
   // Duplicates merged by 0030 (merged_into set) are hidden unless ?merged=1.
   // Before 0030 the column does not exist, so nothing counts as merged.
   const skuById = new Map(all.map((p) => [p.id, p.sku]));

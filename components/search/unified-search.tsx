@@ -50,23 +50,31 @@ export function UnifiedSearch({
   const locale = useLocale();
 
   const [term, setTerm] = useState("");
-  const [parts, setParts] = useState<Part[]>([]);
+  // The catalogue is far too big to download, so the store half is searched in
+  // the database as you type; the inventory half (small, the client's own)
+  // loads once with just the products it references.
+  const [ownedParts, setOwnedParts] = useState<Part[]>([]);
+  const [storeMatches, setStoreMatches] = useState<Part[]>([]);
   const [inventory, setInventory] = useState<ClientInventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const debounced = useDebounced(term, 150);
+  const debounced = useDebounced(term, 200);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
-      const [{ data: partRows }, { data: invRows }] = await Promise.all([
-        supabase.from("parts").select("*").eq("is_published", true),
-        // Returns nothing for a guest — no session, no rows, no error.
-        supabase.from("client_inventory_items").select("*"),
-      ]);
+      // Returns nothing for a guest — no session, no rows, no error.
+      const { data: invRows } = await supabase.from("client_inventory_items").select("*");
+      const inv = (invRows ?? []) as ClientInventoryItem[];
+      const ids = [...new Set(inv.map((r) => r.product_id).filter((x): x is string => !!x))];
+      const owned: Part[] = [];
+      for (let i = 0; i < ids.length; i += 200) {
+        const { data } = await supabase.from("parts").select("*").in("id", ids.slice(i, i + 200));
+        owned.push(...((data ?? []) as Part[]));
+      }
       if (cancelled) return;
-      setParts((partRows ?? []) as Part[]);
-      setInventory((invRows ?? []) as ClientInventoryItem[]);
+      setInventory(inv);
+      setOwnedParts(owned);
       setLoading(false);
     })();
     return () => {
@@ -74,9 +82,33 @@ export function UnifiedSearch({
     };
   }, [reloadKey]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const q = debounced.trim().replace(/[,()%*\\]/g, " ").trim();
+    if (!q) {
+      setStoreMatches([]);
+      return;
+    }
+    (async () => {
+      const like = `%${q}%`;
+      const { data } = await createClient()
+        .from("parts")
+        .select("*")
+        .eq("is_published", true)
+        .is("merged_into", null)
+        .or(["name", "name_ar", "sku", "material"].map((c) => `${c}.ilike.${like}`).join(","))
+        .order("name")
+        .limit(24);
+      if (!cancelled) setStoreMatches((data ?? []) as Part[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debounced]);
+
   const partsById = useMemo(
-    () => new Map(parts.map((p) => [p.id, p])),
-    [parts]
+    () => new Map(ownedParts.map((p) => [p.id, p])),
+    [ownedParts]
   );
 
   const { ownedHits, storeHits } = useMemo(() => {
@@ -104,14 +136,13 @@ export function UnifiedSearch({
     }
 
     // 2. The store, minus anything already shown above.
-    const store: SearchHit[] = parts
+    const store: SearchHit[] = storeMatches
       .filter((p) => !ownedPartIds.has(p.id))
-      .filter((p) => matches(partName(p, locale), p.name, p.name_ar, p.sku, p.material))
       .slice(0, 12)
       .map((p) => ({ key: `part:${p.id}`, part: p, customName: null, owned: 0 }));
 
     return { ownedHits: owned, storeHits: store };
-  }, [debounced, inventory, parts, partsById, locale]);
+  }, [debounced, inventory, storeMatches, partsById, locale]);
 
   const hasTerm = debounced.trim().length > 0;
   const nothing = hasTerm && ownedHits.length === 0 && storeHits.length === 0;

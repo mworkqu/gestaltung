@@ -10,6 +10,7 @@
 // skipped.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 import { matchLine, type InventoryRow } from "./bom-match";
 import { groupOf, type Candidate, type LineMatch, type ProjectBom, type ProjectLine, type ScoredCandidate } from "./bom";
@@ -23,13 +24,14 @@ export async function matchProjectBom(
   if (!bom?.lines?.length) return [];
   const dismissed = new Set(bom.dismissed ?? []);
   const [catRes, invRes] = await Promise.all([
-    db.from("parts").select("*").eq("is_published", true).limit(5000),
+    // Every published product, paged (a response stops at 1,000 rows).
+    fetchAllRows<Candidate>((from, to) => db.from("parts").select("*").eq("is_published", true).order("id").range(from, to)),
     db
       .from("client_inventory_items")
       .select("*, part:parts(name)")
       .eq("user_id", ownerId),
   ]);
-  const catalogue = (catRes.data ?? []) as Candidate[];
+  const catalogue = catRes.rows;
   type InvRow = {
     product_id: string | null;
     custom_name: string | null;

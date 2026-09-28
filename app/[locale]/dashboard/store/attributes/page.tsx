@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowLeft } from "lucide-react";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -24,15 +25,17 @@ export default async function AttributesPage({ params }: { params: Promise<{ loc
 
   const supabase = await createClient();
   const [partsRes, settingRes] = await Promise.all([
-    supabase
-      .from("parts")
-      .select("id, sku, name, name_ar, category, attributes, pack_size, is_published")
-      .order("category")
-      .order("sku")
-      .limit(5000),
+    fetchAllRows<EditablePart>((from, to) =>
+      supabase
+        .from("parts")
+        .select("id, sku, name, name_ar, category, attributes, pack_size, is_published")
+        .order("category")
+        .order("sku")
+        .range(from, to)
+    ),
     supabase.from("store_settings").select("value").eq("key", "kit_discount_pct").maybeSingle(),
   ]);
-  const parts = (partsRes.data ?? []) as EditablePart[];
+  const parts = partsRes.rows;
 
   const byCategory = new Map<string, { total: number; complete: number; typed: number }>();
   for (const p of parts) {

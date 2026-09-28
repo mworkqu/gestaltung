@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
@@ -56,10 +57,13 @@ export async function saveQuickProducts(locale: string, rows: QuickRow[]): Promi
   const suppliers = new Map(((supplierRows ?? []) as Supplier[]).map((s) => [s.id, s]));
 
   const categories = [...new Set(rows.map((r) => r.category.trim()).filter(Boolean))];
-  const { data: existing } = categories.length
-    ? await supabase.from("parts").select("id, sku, name, category").in("category", categories).limit(10000)
-    : { data: [] };
-  const pool = (existing ?? []) as { id: string; sku: string; name: string; category: string }[];
+  const pool = categories.length
+    ? (
+        await fetchAllRows<{ id: string; sku: string; name: string; category: string }>((from, to) =>
+          supabase.from("parts").select("id, sku, name, category").in("category", categories).order("id").range(from, to)
+        )
+      ).rows
+    : [];
 
   const results: QuickResult[] = [];
   for (const r of rows.slice(0, 200)) {

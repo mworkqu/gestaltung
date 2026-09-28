@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Plus, Search } from "lucide-react";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
@@ -58,13 +59,13 @@ export default async function Home({
 
     // Every category with a listed product (published, not a merged duplicate),
     // not just those in the featured eight, so the quick-links cover the whole
-    // catalog and never lead to an empty page (audit #15). `*` rather than a
-    // column list so this still works before merged_into exists (0030).
-    const { data: catRows } = await supabase
-      .from("parts")
-      .select("*")
-      .eq("is_published", true);
-    categories = listedCategories((catRows ?? []) as Part[]);
+    // catalog and never lead to an empty page (audit #15). Paged: a response
+    // stops at 1,000 rows.
+    const { rows: catRows } = await fetchAllRows<{ category: string | null; is_published: boolean; merged_into: string | null }>(
+      (from, to) =>
+        supabase.from("parts").select("category, is_published, merged_into").eq("is_published", true).order("id").range(from, to)
+    );
+    categories = listedCategories(catRows);
   }
 
 
