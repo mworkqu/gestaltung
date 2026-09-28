@@ -1933,5 +1933,10 @@
     "w_add_to_cart": "Add to cart",
     "w_view": "View",
     "saved": "Saved."
+  },
+  "Company": {
+    "legalName": "Gestaltung for Trading and Services W.L.L",
+    "cr": "C.R. {number}",
+    "location": "Qatar"
   }
 }

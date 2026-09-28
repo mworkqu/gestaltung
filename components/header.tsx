@@ -7,6 +7,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { HeaderAuthLink } from "@/components/header-auth-link";
 import { CartIcon } from "@/components/parts/cart-icon";
 import { cn } from "@/lib/utils";
+import { CompanyStrip } from "@/components/company-strip";
 
 export async function Header({ locale }: { locale: Locale }) {
   const t = await getTranslations("Nav");
@@ -25,6 +26,9 @@ export async function Header({ locale }: { locale: Locale }) {
 
   return (
     <header className="sticky top-0 z-40 w-full">
+      <div className="border-b border-borderstrong/40 bg-panel/80 py-1.5 backdrop-blur">
+        <CompanyStrip className="container" />
+      </div>
       <div className="container pt-4">
         <div className="neu flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
           {/* Brand lockup */}
