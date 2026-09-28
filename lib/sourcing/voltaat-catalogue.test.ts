@@ -39,19 +39,28 @@ describe("buildImportRows", () => {
     { id: 3, handle: "uno", title: "Arduino Uno", variants: [{ id: 31, title: "Default Title", price: "95.00", available: true }] },
   ];
 
-  it("creates one product per option, mirror-priced, and skips repeats and mapped ones", () => {
+  it("creates one product per Voltaat product, mirror-priced, and skips repeats and mapped ones", () => {
     const { rows, skippedMapped, skippedDuplicate } = buildImportRows(products, {
       mappedKeys: new Set(["uno|31"]),
       existingPartKeys: new Set(),
       publish: true,
     });
     // Voltaat's "…-copy" listings are separate products with their own names.
-    expect(rows.map((r) => r.part.name)).toEqual(["Servo Motor — SG90", "Servo Motor — MG90S", "Servo Motor"]);
+    expect(rows.map((r) => r.part.name)).toEqual(["Servo Motor"]);
     expect(skippedMapped).toBe(1);
-    expect(skippedDuplicate).toBe(0);
+    expect(skippedDuplicate).toBe(1);
+    expect(rows[0].part.description).toContain("Options: SG90, MG90S.");
     expect(rows[0].part).toMatchObject({ sku: "VLT-11", unit_price: 19, pricing_mode: "mirror", category: "Motors", is_published: true });
     expect(rows[0].offer).toMatchObject({ supplier_url: "https://www.voltaat.com/products/servo?variant=11", active: true, lead_time_days: 1 });
-    expect(rows[1].offer).toMatchObject({ availability: "unavailable", active: false, lead_time_days: null });
+  });
+
+  it("follows the first option in stock", () => {
+    const { rows } = buildImportRows(
+      [{ ...products[0], variants: [{ ...products[0].variants[1] }, { ...products[0].variants[0] }] }],
+      { mappedKeys: new Set(), existingPartKeys: new Set(), publish: true }
+    );
+    expect(rows[0].part.sku).toBe("VLT-11");
+    expect(rows[0].offer.active).toBe(true);
   });
 
   it("never creates a product we already sell under the same name", () => {

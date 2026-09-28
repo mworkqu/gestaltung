@@ -18,6 +18,7 @@ import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
 import { materialLabel } from "@/lib/parts/part-key";
+import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -85,7 +86,7 @@ export default async function PartDetailPage({
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
         <Link href={{ pathname: "/store", query: { category: part.category } }} className="hover:text-heading">
-          {part.category}
+          {categoryLabel(part.category, locale)}
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
         <span className="text-heading">{name}</span>
@@ -167,7 +168,7 @@ export default async function PartDetailPage({
           )}
 
           <dl className="neu p-4">
-            {spec(t("specCategory"), part.category)}
+            {spec(t("specCategory"), categoryLabel(part.category, locale))}
             {spec(t("specMaterial"), materialLabel(part.material) || null)}
             {spec(t("specStandard"), part.standard)}
             {spec(t("specMinOrder"), String(part.min_order_qty))}

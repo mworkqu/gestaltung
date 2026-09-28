@@ -1,7 +1,7 @@
 // Voltaat catalogue import (owner decision 2026-09-28: fill the store mainly
 // from Voltaat, our reseller partner, published at Voltaat's own price).
 // Pure: turns Voltaat's public catalogue into our products + offers. One
-// product per Voltaat option (variant), priced in mirror mode so the daily
+// product per Voltaat product (its first option in stock), priced in mirror mode so the daily
 // sync keeps the price equal to Voltaat's. Photos stay on Voltaat's Shopify
 // CDN (resized by URL) rather than being copied, to keep our storage small.
 
@@ -127,7 +127,7 @@ export type ImportRow = {
 };
 
 /**
- * Rows to create. Skips Voltaat options we already follow (handle+variant),
+ * Rows to create, one per Voltaat product. Skips products we already follow,
  * products whose name/material/pack identity already exists in our store,
  * and repeats inside Voltaat's own catalogue (it has "… copy" listings).
  * Out-of-stock options get an inactive offer: the product shows "available
@@ -139,58 +139,68 @@ export function buildImportRows(
 ): { rows: ImportRow[]; skippedMapped: number; skippedDuplicate: number } {
   const rows: ImportRow[] = [];
   const seen = new Set(opts.existingPartKeys);
+  const mappedHandles = new Set([...opts.mappedKeys].map((k) => k.split("|")[0]));
   let skippedMapped = 0;
   let skippedDuplicate = 0;
   for (const p of products) {
-    const multi = p.variants.length > 1;
-    for (const v of p.variants) {
-      const handle = p.handle.toLowerCase();
-      if (opts.mappedKeys.has(`${handle}|${v.id}`) || opts.mappedKeys.has(`${handle}|*`)) {
-        skippedMapped++;
-        continue;
-      }
-      const name = (multi && v.title && v.title !== "Default Title" ? `${p.title} — ${v.title}` : p.title).trim().slice(0, 160);
-      const key = partKey(name, null, 1);
-      if (!name || seen.has(key)) {
-        skippedDuplicate++;
-        continue;
-      }
-      const price = Number(v.price);
-      if (!Number.isFinite(price) || price <= 0) {
-        skippedDuplicate++;
-        continue;
-      }
-      seen.add(key);
-      const img = v.featured_image?.src ?? p.images?.find((i) => i.variant_ids?.includes(v.id))?.src ?? p.images?.[0]?.src ?? null;
-      rows.push({
-        handle,
-        variantId: v.id,
-        part: {
-          sku: `VLT-${v.id}`,
-          name,
-          description: stripHtml(p.body_html),
-          category: categoryFor(p.product_type, p.title),
-          unit_price: price,
-          min_order_qty: 1,
-          stock_status: "in_stock",
-          is_published: opts.publish,
-          pricing_mode: "mirror",
-          image_url: img ? cdnImage(img, 1000) : null,
-          images: img ? [{ web: cdnImage(img, 1000), thumb: cdnImage(img, 400), path: null, drive_file_id: null }] : [],
-        },
-        offer: {
-          supplier_url: `${VOLTAAT_BASE}/products/${handle}?variant=${v.id}`,
-          supplier_sku: v.sku || String(v.id),
-          retail_price: price,
-          currency: "QAR",
-          availability: v.available ? "in_stock" : "unavailable",
-          lead_time_days: v.available ? 1 : null,
-          active: v.available,
-          pack_size: 1,
-          moq: 1,
-        },
-      });
+    const handle = p.handle.toLowerCase();
+    if (mappedHandles.has(handle)) {
+      skippedMapped++;
+      continue;
     }
+    // One product per Voltaat product (owner, 2026-09-29: one card per option
+    // looked like duplicates). We follow the first option in stock, else the
+    // first; the other options are listed in the description.
+    const priced = p.variants.filter((v) => Number.isFinite(Number(v.price)) && Number(v.price) > 0);
+    const v = priced.find((x) => x.available) ?? priced[0];
+    const name = p.title.trim().slice(0, 160);
+    const key = partKey(name, null, 1);
+    if (!v || !name || seen.has(key)) {
+      skippedDuplicate++;
+      continue;
+    }
+    seen.add(key);
+    const price = Number(v.price);
+    const options = variantOptions(p.variants);
+    const description = [stripHtml(p.body_html), options.length > 1 ? optionsNote(options) : null].filter(Boolean).join("\n\n") || null;
+    const img = v.featured_image?.src ?? p.images?.find((i) => i.variant_ids?.includes(v.id))?.src ?? p.images?.[0]?.src ?? null;
+    rows.push({
+      handle,
+      variantId: v.id,
+      part: {
+        sku: `VLT-${v.id}`,
+        name,
+        description,
+        category: categoryFor(p.product_type, p.title),
+        unit_price: price,
+        min_order_qty: 1,
+        stock_status: "in_stock",
+        is_published: opts.publish,
+        pricing_mode: "mirror",
+        image_url: img ? cdnImage(img, 1000) : null,
+        images: img ? [{ web: cdnImage(img, 1000), thumb: cdnImage(img, 400), path: null, drive_file_id: null }] : [],
+      },
+      offer: {
+        supplier_url: `${VOLTAAT_BASE}/products/${handle}?variant=${v.id}`,
+        supplier_sku: v.sku || String(v.id),
+        retail_price: price,
+        currency: "QAR",
+        availability: v.available ? "in_stock" : "unavailable",
+        lead_time_days: v.available ? 1 : null,
+        active: v.available,
+        pack_size: 1,
+        moq: 1,
+      },
+    });
   }
   return { rows, skippedMapped, skippedDuplicate };
+}
+
+/** Option names worth showing ("Default Title" is Shopify's name for none). */
+export function variantOptions(variants: { title: string }[]): string[] {
+  return variants.map((v) => v.title?.trim()).filter((t): t is string => !!t && t !== "Default Title");
+}
+
+export function optionsNote(options: string[]): string {
+  return `Options: ${options.join(", ")}. Tell us which one you need in the order notes.`;
 }

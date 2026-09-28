@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Plus, Search } from "lucide-react";
+import { categoryLabel } from "@/lib/store/category-label";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 import type { Part } from "@/lib/supabase/types";
@@ -119,7 +120,7 @@ export default async function Home({
                 href={{ pathname: "/store", query: { category } }}
                 className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-medium text-mutedtext shadow-neu-sm transition-colors hover:text-cobalt"
               >
-                {category}
+                {categoryLabel(category, locale)}
               </Link>
             ))}
           </div>

@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { LEAD_TIME_CLASSES } from "@/lib/store/sourcing";
 import { materialLabel } from "@/lib/parts/part-key";
+import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
 
 type Current = {
@@ -80,7 +81,7 @@ export function PartsFilters({
                 onClick={() => apply({ category: c })}
                 className={chip(current.category === c)}
               >
-                {c}
+                {categoryLabel(c, locale)}
               </button>
             ))}
           </div>
