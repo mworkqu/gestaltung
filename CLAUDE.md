@@ -876,6 +876,11 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     are unpublished instead; Arabic names for all 1,318 published products via Gemini (run translate again after
     new imports). Starter set now DigiKey + Mouser (+8 DK, +10 MS parts, SKUs DK-/MS-). Arabic category labels:
     lib/store/category-label.ts. Test order #945ea389 ("TEST ORDER — please delete", Fawran, 53.50 QAR) placed.
+    Home featured = in-stock products WITH a photo, one per category. Mouser serves a bot page instead of
+    product photos, so step "photos" gives MS- products the same part's DigiKey photo (10/10 done).
+    PLANNED (owner 2026-09-29, not built): picture wiring diagram — each netlist part drawn with its real store
+    photo + fixed pin anchors, wires coloured by net (power red, ground black, signals distinct). Structure from
+    the AI netlist, pixels from our photos, never generated. Tracked in the checklist artifact.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
