@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { METHOD_ICON, PaymentInstructions } from "@/components/payment/payment-instructions";
+import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/company";
 import { useTranslations, useLocale } from "next-intl";
 import { Loader2 } from "lucide-react";
 
@@ -32,6 +34,8 @@ export default function CheckoutPage() {
   const { items, totalQar, kitDiscountQar, clearCart, ready } = useCart();
   const tParts = useTranslations("Parts");
   const tD = useTranslations("Delivery");
+  const tPay = useTranslations("PayMethods");
+  const [payMethod, setPayMethod] = useState<PaymentMethod>("cash_on_delivery");
   const { quote, legacy, error: quoteError } = useDeliveryQuote(items);
   const [tier, setTier] = useState<ShippingTier>("standard");
   const [split, setSplit] = useState(false);
@@ -123,6 +127,13 @@ export default function CheckoutPage() {
 
     const orderId = data as string;
 
+    // Record how they'll pay (0039). Before that migration the call fails and
+    // the order simply has no method; the success page still shows the choice.
+    await supabase.rpc("set_order_payment_method", { p_order: orderId, p_method: payMethod }).then(
+      () => {},
+      () => {}
+    );
+
     // Snapshot the order for the (guest-safe) success page — a guest can't read
     // their own order back through RLS.
     try {
@@ -140,6 +151,7 @@ export default function CheckoutPage() {
           earlyDate: doSplit ? chosen?.early_date ?? null : null,
           heldBy: quote?.held_by ?? null,
           hasOnRequest: anyToConfirm,
+          paymentMethod: payMethod,
           items: items.map((i) => ({
             sku: i.sku,
             name: i.name,
@@ -269,6 +281,30 @@ export default function CheckoutPage() {
             {anyToConfirm && <p className="text-[12px] text-mutedtext">{tD("tbcNote")}</p>}
             {quoteError && <p className="text-[12px] font-medium text-destructive">{tD("quoteError")}</p>}
             <p className="text-[11px] text-faint">{tD("promiseNote")}</p>
+          </fieldset>
+
+          <fieldset className="space-y-2">
+            <legend className={mono("block text-[10px] text-mutedtext")}>{tPay("label")}</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {PAYMENT_METHODS.map((m) => {
+                const Icon = METHOD_ICON[m];
+                return (
+                  <label
+                    key={m}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 rounded-xl border bg-panel p-3 text-sm shadow-neu-sm transition",
+                      payMethod === m ? "border-cobalt ring-2 ring-cobalt/40" : "border-white/60"
+                    )}
+                  >
+                    <input type="radio" name="payment_method" value={m} checked={payMethod === m} onChange={() => setPayMethod(m)} className="sr-only" />
+                    <Icon className="h-4 w-4 shrink-0 text-cobalt" />
+                    <span className="font-semibold text-heading">{tPay(`${m}_title`)}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <PaymentInstructions method={payMethod} amount={formatPrice(grandTotal, locale)} />
+            <p className="text-[11px] text-faint">{tPay("cardSoon")}</p>
           </fieldset>
 
           <div className="space-y-2">

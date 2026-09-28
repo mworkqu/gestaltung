@@ -5,6 +5,7 @@
 
 import { escapeHtml } from "@/lib/email";
 import { formatDeliveryDate } from "@/lib/store/delivery";
+import { PAYMENT_DETAILS } from "@/lib/company";
 
 type Item = { part_name: string; quantity: number; unit_price_qar: number; lead_time_class: string | null };
 export type OrderForEmail = {
@@ -20,7 +21,33 @@ export type OrderForEmail = {
   held_by: string | null;
   /** 0032; absent on older databases (then derived from the items). */
   has_on_request?: boolean;
+  /** 0039: cash_on_delivery | fawran | bank_transfer; absent before. */
+  payment_method?: string | null;
 };
+
+/** How to pay, bilingual, with the company's details (lib/company.ts). */
+export function paymentBlock(o: Pick<OrderForEmail, "id" | "total_qar" | "payment_method">, locale: "en" | "ar"): string {
+  const ref = o.id.slice(0, 8);
+  const amount = qar(o.total_qar);
+  const d = PAYMENT_DETAILS;
+  const en = locale === "en";
+  switch (o.payment_method) {
+    case "cash_on_delivery":
+      return en
+        ? `<p><b>Payment: cash on delivery.</b> Please have ${amount} ready when your order arrives.</p>`
+        : `<p><b>الدفع: نقداً عند الاستلام.</b> يرجى تجهيز ${amount} عند وصول طلبك.</p>`;
+    case "fawran":
+      return en
+        ? `<p><b>Payment: Fawran.</b> Send ${amount} to the Fawran alias <b>${d.fawranAlias}</b> (${e(d.accountName)}, ${e(d.bank)}). Put <b>${ref}</b> in the note.</p>`
+        : `<p><b>الدفع: فوران.</b> حوّل ${amount} إلى معرّف فوران <b dir="ltr">${d.fawranAlias}</b> (${e(d.accountName)}، ${e(d.bank)}). اكتب <b>${ref}</b> في الملاحظة.</p>`;
+    case "bank_transfer":
+      return en
+        ? `<p><b>Payment: bank transfer.</b> Send ${amount} to:<br/>Account name: <b>${e(d.accountName)}</b><br/>Bank: ${e(d.bank)}<br/>IBAN: <b>${d.iban}</b><br/>Reference: <b>${ref}</b></p>`
+        : `<p><b>الدفع: تحويل بنكي.</b> حوّل ${amount} إلى:<br/>اسم الحساب: <b dir="ltr">${e(d.accountName)}</b><br/>البنك: ${e(d.bank)}<br/>IBAN: <b dir="ltr">${d.iban}</b><br/>المرجع: <b>${ref}</b></p>`;
+    default:
+      return "";
+  }
+}
 
 const LEAD_EN: Record<string, string> = { in_stock: "In stock", "3_5_days": "3–5 days", "1_2_weeks": "1–2 weeks", "2_4_weeks": "2–4 weeks" };
 const LEAD_AR: Record<string, string> = { in_stock: "متوفر", "3_5_days": "3–5 أيام", "1_2_weeks": "1–2 أسبوع", "2_4_weeks": "2–4 أسابيع" };
@@ -84,6 +111,7 @@ export function confirmationEmail(o: OrderForEmail, items: Item[]) {
 <tr><td>Shipping — ${tierEn}${o.split_shipments ? " × 2 shipments" : ""}</td><td></td><td align="right">${qar(o.shipping_qar)}</td></tr>
 <tr><td>Handling fee</td><td></td><td align="right">${qar(o.handling_fee_qar)}</td></tr>
 <tr><td><b>Total</b></td><td></td><td align="right"><b>${qar(o.total_qar)}</b></td></tr></table>
+${paymentBlock(o, "en")}
 <p>${o.promised_date ? "If this date is going to change we will email you before it, not after. " : ""}We'll confirm payment and delivery on WhatsApp.</p>
 <hr/>
 <div dir="rtl">
@@ -93,6 +121,7 @@ export function confirmationEmail(o: OrderForEmail, items: Item[]) {
 <tr><td>الشحن — ${tierAr}</td><td></td><td>${qar(o.shipping_qar)}</td></tr>
 <tr><td>رسوم التجهيز</td><td></td><td>${qar(o.handling_fee_qar)}</td></tr>
 <tr><td><b>الإجمالي</b></td><td></td><td><b>${qar(o.total_qar)}</b></td></tr></table>
+${paymentBlock(o, "ar")}
 <p>${o.promised_date ? "إذا تغيّر هذا الموعد فسنراسلك قبله، لا بعده. " : ""}سنؤكد الدفع والتوصيل عبر واتساب.</p>
 </div></div>`;
   const when = o.promised_date ? `arrives by ${formatDeliveryDate(o.promised_date, "en")}` : "delivery date to be confirmed";

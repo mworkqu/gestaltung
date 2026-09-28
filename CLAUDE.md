@@ -860,6 +860,16 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     Quote step (AI calls × price, parts to buy now, total, "free during launch", card incl. foreign — coming soon,
     pay in person after a free chat → /contact); admin editor on /dashboard/usage.
 
+  - 2026-09-29: 0038 RUN ✔. PAYMENT METHODS (owner): cash on delivery, Fawran (alias CR-236988), bank transfer
+    (QIIB, account "GESTALTUNG FOR TRD AND SERV", IBAN QA94 QIIB 0000 0000 1112 2207 6400 1) — lib/company.ts
+    PAYMENT_DETAILS/PAYMENT_METHODS. MIGRATION 0039_payment_method.sql (NOT RUN YET): part_orders.payment_method
+    + set_order_payment_method(order, method) (SECURITY DEFINER, fills an EMPTY method on an order < 1 h old;
+    create_part_order signature untouched). Checkout: method cards + PaymentInstructions
+    (components/payment/payment-instructions.tsx, copy buttons); success page shows how to pay with amount +
+    order ref; confirmation email paymentBlock() (bilingual; tests); admin order detail shows the method;
+    prototyping PaymentCard lists the methods; home page HomeTrust section (company + CR + ways to pay). Card
+    still "coming soon".
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -927,6 +937,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0037_restock.sql — restock weights, supplier minimum order value, receipts, restock_summary() (RUN AFTER 0036)
 - 0038_ai_pricing.sql — ai_pricing setting + project_ai_charges() (RUN AFTER 0037; the Payment box on the Quote
   step stays hidden until then)
+- 0039_payment_method.sql — part_orders.payment_method + set_order_payment_method() (RUN AFTER 0038; until then
+  orders are placed without a recorded method but the success page still shows the chosen one)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER

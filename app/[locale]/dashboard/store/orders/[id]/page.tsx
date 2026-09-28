@@ -66,6 +66,7 @@ export default async function OrderDetailPage({
 
   // Shipping + promise (0029); absent on older orders.
   const tD = await getTranslations("Delivery");
+  const tPay = await getTranslations("PayMethods");
   const ship = order as unknown as {
     shipping_tier?: string | null;
     split_shipments?: boolean;
@@ -75,6 +76,7 @@ export default async function OrderDetailPage({
     early_promised_date?: string | null;
     held_by?: string | null;
     delay_notified_at?: string | null;
+    payment_method?: string | null;
   };
   const areaLabel = (DELIVERY_AREAS as readonly string[]).includes(order.delivery_area)
     ? t(`area_${order.delivery_area}`)
@@ -203,6 +205,7 @@ export default async function OrderDetailPage({
                 `${ship.early_promised_date ? `${formatDeliveryDate(ship.early_promised_date, locale)} / ` : ""}${formatDeliveryDate(ship.promised_date, locale)}${ship.held_by ? ` · ${tD("heldBy", { item: ship.held_by })}` : ""}`
               )}
             {ship.delay_notified_at && field(tD("delayNotified"), dateFmt.format(new Date(ship.delay_notified_at)))}
+            {ship.payment_method && field(tPay("label"), tPay(`${ship.payment_method}_title`))}
           </dl>
 
           <div className="neu space-y-4 p-5">

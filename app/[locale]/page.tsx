@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
+import { HomeTrust } from "@/components/payment/home-trust";
 import { isListed, listedCategories } from "@/lib/store/categories";
 import { cn } from "@/lib/utils";
 
@@ -159,6 +160,9 @@ export default async function Home({
           </div>
         )}
       </section>
+
+      {/* Who you're buying from, and how to pay */}
+      <HomeTrust />
 
       {/* Callback CTA */}
       <HomeCallback />

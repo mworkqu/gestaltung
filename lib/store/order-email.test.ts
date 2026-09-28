@@ -57,3 +57,22 @@ describe("confirmationEmail with on-request lines (0032)", () => {
     expect(m.html).toContain("aren't included in this date");
   });
 });
+
+describe("paymentBlock", async () => {
+  const { paymentBlock } = await import("./order-email");
+  const o = { id: "abcdef12-0000-0000-0000-000000000000", total_qar: 125.5 };
+  it("gives the Fawran alias, amount and reference", () => {
+    const html = paymentBlock({ ...o, payment_method: "fawran" }, "en");
+    expect(html).toContain("CR-236988");
+    expect(html).toContain("QAR 125.50");
+    expect(html).toContain("abcdef12");
+  });
+  it("gives the IBAN and account name for a bank transfer", () => {
+    const html = paymentBlock({ ...o, payment_method: "bank_transfer" }, "ar");
+    expect(html).toContain("QA94 QIIB 0000 0000 1112 2207 6400 1");
+    expect(html).toContain("GESTALTUNG FOR TRD AND SERV");
+  });
+  it("says nothing when no method was recorded", () => {
+    expect(paymentBlock({ ...o, payment_method: null }, "en")).toBe("");
+  });
+});

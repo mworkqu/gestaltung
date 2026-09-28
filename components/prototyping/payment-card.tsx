@@ -15,11 +15,14 @@ import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/parts/format";
 import { paymentSummary } from "@/lib/store/payment";
+import { PAYMENT_DETAILS, PAYMENT_METHODS } from "@/lib/company";
+import { METHOD_ICON } from "@/components/payment/payment-instructions";
 
 type Charges = { calls: number; per_call_qar: number; charging: boolean };
 
 export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQar: number }) {
   const t = useTranslations("Payment");
+  const tPay = useTranslations("PayMethods");
   const locale = useLocale();
   const [charges, setCharges] = useState<Charges | null>(null);
 
@@ -65,24 +68,35 @@ export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQ
       </dl>
       <p className="text-[11px] text-mutedtext">{t("partsNote")}</p>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div className="flex items-start gap-2 rounded-lg bg-surface p-3 text-[12.5px]">
-          <CreditCard className="mt-0.5 h-4 w-4 shrink-0 text-cobalt" />
-          <span>
-            <span className="block font-semibold text-heading">{t("cardTitle")}</span>
-            <span className="text-mutedtext">{t("cardBody")}</span>
-          </span>
-        </div>
-        <div className="flex items-start gap-2 rounded-lg bg-surface p-3 text-[12.5px]">
-          <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-cobalt" />
-          <span>
-            <span className="block font-semibold text-heading">{t("inPersonTitle")}</span>
-            <span className="text-mutedtext">{t("inPersonBody")}</span>{" "}
-            <Link href="/contact" className="font-semibold text-cobalt hover:underline">
+      <div className="space-y-1.5 text-[12.5px]">
+        <p className="font-semibold text-heading">{t("waysToPay")}</p>
+        <ul className="grid gap-1.5 sm:grid-cols-2">
+          {PAYMENT_METHODS.map((m) => {
+            const Icon = METHOD_ICON[m];
+            return (
+              <li key={m} className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2">
+                <Icon className="h-4 w-4 shrink-0 text-cobalt" />
+                <span className="text-heading">{tPay(`${m}_title`)}</span>
+                {m === "fawran" && (
+                  <span className="ms-auto font-mono text-[11px] text-mutedtext" dir="ltr">
+                    {PAYMENT_DETAILS.fawranAlias}
+                  </span>
+                )}
+              </li>
+            );
+          })}
+          <li className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2">
+            <Building2 className="h-4 w-4 shrink-0 text-cobalt" />
+            <span className="text-heading">{t("inPersonTitle")}</span>
+            <Link href="/contact" className="ms-auto font-semibold text-cobalt hover:underline">
               {t("bookChat")}
             </Link>
-          </span>
-        </div>
+          </li>
+          <li className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-mutedtext">
+            <CreditCard className="h-4 w-4 shrink-0" />
+            {t("cardTitle")}
+          </li>
+        </ul>
       </div>
     </div>
   );

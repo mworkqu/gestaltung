@@ -1957,6 +1957,30 @@
     "adminPrice": "Price per AI call (QAR)",
     "adminCharging": "Charge clients (needs a payment gateway)",
     "adminSave": "Save",
-    "adminSaved": "Saved."
+    "adminSaved": "Saved.",
+    "waysToPay": "Ways to pay"
+  },
+  "PayMethods": {
+    "label": "How you'll pay",
+    "copy": "Copy {what}",
+    "cash_on_delivery_title": "Cash on delivery",
+    "fawran_title": "Fawran",
+    "bank_transfer_title": "Bank transfer",
+    "cash_on_delivery_how": "Pay the driver in cash when your order arrives.",
+    "fawran_how": "Instant transfer from any Qatari bank app to our Fawran alias.",
+    "bank_transfer_how": "Transfer to our company account at QIIB.",
+    "fawranAlias": "Fawran alias",
+    "iban": "IBAN",
+    "bank": "Bank",
+    "accountName": "Account name",
+    "amount": "Amount",
+    "reference": "Reference (put in the note)",
+    "confirmNote": "We confirm your payment on WhatsApp before we ship.",
+    "cardSoon": "Card payment (Visa, Mastercard, including foreign cards) is coming soon.",
+    "homeKicker": "Registered in Qatar",
+    "homeIntro": "Parts, electronics and custom manufacturing from a registered Qatari company.",
+    "crLabel": "Commercial Registration",
+    "locationLabel": "Location",
+    "homeTitle": "Ways to pay"
   }
 }

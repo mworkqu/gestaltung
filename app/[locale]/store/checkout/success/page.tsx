@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isPaymentMethod } from "@/lib/company";
+import { PaymentInstructions } from "@/components/payment/payment-instructions";
 import { useTranslations, useLocale } from "next-intl";
 import { CheckCircle2, MessageCircle } from "lucide-react";
 
@@ -26,6 +28,7 @@ type OrderSnapshot = {
   heldBy?: string | null;
   /** Some lines were "available on request": date to be confirmed (0032). */
   hasOnRequest?: boolean;
+  paymentMethod?: string;
   items: {
     sku: string;
     name: string;
@@ -145,6 +148,15 @@ export default function CheckoutSuccessPage() {
             {order.hasOnRequest && <p className="mt-1 text-[12px] text-mutedtext">{tD("tbcNote")}</p>}
             {order.promisedDate && <p className="mt-1 text-[12px] text-mutedtext">{tD("promiseKept")}</p>}
           </div>
+        )}
+
+        {order && isPaymentMethod(order.paymentMethod) && (
+          <PaymentInstructions
+            method={order.paymentMethod}
+            amount={formatPrice(order.total, locale)}
+            orderRef={shortId}
+            className="text-start"
+          />
         )}
 
         <Button asChild size="lg" className="w-full rounded-full">
