@@ -22,6 +22,10 @@
     {
       "path": "/api/cron/voltaat-sync",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/supplier-refresh",
+      "schedule": "0 2 * * *"
     }
   ]
 }
