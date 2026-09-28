@@ -42,7 +42,8 @@ export default async function Home({
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  // Published parts via the anon-safe RLS read; newest first as "featured".
+  // Featured: in-stock products with a photo, one per category so the row
+  // shows the range (owner, 2026-09-29: newest-first showed only photo-less parts).
   // Degrade to the empty state if Supabase env is absent (fresh local checkout).
   let products: Part[] = [];
   let categories: string[] = [];
@@ -55,9 +56,14 @@ export default async function Home({
       .from("parts")
       .select("*")
       .eq("is_published", true)
-      .order("created_at", { ascending: false })
-      .limit(8);
-    products = ((data ?? []) as Part[]).filter(isListed);
+      .eq("lead_time_class", "in_stock")
+      .not("image_url", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    const pool = ((data ?? []) as Part[]).filter(isListed);
+    const byCategory = new Map<string, Part>();
+    for (const p of pool) if (!byCategory.has(p.category ?? "")) byCategory.set(p.category ?? "", p);
+    products = [...byCategory.values(), ...pool.filter((p) => !byCategory.has(p.category ?? "") || byCategory.get(p.category ?? "") !== p)].slice(0, 8);
 
     // Every category with a listed product (published, not a merged duplicate),
     // not just those in the featured eight, so the quick-links cover the whole

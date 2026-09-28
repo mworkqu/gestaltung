@@ -4,6 +4,8 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { handleFromUrl } from "@/lib/sourcing/adapters/voltaat";
 import { optionsNote } from "@/lib/sourcing/voltaat-catalogue";
 import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini-client";
+import { digikeySearch } from "@/lib/sourcing/adapters/digikey";
+import { fetchImage, storeImage } from "@/lib/store/store-image";
 
 // Store clean-up (owner, 2026-09-29). super_admin only. POST { step }:
 //  - "dedupe": the Voltaat import made one product per option (CW / CCW
@@ -11,6 +13,8 @@ import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini
 //    product (the option in stock, else the first), name it by the product,
 //    list the options in its description, delete the rest.
 //  - "placeholders": delete the old sample products (SKU 123, GR-…).
+//  - "photos": Mouser serves a bot page instead of product photos, so Mouser
+//    products borrow the same part's photo from DigiKey (one lookup each, once).
 //  - "translate": Arabic names for published products that have none, via
 //    Gemini in batches. Call again until `remaining` is 0.
 // A product an order or project still points at can't be deleted; it is
@@ -100,6 +104,25 @@ async function placeholders(db: Db) {
   return { found: ids.length, ...(await removeParts(db, ids)) };
 }
 
+async function photos(db: Db) {
+  const { data } = await db.from("parts").select("id, description").like("sku", "MS-%").is("image_url", null).limit(30);
+  let added = 0;
+  const missed: string[] = [];
+  for (const p of data ?? []) {
+    const mpn = /Manufacturer part: \S+(?: \S+)*? (\S+)$/m.exec((p.description as string) ?? "")?.[1];
+    const hit = mpn ? (await digikeySearch(mpn, 1).catch(() => []))[0] : undefined;
+    const buf = hit?.imageUrl ? await fetchImage(hit.imageUrl, /(^|\.)digikey\.com$/i).catch(() => null) : null;
+    if (!buf) {
+      missed.push(mpn ?? String(p.id));
+      continue;
+    }
+    const img = await storeImage(db, buf, `supplier/digikey/${p.id}/${Date.now()}`);
+    await db.from("parts").update({ images: [img], image_url: img.web }).eq("id", p.id);
+    added++;
+  }
+  return { added, missed };
+}
+
 const TRANSLATE_SCHEMA = {
   type: "OBJECT",
   properties: {
@@ -166,6 +189,7 @@ export async function POST(request: Request) {
   const db = await createClient();
   if (step === "dedupe") return Response.json(await dedupe(db));
   if (step === "placeholders") return Response.json(await placeholders(db));
+  if (step === "photos") return Response.json(await photos(db));
   if (step === "translate") return Response.json(await translate(db));
   return Response.json({ error: "unknown_step" }, { status: 400 });
 }
