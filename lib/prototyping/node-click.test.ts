@@ -27,8 +27,8 @@ describe("nodeClick: a sidebar row is never a dead click (audit #30)", () => {
   });
 
   it("already on the fix without a control: opens the node itself", () => {
-    const st = { open: [], reason: "needs a concept kept", target: "software.concepts" as const };
-    expect(nodeClick("software.scope", st, "software.concepts")).toEqual({ to: "software.scope" });
+    const st = { open: [], reason: "needs a concept kept", target: "concepts" as const };
+    expect(nodeClick("software.scope", st, "concepts")).toEqual({ to: "software.scope" });
   });
 
   it("a reason whose fix is the node itself opens the node", () => {

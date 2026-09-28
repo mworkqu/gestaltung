@@ -44,7 +44,7 @@ describe("initialNode: the workspace opens where the client left off (audit #32)
   it("maps the old stage ids from before the tree", () => {
     const cases: [string, NodeId][] = [
       ["idea", "brief"],
-      ["concepts", "mechanical.concepts"],
+      ["concepts", "concepts"],
       ["parts", "parts"],
       ["design", "mechanical.drawings"],
       ["engineering", "mechanical.process"],

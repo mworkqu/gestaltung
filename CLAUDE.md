@@ -840,6 +840,26 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     foreign + pay in person at the office after a free chat; 10 QAR per generation. Owner: build payment
     CALCULATION now, no gateway, everything free for now. NOT STARTED.
 
+  - 2026-09-28 (later): 0037 RUN ✔. Owner: store must be populated — "mainly Voltaat, and some parts not in Voltaat
+    from DigiKey/Mouser", publish now. Voltaat catalogue import (/api/admin/voltaat-import, button on the Voltaat
+    sync page; lib/sourcing/voltaat-catalogue.ts pure + tests): one product per Voltaat option, SKU VLT-<variant
+    id>, mirror price, category mapped from Voltaat product_type, description from body_html, photo hotlinked from
+    Shopify CDN (?width=), out-of-stock options = inactive offer ("available on request"; daily sync now sets
+    active = available). RUN LIVE: 1,659 Voltaat products published (1,138 in stock, 521 on request); store =
+    1,688 published. DigiKey starter set /api/admin/starter-parts (13 standard parts, packs of 10 where sensible,
+    landed×1.4). PostgREST 1,000-row cap handled: lib/supabase/fetch-all.ts; store page filters/searches/pages
+    (48) in the DB; unified search queries as you type. Mouser/DigiKey refresh: offers older than 7 days only,
+    max 25/supplier/day.
+  - CR from owner: C.R. 236988, "Gestaltung for Trading and Services W.L.L" / "جستالتونج للتجارة والخدمات ذ.م.م",
+    Qatar (lib/company.ts; NEVER publish the owner's personal ID numbers from the CR). components/company-strip.tsx
+    above the header + in the footer.
+  - REVIEWER ITEMS DONE: tree order Brief → one "Concepts" node (all disciplines, NodeId "concepts"; legacy
+    *.concepts map to it) → branch leaves → Quote → Production → Parts → BOM (last). AI pricing: 1 QAR per
+    successful AI call (owner), MIGRATION 0038_ai_pricing.sql (NOT RUN YET): store_settings.ai_pricing
+    {per_call_qar, charging:false} + project_ai_charges(project); components/prototyping/payment-card.tsx on the
+    Quote step (AI calls × price, parts to buy now, total, "free during launch", card incl. foreign — coming soon,
+    pay in person after a free chat → /contact); admin editor on /dashboard/usage.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -905,6 +925,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0036_voltaat_sync.sql — supplier_sync_runs + voltaat_sync switch (RUN AFTER 0035; the Voltaat sync page says
   "run 0036" until then)
 - 0037_restock.sql — restock weights, supplier minimum order value, receipts, restock_summary() (RUN AFTER 0036)
+- 0038_ai_pricing.sql — ai_pricing setting + project_ai_charges() (RUN AFTER 0037; the Payment box on the Quote
+  step stays hidden until then)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER

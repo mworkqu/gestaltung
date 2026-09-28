@@ -14,20 +14,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
-import {
-  Check,
-  ClipboardList,
-  Cpu,
-  Factory,
-  Layers,
-  Lightbulb,
-  Plus,
-  Receipt,
-  SquareCode,
-  Undo2,
-  Wrench,
-  X,
-} from "lucide-react";
+import { Check, ClipboardList, Cpu, Factory, Layers, Lightbulb, Plus, Receipt, Sparkles, SquareCode, Undo2, Wrench, X } from "lucide-react";
 
 import type { Discipline } from "@/lib/prototyping/constants";
 import { nodeClick } from "@/lib/prototyping/node-click";
@@ -194,8 +181,9 @@ export function TreeNav({
   if (collapsed) {
     const top: { id: string; icon: typeof Wrench; to: NodeId; open: number; label: string }[] = [
       { id: "brief", icon: Lightbulb, to: "brief", open: openAt("brief"), label: t("node_brief") },
-      { id: "parts", icon: Layers, to: "parts", open: openAt("parts"), label: t("node_parts") },
-      { id: "bom", icon: ClipboardList, to: "bom", open: openAt("bom"), label: t("node_bom") },
+      ...(active.length
+        ? [{ id: "concepts", icon: Sparkles, to: "concepts" as NodeId, open: openAt("concepts"), label: t("node_concepts") }]
+        : []),
       ...active.map((b) => ({
         id: b.discipline,
         icon: BRANCH_ICON[b.discipline],
@@ -211,6 +199,8 @@ export function TreeNav({
         open: openAt("production"),
         label: t("node_production"),
       },
+      { id: "parts", icon: Layers, to: "parts", open: openAt("parts"), label: t("node_parts") },
+      { id: "bom", icon: ClipboardList, to: "bom", open: openAt("bom"), label: t("node_bom") },
     ];
     return (
       <nav aria-label={t("treeRoot")} onKeyDown={moveBetweenRows}>
@@ -393,12 +383,11 @@ export function TreeNav({
         <li>
           {node("brief", Lightbulb)}
         </li>
-        <li>
-          {node("parts", Layers)}
-        </li>
-        <li>
-          {node("bom", ClipboardList)}
-        </li>
+        {active.length > 0 && (
+          <li className="ms-4 border-s border-borderstrong/60 ps-2">
+            {node("concepts", Sparkles)}
+          </li>
+        )}
 
         {/* In tree order, so the Undo bar sits where the branch was. */}
         {branches.map((b) =>
@@ -436,6 +425,12 @@ export function TreeNav({
         </li>
         <li>
           {node("production", Factory)}
+        </li>
+        <li className="border-t border-borderstrong/40 pt-2">
+          {node("parts", Layers)}
+        </li>
+        <li>
+          {node("bom", ClipboardList)}
         </li>
       </ul>
 

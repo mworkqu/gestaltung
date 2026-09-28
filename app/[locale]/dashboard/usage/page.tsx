@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { PROVIDERS, dayStart, guardThreshold, nextReset, providerLimits, type ProviderId } from "@/lib/ai/limits";
 import { cn } from "@/lib/utils";
+import { AiPricing } from "@/components/admin/ai-pricing";
 
 // AI usage against the free allowances (migration 0023's ai_usage).
 //
@@ -122,6 +123,9 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   const bw = (W - PADL) / DAYS;
   const y = (v: number) => (H - PADB) * (1 - v / maxCalls);
 
+  const { data: pricingRow } = await supabase.from("store_settings").select("value").eq("key", "ai_pricing").maybeSingle();
+  const pricing = (pricingRow?.value ?? null) as { per_call_qar?: number; charging?: boolean } | null;
+
   return (
     <div className="space-y-8">
       <div>
@@ -131,6 +135,8 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
           {t("intro", { threshold: pct.format(guardThreshold()) })}
         </p>
       </div>
+
+      {pricing && <AiPricing locale={locale} perCall={Number(pricing.per_call_qar ?? 1)} charging={Boolean(pricing.charging)} />}
 
       {error && (
         <p className="text-sm font-medium text-destructive">

@@ -1,6 +1,7 @@
-// The workspace tree: Brief, the Parts list, one branch per discipline the
-// project needs, then Quote and Production — both project-level, because they
-// cover the whole project rather than one discipline.
+// The workspace tree (reviewer order, 2026-09-28): Brief, then one Concepts
+// step for every discipline right under it, then one branch per discipline
+// the project needs, then Quote and Production, and the Parts list and the
+// Bill of materials at the very end.
 //
 // Pure. Branches come from what the analysis detected plus the client's own
 // choices; a manual choice always wins and an analysis never overwrites it.
@@ -8,10 +9,11 @@
 // tree nodes — the tree never counts anything itself.
 //
 // The Parts list shows every part. A branch shows only the to-design parts of
-// its kind — the same rows, viewed for design work, never a second copy. Each
-// branch opens with Concepts: what the analysis suggests designing for that
-// discipline, waiting to be kept or dropped. A kept concept moves to the
-// branch's design leaf (Parts / Board / Scope).
+// its kind — the same rows, viewed for design work, never a second copy. The
+// Concepts step shows what the analysis suggests designing, for every
+// discipline at once, waiting to be kept or dropped — one Continue, not one
+// per discipline. A kept concept moves to its branch's design leaf
+// (Parts / Board / Scope).
 
 import { DISCIPLINES, type Discipline } from "./constants";
 import { detectDisciplines } from "./engine";
@@ -21,13 +23,13 @@ import { factFocus, isCircuitRequirement, type Readiness, type Requirement, type
 import { rowOf, type Spec } from "./spec";
 
 export const LEAVES = {
-  mechanical: ["mechanical.concepts", "mechanical.parts", "mechanical.drawings", "mechanical.process"],
-  electronics: ["electronics.concepts", "electronics.board", "electronics.power", "electronics.components"],
-  software: ["software.concepts", "software.scope"],
+  mechanical: ["mechanical.parts", "mechanical.drawings", "mechanical.process"],
+  electronics: ["electronics.board", "electronics.power", "electronics.components"],
+  software: ["software.scope"],
 } as const satisfies Record<Discipline, readonly string[]>;
 
 export type LeafId = (typeof LEAVES)[Discipline][number];
-export type NodeId = "brief" | "parts" | "bom" | "quote" | "production" | LeafId;
+export type NodeId = "brief" | "concepts" | "parts" | "bom" | "quote" | "production" | LeafId;
 
 /** projects.disciplines (migration 0021). */
 export type DisciplineState = {
@@ -44,11 +46,11 @@ export const DESIGN_NODE: Record<Discipline, NodeId> = {
   software: "software.scope",
 };
 
-/** Where a suggested, not-yet-kept part of each kind waits. */
+/** Where a suggested, not-yet-kept part of each kind waits: the one Concepts step. */
 export const CONCEPT_NODE: Record<Discipline, NodeId> = {
-  mechanical: "mechanical.concepts",
-  electronics: "electronics.concepts",
-  software: "software.concepts",
+  mechanical: "concepts",
+  electronics: "concepts",
+  software: "concepts",
 };
 
 /** The node a part is resolved at: its concepts or design leaf, or the Parts list. */
@@ -105,13 +107,15 @@ export function withBranchChoice(
 
 /** Every node the client can see, in reading order. */
 export function visibleNodes(bs: Branch[]): NodeId[] {
+  const active = bs.filter((b) => b.active);
   return [
     "brief",
-    "parts",
-    "bom",
-    ...bs.filter((b) => b.active).flatMap((b) => [...LEAVES[b.discipline]]),
+    ...(active.length ? (["concepts"] as NodeId[]) : []),
+    ...active.flatMap((b) => [...LEAVES[b.discipline]]),
     "quote",
     "production",
+    "parts",
+    "bom",
   ];
 }
 
@@ -210,7 +214,11 @@ export function nodeStates(
 export function toNode(stored: string, visible: NodeId[]): NodeId {
   const legacy: Record<string, NodeId> = {
     idea: "brief",
-    concepts: "mechanical.concepts",
+    concepts: "concepts",
+    // Per-discipline concept steps before 2026-09-28.
+    "mechanical.concepts": "concepts",
+    "electronics.concepts": "concepts",
+    "software.concepts": "concepts",
     design: "mechanical.drawings",
     engineering: "mechanical.process",
     manufacturing: "mechanical.process",

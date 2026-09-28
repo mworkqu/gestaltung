@@ -68,6 +68,8 @@ import { nodeClick } from "@/lib/prototyping/node-click";
 import type { Discipline } from "@/lib/prototyping/constants";
 import {
   activeLines,
+  bomCost,
+  dedupeLines,
   originOf,
   viewLines,
   type BomView,
@@ -85,6 +87,7 @@ import {
   type SchematicWithRevs,
 } from "@/components/prototyping/schematics-stage";
 import { BomTable, CostSummary } from "@/components/prototyping/bom-table";
+import { PaymentCard } from "@/components/prototyping/payment-card";
 import { BuildRouteCard, LevelFlags } from "@/components/prototyping/electronics-route";
 import type { BuildRoute } from "@/lib/prototyping/analysis";
 import { DimensionDrawings } from "@/components/prototyping/dimension-drawings";
@@ -823,9 +826,14 @@ export function PrototypingWorkspace({
             />
           )}
 
-          {node === "mechanical.concepts" && designStage("mechanical", "concepts")}
-          {node === "electronics.concepts" && designStage("electronics", "concepts")}
-          {node === "software.concepts" && designStage("software", "concepts")}
+          {/* One Concepts step for every discipline, so kept-or-drop is one pass. */}
+          {node === "concepts" && (
+            <>
+              {bs.filter((b) => b.active).map((b) => (
+                <div key={b.discipline}>{designStage(b.discipline, "concepts")}</div>
+              ))}
+            </>
+          )}
 
           {node === "bom" && bomTable("all")}
 
@@ -934,6 +942,7 @@ export function PrototypingWorkspace({
                 onAccept={acceptRoute}
               />
               <Card kicker={t("node_quote")} title={t("stageTitle_quote")} intro={t("quoteIntro")}>
+                <PaymentCard projectId={projectId} partsQar={bomCost(dedupeLines(liveLines), matches).availableNow} />
                 <div className="flex flex-wrap items-center gap-3">
                   {stageAction("quote", "/design/quote", <Receipt className="h-3.5 w-3.5" />, t("requestQuote"))}
                 </div>

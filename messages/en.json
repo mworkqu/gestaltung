@@ -1416,7 +1416,8 @@
     "rule_holder_reason": "battery power for the prototype",
     "rule_fab_name": "Custom PCB",
     "rule_fab_spec": "design (schematic and layout) and fabrication of the board",
-    "rule_fab_reason": "the Custom PCB route: the board itself, made after the prototype works"
+    "rule_fab_reason": "the Custom PCB route: the board itself, made after the prototype works",
+    "node_concepts": "Concepts"
   },
   "AiUsage": {
     "kicker": "Admin",
@@ -1938,5 +1939,24 @@
     "legalName": "Gestaltung for Trading and Services W.L.L",
     "cr": "C.R. {number}",
     "location": "Qatar"
+  },
+  "Payment": {
+    "title": "Payment",
+    "aiLine": "AI generations: {count} × {price}",
+    "partsLine": "Parts to buy now",
+    "total": "Total",
+    "freeDuringLaunch": "Free during launch — AI generations",
+    "partsNote": "Parts are paid when you order them. AI generations are free while we launch; the price is shown so you know what they're worth.",
+    "cardTitle": "Card — coming soon",
+    "cardBody": "Visa and Mastercard, including cards issued outside Qatar.",
+    "inPersonTitle": "Pay in person",
+    "inPersonBody": "Visit our office, have a free chat about your project, and pay on the spot.",
+    "bookChat": "Book a free chat",
+    "adminTitle": "AI generation pricing",
+    "adminHelp": "Every successful AI call on a project is priced at this amount and shown to the client on the project's Quote step. While charging is off it shows as free during launch.",
+    "adminPrice": "Price per AI call (QAR)",
+    "adminCharging": "Charge clients (needs a payment gateway)",
+    "adminSave": "Save",
+    "adminSaved": "Saved."
   }
 }
