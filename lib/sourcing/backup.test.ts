@@ -51,3 +51,14 @@ describe("pickBackup", () => {
     expect(pickBackup([result({ mpn: "NE555P", cost: null })], "NE555")).toBeNull();
   });
 });
+
+describe("sameKind + tighter codes", () => {
+  it("rejects a match that is a different kind of part", async () => {
+    const { sameKind } = await import("./backup");
+    expect(sameKind("MLX90614 Infrared Temperature Sensor", { description: "Temperature Sensor Digital, Infrared", category: null, name: "" })).toBe(true);
+    expect(sameKind("Soil Multifunctional 6 in 1 Sensor RS485", { description: "Interface Modules RS-485 converter", category: null, name: "" })).toBe(false);
+    expect(modelCodes("1045 10-Inch Propeller Pair")).toEqual([]);
+    expect(modelCodes("ST-Link V2 STM32 Programmer")).toEqual([]);
+    expect(isComponent("HC-SR04 Ultrasonic Sensor Mounting Bracket")).toBe(false);
+  });
+});

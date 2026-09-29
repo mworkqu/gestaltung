@@ -16,9 +16,27 @@ const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 // Voltaat names with these words are assemblies, not a single component.
 const ASSEMBLY =
-  /\b(module|modules|board|kit|kits|shield|breakout|expansion|holder|cable|cables|adapter|adaptor|case|enclosure|set|pack|bundle|robot|car|starter|dev|devkit|development|arduino|raspberry|pi|esp32|esp8266|nodemcu|wemos|display|screen|lcd|oled|printer|filament|nozzle|tool|kit|thruster|drone|camera|keypad|joystick|relay|charger|power bank|solar panel|motor driver)\b/i;
+  /\b(module|modules|board|kit|kits|shield|breakout|expansion|holder|cable|cables|adapter|adaptor|case|enclosure|set|pack|bundle|robot|car|starter|dev|devkit|development|arduino|raspberry|pi|esp32|esp8266|nodemcu|wemos|display|screen|lcd|oled|printer|filament|nozzle|tool|kit|thruster|drone|camera|keypad|joystick|relay|charger|power bank|solar panel|motor driver|mount|mounting|bracket|accessory|accessories|iron|soldering|heat sink|heatsink|propeller|programmer|debugger|controller|clearance)\b/i;
 
-const NOT_MODELS = new Set(["usb", "wifi", "rgb", "led", "lcd", "diy", "pcs", "i2c", "spi", "pwm", "x5r", "x7r", "c0g", "np0"]);
+const NOT_MODELS = new Set(["usb", "wifi", "rgb", "led", "lcd", "diy", "pcs", "i2c", "spi", "pwm", "x5r", "x7r", "c0g", "np0", "stm32", "rs485", "rs232", "to220", "to92", "to247", "sot23", "dip8", "dip14", "dip16", "soic8", "atmega", "esp32"]);
+const STOP = new Set(["with", "and", "for", "the", "single", "dual", "input", "output", "high", "low", "digital", "analog", "channel", "chip", "type", "generic", "original", "sale", "clearance", "standard", "general", "purpose", "circuit"]);
+
+const words = (s: string) =>
+  new Set(
+    s
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !STOP.has(w))
+      .map((w) => (w.endsWith("s") && w.length > 4 ? w.slice(0, -1) : w))
+  );
+
+/** Both say what kind of part it is the same way (sensor/sensor, amplifier/amplifier). */
+export function sameKind(voltaatName: string, p: Pick<SupplierProduct, "description" | "category" | "name">): boolean {
+  const a = words(voltaatName);
+  const b = words([p.description, p.category, p.name].filter(Boolean).join(" "));
+  return [...a].some((w) => b.has(w));
+}
 
 /** Is this Voltaat product a single component a distributor would sell as-is? */
 export function isComponent(name: string): boolean {
@@ -35,7 +53,8 @@ export function modelCodes(name: string): string[] {
     .split(/\s+/)
     .map((t) => t.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, ""))
     .filter((t) => squash(t).length >= 5 && /[a-z]/i.test(t) && /\d/.test(t))
-    .filter((t) => !NOT_MODELS.has(t.toLowerCase()))
+    .filter((t) => !NOT_MODELS.has(squash(t)))
+    .filter((t) => !/^\d+-?(inch|in|cm|mm|pin|way|port)s?$/i.test(t))
     // Values and sizes ("1000mAh", "220uF", "12V2A", "5x7cm"), not models.
     .filter((t) => !/^\d+(?:[.,]\d+)?(?:k|m|u|µ|n|p)?(?:v|a|ma|mah|w|mm|cm|uf|nf|pf|ohm|hz|khz|mhz|g|kg|rpm)(?:\d+(?:[.,]\d+)?(?:v|a|w))?$/i.test(t))
     .filter((t) => !/^\d+x\d+/i.test(t));
@@ -49,9 +68,13 @@ export function carriesModel(p: Pick<SupplierProduct, "mpn">, code: string): boo
   return c.length >= 5 && mpn.startsWith(c);
 }
 
-/** The first result that is the same model and has a price, or null. */
-export function pickBackup(results: SupplierProduct[], code: string): SupplierProduct | null {
-  return results.find((r) => r.cost !== null && r.cost > 0 && carriesModel(r, code)) ?? null;
+/** The first result that is the same model, the same kind of part, and has a price. */
+export function pickBackup(results: SupplierProduct[], code: string, voltaatName?: string): SupplierProduct | null {
+  return (
+    results.find(
+      (r) => r.cost !== null && r.cost > 0 && carriesModel(r, code) && (voltaatName === undefined || sameKind(voltaatName, r))
+    ) ?? null
+  );
 }
 
 /** Our store name for a backup: the supplier's description with its maker and part number. */
