@@ -40,3 +40,14 @@ No migrations. Pending owner steps: after 0030–0035, open Plant monitor → El
 - Copy — Phase 4 strings in en + ar (parity 1683/1683), landed with fb94ef1 and the 4.3/4.4 commits.
 
 No migrations. Pending owner steps: after 0030–0035, walk Plant monitor at 1280 px, 1920 px and in /ar — no dead clicks, no clipped tables, one cost figure, one quote button, one kit button, Components count = BOM count, drawings without overlap. Still open: wiring view too small (#38); drawing title-block values clip at ~26+ chars (pre-existing); Readiness labels show raw concept ids; the project page's QAR total and the BOM's "To buy now" are different figures (documented).
+
+
+## Phase 5 — Entry points, navigation, public pages (2026-09-29, on main)
+- Nav: Shop parts · Make a part · How it works; My projects with a session; account menu (Dashboard, Sign out); mobile menu under 768 px (components/header-nav.tsx).
+- Home: three choices — Buy parts / Make my part / Turn an idea into a product.
+- Project spine: /design/quote creates a project with the CAD file attached; /projects/new?for=drawing (brief + WhatsApp → drawing_request lead). FINDINGS #1 closed.
+- Product page: Add to project (components/parts/add-to-project-button.tsx).
+- How it works: all three paths.
+- Prototyping on phones: tree behind a "Project sections" button; title on its own row.
+- Per-page titles/descriptions (lib/meta.ts, Meta namespace); FIG·0x labels and spec chips removed.
+- Copy en + ar parity 1994/1994. Tests 259 passed. Build green. Verified live at 375 px: no horizontal scroll on 11 pages, mobile menu works.

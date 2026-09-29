@@ -101,12 +101,17 @@ Fix one section at a time and re-test with the checklist at the bottom.
 
 ### Site structure (public)
 11. **Six entry points for "make me a part"** that don't connect: Home "New project", Home CAD drop (→ `/design/quote`, never becomes a project), Design page (two cards → quote / drawing), Contact form, Request callback, and "Request this item" on each product. FINDINGS.md #1 is still open. → Make **project** the one spine: CAD drop creates a project with the file attached; "help me draw it" creates a project with a brief; the quote form saves into a project or is retired.
+    - **Status:** Fixed in code (Phase 5) — the /design/quote request creates a project with the file attached (cad-files + project_files) and links to it; "help me draw it" opens /projects/new?for=drawing (project + brief + drawing_request lead). Pending: owner sends one test request.
 12. **Home hero has ~20 equal-weight actions** (search, New project, 13 category chips, dropzone, "explore custom manufacturing"). "New project" is the primary button, but new visitors don't know what a project is. "Start without an account" looks like a link but isn't one. → Three clear choices: *Buy parts* / *Make my part (I have a file)* / *Turn an idea into a product (prototyping)*.
+    - **Status:** Fixed in code (Phase 5) — home hero is three choices: Buy parts (search) · Make my part (file drop) · Turn an idea into a product (Start a project); category chips moved under Featured.
 13. **Menu wording:** "Design" means *get a part made*; "Projects" is jargon; "My inventory" is a sign-up wall for visitors. → *Shop parts · Make a part · How it works*; show My projects / Inventory after sign-in.
+    - **Status:** Fixed in code (Phase 5) — Shop parts · Make a part · How it works; My projects when a session exists; Inventory + account menu (Dashboard, Sign out) when signed in.
 14. **How it works** explains only the upload path — nothing about projects, prototyping or the store.
+    - **Status:** Fixed in code (Phase 5) — How it works covers all three paths, four steps each, with a button per path.
 15. **Store heading** "Mechanical Parts Store — screws, nuts, washers, bolts…" but it sells electronics + construction (Masonry, Glazing, Acoustic Ceiling Tile). There are **no screws**: the BOM reports M3 screws/nuts as "Not in our store". → Fix heading; hide empty categories; stock M3 hardware (demand already in Sourcing gaps).
     - **Status:** Fixed in code (Phase 1, commit 4627347) — new heading and intro, empty categories hidden. Pending: owner stocks M3 hardware.
 16. **Product page has no "Add to project"**, although the projects empty state tells users to "search the store to add parts".
+    - **Status:** Fixed in code (Phase 5) — product page "Add to project": pick one of your projects or start a new one with the part.
 17. No product photos anywhere — every card is the same gear icon.
     - **Status:** Partly in code (Phase 1, commit 33792b2) — GearPlaceholder takes a label, not yet used by callers. Pending: owner uploads product photos at /dashboard/store/quick.
 
@@ -178,15 +183,20 @@ Fix one section at a time and re-test with the checklist at the bottom.
 
 ### Mobile (375 px)
 53. **No navigation at all:** the header shows only the logo, cart and language toggle. There's no menu button, so no Projects, Store, Design, Dashboard, Sign in or Sign out.
+    - **Status:** Fixed in code (Phase 5) — menu button under 768 px opens every link plus Sign in / Dashboard / Sign out. Verified live at 375 px.
 54. The prototyping sidebar stacks full-height **above** the content, so you scroll a whole screen before seeing anything. It should be a drawer or dropdown.
+    - **Status:** Fixed in code (Phase 5) — under 1024 px the project tree opens from a "Project sections" button. Pending: owner checks on a phone.
 55. The project title in the prototyping bar is truncated to a single character.
+    - **Status:** Fixed in code (Phase 5) — on phones the project title takes its own row. Pending: owner checks on a phone.
 
 ---
 
 ## P2 — Polish
 
 56. Page titles: Store, How it works, About, Contact, product pages, cart and dashboard all share *"Gestaltung — Manufacturing, made simple in Qatar"*. Give each page its own (SEO and tabs).
+    - **Status:** Fixed in code (Phase 5) — every public page and each product has its own title and description (Meta namespace; lib/meta.ts).
 57. The decorative labels **FIG·01 / FIG·02 / GRID V4.1 / "Method: Auto-matched · Network: Qatar · Output: Finished part"** repeat across Home, Design, How it works and About, and read like placeholders. FIG·02 is used on two pages.
+    - **Status:** Fixed in code (Phase 5) — FIG·0x labels and the "Method / Network / Output" spec chips removed; the blueprint panels stay (DESIGN.md brand motif).
 58. **Accessibility:** project cards on /projects are links with no accessible name. Prototyping sidebar items are non-semantic `div`s (not reachable by keyboard; screen readers get unnamed buttons). Add names and roles.
     - **Status:** Fixed in code (Phase 2, commit 392ffa2 — Card 2.2: /projects cards carry aria-label = project name; Phase 4, commit fb94ef1 — Card 4.1: sidebar rows are named buttons with arrow-key navigation). Pending: owner checks with a screen reader.
 59. **Loading states:** the prototyping cost panel briefly shows **QAR 0.00 / 0 / 0** before real values arrive. The project page shows a bare spinner. Use skeletons instead of fake zeros.

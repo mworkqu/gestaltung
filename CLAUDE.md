@@ -886,6 +886,13 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   - 2026-09-29 PAYMENT DETAILS (owner): home page shows method names only (PaymentInstructions `brief`); Fawran
     alias at checkout/success; IBAN never on the site — only in the confirmation email; email required at
     checkout when bank transfer is chosen.
+  - 2026-09-29 SITE AUDIT PHASE 5 DONE (on main; log CHANGELOG-audit.md): header nav = Shop parts · Make a part ·
+    How it works (+ My projects with a session, account menu Dashboard/Sign out, mobile menu) in
+    components/header-nav.tsx; home hero = three choices; /design/quote creates a project with the CAD file
+    (cad-files + project_files, falls back to quote-uploads); /projects/new?for=drawing = drawing request project +
+    drawing_request lead (store-lead SOURCES); product "Add to project"; How it works = three paths; prototyping
+    tree drawer under lg + title row on phones; per-page metadata via lib/meta.ts (Meta namespace); FIG labels +
+    spec chips removed. Phase 6 (admin, Arabic, polish) is next.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
