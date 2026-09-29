@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { cn } from "@/lib/utils";
+import { metaFor } from "@/lib/meta";
 
 // Inventory is now its own top-level, signed-in area (store-first Stage 4) —
 // unrelated to the store landing. Single auth gate + page container (previously
@@ -13,6 +14,8 @@ import { cn } from "@/lib/utils";
 // role may reach it; RLS scopes rows to the caller's tenant. The dashboard/
 // account menu links here; it is never linked from the store landing.
 export const dynamic = "force-dynamic";
+
+export const generateMetadata = metaFor("inventory");
 
 export default async function InventoryLayout({
   children,

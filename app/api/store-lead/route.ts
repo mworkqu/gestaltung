@@ -38,6 +38,11 @@ const SOURCES: Record<
     subject: (n, { count }) => `Quote request — ${n} · ${count} unstocked item${count === 1 ? "" : "s"}`,
     fallbackMessage: "Bill of materials — quote request.",
   },
+  drawing_request: {
+    label: "Drawing request",
+    subject: (n) => `New drawing request — ${n}`,
+    fallbackMessage: "Help me draw it — new drawing project.",
+  },
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

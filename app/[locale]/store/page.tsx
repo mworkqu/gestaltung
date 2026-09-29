@@ -10,6 +10,7 @@ import { PartsFilters } from "@/components/parts/parts-filters";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { isListed, listedCategories } from "@/lib/store/categories";
 import { cn } from "@/lib/utils";
+import { metaFor } from "@/lib/meta";
 
 // Published catalog reflects admin publish toggles immediately.
 export const dynamic = "force-dynamic";
@@ -18,6 +19,8 @@ const PAGE_SIZE = 48;
 
 const WHATSAPP_DIGITS =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
+
+export const generateMetadata = metaFor("store");
 
 export default async function PartsStorePage({
   params,

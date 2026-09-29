@@ -4,9 +4,12 @@ import { setRequestLocale } from "next-intl/server";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { dashboardPathForRole } from "@/lib/auth/redirects";
 import { SignUpForm } from "@/components/auth/sign-up-form";
+import { metaFor } from "@/lib/meta";
 
 // Reads the session cookie to redirect already-signed-in users; keep per-request.
 export const dynamic = "force-dynamic";
+
+export const generateMetadata = metaFor("signUp");
 
 export default async function SignUpPage({
   params,

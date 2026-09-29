@@ -34,6 +34,7 @@ import {
   Loader2,
   Receipt,
   Send,
+  ListTree,
 } from "lucide-react";
 
 import { isAuthSessionMissingError } from "@supabase/supabase-js";
@@ -153,6 +154,8 @@ export function PrototypingWorkspace({
   // edit keeps the client where they are.
   const [current, setCurrent] = useState<string | null>(null);
   const [showOpen, setShowOpen] = useState(false);
+  // Under 1024 px the project tree is a drawer behind one button (audit #54).
+  const [treeOpen, setTreeOpen] = useState(false);
   const [briefCleared, setBriefCleared] = useState(false);
   const [branchSaveFailed, setBranchSaveFailed] = useState(false);
   const [specSaveFailed, setSpecSaveFailed] = useState(false);
@@ -444,6 +447,7 @@ export function PrototypingWorkspace({
   /** Go to a node; with `focus`, bring the control that resolves it into view. */
   async function goTo(n: NodeId, focus?: string) {
     setShowOpen(false);
+    setTreeOpen(false);
     setCurrent(n);
     // Remembered so the next visit opens here (audit #32).
     await patchProject({ stage: n });
@@ -665,7 +669,8 @@ export function PrototypingWorkspace({
         backTo(`/projects/${project.id}`, t("backToProject")),
         <>
           <span className="hidden h-6 w-px bg-borderstrong sm:block" />
-          <div className="min-w-0 flex-1">
+          {/* On a phone the title takes its own row so it's never cut to one letter (audit #55). */}
+          <div className="order-last min-w-0 basis-full sm:order-none sm:basis-auto sm:flex-1">
             <p className={mono("text-[10px] text-faint")}>{t("kicker")}</p>
             <h1 className="truncate text-base font-extrabold tracking-tight text-heading">
               {project.name}
@@ -695,7 +700,7 @@ export function PrototypingWorkspace({
           </button>
         </>,
         showOpen && (
-          <div id="readiness-open" className="neu-inset w-full space-y-2 p-4">
+          <div id="readiness-open" className="neu-inset order-last w-full space-y-2 p-4">
             <p className="text-xs font-bold text-heading">
               {open.length ? t("stillNeeded") : t("allSatisfied")}
             </p>
@@ -728,8 +733,23 @@ export function PrototypingWorkspace({
           !collapsed.left && !collapsed.right && "lg:grid-cols-[248px_minmax(0,1fr)_300px]"
         )}
       >
+        {/* Phones and tablets: the tree opens from one button (audit #54). */}
+        <button
+          type="button"
+          onClick={() => setTreeOpen((o) => !o)}
+          aria-expanded={treeOpen}
+          aria-controls="project-tree"
+          className="neu flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-heading lg:hidden"
+        >
+          <span className="flex items-center gap-2">
+            <ListTree className="h-4 w-4 text-cobalt" />
+            {t("projectSections")}
+          </span>
+          <ChevronDown className={cn("h-4 w-4 text-mutedtext transition-transform", treeOpen && "rotate-180")} />
+        </button>
+
         {/* Project tree */}
-        <aside className="neu p-3">
+        <aside id="project-tree" className={cn("neu p-3", treeOpen ? "block" : "hidden lg:block")}>
           <div className="flex items-center justify-end pb-2">
             <button
               type="button"
@@ -749,7 +769,7 @@ export function PrototypingWorkspace({
             branches={bs}
             states={states}
             current={node}
-            collapsed={collapsed.left}
+            collapsed={collapsed.left && !treeOpen}
             saveFailed={branchSaveFailed}
             onSelect={goTo}
             onBranch={setBranch}

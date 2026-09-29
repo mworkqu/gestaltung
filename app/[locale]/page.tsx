@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Plus, Search } from "lucide-react";
+import { ArrowRight, Lightbulb, Plus, Search, ShoppingBag, UploadCloud } from "lucide-react";
 import { categoryLabel } from "@/lib/store/category-label";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
@@ -79,62 +79,71 @@ export default async function Home({
 
   return (
     <div className="container space-y-6 py-6">
-      {/* Hero bento */}
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Store intro + search */}
-        <div className="neu animate-fade-up flex flex-col justify-center gap-6 p-8 sm:p-10 lg:col-span-7 lg:p-12">
+      {/* Hero (audit #12): one line of who we are, then three clear choices. */}
+      <section className="space-y-6">
+        <div className="animate-fade-up space-y-3 px-1 pt-2">
           <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
             <span className="h-2 w-2 rounded-full bg-cobalt" />
             <span className={mono("text-[10px] text-mutedtext")}>{t("tagline")}</span>
           </span>
-
-          <h1 className="text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl lg:text-[3rem]">
-            {t("heroTitle")}
+          <h1 className="max-w-3xl text-[2.1rem] font-extrabold leading-[1.08] tracking-tight text-heading sm:text-5xl">
+            {t("heroChoose")}
           </h1>
-
-          {/* Search → store catalog */}
-          <form action={`/${locale}/store`} className="flex max-w-xl items-stretch gap-2.5">
-            <div className="flex flex-1 items-center gap-2.5 rounded-2xl border border-white/60 bg-panel px-4 shadow-neu-inset">
-              <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
-              <input
-                name="q"
-                placeholder={t("searchPh")}
-                className="w-full flex-1 bg-transparent py-3.5 text-sm text-heading outline-none placeholder:text-faint"
-              />
-            </div>
-            <Button type="submit" size="lg" className="rounded-2xl px-6">
-              {t("searchBtn")}
-            </Button>
-          </form>
-
-          {/* The primary action on this page: start a project. */}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button asChild size="lg" className="rounded-2xl px-6">
-              <Link href="/projects/new">
-                <Plus className="me-2 h-4 w-4" />
-                {t("newProjectCta")}
-              </Link>
-            </Button>
-            <span className="text-sm text-mutedtext">{t("newProjectSub")}</span>
-          </div>
-
-          {/* Category quick-links */}
-          <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
-              <Link
-                key={category}
-                href={{ pathname: "/store", query: { category } }}
-                className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-medium text-mutedtext shadow-neu-sm transition-colors hover:text-cobalt"
-              >
-                {categoryLabel(category, locale)}
-              </Link>
-            ))}
-          </div>
         </div>
 
-        {/* Custom manufacturing panel — drag-and-drop CAD upload → quote */}
-        <div className="neu animate-fade-up delay-1 p-8 lg:col-span-5">
-          <DesignDropzone />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* 1 — Buy parts */}
+          <div className="neu animate-fade-up flex flex-col gap-5 p-6 sm:p-8">
+            <ChoiceHead icon={<ShoppingBag className="h-5 w-5" />} step="1" title={t("choiceBuyTitle")} text={t("choiceBuyText")} />
+            <form action={`/${locale}/store`} className="flex items-stretch gap-2">
+              <div className="flex flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3.5 shadow-neu-inset">
+                <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
+                <input
+                  name="q"
+                  aria-label={t("searchPh")}
+                  placeholder={t("searchPh")}
+                  className="w-full flex-1 bg-transparent py-3 text-sm text-heading outline-none placeholder:text-faint"
+                />
+              </div>
+              <Button type="submit" className="rounded-2xl px-5">
+                {t("searchBtn")}
+              </Button>
+            </form>
+            <Link href="/store" className="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover">
+              {t("choiceBuyCta")}
+              <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+            </Link>
+          </div>
+
+          {/* 2 — Make my part (I have a file) */}
+          <div className="neu animate-fade-up delay-1 flex flex-col gap-5 p-6 sm:p-8">
+            <ChoiceHead icon={<UploadCloud className="h-5 w-5" />} step="2" title={t("choiceMakeTitle")} text={t("choiceMakeText")} />
+            <DesignDropzone compact />
+          </div>
+
+          {/* 3 — Turn an idea into a product (prototyping) */}
+          <div className="neu animate-fade-up delay-2 flex flex-col gap-5 p-6 sm:p-8">
+            <ChoiceHead icon={<Lightbulb className="h-5 w-5" />} step="3" title={t("choiceIdeaTitle")} text={t("choiceIdeaText")} />
+            <ol className="space-y-1.5 text-sm text-body">
+              {(["choiceIdeaStep1", "choiceIdeaStep2", "choiceIdeaStep3"] as const).map((k, i) => (
+                <li key={k} className="flex items-start gap-2">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-panel text-[11px] font-bold text-cobalt shadow-neu-sm">
+                    {i + 1}
+                  </span>
+                  {t(k)}
+                </li>
+              ))}
+            </ol>
+            <div className="mt-auto space-y-2">
+              <Button asChild size="lg" className="w-full rounded-2xl">
+                <Link href="/projects/new">
+                  <Plus className="me-2 h-4 w-4" />
+                  {t("choiceIdeaCta")}
+                </Link>
+              </Button>
+              <p className="text-center text-[11px] text-mutedtext">{t("choiceIdeaNote")}</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -155,6 +164,20 @@ export default async function Home({
           </Link>
         </div>
 
+        {categories.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-1">
+            {categories.map((category) => (
+              <Link
+                key={category}
+                href={{ pathname: "/store", query: { category } }}
+                className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-medium text-mutedtext shadow-neu-sm transition-colors hover:text-cobalt"
+              >
+                {categoryLabel(category, locale)}
+              </Link>
+            ))}
+          </div>
+        )}
+
         {products.length === 0 ? (
           <div className="neu p-10 text-center">
             <p className="text-sm text-mutedtext">{t("emptyFeatured")}</p>
@@ -173,6 +196,23 @@ export default async function Home({
 
       {/* Callback CTA */}
       <HomeCallback />
+    </div>
+  );
+}
+
+function ChoiceHead({ icon, step, title, text }: { icon: React.ReactNode; step: string; title: string; text: string }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-panel text-cobalt shadow-neu-sm" aria-hidden>
+          {icon}
+        </span>
+        <span className="text-xs font-semibold text-faint" aria-hidden>
+          {step}
+        </span>
+      </div>
+      <h2 className="text-xl font-bold text-heading">{title}</h2>
+      <p className="text-sm leading-relaxed text-body">{text}</p>
     </div>
   );
 }

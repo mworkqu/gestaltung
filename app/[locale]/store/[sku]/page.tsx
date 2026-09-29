@@ -17,11 +17,32 @@ import { RequestItemButton } from "@/components/parts/request-item-button";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
+import { AddToProjectButton } from "@/components/parts/add-to-project-button";
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+// Each product's own title and description (audit #56).
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; sku: string }> }) {
+  const { locale, sku } = await params;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("parts")
+    .select("name, name_ar, description, description_ar, category")
+    .eq("sku", sku)
+    .eq("is_published", true)
+    .maybeSingle();
+  if (!data) return {};
+  const t = await getTranslations({ locale, namespace: "Meta" });
+  const name = partName(data as Part, locale);
+  const desc = (partDescription(data as Part, locale) ?? "").replace(/\s+/g, " ").trim();
+  return {
+    title: t("productTitle", { name }),
+    description: desc ? desc.slice(0, 155) : t("productDescription", { name }),
+  };
+}
 
 export default async function PartDetailPage({
   params,
@@ -152,6 +173,7 @@ export default async function PartDetailPage({
 
           <div className="flex flex-wrap items-center gap-3">
             <PartDetailCart part={part} />
+            <AddToProjectButton partId={part.id} partName={name} />
             <RequestItemButton partId={part.id} partName={name} variant="outline" />
           </div>
           <DemandBeacon kind="view" partId={part.id} />

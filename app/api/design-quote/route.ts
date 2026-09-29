@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { normalizePhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { QUOTE_BUCKET } from "@/lib/design/constants";
+import { CAD_BUCKET, QUOTE_BUCKET } from "@/lib/design/constants";
 
 // Public "request a quote" endpoint for the custom-manufacturing flow. The
 // homepage dropzone → /design/quote uploads the CAD file straight to Storage,
@@ -39,6 +39,9 @@ export async function POST(request: Request) {
     file_name?: string;
     file_size?: number;
     storage_path?: string | null;
+    /** "cad" = the file is on the customer's project (cad-files), else quote-uploads. */
+    bucket?: string;
+    project_id?: string | null;
   };
   try {
     body = await request.json();
@@ -59,6 +62,14 @@ export async function POST(request: Request) {
       ? body.storage_path.trim().slice(0, 400)
       : null;
 
+  const bucket = body.bucket === "cad" ? CAD_BUCKET : QUOTE_BUCKET;
+  const projectId =
+    typeof body.project_id === "string" && /^[0-9a-f-]{36}$/i.test(body.project_id) ? body.project_id : null;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gestaltung360.com";
+  const projectLine = projectId
+    ? `Project: ${projectId} (export: ${siteUrl}/api/admin/projects/${projectId}/export)\n`
+    : "";
+
   if (!email && !phone) {
     return NextResponse.json({ error: "missing_contact" }, { status: 422 });
   }
@@ -76,7 +87,7 @@ export async function POST(request: Request) {
       const svc = createServiceClient();
       if (svc) {
         const { data } = await svc.storage
-          .from(QUOTE_BUCKET)
+          .from(bucket)
           .createSignedUrl(storagePath, SIGNED_URL_TTL);
         downloadUrl = data?.signedUrl ?? null;
       }
@@ -99,6 +110,7 @@ export async function POST(request: Request) {
     `Custom manufacturing quote request.\n` +
     `Method: ${methodLabel}\n` +
     `${fileLine}\n` +
+    projectLine +
     `Email: ${email ?? "—"}\n` +
     `Phone / WhatsApp: ${phone || "—"}\n` +
     (notes ? `\nNotes:\n${notes}\n` : "");
@@ -149,6 +161,7 @@ export async function POST(request: Request) {
             `Phone / WhatsApp: ${phone || "—"}\n` +
             `Method: ${methodLabel}\n` +
             `${fileLine}\n` +
+            projectLine +
             `Language: ${locale}\n` +
             (notes ? `\nNotes:\n${notes}\n` : ""),
         }),

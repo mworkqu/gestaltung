@@ -4,11 +4,14 @@ import { MessageCircle, PencilRuler, FileCheck2, Send } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { metaFor } from "@/lib/meta";
 
 // The business WhatsApp number, digits only (e.g. 974XXXXXXXX). When unset, all
 // CTAs fall back to the contact page instead of a broken wa.me link.
 const WHATSAPP_DIGITS =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
+
+export const generateMetadata = metaFor("drawing");
 
 export default async function CadAssistancePage({
   params,
@@ -45,18 +48,26 @@ export default async function CadAssistancePage({
     { name: t("tier3Name"), desc: t("tier3Desc"), price: t("tier3Price") },
   ];
 
-  // Primary CTA: WhatsApp deep link when configured, contact page otherwise.
-  const cta = waHref ? (
-    <Button asChild size="lg" className="rounded-full px-7">
-      <a href={waHref} target="_blank" rel="noopener noreferrer">
-        <MessageCircle className="h-4 w-4" />
-        {t("ctaWhatsApp")}
-      </a>
-    </Button>
-  ) : (
-    <Button asChild size="lg" className="rounded-full px-7">
-      <Link href="/contact">{t("ctaFallback")}</Link>
-    </Button>
+  // Primary CTA (audit #11): start a drawing project — the request, the brief
+  // and any files live on one project. WhatsApp stays as the second option.
+  const cta = (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button asChild size="lg" className="rounded-full px-7">
+        <Link href={{ pathname: "/projects/new", query: { for: "drawing" } }}>{t("ctaProject")}</Link>
+      </Button>
+      {waHref ? (
+        <Button asChild size="lg" variant="outline" className="rounded-full px-6">
+          <a href={waHref} target="_blank" rel="noopener noreferrer">
+            <MessageCircle className="h-4 w-4" />
+            {t("ctaWhatsApp")}
+          </a>
+        </Button>
+      ) : (
+        <Link href="/contact" className="text-sm font-semibold text-cobalt hover:underline">
+          {t("ctaFallback")}
+        </Link>
+      )}
+    </div>
   );
 
   return (

@@ -3,6 +3,9 @@ import { MapPin, Mail, Building2 } from "lucide-react";
 
 import { ContactForm } from "@/components/contact-form";
 import { cn } from "@/lib/utils";
+import { metaFor } from "@/lib/meta";
+
+export const generateMetadata = metaFor("contact");
 
 export default async function ContactPage({
   params,
@@ -49,7 +52,6 @@ export default async function ContactPage({
               <span className="h-1.5 w-1.5 rounded-full bg-cobalt" />
               {t("formTag")}
             </span>
-            <span>FIG·04</span>
           </div>
           <ContactForm />
         </div>

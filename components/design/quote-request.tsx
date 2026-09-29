@@ -7,10 +7,13 @@ import { Loader2, UploadCloud, FileBox, X, CheckCircle2 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { ensureSession } from "@/lib/supabase/guest";
 import { takePendingUpload } from "@/lib/design/pending-upload";
 import {
   ACCEPT_ATTR,
   ACCEPT_EXTENSIONS,
+  CAD_BUCKET,
+  EXT_ALIASES,
   MAX_FILE_BYTES,
   QUOTE_BUCKET,
 } from "@/lib/design/constants";
@@ -51,6 +54,7 @@ export function QuoteRequest() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<Done>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   // Pick up the file the homepage dropzone handed off (client-only).
   useEffect(() => {
@@ -93,8 +97,44 @@ export function QuoteRequest() {
       // Upload the file straight from the browser to Storage (up to 50 MB,
       // bypassing Vercel's request-body limit). Best-effort: if it fails, we
       // still capture the lead and ask the visitor to send the file separately.
+      // Project spine (audit #11, owner decision 2a): the request becomes a
+      // project with the file attached, so the customer can follow it up and
+      // it sits beside everything else they make. If that fails we fall back
+      // to the plain quote upload — the lead is never lost.
       let storagePath: string | null = null;
-      if (file) {
+      let bucket: "cad" | "quote" = "quote";
+      let newProject: string | null = null;
+      try {
+        const user = await ensureSession();
+        const supabase = createClient();
+        const title = (file?.name.replace(/\.[^.]+$/, "") || name.trim() || t("projectDefaultName")).slice(0, 120);
+        const { data: proj, error: projErr } = await supabase
+          .from("projects")
+          .insert({ user_id: user.id, name: title, brief: message.trim() || null })
+          .select("id")
+          .single();
+        if (projErr) throw projErr;
+        newProject = proj.id as string;
+        const ext = file ? EXT_ALIASES[extOf(file.name)] : undefined;
+        if (file && ext) {
+          const path = `${user.id}/${newProject}/${crypto.randomUUID()}-${sanitize(file.name)}`;
+          const { error: upErr } = await supabase.storage.from(CAD_BUCKET).upload(path, file);
+          if (!upErr) {
+            await supabase.from("project_files").insert({
+              project_id: newProject,
+              storage_path: path,
+              file_name: file.name,
+              file_ext: ext,
+              size_bytes: file.size,
+            });
+            storagePath = path;
+            bucket = "cad";
+          }
+        }
+      } catch {
+        newProject = null;
+      }
+      if (file && !storagePath) {
         try {
           const supabase = createClient();
           const path = `${crypto.randomUUID()}/${sanitize(file.name)}`;
@@ -120,6 +160,8 @@ export function QuoteRequest() {
           file_name: file?.name ?? "",
           file_size: file?.size ?? 0,
           storage_path: storagePath,
+          bucket,
+          project_id: newProject,
         }),
       });
       if (!res.ok) {
@@ -129,6 +171,7 @@ export function QuoteRequest() {
       }
       // "sent" = file safely stored; "sent_large" = had a file but upload
       // failed (ask them to send it another way); "sent_nofile" = no file.
+      setProjectId(newProject);
       setDone(!file ? "sent_nofile" : storagePath ? "sent" : "sent_large");
     } catch {
       setError(t("errorGeneric"));
@@ -165,6 +208,11 @@ export function QuoteRequest() {
           >
             {t("newRequest")}
           </Button>
+          {projectId && (
+            <Button asChild className="rounded-full">
+              <Link href={`/projects/${projectId}`}>{t("openProject")}</Link>
+            </Button>
+          )}
           <Button asChild variant="ghost" className="rounded-full">
             <Link href="/">{t("backHome")}</Link>
           </Button>

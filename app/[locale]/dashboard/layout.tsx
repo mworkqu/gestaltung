@@ -4,9 +4,12 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { SignOutButton } from "@/components/auth/sign-out-button";
+import { metaFor } from "@/lib/meta";
 
 // The whole dashboard area is per-request and auth-gated here, once.
 export const dynamic = "force-dynamic";
+
+export const generateMetadata = metaFor("dashboard");
 
 export default async function DashboardLayout({
   children,

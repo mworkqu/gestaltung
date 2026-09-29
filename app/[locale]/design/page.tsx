@@ -41,11 +41,6 @@ export default async function DesignHubPage({
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  const specs = [
-    { label: tHome("specMethodLabel"), value: tHome("specMethodValue") },
-    { label: tHome("specNetworkLabel"), value: tHome("specNetworkValue") },
-    { label: tHome("specOutputLabel"), value: tHome("specOutputValue") },
-  ];
 
   const paths = [
     {
@@ -90,9 +85,6 @@ export default async function DesignHubPage({
         <div className="neu animate-fade-up delay-1 flex flex-col justify-between gap-6 p-8 lg:col-span-5">
           <div className={mono("flex items-center justify-between text-[10px] text-faint")}>
             <span>{t("panelTag")}</span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> FIG·02
-            </span>
           </div>
 
           {/* Inset well with grid + concentric geometry + G mark */}
@@ -106,16 +98,6 @@ export default async function DesignHubPage({
               <GMark className="h-24 w-24" />
               <p className={mono("mt-5 text-[10px] text-faint")}>{tHero("formats")}</p>
             </div>
-          </div>
-
-          {/* Spec readouts */}
-          <div className="grid grid-cols-3 gap-2">
-            {specs.map((s) => (
-              <div key={s.label} className="rounded-xl bg-panel px-3 py-2.5 shadow-neu-sm">
-                <span className={mono("block text-[8.5px] text-faint")}>{s.label}</span>
-                <span className="mt-1 block text-xs font-bold text-heading">{s.value}</span>
-              </div>
-            ))}
           </div>
         </div>
       </section>

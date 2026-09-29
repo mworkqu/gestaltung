@@ -32,7 +32,13 @@
     "signIn": "Sign in",
     "dashboard": "Dashboard",
     "projects": "Projects",
-    "myInventory": "My inventory"
+    "myInventory": "My inventory",
+    "shopParts": "Shop parts",
+    "makePart": "Make a part",
+    "myProjects": "My projects",
+    "account": "Account",
+    "menu": "Menu",
+    "closeMenu": "Close menu"
   },
   "LanguageSwitcher": {
     "label": "Language",
@@ -107,7 +113,8 @@
     "ctaTag": "Start now",
     "ctaHeading": "Send us your sketch today.",
     "ctaWhatsApp": "Chat on WhatsApp",
-    "ctaFallback": "Contact us"
+    "ctaFallback": "Contact us",
+    "ctaProject": "Start a drawing request"
   },
   "HowItWorks": {
     "kicker": "How it works",
@@ -124,7 +131,46 @@
     "step4Title": "We deliver the part",
     "step4Copy": "Your finished part is quality-checked and delivered back to you.",
     "ctaText": "Have a design ready?",
-    "ctaButton": "Get a quote"
+    "ctaButton": "Get a quote",
+    "metaTitle": "How it works — Gestaltung",
+    "metaDescription": "Buy parts, get a part made from your file, or turn an idea into a product — how each works with Gestaltung in Qatar.",
+    "headingPaths": "Three ways to work with us.",
+    "introPaths": "Buy ready parts, send us a file to make, or start from an idea. Each path takes four steps, and all of them end at your door in Qatar.",
+    "jumpTo": "Jump to a path",
+    "pathLabel": "Path {n}",
+    "buyTitle": "Buy parts",
+    "buyIntro": "Electronics, sensors, motors, 3D-printing supplies and hardware. Every product shows when it arrives.",
+    "buyCta": "Shop parts",
+    "buyStep1Title": "Find it",
+    "buyStep1Copy": "Search or browse by category. Each product shows its delivery time.",
+    "buyStep2Title": "Add to cart or a project",
+    "buyStep2Copy": "Buy now, or keep parts together in a project while you plan.",
+    "buyStep3Title": "Choose delivery and payment",
+    "buyStep3Copy": "Pick a delivery speed and pay by cash on delivery, Fawran or bank transfer.",
+    "buyStep4Title": "Delivered",
+    "buyStep4Copy": "You get a date at checkout. If it's going to change, we email you before it, not after.",
+    "makeTitle": "Make my part",
+    "makeIntro": "You have a CAD file, or a sketch we can draw for you. We pick the method, quote it and have it made in Qatar.",
+    "makeCta": "Make a part",
+    "makeStep1Title": "Send your file",
+    "makeStep1Copy": "Drop an STL, STEP, DXF or IGES file, or ask us to draw it. It becomes a project you can follow.",
+    "makeStep2Title": "We pick the method",
+    "makeStep2Copy": "3D printing, CNC machining, laser cutting or EDM, matched to your material and quantity. You get a quote.",
+    "makeStep3Title": "A partner workshop makes it",
+    "makeStep3Copy": "Once you approve, a workshop in Qatar produces the part and we check it.",
+    "makeStep4Title": "Delivered",
+    "makeStep4Copy": "The finished part is delivered to you anywhere in Qatar.",
+    "ideaTitle": "Turn an idea into a product",
+    "ideaIntro": "No drawings yet. Describe what it must do and we help you plan it, part by part, before you spend anything.",
+    "ideaCta": "Start a project",
+    "ideaStep1Title": "Describe it",
+    "ideaStep1Copy": "Write or say what the product must do. No account needed.",
+    "ideaStep2Title": "See the plan",
+    "ideaStep2Copy": "We suggest the parts, draw the circuit with real product photos and check it for common mistakes.",
+    "ideaStep3Title": "Get the parts",
+    "ideaStep3Copy": "Buy everything as one kit from our store, or ask for a quote on what we don't stock.",
+    "ideaStep4Title": "Build or get it made",
+    "ideaStep4Copy": "Build it yourself, or we make the custom parts and enclosure for you."
   },
   "About": {
     "kicker": "About",
@@ -384,7 +430,13 @@
     "pagination": "Pages",
     "prevPage": "Previous",
     "nextPage": "Next",
-    "pageOf": "Page {page} of {pages}"
+    "pageOf": "Page {page} of {pages}",
+    "addToProject": "Add to project",
+    "addedToProject": "Added to",
+    "newProjectFor": "New project, e.g. {name}",
+    "newProjectName": "New project name",
+    "startProjectWithPart": "Start a new project with this part",
+    "addToProjectFailed": "Couldn't add it. Please try again."
   },
   "Cart": {
     "loadError": "We couldn't load your cart. Please try again.",
@@ -602,7 +654,20 @@
     "callbackDone": "Thanks! We'll contact you on WhatsApp shortly.",
     "callbackError": "Please enter your name and number and try again.",
     "newProjectCta": "New project",
-    "newProjectSub": "Start without an account"
+    "newProjectSub": "Start without an account",
+    "heroChoose": "Parts, custom parts and new products — made in Qatar.",
+    "choiceBuyTitle": "Buy parts",
+    "choiceBuyText": "Electronics, sensors, motors, 3D-printing supplies and hardware, delivered across Qatar.",
+    "choiceBuyCta": "Browse the store",
+    "choiceMakeTitle": "Make my part",
+    "choiceMakeText": "You have a CAD file. We pick the right method and send you a quote.",
+    "choiceIdeaTitle": "Turn an idea into a product",
+    "choiceIdeaText": "No drawings yet? Describe it and we help you plan the parts, the circuit and the cost.",
+    "choiceIdeaStep1": "Describe what it must do",
+    "choiceIdeaStep2": "Get the parts list and circuit",
+    "choiceIdeaStep3": "Buy the kit or get it made",
+    "choiceIdeaCta": "Start a project",
+    "choiceIdeaNote": "Free, no account needed."
   },
   "DesignQuote": {
     "metaTitle": "Request a quote — Gestaltung",
@@ -646,7 +711,9 @@
     "errorTechnique": "Please choose a manufacturing method.",
     "errorFileType": "Please choose a CAD file (STL, STEP, DXF or IGES).",
     "errorTooLarge": "That file is over 50 MB. Please choose a smaller file.",
-    "errorGeneric": "Something went wrong. Please try again."
+    "errorGeneric": "Something went wrong. Please try again.",
+    "projectDefaultName": "Part to make",
+    "openProject": "Open your project"
   },
   "DesignHub": {
     "metaTitle": "Design your own part — Gestaltung",
@@ -769,7 +836,14 @@
     "card_parts": "{count, plural, one {# part} other {# parts}}",
     "card_status_planning": "Planning",
     "card_status_in_cart": "In cart",
-    "card_status_ordered": "Ordered"
+    "card_status_ordered": "Ordered",
+    "drawingHeading": "Get your part drawn",
+    "drawingIntro": "Tell us what you need and we'll draw it for you. Your request becomes a project, so you can add sketches, photos or files and follow it in one place.",
+    "drawingRequired": "Tell us what to draw and a WhatsApp number to reach you.",
+    "drawingBriefLabel": "What should we draw?",
+    "drawingBriefPlaceholder": "What the part does, rough size, material, and anything it must fit onto.",
+    "drawingPhoneLabel": "WhatsApp number",
+    "drawingPhoneHint": "We'll message you with a price before we start."
   },
   "Search": {
     "inInventory": "In your inventory",
@@ -1419,7 +1493,8 @@
     "rule_fab_reason": "the Custom PCB route: the board itself, made after the prototype works",
     "node_concepts": "Concepts",
     "wiringExample": "Example photo",
-    "wiringKey": "Wire colours"
+    "wiringKey": "Wire colours",
+    "projectSections": "Project sections"
   },
   "AiUsage": {
     "kicker": "Admin",
@@ -1985,5 +2060,31 @@
     "locationLabel": "Location",
     "homeTitle": "Ways to pay",
     "emailForBank": "Needed for bank transfer: we send the account details (IBAN) to this email."
+  },
+  "Meta": {
+    "storeTitle": "Parts store — Gestaltung",
+    "storeDescription": "Electronics, sensors, motors, 3D-printing supplies and hardware with delivery dates, across Qatar.",
+    "cartTitle": "Your cart — Gestaltung",
+    "cartDescription": "Review the parts in your cart before checkout.",
+    "checkoutTitle": "Checkout — Gestaltung",
+    "checkoutDescription": "Choose delivery and how you'll pay: cash on delivery, Fawran or bank transfer.",
+    "successTitle": "Order received — Gestaltung",
+    "successDescription": "Your order is in. Here is how to pay and when it arrives.",
+    "aboutTitle": "About us — Gestaltung",
+    "aboutDescription": "Gestaltung for Trading and Services W.L.L, a registered Qatari company for parts, custom manufacturing and prototyping.",
+    "contactTitle": "Contact — Gestaltung",
+    "contactDescription": "Message us about parts, a part to make or a product idea. We reply on WhatsApp.",
+    "drawingTitle": "We draw your part — Gestaltung",
+    "drawingDescription": "No CAD file? We draw your part from a sketch or photo, ready to manufacture in Qatar.",
+    "signInTitle": "Sign in — Gestaltung",
+    "signInDescription": "Sign in to your Gestaltung account.",
+    "signUpTitle": "Create an account — Gestaltung",
+    "signUpDescription": "Create a Gestaltung account to keep your projects and orders in one place.",
+    "inventoryTitle": "Workshop inventory — Gestaltung",
+    "inventoryDescription": "Stock and project planning for your workshop.",
+    "dashboardTitle": "Dashboard — Gestaltung",
+    "dashboardDescription": "Your Gestaltung dashboard.",
+    "productTitle": "{name} — Gestaltung store",
+    "productDescription": "Buy {name} from Gestaltung, delivered across Qatar."
   }
 }

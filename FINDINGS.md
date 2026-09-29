@@ -18,6 +18,10 @@ flow — because `/projects/new` does not exist yet.
 to the project flow, stays on the quote flow, or the hub collapses to a single
 path. Same decision applies to the six legacy redirects in `next.config.mjs`
 that now all resolve to `/design/quote`.
+**CLOSED 2026-09-29 (audit Phase 5, decision 2a):** the card and the redirects
+keep `/design/quote`, but that flow now creates a project with the file
+attached (cad-files + project_files) and links to it; "help me draw it" opens
+`/projects/new?for=drawing` (project with a brief + drawing_request lead).
 
 ### 2. Orphaned i18n keys
 **Found:** Step B, commit 1.

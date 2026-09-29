@@ -3,6 +3,9 @@ import { Target, MapPin, LayoutGrid } from "lucide-react";
 
 import { GMark } from "@/components/g-mark";
 import { cn } from "@/lib/utils";
+import { metaFor } from "@/lib/meta";
+
+export const generateMetadata = metaFor("about");
 
 export default async function AboutPage({
   params,
@@ -60,9 +63,6 @@ export default async function AboutPage({
         <div className="neu animate-fade-up delay-1 flex flex-col justify-between gap-6 p-8 lg:col-span-5">
           <div className={mono("flex items-center justify-between text-[10px] text-faint")}>
             <span>{t("panelTag")}</span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> FIG·02
-            </span>
           </div>
 
           {/* Inset well with grid + concentric geometry + G mark */}

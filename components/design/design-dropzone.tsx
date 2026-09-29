@@ -17,7 +17,7 @@ function extOf(name: string) {
 // The homepage "custom manufacturing" panel, now an interactive drag-and-drop
 // zone. Picking or dropping a CAD file carries it to the public /design/quote
 // page (email/phone + method), keeping the blueprint aesthetic of the old box.
-export function DesignDropzone() {
+export function DesignDropzone({ compact = false }: { compact?: boolean }) {
   const t = useTranslations("StoreLanding");
   const locale = useLocale();
   const router = useRouter();
@@ -43,12 +43,11 @@ export function DesignDropzone() {
 
   return (
     <div className="flex flex-col justify-between gap-6">
-      <div className={mono("flex items-center justify-between text-[10px] text-faint")}>
-        <span>{t("customKicker")}</span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> FIG·01
-        </span>
-      </div>
+      {!compact && (
+        <div className={mono("text-[10px] text-faint")}>
+          <span>{t("customKicker")}</span>
+        </div>
+      )}
 
       {/* Drop / browse well */}
       <button
@@ -66,7 +65,9 @@ export function DesignDropzone() {
         }}
         aria-label={t("dropCta")}
         className={cn(
-          "neu-inset relative flex min-h-[15rem] flex-1 cursor-pointer flex-col items-center justify-center overflow-hidden p-8 text-center transition",
+          "neu-inset relative flex flex-1",
+          compact ? "min-h-[11rem]" : "min-h-[15rem]",
+          "cursor-pointer flex-col items-center justify-center overflow-hidden p-8 text-center transition",
           dragging && "ring-2 ring-cobalt/60"
         )}
       >

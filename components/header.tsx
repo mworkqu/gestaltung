@@ -4,25 +4,14 @@ import { Link } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { LogoMark } from "@/components/logo-mark";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { HeaderAuthLink } from "@/components/header-auth-link";
+import { HeaderNav } from "@/components/header-nav";
 import { CartIcon } from "@/components/parts/cart-icon";
 import { cn } from "@/lib/utils";
 import { CompanyStrip } from "@/components/company-strip";
 
 export async function Header({ locale }: { locale: Locale }) {
-  const t = await getTranslations("Nav");
   const tBrand = await getTranslations("Brand");
   const isRtl = locale === "ar";
-
-  // Store-first primary nav (Stage 5): the two customer paths only. Inventory is
-  // deliberately absent from the public header — it lives behind the dashboard/
-  // account menu — so it never appears on the store landing (hard rule).
-  const navLinks = [
-    { href: "/projects", label: t("projects") },
-    { href: "/store", label: t("store") },
-    { href: "/my-inventory", label: t("myInventory") },
-    { href: "/design", label: t("design") },
-  ];
 
   return (
     <header className="sticky top-0 z-40 w-full">
@@ -30,7 +19,7 @@ export async function Header({ locale }: { locale: Locale }) {
         <CompanyStrip className="container" />
       </div>
       <div className="container pt-4">
-        <div className="neu flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="neu relative flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
           {/* Brand lockup */}
           <Link href="/" className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink shadow-neu-sm">
@@ -58,29 +47,10 @@ export async function Header({ locale }: { locale: Locale }) {
             </span>
           </Link>
 
-          {/* Primary nav */}
-          <nav className="hidden items-center gap-1 md:flex">
-            {navLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={cn(
-                  "rounded-lg px-3 py-2 text-mutedtext transition-colors duration-300 hover:text-heading",
-                  isRtl
-                    ? "text-sm font-medium"
-                    : "font-mono text-[11px] uppercase tracking-wider"
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2 sm:gap-3">
+          <HeaderNav isRtl={isRtl}>
             <CartIcon />
             <LanguageSwitcher currentLocale={locale} />
-            <HeaderAuthLink isRtl={isRtl} />
-          </div>
+          </HeaderNav>
         </div>
       </div>
     </header>
