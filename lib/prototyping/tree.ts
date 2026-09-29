@@ -123,7 +123,10 @@ export function visibleNodes(bs: Branch[]): NodeId[] {
 export function nodeOf(r: Requirement, parts: PartLike[], visible: NodeId[]): NodeId {
   if (r.group === "brief" || r.group === "understanding" || r.group === "inputs") return "brief";
   if (r.group === "route") return "quote";
-  if (isCircuitRequirement(r) && visible.includes("electronics.board")) return "electronics.board";
+  // Electronics steps (2026-09-29): the board choice on Board, the circuit on Components.
+  if (r.id === "electronics_route" && visible.includes("electronics.board")) return "electronics.board";
+  if (r.id === "q:power" && visible.includes("electronics.power")) return "electronics.power";
+  if (isCircuitRequirement(r) && visible.includes("electronics.components")) return "electronics.components";
   if (r.group === "bom") {
     const n = r.bomKind ? (bomNode(r.bomKind) as NodeId) : "bom";
     return visible.includes(n) ? n : "bom";
@@ -191,7 +194,7 @@ export function nodeStates(
 
   const power = rowOf(spec, "power");
   if (!power?.value)
-    set("electronics.power", { reason: t("need_power"), target: "brief", focus: factFocus("power") });
+    set("electronics.power", { reason: t("need_power"), target: "electronics.power", focus: "power-choice" });
 
   // Quote waits on parts first, then on an actual quantity.
   const openPart = r.requirements.find((x) => !x.satisfied && x.group === "parts");

@@ -76,6 +76,12 @@ import { cn } from "@/lib/utils";
  * ONE money figure — to buy now — and, on its own line, the counts: not
  * stocked, to fabricate, ordered (audit #26). Money and counts never share a row.
  */
+/** A product name cut to its model: "ESP32-S3 DevKitC-1 N16R8 Development Board" → "ESP32-S3 DevKitC-1 N16R8". */
+function shortModel(name: string): string {
+  const head = name.split(/\s[–—-]\s|,/)[0].replace(/\b(development|module|board|sensor|kit)\b/gi, "").replace(/\s{2,}/g, " ").trim();
+  return (head || name).slice(0, 36);
+}
+
 export function CostSummary({
   lines: given,
   matches,
@@ -590,7 +596,7 @@ function Row({
         <option value="">{t("bomChoosePlaceholder", { count: m.candidates.length })}</option>
         {m.candidates.map((c) => (
           <option key={c.id} value={c.id}>
-            {`${c.strength === "weak" ? `${t("weakPrefix")} ` : ""}${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)} · ${tD(`lt_${c.lead_time_class ?? "on_request"}`)}`}
+            {`${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)} · ${tD(`lt_${c.lead_time_class ?? "on_request"}`)}`}
           </option>
         ))}
       </select>
@@ -671,10 +677,9 @@ function Row({
             {m!.candidates.length > 1 && picker}
             {admin && <Why c={suggestion} />}
           </div>
-        ) : showPicker ? (
+        ) : showPicker && !p ? (
           <div className="space-y-1">
             {picker}
-            {p && admin && <Why c={p} />}
           </div>
         ) : p ? (
           <div className="space-y-1">
@@ -696,6 +701,33 @@ function Row({
                 <span className="block font-mono text-[10px] text-faint">{p.sku}</span>
               </span>
             </Link>
+            {/* Our pick, with the other models one click away (owner, 2026-09-29). */}
+            {m && !m.have && !l.fulfilled && (m.auto || m.candidates.length > 1) && (
+              <div className="space-y-0.5 text-[11px]">
+                {m.auto && <span className="font-semibold text-cobalt">{t("bomOurPick")}</span>}
+                {m.candidates.filter((c) => c.id !== p.id).length > 0 && (
+                  <span className="block text-mutedtext">
+                    {t("bomAlternatives")}{" "}
+                    {m.candidates
+                      .filter((c) => c.id !== p.id)
+                      .map((c, i) => (
+                        <span key={c.id}>
+                          {i > 0 && " · "}
+                          <button
+                            type="button"
+                            disabled={confirming}
+                            onClick={() => void confirm(c.id)}
+                            title={`${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)}`}
+                            className="font-medium text-cobalt hover:underline disabled:opacity-60"
+                          >
+                            {shortModel(partName(c, locale))} ({formatPrice(Number(c.unit_price), locale)})
+                          </button>
+                        </span>
+                      ))}
+                  </span>
+                )}
+              </div>
+            )}
             {admin && <Why c={p} />}
           </div>
         ) : m?.have ? (

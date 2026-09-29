@@ -53,12 +53,13 @@ describe("matchLine — diodes (audit #2)", () => {
     attributes: { class: "diode", diode_type: "signal", current_a: 0.2, voltage_v: 100 },
   });
 
-  it("an untyped 1N4148 is a weak candidate only, never the line's product", () => {
+  it("an untyped 1N4148 is weak, and is picked as our best match (auto) until the client changes it", () => {
     const m = match(flyback, [untyped4148]);
     expect(m.candidates.map((c) => [c.id, c.strength])).toEqual([[untyped4148.id, "weak"]]);
-    expect(m.product).toBeNull();
-    expect(m.status).toBe("choose");
-    expect(weakSuggestion(m)?.id).toBe(untyped4148.id);
+    expect(m.product?.id).toBe(untyped4148.id);
+    expect(m.auto).toBe(true);
+    expect(m.status).toBe("matched");
+    expect(weakSuggestion(m)).toBeNull();
   });
 
   it("a typed rectifier 1N4007, 1 A 1000 V, is a strong match and resolves the line", () => {
@@ -85,12 +86,13 @@ describe("matchLine — diodes (audit #2)", () => {
     const bare = part({ attributes: { class: "diode", diode_type: "rectifier" } });
     const m = match(flyback, [bare]);
     expect(m.candidates[0]?.strength).toBe("weak");
-    expect(m.product).toBeNull();
+    expect(m.auto).toBe(true);
   });
 
   it("the client's explicit pick of the suggestion resolves the line", () => {
     const m = match({ ...flyback, choice: untyped4148.id }, [untyped4148]);
     expect(m.product?.id).toBe(untyped4148.id);
+    expect(m.auto).toBeUndefined();
     expect(m.status).toBe("matched");
     expect(weakSuggestion(m)).toBeNull();
   });

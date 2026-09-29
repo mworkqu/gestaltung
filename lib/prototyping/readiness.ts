@@ -162,7 +162,7 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
   // made, then builds the list.
   if (p.electronics) {
     add(
-      { id: "electronics_route", group: "bom", label: t("req_electronicsRoute"), satisfied: !!p.electronics.route, focus: "route-card", bomKind: "electronics" },
+      { id: "electronics_route", group: "bom", label: t("req_electronicsRoute"), satisfied: !!p.electronics.route, focus: "board-choice", bomKind: "electronics" },
       t("block_electronicsRoute")
     );
     if (p.electronics.route)

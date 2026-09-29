@@ -125,6 +125,9 @@ export function mergeAnalysis(
   };
 }
 
+/** A spec before any analysis: lets a choice (e.g. power) be saved first. */
+export const EMPTY_SPEC: Spec = { summary: "", rows: [], questions: [], confirmed: false, provider: "", fallback: null };
+
 /** The client sets a fact, from the spec sheet or from a question. */
 export function setFact(spec: Spec, fact: { id: string; label: string }, value: string | null): Spec {
   const exists = spec.rows.some((r) => r.id === fact.id);

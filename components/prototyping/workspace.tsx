@@ -48,7 +48,7 @@ import { HeaderAuthLink } from "@/components/header-auth-link";
 import { CartIcon } from "@/components/parts/cart-icon";
 import { CIRCUIT_FOCUS, looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
 import { disciplineOf, isConcept, isMakeable } from "@/lib/prototyping/parts";
-import { rowOf } from "@/lib/prototyping/spec";
+import { EMPTY_SPEC, rowOf, setFact } from "@/lib/prototyping/spec";
 import type { Spec } from "@/lib/prototyping/spec";
 import { projectBoards } from "@/lib/prototyping/footprints";
 import { circuitBomIds } from "@/lib/prototyping/netlist";
@@ -89,7 +89,7 @@ import {
 } from "@/components/prototyping/schematics-stage";
 import { BomTable, CostSummary } from "@/components/prototyping/bom-table";
 import { PaymentCard } from "@/components/prototyping/payment-card";
-import { BuildRouteCard, LevelFlags } from "@/components/prototyping/electronics-route";
+import { BoardChoice, GenerateComponents, LevelFlags, PowerChoice } from "@/components/prototyping/electronics-route";
 import type { BuildRoute } from "@/lib/prototyping/analysis";
 import { DimensionDrawings } from "@/components/prototyping/dimension-drawings";
 import { NetlistView } from "@/components/prototyping/netlist-view";
@@ -904,46 +904,58 @@ export function PrototypingWorkspace({
             />
           )}
 
+          {/* Electronics in three steps: Board → Power → Components (owner, 2026-09-29). */}
           {node === "electronics.board" && (
             <>
-              {designStage("electronics")}
-              {/* Circuit requirements focus here (readiness CIRCUIT_FOCUS). */}
-              <div id={CIRCUIT_FOCUS} tabIndex={-1} className="outline-none">
-                <NetlistView
-                  projectId={project.id}
-                  netlist={project.netlist ?? null}
-                  bom={bom}
-                  matches={matches}
-                  onSaved={load}
-                  extra={levelFlags}
-                />
-              </div>
+              <BoardChoice
+                route={buildRoute}
+                recommendation={spec?.routeRecommendation ?? null}
+                onRoute={chooseRoute}
+                onNext={() => goTo("electronics.power", "power-choice")}
+              />
+              {buildRoute === "custom_pcb" && designStage("electronics")}
               {earlier(designOf("electronics"))}
             </>
           )}
 
           {node === "electronics.power" && (
-            <PowerCard
-              spec={spec}
-              netlist={project.netlist ?? null}
-              onSet={() => goTo("brief", "fact-power")}
-              onCircuit={() => goTo("electronics.board", CIRCUIT_FOCUS)}
-            />
+            <>
+              <PowerChoice
+                value={rowOf(spec, "power")?.value ?? null}
+                onPick={(v) => saveSpec(setFact(spec ?? EMPTY_SPEC, { id: "power", label: "Power" }, v))}
+                onNext={() => goTo("electronics.components", "route-card")}
+              />
+              {project.netlist && (
+                <PowerCard netlist={project.netlist} onCircuit={() => goTo("electronics.components", CIRCUIT_FOCUS)} />
+              )}
+            </>
           )}
 
           {node === "electronics.components" && (
-            <div id="route-card" tabIndex={-1} className="outline-none">
-              <BuildRouteCard
+            <GenerateComponents
+              projectId={project.id}
+              route={buildRoute}
+              power={rowOf(spec, "power")?.value ?? null}
+              builtFor={(bom?.route as BuildRoute | undefined) ?? null}
+              onBuilt={load}
+              onGoBoard={() => goTo("electronics.board", "board-choice")}
+              onGoPower={() => goTo("electronics.power", "power-choice")}
+            />
+          )}
+          {node === "electronics.components" && bomTable("electronics", levelFlags)}
+          {node === "electronics.components" && project.netlist && (
+            // Circuit requirements focus here (readiness CIRCUIT_FOCUS).
+            <div id={CIRCUIT_FOCUS} tabIndex={-1} className="outline-none">
+              <NetlistView
                 projectId={project.id}
-                route={buildRoute}
-                builtFor={(bom?.route as BuildRoute | undefined) ?? null}
-                recommendation={spec?.routeRecommendation ?? null}
-                onRoute={chooseRoute}
-                onBuilt={load}
+                netlist={project.netlist ?? null}
+                bom={bom}
+                matches={matches}
+                onSaved={load}
+                extra={levelFlags}
               />
             </div>
           )}
-          {node === "electronics.components" && bomTable("electronics", levelFlags)}
           {node === "electronics.components" && (
             <ComponentsCard
               onAddExisting={() => setAddingExisting(true)}

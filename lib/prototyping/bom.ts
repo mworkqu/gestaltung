@@ -75,6 +75,8 @@ export type LineMatch = {
   product: ScoredCandidate | null;
   /** Set when the client already owns the product or a matching item. */
   have: { name: string; quantity: number } | null;
+  /** The product is our best match, picked for the client; they can change it. */
+  auto?: boolean;
 };
 
 /** A line's function as a stable key: survives a re-analysis that renames the id. */

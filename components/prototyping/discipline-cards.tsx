@@ -6,41 +6,28 @@
 // powerBudget() the hard rules block on, so the numbers always agree.
 
 import { useTranslations } from "next-intl";
-import { CircleAlert, ListChecks, PackagePlus, Plug } from "lucide-react";
+import { CircleAlert, ListChecks, PackagePlus } from "lucide-react";
 
 import { powerBudget, type Netlist } from "@/lib/prototyping/netlist";
-import { rowOf, type Spec } from "@/lib/prototyping/spec";
-import { formatFact } from "@/components/prototyping/spec-sheet";
 import { Card, PrimaryButton, SoftButton } from "@/components/prototyping/ui";
 
 export function PowerCard({
-  spec,
   netlist,
-  onSet,
   onCircuit,
 }: {
-  spec: Spec | null;
   /** The stored circuit: its rails and each part's typical draw make the budget. */
   netlist: Netlist | null;
-  onSet: () => void;
   onCircuit: () => void;
 }) {
   const t = useTranslations("Prototyping");
-  const row = rowOf(spec, "power");
   const budget = netlist ? powerBudget(netlist) : [];
   const who = (ref: string) => {
     const c = netlist?.components.find((x) => x.ref === ref);
     return c ? `${ref} (${c.function})` : ref;
   };
   return (
-    <Card kicker={t("discipline_electronics")} title={t("powerTitle")} intro={t("powerIntro")}>
-      <p className="flex items-center gap-2 text-sm text-heading">
-        <Plug className="h-4 w-4 shrink-0 text-cobalt" />
-        {row?.value ? t("powerIs", { source: formatFact("power", row.value, t) }) : t("powerUnknown")}
-      </p>
-      <SoftButton onClick={onSet}>{t(row?.value ? "powerChange" : "powerSet")}</SoftButton>
-
-      <div className="space-y-2 border-t border-borderstrong/40 pt-3">
+    <Card kicker={t("discipline_electronics")} title={t("powerBudgetTitle")} intro={t("powerIntro")}>
+      <div className="space-y-2">
         <p className="text-xs font-bold text-heading">{t("powerBudgetTitle")}</p>
         {!budget.length && <p className="text-[12px] text-mutedtext">{t("powerBudgetNone")}</p>}
         {budget.map((b) => (

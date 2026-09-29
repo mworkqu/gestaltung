@@ -204,6 +204,10 @@ function classWordsFor(line: BomLine): RegExp | null {
 }
 
 const STOCK_ORDER: Record<string, number> = { in_stock: 0, low_stock: 1, out_of_stock: 2 };
+// What the storefront shows (lead_time_class, from supplier offers): sooner first,
+// "available on request" (null) last. stock_status is legacy and only breaks ties.
+const LEAD_ORDER: Record<string, number> = { in_stock: 0, "3_5_days": 1, "1_2_weeks": 2, "2_4_weeks": 3 };
+const leadRank = (p: Candidate) => LEAD_ORDER[(p as { lead_time_class?: string | null }).lead_time_class ?? ""] ?? 4;
 
 /** Same product listed twice (same name and price): keep the best-stocked one. */
 function dedupe(list: Scored[]): Scored[] {
@@ -255,6 +259,7 @@ export function matchLine(
     (a, b) =>
       Number(b.strength === "strong") - Number(a.strength === "strong") ||
       b.score - a.score ||
+      leadRank(a.p) - leadRank(b.p) ||
       (STOCK_ORDER[a.p.stock_status] ?? 3) - (STOCK_ORDER[b.p.stock_status] ?? 3) ||
       Number(a.p.unit_price) - Number(b.p.unit_price)
   );
@@ -263,10 +268,14 @@ export function matchLine(
     .map((s) => ({ ...s.p, strength: s.strength, why: s.why }));
 
   const strong = candidates.filter((c) => c.strength === "strong");
-  // The client's own pick wins while it is still a candidate; otherwise only a
-  // single strong match resolves the line by itself.
+  // The client's own pick wins while it is still a candidate; then a single
+  // strong match; otherwise our best candidate is picked for them (owner,
+  // 2026-09-29: "choose the best option and change on request") and marked
+  // `auto` so the table says so and offers the alternatives.
   const chosen = line.choice ? candidates.find((c) => c.id === line.choice) ?? null : null;
-  const product = chosen ?? (strong.length === 1 ? strong[0] : null);
+  const decided = chosen ?? (strong.length === 1 ? strong[0] : null);
+  const auto = !decided && candidates.length > 0;
+  const product = decided ?? (auto ? candidates[0] : null);
 
   const ownedProduct = inventory.find(
     (i) =>
@@ -289,7 +298,7 @@ export function matchLine(
     : null;
 
   const status = have ? "have" : candidates.length === 0 ? "not_stocked" : product ? "matched" : "choose";
-  return { lineId: line.id, status, candidates, product, have };
+  return { lineId: line.id, status, candidates, product, have, ...(auto ? { auto: true } : {}) };
 }
 
 /**

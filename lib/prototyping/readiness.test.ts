@@ -53,15 +53,15 @@ describe("readiness: circuit_clean (audit #1)", () => {
     expect(r.requirements.find((x) => x.id === "circuit_clean")).toMatchObject({ satisfied: false, blockingReason: "block_circuitMissing" });
   });
 
-  it("the tree counts them on Electronics › Board", () => {
+  it("the tree counts them on Electronics › Components, where the circuit is shown", () => {
     const r = projectReadiness(input(raw), tKey);
     const visible = visibleNodes(branches({ manual: { electronics: true } }, null, []));
     const states = nodeStates(r, [], null, visible, tKey, "prototype");
-    const board = states["electronics.board"].open.map((x) => x.id);
-    expect(board).toContain("circuit_clean");
-    expect(board).toContain("circuit:shorted_supplies:5V");
-    expect(board).toHaveLength(7);
-    expect(nodeOf(r.requirements.find((x) => x.id === "circuit_clean")!, [], visible)).toBe("electronics.board");
+    const components = states["electronics.components"].open.map((x) => x.id);
+    expect(components).toContain("circuit_clean");
+    expect(components).toContain("circuit:shorted_supplies:5V");
+    expect(states["electronics.board"].open.map((x) => x.id)).not.toContain("circuit_clean");
+    expect(nodeOf(r.requirements.find((x) => x.id === "circuit_clean")!, [], visible)).toBe("electronics.components");
   });
 });
 
