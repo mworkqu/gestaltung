@@ -893,6 +893,13 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     drawing_request lead (store-lead SOURCES); product "Add to project"; How it works = three paths; prototyping
     tree drawer under lg + title row on phones; per-page metadata via lib/meta.ts (Meta namespace); FIG labels +
     spec chips removed. Phase 6 (admin, Arabic, polish) is next.
+  - 2026-09-29 (owner): dashboard = grouped sidebar (Today · Customers · Store · Suppliers · Settings + Back to
+    the website; components/dashboard/dashboard-nav.tsx) and "Today" overview (components/dashboard/admin-overview.tsx:
+    new messages, open orders, product requests, parts we don't sell, active projects, on-request products + latest
+    messages/orders). Offer-coverage box reworded (all "without an offer" = Voltaat out of stock). Guests starting a
+    project give a WhatsApp number (saved to profiles.phone; banner "Saved under {phone}"); phone-only login on
+    other devices would need paid SMS, so cross-device still = add an email. AI usage page: "Which AI does what"
+    (main/backup Gemini, Groq Whisper, answers per model from ai_usage.model).
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
