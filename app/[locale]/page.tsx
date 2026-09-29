@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
-import { HomeTrust } from "@/components/payment/home-trust";
 import { isListed, listedCategories } from "@/lib/store/categories";
 import { cn } from "@/lib/utils";
 
@@ -89,6 +88,7 @@ export default async function Home({
           <h1 className="max-w-3xl text-[2.1rem] font-extrabold leading-[1.08] tracking-tight text-heading sm:text-5xl">
             {t("heroChoose")}
           </h1>
+          <p className="max-w-2xl text-base leading-relaxed text-body">{t("heroChooseIntro")}</p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -191,8 +191,6 @@ export default async function Home({
         )}
       </section>
 
-      {/* Who you're buying from, and how to pay */}
-      <HomeTrust />
 
       {/* Callback CTA */}
       <HomeCallback />

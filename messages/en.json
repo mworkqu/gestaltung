@@ -38,7 +38,10 @@
     "myProjects": "My projects",
     "account": "Account",
     "menu": "Menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "pathBuy": "Buy parts",
+    "pathMake": "Make my part",
+    "pathIdea": "Turn an idea into a product"
   },
   "LanguageSwitcher": {
     "label": "Language",
@@ -682,7 +685,7 @@
     "callbackError": "Please enter your name and number and try again.",
     "newProjectCta": "New project",
     "newProjectSub": "Start without an account",
-    "heroChoose": "Parts, custom parts and new products — made in Qatar.",
+    "heroChoose": "Three ways to work with us.",
     "choiceBuyTitle": "Buy parts",
     "choiceBuyText": "Electronics, sensors, motors, 3D-printing supplies and hardware, delivered across Qatar.",
     "choiceBuyCta": "Browse the store",
@@ -694,7 +697,8 @@
     "choiceIdeaStep2": "Get the parts list and circuit",
     "choiceIdeaStep3": "Buy the kit or get it made",
     "choiceIdeaCta": "Start a project",
-    "choiceIdeaNote": "Free, no account needed."
+    "choiceIdeaNote": "Free, no account needed.",
+    "heroChooseIntro": "Buy ready parts, send us a file to make, or start from an idea. Each path takes four steps, and all of them end at your door in Qatar."
   },
   "DesignQuote": {
     "metaTitle": "Request a quote — Gestaltung",

@@ -1,17 +1,14 @@
 import { getTranslations } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
-import { CompanyStrip } from "@/components/company-strip";
 
 export async function Footer() {
   const t = await getTranslations("Footer");
   const tNav = await getTranslations("Nav");
 
-  // Secondary nav lives in the footer now that the header is store-first (Store
-  // + Design only). Inventory is intentionally NOT here — it's dashboard-only.
+  // Only what the header doesn't carry (owner, 2026-09-29: no repeats). The
+  // company name + C.R. is already in the strip above the header.
   const links = [
-    { href: "/store", label: tNav("store") },
-    { href: "/design", label: tNav("design") },
     { href: "/how-it-works", label: tNav("howItWorks") },
     { href: "/about", label: tNav("about") },
     { href: "/contact", label: tNav("contact") },
@@ -31,15 +28,9 @@ export async function Footer() {
             </Link>
           ))}
         </nav>
-        <div className="flex flex-col items-center justify-between gap-2 border-t border-borderstrong/40 pt-4 text-center sm:flex-row sm:text-start">
-          <div className="space-y-1 text-sm text-mutedtext">
-            <span className="block">{t("text")}</span>
-            <CompanyStrip className="justify-center sm:justify-start" />
-          </div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-faint">
-            © 2026 · Grid v4.1
-          </span>
-        </div>
+        <p className="border-t border-borderstrong/40 pt-4 text-center text-xs text-mutedtext sm:text-start">
+          © 2026 {t("text")}
+        </p>
       </div>
     </footer>
   );

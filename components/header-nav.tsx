@@ -3,7 +3,7 @@
 // Site navigation (audit #13, #53; owner decision 8a): Shop parts · Make a
 // part · How it works for everyone; My projects once the visitor has a session
 // (a guest who started a project too); Inventory + Dashboard + Sign out for a
-// signed-in account. Desktop: links + account menu. Under 768 px: a menu
+// signed-in account. Desktop: links + account menu. Under 1024 px: a menu
 // button opening a panel with everything.
 
 import { useEffect, useRef, useState } from "react";
@@ -59,14 +59,17 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
     router.refresh();
   }
 
+  // The site's three paths (owner, 2026-09-29) — nothing else in the bar.
+  // Projects and inventory live behind the account menu.
   const primary = [
-    { href: "/store", label: t("shopParts") },
-    { href: "/design", label: t("makePart") },
-    { href: "/how-it-works", label: t("howItWorks") },
+    { href: "/store", label: t("pathBuy") },
+    { href: "/design", label: t("pathMake") },
+    { href: session.kind === "none" ? "/projects/new" : "/projects", label: t("pathIdea") },
   ];
-  const personal = [
-    ...(session.kind !== "none" ? [{ href: "/projects", label: t("myProjects") }] : []),
-    ...(session.kind === "account" ? [{ href: "/my-inventory", label: t("myInventory") }] : []),
+  const accountLinks = [
+    { href: "/projects", label: t("myProjects") },
+    { href: "/my-inventory", label: t("myInventory") },
+    { href: "/dashboard", label: t("dashboard") },
   ];
   const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const linkClass = (href: string) =>
@@ -78,8 +81,8 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
 
   return (
     <>
-      <nav className="hidden items-center gap-1 md:flex" aria-label={t("menu")}>
-        {[...primary, ...personal].map((l) => (
+      <nav className="hidden items-center gap-1 lg:flex" aria-label={t("menu")}>
+        {primary.map((l) => (
           <Link key={l.href} href={l.href} className={linkClass(l.href)} aria-current={active(l.href) ? "page" : undefined}>
             {l.label}
           </Link>
@@ -89,7 +92,7 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
       {children}
       {/* Account: Sign in, or a menu with Dashboard + Sign out. */}
-      <div className="hidden md:block" ref={accountRef}>
+      <div className="hidden lg:block" ref={accountRef}>
         {session.kind === "account" ? (
           <div className="relative">
             <button
@@ -106,9 +109,11 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
             {accountOpen && (
               <div role="menu" className="neu absolute end-0 top-full z-50 mt-2 w-56 space-y-1 p-2">
                 {session.email && <p className="truncate px-3 py-1 text-[11px] text-mutedtext">{session.email}</p>}
-                <Link role="menuitem" href="/dashboard" className="block rounded-lg px-3 py-2 text-sm text-heading hover:bg-panel">
-                  {t("dashboard")}
-                </Link>
+                {accountLinks.map((l) => (
+                  <Link key={l.href} role="menuitem" href={l.href} className="block rounded-lg px-3 py-2 text-sm text-heading hover:bg-panel">
+                    {l.label}
+                  </Link>
+                ))}
                 <button
                   role="menuitem"
                   type="button"
@@ -135,14 +140,14 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
         aria-expanded={menuOpen}
         aria-controls="mobile-menu"
         aria-label={menuOpen ? t("closeMenu") : t("menu")}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-heading shadow-neu-sm md:hidden"
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-heading shadow-neu-sm lg:hidden"
       >
         {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </button>
       </div>
       {menuOpen && (
-        <div id="mobile-menu" className="neu absolute inset-x-4 top-full z-50 mt-2 space-y-1 p-3 md:hidden">
-          {[...primary, ...personal].map((l) => (
+        <div id="mobile-menu" className="neu absolute inset-x-4 top-full z-50 mt-2 space-y-1 p-3 lg:hidden">
+          {primary.map((l) => (
             <Link key={l.href} href={l.href} className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-heading hover:bg-panel">
               {l.label}
             </Link>
@@ -150,9 +155,11 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
           <div className="my-1 border-t border-borderstrong/40" />
           {session.kind === "account" ? (
             <>
-              <Link href="/dashboard" className="block rounded-lg px-3 py-2.5 text-sm text-heading hover:bg-panel">
-                {t("dashboard")}
-              </Link>
+              {accountLinks.map((l) => (
+                <Link key={l.href} href={l.href} className="block rounded-lg px-3 py-2.5 text-sm text-heading hover:bg-panel">
+                  {l.label}
+                </Link>
+              ))}
               <button
                 type="button"
                 onClick={signOut}
