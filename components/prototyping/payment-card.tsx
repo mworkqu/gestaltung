@@ -15,7 +15,7 @@ import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/parts/format";
 import { paymentSummary } from "@/lib/store/payment";
-import { PAYMENT_DETAILS, PAYMENT_METHODS } from "@/lib/company";
+import { PAYMENT_METHODS } from "@/lib/company";
 import { METHOD_ICON } from "@/components/payment/payment-instructions";
 
 type Charges = { calls: number; per_call_qar: number; charging: boolean };
@@ -77,11 +77,6 @@ export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQ
               <li key={m} className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2">
                 <Icon className="h-4 w-4 shrink-0 text-cobalt" />
                 <span className="text-heading">{tPay(`${m}_title`)}</span>
-                {m === "fawran" && (
-                  <span className="ms-auto font-mono text-[11px] text-mutedtext" dir="ltr">
-                    {PAYMENT_DETAILS.fawranAlias}
-                  </span>
-                )}
               </li>
             );
           })}

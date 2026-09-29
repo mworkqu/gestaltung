@@ -12,7 +12,7 @@
 // while any stands the circuit is never called checked or validated — then
 // sanityChecks()'s remaining warnings (floating nets, unpowered parts).
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CircleAlert, Cpu, Loader2, RefreshCw } from "lucide-react";
 
@@ -28,7 +28,9 @@ import {
   type SanityFlag,
 } from "@/lib/prototyping/netlist";
 import { renderSchematic } from "@/lib/prototyping/schematic-svg";
-import { renderWiring, wiringProducts } from "@/lib/prototyping/wiring-svg";
+import { renderWiring, wiringProducts, type WiringProduct } from "@/lib/prototyping/wiring-svg";
+import { loadExamplePhotos } from "@/lib/prototyping/example-photos";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 type ErrorCode = "paused" | "invalid" | "no_electronics" | "unavailable" | "rate_limited" | "not_ready" | "failed";
@@ -64,12 +66,38 @@ export function NetlistView({
   );
   const flags = useMemo<Flag[]>(() => [...hard, ...warnings], [hard, warnings]);
 
+  const products = useMemo(() => wiringProducts(bom?.lines ?? [], matches, locale), [bom, matches, locale]);
+
+  // Parts with no store product yet show an example photo of the same kind
+  // of part from our store (labelled), so the picture diagram is never blank.
+  const [examples, setExamples] = useState<Map<string, WiringProduct>>(new Map());
+  useEffect(() => {
+    if (!netlist || view !== "wiring") return;
+    const wanted = netlist.components
+      .filter((c) => !products.get(c.bomId)?.image)
+      .map((c) => ({ bomId: c.bomId, fn: c.function }));
+    if (!wanted.length) return;
+    let cancelled = false;
+    loadExamplePhotos(createClient(), wanted, locale)
+      .then((m) => !cancelled && setExamples(m))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [netlist, view, products, locale]);
+
   const svg = useMemo(() => {
     if (!netlist) return "";
     if (view === "schematic") return renderSchematic({ netlist, flags });
-    const products = wiringProducts(bom?.lines ?? [], matches, locale);
-    return renderWiring({ netlist, flags, products, labels: { noPhoto: t("noPhoto"), noProduct: t("wiringNoProduct") } });
-  }, [netlist, view, flags, bom, matches, locale, t]);
+    const shown = new Map(products);
+    for (const [id, ex] of examples) if (!shown.get(id)?.image) shown.set(id, ex);
+    return renderWiring({
+      netlist,
+      flags,
+      products: shown,
+      labels: { noPhoto: t("noPhoto"), noProduct: t("wiringNoProduct"), example: t("wiringExample"), key: t("wiringKey") },
+    });
+  }, [netlist, view, flags, products, examples, t]);
 
   async function generate() {
     setBusy(true);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Candidate, LineMatch, ProjectLine, ScoredCandidate } from "./bom";
 import type { Netlist } from "./netlist";
-import { renderWiring, wiringProducts, type WiringProduct } from "./wiring-svg";
+import { GROUND_WIRE, netColours, renderWiring, SIGNAL_WIRES, wiringProducts, type WiringProduct } from "./wiring-svg";
 
 const netlist: Netlist = {
   components: [
@@ -59,6 +59,28 @@ describe("renderWiring (audit #38)", () => {
       ["l-board", { name: "ESP32", sku: "GR-012", href: "/en/store/GR-012", image: null }],
     ]);
     expect(renderWiring({ netlist, flags: [], products, labels })).toContain(">GR-012</text>");
+  });
+});
+
+describe("picture diagram", () => {
+  it("gives ground black, each signal its own colour, and lists them in the key", () => {
+    const colours = netColours(netlist);
+    expect(colours.get("GND")).toBe(GROUND_WIRE);
+    expect(colours.get("SIG")).toBe(SIGNAL_WIRES[0]);
+    const svg = renderWiring({ netlist, flags: [], products: new Map(), labels: { ...labels, key: "Wire colours" } });
+    expect(svg).toContain(`stroke="${SIGNAL_WIRES[0]}"`);
+    expect(svg).toContain(">Wire colours</text>");
+  });
+
+  it("labels an example photo and never links or names it as the part", () => {
+    const products = new Map<string, WiringProduct | null>([
+      ["l-led", { name: "Red LED 5 mm", sku: "VLT-1", href: "/en/store/VLT-1", image: "https://cdn.example/led.jpg", example: true }],
+    ]);
+    const svg = renderWiring({ netlist, flags: [], products, labels: { ...labels, example: "Example photo" } });
+    expect(svg).toContain("https://cdn.example/led.jpg");
+    expect(svg).toContain(">Example photo</text>");
+    expect(svg).not.toContain('href="/en/store/VLT-1"');
+    expect(svg).not.toContain("Red LED 5 mm");
   });
 });
 

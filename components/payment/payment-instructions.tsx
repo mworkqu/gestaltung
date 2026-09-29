@@ -1,8 +1,10 @@
 "use client";
 
-// How to pay for one method (cash on delivery, Fawran, bank transfer), with
-// the company's details and copy buttons. Used at checkout, on the order
-// confirmation page and on the home page.
+// How to pay for one method (cash on delivery, Fawran, bank transfer).
+// Owner, 2026-09-29: payment details stay off the home page (`brief` shows
+// only the method), the Fawran alias shows at checkout and on the
+// confirmation, and the IBAN is never on the site — it goes out only in the
+// order confirmation email.
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -46,6 +48,7 @@ export function PaymentInstructions({
   amount,
   orderRef,
   className,
+  brief,
 }: {
   method: PaymentMethod;
   /** Formatted amount to pay, when known. */
@@ -53,6 +56,8 @@ export function PaymentInstructions({
   /** Short order reference to put in the transfer note. */
   orderRef?: string;
   className?: string;
+  /** Method name and one line only — no account details (home page). */
+  brief?: boolean;
 }) {
   const t = useTranslations("PayMethods");
   const Icon = METHOD_ICON[method];
@@ -63,7 +68,7 @@ export function PaymentInstructions({
         {t(`${method}_title`)}
       </p>
       <p className="text-body">{t(`${method}_how`, { amount: amount ?? "" })}</p>
-      {method !== "cash_on_delivery" && (
+      {!brief && method !== "cash_on_delivery" && (
         <dl className="grid gap-x-6 gap-y-1.5 text-[13px] [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] [&>div>dt]:text-[11px] [&>div>dt]:text-mutedtext">
           {method === "fawran" && (
             <>
@@ -75,28 +80,14 @@ export function PaymentInstructions({
               </div>
             </>
           )}
-          {method === "bank_transfer" && (
-            <>
-              <div>
-                <dt>{t("iban")}</dt>
-                <dd>
-                  <CopyValue value={PAYMENT_DETAILS.iban} label={t("iban")} />
-                </dd>
-              </div>
-              <div>
-                <dt>{t("bank")}</dt>
-                <dd className="text-heading" dir="ltr">
-                  {PAYMENT_DETAILS.bank}
-                </dd>
-              </div>
-            </>
+          {method === "fawran" && (
+            <div>
+              <dt>{t("accountName")}</dt>
+              <dd className="font-semibold text-heading" dir="ltr">
+                {PAYMENT_DETAILS.accountName}
+              </dd>
+            </div>
           )}
-          <div>
-            <dt>{t("accountName")}</dt>
-            <dd className="font-semibold text-heading" dir="ltr">
-              {PAYMENT_DETAILS.accountName}
-            </dd>
-          </div>
           {amount && (
             <>
               <div>
@@ -117,7 +108,7 @@ export function PaymentInstructions({
           )}
         </dl>
       )}
-      {method !== "cash_on_delivery" && <p className="text-[11px] text-mutedtext">{t("confirmNote")}</p>}
+      {!brief && method !== "cash_on_delivery" && <p className="text-[11px] text-mutedtext">{t("confirmNote")}</p>}
     </div>
   );
 }

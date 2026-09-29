@@ -7,6 +7,13 @@
 // product without a photo gets a labelled placeholder box — never a generated
 // image.
 //
+// Picture diagram (owner, 2026-09-29): photos are large, every connection has
+// its own wire colour — power red, ground black, each signal a distinct
+// colour, the pin dots in the same colour — with a colour key underneath.
+// A part not yet matched to a product can show an EXAMPLE photo of the same
+// kind of part from our store, labelled as an example. Nothing is generated:
+// the model only decides what connects to what; photos are store photos.
+//
 // Pure string building from a validated netlist: same input, same SVG.
 
 import { partImageUrl, partName } from "@/lib/parts/format";
@@ -14,7 +21,14 @@ import type { LineMatch, ProjectLine } from "./bom";
 import { esc, flaggedRefs, powerNets, type Flag, type Netlist, type PinType } from "./netlist";
 
 /** `sku` is shown under the name; when absent it is read from `href` (…/store/<sku>). */
-export type WiringProduct = { name: string; href: string; image: string | null; sku?: string };
+export type WiringProduct = {
+  name: string;
+  href: string;
+  image: string | null;
+  sku?: string;
+  /** A store product of the same kind, shown only for its photo — not the line's product. */
+  example?: boolean;
+};
 
 /**
  * The products map for renderWiring, by BOM line id: the line's store product
@@ -61,18 +75,35 @@ export type WiringInput = {
   flags: Flag[];
   /** By BOM line id: the product the line resolved to, if any. */
   products: Map<string, WiringProduct | null>;
-  labels: { noPhoto: string; noProduct: string };
+  labels: { noPhoto: string; noProduct: string; example?: string; key?: string };
 };
+
+/** Wire colours: ground black, power red, signals in order (distinct, readable on white). */
+export const GROUND_WIRE = "#111827";
+export const POWER_WIRE = "#dc2626";
+export const SIGNAL_WIRES = ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#a16207", "#db2777", "#4f46e5", "#65a30d", "#0f766e"];
+
+/** Colour per net name; same netlist → same colours. */
+export function netColours(n: Netlist): Map<string, string> {
+  const { power, ground } = powerNets(n);
+  const out = new Map<string, string>();
+  let i = 0;
+  for (const net of n.nets) {
+    if (ground.has(net.name)) out.set(net.name, GROUND_WIRE);
+    else if (power.has(net.name)) out.set(net.name, POWER_WIRE);
+    else out.set(net.name, SIGNAL_WIRES[i++ % SIGNAL_WIRES.length]);
+  }
+  return out;
+}
 
 const INK = "#1c2434";
 const MUTED = "#64748b";
 const LINE = "#cbd5e1";
 const COBALT = "#0e59c5";
-const POWER = "#c2410c";
 const ALERT = "#dc2626";
 
-const BOX_W = 210;
-const IMG_H = 86;
+const BOX_W = 230;
+const IMG_H = 136;
 const HEAD = IMG_H + 64;
 const PIN_H = 18;
 const GUT_X = 150;
@@ -87,7 +118,10 @@ type Anchor = { x: number; y: number; side: 1 | -1; row: number };
 
 export function renderWiring({ netlist: n, flags, products, labels }: WiringInput): string {
   const flagged = flaggedRefs(flags);
-  const { power, ground } = powerNets(n);
+  const colours = netColours(n);
+  const pinNet = new Map<string, string>();
+  for (const net of n.nets) for (const c of net.connections) pinNet.set(`${c.ref}.${c.pin}`, net.name);
+  const colourOf = (ref: string, pin: string) => colours.get(pinNet.get(`${ref}.${pin}`) ?? "") ?? INK;
   const sources = new Set(n.powerRails.map((r) => r.sourceRef));
   const degree = (ref: string) => n.nets.reduce((s, net) => s + net.connections.filter((c) => c.ref === ref).length, 0);
   const comps = [...n.components].sort(
@@ -123,8 +157,13 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
       const sku = prod ? skuOf(prod) : "";
       const s = sides(c);
 
+      const exampleTag =
+        prod?.example && prod.image && labels.example
+          ? `<rect x="${x + 12}" y="${y + 12}" width="${labels.example.length * 6 + 14}" height="17" rx="8.5" fill="#fef3c7"/>
+             <text x="${x + 19}" y="${y + 24}" font-size="10" font-weight="600" fill="#92400e">${esc(labels.example)}</text>`
+          : "";
       const photo = prod?.image
-        ? `<image href="${esc(prod.image)}" x="${x + 8}" y="${y + 8}" width="${BOX_W - 16}" height="${IMG_H - 8}" preserveAspectRatio="xMidYMid meet"/>`
+        ? `<image href="${esc(prod.image)}" x="${x + 8}" y="${y + 8}" width="${BOX_W - 16}" height="${IMG_H - 8}" preserveAspectRatio="xMidYMid meet"/>${exampleTag}`
         : `<rect x="${x + 8}" y="${y + 8}" width="${BOX_W - 16}" height="${IMG_H - 8}" rx="6" fill="#f8fafc" stroke="${LINE}" stroke-dasharray="4 3"/>
            <text x="${x + BOX_W / 2}" y="${y + 8 + (IMG_H - 8) / 2 + 4}" text-anchor="middle" font-size="11" fill="${MUTED}">${esc(prod ? labels.noPhoto : labels.noProduct)}</text>`;
 
@@ -134,8 +173,9 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
             const py = y + HEAD + i * PIN_H + PIN_H / 2;
             const px = side === -1 ? x : x + BOX_W;
             anchors.set(`${c.ref}.${p.id}`, { x: px, y: py, side, row: r });
-            return `<circle cx="${px}" cy="${py}" r="3" fill="${INK}"/>
-              <text x="${side === -1 ? x + 8 : x + BOX_W - 8}" y="${py + 4}" font-size="11" fill="${INK}" text-anchor="${side === -1 ? "start" : "end"}">${esc(clip(p.name, 14))}</text>`;
+            const col = colourOf(c.ref, p.id);
+            return `<circle cx="${px}" cy="${py}" r="4.5" fill="${col}" stroke="#ffffff" stroke-width="1.5"/>
+              <text x="${side === -1 ? x + 10 : x + BOX_W - 10}" y="${py + 4}" font-size="11" font-weight="600" fill="${col}" text-anchor="${side === -1 ? "start" : "end"}">${esc(clip(p.name, 14))}</text>`;
           })
           .join("");
 
@@ -144,12 +184,12 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
         ${photo}
         <text x="${x + 10}" y="${y + IMG_H + 18}" font-size="13" font-weight="700" fill="${bad ? ALERT : INK}">${esc(c.ref)}${bad ? " ⚠" : ""}</text>
         <text x="${x + 10}" y="${y + IMG_H + 32}" font-size="11" fill="${MUTED}">${esc(clip(c.function, 30))}</text>
-        <text x="${x + 10}" y="${y + IMG_H + 46}" font-size="10.5" fill="${prod ? COBALT : MUTED}">${esc(clip(prod ? prod.name : labels.noProduct, 32))}</text>
-        ${sku ? `<text x="${x + 10}" y="${y + IMG_H + 59}" font-size="10" font-family="ui-monospace, monospace" fill="${MUTED}">${esc(clip(sku, 34))}</text>` : ""}
+        <text x="${x + 10}" y="${y + IMG_H + 46}" font-size="10.5" fill="${prod && !prod.example ? COBALT : MUTED}">${esc(clip(prod && !prod.example ? prod.name : labels.noProduct, 34))}</text>
+        ${sku && !prod?.example ? `<text x="${x + 10}" y="${y + IMG_H + 59}" font-size="10" font-family="ui-monospace, monospace" fill="${MUTED}">${esc(clip(sku, 34))}</text>` : ""}
         <line x1="${x}" x2="${x + BOX_W}" y1="${y + HEAD - 4}" y2="${y + HEAD - 4}" stroke="${LINE}"/>
         ${pinRows(s.left, -1)}${pinRows(s.right, 1)}
       </g>`;
-      boxes.push(prod ? `<a href="${esc(prod.href)}" target="_blank">${card}</a>` : card);
+      boxes.push(prod && !prod.example ? `<a href="${esc(prod.href)}" target="_blank">${card}</a>` : card);
     })
   );
 
@@ -159,7 +199,7 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
   n.nets.forEach((net, k) => {
     const pts = net.connections.map((c) => anchors.get(`${c.ref}.${c.pin}`)).filter(Boolean) as Anchor[];
     if (!pts.length) return;
-    const colour = ground.has(net.name) ? INK : power.has(net.name) ? POWER : COBALT;
+    const colour = colours.get(net.name) ?? INK;
     const off = 14 + (k % 10) * 6;
     const [hub, ...rest] = pts;
     const laneA = hub.x + hub.side * off;
@@ -168,7 +208,9 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
       const upper = Math.min(hub.row, p.row);
       const channel = rowY[upper] + rowH[upper] + 16 + (k % 10) * 7;
       wires.push(
-        `<path d="M${hub.x} ${hub.y} H${laneA} V${channel} H${laneB} V${p.y} H${p.x}" fill="none" stroke="${colour}" stroke-width="1.6" stroke-opacity="0.85"/>`
+        // A white casing under each wire keeps crossings readable, like jumper wires.
+        `<path d="M${hub.x} ${hub.y} H${laneA} V${channel} H${laneB} V${p.y} H${p.x}" fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="round"/>
+<path d="M${hub.x} ${hub.y} H${laneA} V${channel} H${laneB} V${p.y} H${p.x}" fill="none" stroke="${colour}" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/>`
       );
     }
     if (!rest.length)
@@ -179,10 +221,31 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
   });
 
   const width = PAD * 2 + GUT_X + cols * BOX_W + (cols - 1) * GUT_X;
-  const height = rowY[rowY.length - 1] + rowH[rowH.length - 1] + GUT_Y + PAD;
+  const bodyH = rowY[rowY.length - 1] + rowH[rowH.length - 1] + GUT_Y;
+
+  // Colour key: one swatch per wire, wrapped to the drawing width.
+  const keyItems: string[] = [];
+  let kx = PAD;
+  let ky = bodyH + 22;
+  if (labels.key) keyItems.push(`<text x="${kx}" y="${ky}" font-size="11" font-weight="700" fill="${MUTED}">${esc(labels.key)}</text>`);
+  ky += 20;
+  for (const net of n.nets) {
+    const w = 34 + clip(net.name, 18).length * 7;
+    if (kx + w > width - PAD) {
+      kx = PAD;
+      ky += 20;
+    }
+    keyItems.push(
+      `<line x1="${kx}" x2="${kx + 22}" y1="${ky - 4}" y2="${ky - 4}" stroke="${colours.get(net.name) ?? INK}" stroke-width="4" stroke-linecap="round"/>
+<text x="${kx + 28}" y="${ky}" font-size="11" fill="${INK}">${esc(clip(net.name, 18))}</text>`
+    );
+    kx += w + 12;
+  }
+  const height = ky + PAD;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <rect width="100%" height="100%" fill="#ffffff"/>
 ${wires.join("\n")}
 ${boxes.join("\n")}
+${keyItems.join("\n")}
 </svg>`;
 }

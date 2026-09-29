@@ -5,8 +5,8 @@ import { COMPANY } from "@/lib/company";
 import { PaymentInstructions } from "@/components/payment/payment-instructions";
 
 // Home page: who you're buying from and how you can pay (owner, 2026-09-29).
-// The registered company (C.R. 236988) beside the three ways to pay, with the
-// Fawran alias and IBAN customers can copy.
+// The registered company (C.R. 236988) beside the three ways to pay — method
+// names only; the details appear at checkout and in the confirmation email.
 export async function HomeTrust() {
   const t = await getTranslations("PayMethods");
   const tc = await getTranslations("Company");
@@ -36,9 +36,9 @@ export async function HomeTrust() {
       <div className="neu space-y-3 p-6 lg:col-span-8">
         <h2 className="text-lg font-bold text-heading">{t("homeTitle")}</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <PaymentInstructions method="cash_on_delivery" />
-          <PaymentInstructions method="fawran" />
-          <PaymentInstructions method="bank_transfer" className="sm:col-span-2" />
+          <PaymentInstructions method="cash_on_delivery" brief />
+          <PaymentInstructions method="fawran" brief />
+          <PaymentInstructions method="bank_transfer" brief className="sm:col-span-2" />
         </div>
         <p className="text-[11px] text-mutedtext">{t("cardSoon")}</p>
       </div>

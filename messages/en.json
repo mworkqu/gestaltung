@@ -1417,7 +1417,9 @@
     "rule_fab_name": "Custom PCB",
     "rule_fab_spec": "design (schematic and layout) and fabrication of the board",
     "rule_fab_reason": "the Custom PCB route: the board itself, made after the prototype works",
-    "node_concepts": "Concepts"
+    "node_concepts": "Concepts",
+    "wiringExample": "Example photo",
+    "wiringKey": "Wire colours"
   },
   "AiUsage": {
     "kicker": "Admin",
@@ -1968,7 +1970,7 @@
     "bank_transfer_title": "Bank transfer",
     "cash_on_delivery_how": "Pay the driver in cash when your order arrives.",
     "fawran_how": "Instant transfer from any Qatari bank app to our Fawran alias.",
-    "bank_transfer_how": "Transfer to our company account at QIIB.",
+    "bank_transfer_how": "Transfer to our company account at QIIB. We email you the account details (IBAN) with your order confirmation.",
     "fawranAlias": "Fawran alias",
     "iban": "IBAN",
     "bank": "Bank",
@@ -1981,6 +1983,7 @@
     "homeIntro": "Parts, electronics and custom manufacturing from a registered Qatari company.",
     "crLabel": "Commercial Registration",
     "locationLabel": "Location",
-    "homeTitle": "Ways to pay"
+    "homeTitle": "Ways to pay",
+    "emailForBank": "Needed for bank transfer: we send the account details (IBAN) to this email."
   }
 }

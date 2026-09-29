@@ -212,8 +212,10 @@ export default function CheckoutPage() {
                 id="customer_email"
                 name="customer_email"
                 type="email"
+                required={payMethod === "bank_transfer"}
                 className={fieldClass}
               />
+              {payMethod === "bank_transfer" && <p className="text-[11px] text-mutedtext">{tPay("emailForBank")}</p>}
             </div>
           </div>
 
