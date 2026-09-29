@@ -878,9 +878,14 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     lib/store/category-label.ts. Test order #945ea389 ("TEST ORDER — please delete", Fawran, 53.50 QAR) placed.
     Home featured = in-stock products WITH a photo, one per category. Mouser serves a bot page instead of
     product photos, so step "photos" gives MS- products the same part's DigiKey photo (10/10 done).
-    PLANNED (owner 2026-09-29, not built): picture wiring diagram — each netlist part drawn with its real store
-    photo + fixed pin anchors, wires coloured by net (power red, ground black, signals distinct). Structure from
-    the AI netlist, pixels from our photos, never generated. Tracked in the checklist artifact.
+  - 2026-09-29 PICTURE WIRING DIAGRAM (owner): lib/prototyping/wiring-svg.ts — bigger store photos, one colour per
+    net (netColours: ground black, power red, signals from SIGNAL_WIRES), coloured pin dots/labels, cased wires,
+    colour key. Parts with no product yet get an EXAMPLE store photo of the same kind (lib/prototyping/
+    example-photos.ts, exampleQueries + loadExamplePhotos, labelled "Example photo", not linked/named as the part).
+    Never generated. Per-product pin positions on the photo NOT done (no pin-position data yet).
+  - 2026-09-29 PAYMENT DETAILS (owner): home page shows method names only (PaymentInstructions `brief`); Fawran
+    alias at checkout/success; IBAN never on the site — only in the confirmation email; email required at
+    checkout when bank transfer is chosen.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
