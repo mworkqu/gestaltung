@@ -14,6 +14,7 @@ import { isMakeable, partNeeds, type PartContext, type PartLike } from "./parts"
 import { rowOf, type Spec } from "./spec";
 import type { BomKind, LineStatus } from "./bom";
 import { describeHard, hardFlagId, hardRules, type Netlist } from "./netlist";
+import { isStandardFact } from "./analysis";
 
 /** Which area of the workspace a requirement belongs to. */
 export type RequirementGroup = "brief" | "understanding" | "inputs" | "parts" | "bom" | "route";
@@ -126,9 +127,12 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
     spec ? t("block_specUnconfirmed") : t("block_notAnalysed")
   );
 
-  // Needs your input: one requirement per open question. "Not decided yet" is
-  // a recorded answer, so it satisfies the question.
-  for (const q of spec?.questions ?? []) {
+  // Needs your input: one requirement per open question that changes the plan
+  // (the standard facts: quantity, power, mounting, environment). Other
+  // questions are optional details and never block (owner, 2026-09-29: "if the
+  // information won't change anything, skip it"). "Not decided yet" is a
+  // recorded answer, so it satisfies the question.
+  for (const q of (spec?.questions ?? []).filter((x) => isStandardFact(x.id))) {
     const label = factLabel(q.id, q.label, t);
     add(
       { id: `q:${q.id}`, group: "inputs", label, satisfied: !!rowOf(spec, q.id)?.edited, focus: factFocus(q.id) },

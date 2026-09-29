@@ -26,6 +26,7 @@ import { disciplineOf } from "@/lib/prototyping/parts";
 import { mergeBom } from "@/lib/prototyping/bom";
 import { looksLikeSchema } from "@/lib/prototyping/readiness";
 import {
+  EMPTY_SPEC,
   aiConsentOf,
   answersOf,
   mergeAnalysis,
@@ -33,10 +34,12 @@ import {
   type Spec,
 } from "@/lib/prototyping/spec";
 import { BriefEditor, type SaveState } from "@/components/prototyping/brief-editor";
-import { NeedsInput, SpecSheet } from "@/components/prototyping/spec-sheet";
+import { UnderstoodPanel } from "@/components/prototyping/understood-panel";
 import { Card, PrimaryButton, Warn } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
 import type { Project, ProjectPart } from "@/lib/supabase/types";
+import { BriefChat } from "@/components/prototyping/brief-chat";
+import { ReadAloud } from "@/components/prototyping/read-aloud";
 
 /** Long enough that a fast analysis doesn't flash its progress. */
 const MIN_VISIBLE_MS = 400;
@@ -146,6 +149,21 @@ export function IdeaStage({
     setSaveState("saved");
     await onChanged();
     return true;
+  }
+
+  // The chat's paragraph is appended and saved at once (it's the client's click).
+  async function addToBrief(text: string) {
+    const next = [brief.trim(), text.trim()].filter(Boolean).join("\n\n");
+    setBrief(next);
+    setSaveState("saving");
+    const { error } = await createClient().from("projects").update({ brief: next }).eq("id", project.id);
+    if (error) {
+      setSaveState("error");
+      return;
+    }
+    setSavedBrief(next);
+    setSaveState("saved");
+    await onChanged();
   }
 
   async function runAnalysis() {
@@ -307,6 +325,18 @@ export function IdeaStage({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3">
+          <BriefChat
+            projectId={project.id}
+            brief={brief}
+            destination={briefDestination}
+            consented={!needsConsent}
+            onConsent={() => {
+              if (briefDestination)
+                onSpec({ ...(spec ?? EMPTY_SPEC), aiConsent: { at: new Date().toISOString(), destination: briefDestination } });
+            }}
+            onAdd={addToBrief}
+          />
+          <ReadAloud text={brief} />
           <PrimaryButton
             onClick={runAnalysis}
             disabled={running || (needsConsent && !consentTicked)}
@@ -369,8 +399,7 @@ export function IdeaStage({
         )}
       </Card>
 
-      <SpecSheet spec={spec} brief={savedBrief} running={running} onChange={onSpec} />
-      {!running && <NeedsInput spec={spec} onChange={onSpec} />}
+      <UnderstoodPanel spec={spec} brief={savedBrief} running={running} onChange={onSpec} />
     </>
   );
 }

@@ -31,7 +31,7 @@ export function formatFact(id: string, value: string | null, t: Translate): stri
 }
 
 /** The control for a fact: a select for options, a number field, or text. */
-function FactControl({
+export function FactControl({
   id,
   domId,
   label,
@@ -111,7 +111,7 @@ function FactControl({
   );
 }
 
-function controlType(row: { id: string }): "number" | "select" | "text" {
+export function controlType(row: { id: string }): "number" | "select" | "text" {
   if (!isStandardFact(row.id)) return "text";
   return STANDARD_FACTS[row.id].type === "number" ? "number" : "select";
 }
