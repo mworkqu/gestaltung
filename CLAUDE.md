@@ -925,6 +925,9 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     (supplier specs, or the Voltaat description's "Specifications" bullets, lib/store/specs.ts) + Datasheet (PDF).
     Dashboard → Store → Sourcing overview (/dashboard/store/overview): highlights (Voltaat back in stock with a
     backup → Keep Voltaat, below margin [non-Voltaat only], backup >30% pricier, no photo) + groups. Live store = 950.
+    Owner rule: through-hole and surface-mount are DIFFERENT items → backups must match mounting (sameMount;
+    DigiKey "Mounting Type"/Mouser "Mounting Style"; Voltaat defaults to through-hole). Re-run: 7 backups (LF412 now
+    8-PDIP, MCP4725 now the MCP4725EV board). Make my part (/design) has a store search box.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
