@@ -264,7 +264,8 @@
     "group_store": "المتجر",
     "group_suppliers": "الموردون",
     "group_settings": "الإعدادات",
-    "backToSite": "العودة إلى الموقع"
+    "backToSite": "العودة إلى الموقع",
+    "overviewStore": "نظرة على التوريد"
   },
   "Admin": {
     "kicker": "مركز التحكم",
@@ -440,7 +441,9 @@
     "newProjectFor": "مشروع جديد، مثل {name}",
     "newProjectName": "اسم المشروع الجديد",
     "startProjectWithPart": "ابدأ مشروعاً جديداً بهذه القطعة",
-    "addToProjectFailed": "تعذّرت الإضافة. حاول مرة أخرى."
+    "addToProjectFailed": "تعذّرت الإضافة. حاول مرة أخرى.",
+    "specsLabel": "المواصفات",
+    "datasheet": "ورقة البيانات (PDF)"
   },
   "Cart": {
     "loadError": "تعذّر تحميل سلّتك. يرجى المحاولة مرة أخرى.",
@@ -2195,5 +2198,45 @@
   },
   "Phone": {
     "invalid": "أدخل رقم هاتف يمكننا التواصل معه عبر واتساب، مثل 5555 1234 أو ‎+974 5555 1234."
+  },
+  "SourcingOverview": {
+    "kicker": "المتجر",
+    "title": "نظرة على التوريد",
+    "intro": "مصدر كل منتج، وما يراه العملاء، وما يحتاج إلى قرار. المنتجات بلا موعد توصيل مخفية من المتجر.",
+    "needsMigration": "شغّل الترحيل 0041 أولاً.",
+    "lookFirst": "انظر إلى هذه أولاً",
+    "hl_restocked": "عاد متوفراً لدى فولتات",
+    "hlHelp_restocked": "يوجد بديل معروض وأعادت فولتات التخزين. اختر واحداً.",
+    "hl_belowFloor": "أقل من هامش الربح",
+    "hlHelp_belowFloor": "ربحها أقل من الحد الأدنى للهامش.",
+    "hl_pricier": "البديل أغلى بكثير",
+    "hlHelp_pricier": "بديل DigiKey/Mouser أغلى بـ 30% من سعر فولتات.",
+    "hl_noPhoto": "بلا صورة",
+    "hlHelp_noPhoto": "معروض دون صورة.",
+    "src_voltaat": "معروضة من فولتات",
+    "src_digikey": "معروضة من DigiKey",
+    "src_mouser": "معروضة من Mouser",
+    "src_hidden": "مخفية — لا مخزون في أي مكان",
+    "restockedTitle": "عاد متوفراً لدى فولتات",
+    "restockedHelp": "\"أبقِ فولتات\" يخفي البديل؛ وإلا يبقى الاثنان معروضين.",
+    "keepVoltaat": "أبقِ فولتات",
+    "voltaatPrice": "سعر فولتات {price}",
+    "belowFloorTitle": "أقل من هامش الربح",
+    "belowFloorHelp": "ارفع السعر أو اختر مورداً آخر من صفحة المنتج.",
+    "pricierTitle": "بدائل أغلى بكثير من فولتات",
+    "pricierHelp": "يدفع العملاء أكثر أثناء نفاد فولتات. يمكنك خفض السعر.",
+    "backupsTitle": "بدائل DigiKey / Mouser",
+    "backupsHelp": "الطراز نفسه، أُضيف لأن فولتات نفد لديها.",
+    "replaces": "بدل {name}",
+    "hiddenTitle": "مخفية — لا مخزون في أي مكان",
+    "hiddenHelp": "نفدت لدى فولتات ولا يوجد الطراز نفسه لدى DigiKey/Mouser. تعود تلقائياً عندما تعيد فولتات التخزين.",
+    "noPhotoTitle": "بلا صورة",
+    "noPhotoHelp": "أضف صورة من صفحة المنتج أو من إضافة منتجات.",
+    "noSpecsTitle": "بلا مواصفات أو ورقة بيانات",
+    "noSpecsHelp": "يرى العملاء الوصف فقط.",
+    "changesTitle": "تغيّرات الأسعار والمخزون هذا الأسبوع",
+    "changesHelp": "من فحوصات فولتات وDigiKey وMouser الليلية.",
+    "andMore": "و{count} أخرى",
+    "none": "لا شيء هنا."
   }
 }

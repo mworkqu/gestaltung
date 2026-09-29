@@ -70,7 +70,7 @@ export default async function Home({
     // stops at 1,000 rows.
     const { rows: catRows } = await fetchAllRows<{ category: string | null; is_published: boolean; merged_into: string | null }>(
       (from, to) =>
-        supabase.from("parts").select("category, is_published, merged_into").eq("is_published", true).order("id").range(from, to)
+        supabase.from("parts").select("category, is_published, merged_into").eq("is_published", true).not("lead_time_class", "is", null).order("id").range(from, to)
     );
     categories = listedCategories(catRows);
   }

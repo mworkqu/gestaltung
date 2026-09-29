@@ -123,7 +123,7 @@ export function PartsFilters({
             className={cn(fieldClass, isRtl && "text-right")}
           >
             <option value="">{tD("filterAllLead")}</option>
-            {[...LEAD_TIME_CLASSES, "on_request" as const].map((s) => (
+            {LEAD_TIME_CLASSES.map((s) => (
               <option key={s} value={s}>
                 {tD(`lt_${s}`)}
               </option>

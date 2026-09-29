@@ -54,6 +54,7 @@ export default async function PartsStorePage({
       .from("parts")
       .select("category, material, is_published, merged_into")
       .eq("is_published", true)
+      .not("lead_time_class", "is", null)
       .order("id")
       .range(from, from + 999);
     facetRows.push(...((page ?? []) as typeof facetRows));
@@ -74,10 +75,14 @@ export default async function PartsStorePage({
     .from("parts")
     .select("*", { count: "exact" })
     .eq("is_published", true)
-    .is("merged_into", null);
+    .is("merged_into", null)
+    // Nothing without a delivery date is listed (owner, 2026-09-29): a Voltaat
+    // item out of stock is hidden until it's back, or replaced by a DigiKey /
+    // Mouser backup (0041). Its page still opens from an old link.
+    .not("lead_time_class", "is", null);
   if (category) query = query.eq("category", category);
   if (material) query = query.eq("material", material);
-  if (stock) query = stock === "on_request" ? query.is("lead_time_class", null) : query.eq("lead_time_class", stock);
+  if (stock && stock !== "on_request") query = query.eq("lead_time_class", stock);
   if (term) {
     // PostgREST .or() syntax: commas, parentheses and wildcards in the term would break it.
     const safe = term.replace(/[,()%*\\]/g, " ").trim();

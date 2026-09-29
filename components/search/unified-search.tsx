@@ -96,6 +96,7 @@ export function UnifiedSearch({
         .select("*")
         .eq("is_published", true)
         .is("merged_into", null)
+        .not("lead_time_class", "is", null)
         .or(["name", "name_ar", "sku", "material"].map((c) => `${c}.ilike.${like}`).join(","))
         .order("name")
         .limit(24);

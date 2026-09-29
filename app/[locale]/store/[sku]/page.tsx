@@ -1,6 +1,6 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, FileText } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
@@ -21,6 +21,7 @@ import { AddToProjectButton } from "@/components/parts/add-to-project-button";
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
+import { productSpecs } from "@/lib/store/specs";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,13 @@ export default async function PartDetailPage({
   const onRequest = !part.lead_time_class;
 
   const name = partName(part, locale);
-  const description = partDescription(part, locale);
+  // Specs from the supplier's table or the description's own "Specifications"
+  // section, shown once as a table (owner, 2026-09-29).
+  const { text: description, specs: specRows } = productSpecs({
+    specs: (part as { specs?: unknown }).specs,
+    description: partDescription(part, locale),
+  });
+  const datasheet = (part as { datasheet_url?: string | null }).datasheet_url ?? null;
   const imageUrl = partImageUrl(part);
 
   const spec = (label: string, value: string | null) =>
@@ -186,6 +193,43 @@ export default async function PartDetailPage({
               <p className="whitespace-pre-line text-sm leading-relaxed text-body">
                 {description}
               </p>
+            </div>
+          )}
+
+          {(specRows.length > 0 || datasheet) && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className={mono("text-[10px] text-mutedtext")}>{t("specsLabel")}</h2>
+                {datasheet && (
+                  <a
+                    href={datasheet}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-cobalt shadow-neu-sm hover:underline"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    {t("datasheet")}
+                  </a>
+                )}
+              </div>
+              {specRows.length > 0 && (
+                <div className="neu overflow-hidden">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y divide-borderstrong/40">
+                      {specRows.map((r) => (
+                        <tr key={r.name}>
+                          <th scope="row" className="w-2/5 px-4 py-2 text-start text-[12.5px] font-medium text-mutedtext">
+                            {r.name}
+                          </th>
+                          <td className="px-4 py-2 text-[12.5px] text-heading" dir="auto">
+                            {r.value}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 

@@ -264,7 +264,8 @@
     "group_store": "Store",
     "group_suppliers": "Suppliers",
     "group_settings": "Settings",
-    "backToSite": "Back to the website"
+    "backToSite": "Back to the website",
+    "overviewStore": "Sourcing overview"
   },
   "Admin": {
     "kicker": "Command center",
@@ -440,7 +441,9 @@
     "newProjectFor": "New project, e.g. {name}",
     "newProjectName": "New project name",
     "startProjectWithPart": "Start a new project with this part",
-    "addToProjectFailed": "Couldn't add it. Please try again."
+    "addToProjectFailed": "Couldn't add it. Please try again.",
+    "specsLabel": "Specifications",
+    "datasheet": "Datasheet (PDF)"
   },
   "Cart": {
     "loadError": "We couldn't load your cart. Please try again.",
@@ -2195,5 +2198,45 @@
   },
   "Phone": {
     "invalid": "Please enter a phone number we can reach on WhatsApp, e.g. 5555 1234 or +974 5555 1234."
+  },
+  "SourcingOverview": {
+    "kicker": "Store",
+    "title": "Sourcing overview",
+    "intro": "Where every product comes from, what customers can see, and what needs a decision. Products without a delivery date are hidden from the store.",
+    "needsMigration": "Run migration 0041 first.",
+    "lookFirst": "Look at these first",
+    "hl_restocked": "Voltaat has it again",
+    "hlHelp_restocked": "A backup is on sale and Voltaat restocked. Pick one.",
+    "hl_belowFloor": "Below your margin",
+    "hlHelp_belowFloor": "Earning less than your minimum margin.",
+    "hl_pricier": "Backup much pricier",
+    "hlHelp_pricier": "DigiKey/Mouser backup costs 30% more than Voltaat's price.",
+    "hl_noPhoto": "No photo",
+    "hlHelp_noPhoto": "On sale without a picture.",
+    "src_voltaat": "on sale from Voltaat",
+    "src_digikey": "on sale from DigiKey",
+    "src_mouser": "on sale from Mouser",
+    "src_hidden": "hidden — no stock anywhere",
+    "restockedTitle": "Voltaat has it again",
+    "restockedHelp": "\"Keep Voltaat\" hides the backup; otherwise both stay on sale.",
+    "keepVoltaat": "Keep Voltaat",
+    "voltaatPrice": "Voltaat price {price}",
+    "belowFloorTitle": "Below your margin",
+    "belowFloorHelp": "Raise the price or pick another supplier on the product page.",
+    "pricierTitle": "Backups much pricier than Voltaat",
+    "pricierHelp": "Customers pay more while Voltaat is out of stock. You may lower the price.",
+    "backupsTitle": "DigiKey / Mouser backups",
+    "backupsHelp": "The same model, added because Voltaat ran out.",
+    "replaces": "replaces {name}",
+    "hiddenTitle": "Hidden — no stock anywhere",
+    "hiddenHelp": "Out of stock at Voltaat and no exact model at DigiKey/Mouser. They come back by themselves when Voltaat restocks.",
+    "noPhotoTitle": "No photo",
+    "noPhotoHelp": "Add a photo on the product page or through Add products.",
+    "noSpecsTitle": "No specifications or datasheet",
+    "noSpecsHelp": "Customers see only the description.",
+    "changesTitle": "Price and stock changes this week",
+    "changesHelp": "From the nightly Voltaat, DigiKey and Mouser checks.",
+    "andMore": "and {count} more",
+    "none": "Nothing here."
   }
 }
