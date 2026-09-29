@@ -685,14 +685,19 @@ function Row({
           <div className="space-y-1">
             <Link
               href={`/store/${encodeURIComponent(p.sku)}`}
-              className="flex items-center gap-2 text-[12.5px] font-medium text-heading hover:text-cobalt"
+              className="flex items-center gap-3 text-[12.5px] font-medium text-heading hover:text-cobalt"
             >
               {img ? (
-                // Store product photo, as the catalogue holds it.
+                // Store product photo, big enough to see what you're buying (owner, 2026-09-29).
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={img} alt="" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain" />
+                <img
+                  src={img}
+                  alt={partName(p, locale)}
+                  loading="lazy"
+                  className="h-16 w-16 shrink-0 rounded-lg bg-white object-contain shadow-neu-sm"
+                />
               ) : (
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-panel text-[8px] text-faint">
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-lg bg-panel text-[9px] text-faint">
                   {t("noPhoto")}
                 </span>
               )}
@@ -718,8 +723,12 @@ function Row({
                             disabled={confirming}
                             onClick={() => void confirm(c.id)}
                             title={`${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)}`}
-                            className="font-medium text-cobalt hover:underline disabled:opacity-60"
+                            className="inline-flex items-center gap-1 align-middle font-medium text-cobalt hover:underline disabled:opacity-60"
                           >
+                            {partImageUrl(c) && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={partImageUrl(c)!} alt="" loading="lazy" className="h-7 w-7 rounded bg-white object-contain" />
+                            )}
                             {shortModel(partName(c, locale))} ({formatPrice(Number(c.unit_price), locale)})
                           </button>
                         </span>
