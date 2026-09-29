@@ -56,32 +56,6 @@
     "ctaSecondary": "كيف نعمل",
     "formats": "STL · STEP · DXF · IGES"
   },
-  "Features": {
-    "customTitle": "التصنيع حسب الطلب",
-    "customCopy": "ارفع، طابِق، أنتِج، سلِّم.",
-    "storeTitle": "متجر القطع الميكانيكية",
-    "storeCopy": "براغٍ وصواميل ومثبّتات.",
-    "cadTitle": "خدمة رسم CAD — من 200 ر.ق",
-    "cadCopy": "لا تملك ملف CAD؟ أرسل لنا رسمة، ونرسمها لك."
-  },
-  "LocalAdvantage": {
-    "item1Title": "بلا تأخير استيراد",
-    "item1Copy": "القطع تُصنع داخل قطر — لا جمارك، ولا انتظار شحن لأربعة أسابيع.",
-    "item2Title": "توصيل في اليوم التالي داخل الدوحة",
-    "item2Copy": "شبكة ورشنا تغطي الدوحة ولوسيل والمنطقة الصناعية.",
-    "item3Title": "أسعار قطرية أولًا",
-    "item3Copy": "بلا هوامش شحن دولي — تدفع ثمن القطعة والصنعة فقط."
-  },
-  "Social": {
-    "tag": "مع من نعمل",
-    "heading": "مبني لمجتمع الهندسة في قطر",
-    "subtext": "نخدم المهندسين والصنّاع والمؤسسات في الدوحة وعموم الخليج.",
-    "org1": "جامعة قطر",
-    "org2": "جامعة تكساس إي آند إم في قطر",
-    "org3": "قطر للطاقة",
-    "org4": "مؤسسة قطر",
-    "footnote": "مؤسسات توضيحية للعرض فقط. ستُعرض شعارات الشركاء بعد الحصول على إذنهم."
-  },
   "CadAssistance": {
     "kicker": "المساعدة في تصميم CAD",
     "heading": "ليس لديك ملف CAD؟ سنرسمه لك.",
@@ -241,7 +215,7 @@
     "emailLabel": "البريد الإلكتروني",
     "emailPlaceholder": "you@company.com",
     "passwordLabel": "كلمة المرور",
-    "passwordPlaceholder": "٦ أحرف على الأقل",
+    "passwordPlaceholder": "6 أحرف على الأقل",
     "noAccount": "ليس لديك حساب؟",
     "signUpLink": "أنشئ حسابًا",
     "haveAccount": "لديك حساب بالفعل؟",
@@ -343,7 +317,7 @@
     "priceLabel": "سعر الوحدة",
     "pricePlaceholder": "0.00",
     "thresholdLabel": "حد المخزون المنخفض",
-    "thresholdPlaceholder": "مثال: ١٠",
+    "thresholdPlaceholder": "مثال: 10",
     "thresholdNote": "يظهر تنبيه انخفاض المخزون عندما تنخفض الكمية إلى هذا الحد أو أقل. اتركه فارغًا للتعطيل.",
     "descriptionLabel": "الوصف",
     "descriptionPlaceholder": "ملاحظات اختيارية",
@@ -668,11 +642,11 @@
     "customBtn": "التصميم",
     "dropCta": "أفلت ملف CAD هنا",
     "dropBrowse": "أو تصفّح",
-    "dropHint": "STL · STEP · DXF · IGES · حتى ٥٠ ميجابايت",
+    "dropHint": "STL · STEP · DXF · IGES · حتى 50 ميجابايت",
     "dropText": "سنطابقه مع الطريقة المناسبة ونرسل لك عرض السعر.",
     "dropExplore": "أو استكشف التصنيع حسب الطلب",
     "dropError": "الرجاء اختيار ملف CAD (STL أو STEP أو DXF أو IGES).",
-    "footerText": "الدوحة، قطر\nالأحد–الخميس · ٨:٠٠–١٨:٠٠",
+    "footerText": "الدوحة، قطر\nالأحد–الخميس · 8:00–18:00",
     "footerCta": "اطلب معاودة الاتصال",
     "whatsappMsg": "مرحبًا! أتصفح متجر جِشتالتُونج.",
     "themeDark": "التبديل إلى الوضع الداكن",
@@ -710,7 +684,7 @@
     "fileNone": "لم يتم إرفاق ملف بعد",
     "fileBrowse": "اختر ملف CAD",
     "fileChange": "تغيير الملف",
-    "fileHint": "STL · STEP · DXF · IGES · حتى ٥٠ ميجابايت",
+    "fileHint": "STL · STEP · DXF · IGES · حتى 50 ميجابايت",
     "contactLabel": "كيف نتواصل معك؟",
     "contactHint": "أدخل بريدك الإلكتروني أو هاتفك — واحد على الأقل.",
     "emailLabel": "البريد الإلكتروني",
@@ -741,7 +715,7 @@
     "errorContact": "الرجاء إدخال بريدك الإلكتروني أو رقم هاتفك.",
     "errorTechnique": "الرجاء اختيار طريقة التصنيع.",
     "errorFileType": "الرجاء اختيار ملف CAD (STL أو STEP أو DXF أو IGES).",
-    "errorTooLarge": "حجم الملف يتجاوز ٥٠ ميجابايت. الرجاء اختيار ملف أصغر.",
+    "errorTooLarge": "حجم الملف يتجاوز 50 ميجابايت. الرجاء اختيار ملف أصغر.",
     "errorGeneric": "حدث خطأ ما. الرجاء المحاولة مرة أخرى.",
     "projectDefaultName": "قطعة للتصنيع",
     "openProject": "افتح مشروعك"
@@ -780,7 +754,19 @@
     "noEmail": "لا يوجد بريد إلكتروني",
     "markNew": "إعادة فتح",
     "markContacted": "تم التواصل",
-    "markClosed": "إغلاق"
+    "markClosed": "إغلاق",
+    "openProject": "ابحث عن المشروع",
+    "filter_open": "مفتوحة",
+    "filter_new": "جديدة",
+    "filter_contacted": "تم التواصل",
+    "filter_closed": "مغلقة",
+    "filter_all": "الكل",
+    "kind_all": "كل الأنواع",
+    "kind_quote": "تسعير ملف",
+    "kind_drawing": "رسم",
+    "kind_bom": "تسعير قطع",
+    "kind_callback": "طلب اتصال",
+    "kind_contact": "رسالة"
   },
   "Projects": {
     "kicker": "المشاريع",
@@ -893,14 +879,14 @@
   },
   "ProjectCad": {
     "heading": "ملف CAD",
-    "intro": "أرفق ملفًا ثلاثي الأبعاد أو ملف CAD وسنُسعّره يدويًا. STL أو STEP أو DXF أو IGES، حتى ٥٠ ميغابايت.",
+    "intro": "أرفق ملفًا ثلاثي الأبعاد أو ملف CAD وسنُسعّره يدويًا. STL أو STEP أو DXF أو IGES، حتى 50 ميغابايت.",
     "attach": "إرفاق ملف",
     "uploading": "جارٍ الرفع…",
     "notified": "تم الإرسال — سنوافيك بالسعر.",
     "empty": "لم يُرفق أي ملف بعد.",
     "remove": "إزالة الملف",
     "wrongType": "نوع الملف غير مدعوم. استخدم STL أو STEP أو DXF أو IGES.",
-    "tooLarge": "حجم الملف يتجاوز ٥٠ ميغابايت.",
+    "tooLarge": "حجم الملف يتجاوز 50 ميغابايت.",
     "uploadFailed": "تعذّر رفع الملف."
   },
   "MyInventory": {
@@ -926,7 +912,7 @@
     "addToInventory": "إضافة إلى المخزون",
     "metaTitle": "مخزونك — جِشتالتُونج",
     "metaDescription": "تتبّع القطع والمواد التي تملكها.",
-    "imageTooLarge": "حجم الصورة يتجاوز ١٠ ميغابايت.",
+    "imageTooLarge": "حجم الصورة يتجاوز 10 ميغابايت.",
     "uploadFailed": "تعذّر رفع الصورة."
   },
   "Prototyping": {
@@ -1686,7 +1672,10 @@
     "status_analysed": "حُلِّل، لم يُؤكَّد",
     "status_understanding_confirmed": "الفهم مؤكَّد",
     "status_bom_ready": "قائمة المواد جاهزة",
-    "status_circuit_generated": "الدائرة مستخلصة"
+    "status_circuit_generated": "الدائرة مستخلصة",
+    "search": "بحث",
+    "searchPlaceholder": "الاسم أو رقم المشروع أو الهاتف",
+    "guestWithPhone": "زائر (أعطى رقمه)"
   },
   "StoreAttributes": {
     "kicker": "الإدارة",
@@ -2203,5 +2192,8 @@
     "dashboardDescription": "لوحة التحكم الخاصة بك في جِشتالتُونج.",
     "productTitle": "{name} — متجر جِشتالتُونج",
     "productDescription": "اشترِ {name} من جِشتالتُونج، مع التوصيل في جميع أنحاء قطر."
+  },
+  "Phone": {
+    "invalid": "أدخل رقم هاتف يمكننا التواصل معه عبر واتساب، مثل 5555 1234 أو ‎+974 5555 1234."
   }
 }

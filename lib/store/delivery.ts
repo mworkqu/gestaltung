@@ -44,7 +44,7 @@ export const LEAD_CLASS_DAYS: Record<LeadTimeClass, number> = {
 export function formatDeliveryDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return "";
   const d = new Date(`${iso}T12:00:00Z`);
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "numeric",
     month: "long",
     timeZone: "UTC",

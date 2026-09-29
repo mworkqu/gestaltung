@@ -45,7 +45,7 @@ export function RestockDashboard({
   const [receiving, setReceiving] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const money = (n: number | null) => (n === null ? "—" : formatPrice(n, locale));
-  const date = (s: string) => new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", { dateStyle: "medium" }).format(new Date(s));
+  const date = (s: string) => new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium" }).format(new Date(s));
 
   const groups = useMemo(
     () => groupDraft(rows.filter((r) => picked[r.partId] !== undefined).map((r) => ({ row: r, qty: picked[r.partId] }))),

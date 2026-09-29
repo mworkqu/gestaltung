@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, isGuest } from "@/lib/supabase/guest";
-import { normalizePhone } from "@/lib/phone";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { Button } from "@/components/ui/button";
 
 // Starting a project is the one thing that must never hit a sign-in wall. The
@@ -52,7 +52,7 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
       setError(t("drawingRequired"));
       return;
     }
-    if (askPhone && normalizePhone(phone).replace(/\D/g, "").length < 8) {
+    if (askPhone && !isValidPhone(phone)) {
       setError(t("phoneRequired"));
       return;
     }

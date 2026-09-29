@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, MessageCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { isValidPhone } from "@/lib/phone";
 
 // Homepage lead capture, neu style. Collects a name + number and tells the
 // visitor we'll contact them; POSTs to /api/store-lead which saves the lead
@@ -15,6 +16,7 @@ const fieldClass =
 
 export function HomeCallback() {
   const t = useTranslations("StoreLanding");
+  const tPhone = useTranslations("Phone");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,10 @@ export function HomeCallback() {
     const phone = String(form.get("phone") ?? "").trim();
     if (!name || !phone) {
       setError(t("callbackError"));
+      return;
+    }
+    if (!isValidPhone(phone)) {
+      setError(tPhone("invalid"));
       return;
     }
     setLoading(true);

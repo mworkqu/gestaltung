@@ -18,6 +18,7 @@ import {
   QUOTE_BUCKET,
 } from "@/lib/design/constants";
 import { cn } from "@/lib/utils";
+import { isValidPhone } from "@/lib/phone";
 
 const TECHNIQUES = [
   "3d_printing",
@@ -41,6 +42,7 @@ type Done = "sent" | "sent_large" | "sent_nofile" | null;
 
 export function QuoteRequest() {
   const t = useTranslations("DesignQuote");
+  const tPhone = useTranslations("Phone");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const inputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +87,10 @@ export function QuoteRequest() {
 
     if (!email.trim() && !phone.trim()) {
       setError(t("errorContact"));
+      return;
+    }
+    if (phone.trim() && !isValidPhone(phone)) {
+      setError(tPhone("invalid"));
       return;
     }
     if (!technique) {

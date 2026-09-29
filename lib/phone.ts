@@ -60,3 +60,14 @@ export function toWhatsAppDigits(raw: string): string | null {
   if (!normalised.startsWith("+")) return null;
   return normalised.slice(1);
 }
+
+/**
+ * A number we can actually call back (audit Phase 6): a Qatar number (8 digits,
+ * with or without +974), or an international one written with + / 00 and
+ * 8–15 digits. Forms use this to show an error before sending.
+ */
+export function isValidPhone(raw: string): boolean {
+  const n = normalizePhone(raw);
+  if (/^\+974\d{8}$/.test(n)) return true;
+  return /^\+\d{8,15}$/.test(n) && !n.startsWith("+974");
+}

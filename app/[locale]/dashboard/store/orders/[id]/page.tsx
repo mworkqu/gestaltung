@@ -56,7 +56,7 @@ export default async function OrderDetailPage({
   }
   const soleProject = projectIds.length === 1 && items.every((it) => it.project_id === projectIds[0]) ? projectIds[0] : null;
 
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",

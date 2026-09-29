@@ -56,32 +56,6 @@
     "ctaSecondary": "How it works",
     "formats": "STL · STEP · DXF · IGES"
   },
-  "Features": {
-    "customTitle": "Custom manufacturing",
-    "customCopy": "Upload, match, produce, deliver.",
-    "storeTitle": "Mechanical parts store",
-    "storeCopy": "Screws, nuts, fasteners.",
-    "cadTitle": "CAD drawing service — from 200 QAR",
-    "cadCopy": "No CAD file? Send a sketch — we'll draw it for you."
-  },
-  "LocalAdvantage": {
-    "item1Title": "Zero Import Delays",
-    "item1Copy": "Parts produced inside Qatar — no customs, no 4-week shipping waits.",
-    "item2Title": "Next-Day Delivery in Doha",
-    "item2Copy": "Workshop network covers Doha, Lusail, and Industrial Area.",
-    "item3Title": "Qatar-First Pricing",
-    "item3Copy": "No international freight markups. Pay only for the part and the craft."
-  },
-  "Social": {
-    "tag": "Who we work with",
-    "heading": "Built for Qatar's Engineering Community",
-    "subtext": "Serving engineers, makers, and institutions across Doha and the wider Gulf.",
-    "org1": "Qatar University",
-    "org2": "Texas A&M at Qatar",
-    "org3": "QatarEnergy",
-    "org4": "Qatar Foundation",
-    "footnote": "Representative institutions. Partner logos will be shown with permission."
-  },
   "CadAssistance": {
     "kicker": "CAD design assistance",
     "heading": "Don't have a CAD file? We'll draw it for you.",
@@ -780,7 +754,19 @@
     "noEmail": "No email given",
     "markNew": "Reopen",
     "markContacted": "Mark contacted",
-    "markClosed": "Close"
+    "markClosed": "Close",
+    "openProject": "Find the project",
+    "filter_open": "Open",
+    "filter_new": "New",
+    "filter_contacted": "Contacted",
+    "filter_closed": "Closed",
+    "filter_all": "All",
+    "kind_all": "Every kind",
+    "kind_quote": "File quote",
+    "kind_drawing": "Drawing",
+    "kind_bom": "Parts quote",
+    "kind_callback": "Callback",
+    "kind_contact": "Message"
   },
   "Projects": {
     "kicker": "Projects",
@@ -1686,7 +1672,10 @@
     "status_analysed": "Analysed, not confirmed",
     "status_understanding_confirmed": "Understanding confirmed",
     "status_bom_ready": "Bill of materials ready",
-    "status_circuit_generated": "Circuit generated"
+    "status_circuit_generated": "Circuit generated",
+    "search": "Search",
+    "searchPlaceholder": "Name, project ID or phone",
+    "guestWithPhone": "Guest (phone given)"
   },
   "StoreAttributes": {
     "kicker": "Admin",
@@ -2203,5 +2192,8 @@
     "dashboardDescription": "Your Gestaltung dashboard.",
     "productTitle": "{name} — Gestaltung store",
     "productDescription": "Buy {name} from Gestaltung, delivered across Qatar."
+  },
+  "Phone": {
+    "invalid": "Please enter a phone number we can reach on WhatsApp, e.g. 5555 1234 or +974 5555 1234."
   }
 }

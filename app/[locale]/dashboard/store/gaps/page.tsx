@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { TestBadge, TestDataToggle, showsTestData } from "@/components/admin/test-data-toggle";
 import { cn } from "@/lib/utils";
+import { gapKey, gapLabel } from "@/lib/admin/gap-key";
 
 // Sourcing gaps: every bill-of-materials line the store could not supply,
 // grouped by function with a count of projects asking for it. The restocking
@@ -40,7 +41,7 @@ export default async function SourcingGapsPage({
   const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -65,12 +66,16 @@ export default async function SourcingGapsPage({
   >();
   for (const g of gaps) {
     const test = Boolean(g.project?.is_test);
-    const key = `${test ? "test:" : ""}${g.function_key}`;
+    // Same kind of part in one row, values kept as specs (audit Phase 6).
+    const base = gapKey(g.function);
+    const key = `${test ? "test:" : ""}${base}`;
     const e =
       groups.get(key) ??
-      { label: g.function, test, projects: new Set<string>(), specs: new Set<string>(), kinds: new Set<string>(), units: 0, last: g.last_seen };
+      { label: gapLabel(base), test, projects: new Set<string>(), specs: new Set<string>(), kinds: new Set<string>(), units: 0, last: g.last_seen };
     e.projects.add(g.project_id);
     if (g.spec) e.specs.add(g.spec);
+    // A value in the name ("resistor 220 Ω") is a spec too.
+    if (/\d/.test(g.function)) e.specs.add(g.function.trim());
     if (g.kind) e.kinds.add(g.kind);
     e.units += g.quantity ?? 0;
     if (g.last_seen > e.last) e.last = g.last_seen;

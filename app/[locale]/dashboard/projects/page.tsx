@@ -6,6 +6,7 @@ import { projectStatus } from "@/lib/admin/project-export";
 import { ProjectExportButtons } from "@/components/admin/project-export-buttons";
 import { TestBadge, TestDataToggle, showsTestData } from "@/components/admin/test-data-toggle";
 import { cn } from "@/lib/utils";
+import { toWhatsAppDigits } from "@/lib/phone";
 
 // Every project on the platform, for diagnostics. super_admin only (layout +
 // RLS). Owner, created, status and last activity per project; filter by
@@ -32,17 +33,18 @@ export default async function AdminProjectsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ user?: string; test?: string }>;
+  searchParams: Promise<{ user?: string; test?: string; q?: string }>;
 }) {
   const { locale } = await params;
-  const { user: userFilter, test } = await searchParams;
+  const { user: userFilter, test, q } = await searchParams;
+  const search = (q ?? "").trim().toLowerCase();
   const showTest = showsTestData(test);
   setRequestLocale(locale);
   const t = await getTranslations("AdminProjects");
   const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -60,13 +62,15 @@ export default async function AdminProjectsPage({
   if (!showTest) projQuery = projQuery.eq("is_test", false);
   const [projRes, profRes, eventsRes, partsRes] = await Promise.all([
     projQuery,
-    supabase.from("profiles").select("id, full_name, role").limit(5000),
+    supabase.from("profiles").select("id, full_name, role, phone").limit(5000),
     // Latest event per project, for "last activity" (0024; empty before it runs).
     supabase.from("project_events").select("project_id, created_at").order("created_at", { ascending: false }).limit(10000),
     supabase.from("project_parts").select("project_id, updated_at").order("updated_at", { ascending: false }).limit(10000),
   ]);
   const all = (projRes.data ?? []) as Row[];
-  const profiles = new Map((profRes.data ?? []).map((p) => [p.id as string, p as { id: string; full_name: string | null; role: string }]));
+  const profiles = new Map(
+    (profRes.data ?? []).map((p) => [p.id as string, p as { id: string; full_name: string | null; role: string; phone: string | null }])
+  );
 
   // Emails live in auth.users; only the service key can read them.
   const emails = new Map<string, { email: string | null; anonymous: boolean }>();
@@ -87,9 +91,11 @@ export default async function AdminProjectsPage({
   const ownerLabel = (id: string) => {
     const e = emails.get(id);
     const p = profiles.get(id);
-    if (e?.anonymous) return t("guest");
+    if (e?.anonymous) return p?.phone ? t("guestWithPhone") : t("guest");
     return e?.email ?? p?.full_name ?? t("unknownOwner");
   };
+  // Guests now leave a WhatsApp number when they start a project (2026-09-29).
+  const ownerPhone = (id: string) => profiles.get(id)?.phone ?? null;
 
   const latest = new Map<string, string>();
   for (const e of [...(eventsRes.data ?? []), ...(partsRes.data ?? [])] as { project_id: string; created_at?: string; updated_at?: string }[]) {
@@ -104,7 +110,16 @@ export default async function AdminProjectsPage({
   const owners = [...new Set(all.map((p) => p.user_id))]
     .map((id) => ({ id, label: ownerLabel(id), count: all.filter((p) => p.user_id === id).length }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
-  const rows = (userFilter ? all.filter((p) => p.user_id === userFilter) : all).sort((a, b) =>
+  const rows = (userFilter ? all.filter((p) => p.user_id === userFilter) : all)
+    .filter(
+      (p) =>
+        !search ||
+        p.id.toLowerCase().includes(search) ||
+        p.name.toLowerCase().includes(search) ||
+        (ownerPhone(p.user_id) ?? "").replace(/\s/g, "").includes(search.replace(/\s/g, "")) ||
+        ownerLabel(p.user_id).toLowerCase().includes(search)
+    )
+    .sort((a, b) =>
     lastActivity(b).localeCompare(lastActivity(a))
   );
 
@@ -132,6 +147,15 @@ export default async function AdminProjectsPage({
               </option>
             ))}
           </select>
+        </label>
+        <label className="flex flex-col gap-1 text-[11px] text-mutedtext">
+          {t("search")}
+          <input
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder={t("searchPlaceholder")}
+            className="rounded-lg border border-white/60 bg-surface px-2.5 py-1.5 text-sm text-heading shadow-neu-inset"
+          />
         </label>
         <button type="submit" className="rounded-lg bg-cobalt px-3 py-1.5 text-xs font-semibold text-white hover:bg-cobalt-hover">
           {t("apply")}
@@ -172,6 +196,22 @@ export default async function AdminProjectsPage({
                 </td>
                 <td className="px-3 py-2.5 text-[12.5px] text-heading">
                   {ownerLabel(p.user_id)}
+                  {ownerPhone(p.user_id) &&
+                    (toWhatsAppDigits(ownerPhone(p.user_id) ?? "") ? (
+                      <a
+                        href={`https://wa.me/${toWhatsAppDigits(ownerPhone(p.user_id) ?? "")}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-[11.5px] font-medium text-cobalt hover:underline"
+                        dir="ltr"
+                      >
+                        {ownerPhone(p.user_id)}
+                      </a>
+                    ) : (
+                      <span className="block text-[11.5px] text-mutedtext" dir="ltr">
+                        {ownerPhone(p.user_id)}
+                      </span>
+                    ))}
                   <span className="block font-mono text-[10px] text-faint">{p.user_id.slice(0, 8)}</span>
                 </td>
                 <td className="px-3 py-2.5 text-[12px] text-mutedtext">{dateFmt.format(new Date(p.created_at))}</td>

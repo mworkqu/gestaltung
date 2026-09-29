@@ -7,6 +7,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/phone-input";
 import { cn } from "@/lib/utils";
+import { isValidPhone } from "@/lib/phone";
 
 // Recessed "well" inputs. Uses the shadow-neu-inset utility (not the .neu-inset
 // component class) so the cobalt focus ring composes with the inset shadow via
@@ -16,6 +17,7 @@ const fieldClass =
 
 export function ContactForm() {
   const t = useTranslations("Contact");
+  const tPhone = useTranslations("Phone");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const [submitted, setSubmitted] = useState(false);
@@ -33,6 +35,11 @@ export function ContactForm() {
 
     const data = new FormData(e.currentTarget);
     const form = e.currentTarget;
+    if (!isValidPhone(String(data.get("phone") ?? ""))) {
+      setError(tPhone("invalid"));
+      setLoading(false);
+      return;
+    }
     const payload = {
       name: String(data.get("name")).trim(),
       phone: String(data.get("phone")).trim(), // WhatsApp — primary contact

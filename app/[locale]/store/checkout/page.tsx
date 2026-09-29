@@ -15,6 +15,7 @@ import { DELIVERY_AREAS, LAST_ORDER_KEY } from "@/lib/parts/constants";
 import { cn } from "@/lib/utils";
 import type { CartItem } from "@/lib/supabase/types";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
+import { isValidPhone } from "@/lib/phone";
 import {
   formatDeliveryDate,
   isOnRequest,
@@ -35,6 +36,7 @@ export default function CheckoutPage() {
   const tParts = useTranslations("Parts");
   const tD = useTranslations("Delivery");
   const tPay = useTranslations("PayMethods");
+  const tPhone = useTranslations("Phone");
   const [payMethod, setPayMethod] = useState<PaymentMethod>("cash_on_delivery");
   const { quote, legacy, error: quoteError } = useDeliveryQuote(items);
   const [tier, setTier] = useState<ShippingTier>("standard");
@@ -85,6 +87,10 @@ export default function CheckoutPage() {
 
     if (!customerName || !customerPhone || !deliveryArea) {
       setError(t("errorRequired"));
+      return;
+    }
+    if (!isValidPhone(customerPhone)) {
+      setError(tPhone("invalid"));
       return;
     }
     if (items.length === 0) {

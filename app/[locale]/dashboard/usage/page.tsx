@@ -37,10 +37,10 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const num = new Intl.NumberFormat(locale === "ar" ? "ar-QA" : "en-GB");
-  const pct = new Intl.NumberFormat(locale === "ar" ? "ar-QA" : "en-GB", { style: "percent", maximumFractionDigits: 1 });
-  const dayFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
-  const timeFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
+  const num = new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB");
+  const pct = new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { style: "percent", maximumFractionDigits: 1 });
+  const dayFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
+  const timeFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",

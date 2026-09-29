@@ -69,7 +69,11 @@ export default async function InventoryPage({
       .from("tenants")
       .select("id, name")
       .order("name", { ascending: true });
-    tenants = tdata ?? [];
+    // Tenants that share a name get their short id, so the filter never shows
+    // two identical entries (audit Phase 6).
+    const seen = new Map<string, number>();
+    for (const x of tdata ?? []) seen.set(x.name, (seen.get(x.name) ?? 0) + 1);
+    tenants = (tdata ?? []).map((x) => ((seen.get(x.name) ?? 0) > 1 ? { ...x, name: `${x.name} · ${x.id.slice(0, 4)}` } : x));
   }
 
   const priceFmt = (v: number | null) =>

@@ -31,7 +31,7 @@ export default async function VoltaatSyncPage({ params }: { params: Promise<{ lo
   const t = await getTranslations("VoltaatSync");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
 
   const supabase = await createClient();
   const { data: sup } = await supabase.from("suppliers").select("id").eq("code", "voltaat").maybeSingle();

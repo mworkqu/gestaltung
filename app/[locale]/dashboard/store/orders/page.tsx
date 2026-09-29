@@ -36,7 +36,7 @@ export default async function PartsOrdersPage({
 
   const orders = (data ?? []) as unknown as OrderRow[];
 
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",

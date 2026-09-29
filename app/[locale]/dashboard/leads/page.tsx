@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Inbox, Mail, MessageCircle } from "lucide-react";
+import { Download, FolderOpen, Inbox, Mail, MessageCircle } from "lucide-react";
+
+import { Link } from "@/i18n/navigation";
+import { createServiceClient } from "@/lib/supabase/service";
+import { LEAD_KINDS, leadKind, leadProjectId, type LeadKind } from "@/lib/admin/lead-kind";
+import { CAD_BUCKET } from "@/lib/design/constants";
 
 import type { Inquiry, InquiryStatus } from "@/lib/supabase/types";
 import { setLeadStatus } from "./actions";
@@ -35,12 +40,36 @@ const ACTION_LABEL: Record<InquiryStatus, "markNew" | "markContacted" | "markClo
   closed: "markClosed",
 };
 
+/** URLs in a message become links (quote requests carry download links). */
+function Linkified({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s)]+)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        /^https?:\/\//.test(p) ? (
+          <a key={i} href={p} target="_blank" rel="noopener noreferrer" className="break-all text-cobalt hover:underline" dir="ltr">
+            {p}
+          </a>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </>
+  );
+}
+
 export default async function LeadsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<{ status?: string; kind?: string }>;
 }) {
   const { locale } = await params;
+  const sp = await searchParams;
+  // Filters (audit Phase 6): open (new + contacted) by default; by kind.
+  const statusFilter = ["new", "contacted", "closed", "all"].includes(sp.status ?? "") ? sp.status! : "open";
+  const kindFilter = (LEAD_KINDS as readonly string[]).includes(sp.kind ?? "") ? (sp.kind as LeadKind) : null;
   setRequestLocale(locale);
 
   // RLS already restricts these rows to super_admin, but redirect rather than
@@ -59,9 +88,46 @@ export default async function LeadsPage({
     .from("inquiries")
     .select("*")
     .order("created_at", { ascending: false });
-  const leads = (data ?? []) as Inquiry[];
+  const all = (data ?? []) as Inquiry[];
+  const leads = all.filter(
+    (l) =>
+      (statusFilter === "all" || (statusFilter === "open" ? l.status !== "closed" : l.status === statusFilter)) &&
+      (!kindFilter || leadKind(l.message) === kindFilter)
+  );
 
-  const dateFmt = new Intl.DateTimeFormat(isRtl ? "ar-QA" : "en-GB", {
+  // The CAD files on each lead's project, as fresh 1-hour download links
+  // (the links inside old emails expire after 7 days).
+  const projectIds = [...new Set(leads.map((l) => leadProjectId(l.message)).filter((x): x is string => !!x))];
+  const filesByProject = new Map<string, { name: string; url: string }[]>();
+  const svc = projectIds.length ? createServiceClient() : null;
+  if (svc) {
+    const { data: files } = await svc
+      .from("project_files")
+      .select("project_id, file_name, storage_path")
+      .in("project_id", projectIds);
+    for (const f of files ?? []) {
+      const { data: signed } = await svc.storage.from(CAD_BUCKET).createSignedUrl(f.storage_path as string, 3600);
+      if (!signed?.signedUrl) continue;
+      const list = filesByProject.get(f.project_id as string) ?? [];
+      list.push({ name: f.file_name as string, url: signed.signedUrl });
+      filesByProject.set(f.project_id as string, list);
+    }
+  }
+  const filterHref = (patch: { status?: string; kind?: string | null }) => {
+    const q: Record<string, string> = {};
+    const s = patch.status ?? statusFilter;
+    const k = patch.kind === undefined ? kindFilter : patch.kind;
+    if (s !== "open") q.status = s;
+    if (k) q.kind = k;
+    return { pathname: "/dashboard/leads", query: q };
+  };
+  const chip = (on: boolean) =>
+    cn(
+      "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+      on ? "bg-panel text-heading shadow-neu-sm" : "text-mutedtext hover:text-heading"
+    );
+
+  const dateFmt = new Intl.DateTimeFormat(isRtl ? "ar-QA-u-nu-latn" : "en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
   });
@@ -76,6 +142,26 @@ export default async function LeadsPage({
         </p>
       </div>
 
+      <div className="mt-6 space-y-2">
+        <div className="flex flex-wrap gap-1">
+          {(["open", "new", "contacted", "closed", "all"] as const).map((s) => (
+            <Link key={s} href={filterHref({ status: s })} className={chip(statusFilter === s)}>
+              {t(`filter_${s}`)}
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Link href={filterHref({ kind: null })} className={chip(!kindFilter)}>
+            {t("kind_all")}
+          </Link>
+          {LEAD_KINDS.map((k) => (
+            <Link key={k} href={filterHref({ kind: k })} className={chip(kindFilter === k)}>
+              {t(`kind_${k}`)}
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {leads.length === 0 ? (
         <div className="neu mt-8 flex flex-col items-center gap-3 p-12 text-center">
           <Inbox className="h-8 w-8 text-faint" aria-hidden />
@@ -87,6 +173,9 @@ export default async function LeadsPage({
           {leads.map((lead) => {
             // null when the stored number can't form a valid wa.me link.
             const waDigits = toWhatsAppDigits(lead.phone);
+            const kind = leadKind(lead.message);
+            const projectId = leadProjectId(lead.message);
+            const files = projectId ? filesByProject.get(projectId) ?? [] : [];
 
             return (
               <li key={lead.id} className="neu p-5">
@@ -94,6 +183,9 @@ export default async function LeadsPage({
                   <div className="min-w-0">
                     <p className="truncate text-base font-semibold text-heading">
                       {lead.name}
+                      <span className="ms-2 rounded-full bg-panel px-2 py-0.5 align-middle text-[10px] font-semibold text-cobalt shadow-neu-sm">
+                        {t(`kind_${kind}`)}
+                      </span>
                     </p>
                     <p className={mono("mt-1 text-[10px] text-faint")}>
                       {t("colDate")} · {dateFmt.format(new Date(lead.created_at))}
@@ -150,9 +242,34 @@ export default async function LeadsPage({
                 <div className="mt-4 border-t border-borderstrong/60 pt-4">
                   <p className={mono("text-[10px] text-faint")}>{t("colMessage")}</p>
                   {/* Quote enquiries arrive as multi-line text (method, file, notes). */}
-                  <p className="mt-2 whitespace-pre-line text-sm text-body">
-                    {lead.message}
+                  <p className="mt-2 whitespace-pre-line break-words text-sm text-body">
+                    <Linkified text={lead.message ?? ""} />
                   </p>
+                  {(files.length > 0 || projectId) && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {files.map((f) => (
+                        <a
+                          key={f.url}
+                          href={f.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm hover:text-cobalt"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span dir="ltr">{f.name}</span>
+                        </a>
+                      ))}
+                      {projectId && (
+                        <Link
+                          href={{ pathname: "/dashboard/projects", query: { q: projectId } }}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm hover:text-cobalt"
+                        >
+                          <FolderOpen className="h-3.5 w-3.5" />
+                          {t("openProject")}
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-borderstrong/60 pt-4">
