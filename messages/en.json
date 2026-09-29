@@ -2208,7 +2208,7 @@
     "hl_restocked": "Voltaat has it again",
     "hlHelp_restocked": "A backup is on sale and Voltaat restocked. Pick one.",
     "hl_belowFloor": "Below your margin",
-    "hlHelp_belowFloor": "Earning less than your minimum margin.",
+    "hlHelp_belowFloor": "DigiKey/Mouser items earning less than your minimum margin. (Voltaat items always earn their fixed commission.)",
     "hl_pricier": "Backup much pricier",
     "hlHelp_pricier": "DigiKey/Mouser backup costs 30% more than Voltaat's price.",
     "hl_noPhoto": "No photo",

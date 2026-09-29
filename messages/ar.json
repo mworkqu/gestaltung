@@ -2208,7 +2208,7 @@
     "hl_restocked": "عاد متوفراً لدى فولتات",
     "hlHelp_restocked": "يوجد بديل معروض وأعادت فولتات التخزين. اختر واحداً.",
     "hl_belowFloor": "أقل من هامش الربح",
-    "hlHelp_belowFloor": "ربحها أقل من الحد الأدنى للهامش.",
+    "hlHelp_belowFloor": "منتجات DigiKey/Mouser بربح أقل من الحد الأدنى. (منتجات فولتات تربح عمولتها الثابتة دائماً.)",
     "hl_pricier": "البديل أغلى بكثير",
     "hlHelp_pricier": "بديل DigiKey/Mouser أغلى بـ 30% من سعر فولتات.",
     "hl_noPhoto": "بلا صورة",
