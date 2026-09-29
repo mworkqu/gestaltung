@@ -738,7 +738,10 @@
     "pathsTag": "Choose your path",
     "ctaTag": "Not sure which?",
     "ctaHeading": "Tell us what you need — we'll guide you.",
-    "ctaButton": "Talk to us"
+    "ctaButton": "Talk to us",
+    "searchLabel": "Maybe we already sell it — search first",
+    "searchPlaceholder": "Part name, model or size, e.g. M3 bracket, NE555",
+    "searchButton": "Search"
   },
   "Leads": {
     "kicker": "Leads",

@@ -108,11 +108,11 @@ async function backups(db: Db, preview: boolean) {
     for (const code of codes) {
       usedCode = code;
       calls++;
-      hit = pickBackup(await digikeySearch(code, 5).catch(() => []), code, p.name);
+      hit = pickBackup(await digikeySearch(code, 10).catch(() => []), code, p.name);
       await wait(600);
       if (hit) break;
       calls++;
-      hit = pickBackup(await mouserSearch(code, 5).catch(() => []), code, p.name);
+      hit = pickBackup(await mouserSearch(code, 10).catch(() => []), code, p.name);
       await wait(2100);
       if (hit) break;
     }

@@ -62,3 +62,15 @@ describe("sameKind + tighter codes", () => {
     expect(isComponent("HC-SR04 Ultrasonic Sensor Mounting Bracket")).toBe(false);
   });
 });
+
+describe("sameMount", () => {
+  it("never backs a through-hole item with a surface-mount chip", async () => {
+    const { sameMount } = await import("./backup");
+    const soic = { parameters: [{ name: "Mounting Type", value: "Surface Mount" }], description: "J-FET Amplifier 8-SOIC" };
+    const pdip = { parameters: [{ name: "Mounting Type", value: "Through Hole" }], description: "Amplifier 8-PDIP" };
+    expect(sameMount("LF412 Dual JFET Operational Amplifier IC", soic)).toBe(false);
+    expect(sameMount("LF412 Dual JFET Operational Amplifier IC", pdip)).toBe(true);
+    expect(sameMount("MCP4725 DAC SOT-23 SMD", soic)).toBe(true);
+    expect(sameMount("Energizer 9V Battery", { parameters: [], description: "9V Alkaline Battery" })).toBe(true);
+  });
+});

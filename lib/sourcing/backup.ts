@@ -68,11 +68,44 @@ export function carriesModel(p: Pick<SupplierProduct, "mpn">, code: string): boo
   return c.length >= 5 && mpn.startsWith(c);
 }
 
-/** The first result that is the same model, the same kind of part, and has a price. */
+type Mount = "tht" | "smd" | "other" | null;
+
+/**
+ * How a part is mounted (owner, 2026-09-29: surface-mount and through-hole are
+ * different items). Voltaat's hobby parts are through-hole unless the name
+ * says otherwise.
+ */
+export function wantedMount(voltaatName: string): Mount {
+  return /\b(smd|smt|surface[- ]mount|soic|sot-?\d+|qfn|tssop|ssop|msop|0402|0603|0805|1206)\b/i.test(voltaatName) ? "smd" : "tht";
+}
+
+export function resultMount(p: Pick<SupplierProduct, "parameters" | "description">): Mount {
+  const param = p.parameters.find((x) => /mounting (type|style)/i.test(x.name))?.value ?? "";
+  if (/surface|smd|smt/i.test(param)) return "smd";
+  if (/through/i.test(param)) return "tht";
+  if (param) return "other"; // chassis, panel, free-hanging…
+  const d = p.description ?? "";
+  if (/\b(soic|sot-?\d+|qfn|tssop|ssop|msop|dfn|0402|0603|0805)\b/i.test(d)) return "smd";
+  if (/\b(dip|pdip|to-?92|to-?220|through hole)\b/i.test(d)) return "tht";
+  return null;
+}
+
+/** A surface-mount result never backs a through-hole item, and the other way round. */
+export function sameMount(voltaatName: string, p: Pick<SupplierProduct, "parameters" | "description">): boolean {
+  const want = wantedMount(voltaatName);
+  const got = resultMount(p);
+  return !(got === "smd" && want === "tht") && !(got === "tht" && want === "smd");
+}
+
+/** The first result that is the same model, kind of part and mounting, and has a price. */
 export function pickBackup(results: SupplierProduct[], code: string, voltaatName?: string): SupplierProduct | null {
   return (
     results.find(
-      (r) => r.cost !== null && r.cost > 0 && carriesModel(r, code) && (voltaatName === undefined || sameKind(voltaatName, r))
+      (r) =>
+        r.cost !== null &&
+        r.cost > 0 &&
+        carriesModel(r, code) &&
+        (voltaatName === undefined || (sameKind(voltaatName, r) && sameMount(voltaatName, r)))
     ) ?? null
   );
 }

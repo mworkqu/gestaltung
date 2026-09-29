@@ -738,7 +738,10 @@
     "pathsTag": "اختر مسارك",
     "ctaTag": "غير متأكد؟",
     "ctaHeading": "أخبرنا بما تحتاجه — وسنرشدك.",
-    "ctaButton": "تحدث إلينا"
+    "ctaButton": "تحدث إلينا",
+    "searchLabel": "ربما نبيعه بالفعل — ابحث أولاً",
+    "searchPlaceholder": "اسم القطعة أو الطراز أو المقاس، مثل M3 أو NE555",
+    "searchButton": "بحث"
   },
   "Leads": {
     "kicker": "العملاء المحتملون",

@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { UploadCloud, PencilRuler, ArrowUpRight } from "lucide-react";
+import { UploadCloud, PencilRuler, ArrowUpRight, Search } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,27 @@ export default async function DesignHubPage({
           <p className="max-w-xl text-base leading-relaxed text-body sm:text-lg">
             {t("subheading")}
           </p>
+
+          {/* Maybe it's already sold: search the store before making it (owner, 2026-09-29). */}
+          <form action={`/${locale}/store`} className="max-w-xl space-y-1.5">
+            <label htmlFor="design-search" className="block text-xs font-semibold text-mutedtext">
+              {t("searchLabel")}
+            </label>
+            <div className="flex items-stretch gap-2">
+              <div className="flex flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3.5 shadow-neu-inset">
+                <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
+                <input
+                  id="design-search"
+                  name="q"
+                  placeholder={t("searchPlaceholder")}
+                  className="w-full flex-1 bg-transparent py-3 text-sm text-heading outline-none placeholder:text-faint"
+                />
+              </div>
+              <Button type="submit" className="rounded-2xl px-5">
+                {t("searchButton")}
+              </Button>
+            </div>
+          </form>
         </div>
 
         {/* Blueprint panel */}
