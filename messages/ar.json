@@ -1089,7 +1089,7 @@
     "node_electronics_board": "اللوحة",
     "node_electronics_power": "الطاقة",
     "node_electronics_components": "المكوّنات",
-    "node_software_scope": "النطاق",
+    "node_software_scope": "الكود",
     "need_parts": "تحتاج قطعًا",
     "need_material": "تحتاج مادة",
     "need_process": "تحتاج طريقة تصنيع",
@@ -1573,7 +1573,26 @@
     "chatPlaceholder": "إجابتك…",
     "chatSend": "إرسال",
     "chatRestart": "ابدأ من جديد",
-    "chatClose": "إغلاق"
+    "chatClose": "إغلاق",
+    "fwTitle": "كود للوحتك",
+    "fwIntro": "نكتب كوداً أولياً (Arduino IDE) لهذه الدائرة بالضبط: اللوحة والقطع والأطراف نفسها. انسخه أو نزّل ملف ‎.ino.",
+    "fwNeedsCircuit": "أنشئ أولاً قائمة المكونات والدائرة، ليعرف الكود وظيفة كل طرف.",
+    "fwGoCircuit": "اذهب إلى الإلكترونيات › المكونات",
+    "fwWrite": "اكتب الكود",
+    "fwRewrite": "اكتبه من جديد",
+    "fwWriting": "جارٍ الكتابة…",
+    "fwWritingNote": "يستغرق ذلك حتى دقيقة.",
+    "fwBoard": "اللوحة في Arduino IDE",
+    "fwCopy": "انسخ الكود",
+    "fwCopied": "تم النسخ",
+    "fwDownload": "نزّل {file}",
+    "fwLibraries": "مكتبات يجب تثبيتها",
+    "fwSteps": "طريقة الرفع",
+    "fwDisclaimer": "كود أولي كتبه الذكاء الاصطناعي لدائرتك. جرّبه على الطاولة قبل الاعتماد عليه.",
+    "fwErr_no_controller": "لا تحتوي الدائرة على متحكم (ESP32 أو Arduino…)، فلا يوجد ما نبرمجه.",
+    "fwErr_no_circuit": "أنشئ الدائرة أولاً.",
+    "fwErr_paused": "نفد رصيد الذكاء الاصطناعي لليوم. حاول غداً.",
+    "fwErr_failed": "تعذّرت كتابة الكود هذه المرة. حاول بعد دقيقة."
   },
   "AiUsage": {
     "kicker": "الإدارة",
@@ -1616,7 +1635,9 @@
     "jobTranslate": "يترجم أسماء المنتجات إلى العربية (تنظيف إداري فقط، غير محسوب هنا)",
     "jobBackup": "يؤدي المهام نفسها فقط عندما يكون النموذج الرئيسي مشغولاً (خطأ Google 503)",
     "jobTranscribe": "يحوّل التسجيل الصوتي إلى نص في وصف المشروع (يُستخدم للكلام العربي)",
-    "modelUnused": "لا توجد طلبات خلال آخر {days} يوماً."
+    "modelUnused": "لا توجد طلبات خلال آخر {days} يوماً.",
+    "feature_firmware": "كود البرنامج الثابت",
+    "jobFirmware": "يكتب كوداً أولياً لـ Arduino/ESP32 لدائرة المشروع"
   },
   "SourcingGaps": {
     "kicker": "الإدارة",

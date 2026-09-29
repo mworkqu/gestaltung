@@ -900,6 +900,17 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     project give a WhatsApp number (saved to profiles.phone; banner "Saved under {phone}"); phone-only login on
     other devices would need paid SMS, so cross-device still = add an email. AI usage page: "Which AI does what"
     (main/backup Gemini, Groq Whisper, answers per model from ai_usage.model).
+  - 2026-09-29 PROTOTYPING SIMPLIFIED (owner): one colour-coded "What we understood" list
+    (components/prototyping/understood-panel.tsx: blue = answer, amber = our guess ✓/change, green = settled, grey =
+    optional details with Skip all; only standard facts block readiness); "Help me describe it" chat on the brief
+    (components/prototyping/brief-chat.tsx + /api/brief-chat, metered as 'analyse', same consent); read aloud
+    (components/prototyping/read-aloud.tsx, browser speechSynthesis). Electronics = 3 steps: Board (Prototype/Custom,
+    saves on click) → Power (1 adapter / 2 battery / 3 solar = spec fact power) → Components (Generate component list +
+    BOM + circuit; circuit requirements now map to Components). BOM auto-picks the best candidate (LineMatch.auto)
+    with other models one click away; candidates rank by lead_time_class. Software › Code: /api/firmware writes a
+    starter Arduino/ESP32 sketch from the netlist (lib/prototyping/firmware.ts, components/prototyping/firmware-card.tsx).
+    MIGRATION 0040_firmware.sql (NOT RUN YET): projects.firmware + 'firmware' feature; before it runs the code shows
+    but isn't saved.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -970,6 +981,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   step stays hidden until then)
 - 0039_payment_method.sql — (RUN ✔ 2026-09-29) part_orders.payment_method + set_order_payment_method() (RUN AFTER 0038; until then
   orders are placed without a recorded method but the success page still shows the chosen one)
+- 0040_firmware.sql — projects.firmware + 'firmware' ai_usage/analysis_runs feature (RUN AFTER 0039)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER

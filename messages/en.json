@@ -1089,7 +1089,7 @@
     "node_electronics_board": "Board",
     "node_electronics_power": "Power",
     "node_electronics_components": "Components",
-    "node_software_scope": "Scope",
+    "node_software_scope": "Code",
     "need_parts": "needs parts",
     "need_material": "needs material",
     "need_process": "needs process",
@@ -1573,7 +1573,26 @@
     "chatPlaceholder": "Your answer…",
     "chatSend": "Send",
     "chatRestart": "Start over",
-    "chatClose": "Close"
+    "chatClose": "Close",
+    "fwTitle": "Code for your board",
+    "fwIntro": "We write starter code (Arduino IDE) for this exact circuit: the same board, parts and pins. Copy it or download the .ino file.",
+    "fwNeedsCircuit": "First make the component list and circuit, so the code knows which pin does what.",
+    "fwGoCircuit": "Go to Electronics › Components",
+    "fwWrite": "Write the code",
+    "fwRewrite": "Write it again",
+    "fwWriting": "Writing…",
+    "fwWritingNote": "This takes up to a minute.",
+    "fwBoard": "Board in Arduino IDE",
+    "fwCopy": "Copy code",
+    "fwCopied": "Copied",
+    "fwDownload": "Download {file}",
+    "fwLibraries": "Libraries to install",
+    "fwSteps": "How to upload it",
+    "fwDisclaimer": "Starter code written by AI for your circuit. Test it on the bench before relying on it.",
+    "fwErr_no_controller": "The circuit has no microcontroller (ESP32, Arduino…), so there is nothing to program.",
+    "fwErr_no_circuit": "Make the circuit first.",
+    "fwErr_paused": "Today's AI allowance is used up. Try again tomorrow.",
+    "fwErr_failed": "The code couldn't be written this time. Try again in a minute."
   },
   "AiUsage": {
     "kicker": "Admin",
@@ -1616,7 +1635,9 @@
     "jobTranslate": "Translates product names to Arabic (admin clean-up only, not counted here)",
     "jobBackup": "Does the same jobs only when the main model is busy (Google \"503\")",
     "jobTranscribe": "Turns a recorded voice note into text in the project brief (used for Arabic speech)",
-    "modelUnused": "No calls in the last {days} days."
+    "modelUnused": "No calls in the last {days} days.",
+    "feature_firmware": "Firmware code",
+    "jobFirmware": "Writes starter Arduino/ESP32 code for a project's circuit"
   },
   "SourcingGaps": {
     "kicker": "Admin",

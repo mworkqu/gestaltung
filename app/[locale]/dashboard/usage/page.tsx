@@ -74,7 +74,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
     answered.set(r.model, m);
   }
   const models: { name: string; role: string; jobs: string[] }[] = [
-    { name: mainModel, role: "roleMain", jobs: ["jobAnalyse", "jobElectronics", "jobNetlist", "jobTranslate"] },
+    { name: mainModel, role: "roleMain", jobs: ["jobAnalyse", "jobElectronics", "jobNetlist", "jobFirmware", "jobTranslate"] },
     ...(backupModel ? [{ name: backupModel, role: "roleBackup", jobs: ["jobBackup"] }] : []),
     { name: whisperModel, role: "roleVoice", jobs: ["jobTranscribe"] },
   ];

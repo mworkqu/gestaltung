@@ -190,7 +190,7 @@ export function nodeStates(
 
   if (buildRoute === "custom_pcb" && !kept("electronics").length)
     set("electronics.board", nothingKept("electronics", t("need_board")));
-  if (!kept("software").length) set("software.scope", nothingKept("software", t("need_scope")));
+  // Software › Code needs no parts: it writes the firmware for the circuit.
 
   const power = rowOf(spec, "power");
   if (!power?.value)

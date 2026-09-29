@@ -173,6 +173,8 @@ export type Project = {
   netlist?: ProjectNetlist | null;
   // 0025. How the electronics are built; null until the client chooses.
   build_route?: "prototype" | "custom_pcb" | null;
+  // 0040. Generated starter firmware (lib/prototyping/firmware.ts Firmware).
+  firmware?: unknown;
   created_at: string;
   updated_at: string;
 };

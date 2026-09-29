@@ -98,6 +98,8 @@ import { ComponentsCard, PowerCard } from "@/components/prototyping/discipline-c
 import { Card, GhostButton, PrimaryButton, Warn, useMono } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
 import type { Project, ProjectPart, ProjectSchematicRevision } from "@/lib/supabase/types";
+import { FirmwareCard } from "@/components/prototyping/firmware-card";
+import type { Firmware } from "@/lib/prototyping/firmware";
 
 /** Where a part's drawings are shown. */
 const drawingsNode = (p: ProjectPart): NodeId =>
@@ -963,7 +965,18 @@ export function PrototypingWorkspace({
             />
           )}
 
-          {node === "software.scope" && designStage("software")}
+          {/* Software › Code: starter firmware for this circuit (owner, 2026-09-29).
+              Software parts only show if the project already has some. */}
+          {node === "software.scope" && (
+            <FirmwareCard
+              projectId={project.id}
+              firmware={(project.firmware ?? null) as Firmware | null}
+              hasCircuit={!!project.netlist?.components?.length}
+              onGoCircuit={() => goTo("electronics.components", "route-card")}
+              onSaved={load}
+            />
+          )}
+          {node === "software.scope" && designOf("software").length > 0 && designStage("software")}
 
           {node === "quote" && (
             <>
