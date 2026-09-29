@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PROVIDERS, dayStart, guardThreshold, nextReset, providerLimits, type ProviderId } from "@/lib/ai/limits";
 import { cn } from "@/lib/utils";
 import { AiPricing } from "@/components/admin/ai-pricing";
+import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL } from "@/lib/prototyping/providers/gemini-client";
 
 // AI usage against the free allowances (migration 0023's ai_usage).
 //
@@ -24,6 +25,7 @@ type Row = {
   total_tokens: number | null;
   audio_seconds: number | null;
   outcome: string;
+  model: string | null;
 };
 
 const DAYS = 30;
@@ -51,13 +53,34 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   since.setUTCHours(0, 0, 0, 0);
   const { data, error } = await supabase
     .from("ai_usage")
-    .select("created_at, provider, feature, project_id, total_tokens, audio_seconds, outcome")
+    .select("created_at, provider, feature, project_id, total_tokens, audio_seconds, outcome, model")
     .gte("created_at", since.toISOString())
     .eq("is_test", false)
     .order("created_at", { ascending: true })
     .limit(20000);
   const rows = (data ?? []) as Row[];
   const called = (r: Row) => r.outcome !== "blocked";
+
+  // Which model does what (owner, 2026-09-29): the configured models and their
+  // jobs, plus what each model actually answered over the last 30 days.
+  const mainModel = GEMINI_MODEL;
+  const backupModel = GEMINI_FALLBACK_MODEL || null;
+  const whisperModel = process.env.GROQ_WHISPER_MODEL?.trim() || "whisper-large-v3";
+  const answered = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    if (!called(r) || !r.model) continue;
+    const m = answered.get(r.model) ?? new Map<string, number>();
+    m.set(r.feature, (m.get(r.feature) ?? 0) + 1);
+    answered.set(r.model, m);
+  }
+  const models: { name: string; role: string; jobs: string[] }[] = [
+    { name: mainModel, role: "roleMain", jobs: ["jobAnalyse", "jobElectronics", "jobNetlist", "jobTranslate"] },
+    ...(backupModel ? [{ name: backupModel, role: "roleBackup", jobs: ["jobBackup"] }] : []),
+    { name: whisperModel, role: "roleVoice", jobs: ["jobTranscribe"] },
+  ];
+  for (const name of answered.keys()) {
+    if (!models.some((m) => m.name === name)) models.push({ name, role: "roleOther", jobs: [] });
+  }
 
   // ── Today, per provider, in the provider's own day ──
   const today = PROVIDERS.map((id: ProviderId) => {
@@ -135,6 +158,38 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
           {t("intro", { threshold: pct.format(guardThreshold()) })}
         </p>
       </div>
+
+      <section className="neu space-y-4 p-6">
+        <div>
+          <h2 className="text-base font-bold text-heading">{t("modelsTitle")}</h2>
+          <p className="text-[12px] text-mutedtext">{t("modelsNote", { days: DAYS })}</p>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {models.map((m) => {
+            const used = answered.get(m.name);
+            return (
+              <div key={m.name} className="space-y-2 rounded-xl bg-panel p-4 shadow-neu-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-cobalt">{t(m.role)}</p>
+                <p className="font-mono text-sm font-semibold text-heading" dir="ltr">
+                  {m.name}
+                </p>
+                {m.jobs.length > 0 && (
+                  <ul className="list-disc space-y-0.5 ps-4 text-[12.5px] text-body">
+                    {m.jobs.map((j) => (
+                      <li key={j}>{t(j)}</li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[11px] text-mutedtext">
+                  {used && used.size
+                    ? [...used.entries()].map(([f, n]) => `${t(`feature_${f}`)}: ${num.format(n)}`).join(" · ")
+                    : t("modelUnused", { days: DAYS })}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {pricing && <AiPricing locale={locale} perCall={Number(pricing.per_call_qar ?? 1)} charging={Boolean(pricing.charging)} />}
 

@@ -1554,7 +1554,20 @@
     "noProjects": "No project has used AI in this period.",
     "project": "Project",
     "lastCall": "Last call",
-    "feature_electronics": "Electronics list"
+    "feature_electronics": "Electronics list",
+    "modelsTitle": "Which AI does what",
+    "modelsNote": "The models the site uses and their jobs. The small line under each shows what it actually answered in the last {days} days.",
+    "roleMain": "Main model · Google Gemini",
+    "roleBackup": "Backup model · Google Gemini",
+    "roleVoice": "Voice to text · Groq",
+    "roleOther": "Also answered calls",
+    "jobAnalyse": "Reads a customer's project brief: facts, questions to ask, suggested parts",
+    "jobElectronics": "Lists the electronics a project needs",
+    "jobNetlist": "Works out which pin connects to which for the circuit drawing",
+    "jobTranslate": "Translates product names to Arabic (admin clean-up only, not counted here)",
+    "jobBackup": "Does the same jobs only when the main model is busy (Google \"503\")",
+    "jobTranscribe": "Turns a recorded voice note into text in the project brief (used for Arabic speech)",
+    "modelUnused": "No calls in the last {days} days."
   },
   "SourcingGaps": {
     "kicker": "Admin",
