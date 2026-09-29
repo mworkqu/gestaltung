@@ -51,3 +51,15 @@ No migrations. Pending owner steps: after 0030–0035, walk Plant monitor at 128
 - Prototyping on phones: tree behind a "Project sections" button; title on its own row.
 - Per-page titles/descriptions (lib/meta.ts, Meta namespace); FIG·0x labels and spec chips removed.
 - Copy en + ar parity 1994/1994. Tests 259 passed. Build green. Verified live at 375 px: no horizontal scroll on 11 pages, mobile menu works.
+
+## Phase 6 — Admin, Arabic, polish (2026-09-29, on main)
+- Dashboard: grouped sidebar + "What needs you today" overview (done earlier the same day).
+- Leads: status filter (open by default) + kind filter (file quote, drawing, parts quote, callback, message; lib/admin/lead-kind.ts), links clickable, project CAD files as fresh 1-hour downloads, "Find the project".
+- Admin projects: search by name / id / phone; guest owners show their WhatsApp number.
+- Phones: isValidPhone() (lib/phone.ts) checked on checkout, callback, contact, quote and new-project forms; stored as +974…
+- Parts customers need: grouped by kind of part (lib/admin/gap-key.ts), values kept as specs.
+- Arabic: Western digits everywhere (ar-QA-u-nu-latn formatters, 9 message strings fixed); verified live on 5 /ar pages.
+- Inventory tenant filter: same-name tenants get a short id.
+- Cleanup: unused Features/LocalAdvantage/Social copy and the old spec sheet removed.
+- Header = the three paths; projects / inventory / dashboard in the account menu; footer and home without repeats (owner).
+- Tests 267 passed; build green; en/ar parity kept.
