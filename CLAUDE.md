@@ -916,6 +916,15 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     About · Contact + one © line; HomeTrust removed from home (payment shows at checkout). SITE AUDIT PHASE 6 DONE (see
     CHANGELOG-audit.md): leads filters/kinds/file links, admin project search + guest phone, isValidPhone on all forms,
     gap grouping (lib/admin/gap-key.ts), Western digits in Arabic, tenant filter, unused copy removed.
+  - 2026-09-29 SOURCING (owner): MIGRATION 0041 RUN ✔ (parts.datasheet_url, specs, backup_for). Store listing,
+    search and home categories hide products with no delivery date (lead_time_class null); their pages still open.
+    /api/admin/sourcing-backup {step: backups [preview] | clear | specs}: DigiKey/Mouser backups for out-of-stock
+    Voltaat items — components only (lib/sourcing/backup.ts isComponent), specific code that starts the MPN, same
+    kind of part (sameKind). First loose run made 107 wrong matches → cleared; strict run found 8, owner approved all
+    → 7 added (MLX90614 twice = one backup). specs step filled 30 DK/MS products. Product pages: Specifications table
+    (supplier specs, or the Voltaat description's "Specifications" bullets, lib/store/specs.ts) + Datasheet (PDF).
+    Dashboard → Store → Sourcing overview (/dashboard/store/overview): highlights (Voltaat back in stock with a
+    backup → Keep Voltaat, below margin [non-Voltaat only], backup >30% pricier, no photo) + groups. Live store = 950.
 
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
@@ -986,6 +995,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   step stays hidden until then)
 - 0039_payment_method.sql — (RUN ✔ 2026-09-29) part_orders.payment_method + set_order_payment_method() (RUN AFTER 0038; until then
   orders are placed without a recorded method but the success page still shows the chosen one)
+- 0041_datasheets_and_backups.sql — (RUN ✔ 2026-09-29) parts.datasheet_url/specs/backup_for
 - 0040_firmware.sql — (RUN ✔ 2026-09-29) projects.firmware + 'firmware' ai_usage/analysis_runs feature (RUN AFTER 0039)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
