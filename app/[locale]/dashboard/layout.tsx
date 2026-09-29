@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { getSessionContext } from "@/lib/auth/get-session";
-import { DashboardNav } from "@/components/dashboard/dashboard-nav";
+import { DashboardNav, type NavGroup } from "@/components/dashboard/dashboard-nav";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { metaFor } from "@/lib/meta";
 
@@ -30,39 +30,63 @@ export default async function DashboardLayout({
   const t = await getTranslations("DashboardNav");
   const isClient = session.profile.role === "client";
   const isSuperAdmin = session.profile.role === "super_admin";
-  const navItems = [
-    { href: "/dashboard", label: t("overview") },
-    // Inventory is hidden from clients in the UI (their table stays in the DB,
-    // reserved for future use); workshops + super_admin keep it.
-    ...(isClient
-      ? []
-      : [{ href: "/inventory", label: t("inventory") }]),
-    // Parts catalog, orders + website leads are super_admin only.
-    ...(isSuperAdmin
-      ? [
-          { href: "/dashboard/projects", label: t("projects") },
-          { href: "/dashboard/leads", label: t("leads") },
-          { href: "/dashboard/store/orders", label: t("partsOrders") },
-          { href: "/dashboard/store", label: t("partsCatalog") },
-          { href: "/dashboard/store/quick", label: t("quickAdd") },
-          { href: "/dashboard/store/attributes", label: t("storeAttributes") },
-          { href: "/dashboard/store/restock", label: t("restock") },
-          { href: "/dashboard/store/suppliers", label: t("suppliers") },
-          { href: "/dashboard/store/suppliers/lookup", label: t("findParts") },
-          { href: "/dashboard/store/suppliers/voltaat", label: t("voltaatSync") },
-          { href: "/dashboard/store/gaps", label: t("sourcingGaps") },
-          { href: "/dashboard/usage", label: t("aiUsage") },
-        ]
-      : []),
-  ];
+  const groups: NavGroup[] = isSuperAdmin
+    ? [
+        { items: [{ href: "/dashboard", label: t("overview") }] },
+        {
+          label: t("group_customers"),
+          items: [
+            { href: "/dashboard/leads", label: t("leads") },
+            { href: "/dashboard/store/orders", label: t("partsOrders") },
+            { href: "/dashboard/projects", label: t("projects") },
+          ],
+        },
+        {
+          label: t("group_store"),
+          items: [
+            { href: "/dashboard/store", label: t("partsCatalog") },
+            { href: "/dashboard/store/quick", label: t("quickAdd") },
+            { href: "/dashboard/store/attributes", label: t("storeAttributes") },
+            { href: "/dashboard/store/restock", label: t("restock") },
+            { href: "/dashboard/store/gaps", label: t("sourcingGaps") },
+          ],
+        },
+        {
+          label: t("group_suppliers"),
+          items: [
+            { href: "/dashboard/store/suppliers", label: t("suppliers") },
+            { href: "/dashboard/store/suppliers/lookup", label: t("findParts") },
+            { href: "/dashboard/store/suppliers/voltaat", label: t("voltaatSync") },
+          ],
+        },
+        {
+          label: t("group_settings"),
+          items: [
+            { href: "/dashboard/usage", label: t("aiUsage") },
+            { href: "/inventory", label: t("inventory") },
+          ],
+        },
+      ]
+    : [
+        {
+          items: [
+            { href: "/dashboard", label: t("overview") },
+            { href: "/projects", label: t("myProjects") },
+            // Inventory is hidden from clients; workshops keep it.
+            ...(isClient ? [] : [{ href: "/inventory", label: t("inventory") }]),
+          ],
+        },
+      ];
 
   return (
-    <div className="container py-10">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderstrong/60 pb-4">
-        <DashboardNav items={navItems} />
-        <SignOutButton />
+    <div className="container py-8">
+      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside className="space-y-3">
+          <DashboardNav groups={groups} />
+          <SignOutButton />
+        </aside>
+        <div className="min-w-0">{children}</div>
       </div>
-      <div className="pt-8">{children}</div>
     </div>
   );
 }

@@ -77,6 +77,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [orderLines, setOrderLines] = useState<StatusOrderLine[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [guest, setGuest] = useState(false);
+  const [guestPhone, setGuestPhone] = useState<string | null>(null);
   // No session, or an anonymous one: the not-available state offers sign-in.
   const [signedIn, setSignedIn] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       data: { user },
     } = await supabase.auth.getUser();
     setGuest(isGuest(user));
+    if (user && isGuest(user)) {
+      const { data: prof } = await supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle();
+      setGuestPhone((prof?.phone as string | null) || null);
+    }
     setSignedIn(!!user && !isGuest(user));
 
     // No session at all: nothing can be theirs. Don't mint one just to read.
@@ -255,6 +260,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       <ProjectHeader
         project={project}
         guest={guest}
+        guestPhone={guestPhone}
         onRenamed={(name) => setProject((p) => (p ? { ...p, name } : p))}
       />
       <PrototypingCard projectId={projectId} />
@@ -284,10 +290,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 function ProjectHeader({
   project,
   guest,
+  guestPhone,
   onRenamed,
 }: {
   project: Project;
   guest: boolean;
+  guestPhone: string | null;
   onRenamed: (name: string) => void;
 }) {
   const t = useTranslations("Projects");
@@ -324,7 +332,7 @@ function ProjectHeader({
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-inventory-bg px-4 py-3">
           <Tag variant="inventory">{t("guestBadge")}</Tag>
           <p className="min-w-0 basis-full text-sm text-heading sm:flex-1 sm:basis-auto">
-            {t("guestNote")}
+            {guestPhone ? t("guestPhoneNote", { phone: guestPhone }) : t("guestNote")}
           </p>
           <Link
             href="/sign-up"
