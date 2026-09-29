@@ -19,9 +19,9 @@ export async function Header({ locale }: { locale: Locale }) {
         <CompanyStrip className="container" />
       </div>
       <div className="container pt-4">
-        <div className="neu relative flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="neu relative flex h-16 items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
           {/* Brand lockup */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink shadow-neu-sm">
               <LogoMark title={tBrand("name")} className="h-5 w-5" />
             </span>
@@ -36,7 +36,7 @@ export async function Header({ locale }: { locale: Locale }) {
               </span>
               <span
                 className={cn(
-                  "mt-1 block text-[9px] text-faint",
+                  "mt-1 hidden text-[9px] text-faint sm:block",
                   isRtl
                     ? "font-sans"
                     : "font-mono uppercase tracking-[0.18em]"

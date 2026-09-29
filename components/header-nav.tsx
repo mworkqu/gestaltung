@@ -86,7 +86,7 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
         ))}
       </nav>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
       {children}
       {/* Account: Sign in, or a menu with Dashboard + Sign out. */}
       <div className="hidden md:block" ref={accountRef}>
