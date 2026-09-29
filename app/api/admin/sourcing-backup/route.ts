@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { digikeyPart, digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { mouserPart, mouserSearch } from "@/lib/sourcing/adapters/mouser";
-import { backupName, modelCodes, pickBackup } from "@/lib/sourcing/backup";
+import { backupName, isComponent, modelCodes, pickBackup } from "@/lib/sourcing/backup";
 import { parametersToAttributes } from "@/lib/sourcing/spec-map";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
 import type { SupplierProduct } from "@/lib/sourcing/types";
@@ -15,6 +15,9 @@ import type { SupplierProduct } from "@/lib/sourcing/types";
 //    store product (backup_for = the Voltaat product) with the supplier's
 //    photo, price, specs and datasheet. Each Voltaat product is searched once
 //    (store_settings.backup_search); call again until `remaining` is 0.
+//    { preview: true } finds matches and returns them WITHOUT creating anything
+//    or marking products as searched — check the pairs first.
+//  - "clear": delete every backup product and forget which were searched.
 //  - "specs": fill specs + datasheet on our DigiKey / Mouser products (one
 //    lookup each, once).
 // Needs migration 0041.
@@ -40,7 +43,24 @@ function specsOf(p: SupplierProduct) {
   return p.parameters.filter((x) => x.name && x.value && x.value !== "-").slice(0, 40);
 }
 
-async function backups(db: Db) {
+async function clear(db: Db) {
+  const { data } = await db.from("parts").select("id").not("backup_for", "is", null);
+  const ids = (data ?? []).map((p) => p.id as string);
+  let deleted = 0;
+  let unpublished = 0;
+  for (const id of ids) {
+    const { error } = await db.from("parts").delete().eq("id", id);
+    if (!error) deleted++;
+    else {
+      await db.from("parts").update({ is_published: false, backup_for: null }).eq("id", id);
+      unpublished++;
+    }
+  }
+  await db.from("store_settings").upsert({ key: "backup_search", value: { checked: {} } });
+  return { deleted, unpublished };
+}
+
+async function backups(db: Db, preview: boolean) {
   const started = Date.now();
   const { sups, fx } = await settings(db);
   const { data: state } = await db.from("store_settings").select("value").eq("key", "backup_search").maybeSingle();
@@ -64,20 +84,29 @@ async function backups(db: Db) {
   const todo = waiting.filter((p) => !checked[p.id] && !hasBackup.has(p.id));
 
   let added = 0;
+  let assembly = 0;
   let noModel = 0;
+  const pairs: { voltaat: string; code: string; match: string; mpn: string | null; supplier: string }[] = [];
   let notFound = 0;
   let calls = 0;
   const addedNames: string[] = [];
   for (const p of todo) {
     if (Date.now() - started > BUDGET_MS) break;
+    if (!isComponent(p.name)) {
+      if (!preview) checked[p.id] = "assembly";
+      assembly++;
+      continue;
+    }
     const codes = modelCodes(p.name).slice(0, 2);
     if (!codes.length) {
-      checked[p.id] = "no_model";
+      if (!preview) checked[p.id] = "no_model";
       noModel++;
       continue;
     }
     let hit: SupplierProduct | null = null;
+    let usedCode = "";
     for (const code of codes) {
+      usedCode = code;
       calls++;
       hit = pickBackup(await digikeySearch(code, 5).catch(() => []), code);
       await wait(600);
@@ -88,10 +117,12 @@ async function backups(db: Db) {
       if (hit) break;
     }
     if (!hit) {
-      checked[p.id] = "not_found";
+      if (!preview) checked[p.id] = "not_found";
       notFound++;
       continue;
     }
+    pairs.push({ voltaat: p.name, code: usedCode, match: backupName(hit), mpn: hit.mpn, supplier: hit.supplierCode });
+    if (preview) continue;
     const sup = sups.find((s) => s.code === hit!.supplierCode);
     if (!sup) continue;
     const rate = Number(fx[hit.currency]) || (hit.currency === "QAR" ? 1 : 3.64);
@@ -152,9 +183,9 @@ async function backups(db: Db) {
     addedNames.push(backupName(hit).slice(0, 60));
   }
 
-  await db.from("store_settings").upsert({ key: "backup_search", value: { checked } });
+  if (!preview) await db.from("store_settings").upsert({ key: "backup_search", value: { checked } });
   const remaining = todo.filter((p) => !checked[p.id]).length;
-  return { added, noModel, notFound, calls, remaining, addedNames };
+  return { preview, added, assembly, noModel, notFound, calls, remaining, pairs, addedNames };
 }
 
 async function specs(db: Db) {
@@ -190,11 +221,12 @@ async function specs(db: Db) {
 export async function POST(request: Request) {
   const session = await getSessionContext();
   if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
-  const { step } = (await request.json().catch(() => ({}))) as { step?: string };
+  const { step, preview } = (await request.json().catch(() => ({}))) as { step?: string; preview?: boolean };
   const db = await createClient();
   const { error } = await db.from("parts").select("backup_for").limit(1);
   if (error) return Response.json({ error: "run_migration_0041" }, { status: 409 });
-  if (step === "backups") return Response.json(await backups(db));
+  if (step === "backups") return Response.json(await backups(db, preview === true));
+  if (step === "clear") return Response.json(await clear(db));
   if (step === "specs") return Response.json(await specs(db));
   return Response.json({ error: "unknown_step" }, { status: 400 });
 }

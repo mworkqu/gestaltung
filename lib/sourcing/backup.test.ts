@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { carriesModel, modelCodes, pickBackup } from "./backup";
+import { carriesModel, isComponent, modelCodes, pickBackup } from "./backup";
 import type { SupplierProduct } from "./types";
 
 const result = (over: Partial<SupplierProduct>): SupplierProduct => ({
@@ -23,22 +23,31 @@ const result = (over: Partial<SupplierProduct>): SupplierProduct => ({
   ...over,
 });
 
+describe("isComponent", () => {
+  it("keeps modules, boards and kits away from distributor chips", () => {
+    expect(isComponent("DRV8833 Dual H-Bridge Motor Driver Module")).toBe(false);
+    expect(isComponent("ESP32-S3 DevKitC-1 N16R8 Development Board")).toBe(false);
+    expect(isComponent("NE555 Timer IC DIP-8")).toBe(true);
+    expect(isComponent("IRF540N N-Channel MOSFET")).toBe(true);
+  });
+});
+
 describe("modelCodes", () => {
-  it("reads model codes, not values or plain words", () => {
-    expect(modelCodes("Ultrasonic Distance Sensor HC-SR04")).toEqual(["HC-SR04"]);
-    expect(modelCodes("DRV8833 Dual H-Bridge Motor Driver Module")).toEqual(["DRV8833"]);
-    expect(modelCodes("Resistor 10k 1/4W 5mm")).toEqual([]);
-    expect(modelCodes("APISQUEEN U1 Underwater Thruster")).toEqual([]);
-    expect(modelCodes("ESP32-S3 DevKitC-1 N16R8 Development Board")).toEqual(["DevKitC-1", "ESP32-S3", "N16R8"]);
+  it("reads specific codes, not values, sizes or short codes", () => {
+    expect(modelCodes("IRF540N N-Channel MOSFET")).toEqual(["IRF540N"]);
+    expect(modelCodes("NE555 Timer IC")).toEqual(["NE555"]);
+    expect(modelCodes("Capacitor 1000uF 25V 0402 X5R")).toEqual([]);
+    expect(modelCodes("Battery 18650 3.7V 2600mAh")).toEqual([]);
+    expect(modelCodes("Resistor 10k 1/4W")).toEqual([]);
   });
 });
 
 describe("pickBackup", () => {
-  it("accepts only the same model, with a price", () => {
-    const wrong = result({ mpn: "HC-SR501", description: "PIR sensor" });
-    const right = result({ mpn: "SEN0001", description: "Ultrasonic sensor HC-SR04 compatible" });
-    expect(pickBackup([wrong, right], "HC-SR04")).toBe(right);
-    expect(pickBackup([result({ mpn: "HCSR04", cost: null })], "HC-SR04")).toBeNull();
-    expect(carriesModel({ mpn: "DRV8833PWPR", name: "", description: null }, "DRV8833")).toBe(true);
+  it("needs the part number to start with the code", () => {
+    expect(carriesModel({ mpn: "IRF540NPBF" }, "IRF540N")).toBe(true);
+    expect(carriesModel({ mpn: "SEN0001" }, "HC-SR04")).toBe(false);
+    const right = result({ mpn: "NE555P" });
+    expect(pickBackup([result({ mpn: "TLC555CP" }), right], "NE555")).toBe(right);
+    expect(pickBackup([result({ mpn: "NE555P", cost: null })], "NE555")).toBeNull();
   });
 });
