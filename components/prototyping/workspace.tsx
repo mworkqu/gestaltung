@@ -944,8 +944,10 @@ export function PrototypingWorkspace({
               onGoPower={() => goTo("electronics.power", "power-choice")}
             />
           )}
-          {node === "electronics.components" && bomTable("electronics", levelFlags)}
-          {node === "electronics.components" && project.netlist && (
+          {/* The circuit (wiring picture + schematic) right under the list button,
+              always shown so it can be drawn or redrawn here (owner, 2026-09-30:
+              "I can't find the schematics and the connections"). */}
+          {node === "electronics.components" && (
             // Circuit requirements focus here (readiness CIRCUIT_FOCUS).
             <div id={CIRCUIT_FOCUS} tabIndex={-1} className="outline-none">
               <NetlistView
@@ -958,6 +960,7 @@ export function PrototypingWorkspace({
               />
             </div>
           )}
+          {node === "electronics.components" && bomTable("electronics", levelFlags)}
           {node === "electronics.components" && (
             <ComponentsCard
               onAddExisting={() => setAddingExisting(true)}
