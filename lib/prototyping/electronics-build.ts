@@ -20,12 +20,13 @@ import { getTranslations } from "next-intl/server";
 import type { BuildRoute } from "./analysis";
 import { originOf, replaceLines, type ProjectBom, type ProjectLine } from "./bom";
 import { augmentedCircuit, deriveElectronics } from "./electronics-rules";
+import type { CallResult } from "./ai-call";
 import { generateNetlist, listElectronics } from "./electronics-gen";
 import type { Netlist, ProjectNetlist } from "./netlist";
 import type { Spec } from "./spec";
 
 export type BuildOutcome =
-  | { ok: true; bom: ProjectBom; netlist: ProjectNetlist | null; circuit: "ok" | "failed"; problems: string[] }
+  | { ok: true; bom: ProjectBom; netlist: ProjectNetlist | null; circuit: "ok" | "failed" | "skipped"; problems: string[] }
   | { ok: false; error: string; problems: string[] };
 
 type ProjectRow = {
@@ -43,6 +44,8 @@ export async function buildElectronics(opts: {
   locale: "en" | "ar";
   /** false = keep the current electronics lines and only redraw + re-derive. */
   relist: boolean;
+  /** false = list only; the circuit is not drawn (no wiring access/credit) and the saved one is kept. */
+  drawCircuit?: boolean;
 }): Promise<BuildOutcome> {
   const { supabase, project, locale } = opts;
   const route: BuildRoute = project.build_route ?? "prototype";
@@ -66,7 +69,10 @@ export async function buildElectronics(opts: {
     if (!lines.length) return { ok: false, error: "no_electronics", problems: [] };
   }
 
-  const drawn = await generateNetlist({ supabase, projectId: project.id, summary, lines, locale });
+  const draw = opts.drawCircuit !== false || !opts.relist;
+  const drawn: CallResult<Netlist> | { ok: false; error: "skipped"; problems: string[] } = draw
+    ? await generateNetlist({ supabase, projectId: project.id, summary, lines, locale })
+    : { ok: false, error: "skipped", problems: [] };
   const netlist: Netlist | null = drawn.ok ? drawn.value : null;
   if (!drawn.ok && (drawn.error === "paused" || drawn.error === "unavailable" || drawn.error === "rate_limited") && !opts.relist)
     return { ok: false, error: drawn.error, problems: drawn.problems };
@@ -105,7 +111,7 @@ export async function buildElectronics(opts: {
     ok: true,
     bom: saved,
     netlist: savedNetlist,
-    circuit: drawn.ok ? "ok" : "failed",
+    circuit: drawn.ok ? "ok" : draw ? "failed" : "skipped",
     problems: drawn.ok ? [] : drawn.problems,
   };
 }

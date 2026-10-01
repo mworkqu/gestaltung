@@ -15,7 +15,8 @@ export type MetaKey =
   | "signIn"
   | "signUp"
   | "inventory"
-  | "dashboard";
+  | "dashboard"
+  | "credits";
 
 export async function pageMeta(locale: string, key: MetaKey): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: "Meta" });

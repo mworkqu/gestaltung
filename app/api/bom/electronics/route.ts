@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { buildElectronics } from "@/lib/prototyping/electronics-build";
+import { bomRate, canUse, spend } from "@/lib/credits/server";
 
 // POST /api/bom/electronics — build the electronics bill of materials for the
 // build route the client chose (projects.build_route). Refuses to run before
@@ -7,6 +8,12 @@ import { buildElectronics } from "@/lib/prototyping/electronics-build";
 //
 // Lists the parts (model), wires them (model, validated), then derives the
 // passives, level shifters, consumables and fabrication line (our rules).
+//
+// Credits (0042): listing the parts is the "bom" step (daily rate limit).
+// Wiring them is the "wiring" step: drawn only when the caller may — first
+// circuit per project free, later ones 1 wiring credit, charged after a
+// circuit was saved. Otherwise the list is rebuilt, the circuit is left as it
+// was, and the answer says why (circuit: "skipped", circuitReason).
 
 export const dynamic = "force-dynamic";
 // Two model calls in a row (list, then circuit), each up to 90 s on a busy
@@ -35,11 +42,25 @@ export async function POST(request: Request) {
   if (!project.build_route) return Response.json({ error: "no_route" }, { status: 409 });
   if (!project.brief?.trim()) return Response.json({ error: "no_brief" }, { status: 409 });
 
-  const r = await buildElectronics({ supabase, project, locale, relist: true });
+  const rate = await bomRate(supabase, request);
+  if (!rate.allowed) return Response.json({ error: "daily_limit", limit: rate.limit }, { status: 429 });
+
+  const wiring = await canUse(supabase, "wiring", project.id);
+  const r = await buildElectronics({ supabase, project, locale, relist: true, drawCircuit: wiring.allowed });
   if (!r.ok)
     return Response.json(
       { error: r.error, problems: r.problems },
       { status: r.error === "paused" || r.error === "rate_limited" ? 429 : r.error === "invalid" ? 422 : 502 }
     );
-  return Response.json({ circuit: r.circuit, problems: r.problems });
+  let charged = false;
+  if (r.circuit === "ok") {
+    const paid = await spend(supabase, "wiring", project.id);
+    charged = paid.ok && paid.charged;
+  }
+  return Response.json({
+    circuit: r.circuit,
+    circuitReason: r.circuit === "skipped" ? wiring.reason : null,
+    charged,
+    problems: r.problems,
+  });
 }

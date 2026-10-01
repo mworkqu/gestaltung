@@ -19,6 +19,7 @@ import { Card, PrimaryButton, SoftButton, Warn } from "@/components/prototyping/
 import type { BuildRoute, RouteRecommendation } from "@/lib/prototyping/analysis";
 import type { LevelFlag } from "@/lib/prototyping/electronics-rules";
 import { cn } from "@/lib/utils";
+import { creditsChanged } from "@/lib/credits/use-credits";
 
 const optionClass = (on: boolean) =>
   cn(
@@ -168,27 +169,38 @@ export function GenerateComponents({
   onGoPower: () => void;
 }) {
   const t = useTranslations("Prototyping");
+  const tc = useTranslations("Credits");
   const locale = useLocale();
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<BuildError | null>(null);
   const [warning, setWarning] = useState(false);
+  // Why the circuit was not redrawn with this list (no wiring access/credit).
+  const [skipped, setSkipped] = useState<string | null>(null);
 
   async function build() {
     setBuilding(true);
     setError(null);
     setWarning(false);
+    setSkipped(null);
     try {
       const res = await fetch("/api/bom/electronics", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ projectId, locale }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; problems?: string[]; circuit?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        problems?: string[];
+        circuit?: string;
+        circuitReason?: string | null;
+      };
       if (!res.ok) setError({ code: data.error ?? "failed", problems: data.problems });
       else {
         if (data.circuit === "failed") setWarning(true);
+        if (data.circuit === "skipped") setSkipped(data.circuitReason ?? "no_credits");
         await onBuilt();
       }
+      creditsChanged();
     } catch {
       setError({ code: "failed" });
     }
@@ -246,6 +258,7 @@ export function GenerateComponents({
           </Warn>
         )}
         {warning && <Warn blocking={false}>{t("electronicsCircuitFailed")}</Warn>}
+        {skipped && <Warn blocking={false}>{tc(skipped === "sign_in" ? "listOnlySignIn" : "listOnlyNoCredits")}</Warn>}
       </Card>
     </div>
   );

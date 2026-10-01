@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { CartItem } from "@/lib/supabase/types";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
 import { isValidPhone } from "@/lib/phone";
+import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
 import {
   formatDeliveryDate,
   isOnRequest,
@@ -45,7 +46,13 @@ export default function CheckoutPage() {
   const doSplit = split && canSplit;
   const shippingQar = quote ? shippingTotal(quote, tier, doSplit) : 0;
   const handlingQar = quote?.handling_fee_qar ?? 0;
-  const grandTotal = Math.round((totalQar + shippingQar + handlingQar) * 100) / 100;
+  // AI credits spent in the last 30 days come back as one discount (0042),
+  // capped at the goods subtotal. The server applies it (redeem_credits) right
+  // after the order is created; this is the same figure, shown in advance.
+  const credits = useCreditSummary();
+  const tCr = useTranslations("Credits");
+  const creditQar = credits ? Math.min(credits.redeemable_qar, Math.max(totalQar, 0)) : 0;
+  const grandTotal = Math.round((totalQar - creditQar + shippingQar + handlingQar) * 100) / 100;
   const chosen = quote?.tiers[tier];
   // "Available on request" lines are sold at the listed price with the date to
   // be confirmed (0032); they no longer block checkout. Only a missing quote does.
@@ -133,6 +140,16 @@ export default function CheckoutPage() {
 
     const orderId = data as string;
 
+    // Apply redeemable AI credits to this order (0042). The server decides the
+    // amount; before 0042 the call fails and nothing is applied.
+    const { data: applied } = await supabase.rpc("redeem_credits", { p_order: orderId }).then(
+      (r) => r,
+      () => ({ data: 0 })
+    );
+    const appliedQar = Number(applied) || 0;
+    const placedTotal = Math.round((grandTotal + creditQar - appliedQar) * 100) / 100;
+    if (appliedQar > 0) creditsChanged();
+
     // Record how they'll pay (0039). Before that migration the call fails and
     // the order simply has no method; the success page still shows the choice.
     await supabase.rpc("set_order_payment_method", { p_order: orderId, p_method: payMethod }).then(
@@ -148,7 +165,7 @@ export default function CheckoutPage() {
         JSON.stringify({
           id: orderId,
           customerName,
-          total: grandTotal,
+          total: placedTotal,
           shippingQar,
           handlingQar,
           tier,
@@ -368,6 +385,25 @@ export default function CheckoutPage() {
             <div className="flex items-center justify-between text-sm">
               <span className="text-mutedtext">{tParts("kitDiscount")}</span>
               <span className="tabular-nums text-buy">−{formatPrice(kitDiscountQar, locale)}</span>
+            </div>
+          )}
+          {creditQar > 0 && credits && (
+            <div className="space-y-0.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-mutedtext">{tCr("checkoutLine")}</span>
+                <span className="tabular-nums text-buy">−{formatPrice(creditQar, locale)}</span>
+              </div>
+              {credits.next_expiry && (
+                <p className="text-[11px] text-faint">
+                  {tCr("checkoutExpiry", {
+                    date: new Date(credits.next_expiry).toLocaleDateString(locale === "ar" ? "ar-QA" : "en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  })}
+                </p>
+              )}
             </div>
           )}
           <div className="flex items-center justify-between text-sm">

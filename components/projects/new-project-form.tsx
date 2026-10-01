@@ -98,7 +98,9 @@ ${brief.trim()}`,
       router.push(`/projects/${data.id}`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? String(err);
+      // 0042: the database refuses a 4th active project.
+      setError(message.includes("project_limit") ? t("limitReached") : message);
       setLoading(false);
     }
   }

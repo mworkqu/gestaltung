@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
-import { Loader2, Plus } from "lucide-react";
+import { Archive, ArchiveRestore, Loader2, Plus } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,8 @@ import { deriveProjectStatus, type ProjectStatusKind } from "@/lib/projects/item
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import type { Project } from "@/lib/supabase/types";
+import { PROJECT_LIMIT } from "@/lib/credits/constants";
+import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
 
 // Client-side on purpose: a first-time visitor has no session at all, and a
 // guest's session cookie is written by the browser. Reading here means the list
@@ -17,11 +19,19 @@ import type { Project } from "@/lib/supabase/types";
 //
 // Only the signed-in user's own projects (decision 6a): RLS lets a super_admin
 // read everyone's, and that view lives at /dashboard/projects.
+//
+// Active vs archived (0042): at most 3 active projects (admin unlimited,
+// enforced by a database trigger); archiving one frees a slot. Before 0042
+// there is no status column: every project counts as active and the archive
+// controls stay hidden.
 
 type CardProject = Pick<Project, "id" | "name" | "brief" | "created_at"> & {
   partCount: number;
   status: ProjectStatusKind;
+  archived: boolean;
 };
+
+type ListRow = Pick<Project, "id" | "name" | "brief" | "created_at"> & { status?: string };
 
 type ProjectIdRow = { project_id: string | null };
 type OrderLineRow = {
@@ -34,6 +44,29 @@ export function ProjectList() {
   const format = useFormatter();
   const [projects, setProjects] = useState<CardProject[] | null>(null);
   const [error, setError] = useState(false);
+  const [hasStatus, setHasStatus] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [limitHit, setLimitHit] = useState(false);
+  const [reload, setReload] = useState(0);
+  const summary = useCreditSummary();
+  const limit = summary ? summary.project_limit : PROJECT_LIMIT;
+
+  const setArchived = useCallback(async (id: string, archived: boolean) => {
+    setBusyId(id);
+    setLimitHit(false);
+    const { error: e } = await createClient()
+      .from("projects")
+      .update({ status: archived ? "archived" : "active" })
+      .eq("id", id);
+    setBusyId(null);
+    if (e) {
+      if (e.message?.includes("project_limit")) setLimitHit(true);
+      else setError(true);
+      return;
+    }
+    setReload((n) => n + 1);
+    creditsChanged();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,18 +83,19 @@ export function ProjectList() {
         return;
       }
 
-      const { data, error: listErr } = await supabase
-        .from("projects")
-        .select("id, name, brief, created_at")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false });
+      const list = (cols: string) =>
+        supabase.from("projects").select(cols).eq("user_id", user.id).order("updated_at", { ascending: false });
+      let { data, error: listErr } = await list("id, name, brief, created_at, status");
+      const withStatus = !listErr;
+      if (listErr) ({ data, error: listErr } = await list("id, name, brief, created_at"));
 
       if (listErr) {
         if (!cancelled) setError(true);
         return;
       }
+      if (!cancelled) setHasStatus(withStatus);
 
-      const rows = (data ?? []) as Pick<Project, "id" | "name" | "brief" | "created_at">[];
+      const rows = (data ?? []) as unknown as ListRow[];
       const ids = rows.map((p) => p.id);
       if (ids.length === 0) {
         if (!cancelled) setProjects([]);
@@ -105,7 +139,11 @@ export function ProjectList() {
       if (!cancelled) {
         setProjects(
           rows.map((p) => ({
-            ...p,
+            id: p.id,
+            name: p.name,
+            brief: p.brief,
+            created_at: p.created_at,
+            archived: p.status === "archived",
             partCount: (items.get(p.id) ?? 0) + (parts.get(p.id) ?? 0),
             status: deriveProjectStatus({
               hasLiveOrder: ordered.has(p.id),
@@ -119,7 +157,7 @@ export function ProjectList() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reload]);
 
   if (error) {
     return (
@@ -151,10 +189,12 @@ export function ProjectList() {
     );
   }
 
-  return (
-    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {projects.map((p) => (
-        <li key={p.id}>
+  const active = projects.filter((p) => !p.archived);
+  const archived = projects.filter((p) => p.archived);
+  const full = limit !== null && active.length >= limit;
+
+  const card = (p: CardProject) => (
+        <li key={p.id} className="flex flex-col gap-2">
           <Link
             href={`/projects/${p.id}`}
             aria-label={p.name}
@@ -181,8 +221,54 @@ export function ProjectList() {
               <span>{t("card_parts", { count: p.partCount })}</span>
             </p>
           </Link>
+          {hasStatus && (
+            <button
+              type="button"
+              onClick={() => setArchived(p.id, !p.archived)}
+              disabled={busyId === p.id}
+              className="inline-flex w-fit items-center gap-1.5 self-end rounded-lg px-2 py-1 text-xs font-semibold text-mutedtext transition-colors hover:text-heading disabled:opacity-60"
+            >
+              {busyId === p.id ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : p.archived ? (
+                <ArchiveRestore className="h-3.5 w-3.5" />
+              ) : (
+                <Archive className="h-3.5 w-3.5" />
+              )}
+              {p.archived ? t("restore") : t("archive")}
+            </button>
+          )}
         </li>
-      ))}
-    </ul>
+  );
+
+  return (
+    <div className="space-y-6">
+      {hasStatus && limit !== null && (
+        <div
+          className={
+            full
+              ? "rounded-xl bg-inventory-bg px-4 py-3 text-sm font-medium text-inventory"
+              : "text-xs text-mutedtext"
+          }
+          role={full ? "status" : undefined}
+        >
+          {full ? t("limitFull", { used: active.length, limit }) : t("limitUsed", { used: active.length, limit })}
+        </div>
+      )}
+      {limitHit && (
+        <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {t("limitRestore", { limit: limit ?? PROJECT_LIMIT })}
+        </p>
+      )}
+      <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">{active.map(card)}</ul>
+      {archived.length > 0 && (
+        <details>
+          <summary className="cursor-pointer text-sm font-semibold text-mutedtext hover:text-heading">
+            {t("archivedHeading", { count: archived.length })}
+          </summary>
+          <ul className="mt-4 grid grid-cols-1 gap-4 opacity-80 sm:grid-cols-2 lg:grid-cols-3">{archived.map(card)}</ul>
+        </details>
+      )}
+    </div>
   );
 }

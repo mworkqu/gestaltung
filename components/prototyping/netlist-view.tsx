@@ -32,6 +32,8 @@ import { renderWiring, wiringProducts, type WiringProduct } from "@/lib/prototyp
 import { loadExamplePhotos } from "@/lib/prototyping/example-photos";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { AccessNote, CostLabel } from "@/components/credits/access-note";
+import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 
 type ErrorCode = "paused" | "invalid" | "no_electronics" | "unavailable" | "rate_limited" | "not_ready" | "failed";
 
@@ -56,6 +58,10 @@ export function NetlistView({
   const [view, setView] = useState<"wiring" | "schematic">("wiring");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ code: ErrorCode; problems?: string[] } | null>(null);
+  // Credits (0042): first circuit per project free, then 1 wiring credit;
+  // guests are asked to sign in. The route re-checks and charges.
+  const access = useCanUse("wiring", projectId);
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   const hasElectronics = (bom?.lines ?? []).some((l) => l.kind === "electronics");
   const hard = useMemo(() => (netlist ? hardRules(netlist) : []), [netlist]);
@@ -100,17 +106,24 @@ export function NetlistView({
   }, [netlist, view, flags, products, examples, t]);
 
   async function generate() {
-    setBusy(true);
     setError(null);
+    setBlocked(null);
+    if (access && !access.allowed) {
+      setBlocked(access.reason);
+      return;
+    }
+    setBusy(true);
     try {
       const res = await fetch("/api/netlist", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ projectId, locale }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: ErrorCode; problems?: string[] };
-      if (!res.ok) setError({ code: data.error ?? "failed", problems: data.problems });
+      const data = (await res.json().catch(() => ({}))) as { error?: ErrorCode | "sign_in" | "no_credits"; problems?: string[] };
+      if (data.error === "sign_in" || data.error === "no_credits") setBlocked(data.error);
+      else if (!res.ok) setError({ code: data.error ?? "failed", problems: data.problems });
       else await onSaved();
+      creditsChanged();
     } catch {
       setError({ code: "failed" });
     }
@@ -138,7 +151,9 @@ export function NetlistView({
       intro={t("circuitIntro")}
       actions={
         hasElectronics && (
-          netlist ? (
+          <>
+          <CostLabel cost={access?.cost} />
+          {netlist ? (
             <SoftButton onClick={generate} disabled={busy}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               {t("circuitRegenerate")}
@@ -148,11 +163,13 @@ export function NetlistView({
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Cpu className="h-3.5 w-3.5" />}
               {busy ? t("circuitWorking") : t("circuitGenerate")}
             </PrimaryButton>
-          )
+          )}
+          </>
         )
       }
     >
       {!hasElectronics && <p className="text-sm text-mutedtext">{t("circuitNeedsBom")}</p>}
+      <AccessNote reason={blocked} step="wiring" />
 
       {error && (
         <Warn blocking>

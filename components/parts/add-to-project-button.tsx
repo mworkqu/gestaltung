@@ -23,6 +23,7 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState<Project | null>(null);
   const [error, setError] = useState(false);
+  const [limit, setLimit] = useState(false);
   const [newName, setNewName] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -82,9 +83,11 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
       if (err) throw err;
       setBusy(false);
       await addTo(data as Project);
-    } catch {
+    } catch (e) {
       setBusy(false);
       setError(true);
+      // 0042: a 4th active project is refused — say why.
+      setLimit(String((e as { message?: string })?.message ?? "").includes("project_limit"));
     }
   }
 
@@ -137,7 +140,7 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("startProjectWithPart")}
             </Button>
           </div>
-          {error && <p className="px-3 py-1 text-xs font-medium text-destructive">{t("addToProjectFailed")}</p>}
+          {error && <p className="px-3 py-1 text-xs font-medium text-destructive">{limit ? t("projectLimit") : t("addToProjectFailed")}</p>}
         </div>
       )}
     </div>

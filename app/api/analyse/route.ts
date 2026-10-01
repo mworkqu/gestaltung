@@ -14,6 +14,7 @@ import {
   RequirementsSchema,
 } from "@/lib/prototyping/analysis-schema";
 import { logUsage, quota } from "@/lib/ai/usage";
+import { bomRate } from "@/lib/credits/server";
 import type { ProviderId } from "@/lib/ai/limits";
 import { configuredProviderName, loadProvider } from "@/lib/prototyping/providers";
 import { readWithRules } from "@/lib/prototyping/providers/rules";
@@ -80,6 +81,9 @@ export async function POST(request: Request) {
         if (!provider) throw new ProviderError("unavailable", `unknown provider "${name}"`);
         if (!provider.configured()) throw new ProviderError("missing_key");
         if (metered && (await quota(supabase, metered)).paused) throw new ProviderError("paused");
+        // The "bom" step's per-person daily allowance (0042) — over it, the
+        // basic reader answers instead and says why.
+        if (metered && !(await bomRate(supabase, request)).allowed) throw new ProviderError("daily_limit");
 
         called = true;
         const result = await provider.analyse(req);

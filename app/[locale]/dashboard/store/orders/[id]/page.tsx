@@ -67,6 +67,7 @@ export default async function OrderDetailPage({
   // Shipping + promise (0029); absent on older orders.
   const tD = await getTranslations("Delivery");
   const tPay = await getTranslations("PayMethods");
+  const tCredits = await getTranslations("Credits");
   const ship = order as unknown as {
     shipping_tier?: string | null;
     split_shipments?: boolean;
@@ -164,6 +165,16 @@ export default async function OrderDetailPage({
               ))}
             </tbody>
             <tfoot>
+              {Number((order as { credit_discount_qar?: number }).credit_discount_qar) > 0 && (
+                <tr className="border-t border-borderstrong/60">
+                  <td colSpan={4} className="px-4 py-2 text-end text-sm text-mutedtext">
+                    {tCredits("checkoutLine")}
+                  </td>
+                  <td className="px-4 py-2 text-end tabular-nums text-sm text-buy">
+                    −{formatPrice(Number((order as { credit_discount_qar?: number }).credit_discount_qar), locale)}
+                  </td>
+                </tr>
+              )}
               <tr className="border-t border-borderstrong/60">
                 <td colSpan={4} className="px-4 py-3 text-end text-sm font-semibold text-heading">
                   {t("colTotal")}

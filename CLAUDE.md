@@ -929,6 +929,26 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     DigiKey "Mounting Type"/Mouser "Mounting Style"; Voltaat defaults to through-hole). Re-run: 7 backups (LF412 now
     8-PDIP, MCP4725 now the MCP4725EV board). Make my part (/design) has a store search box.
 
+- AI ACCESS + CREDITS (2026-10-01, migration 0042 — NOT RUN YET): who may use which AI step, usage counting,
+  credits. No payment. Rules live in Postgres (SECURITY DEFINER fns); TS wrappers in lib/credits/ (server.ts for
+  routes, use-credits.ts read-only hooks, classify.ts = keyword CAD tier heuristic). Roles for AI = ai_role():
+  admin (super_admin) / user (confirmed email, not anonymous) / anonymous (no session, guest, unconfirmed).
+  - bom step (/api/analyse, /api/bom/electronics list): bom_rate_check — anonymous 5/day (per anon session AND
+    hashed IP, salt env AI_RATE_SALT), user 30/day, admin unlimited; override store_settings.ai_limits.
+    TODO Turnstile. Over the limit, analyse falls back to the basic reader ("daily_limit").
+  - wiring step (/api/netlist; circuit part of /api/bom/electronics): anonymous blocked; first circuit per
+    project free (projects.free_wiring_used), then 1 wiring credit; spend_credit() AFTER a saved circuit.
+    /api/bom/electronics rebuilds the list without redrawing when wiring isn't allowed (circuit "skipped").
+  - cad step: gate + cost dialog only (components/credits/cad-card.tsx in Mechanical › Drawings); Confirm stores
+    projects.cad_tier via set_cad_request, spends nothing. 1 cad credit = 3 generations (cad_regens_remaining).
+  - credits_ledger (balance = sum(delta), no balance column; client read-only). +3 wiring +1 cad when an order
+    is marked delivered (trigger, once per order). admin_grant at /dashboard/credits (note required).
+  - Every 'spend:' row is redeemable for 30 days as QAR 20 off a later order: checkout shows the line and calls
+    redeem_credits(order) right after create_part_order (sets part_orders.credit_discount_qar, lowers total).
+  - projects.status active/archived; trigger limits non-super_admin owners to 3 ACTIVE projects (guests too).
+  - ai_usage gets anon_key/cost_usd/'cad' feature; view ai_usage_log; ai_usage_daily() on /dashboard/credits.
+  - Before 0042 runs, all of this degrades to today's behaviour (no credit UI, nothing charged).
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -1000,6 +1020,8 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   orders are placed without a recorded method but the success page still shows the chosen one)
 - 0041_datasheets_and_backups.sql — (RUN ✔ 2026-09-29) parts.datasheet_url/specs/backup_for
 - 0040_firmware.sql — (RUN ✔ 2026-09-29) projects.firmware + 'firmware' ai_usage/analysis_runs feature (RUN AFTER 0039)
+- 0042_ai_credits.sql — AI access + credits: credits_ledger, projects.status/limit, rate limits, credit RPCs,
+  profiles.email sync, ai_usage_log (RUN AFTER 0041; also turn ON "Confirm email" in Supabase Auth)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
 - 0026_electronics_feature.sql — lets ai_usage / analysis_runs record the 'electronics' feature (RUN AFTER

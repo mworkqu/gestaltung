@@ -6,6 +6,7 @@ import { LogoMark } from "@/components/logo-mark";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { HeaderNav } from "@/components/header-nav";
 import { CartIcon } from "@/components/parts/cart-icon";
+import { CreditsBadge } from "@/components/credits/credits-badge";
 import { cn } from "@/lib/utils";
 import { CompanyStrip } from "@/components/company-strip";
 
@@ -48,6 +49,7 @@ export async function Header({ locale }: { locale: Locale }) {
           </Link>
 
           <HeaderNav isRtl={isRtl}>
+            <CreditsBadge />
             <CartIcon />
             <LanguageSwitcher currentLocale={locale} />
           </HeaderNav>

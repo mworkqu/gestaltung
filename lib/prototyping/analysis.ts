@@ -71,7 +71,7 @@ export const ANALYSIS_STEPS = ["reading", "disciplines", "requirements", "gaps"]
 export type AnalysisStep = (typeof ANALYSIS_STEPS)[number];
 
 /** Why the basic reader was used instead of the configured provider. */
-export type FallbackReason = "missing_key" | "rate_limited" | "malformed" | "unavailable" | "paused";
+export type FallbackReason = "missing_key" | "rate_limited" | "malformed" | "unavailable" | "paused" | "daily_limit";
 
 /** One line of the /api/analyse NDJSON stream. */
 export type AnalysisEvent =

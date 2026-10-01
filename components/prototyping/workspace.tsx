@@ -90,6 +90,8 @@ import {
 import { BomTable, CostSummary } from "@/components/prototyping/bom-table";
 import { PaymentCard } from "@/components/prototyping/payment-card";
 import { BoardChoice, GenerateComponents, LevelFlags, PowerChoice } from "@/components/prototyping/electronics-route";
+import { CadCard } from "@/components/credits/cad-card";
+import { CreditsBadge } from "@/components/credits/credits-badge";
 import type { BuildRoute } from "@/lib/prototyping/analysis";
 import { DimensionDrawings } from "@/components/prototyping/dimension-drawings";
 import { NetlistView } from "@/components/prototyping/netlist-view";
@@ -328,6 +330,7 @@ export function PrototypingWorkspace({
       {back}
       {rest ?? <span className="flex-1" />}
       <div className="flex items-center gap-2">
+        <CreditsBadge />
         <CartIcon />
         <LanguageSwitcher currentLocale={locale} />
         <HeaderAuthLink isRtl={isRtl} />
@@ -873,6 +876,7 @@ export function PrototypingWorkspace({
                 onFix={(focus) => goTo("mechanical.parts", focus)}
               />
               {earlier(designOf("mechanical"))}
+              <CadCard projectId={project.id} brief={project.brief ?? ""} />
               {/* 3D CAD is still a human service; say so where drawings live. */}
               <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
                 <p className="min-w-0 flex-1 text-[12px] text-mutedtext">{t("engineeringBody")}</p>
