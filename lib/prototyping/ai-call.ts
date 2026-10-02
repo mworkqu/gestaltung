@@ -12,7 +12,7 @@ import { logUsage, quota } from "@/lib/ai/usage";
 import { callGemini, geminiConfigured } from "./providers/gemini-client";
 import { ProviderError, type TokenUsage } from "./providers/types";
 
-export type CallFeature = "netlist" | "electronics";
+export type CallFeature = "netlist" | "electronics" | "cad";
 
 export type CallResult<T> =
   | { ok: true; value: T; model: string | null }

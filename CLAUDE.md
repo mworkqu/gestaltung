@@ -949,6 +949,16 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   - ai_usage gets anon_key/cost_usd/'cad' feature; view ai_usage_log; ai_usage_daily() on /dashboard/credits.
   - Before 0042 runs, all of this degrades to today's behaviour (no credit UI, nothing charged).
 
+- CAD GENERATION (2026-10-02, migration 0043 — NOT RUN YET): zero-cost 3D models. POST /api/cad: Gemini writes
+  OpenSCAD (lib/cad/prompt.ts, static check lib/cad/validate.ts, feature "cad"); the BROWSER renders it to STL in
+  a Web Worker (lib/cad/render*.ts) with openscad-wasm-prebuilt@1.2.0 loaded from jsDelivr (unpkg fallback) —
+  never bundled or put in /public (data-transfer cost). three.js viewer (components/credits/cad-viewer.tsx, lazy).
+  cad_generations table, writes only via cad_begin / cad_set_code / cad_deliver / cad_fail. The credit is spent
+  in cad_deliver, which the browser calls after a successful render (reuses spend_credit: 1 cad credit = 3
+  versions); failed builds never charge and get one automatic repair. Cap: 5 undelivered-with-code generations
+  per 24 h. Saved versions re-render from stored code with no AI call. No CadQuery (needs a paid Python server).
+  Before 0043 the card keeps the stub. 0042 RUN ✔ 2026-10-02 and verified end to end by script (61 checks).
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -1020,7 +1030,9 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   orders are placed without a recorded method but the success page still shows the chosen one)
 - 0041_datasheets_and_backups.sql — (RUN ✔ 2026-09-29) parts.datasheet_url/specs/backup_for
 - 0040_firmware.sql — (RUN ✔ 2026-09-29) projects.firmware + 'firmware' ai_usage/analysis_runs feature (RUN AFTER 0039)
-- 0042_ai_credits.sql — AI access + credits: credits_ledger, projects.status/limit, rate limits, credit RPCs,
+- 0043_cad_generations.sql — cad_generations + cad_begin/cad_set_code/cad_deliver/cad_fail, analysis_runs 'cad'
+  (RUN AFTER 0042; until then the 3D model card only shows the cost dialog)
+- 0042_ai_credits.sql — (RUN ✔ 2026-10-02) AI access + credits: credits_ledger, projects.status/limit, rate limits, credit RPCs,
   profiles.email sync, ai_usage_log (RUN AFTER 0041; also turn ON "Confirm email" in Supabase Auth)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units
   bought for a project stop showing as "to buy" (RUN AFTER 0026)
