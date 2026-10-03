@@ -5,10 +5,11 @@ import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { hasAccount } from "@/lib/auth/guest-redirect";
 import { cn } from "@/lib/utils";
 
 // Header link that reflects auth state: "Sign in" for anonymous visitors,
-// "Dashboard" once signed in. Done client-side so the marketing pages stay
+// "Dashboard" once signed in. A guest (anonymous session) counts as signed out. Done client-side so the marketing pages stay
 // statically rendered. SSR/first paint shows the signed-out link (matches the
 // anonymous case); it swaps to Dashboard after the session resolves.
 export function HeaderAuthLink({ isRtl }: { isRtl: boolean }) {
@@ -17,9 +18,9 @@ export function HeaderAuthLink({ isRtl }: { isRtl: boolean }) {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setSignedIn(!!data.user));
+    supabase.auth.getUser().then(({ data }) => setSignedIn(hasAccount(data.user)));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
-      setSignedIn(!!session)
+      setSignedIn(hasAccount(session?.user))
     );
     return () => sub.subscription.unsubscribe();
   }, []);

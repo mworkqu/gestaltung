@@ -3,7 +3,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { LayoutDashboard } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
+import { guestRedirect } from "@/lib/auth/guest-redirect";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
@@ -27,7 +28,12 @@ export default async function InventoryLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const session = await getSessionContext();
+  // Guests (anonymous session) have no inventory: send them to /projects (D5).
+  const user = await getAuthUser();
+  const guestTarget = guestRedirect({ user, path: `/${locale}/inventory` });
+  if (guestTarget) redirect(guestTarget);
+
+  const session = await getSessionContext(user);
   if (!session) redirect(`/${locale}/sign-in`);
 
   const t = await getTranslations("Inventory");

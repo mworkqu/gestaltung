@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
+import { guestRedirect } from "@/lib/auth/guest-redirect";
 import { DashboardNav, type NavGroup } from "@/components/dashboard/dashboard-nav";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { metaFor } from "@/lib/meta";
@@ -21,8 +22,13 @@ export default async function DashboardLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  // Single auth gate for every /dashboard/* route.
-  const session = await getSessionContext();
+  // Single auth gate for every /dashboard/* route. A guest (anonymous session)
+  // has no dashboard: send them to their projects (D5).
+  const user = await getAuthUser();
+  const guestTarget = guestRedirect({ user, path: `/${locale}/dashboard` });
+  if (guestTarget) redirect(guestTarget);
+
+  const session = await getSessionContext(user);
   if (!session) {
     redirect(`/${locale}/sign-in`);
   }

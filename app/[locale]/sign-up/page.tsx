@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
+import { hasAccount } from "@/lib/auth/guest-redirect";
 import { dashboardPathForRole } from "@/lib/auth/redirects";
 import { SignUpForm } from "@/components/auth/sign-up-form";
 import { metaFor } from "@/lib/meta";
@@ -19,7 +20,9 @@ export default async function SignUpPage({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const session = await getSessionContext();
+  // A guest (anonymous session) is not signed in: they still get the form.
+  const user = await getAuthUser();
+  const session = hasAccount(user) ? await getSessionContext(user) : null;
   if (session) {
     redirect(`/${locale}${dashboardPathForRole(session.profile.role)}`);
   }

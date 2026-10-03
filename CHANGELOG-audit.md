@@ -89,3 +89,13 @@ Source: STAGE_SITE_REVIEW_FIXES_PROMPT.md
 - Tests 325; i18n parity 2337/2337.
 - Pending owner steps: run 0045 (after 0044); add https://gestaltung360.com/** to Supabase Auth redirect URLs.
 - Known gap: there is no customer orders page; "My orders" shows the count and links to the store.
+
+## Phase D — Trust, contact, footer, errors (2026-10-03)
+- /contact: WhatsApp, phone, address (Rafal Tower, Lusail, Qatar), company details with C.R. 236988. Hours omitted (not supplied).
+- Footer: contact block, payment badges (Cash on delivery, Fawran, Bank transfer; no card logos), policy and info links, C.R. line.
+- /delivery-returns, /warranty, /terms, /privacy built verbatim from LEGAL_PAGES_DRAFT.md (EN + AR) via content/legal/*.md; `node scripts/split-legal-draft.mjs --check` proves the text matches the draft.
+- Branded 404 (app/[locale]/not-found.tsx + catch-all route) with search, Store/Home links and WhatsApp.
+- /projects empty state example + sign-in link; "not available" project page explains guest projects with Sign up / My projects.
+- Guests (anonymous sessions) on /dashboard and /inventory are redirected to /projects (lib/auth/guest-redirect.ts, tested); header shows "Sign in" for guests. No RLS change.
+- Arabic brand spelling unified to the owner's spelling in two site strings.
+- Tests 385; i18n parity 2385/2385.

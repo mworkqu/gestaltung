@@ -1,3 +1,5 @@
+import type { User } from "@supabase/supabase-js";
+
 import { createClient } from "@/lib/supabase/server";
 import type { Profile, Tenant } from "@/lib/supabase/types";
 
@@ -7,16 +9,34 @@ export type SessionContext = {
   tenant: Tenant | null;
 };
 
+/**
+ * The current auth user (revalidated server-side), or null when signed out.
+ * An anonymous guest session is a user too (`is_anonymous === true`).
+ */
+export async function getAuthUser(): Promise<User | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user ?? null;
+}
+
 // Resolves the current user together with their profile (role + tenant) and the
 // tenant row itself. Returns null when there is no session OR no profile yet.
 // All reads go through the request-scoped, RLS-enforced server client, so this
 // also exercises the policies it depends on.
-export async function getSessionContext(): Promise<SessionContext | null> {
+//
+// Pass `knownUser` (from getAuthUser) to skip the second auth round trip when
+// the caller has already read the user.
+export async function getSessionContext(
+  knownUser?: Pick<User, "id" | "email"> | null
+): Promise<SessionContext | null> {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user =
+    knownUser !== undefined
+      ? knownUser
+      : (await supabase.auth.getUser()).data.user;
 
   if (!user) return null;
 

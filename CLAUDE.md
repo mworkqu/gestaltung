@@ -974,6 +974,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 
 - SITE REVIEW FIXES, PHASE B (2026-10-03, migration 0045 — NOT RUN YET): copy, naming and jargon. One name per path (Shop parts / Get a part made / Plan a product / My projects, EN + AR); nav "Plan a product" → /projects/new. /projects/new has the three explanation lines, optional email and "My projects" link; with an email the project link is sent once (lib/projects/recovery.ts, link-email.ts, /api/projects/recovery-email, /api/projects/claim, components/projects/project-claim-gate.tsx; claim_project() moves guest-owned projects only and rotates the key). Client dashboard shows My orders / My projects (no customer orders page exists yet). About rewritten from owner facts. Forgot/reset password pages + /api/auth/callback added (Supabase redirect URL allow-list needed). Tests 325, parity 2337/2337.
 
+- SITE REVIEW FIXES, PHASE D (2026-10-03, no migration): contact + footer with WhatsApp/address/C.R./payment badges; legal pages /delivery-returns, /warranty, /terms, /privacy rendered from content/legal/*.md, generated verbatim from LEGAL_PAGES_DRAFT.md by scripts/split-legal-draft.mjs (re-run it with --check after any edit to the draft; never hand-edit the content files); branded 404 via app/[locale]/[...rest]; guest sessions redirected from /dashboard and /inventory to /projects (lib/auth/guest-redirect.ts). Hours are omitted until the owner supplies them.
+
 ## Site review decisions (owner, 2026-10-03)
 
 Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).

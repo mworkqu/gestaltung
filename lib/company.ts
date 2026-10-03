@@ -23,6 +23,19 @@ export const COMPANY_WHATSAPP = {
   url: "https://wa.me/97466567410",
 } as const;
 
+// Same number as the WhatsApp line: the phone link for tel: (owner, 2026-10-03).
+export const COMPANY_PHONE = {
+  display: "+974 6656 7410",
+  tel: "tel:+97466567410",
+} as const;
+
+// Registered office (owner, 2026-10-03). Opening hours were not provided, so
+// none are shown anywhere.
+export const COMPANY_ADDRESS = {
+  en: "Rafal Tower, Lusail, Qatar",
+  ar: "برج رافال، لوسيل، قطر",
+} as const;
+
 export const PAYMENT_METHODS = ["cash_on_delivery", "fawran", "bank_transfer"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 

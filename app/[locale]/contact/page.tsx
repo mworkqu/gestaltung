@@ -1,7 +1,8 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { MapPin, Mail, Building2 } from "lucide-react";
+import { MapPin, Mail, Building2, MessageCircle, Phone, BadgeCheck } from "lucide-react";
 
 import { ContactForm } from "@/components/contact-form";
+import { COMPANY, COMPANY_ADDRESS, COMPANY_PHONE, COMPANY_WHATSAPP } from "@/lib/company";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
 
@@ -16,16 +17,22 @@ export default async function ContactPage({
   setRequestLocale(locale);
 
   const t = await getTranslations("Contact");
+  const tCompany = await getTranslations("Company");
   const isRtl = locale === "ar";
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  const details = [
-    { icon: Building2, value: t("company") },
-    { icon: MapPin, value: t("location") },
-  ];
+  const address = COMPANY_ADDRESS[isRtl ? "ar" : "en"];
+
+  // One row of the contact list. `href` makes the value a link; numbers and
+  // emails stay left-to-right inside Arabic text. min-h-11 = 44 px tap target.
+  const rowCls = "flex items-center gap-3 rounded-2xl bg-panel p-4 shadow-neu-sm";
+  const iconCls =
+    "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface shadow-neu-sm";
+  const linkCls = "inline-flex min-h-11 items-center text-sm text-body transition-colors hover:text-cobalt";
+
 
   return (
     <div className="container space-y-6 py-6">
@@ -58,33 +65,74 @@ export default async function ContactPage({
 
         {/* Details card */}
         <div className="neu animate-fade-up delay-2 flex flex-col gap-6 p-8 lg:col-span-5">
-          <h2 className={mono("text-[10px] text-cobalt")}>{t("detailsTitle")}</h2>
+          <h2 className={mono("text-[10px] text-cobalt")}>{t("reachTitle")}</h2>
 
           <ul className="space-y-3">
-            {details.map(({ icon: Icon, value }) => (
-              <li
-                key={value}
-                className="flex items-center gap-3 rounded-2xl bg-panel p-4 shadow-neu-sm"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface shadow-neu-sm">
-                  <Icon className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
-                </span>
-                <span className="text-sm text-body">{value}</span>
-              </li>
-            ))}
-            <li className="flex items-center gap-3 rounded-2xl bg-panel p-4 shadow-neu-sm">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface shadow-neu-sm">
+            <li className={rowCls}>
+              <span className={iconCls}>
+                <MessageCircle className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[11px] text-mutedtext">{t("whatsappLine")}</span>
+                <a
+                  href={COMPANY_WHATSAPP.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  dir="ltr"
+                  className={cn(linkCls, "justify-start")}
+                >
+                  {COMPANY_WHATSAPP.display}
+                </a>
+              </span>
+            </li>
+            <li className={rowCls}>
+              <span className={iconCls}>
+                <Phone className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[11px] text-mutedtext">{t("phoneLabel")}</span>
+                <a href={COMPANY_PHONE.tel} dir="ltr" className={cn(linkCls, "justify-start")}>
+                  {COMPANY_PHONE.display}
+                </a>
+              </span>
+            </li>
+            <li className={rowCls}>
+              <span className={iconCls}>
+                <MapPin className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[11px] text-mutedtext">{t("addressLabel")}</span>
+                <span className="text-sm text-body">{address}</span>
+              </span>
+            </li>
+            <li className={rowCls}>
+              <span className={iconCls}>
                 <Mail className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
               </span>
-              <a
-                href={`mailto:${t("email")}`}
-                dir="ltr"
-                className="text-sm text-body transition-colors hover:text-cobalt"
-              >
+              <a href={`mailto:${t("email")}`} dir="ltr" className={linkCls}>
                 {t("email")}
               </a>
             </li>
           </ul>
+
+          {/* Company details: legal name + Commercial Registration */}
+          <div className="space-y-3">
+            <h2 className={mono("text-[10px] text-cobalt")}>{t("detailsTitle")}</h2>
+            <ul className="space-y-3">
+              <li className={rowCls}>
+                <span className={iconCls}>
+                  <Building2 className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
+                </span>
+                <span className="text-sm font-semibold text-heading">{tCompany("legalName")}</span>
+              </li>
+              <li className={rowCls}>
+                <span className={iconCls}>
+                  <BadgeCheck className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
+                </span>
+                <span className="text-sm text-body">{t("crLine", { number: COMPANY.crNumber })}</span>
+              </li>
+            </ul>
+          </div>
 
           {/* Response telemetry note */}
           <div className="neu-inset mt-auto flex items-center gap-2.5 px-4 py-3">

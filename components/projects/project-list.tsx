@@ -48,6 +48,9 @@ export function ProjectList() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [limitHit, setLimitHit] = useState(false);
   const [reload, setReload] = useState(0);
+  // A real account (not a guest / no session): hides the "sign in to keep
+  // projects on every device" prompt in the empty state.
+  const [hasAccount, setHasAccount] = useState(false);
   const summary = useCreditSummary();
   const limit = summary ? summary.project_limit : PROJECT_LIMIT;
 
@@ -76,6 +79,8 @@ export function ProjectList() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      if (!cancelled) setHasAccount(!!user && user.is_anonymous !== true);
 
       // No session yet = no projects yet. Don't mint one just to read.
       if (!user) {
@@ -179,12 +184,23 @@ export function ProjectList() {
     return (
       <div className="neu space-y-5 p-8 text-center sm:p-12">
         <p className="text-base text-mutedtext">{t("emptyList")}</p>
+        <p className="text-sm italic text-faint">{t("emptyExample")}</p>
         <Button asChild size="lg">
           <Link href="/projects/new">
             <Plus className="me-2 h-4 w-4" />
             {t("newProject")}
           </Link>
         </Button>
+        {!hasAccount && (
+          <p>
+            <Link
+              href="/sign-in"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-cobalt underline underline-offset-2 hover:text-cobalt-hover"
+            >
+              {t("emptySignIn")}
+            </Link>
+          </p>
+        )}
       </div>
     );
   }

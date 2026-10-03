@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
+import { hasAccount } from "@/lib/auth/guest-redirect";
 import { dashboardPathForRole } from "@/lib/auth/redirects";
 import { SignInForm } from "@/components/auth/sign-in-form";
 import { metaFor } from "@/lib/meta";
@@ -20,7 +21,9 @@ export default async function SignInPage({
   setRequestLocale(locale);
 
   // Already signed in? Skip the form.
-  const session = await getSessionContext();
+  // A guest (anonymous session) is not signed in: they still get the form.
+  const user = await getAuthUser();
+  const session = hasAccount(user) ? await getSessionContext(user) : null;
   if (session) {
     redirect(`/${locale}${dashboardPathForRole(session.profile.role)}`);
   }

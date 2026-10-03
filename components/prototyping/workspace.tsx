@@ -45,6 +45,7 @@ import { createClient } from "@/lib/supabase/client";
 import { LogoMark } from "@/components/logo-mark";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { HeaderAuthLink } from "@/components/header-auth-link";
+import { ProjectUnavailable } from "@/components/projects/project-unavailable";
 import { CartIcon } from "@/components/parts/cart-icon";
 import { CIRCUIT_FOCUS, looksLikeSchema, projectReadiness, type Requirement } from "@/lib/prototyping/readiness";
 import { disciplineOf, isConcept, isMakeable } from "@/lib/prototyping/parts";
@@ -137,7 +138,6 @@ export function PrototypingWorkspace({
 }) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
-  const tNav = useTranslations("Nav");
   const tBrand = useTranslations("Brand");
   const mono = useMono();
   const locale = useLocale() as Locale;
@@ -152,6 +152,9 @@ export function PrototypingWorkspace({
   const [schematics, setSchematics] = useState<SchematicWithRevs[]>([]);
   const [loading, setLoading] = useState(true);
   const [missing, setMissing] = useState(false);
+  // A real account, not a guest or no session: the not-available state then
+  // skips the guest explanation and the Sign up button.
+  const [signedIn, setSignedIn] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
   const [collapsed, setCollapsed] = useState<Panels>({ left: false, right: false });
   // The open node. Chosen once per visit by initialNode; a reload after an
@@ -200,6 +203,7 @@ export function PrototypingWorkspace({
       setLoading(false);
       return;
     }
+    setSignedIn(!!user && user.is_anonymous !== true);
     if (!user) {
       // No session at all (not even a guest one): nothing here can be theirs.
       setMissing(true);
@@ -377,21 +381,9 @@ export function PrototypingWorkspace({
       <div className="space-y-4">
         {bar(backTo("/projects", tProj("listHeading")))}
         <div className="neu space-y-4 p-10 text-center">
-          <p className="text-base text-mutedtext">{t("notAvailable")}</p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/sign-in"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover"
-            >
-              {tNav("signIn")}
-            </Link>
-            <Link
-              href="/projects"
-              className="text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
-            >
-              {tProj("listHeading")}
-            </Link>
-          </div>
+          <ProjectUnavailable signedIn={signedIn}>
+            <p className="text-base text-mutedtext">{t("notAvailable")}</p>
+          </ProjectUnavailable>
         </div>
       </div>
     );

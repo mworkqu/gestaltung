@@ -40,6 +40,7 @@ import {
 import { ProjectCadCard } from "@/components/projects/project-cad-card";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Tag } from "@/components/ui/tag";
+import { ProjectUnavailable } from "@/components/projects/project-unavailable";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
@@ -214,19 +215,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   // they should: a foreign project must not be confirmed to exist (audit #9).
   if (notFound || !project) {
     return (
-      <div className="neu space-y-3 p-10 text-center">
-        <h1 className="text-xl font-bold text-heading">{t("notAvailableTitle")}</h1>
-        <p className="mx-auto max-w-md text-base text-mutedtext">{t("notAvailableBody")}</p>
-        <div className="flex flex-wrap justify-center gap-3 pt-3">
-          {!signedIn && (
-            <Button asChild>
-              <Link href="/sign-in">{t("signInCta")}</Link>
-            </Button>
-          )}
-          <Button asChild variant={signedIn ? "default" : "outline"}>
-            <Link href="/projects">{t("listHeading")}</Link>
-          </Button>
-        </div>
+      <div className="neu p-10 text-center">
+        <ProjectUnavailable signedIn={signedIn}>
+          <div className="space-y-3">
+            <h1 className="text-xl font-bold text-heading">{t("notAvailableTitle")}</h1>
+            <p className="mx-auto max-w-md text-base text-mutedtext">{t("notAvailableBody")}</p>
+          </div>
+        </ProjectUnavailable>
       </div>
     );
   }
