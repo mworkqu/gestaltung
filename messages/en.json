@@ -480,6 +480,10 @@
     "filterStock": "Availability",
     "filterAllStock": "Any availability",
     "clearFilters": "Clear filters",
+    "filtersButton": "Filters",
+    "filtersClose": "Close filters",
+    "showResults": "Show results",
+    "backToTop": "Back to top",
     "stock_in_stock": "In stock",
     "stock_low_stock": "Low stock",
     "stock_out_of_stock": "Out of stock",
@@ -2357,6 +2361,13 @@
     "productDescription": "Buy {name} from Gestaltung, delivered across Qatar.",
     "creditsTitle": "AI credits | Gestaltung360",
     "creditsDescription": "How AI credits work on Gestaltung and how to get more: store orders or a WhatsApp top-up."
+  },
+  "CookieNotice": {
+    "label": "Cookie notice",
+    "text": "We use cookies for basic analytics to improve the site.",
+    "privacy": "Privacy policy",
+    "accept": "Accept",
+    "decline": "Decline"
   },
   "Phone": {
     "invalid": "Please enter a phone number we can reach on WhatsApp, e.g. 5555 1234 or +974 5555 1234."

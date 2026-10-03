@@ -11,7 +11,7 @@ import { Check, FolderPlus, Loader2 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession } from "@/lib/supabase/guest";
+import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { Button } from "@/components/ui/button";
 
 type Project = { id: string; name: string };
@@ -31,12 +31,12 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
   useEffect(() => {
     if (!open || projects) return;
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return setProjects([]);
+    getCurrentUser().then(async (user) => {
+      if (!user) return setProjects([]);
       const { data: rows } = await supabase
         .from("projects")
         .select("id, name")
-        .eq("user_id", data.user.id)
+        .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(20);
       setProjects((rows ?? []) as Project[]);
@@ -105,7 +105,7 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
   }
 
   return (
-    <div className="group relative" ref={boxRef}>
+    <div className="group sm:relative" ref={boxRef}>
       <Button
         type="button"
         variant="outline"
@@ -122,14 +122,15 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
         id={hintId}
         role="tooltip"
         className={
-          "pointer-events-none absolute start-0 bottom-full z-20 mb-2 w-max max-w-[16rem] rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-neu-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100" +
+          "pointer-events-none absolute start-0 bottom-full z-20 mb-2 hidden w-max max-w-[16rem] sm:block rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-neu-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100" +
           (open ? " !opacity-0" : "")
         }
       >
         {t("addToProjectHint")}
       </span>
+      {/* Phones: a bottom panel pinned to the screen edges (an anchored 288 px panel could run off a 375 px screen). */}
       {open && (
-        <div className="neu absolute start-0 top-full z-30 mt-2 w-72 space-y-1 p-2">
+        <div className="neu z-30 space-y-1 p-2 max-sm:fixed max-sm:inset-x-4 max-sm:bottom-[calc(1rem+env(safe-area-inset-bottom))] max-sm:max-h-[70dvh] max-sm:overflow-y-auto sm:absolute sm:start-0 sm:top-full sm:mt-2 sm:w-72">
           {projects === null ? (
             <p className="flex items-center gap-2 px-3 py-2 text-sm text-mutedtext">
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 const config: Config = {
   darkMode: ["class"],
@@ -122,7 +123,45 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Touch targets (WCAG 2.5.5 / DESIGN.md §8: 44 px minimum). Combine with
+    // responsive variants to keep desktop compact, e.g. `max-md:tap-target`.
+    //   tap-target    min 44 x 44 box (add inline-flex items-center justify-center
+    //                 on the element when its content needs centring)
+    //   tap-target-y  min 44 px tall, width left alone (inline links, rows)
+    //   tap-hit       keeps the visual size but extends the hit area to 44 x 44
+    //                 with an invisible ::after (for small icon buttons / chips
+    //                 that must not grow). Needs a non-positioned element.
+    //   tap-icon      small icon button: a real 44 x 44 centred box on phones
+    //                 (< 768 px), and on larger screens it keeps its visual size
+    //                 with the hit area extended like tap-hit. Don't combine
+    //                 with hidden / absolute / fixed.
+    plugin(({ addUtilities }) => {
+      const hitArea = {
+        content: '""',
+        position: "absolute",
+        top: "min(0px, calc((100% - 44px) / 2))",
+        bottom: "min(0px, calc((100% - 44px) / 2))",
+        left: "min(0px, calc((100% - 44px) / 2))",
+        right: "min(0px, calc((100% - 44px) / 2))",
+      };
+      addUtilities({
+        ".tap-icon": {
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          "@media (max-width: 767.98px)": { minHeight: "44px", minWidth: "44px" },
+        },
+        ".tap-icon::after": hitArea,
+        ".tap-target": { minHeight: "44px", minWidth: "44px" },
+        ".tap-target-y": { minHeight: "44px" },
+        ".tap-hit": { position: "relative" },
+        ".tap-hit::after": hitArea,
+      });
+    }),
+  ],
 };
 
 export default config;

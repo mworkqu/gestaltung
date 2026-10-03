@@ -7,6 +7,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { Button } from "@/components/ui/button";
 import { PartCard } from "@/components/parts/part-card";
 import { PartsFilters } from "@/components/parts/parts-filters";
+import { BackToTop } from "@/components/back-to-top";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { RequestItemButton } from "@/components/parts/request-item-button";
 import { isListed, listedCategories } from "@/lib/store/categories";
@@ -136,10 +137,11 @@ export default async function PartsStorePage({
       <span dir="ltr" className="text-xs tabular-nums text-mutedtext">{COMPANY_WHATSAPP.display}</span>
     </div>
   );
-  const pill = "rounded-full border border-borderstrong px-4 py-1.5 text-sm text-heading hover:border-cobalt";
+  const pill =
+    "inline-flex items-center justify-center rounded-full border border-borderstrong px-4 py-1.5 text-sm text-heading hover:border-cobalt max-md:min-h-11";
 
   return (
-    <div className="container space-y-8 py-8">
+    <div className="container space-y-6 py-6 sm:space-y-8 sm:py-8">
       <header className="space-y-3">
         <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
         <h1 className="text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
@@ -153,11 +155,11 @@ export default async function PartsStorePage({
       <PartsFilters categories={categories} materials={materials} state={state} />
 
       {empty ? (
-        <div className="neu flex flex-col items-center gap-4 p-12 text-center">
+        <div className="neu flex flex-col items-center gap-4 p-6 text-center sm:p-12">
           {empty.kind === "search" && (
             <>
               <DemandBeacon kind="zero_search" searchTerm={state.q} />
-              <p className="max-w-lg text-base font-semibold text-heading">{t("emptySearchTitle", { q: state.q })}</p>
+              <p className="max-w-lg break-words text-base font-semibold text-heading">{t("emptySearchTitle", { q: state.q })}</p>
               <p className="max-w-md text-sm text-mutedtext">{t("emptySearchBody")}</p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <RequestItemButton itemName={state.q} variant="default" size="default" />
@@ -190,13 +192,13 @@ export default async function PartsStorePage({
       ) : (
         <>
           <p className="text-sm text-mutedtext" aria-live="polite">{t("resultCount", { count: total, form: arabicCountForm(total) })}</p>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {parts.map((part) => (
               <PartCard key={part.id} part={part} locale={locale} shipping={shipping} />
             ))}
           </div>
           {pages > 1 && (
-            <nav className="flex items-center justify-center gap-3 text-sm" aria-label={t("pagination")}>
+            <nav className="flex flex-wrap items-center justify-center gap-3 text-sm" aria-label={t("pagination")}>
               {state.page > 1 ? (
                 <Link href={href({ page: Math.min(state.page - 1, pages) })} className={pill}>
                   {t("prevPage")}
@@ -212,6 +214,7 @@ export default async function PartsStorePage({
           )}
         </>
       )}
+      <BackToTop />
     </div>
   );
 }

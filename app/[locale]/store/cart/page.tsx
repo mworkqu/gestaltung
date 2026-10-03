@@ -76,25 +76,25 @@ export default function CartPage() {
   const freeGap = freeDeliveryGap(totalQar, freeShipping);
 
   return (
-    <div className="container space-y-8 py-8">
+    <div className="container space-y-6 py-6 sm:space-y-8 sm:py-8">
       <h1 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
         {t("cartTitle")}
       </h1>
       {errorBar}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <ul className="space-y-3">
+        <ul className="min-w-0 space-y-3">
           {[...kits.entries()].map(([kitId, lines]) => {
             const sum = lines.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
             const price = sum - Math.round(((sum * kitDiscountPct) / 100) * 100) / 100;
             return (
-              <li key={kitId} className="neu space-y-3 p-4">
+              <li key={kitId} className="neu min-w-0 space-y-3 p-3 sm:p-4">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-panel shadow-neu-sm">
                     <Package className="h-6 w-6 text-cobalt" strokeWidth={1.5} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-heading">
+                    <p className="break-words text-sm font-bold text-heading">
                       {t("kitTitle", { project: lines[0].projectName ?? "" })}
                     </p>
                     <p className="text-[11px] text-mutedtext">{t("kitCount", { count: lines.length })}</p>
@@ -112,7 +112,7 @@ export default function CartPage() {
                     type="button"
                     onClick={() => removeKit(kitId)}
                     aria-label={t("removeKit")}
-                    className="text-mutedtext transition-colors hover:text-destructive"
+                    className="tap-icon rounded-full text-mutedtext transition-colors hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -137,23 +137,23 @@ export default function CartPage() {
           {loose.map((item) => {
             const name = nameOf(item);
             return (
-              <li key={item.rowId ?? item.sku} className="neu flex items-center gap-4 p-3 sm:p-4">
+              <li key={item.rowId ?? item.sku} className="neu flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 p-3 sm:flex-nowrap sm:p-4">
                 <Link
                   href={`/store/${item.sku}`}
-                  className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-panel"
+                  className="block aspect-square h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-panel"
                 >
                   {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt={name} className="h-full w-full object-cover" />
+                    <img src={item.imageUrl} alt={name} className="h-full w-full object-contain" />
                   ) : (
                     <GearPlaceholder className="h-full w-full" />
                   )}
                 </Link>
 
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-40">
                   <Link
                     href={`/store/${item.sku}`}
-                    className="line-clamp-1 text-sm font-semibold text-heading hover:text-cobalt"
+                    className="line-clamp-2 break-words text-sm font-semibold text-heading hover:text-cobalt sm:line-clamp-1"
                     title={name}
                   >
                     <IsolatedTitle text={name} locale={locale} />
@@ -170,25 +170,25 @@ export default function CartPage() {
                   <p className="mt-1 text-sm font-medium text-body">{formatPrice(item.unitPrice, locale)}</p>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-end gap-2 max-sm:w-full max-sm:flex-row max-sm:items-center max-sm:justify-between">
                   <div className="inline-flex items-center rounded-full bg-panel shadow-neu-inset">
                     <button
                       type="button"
                       aria-label={t("decrease")}
                       onClick={() => item.rowId && updateQty(item.rowId, item.quantity - 1)}
                       disabled={item.quantity <= item.minOrderQty}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-mutedtext hover:text-heading disabled:opacity-40"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-mutedtext hover:text-heading disabled:opacity-40 max-md:h-11 max-md:w-11"
                     >
                       <Minus className="h-3.5 w-3.5" />
                     </button>
-                    <span className="min-w-8 text-center text-sm font-semibold tabular-nums text-heading">
+                    <span className="min-w-8 text-center text-sm font-semibold tabular-nums text-heading max-md:min-w-10">
                       {item.quantity}
                     </span>
                     <button
                       type="button"
                       aria-label={t("increase")}
                       onClick={() => item.rowId && updateQty(item.rowId, item.quantity + 1)}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-mutedtext hover:text-heading"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-mutedtext hover:text-heading max-md:h-11 max-md:w-11"
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
@@ -200,7 +200,7 @@ export default function CartPage() {
                     type="button"
                     onClick={() => item.rowId && removeItem(item.rowId)}
                     aria-label={t("remove")}
-                    className="text-mutedtext transition-colors hover:text-destructive"
+                    className="tap-icon rounded-full text-mutedtext transition-colors hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -210,7 +210,7 @@ export default function CartPage() {
           })}
         </ul>
 
-        <aside className="neu h-fit space-y-4 p-5 lg:sticky lg:top-24">
+        <aside className="neu h-fit min-w-0 space-y-4 p-5 lg:sticky lg:top-24">
           <h2 className="text-sm font-bold text-heading">{t("summaryTitle")}</h2>
           <div className="flex items-center justify-between text-sm">
             <span className="text-mutedtext">{t("subtotal")}</span>

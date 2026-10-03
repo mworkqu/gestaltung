@@ -62,12 +62,36 @@ export default async function DesignHubPage({
     },
   ] as const;
 
+  // "Maybe we already sell it": searching the store first (owner, 2026-09-29).
+  // Phones: shown below the two choices (below); md and up: inside the intro card.
+  const searchForm = (idSuffix: string, className: string) => (
+    <form action={`/${locale}/store`} className={className}>
+      <label htmlFor={`design-search-${idSuffix}`} className="block text-xs font-semibold text-mutedtext">
+        {t("searchLabel")}
+      </label>
+      <div className="flex items-stretch gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3.5 shadow-neu-inset">
+          <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
+          <input
+            id={`design-search-${idSuffix}`}
+            name="q"
+            placeholder={t("searchPlaceholder")}
+            className="w-full min-w-0 flex-1 bg-transparent py-3 text-sm text-heading outline-none placeholder:text-faint"
+          />
+        </div>
+        <Button type="submit" className="rounded-2xl px-5">
+          {t("searchButton")}
+        </Button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="container space-y-6 py-6">
       {/* Hero bento */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Intro */}
-        <div className="neu animate-fade-up flex flex-col justify-center gap-6 p-8 sm:p-10 lg:col-span-7 lg:p-12">
+        <div className="neu animate-fade-up flex flex-col justify-center gap-5 p-6 sm:gap-6 sm:p-10 lg:col-span-7 lg:p-12">
           <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
             <span className="h-2 w-2 rounded-full bg-cobalt" />
             <span className={mono("text-[10px] text-mutedtext")}>{t("kicker")}</span>
@@ -82,29 +106,11 @@ export default async function DesignHubPage({
           </p>
 
           {/* Maybe it's already sold: search the store before making it (owner, 2026-09-29). */}
-          <form action={`/${locale}/store`} className="max-w-xl space-y-1.5">
-            <label htmlFor="design-search" className="block text-xs font-semibold text-mutedtext">
-              {t("searchLabel")}
-            </label>
-            <div className="flex items-stretch gap-2">
-              <div className="flex flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3.5 shadow-neu-inset">
-                <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
-                <input
-                  id="design-search"
-                  name="q"
-                  placeholder={t("searchPlaceholder")}
-                  className="w-full flex-1 bg-transparent py-3 text-sm text-heading outline-none placeholder:text-faint"
-                />
-              </div>
-              <Button type="submit" className="rounded-2xl px-5">
-                {t("searchButton")}
-              </Button>
-            </div>
-          </form>
+          {searchForm("md", "hidden max-w-xl space-y-1.5 md:block")}
         </div>
 
         {/* Blueprint panel */}
-        <div className="neu animate-fade-up delay-1 flex flex-col justify-between gap-6 p-8 lg:col-span-5">
+        <div className="neu animate-fade-up delay-1 hidden flex-col justify-between gap-6 p-8 md:flex lg:col-span-5">
           <div className={mono("flex items-center justify-between text-[10px] text-faint")}>
             <span>{t("panelTag")}</span>
           </div>
@@ -135,7 +141,7 @@ export default async function DesignHubPage({
             <Link
               key={href}
               href={href}
-              className="neu neu-hover group flex flex-col p-8 sm:p-10"
+              className="neu neu-hover group flex flex-col p-6 sm:p-10"
             >
               <div className="flex items-center justify-between">
                 <span
@@ -171,6 +177,11 @@ export default async function DesignHubPage({
             </Link>
           ))}
         </div>
+      </section>
+
+      {/* Phones only: the store search sits below the two choices. */}
+      <section className="neu animate-fade-up delay-2 p-6 md:hidden">
+        {searchForm("sm", "space-y-1.5")}
       </section>
 
       {/* Closing CTA band */}

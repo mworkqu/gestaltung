@@ -150,6 +150,20 @@ export function hasActiveFilters(state: StoreState): boolean {
   return !!(state.q || state.category || state.material || state.stock || state.sort !== defaultSort(!!state.q));
 }
 
+/**
+ * How many controls inside the mobile "Filters" drawer are set: category,
+ * material, delivery time, and a non-default sort. The search text is not
+ * counted (its box stays outside the drawer).
+ */
+export function activeFilterCount(state: StoreState): number {
+  return (
+    (state.category ? 1 : 0) +
+    (state.material ? 1 : 0) +
+    (state.stock ? 1 : 0) +
+    (state.sort !== defaultSort(!!state.q) ? 1 : 0)
+  );
+}
+
 // ── Empty state ──────────────────────────────────────────────────────────────
 
 export type EmptyState =

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeFilterCount,
   emptyState,
   hasActiveFilters,
   leadClassesFor,
@@ -88,6 +89,16 @@ describe("hasActiveFilters (Clear filters, both locales)", () => {
     expect(hasActiveFilters(parseStoreParams({ stock: "2_4_weeks" }))).toBe(true);
     expect(hasActiveFilters(parseStoreParams({ sort: "price_asc" }))).toBe(true);
     expect(hasActiveFilters(parseStoreParams({ stock: "in_stock" }))).toBe(false);
+  });
+});
+
+describe("activeFilterCount (badge on the mobile Filters button)", () => {
+  it("counts drawer controls, never the search text", () => {
+    expect(activeFilterCount(parseStoreParams({}))).toBe(0);
+    expect(activeFilterCount(parseStoreParams({ q: "bolt" }))).toBe(0);
+    expect(activeFilterCount(parseStoreParams({ category: "Sensors", stock: "2_4_weeks" }))).toBe(2);
+    expect(activeFilterCount(parseStoreParams({ category: "Sensors", material: "Steel", stock: "1_2_weeks", sort: "price_asc" }))).toBe(4);
+    expect(activeFilterCount(parseStoreParams({ q: "bolt", sort: "relevance" }))).toBe(0);
   });
 });
 

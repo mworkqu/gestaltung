@@ -11,29 +11,37 @@ import { useTranslations } from "next-intl";
 import { ChevronDown, LogOut, Menu, User, X } from "lucide-react";
 
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
+import { useAuth } from "@/components/auth/auth-provider";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 type Session = { kind: "none" | "guest" | "account"; email?: string | null };
 
-export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: React.ReactNode }) {
+// `credits` (the credit-balance chip) shows in the bar from sm up and inside the
+// mobile menu below sm, where the bar has no room for it at 375 px.
+export function HeaderNav({
+  isRtl,
+  children,
+  credits,
+}: {
+  isRtl: boolean;
+  children?: React.ReactNode;
+  credits?: React.ReactNode;
+}) {
   const t = useTranslations("Nav");
   const tAuth = useTranslations("Auth");
   const pathname = usePathname();
   const router = useRouter();
-  const [session, setSession] = useState<Session>({ kind: "none" });
+  // Who is asking comes from the shared <AuthProvider> (one read for the whole page).
+  const { user: authUser } = useAuth();
+  const session: Session = !authUser
+    ? { kind: "none" }
+    : authUser.is_anonymous
+      ? { kind: "guest" }
+      : { kind: "account", email: authUser.email };
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    const read = (u: { is_anonymous?: boolean; email?: string | null } | null | undefined) =>
-      setSession(!u ? { kind: "none" } : u.is_anonymous ? { kind: "guest" } : { kind: "account", email: u.email });
-    supabase.auth.getUser().then(({ data }) => read(data.user));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => read(s?.user));
-    return () => sub.subscription.unsubscribe();
-  }, []);
 
   // Close menus on navigation and on outside click / Escape.
   useEffect(() => {
@@ -74,7 +82,7 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
   const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const linkClass = (href: string) =>
     cn(
-      "rounded-lg px-3 py-2 transition-colors duration-300 hover:text-heading",
+      "rounded-lg px-3 py-2 transition-colors duration-300 hover:text-heading max-lg:inline-flex max-lg:min-h-11 max-lg:items-center",
       active(href) ? "text-heading" : "text-mutedtext",
       isRtl ? "text-sm font-medium" : "font-mono text-[11px] uppercase tracking-wider"
     );
@@ -89,7 +97,8 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
         ))}
       </nav>
 
-      <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+      <div className="max-sm:hidden empty:hidden">{credits}</div>
       {children}
       {/* Account: Sign in, or a menu with Dashboard + Sign out. */}
       <div className="hidden lg:block" ref={accountRef}>
@@ -140,15 +149,16 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
         aria-expanded={menuOpen}
         aria-controls="mobile-menu"
         aria-label={menuOpen ? t("closeMenu") : t("menu")}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-heading shadow-neu-sm lg:hidden"
+        className="flex h-9 w-9 items-center justify-center rounded-lg text-heading shadow-neu-sm max-lg:h-11 max-lg:w-11 lg:hidden"
       >
         {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </button>
       </div>
       {menuOpen && (
-        <div id="mobile-menu" className="neu absolute inset-x-4 top-full z-50 mt-2 space-y-1 p-3 lg:hidden">
+        <div id="mobile-menu" className="neu absolute inset-x-4 top-full z-50 mt-2 max-h-[calc(100dvh-8rem)] space-y-1 overflow-y-auto p-3 lg:hidden">
+          {credits && <div className="px-1 pb-1 sm:hidden empty:hidden [&_a]:min-h-11">{credits}</div>}
           {primary.map((l) => (
-            <Link key={l.href} href={l.href} className="block rounded-lg px-3 py-2.5 text-sm font-semibold text-heading hover:bg-panel">
+            <Link key={l.href} href={l.href} className="flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-heading hover:bg-panel">
               {l.label}
             </Link>
           ))}
@@ -156,21 +166,21 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
           {session.kind === "account" ? (
             <>
               {accountLinks.map((l) => (
-                <Link key={l.href} href={l.href} className="block rounded-lg px-3 py-2.5 text-sm text-heading hover:bg-panel">
+                <Link key={l.href} href={l.href} className="flex min-h-11 items-center rounded-lg px-3 text-sm text-heading hover:bg-panel">
                   {l.label}
                 </Link>
               ))}
               <button
                 type="button"
                 onClick={signOut}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-start text-sm text-heading hover:bg-panel"
+                className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-start text-sm text-heading hover:bg-panel"
               >
                 <LogOut className={cn("h-4 w-4", isRtl && "rotate-180")} aria-hidden />
                 {tAuth("signOut")}
               </button>
             </>
           ) : (
-            <Link href="/sign-in" className="block rounded-lg px-3 py-2.5 text-sm text-heading hover:bg-panel">
+            <Link href="/sign-in" className="flex min-h-11 items-center rounded-lg px-3 text-sm text-heading hover:bg-panel">
               {t("signIn")}
             </Link>
           )}

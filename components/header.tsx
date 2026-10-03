@@ -22,7 +22,7 @@ export async function Header({ locale }: { locale: Locale }) {
       <div className="container pt-4">
         <div className="neu relative flex h-16 items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
           {/* Brand lockup */}
-          <Link href="/" className="flex min-w-0 items-center gap-2 sm:gap-3">
+          <Link href="/" className="flex min-h-11 min-w-0 items-center gap-2 sm:gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink shadow-neu-sm">
               <LogoMark title={tBrand("name")} className="h-5 w-5" />
             </span>
@@ -30,7 +30,7 @@ export async function Header({ locale }: { locale: Locale }) {
               <span
                 className={cn(
                   "block text-sm font-extrabold text-heading",
-                  !isRtl && "uppercase tracking-[0.12em]"
+                  !isRtl && "uppercase tracking-[0.12em] max-sm:tracking-[0.06em]"
                 )}
               >
                 {tBrand("name")}
@@ -48,8 +48,7 @@ export async function Header({ locale }: { locale: Locale }) {
             </span>
           </Link>
 
-          <HeaderNav isRtl={isRtl}>
-            <CreditsBadge />
+          <HeaderNav isRtl={isRtl} credits={<CreditsBadge />}>
             <CartIcon />
             <LanguageSwitcher currentLocale={locale} />
           </HeaderNav>

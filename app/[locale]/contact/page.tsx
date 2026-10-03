@@ -64,7 +64,7 @@ export default async function ContactPage({
         </div>
 
         {/* Details card */}
-        <div className="neu animate-fade-up delay-2 flex flex-col gap-6 p-8 lg:col-span-5">
+        <div className="neu animate-fade-up delay-2 flex min-w-0 flex-col gap-6 p-6 sm:p-8 lg:col-span-5">
           <h2 className={mono("text-[10px] text-cobalt")}>{t("reachTitle")}</h2>
 
           <ul className="space-y-3">
@@ -109,7 +109,7 @@ export default async function ContactPage({
               <span className={iconCls}>
                 <Mail className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
               </span>
-              <a href={`mailto:${t("email")}`} dir="ltr" className={linkCls}>
+              <a href={`mailto:${t("email")}`} dir="ltr" className={cn(linkCls, "min-w-0 break-all")}>
                 {t("email")}
               </a>
             </li>

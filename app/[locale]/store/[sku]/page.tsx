@@ -142,35 +142,35 @@ export default async function PartDetailPage({
   const spec = (label: string, value: string | null) =>
     value ? (
       <div className="flex justify-between gap-4 border-b border-borderstrong/40 py-2 last:border-0">
-        <dt className={mono("text-[10px] text-mutedtext")}>{label}</dt>
-        <dd className="text-sm text-body">{value}</dd>
+        <dt className={mono("shrink-0 text-[10px] text-mutedtext")}>{label}</dt>
+        <dd className="min-w-0 break-words text-end text-sm text-body">{value}</dd>
       </div>
     ) : null;
 
   return (
-    <div className="container space-y-8 py-8">
+    <div className="container space-y-6 py-6 sm:space-y-8 sm:py-8">
       {/* Breadcrumb */}
-      <nav className="flex flex-wrap items-center gap-1.5 text-xs text-mutedtext">
-        <Link href="/store" className="hover:text-heading">
+      <nav className="flex flex-wrap items-center gap-x-1.5 text-xs text-mutedtext">
+        <Link href="/store" className="inline-flex items-center hover:text-heading max-md:min-h-11">
           {t("breadcrumbStore")}
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-        <Link href={{ pathname: "/store", query: { category: part.category } }} className="hover:text-heading">
+        <Link href={{ pathname: "/store", query: { category: part.category } }} className="inline-flex items-center hover:text-heading max-md:min-h-11">
           {categoryLabel(part.category, locale)}
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-        <span className="text-heading">{name}</span>
+        <span className="min-w-0 break-words text-heading">{name}</span>
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        {/* Image */}
-        <div className="neu aspect-square overflow-hidden">
+        {/* Image: fixed square + panel background so a late-loading photo never shifts the layout. */}
+        <div className="neu aspect-square min-w-0 overflow-hidden bg-panel">
           {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imageUrl}
               alt={name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain"
             />
           ) : (
             <GearPlaceholder className="h-full w-full" />
@@ -178,14 +178,14 @@ export default async function PartDetailPage({
         </div>
 
         {/* Details */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <div className="space-y-3">
             {onRequest && (
               <div className="flex flex-wrap items-center gap-3">
                 <LeadTimeBadge leadClass={null} />
               </div>
             )}
-            <h1 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+            <h1 className="break-words text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
               <IsolatedTitle text={name} locale={locale} />
             </h1>
             <p className="text-2xl font-bold text-heading">
@@ -238,7 +238,7 @@ export default async function PartDetailPage({
                 {t("descriptionLabel")}
               </h2>
               {description ? (
-                <p className="whitespace-pre-line text-sm leading-relaxed text-body">
+                <p className="whitespace-pre-line break-words text-sm leading-relaxed text-body">
                   {description}
                 </p>
               ) : (
@@ -257,7 +257,7 @@ export default async function PartDetailPage({
                       href={l.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-cobalt shadow-neu-sm hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-cobalt shadow-neu-sm hover:underline max-md:min-h-11"
                     >
                       <ExternalLink className="h-3.5 w-3.5" />
                       {l.label}
@@ -277,7 +277,7 @@ export default async function PartDetailPage({
                     href={datasheet}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-cobalt shadow-neu-sm hover:underline"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-cobalt shadow-neu-sm hover:underline max-md:min-h-11"
                   >
                     <FileText className="h-3.5 w-3.5" />
                     {t("datasheet")}
@@ -286,15 +286,15 @@ export default async function PartDetailPage({
               </div>
               {specRows.length === 0 && untranslated.specs && !untranslated.description && notTranslated}
               {specRows.length > 0 && (
-                <div className="neu overflow-hidden">
+                <div className="neu overflow-x-auto">
                   <table className="w-full text-sm">
                     <tbody className="divide-y divide-borderstrong/40">
                       {specRows.map((r, i) => (
                         <tr key={`${i}-${r.name}`}>
-                          <th scope="row" className="w-2/5 px-4 py-2 text-start text-[12.5px] font-medium text-mutedtext">
+                          <th scope="row" className="w-2/5 break-words px-4 py-2 text-start text-[12.5px] font-medium text-mutedtext">
                             {r.name}
                           </th>
-                          <td className="px-4 py-2 text-[12.5px] text-heading" dir="auto">
+                          <td className="break-words px-4 py-2 text-[12.5px] text-heading" dir="auto">
                             {r.value}
                           </td>
                         </tr>

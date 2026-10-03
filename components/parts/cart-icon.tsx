@@ -17,7 +17,7 @@ export function CartIcon() {
     <Link
       href="/store/cart"
       aria-label={t("cartAria", { count: itemCount, form: arabicCountForm(itemCount) })}
-      className="relative flex h-9 w-9 items-center justify-center rounded-full text-mutedtext transition-colors duration-300 hover:text-heading"
+      className="relative flex h-9 w-9 items-center justify-center rounded-full text-mutedtext transition-colors duration-300 hover:text-heading max-md:h-11 max-md:w-11"
     >
       <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={1.75} />
       {ready && itemCount > 0 && (

@@ -113,7 +113,7 @@ export function DesignDropzone({ compact = false }: { compact?: boolean }) {
         )}
         <Link
           href="/design"
-          className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+          className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11"
         >
           {t("dropExplore")}
           <ArrowUpRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />

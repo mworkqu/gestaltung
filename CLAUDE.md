@@ -983,6 +983,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 - SITE REVIEW FIXES, PHASE H (2026-10-03): SEO. lib/seo.ts pageMetadata() is the only place that builds canonical/hreflang/OG/Twitter; lib/meta.ts metaFor() calls it. app/sitemap.ts, app/robots.ts, app/[locale]/opengraph-image.tsx (English card for both locales).
 - SITE REVIEW FIXES, PHASE E (2026-10-03, migration 0047 — NOT RUN YET): Arabic. translate_details step (lib/store/translate-details.ts) fills description_ar/specs_ar; productDetailsForLocale() decides what /ar shows (never raw English supplier text); IsolatedTitle for mixed-direction titles; arabicCountForm() for counts; sensor = مستشعر, kits = مجموعات. content/legal/** is the owner's verbatim text and is excluded from wording changes.
 
+- SITE REVIEW FIXES, PHASE F (2026-10-03): mobile. Filters drawer (components/ui/sheet.tsx, native dialog, no Radix), back-to-top, tap-target utilities in tailwind.config.ts, Button min 44 px below md, square image boxes, /design reordered on phones. Not audited at 375 px: checkout, /design/quote, prototyping workspace, dashboard.
+
 ## Site review decisions (owner, 2026-10-03)
 
 Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).

@@ -94,36 +94,36 @@ export default async function Home({
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* 1 — Shop parts */}
-          <div className="neu animate-fade-up flex flex-col gap-5 p-6 sm:p-8">
+          <div className="neu animate-fade-up flex min-w-0 flex-col gap-5 p-6 sm:p-8">
             <ChoiceHead icon={<ShoppingBag className="h-5 w-5" />} step="1" title={t("choiceBuyTitle")} text={t("choiceBuyText")} />
             <form action={`/${locale}/store`} className="flex items-stretch gap-2">
-              <div className="flex flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3.5 shadow-neu-inset">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3.5 shadow-neu-inset">
                 <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
                 <input
                   name="q"
                   aria-label={t("searchPh")}
                   placeholder={t("searchPh")}
-                  className="w-full flex-1 bg-transparent py-3 text-sm text-heading outline-none placeholder:text-faint"
+                  className="w-full min-w-0 flex-1 bg-transparent py-3 text-sm text-heading outline-none placeholder:text-faint"
                 />
               </div>
               <Button type="submit" className="rounded-2xl px-5">
                 {t("searchBtn")}
               </Button>
             </form>
-            <Link href="/store" className="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover">
+            <Link href="/store" className="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11">
               {t("choiceBuyCta")}
               <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
             </Link>
           </div>
 
           {/* 2 — Get a part made (I have a file) */}
-          <div className="neu animate-fade-up delay-1 flex flex-col gap-5 p-6 sm:p-8">
+          <div className="neu animate-fade-up delay-1 flex min-w-0 flex-col gap-5 p-6 sm:p-8">
             <ChoiceHead icon={<UploadCloud className="h-5 w-5" />} step="2" title={t("choiceMakeTitle")} text={t("choiceMakeText")} />
             <DesignDropzone compact />
             {/* No file: we draw it from a sketch (one extra link, not a fourth path). */}
             <Link
               href="/design/drawing"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11"
             >
               {t("drawLink")}
               <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
@@ -131,7 +131,7 @@ export default async function Home({
           </div>
 
           {/* 3 — Plan a product (prototyping) */}
-          <div className="neu animate-fade-up delay-2 flex flex-col gap-5 p-6 sm:p-8">
+          <div className="neu animate-fade-up delay-2 flex min-w-0 flex-col gap-5 p-6 sm:p-8">
             <ChoiceHead icon={<Lightbulb className="h-5 w-5" />} step="3" title={t("choiceIdeaTitle")} text={t("choiceIdeaText")} />
             <ol className="space-y-1.5 text-sm text-body">
               {(["choiceIdeaStep1", "choiceIdeaStep2", "choiceIdeaStep3"] as const).map((k, i) => (
@@ -167,7 +167,7 @@ export default async function Home({
           </div>
           <Link
             href="/store"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11"
           >
             {t("viewAll")}
           </Link>
@@ -179,7 +179,7 @@ export default async function Home({
               <Link
                 key={category}
                 href={{ pathname: "/store", query: { category } }}
-                className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-medium text-mutedtext shadow-neu-sm transition-colors hover:text-cobalt"
+                className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-medium text-mutedtext shadow-neu-sm transition-colors hover:text-cobalt max-md:inline-flex max-md:min-h-11 max-md:items-center max-md:px-4"
               >
                 {categoryLabel(category, locale)}
               </Link>
@@ -192,7 +192,7 @@ export default async function Home({
             <p className="text-sm text-mutedtext">{t("emptyFeatured")}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
             {products.map((part) => (
               <PartCard key={part.id} part={part} locale={locale} />
             ))}

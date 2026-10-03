@@ -40,8 +40,13 @@ export async function PartCard({
   // word) and keeps the full title in title/aria-label.
   const shownName = locale === "ar" ? truncateAtWord(name) : name;
 
+  // Phones show two cards per row (~165 px each), so the card gets tighter
+  // padding and type below sm, and its buttons may wrap to two lines instead
+  // of overflowing ("Added — View cart", "Request this item").
+  const cardBtn = "w-full max-sm:h-auto max-sm:whitespace-normal max-sm:px-2 max-sm:py-2 max-sm:leading-tight";
+
   return (
-    <div className="neu flex flex-col overflow-hidden">
+    <div className="neu flex min-w-0 flex-col overflow-hidden max-sm:rounded-2xl">
       <Link
         href={`/store/${part.sku}`}
         className="block aspect-square overflow-hidden bg-panel"
@@ -52,17 +57,17 @@ export async function PartCard({
             src={imageUrl}
             alt={name}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+            className="h-full w-full object-contain transition-transform duration-300 hover:scale-105"
           />
         ) : (
           <GearPlaceholder className="h-full w-full" />
         )}
       </Link>
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4">
         <Link
           href={`/store/${part.sku}`}
-          className="line-clamp-2 text-sm font-semibold text-heading transition-colors hover:text-cobalt"
+          className="line-clamp-2 break-words max-md:min-h-11 text-[13px] font-semibold leading-snug text-heading transition-colors hover:text-cobalt sm:text-sm"
           title={name}
           aria-label={name}
         >
@@ -70,19 +75,23 @@ export async function PartCard({
         </Link>
 
         <div>
-          <ArrivalBadge leadClass={part.lead_time_class} date={arrives} />
+          <ArrivalBadge
+            leadClass={part.lead_time_class}
+            date={arrives}
+            className="max-sm:whitespace-normal max-sm:rounded-lg max-sm:leading-tight"
+          />
         </div>
 
         <div className="mt-auto space-y-2">
-          <p className="text-base font-bold text-heading">
+          <p className="text-sm font-bold text-heading sm:text-base">
             {formatPrice(part.unit_price, locale)}
           </p>
           {showMinOrder(part.min_order_qty) && (
             <p className="text-[11px] text-mutedtext">{t("minOrder", { qty: part.min_order_qty })}</p>
           )}
-          <AddToCartButton part={part} className="w-full" />
+          <AddToCartButton part={part} className={cardBtn} />
           {canRequestItem(part.lead_time_class) && (
-            <RequestItemButton partId={part.id} partName={name} size="sm" className="w-full" />
+            <RequestItemButton partId={part.id} partName={name} size="sm" className={cardBtn} />
           )}
         </div>
       </div>

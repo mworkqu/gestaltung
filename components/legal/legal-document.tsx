@@ -127,7 +127,7 @@ export function legalPage(slug: LegalSlug) {
           </h1>
         </section>
 
-        <article className="neu animate-fade-up delay-1 mx-auto w-full max-w-3xl space-y-4 p-6 sm:p-10">
+        <article className="neu animate-fade-up delay-1 mx-auto w-full max-w-3xl space-y-4 break-words p-6 sm:p-10">
           {blocks.map(renderBlock)}
         </article>
       </div>

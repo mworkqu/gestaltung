@@ -44,6 +44,10 @@ export function LanguageSwitcher({
             }
             className={cn(
               "rounded-full px-2.5 py-0.5 text-xs font-semibold leading-none transition-colors disabled:opacity-60",
+              // 44 px targets on phones; below sm only the other language is
+              // shown (one button), which saves room in the 375 px header.
+              "max-md:min-h-11 max-md:min-w-11",
+              isActive && "max-sm:hidden",
               loc === "ar" && "font-arabic text-sm",
               isActive
                 ? "bg-azure text-background"

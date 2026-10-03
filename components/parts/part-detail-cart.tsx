@@ -37,7 +37,7 @@ export function PartDetailCart({ part }: { part: Part }) {
           type="button"
           aria-label={t("decrease")}
           onClick={() => changeQty((q) => Math.max(part.min_order_qty, q - 1))}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-mutedtext hover:text-heading disabled:opacity-40"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-mutedtext hover:text-heading disabled:opacity-40 max-md:h-11 max-md:w-11"
           disabled={qty <= part.min_order_qty}
         >
           <Minus className="h-4 w-4" />
@@ -49,7 +49,7 @@ export function PartDetailCart({ part }: { part: Part }) {
           type="button"
           aria-label={t("increase")}
           onClick={() => changeQty((q) => q + 1)}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-mutedtext hover:text-heading"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-mutedtext hover:text-heading max-md:h-11 max-md:w-11"
         >
           <Plus className="h-4 w-4" />
         </button>
