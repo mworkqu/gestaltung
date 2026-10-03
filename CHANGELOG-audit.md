@@ -119,3 +119,20 @@ Source: STAGE_SITE_REVIEW_FIXES_PROMPT.md
 - Guests without an email are stored as skipped (no_email).
 - Tests 500 (templates in both languages, decide/skip rules, cron auth).
 - Pending owner steps: run 0046 (after 0045); CRON_SECRET must be set in Vercel.
+
+## Phase H — SEO and sharing (2026-10-03)
+- lib/seo.ts: one helper gives every page canonical (absolute, per locale), hreflang (en, ar, x-default), Open Graph and Twitter summary_large_image; private pages are noindex. Titles normalised to "X | Gestaltung360".
+- Default share image generated with next/og (app/[locale]/opengraph-image.tsx, nothing added to /public). The Arabic locale uses the same English card (no Arabic font available to the generator).
+- Product pages: og:image from the product photo (width 1200), price in og:description, product:price tags.
+- app/sitemap.ts (static pages + every published product, en and ar, hourly revalidate) and app/robots.ts (disallow /dashboard, /inventory, /api; Sitemap line). public/robots.txt removed.
+- Tests: metadata shape, sitemap entries, robots rules.
+
+## Phase E — Arabic (2026-10-03)
+- Migration 0047 (not run): parts.specs_ar jsonb + details_ar_at (description_ar already existed). New admin step translate_details in /api/admin/store-cleanup with a control on Dashboard → Store → Sourcing overview (batched, resumable, idempotent, never automatic).
+- /ar product page shows Arabic description and specs; when a product has none yet it hides the English supplier text and shows the Arabic headings with a note and a link to the English page (lib/store/product-details.ts).
+- Latin part numbers and brand tokens isolated with <bdi dir="ltr"> in titles on cards, product H1, cart, checkout (components/ltr-isolate.tsx, lib/text/bidi.ts); Arabic card titles cut at 80 characters.
+- "Sensor" unified to مستشعر and kits to مجموعات in messages and category labels (old words still work in search). Legal text untouched.
+- Product count uses the owner's Arabic rule (3–10 منتجات, 11+ منتجًا) via lib/text/count.ts, because CLDR would give "107 منتجات".
+- Arabic half of the order confirmation email: Arabic amounts, bank name, product names (name_ar), split-shipment wording; Arabic first for an Arabic checkout.
+- Tests 580; i18n parity 2446/2446.
+- Pending owner steps: run 0047 (after 0046), then Dashboard → Store → Sourcing overview → "Arabic descriptions and specs" → Translate (about 45–90 minutes, free Gemini tier).

@@ -25,6 +25,7 @@ import { sortProducts } from "@/lib/store/search";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { cn } from "@/lib/utils";
+import { arabicCountForm } from "@/lib/text/count";
 import { metaFor } from "@/lib/meta";
 
 // Published catalog reflects admin publish toggles immediately. (No cookies or
@@ -188,7 +189,7 @@ export default async function PartsStorePage({
         </div>
       ) : (
         <>
-          <p className="text-sm text-mutedtext" aria-live="polite">{t("resultCount", { count: total })}</p>
+          <p className="text-sm text-mutedtext" aria-live="polite">{t("resultCount", { count: total, form: arabicCountForm(total) })}</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {parts.map((part) => (
               <PartCard key={part.id} part={part} locale={locale} shipping={shipping} />

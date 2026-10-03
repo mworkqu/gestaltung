@@ -7,11 +7,11 @@ const AR: Record<string, string> = {
   "3D printer parts": "قطع الطابعات ثلاثية الأبعاد",
   "Raspberry Pi": "راسبيري باي",
   Microcontrollers: "المتحكمات الدقيقة",
-  Kits: "الأطقم",
+  Kits: "المجموعات",
   "Chips & ICs": "الرقائق والدوائر المتكاملة",
   Displays: "الشاشات",
   Modules: "الوحدات",
-  Sensors: "الحساسات",
+  Sensors: "المستشعرات",
   Motors: "المحركات",
   Power: "الطاقة",
   Prototyping: "النماذج الأولية",
@@ -22,12 +22,23 @@ const AR: Record<string, string> = {
   Other: "أخرى",
 };
 
-/** Stored categories whose Arabic label contains this Arabic text (search "حساسات" → Sensors). */
+// Older / colloquial Arabic words customers still type for a category. The
+// displayed label is the canonical one above (مستشعرات, مجموعات); these only
+// keep search working for the previous wording.
+const AR_SEARCH_ALIASES: Record<string, string[]> = {
+  Sensors: ["حساسات", "الحساسات", "حساس", "الحساس", "حسّاسات", "حسّاس"],
+  Kits: ["أطقم", "الأطقم", "اطقم", "الاطقم", "طقم", "الطقم"],
+};
+
+/** Stored categories whose Arabic label contains this Arabic text (search "مستشعرات" or "حساسات" → Sensors). */
 export function categoriesForArabicTerm(term: string): string[] {
   const t = term.trim();
   if (t.length < 3 || !/[؀-ۿ]/.test(t)) return [];
   return Object.entries(AR)
-    .filter(([, label]) => label.includes(t))
+    .filter(
+      ([category, label]) =>
+        label.includes(t) || (AR_SEARCH_ALIASES[category] ?? []).some((a) => a.includes(t)),
+    )
     .map(([category]) => category);
 }
 

@@ -5,6 +5,7 @@ import { ShoppingCart } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/components/parts/cart-provider";
+import { arabicCountForm } from "@/lib/text/count";
 
 // Header cart button with a live item-count badge. Always visible; links to the
 // cart page.
@@ -15,7 +16,7 @@ export function CartIcon() {
   return (
     <Link
       href="/store/cart"
-      aria-label={t("cartAria", { count: itemCount })}
+      aria-label={t("cartAria", { count: itemCount, form: arabicCountForm(itemCount) })}
       className="relative flex h-9 w-9 items-center justify-center rounded-full text-mutedtext transition-colors duration-300 hover:text-heading"
     >
       <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={1.75} />

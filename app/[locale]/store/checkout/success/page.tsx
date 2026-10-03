@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/parts/format";
 import { LAST_ORDER_KEY } from "@/lib/parts/constants";
 import { formatDeliveryDate } from "@/lib/store/delivery";
+import { IsolatedTitle } from "@/components/ltr-isolate";
 
 const WHATSAPP_DIGITS =
   process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
@@ -86,7 +87,7 @@ export default function CheckoutSuccessPage() {
           </h1>
           {shortId && (
             <p className="font-mono text-xs text-mutedtext">
-              {t("orderRef", { id: shortId })}
+              {t("orderRef", { id: `⁦${shortId}⁩` })}
             </p>
           )}
           <p className="text-sm leading-relaxed text-body">{t("successNote")}</p>
@@ -98,7 +99,7 @@ export default function CheckoutSuccessPage() {
               {order.items.map((i) => (
                 <li key={i.sku} className="flex justify-between gap-3 text-sm">
                   <span className="min-w-0 truncate text-body">
-                    {(locale === "ar" && i.nameAr ? i.nameAr : i.name)}
+                    <IsolatedTitle text={locale === "ar" && i.nameAr ? i.nameAr : i.name} locale={locale} />
                     <span className="text-mutedtext"> × {i.quantity}</span>
                     {i.onRequest && <span className="block text-[11px] text-faint">{tD("dateTbc")}</span>}
                   </span>

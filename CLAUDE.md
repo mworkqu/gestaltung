@@ -980,6 +980,9 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 
 - SITE REVIEW FIXES, PHASE I (2026-10-03, migration 0046 — NOT RUN YET): credit and milestone emails. Outbox + triggers in 0046; drainer app/api/cron/notifications (lib/notifications/decide.ts, links.ts); templates lib/email/templates/*; unsubscribe app/api/notifications/unsubscribe; admin /dashboard/notifications. Kind names must stay in sync in three places (0046 check constraint, OUTBOX_KINDS, NOTIFICATION_KINDS). discount_ready is OFF in store_settings.notifications until spend_credit/redeem_credits can date a credit from when it was earned (owner rule: 30 days from the day earned). vercel.json cron is daily (Hobby-safe); */15 needs Pro.
 
+- SITE REVIEW FIXES, PHASE H (2026-10-03): SEO. lib/seo.ts pageMetadata() is the only place that builds canonical/hreflang/OG/Twitter; lib/meta.ts metaFor() calls it. app/sitemap.ts, app/robots.ts, app/[locale]/opengraph-image.tsx (English card for both locales).
+- SITE REVIEW FIXES, PHASE E (2026-10-03, migration 0047 — NOT RUN YET): Arabic. translate_details step (lib/store/translate-details.ts) fills description_ar/specs_ar; productDetailsForLocale() decides what /ar shows (never raw English supplier text); IsolatedTitle for mixed-direction titles; arabicCountForm() for counts; sensor = مستشعر, kits = مجموعات. content/legal/** is the owner's verbatim text and is excluded from wording changes.
+
 ## Site review decisions (owner, 2026-10-03)
 
 Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
@@ -1077,6 +1080,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0044_shipping_flat_free_threshold.sql — QAR 50 all tiers + handling 0, free_shipping_threshold (QAR 300, Standard), quote v2, create_part_order v6 (+p_payment_method; bank transfer needs email; total > 0), set_order_payment_method v2 (RUN AFTER 0043; checkout falls back to the old call until then)
 - 0045_project_recovery_link.sql — D6 project link by email: projects.contact_email/recovery_token/recovery_emailed_at (guarded), project_recovery_begin(), claim_project() (moves a GUEST project to the session holding the #key= link, key rotated, new link emailed), storage read/delete by project owner (RUN AFTER 0044; until then /projects/new skips the email and #key= links show "not available")
 - 0046_notification_outbox.sql — Phase I credit/milestone emails: notification_outbox (+ unique dedupe index) + notification_prefs (unsubscribe token), triggers on credits_ledger/projects, claim_notifications / mark_notification / notification_unsubscribe (service_role), store_settings.notifications (discount_ready OFF) (RUN AFTER 0045; until then /api/cron/notifications answers 500 claim_failed and nothing is queued)
+- 0047_parts_arabic_details.sql — Phase E1: parts.specs_ar (Arabic spec rows, same shape as specs) + parts.details_ar_at (translate marker); description_ar already exists (RUN AFTER 0046; then Dashboard → Store → Sourcing overview → "Arabic descriptions and specs" → Translate; until then /ar product pages show headings + "not translated yet" and the step answers run_0047)
 - 0042_ai_credits.sql — (RUN ✔ 2026-10-02) AI access + credits: credits_ledger, projects.status/limit, rate limits, credit RPCs,
   profiles.email sync, ai_usage_log (RUN AFTER 0041; also turn ON "Confirm email" in Supabase Auth)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units

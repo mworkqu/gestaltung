@@ -7,6 +7,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { formatPrice, partName } from "@/lib/parts/format";
 import { productSpecs } from "@/lib/store/specs";
 import { hideProduct } from "./actions";
+import { StoreTranslate } from "@/components/admin/store-translate";
 import { cn } from "@/lib/utils";
 
 // Sourcing overview (owner, 2026-09-29): every product in plain groups —
@@ -182,6 +183,9 @@ export default async function SourcingOverviewPage({ params }: { params: Promise
           </div>
         ))}
       </section>
+
+      {/* Arabic names, descriptions and specs (Phase E1; admin-only AI step) */}
+      <StoreTranslate />
 
       {section(
         "restocked",

@@ -10,6 +10,8 @@ import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { ArrivalBadge } from "@/components/parts/arrival-badge";
 import { AddToCartButton } from "@/components/parts/add-to-cart-button";
 import { RequestItemButton } from "@/components/parts/request-item-button";
+import { IsolatedTitle } from "@/components/ltr-isolate";
+import { truncateAtWord } from "@/lib/text/title";
 
 // Catalog grid card. Server component; the cart action lives in the client
 // AddToCartButton child. Image URLs are admin-pasted from arbitrary hosts, so a
@@ -34,6 +36,9 @@ export async function PartCard({
   const imageUrl = partImageUrl(part);
   const settings = shipping === undefined ? await loadShippingSettings() : shipping;
   const arrives = arrivesByDate(part.lead_time_class, settings);
+  // Arabic titles can be long; the card shows the first 80 characters (cut at a
+  // word) and keeps the full title in title/aria-label.
+  const shownName = locale === "ar" ? truncateAtWord(name) : name;
 
   return (
     <div className="neu flex flex-col overflow-hidden">
@@ -58,8 +63,10 @@ export async function PartCard({
         <Link
           href={`/store/${part.sku}`}
           className="line-clamp-2 text-sm font-semibold text-heading transition-colors hover:text-cobalt"
+          title={name}
+          aria-label={name}
         >
-          {name}
+          <IsolatedTitle text={shownName} locale={locale} />
         </Link>
 
         <div>

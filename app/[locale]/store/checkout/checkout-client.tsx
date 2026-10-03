@@ -25,6 +25,7 @@ import {
 } from "@/lib/store/delivery";
 import { shippingFor } from "@/lib/store/shipping";
 import { checkoutRpcError, validateCheckoutEmail } from "@/lib/store/checkout";
+import { IsolatedTitle } from "@/components/ltr-isolate";
 
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -274,6 +275,7 @@ export default function CheckoutClient() {
                 name="customer_phone"
                 required
                 inputMode="tel"
+                dir="ltr"
                 placeholder={t("phonePlaceholder")}
                 className={fieldClass}
               />
@@ -286,6 +288,7 @@ export default function CheckoutClient() {
                 id="customer_email"
                 name="customer_email"
                 type="email"
+                dir="ltr"
                 required={bankTransfer}
                 aria-invalid={emailError ? true : undefined}
                 aria-describedby={emailError ? "customer_email_error" : bankTransfer ? "customer_email_hint" : undefined}
@@ -440,7 +443,7 @@ export default function CheckoutClient() {
             {items.map((i) => (
               <li key={i.rowId ?? i.sku} className="flex justify-between gap-3 text-sm">
                 <span className="min-w-0 truncate text-body">
-                  {(locale === "ar" && i.nameAr ? i.nameAr : i.name)}
+                  <IsolatedTitle text={locale === "ar" && i.nameAr ? i.nameAr : i.name} locale={locale} />
                   <span className="text-mutedtext"> × {i.quantity}</span>
                   {toConfirm(i) ? (
                     <span className="block text-[11px] text-faint">{tD("dateTbc")}</span>

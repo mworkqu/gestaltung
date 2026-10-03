@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ChevronRight, ExternalLink, FileText } from "lucide-react";
@@ -8,7 +9,6 @@ import { createClient } from "@/lib/supabase/server";
 import {
   formatPrice,
   partName,
-  partDescription,
   partImageUrl,
 } from "@/lib/parts/format";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
@@ -24,28 +24,45 @@ import { AddToProjectButton } from "@/components/parts/add-to-project-button";
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
-import { productSpecs, tidyDescription } from "@/lib/store/specs";
+import { IsolatedTitle } from "@/components/ltr-isolate";
+import { productDetailsForLocale } from "@/lib/store/product-details";
+import { clipText, ogProductImage, pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-// Each product's own title and description (audit #56).
-export async function generateMetadata({ params }: { params: Promise<{ locale: string; sku: string }> }) {
+// Each product's own title and description (audit #56), plus the share card:
+// the product photo as og:image, price first in og:description. The Arabic
+// description comes only from description_ar (never raw English supplier text);
+// without it the localized fallback line is used.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; sku: string }>;
+}): Promise<Metadata> {
   const { locale, sku } = await params;
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("parts")
-    .select("name, name_ar, description, description_ar, category")
-    .eq("sku", sku)
-    .eq("is_published", true)
-    .maybeSingle();
+  // select("*"): specs_ar (0047) may not exist yet, so no named columns here.
+  const { data } = await supabase.from("parts").select("*").eq("sku", sku).eq("is_published", true).maybeSingle();
   if (!data) return {};
+  const part = data as Part & { specs?: unknown; specs_ar?: unknown };
   const t = await getTranslations({ locale, namespace: "Meta" });
-  const name = partName(data as Part, locale);
-  const desc = (partDescription(data as Part, locale) ?? "").replace(/\s+/g, " ").trim();
-  return {
+  const name = partName(part, locale);
+  const plain = productDetailsForLocale(part, locale).plainDescription;
+  const description = plain ? clipText(plain, 155) : t("productDescription", { name });
+  const price = formatPrice(Number(part.unit_price), locale);
+  return pageMetadata({
+    locale,
+    path: `/store/${encodeURIComponent(sku)}`,
     title: t("productTitle", { name }),
-    description: desc ? desc.slice(0, 155) : t("productDescription", { name }),
-  };
+    description,
+    ogDescription: clipText(`${price} · ${description}`, 200),
+    image: ogProductImage(partImageUrl(part)),
+    imageAlt: name,
+    other: {
+      "product:price:amount": Number(part.unit_price).toFixed(2),
+      "product:price:currency": "QAR",
+    },
+  });
 }
 
 export default async function PartDetailPage({
@@ -100,15 +117,25 @@ export default async function PartDetailPage({
     deliveryFrom !== null ? tDelivery("deliveryFrom", { min: qarAmount(deliveryFrom) }) : null;
 
   const name = partName(part, locale);
-  // Specs from the supplier's table or the description's own "Specifications"
-  // section, shown once as a table (owner, 2026-09-29).
-  const { text: rawDescription, specs: specRows } = productSpecs({
-    specs: (part as { specs?: unknown }).specs,
-    description: partDescription(part, locale),
-  });
-  // The title is the H1 only: lines repeating it are dropped. A "Links" list
-  // keeps only entries that carry a URL (rendered as links), else it goes.
-  const { text: description, links } = tidyDescription(rawDescription, [part.name, part.name_ar]);
+  // Description + spec table for this locale (lib/store/product-details.ts):
+  // /en = supplier text and table (title lines and dead "Links" dropped);
+  // /ar = only description_ar / specs_ar (0047) — never raw English. The row
+  // comes from select('*'), so before 0047 specs_ar is simply absent.
+  const {
+    description,
+    specs: specRows,
+    links,
+    untranslated,
+  } = productDetailsForLocale(part as Part & { specs?: unknown; specs_ar?: unknown }, locale);
+  // /ar without its Arabic yet: a short Arabic note + the English page.
+  const notTranslated = (
+    <p className="text-sm text-mutedtext">
+      {t("detailsNotTranslated")}{" "}
+      <Link href={`/store/${encodeURIComponent(part.sku)}`} locale="en" className="font-semibold text-cobalt hover:underline">
+        {t("viewInEnglish")}
+      </Link>
+    </p>
+  );
   const datasheet = (part as { datasheet_url?: string | null }).datasheet_url ?? null;
   const imageUrl = partImageUrl(part);
 
@@ -159,7 +186,7 @@ export default async function PartDetailPage({
               </div>
             )}
             <h1 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
-              {name}
+              <IsolatedTitle text={name} locale={locale} />
             </h1>
             <p className="text-2xl font-bold text-heading">
               {formatPrice(part.unit_price, locale)}
@@ -205,14 +232,18 @@ export default async function PartDetailPage({
           </div>
           <DemandBeacon kind="view" partId={part.id} />
 
-          {description && (
+          {(description || untranslated.description) && (
             <div className="space-y-2">
               <h2 className={mono("text-[10px] text-mutedtext")}>
                 {t("descriptionLabel")}
               </h2>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-body">
-                {description}
-              </p>
+              {description ? (
+                <p className="whitespace-pre-line text-sm leading-relaxed text-body">
+                  {description}
+                </p>
+              ) : (
+                notTranslated
+              )}
             </div>
           )}
 
@@ -237,7 +268,7 @@ export default async function PartDetailPage({
             </div>
           )}
 
-          {(specRows.length > 0 || datasheet) && (
+          {(specRows.length > 0 || datasheet || untranslated.specs) && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className={mono("text-[10px] text-mutedtext")}>{t("specsLabel")}</h2>
@@ -253,12 +284,13 @@ export default async function PartDetailPage({
                   </a>
                 )}
               </div>
+              {specRows.length === 0 && untranslated.specs && !untranslated.description && notTranslated}
               {specRows.length > 0 && (
                 <div className="neu overflow-hidden">
                   <table className="w-full text-sm">
                     <tbody className="divide-y divide-borderstrong/40">
-                      {specRows.map((r) => (
-                        <tr key={r.name}>
+                      {specRows.map((r, i) => (
+                        <tr key={`${i}-${r.name}`}>
                           <th scope="row" className="w-2/5 px-4 py-2 text-start text-[12.5px] font-medium text-mutedtext">
                             {r.name}
                           </th>

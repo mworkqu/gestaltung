@@ -12,6 +12,7 @@ import type { CartItem } from "@/lib/supabase/types";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
 import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
+import { IsolatedTitle } from "@/components/ltr-isolate";
 import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
@@ -120,7 +121,7 @@ export default function CartPage() {
                   {lines.map((i) => (
                     <li key={i.rowId} className="flex items-center justify-between gap-3 py-1.5">
                       <span className="min-w-0 truncate text-heading">
-                        {nameOf(i)} <LeadTimeBadge leadClass={i.leadTimeClass} />
+                        <IsolatedTitle text={nameOf(i)} locale={locale} /> <LeadTimeBadge leadClass={i.leadTimeClass} />
                         {toConfirm(i) && <span className="ms-1 text-[10.5px] text-mutedtext">{tD("dateTbc")}</span>}
                       </span>
                       <span className="shrink-0 tabular-nums text-mutedtext">
@@ -153,8 +154,9 @@ export default function CartPage() {
                   <Link
                     href={`/store/${item.sku}`}
                     className="line-clamp-1 text-sm font-semibold text-heading hover:text-cobalt"
+                    title={name}
                   >
-                    {name}
+                    <IsolatedTitle text={name} locale={locale} />
                   </Link>
                   <p className="flex flex-wrap items-center gap-2 text-[11px] text-mutedtext">
                     <LeadTimeBadge leadClass={item.leadTimeClass} />

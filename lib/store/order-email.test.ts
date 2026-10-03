@@ -106,3 +106,57 @@ describe("paymentBlock", async () => {
     expect(paymentBlock({ ...o, payment_method: null }, "en")).toBe("");
   });
 });
+
+describe("confirmationEmail Arabic half", () => {
+  const items = [
+    { part_name: "ESP32-S3 DevKit", part_name_ar: "لوحة ESP32-S3 للتطوير", quantity: 2, unit_price_qar: 30, lead_time_class: "in_stock" },
+  ];
+  const html = confirmationEmail({ ...base, promised_date: "2026-10-05", split_shipments: true, early_promised_date: "2026-10-03", payment_method: "bank_transfer", total_qar: 112 }, items).html;
+  const ar = html.slice(html.indexOf('<div dir="rtl">'));
+
+  it("shows amounts in Arabic currency, isolated, with no QAR in the Arabic half", () => {
+    expect(ar).toContain('<bdi dir="rtl">60.00 ر.ق</bdi>');
+    expect(ar).toContain('<bdi dir="rtl">112.00 ر.ق</bdi>');
+    expect(ar).not.toContain("QAR");
+  });
+
+  it("uses the Arabic product name with its Latin part number isolated", () => {
+    expect(ar).toContain('لوحة <bdi dir="ltr">ESP32-S3</bdi> للتطوير');
+  });
+
+  it("names the bank in Arabic and mentions the split shipments", () => {
+    expect(ar).toContain("مصرف قطر الإسلامي الدولي");
+    expect(ar).not.toContain("Qatar International Islamic Bank");
+    expect(ar).toContain("× شحنتين");
+  });
+
+  it("keeps the English half in English (name, QAR)", () => {
+    const en = html.slice(0, html.indexOf('<div dir="rtl">'));
+    expect(en).toContain("ESP32-S3 DevKit");
+    expect(en).toContain("QAR 60.00");
+    expect(en).toContain("× 2 shipments");
+  });
+
+  it("falls back to the English name when there is no Arabic one", () => {
+    const m = confirmationEmail(base, [{ part_name: "Relay", quantity: 1, unit_price_qar: 10, lead_time_class: "in_stock" }]);
+    expect(m.html).toContain('<bdi dir="ltr">Relay</bdi>');
+  });
+
+  it("leads with the Arabic half and subject for an Arabic checkout", () => {
+    const m = confirmationEmail({ ...base, promised_date: "2026-10-05" }, items, "ar");
+    expect(m.html.indexOf('<div dir="rtl">')).toBeLessThan(m.html.indexOf("Thanks for your order"));
+    expect(m.subject.startsWith("طلبك 12345678")).toBe(true);
+    expect(confirmationEmail({ ...base, promised_date: "2026-10-05" }, items).subject.startsWith("Order 12345678")).toBe(true);
+  });
+
+  it("the Arabic payment block uses Arabic amounts and an isolated reference", () => {
+    const block = paymentBlockAr();
+    expect(block).toContain('<bdi dir="rtl">125.50 ر.ق</bdi>');
+    expect(block).toContain('<b dir="ltr">abcdef12</b>');
+    expect(block).toContain("IBAN");
+  });
+});
+
+import { paymentBlock as paymentBlockImport } from "./order-email";
+const paymentBlockAr = () =>
+  paymentBlockImport({ id: "abcdef12-0000-0000-0000-000000000000", total_qar: 125.5, payment_method: "bank_transfer" }, "ar");

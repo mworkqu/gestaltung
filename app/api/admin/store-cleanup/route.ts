@@ -6,6 +6,20 @@ import { optionsNote } from "@/lib/sourcing/voltaat-catalogue";
 import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini-client";
 import { digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
+import { ProviderError } from "@/lib/prototyping/providers/types";
+import {
+  DETAILS_SCHEMA,
+  DETAILS_SYSTEM_PROMPT,
+  detailsPrompt,
+  detailsUpdate,
+  hasWork,
+  parseDetailsTranslation,
+  takeBatch,
+  translationSource,
+  type DetailsPart,
+  type DetailsResult,
+  type DetailsSource,
+} from "@/lib/store/translate-details";
 
 // Store clean-up (owner, 2026-09-29). super_admin only. POST { step }:
 //  - "dedupe": the Voltaat import made one product per option (CW / CCW
@@ -17,6 +31,7 @@ import { fetchImage, storeImage } from "@/lib/store/store-image";
 //    products borrow the same part's photo from DigiKey (one lookup each, once).
 //  - "translate": Arabic names for published products that have none, via
 //    Gemini in batches. Call again until `remaining` is 0.
+//  - "translate_details": Arabic description + spec table (0047); see below.
 // A product an order or project still points at can't be deleted; it is
 // unpublished (and merged into the kept product) instead.
 
@@ -182,14 +197,155 @@ async function translate(db: Db) {
   return { translated, batches, remaining: count ?? null };
 }
 
+// ── "translate_details" (Phase E1, 2026-10-03) ───────────────────────────────
+// Arabic description + spec table for every published product, into
+// parts.description_ar / specs_ar, marked done with details_ar_at (0047).
+// One sweep in sku order: each call handles the next products after `after`
+// for up to ~110 s (a batch = ≤ 6 products / 9,000 characters per Gemini call,
+// 55 s timeout; worst case with the client's retries stays under the 300 s
+// limit) and returns {done, remaining, processed, cursor}; the admin page
+// calls again with `after: cursor` until done. A product whose answer fails
+// is skipped (not marked), so the next sweep retries it. Without `force`,
+// already-translated products (details_ar_at set) and filled halves are never
+// sent again. Admin-only, never automatic. Same free-tier model as "translate".
+
+const DETAILS_COLS = "id, sku, name, name_ar, description, description_ar, specs, specs_ar, details_ar_at";
+const DETAILS_BUDGET_MS = 110_000;
+const DETAILS_FETCH = 30;
+
+type DetailsRow = DetailsPart & { details_ar_at: string | null };
+
+async function callDetails(sources: DetailsSource[]): Promise<DetailsResult[]> {
+  const res = await callGemini({
+    system: DETAILS_SYSTEM_PROMPT,
+    prompt: detailsPrompt(sources),
+    schema: DETAILS_SCHEMA,
+    temperature: 0.1,
+    timeoutMs: 55_000,
+  });
+  return parseDetailsTranslation(res.raw, sources);
+}
+
+async function translateDetails(db: Db, force: boolean, after: string | null) {
+  if (!geminiConfigured()) return { error: "gemini_not_configured" };
+  const started = Date.now();
+  let cursor = after;
+  let processed = 0;
+  let translated = 0;
+  let done = false;
+  const failed: string[] = [];
+  let stopError: string | null = null;
+
+  const query = (cols: string, head = false) => {
+    let q = db
+      .from("parts")
+      .select(cols, head ? { count: "exact", head: true } : undefined)
+      .eq("is_published", true)
+      .is("merged_into", null);
+    if (!force) q = q.is("details_ar_at", null);
+    if (cursor) q = q.gt("sku", cursor);
+    return q;
+  };
+
+  while (Date.now() - started < DETAILS_BUDGET_MS) {
+    const { data, error } = await query(DETAILS_COLS).order("sku").limit(DETAILS_FETCH);
+    if (error) {
+      // 42703 = column does not exist → 0047 not run yet.
+      if (error.code === "42703" || /specs_ar|details_ar_at/.test(error.message)) return { error: "run_0047" };
+      return { error: error.message };
+    }
+    const rows = (data ?? []) as unknown as DetailsRow[];
+    if (!rows.length) {
+      done = true;
+      break;
+    }
+    const sources = rows.map((r) => translationSource(r, force));
+    const n = takeBatch(sources);
+    const batchRows = rows.slice(0, n);
+    const batch = sources.slice(0, n);
+    const work = batch.map((s, i) => ({ s, i })).filter((x) => hasWork(x.s));
+
+    let results: DetailsResult[] = batch.map(() => ({ ok: true, description_ar: null, specs_ar: null }));
+    if (work.length) {
+      try {
+        const got = await callDetails(work.map((x) => x.s));
+        work.forEach((x, k) => (results[x.i] = got[k]));
+      } catch (e) {
+        if (e instanceof ProviderError && e.reason === "rate_limited") {
+          stopError = "rate_limited";
+          break;
+        }
+        // The whole call failed: try each product alone so one bad product
+        // cannot sink its batch (as long as time allows).
+        results = batch.map(() => ({ ok: false, reason: "call_failed" }) as DetailsResult);
+        if (work.length > 1) {
+          for (const x of work) {
+            if (Date.now() - started > DETAILS_BUDGET_MS) break;
+            try {
+              results[x.i] = (await callDetails([x.s]))[0];
+            } catch (one) {
+              if (one instanceof ProviderError && one.reason === "rate_limited") {
+                stopError = "rate_limited";
+                break;
+              }
+            }
+          }
+        }
+        for (const [i, s] of batch.entries()) if (!hasWork(s)) results[i] = { ok: true, description_ar: null, specs_ar: null };
+      }
+    }
+
+    const now = new Date().toISOString();
+    for (const [i, row] of batchRows.entries()) {
+      const update = detailsUpdate(batch[i], results[i], now);
+      if (!update) {
+        failed.push(row.sku);
+        continue;
+      }
+      const { error: upErr } = await db.from("parts").update(update).eq("id", row.id);
+      if (upErr) failed.push(row.sku);
+      else if (hasWork(batch[i])) translated++;
+    }
+    processed += batchRows.length;
+    cursor = batchRows[batchRows.length - 1].sku;
+    if (stopError) break;
+  }
+
+  const { count: remaining } = await query("id", true);
+  // Everything still without Arabic details (also before the cursor: the
+  // products that failed in this sweep).
+  const { count: untranslated } = await db
+    .from("parts")
+    .select("id", { count: "exact", head: true })
+    .eq("is_published", true)
+    .is("merged_into", null)
+    .is("details_ar_at", null);
+  return {
+    done: done || (!stopError && remaining === 0),
+    processed,
+    translated,
+    failed: failed.length,
+    failedSkus: failed.slice(0, 20),
+    remaining: remaining ?? null,
+    untranslated: untranslated ?? null,
+    cursor,
+    ...(stopError ? { error: stopError } : {}),
+  };
+}
+
 export async function POST(request: Request) {
   const session = await getSessionContext();
   if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
-  const { step } = (await request.json().catch(() => ({}))) as { step?: string };
+  const body = (await request.json().catch(() => ({}))) as { step?: string; force?: unknown; after?: unknown };
+  const { step } = body;
   const db = await createClient();
   if (step === "dedupe") return Response.json(await dedupe(db));
   if (step === "placeholders") return Response.json(await placeholders(db));
   if (step === "photos") return Response.json(await photos(db));
   if (step === "translate") return Response.json(await translate(db));
+  if (step === "translate_details") {
+    const after = typeof body.after === "string" && body.after.length <= 200 ? body.after : null;
+    return Response.json(await translateDetails(db, body.force === true, after));
+  }
   return Response.json({ error: "unknown_step" }, { status: 400 });
 }
