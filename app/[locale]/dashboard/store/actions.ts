@@ -10,6 +10,7 @@ import { STOCK_STATUSES } from "@/lib/parts/constants";
 import { isDuplicateProductError } from "@/lib/parts/part-key";
 import { parseSheet, type ExistingPart, type SkippedRow } from "@/lib/parts/sheet-import";
 import type { StockStatus } from "@/lib/supabase/types";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 export type PartFormState = { error?: string };
 
@@ -110,6 +111,7 @@ export async function createPart(
     return { error: t("error_unknown") };
   }
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   redirect(`/${locale}/dashboard/store`);
 }
@@ -139,6 +141,7 @@ export async function updatePart(
     return { error: t("error_unknown") };
   }
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   redirect(`/${locale}/dashboard/store`);
 }
@@ -168,6 +171,7 @@ export async function deletePart(formData: FormData): Promise<PartFormState> {
     return { error: t("error_unknown") };
   }
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   return {};
 }
@@ -266,6 +270,7 @@ export async function importPartsFromSheet(
     return { error: "db" };
   }
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/store`);
   return {
@@ -364,6 +369,7 @@ export async function togglePublished(formData: FormData): Promise<PartFormState
   const { error } = await supabase.from("parts").update({ is_published: next }).eq("id", id);
   if (error) return { error: t("error_unknown") };
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   return {};
 }

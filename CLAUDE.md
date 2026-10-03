@@ -130,8 +130,9 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     Storage (lib/supabase/client) under <tenant_id>/<uuid>/<file> — keeps big CAD files off the Vercel
     server-action 4.5MB body limit; DB rows written via server action createJob (jobs/actions.ts, RLS server-side,
     no service-role). Jobs link added to dashboard nav. lib/jobs/constants.ts (methods, exts, 50MB, bucket).
-  - GA4 (global): @next/third-parties <GoogleAnalytics> in app/[locale]/layout.tsx, gated on
-    NEXT_PUBLIC_GA_MEASUREMENT_ID (value G-QXVQ4H05Y7; in .env.local). ADD it in Vercel (Prod/Preview/Dev).
+  - GA4 (global): loaded by components/cookie-notice.tsx only after the visitor presses Accept (decision D7,
+    Phase G; @next/third-parties was removed), gated on NEXT_PUBLIC_GA_MEASUREMENT_ID (value G-QXVQ4H05Y7;
+    in .env.local). ADD it in Vercel (Prod/Preview/Dev).
 - Stage 6b (workshop dispatch + status workflow): DONE (code) — needs migration 0006 run in Supabase.
   - supabase/migrations/0006_job_workflow.sql: canonical status set submitted→quoted→in_production→ready→delivered
     (+cancelled) [replaces 6a set]. jobs RLS now also lets the assigned workshop SELECT/UPDATE its rows; storage
@@ -984,6 +985,13 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 - SITE REVIEW FIXES, PHASE E (2026-10-03, migration 0047 — NOT RUN YET): Arabic. translate_details step (lib/store/translate-details.ts) fills description_ar/specs_ar; productDetailsForLocale() decides what /ar shows (never raw English supplier text); IsolatedTitle for mixed-direction titles; arabicCountForm() for counts; sensor = مستشعر, kits = مجموعات. content/legal/** is the owner's verbatim text and is excluded from wording changes.
 
 - SITE REVIEW FIXES, PHASE F (2026-10-03): mobile. Filters drawer (components/ui/sheet.tsx, native dialog, no Radix), back-to-top, tap-target utilities in tailwind.config.ts, Button min 44 px below md, square image boxes, /design reordered on phones. Not audited at 375 px: checkout, /design/quote, prototyping workspace, dashboard.
+
+- SITE REVIEW FIXES, PHASE G (2026-10-03, no migration): performance; log + before/after in CHANGELOG-audit.md.
+  - Caching: home, /store and /store/[sku] are ISR (`revalidate = 300`, products built on first visit); marketing, legal, /design, /design/quote, cart shell and checkout success are static. Public reads go through lib/store/public-catalog.ts (cookie-free anon client + `unstable_cache`, tags `parts` / `store-settings`, lib/cache/storefront.ts). Any write to parts / supplier_offers / suppliers / store_settings must call `revalidateStorefront()` (already in every dashboard/store action, the admin store API routes and the voltaat-sync / supplier-refresh crons). Never add cookies()/headers()/force-dynamic/the cookie server client to these pages, and call setRequestLocale in every page/layout. Private areas stay dynamic.
+  - /store?q|category|material|stock|sort|page is rewritten (next.config.mjs, list = STORE_URL_PARAMS in lib/store/catalog.ts, test-checked) to the dynamic app/[locale]/store/search; plain /store stays cached. Middleware skips Supabase when there is no sb-…-auth-token cookie and never sets NEXT_LOCALE on locale-prefixed pages.
+  - Messages: the locale layout sends only BASE_MESSAGES (site chrome); pages/layouts wrap their output in <MessagesScope scope="…"> (components/i18n/messages-scope.tsx, scopes in lib/i18n/scopes.ts; dashboard/inventory/my-inventory/prototyping use "all"). New client component with useTranslations("X") → add "X" to the scope of each route that renders it (or BASE for header/footer chrome); lib/i18n/scopes.test.ts fails if anything is missing.
+  - Photos: lib/store/image-url.ts sizedImage()/sizedSrcSet() (Shopify `?width=`: cards 300/600, product 600/1000, thumbs 140; our uploads → -thumb.webp); plain <img> with width/height, lazy except the first four cards. Low-res originals: scripts/find-low-res-photos.mjs.
+  - GA4 loads only after Accept in components/cookie-notice.tsx (lib/analytics/consent.ts); @next/third-parties removed. Fonts: Outfit + JetBrains Mono variable, IBM Plex Sans Arabic 400/700 only, only Outfit preloaded. Live `x-vercel-cache: HIT` still to be confirmed after deploy.
 
 ## Site review decisions (owner, 2026-10-03)
 

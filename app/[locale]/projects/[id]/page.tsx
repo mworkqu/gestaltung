@@ -4,6 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 
 import { createClient } from "@/lib/supabase/server";
 import { ProjectClaimGate } from "@/components/projects/project-claim-gate";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 // Tab title = the project's name (audit #23). Read with the request's own
 // session, scoped to the signed-in owner exactly like the workspace, so a
@@ -68,8 +69,10 @@ export default async function ProjectPage({
   setRequestLocale(locale);
 
   return (
+    <MessagesScope scope="project">
     <div className="container max-w-3xl py-8">
       <ProjectClaimGate projectId={id} />
     </div>
+    </MessagesScope>
   );
 }

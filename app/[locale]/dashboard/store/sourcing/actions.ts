@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { AVAILABILITIES, PRICING_MODES, type Availability, type PricingMode } from "@/lib/store/sourcing";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Suppliers, supplier offers and pricing modes (Task 16). super_admin only —
 // checked here and again by RLS. The derived product fields are recomputed by
@@ -16,6 +17,7 @@ async function requireAdmin() {
 }
 
 function revalidate(locale: string, partId?: string) {
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/dashboard/store/suppliers`);
   if (partId) revalidatePath(`/${locale}/dashboard/store/${partId}/edit`);

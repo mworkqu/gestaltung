@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession, isGuest } from "@/lib/supabase/guest";
+import { ensureSession, getCurrentUser, isGuest } from "@/lib/supabase/guest";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { isPlausibleEmail } from "@/lib/store/shipping";
 import { Button } from "@/components/ui/button";
@@ -39,13 +39,13 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
   const [needsPhone, setNeedsPhone] = useState(true);
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
-      if (!isGuest(data.user)) {
+    getCurrentUser().then(async (user) => {
+      if (!user) return;
+      if (!isGuest(user)) {
         setIsAccount(true);
         return setNeedsPhone(false);
       }
-      const { data: prof } = await supabase.from("profiles").select("phone").eq("id", data.user.id).maybeSingle();
+      const { data: prof } = await supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle();
       if (prof?.phone) setNeedsPhone(false);
     });
   }, []);

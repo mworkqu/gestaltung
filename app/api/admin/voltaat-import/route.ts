@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { partKey } from "@/lib/parts/part-key";
 import { BlockedError, handleFromUrl, robotsAllows, variantFromUrl, VoltaatClient } from "@/lib/sourcing/adapters/voltaat";
 import { buildImportRows } from "@/lib/sourcing/voltaat-catalogue";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Import Voltaat's catalogue into our store (owner decision 2026-09-28).
 // Reads the public catalogue once (robots.txt checked, 5 s between requests),
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
     else created += Math.min(200, offers.length - i);
   }
 
+  revalidateStorefront();
   return Response.json({
     requests: client.requests,
     products: raw.length,

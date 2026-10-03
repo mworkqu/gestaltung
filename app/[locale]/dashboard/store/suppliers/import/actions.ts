@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AVAILABILITIES, type Supplier } from "@/lib/store/sourcing";
 import type { ColumnMapping } from "@/lib/sourcing/adapters/csv";
 import type { SourcedOffer } from "@/lib/sourcing/types";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Supplier price-list import (Task 19a). The browser parses the CSV through
 // the column mapping; the server re-plans from those rows and the database,
@@ -260,6 +261,7 @@ export async function applyImport(
     .from("store_settings")
     .upsert({ key: `csv_mapping:${supplier.code}`, value: saved, updated_at: now });
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/dashboard/store/suppliers`);
   revalidatePath(`/${locale}/store`);

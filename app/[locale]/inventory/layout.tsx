@@ -8,6 +8,7 @@ import { guestRedirect } from "@/lib/auth/guest-redirect";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 // Inventory is now its own top-level, signed-in area (store-first Stage 4) —
 // unrelated to the store landing. Single auth gate + page container (previously
@@ -40,6 +41,7 @@ export default async function InventoryLayout({
   const isRtl = locale === "ar";
 
   return (
+    <MessagesScope scope="all">
     <div className="container py-10">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-borderstrong/60 pb-4">
         <h1
@@ -68,5 +70,6 @@ export default async function InventoryLayout({
       </div>
       <div className="pt-8">{children}</div>
     </div>
+    </MessagesScope>
   );
 }

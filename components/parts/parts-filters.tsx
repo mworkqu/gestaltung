@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 
-import { useRouter, usePathname } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Sheet } from "@/components/ui/sheet";
 import {
   activeFilterCount,
@@ -45,7 +45,9 @@ export function PartsFilters({
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
-  const pathname = usePathname();
+  // Always /store: filtered views are served by an internal rewrite to
+  // /store/search (next.config.mjs), which must never end up in the URL.
+  const pathname = "/store" as const;
   const [pending, startTransition] = useTransition();
   const [sheetOpen, setSheetOpen] = useState(false);
 

@@ -15,7 +15,7 @@ import {
 
 import { Link, useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession, isGuest } from "@/lib/supabase/guest";
+import { ensureSession, getCurrentUser, isGuest } from "@/lib/supabase/guest";
 import { formatPrice, partName } from "@/lib/parts/format";
 import {
   MAX_PROJECT_IMAGE_BYTES,
@@ -90,9 +90,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     setGuest(isGuest(user));
     if (user && isGuest(user)) {
       const { data: prof } = await supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle();

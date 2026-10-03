@@ -7,6 +7,7 @@
 import type { Metadata, MetadataRoute } from "next";
 
 import { routing } from "@/i18n/routing";
+import { sizedImage } from "@/lib/store/image-url";
 
 export const SITE_URL = "https://gestaltung360.com";
 export const SITE_NAME = "Gestaltung360";
@@ -66,10 +67,8 @@ export function ogProductImage(url: string | null | undefined): string | null {
     return null;
   }
   if (u.protocol !== "https:") return null;
-  if (u.hostname === "cdn.shopify.com" || u.hostname.endsWith(".shopify.com")) {
-    u.searchParams.set("width", String(OG_IMAGE_SIZE.width));
-  }
-  return u.toString();
+  // Same resizing rule as the storefront photos (lib/store/image-url.ts).
+  return sizedImage(u.toString(), OG_IMAGE_SIZE.width);
 }
 
 /** Collapse whitespace and cut to `max` characters (with an ellipsis). */

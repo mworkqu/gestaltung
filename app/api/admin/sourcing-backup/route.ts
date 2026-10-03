@@ -1,4 +1,5 @@
 import { getSessionContext } from "@/lib/auth/get-session";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { digikeyPart, digikeySearch } from "@/lib/sourcing/adapters/digikey";
@@ -225,8 +226,12 @@ export async function POST(request: Request) {
   const db = await createClient();
   const { error } = await db.from("parts").select("backup_for").limit(1);
   if (error) return Response.json({ error: "run_migration_0041" }, { status: 409 });
-  if (step === "backups") return Response.json(await backups(db, preview === true));
-  if (step === "clear") return Response.json(await clear(db));
-  if (step === "specs") return Response.json(await specs(db));
-  return Response.json({ error: "unknown_step" }, { status: 400 });
+  let result: unknown;
+  if (step === "backups") result = await backups(db, preview === true);
+  else if (step === "clear") result = await clear(db);
+  else if (step === "specs") result = await specs(db);
+  else return Response.json({ error: "unknown_step" }, { status: 400 });
+  // Backups and specs add / edit published products: refresh the cached storefront.
+  if (!(step === "backups" && preview === true)) revalidateStorefront();
+  return Response.json(result);
 }

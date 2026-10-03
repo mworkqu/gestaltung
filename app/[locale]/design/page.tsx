@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 // TODO(step 7): repoint the first card at /projects/new once it exists.
 // Design language matches the marketing site (how-it-works): neu bento +
 // blueprint panel + cobalt accents + ink CTA band.
-export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

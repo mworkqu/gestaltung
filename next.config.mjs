@@ -11,6 +11,22 @@ const nextConfig = {
   // root" warning. Vercel builds from a clean checkout and are unaffected.
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
 
+  // Phase G caching: /<locale>/store without query params is a static (ISR)
+  // page. With any listing param (lib/store/catalog.ts STORE_URL_PARAMS —
+  // keep the two lists in step; catalog.test.ts checks) the request is
+  // rewritten to the dynamic /store/search route, which renders the same
+  // listing. The browser URL stays /store?..., the query is passed through.
+  // beforeFiles runs after the middleware and before the page lookup.
+  async rewrites() {
+    return {
+      beforeFiles: ["q", "category", "material", "stock", "sort", "page"].map((key) => ({
+        source: "/:locale(en|ar)/store",
+        has: [{ type: "query", key }],
+        destination: "/:locale/store/search",
+      })),
+    };
+  },
+
   // Store-first Stage 2: the customer store moved /parts -> /store. Permanent
   // (308) redirects keep old links + bookmarks working, for both locales.
   async redirects() {

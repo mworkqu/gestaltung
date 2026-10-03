@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { NewProjectForm } from "@/components/projects/new-project-form";
 import { cn } from "@/lib/utils";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 export async function generateMetadata({
   params,
@@ -46,6 +47,7 @@ export default async function NewProjectPage({
   const explain = forDrawing ? ["explainWhy"] : ["explainNext", "explainFree", "explainWhy"];
 
   return (
+    <MessagesScope scope="projects">
     <div className="container max-w-xl space-y-6 py-12">
       <header className="space-y-2">
         <div className="flex items-center justify-between gap-3">
@@ -75,5 +77,6 @@ export default async function NewProjectPage({
 
       <NewProjectForm forDrawing={forDrawing} />
     </div>
+    </MessagesScope>
   );
 }

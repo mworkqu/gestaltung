@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ProjectList } from "@/components/projects/project-list";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 export async function generateMetadata({
   params,
@@ -44,6 +45,7 @@ export default async function ProjectsPage({
   const hasAccount = !!user && user.is_anonymous !== true;
 
   return (
+    <MessagesScope scope="projects">
     <div className="container space-y-8 py-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
@@ -65,5 +67,6 @@ export default async function ProjectsPage({
 
       <ProjectList />
     </div>
+    </MessagesScope>
   );
 }

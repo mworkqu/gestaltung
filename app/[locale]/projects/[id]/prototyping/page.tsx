@@ -3,6 +3,7 @@ import { pageMetadata } from "@/lib/seo";
 
 import { PrototypingWorkspace } from "@/components/prototyping/workspace";
 import { providerStatus } from "@/lib/prototyping/providers";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 export async function generateMetadata({
   params,
@@ -34,8 +35,10 @@ export default async function PrototypingPage({
   const { destination } = await providerStatus();
 
   return (
+    <MessagesScope scope="all">
     <div className="mx-auto w-full max-w-[1760px] px-4 py-4 sm:px-6">
       <PrototypingWorkspace projectId={id} briefDestination={destination} />
     </div>
+    </MessagesScope>
   );
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/parts/cart-provider";
 import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { formatPrice } from "@/lib/parts/format";
+import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import type { CartItem } from "@/lib/supabase/types";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
@@ -144,7 +145,15 @@ export default function CartPage() {
                 >
                   {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt={name} className="h-full w-full object-contain" />
+                    <img
+                      src={sizedImage(item.imageUrl, IMAGE_WIDTHS.thumb)!}
+                      width={64}
+                      height={64}
+                      alt={name}
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-contain"
+                    />
                   ) : (
                     <GearPlaceholder className="h-full w-full" />
                   )}

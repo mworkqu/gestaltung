@@ -53,7 +53,7 @@ import { PhoneInput } from "@/components/phone-input";
 import { Tag } from "@/components/ui/tag";
 import { Card, PrimaryButton, SoftButton, selectClass } from "@/components/prototyping/ui";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession } from "@/lib/supabase/guest";
+import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
 import {
   bomCost,
@@ -71,6 +71,7 @@ import { packLineCount, weakSuggestion } from "@/lib/prototyping/bom-match";
 import { fulfilledLabel, fulfilledOrderIds } from "@/lib/prototyping/fulfilled";
 import type { BomGroup } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
+import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 
 /**
  * ONE money figure — to buy now — and, on its own line, the counts: not
@@ -265,7 +266,7 @@ function useIsSuperAdmin(): boolean {
   useEffect(() => {
     let cancelled = false;
     const supabase = createClient();
-    void supabase.auth.getUser().then(async ({ data: { user } }) => {
+    void getCurrentUser().then(async (user) => {
       if (!user || cancelled) return;
       const { data, error } = await supabase
         .from("profiles")
@@ -691,7 +692,7 @@ function Row({
                 // Store product photo, big enough to see what you're buying (owner, 2026-09-29).
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={img}
+                  src={sizedImage(img, IMAGE_WIDTHS.thumb)!}
                   alt={partName(p, locale)}
                   loading="lazy"
                   className="h-16 w-16 shrink-0 rounded-lg bg-white object-contain shadow-neu-sm"
@@ -727,7 +728,7 @@ function Row({
                           >
                             {partImageUrl(c) && (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={partImageUrl(c)!} alt="" loading="lazy" className="h-7 w-7 rounded bg-white object-contain" />
+                              <img src={sizedImage(partImageUrl(c), IMAGE_WIDTHS.thumb)!} alt="" loading="lazy" className="h-7 w-7 rounded bg-white object-contain" />
                             )}
                             {shortModel(partName(c, locale))} ({formatPrice(Number(c.unit_price), locale)})
                           </button>

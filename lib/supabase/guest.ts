@@ -2,6 +2,7 @@
 
 import type { User } from "@supabase/supabase-js";
 
+import { shareInflight } from "@/lib/dedupe";
 import { createClient } from "@/lib/supabase/client";
 
 // ── Guest sessions ──────────────────────────────────────────────────────────
@@ -40,11 +41,19 @@ export function isGuest(user: User | null | undefined): boolean {
   return user?.is_anonymous === true;
 }
 
-/** The current user without creating one. Null for a first-time visitor. */
-export async function getCurrentUser(): Promise<User | null> {
-  const supabase = createClient();
+/**
+ * The current user without creating one. Null for a first-time visitor.
+ *
+ * Reads the session the browser already holds (cookie), so a visitor with no
+ * session costs no request and a signed-in one costs none either (the access
+ * token is only refreshed when it is about to expire). Concurrent callers share
+ * one read. Row-level security checks the token on every query, so nothing here
+ * grants access; it only tells the UI who is asking. Use auth.getUser() where a
+ * server-verified identity matters (account upgrade, sign-up).
+ */
+export const getCurrentUser: () => Promise<User | null> = shareInflight(async () => {
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user ?? null;
-}
+    data: { session },
+  } = await createClient().auth.getSession();
+  return session?.user ?? null;
+});

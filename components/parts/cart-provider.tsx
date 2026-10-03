@@ -12,7 +12,7 @@ import {
 import type { CartItem, Part } from "@/lib/supabase/types";
 import { cartItemCount, cartTotal, getCart, saveCart, toCartItem } from "@/lib/parts/cart";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession } from "@/lib/supabase/guest";
+import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { trackDemand } from "@/lib/store/demand-client";
 
 // ── The cart ────────────────────────────────────────────────────────────────
@@ -89,9 +89,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const reload = useCallback(async () => {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
 
     if (!user) {
       setItems([]);
@@ -301,9 +299,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(async () => {
     const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (user) {
       const { error: e } = await supabase.from("cart_items").delete().eq("user_id", user.id);
       if (e) return failed("clear", e);

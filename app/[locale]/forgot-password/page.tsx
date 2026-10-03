@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { pageMetadata } from "@/lib/seo";
 
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 export async function generateMetadata({
   params,
@@ -24,5 +25,9 @@ export default async function ForgotPasswordPage({
   setRequestLocale(locale);
   const { expired } = await searchParams;
 
-  return <ForgotPasswordForm expired={expired === "1"} />;
+  return (
+    <MessagesScope scope="auth">
+      <ForgotPasswordForm expired={expired === "1"} />
+    </MessagesScope>
+  );
 }

@@ -6,6 +6,7 @@ import { CreditsOverview } from "@/components/credits/credits-overview";
 import { CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
 import { metaFor } from "@/lib/meta";
 import { cn } from "@/lib/utils";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 // "Get credits": how AI credits work and how to get more. No online payment
 // yet — credits come with store orders, or a WhatsApp/bank top-up the owner
@@ -28,6 +29,7 @@ export default async function CreditsPage({ params }: { params: Promise<{ locale
   const rules = [t("rule1"), t("rule2", { qar: CREDIT_QAR }), t("rule3", { qar: CREDIT_QAR, days: REDEEM_DAYS }), t("rule4")];
 
   return (
+    <MessagesScope scope="credits">
     <div className="container max-w-4xl space-y-8 py-8">
       <header className="space-y-2">
         <p className={mono("text-[10px] text-azure")}>{t("pageKicker")}</p>
@@ -75,5 +77,6 @@ export default async function CreditsPage({ params }: { params: Promise<{ locale
         </ul>
       </section>
     </div>
+    </MessagesScope>
   );
 }

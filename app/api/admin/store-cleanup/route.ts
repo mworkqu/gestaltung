@@ -1,4 +1,5 @@
 import { getSessionContext } from "@/lib/auth/get-session";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { handleFromUrl } from "@/lib/sourcing/adapters/voltaat";
@@ -339,13 +340,16 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { step?: string; force?: unknown; after?: unknown };
   const { step } = body;
   const db = await createClient();
-  if (step === "dedupe") return Response.json(await dedupe(db));
-  if (step === "placeholders") return Response.json(await placeholders(db));
-  if (step === "photos") return Response.json(await photos(db));
-  if (step === "translate") return Response.json(await translate(db));
-  if (step === "translate_details") {
+  let result: unknown;
+  if (step === "dedupe") result = await dedupe(db);
+  else if (step === "placeholders") result = await placeholders(db);
+  else if (step === "photos") result = await photos(db);
+  else if (step === "translate") result = await translate(db);
+  else if (step === "translate_details") {
     const after = typeof body.after === "string" && body.after.length <= 200 ? body.after : null;
-    return Response.json(await translateDetails(db, body.force === true, after));
-  }
-  return Response.json({ error: "unknown_step" }, { status: 400 });
+    result = await translateDetails(db, body.force === true, after);
+  } else return Response.json({ error: "unknown_step" }, { status: 400 });
+  // Every step edits published products: refresh the cached storefront.
+  revalidateStorefront();
+  return Response.json(result);
 }

@@ -94,6 +94,14 @@ export type StoreState = {
 
 export type RawSearchParams = Record<string, string | string[] | undefined>;
 
+/**
+ * The query params that change the listing. /store without any of them is the
+ * static (ISR) default listing; with one of them next.config.mjs rewrites the
+ * request to the dynamic /store/search route (same page, same URL in the
+ * browser). Keep in step with the `rewrites()` there (catalog.test.ts checks).
+ */
+export const STORE_URL_PARAMS = ["q", "category", "material", "stock", "sort", "page"] as const;
+
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const MAX_QUERY = 100;
 

@@ -3,12 +3,12 @@ import { pageMetadata } from "@/lib/seo";
 
 import { cn } from "@/lib/utils";
 import { QuoteRequest } from "@/components/design/quote-request";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 // Public quote-request page. The homepage dropzone hands off a CAD file here;
 // this page collects the visitor's email/phone + preferred method and submits a
 // lead (no sign-in). Since the jobs pipeline was retired this is the only
 // CAD intake path: the file is stored and quoted manually.
-export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -34,6 +34,7 @@ export default async function DesignQuotePage({
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   return (
+    <MessagesScope scope="designQuote">
     <div className="container py-10">
       <div className="mx-auto max-w-2xl">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
@@ -51,5 +52,6 @@ export default async function DesignQuotePage({
         <QuoteRequest />
       </div>
     </div>
+    </MessagesScope>
   );
 }

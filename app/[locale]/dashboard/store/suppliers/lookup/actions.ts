@@ -10,6 +10,7 @@ import { fillMissing, parametersToAttributes } from "@/lib/sourcing/spec-map";
 import type { SupplierProduct } from "@/lib/sourcing/types";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
 import type { Attributes } from "@/lib/store/attributes";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Mouser + DigiKey lookups (Task 19b). Catalogue content (name, description,
 // photo, specifications) comes from the supplier's official API and is used
@@ -152,6 +153,7 @@ export async function addFromSupplier(
     if (JSON.stringify(merged) !== JSON.stringify(part.attributes)) {
       await supabase.from("parts").update({ attributes: merged }).eq("id", part.id);
     }
+    revalidateStorefront();
     revalidatePath(`/${locale}/dashboard/store`);
     return { ok: true, partId: part.id, partSku: part.sku, imageSaved: false };
   }
@@ -204,6 +206,7 @@ export async function addFromSupplier(
     }
   }
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/store`);
   return { ok: true, partId: part.id, partSku: part.sku, imageSaved };
@@ -251,6 +254,7 @@ export async function refreshApiOffer(locale: string, offerId: string): Promise<
     changed.push("attributes");
   }
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store/${row.part_id}/edit`);
   revalidatePath(`/${locale}/dashboard/store`);
   return { ok: true, changed };

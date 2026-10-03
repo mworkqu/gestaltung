@@ -12,6 +12,7 @@ import {
   VOLTAAT_IN_STOCK_DAYS,
   VoltaatClient,
 } from "@/lib/sourcing/adapters/voltaat";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Voltaat sync admin (Task 19g): the one-click switch, and mapping one of our
 // products to one Voltaat product (explicit — unmapped products are never
@@ -30,6 +31,7 @@ export async function setVoltaatSync(locale: string, enabled: boolean) {
     .from("store_settings")
     .upsert({ key: "voltaat_sync", value: { enabled }, updated_at: new Date().toISOString() });
   if (error) return { error: error.message };
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store/suppliers/voltaat`);
   return { ok: true };
 }
@@ -89,6 +91,7 @@ export async function mapVoltaatProduct(locale: string, ourSku: string, url: str
   // Voltaat products are sold at Voltaat's price; the trigger sets ours from the offer.
   await supabase.from("parts").update({ pricing_mode: "mirror" }).eq("id", part.id);
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store/suppliers/voltaat`);
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/store`);

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/components/auth/auth-provider";
 import { hasAccount } from "@/lib/auth/guest-redirect";
 import { cn } from "@/lib/utils";
 
@@ -14,16 +13,8 @@ import { cn } from "@/lib/utils";
 // anonymous case); it swaps to Dashboard after the session resolves.
 export function HeaderAuthLink({ isRtl }: { isRtl: boolean }) {
   const t = useTranslations("Nav");
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setSignedIn(hasAccount(data.user)));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
-      setSignedIn(hasAccount(session?.user))
-    );
-    return () => sub.subscription.unsubscribe();
-  }, []);
+  const { user } = useAuth();
+  const signedIn = hasAccount(user);
 
   const href = signedIn ? "/dashboard" : "/sign-in";
   const label = signedIn ? t("dashboard") : t("signIn");

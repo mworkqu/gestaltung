@@ -5,6 +5,7 @@ import { ContactForm } from "@/components/contact-form";
 import { COMPANY, COMPANY_ADDRESS, COMPANY_PHONE, COMPANY_WHATSAPP } from "@/lib/company";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 export const generateMetadata = metaFor("contact");
 
@@ -35,6 +36,7 @@ export default async function ContactPage({
 
 
   return (
+    <MessagesScope scope="contact">
     <div className="container space-y-6 py-6">
       {/* Header */}
       <section className="animate-fade-up flex flex-col gap-5 px-1">
@@ -149,5 +151,6 @@ export default async function ContactPage({
         </div>
       </section>
     </div>
+    </MessagesScope>
   );
 }

@@ -3,6 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { shouldRedirectEmptyCart } from "@/lib/store/checkout";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 import CheckoutClient from "./checkout-client";
 
 // Checkout with an empty cart goes to the cart, decided on the server so the
@@ -41,5 +42,9 @@ export default async function CheckoutPage({ params }: { params: Promise<{ local
     redirect({ href: "/store/cart", locale });
   }
 
-  return <CheckoutClient />;
+  return (
+    <MessagesScope scope="checkout">
+      <CheckoutClient />
+    </MessagesScope>
+  );
 }

@@ -2,20 +2,20 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { pageMetadata } from "@/lib/seo";
 import { ArrowRight, Lightbulb, Plus, Search, ShoppingBag, UploadCloud } from "lucide-react";
 import { categoryLabel } from "@/lib/store/category-label";
-import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
-import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
-import { isListed, listedCategories } from "@/lib/store/categories";
+import { MessagesScope } from "@/components/i18n/messages-scope";
+import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
 
-// Featured products reflect admin publish toggles immediately.
-export const dynamic = "force-dynamic";
+// ISR (Phase G): static per locale, re-rendered at most every 5 minutes, or at
+// once when an admin edit calls revalidateStorefront() (tag "parts"). Nothing
+// per-visitor is rendered here (auth, cart and credits are client components).
+export const revalidate = 300;
 
 // Store-first metadata (overrides the sitewide default, which mentions the
 // inventory platform — never surfaced on the store landing).
@@ -44,40 +44,13 @@ export default async function Home({
 
   // Featured: in-stock products with a photo, one per category so the row
   // shows the range (owner, 2026-09-29: newest-first showed only photo-less parts).
-  // Degrade to the empty state if Supabase env is absent (fresh local checkout).
-  let products: Part[] = [];
-  let categories: string[] = [];
-  if (
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
-    const supabase = await createClient();
-    const { data } = await supabase
-      .from("parts")
-      .select("*")
-      .eq("is_published", true)
-      .eq("lead_time_class", "in_stock")
-      .not("image_url", "is", null)
-      .order("updated_at", { ascending: false })
-      .limit(200);
-    const pool = ((data ?? []) as Part[]).filter(isListed);
-    const byCategory = new Map<string, Part>();
-    for (const p of pool) if (!byCategory.has(p.category ?? "")) byCategory.set(p.category ?? "", p);
-    products = [...byCategory.values(), ...pool.filter((p) => !byCategory.has(p.category ?? "") || byCategory.get(p.category ?? "") !== p)].slice(0, 8);
-
-    // Every category with a listed product (published, not a merged duplicate),
-    // not just those in the featured eight, so the quick-links cover the whole
-    // catalog and never lead to an empty page (audit #15). Paged: a response
-    // stops at 1,000 rows.
-    const { rows: catRows } = await fetchAllRows<{ category: string | null; is_published: boolean; merged_into: string | null }>(
-      (from, to) =>
-        supabase.from("parts").select("category, is_published, merged_into").eq("is_published", true).not("lead_time_class", "is", null).order("id").range(from, to)
-    );
-    categories = listedCategories(catRows);
-  }
-
+  // Quick-links: every category with a listed product, not just those in the
+  // featured eight, so they never lead to an empty page (audit #15). Both are
+  // cached, card fields only; empty without Supabase env (fresh local checkout).
+  const [products, { categories }] = await Promise.all([getFeaturedParts(), getStoreFacets()]);
 
   return (
+    <MessagesScope scope="home">
     <div className="container space-y-6 py-6">
       {/* Hero (audit #12): one line of who we are, then three clear choices. */}
       <section className="space-y-6">
@@ -193,8 +166,9 @@ export default async function Home({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-            {products.map((part) => (
-              <PartCard key={part.id} part={part} locale={locale} />
+            {/* The first four photos are above the fold on desktop: eager + high priority. */}
+            {products.map((part, i) => (
+              <PartCard key={part.id} part={part} locale={locale} priority={i < 4} />
             ))}
           </div>
         )}
@@ -204,6 +178,7 @@ export default async function Home({
       {/* Callback CTA */}
       <HomeCallback />
     </div>
+    </MessagesScope>
   );
 }
 

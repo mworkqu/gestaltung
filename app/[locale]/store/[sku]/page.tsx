@@ -5,7 +5,6 @@ import { ChevronRight, ExternalLink, FileText } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/server";
 import {
   formatPrice,
   partName,
@@ -27,8 +26,22 @@ import { cn } from "@/lib/utils";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { productDetailsForLocale } from "@/lib/store/product-details";
 import { clipText, ogProductImage, pageMetadata } from "@/lib/seo";
+import { getMergedRedirectSku, getProductDeliveryQuote, getPublishedPart } from "@/lib/store/public-catalog";
+import { GALLERY_SIZES, IMAGE_WIDTHS, sizedImage, sizedSrcSet } from "@/lib/store/image-url";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
-export const dynamic = "force-dynamic";
+// ISR (Phase G): each product page is rendered on its first visit per locale,
+// then served from the CDN and re-rendered at most every 5 minutes (prices,
+// lead time and the "Arrives by" dates are at most that stale) or at once
+// when an admin edit calls revalidateStorefront(). Everything here is
+// cookie-free (cached anon reads in lib/store/public-catalog.ts); per-visitor
+// bits (cart, add to project) are client components.
+export const revalidate = 300;
+
+// No product is built at deploy time; each one is cached on first request.
+export function generateStaticParams() {
+  return [];
+}
 
 // Each product's own title and description (audit #56), plus the share card:
 // the product photo as og:image, price first in og:description. The Arabic
@@ -40,9 +53,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string; sku: string }>;
 }): Promise<Metadata> {
   const { locale, sku } = await params;
-  const supabase = await createClient();
-  // select("*"): specs_ar (0047) may not exist yet, so no named columns here.
-  const { data } = await supabase.from("parts").select("*").eq("sku", sku).eq("is_published", true).maybeSingle();
+  const data = await getPublishedPart(sku);
   if (!data) return {};
   const part = data as Part & { specs?: unknown; specs_ar?: unknown };
   const t = await getTranslations({ locale, namespace: "Meta" });
@@ -78,20 +89,12 @@ export default async function PartDetailPage({
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("parts")
-    .select("*")
-    .eq("sku", sku)
-    .eq("is_published", true)
-    .maybeSingle();
-
-  const part = data as Part | null;
+  const part = await getPublishedPart(sku);
   if (!part) {
     // Audit #7: an old SKU merged into another product (0030) → that product.
     // Before 0030 the RPC does not exist; fall through to 404 as before.
-    const { data: survivorSku } = await supabase.rpc("part_merged_redirect_sku", { p_sku: sku });
-    if (typeof survivorSku === "string" && survivorSku && survivorSku !== sku) {
+    const survivorSku = await getMergedRedirectSku(sku);
+    if (survivorSku) {
       permanentRedirect(`/${locale === "ar" ? "ar" : "en"}/store/${encodeURIComponent(survivorSku)}`);
     }
     notFound();
@@ -101,10 +104,7 @@ export default async function PartDetailPage({
   // A product with no supplier offer is still sold at its listed price; its
   // date is confirmed after the order (0032).
   const tDelivery = await getTranslations("Delivery");
-  const { data: quoteData } = await supabase.rpc("order_delivery_quote", {
-    p_items: [{ part_id: part.id, quantity: part.min_order_qty }],
-  });
-  const quote = (quoteData ?? null) as DeliveryQuote | null;
+  const quote: DeliveryQuote | null = await getProductDeliveryQuote(part.id, part.min_order_qty);
   const onRequest = !part.lead_time_class;
   // Standard-tier date: the quote's, else the same sum computed in TS (the
   // card's formula) if the quote couldn't load.
@@ -148,6 +148,7 @@ export default async function PartDetailPage({
     ) : null;
 
   return (
+    <MessagesScope scope="product">
     <div className="container space-y-6 py-6 sm:space-y-8 sm:py-8">
       {/* Breadcrumb */}
       <nav className="flex flex-wrap items-center gap-x-1.5 text-xs text-mutedtext">
@@ -168,8 +169,13 @@ export default async function PartDetailPage({
           {imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={imageUrl}
+              src={sizedImage(imageUrl, IMAGE_WIDTHS.gallery)!}
+              srcSet={sizedSrcSet(imageUrl, [600, IMAGE_WIDTHS.gallery])}
+              sizes={GALLERY_SIZES}
+              width={IMAGE_WIDTHS.gallery}
+              height={IMAGE_WIDTHS.gallery}
               alt={name}
+              fetchPriority="high"
               className="h-full w-full object-contain"
             />
           ) : (
@@ -224,7 +230,7 @@ export default async function PartDetailPage({
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            <PartDetailCart part={part} />
+            <PartDetailCart part={{ id: part.id, min_order_qty: part.min_order_qty }} />
             <AddToProjectButton partId={part.id} partName={name} />
             {canRequestItem(part.lead_time_class) && (
               <RequestItemButton partId={part.id} partName={name} variant="outline" />
@@ -315,5 +321,6 @@ export default async function PartDetailPage({
         </div>
       </div>
     </div>
+    </MessagesScope>
   );
 }

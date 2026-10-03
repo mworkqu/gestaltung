@@ -10,6 +10,7 @@ import { cleanAttributes, type Attributes } from "@/lib/store/attributes";
 import { findSimilar } from "@/lib/store/similar";
 import type { ProductImage } from "@/lib/google/drive-picker";
 import type { Supplier } from "@/lib/store/sourcing";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Fast product entry (Task 17c/d/e). One call saves one product or a batch:
 // the product (ours: name, category, attributes, price, images) plus one
@@ -153,6 +154,7 @@ export async function saveQuickProducts(locale: string, rows: QuickRow[]): Promi
     results.push({ key: r.key, ok: true, sku: inserted.sku, id: inserted.id });
   }
 
+  revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/store`);
   return results;

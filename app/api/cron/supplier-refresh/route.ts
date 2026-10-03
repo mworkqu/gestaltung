@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { runApiRefresh } from "@/lib/sourcing/api-refresh";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Daily Mouser + DigiKey refresh (vercel.json cron). Vercel sends CRON_SECRET.
 
@@ -13,5 +14,8 @@ export async function GET(request: Request) {
   }
   const db = createServiceClient();
   if (!db) return Response.json({ error: "no_service_key" }, { status: 500 });
-  return Response.json(await runApiRefresh(db, "cron"));
+  const result = await runApiRefresh(db, "cron");
+  // Offer costs / lead times may have moved: refresh the cached storefront.
+  revalidateStorefront();
+  return Response.json(result);
 }

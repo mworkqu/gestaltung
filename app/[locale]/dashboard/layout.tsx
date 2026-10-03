@@ -6,6 +6,7 @@ import { guestRedirect } from "@/lib/auth/guest-redirect";
 import { DashboardNav, type NavGroup } from "@/components/dashboard/dashboard-nav";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { metaFor } from "@/lib/meta";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 // The whole dashboard area is per-request and auth-gated here, once.
 export const dynamic = "force-dynamic";
@@ -88,6 +89,7 @@ export default async function DashboardLayout({
       ];
 
   return (
+    <MessagesScope scope="all">
     <div className="container py-8">
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="space-y-3">
@@ -97,5 +99,6 @@ export default async function DashboardLayout({
         <div className="min-w-0">{children}</div>
       </div>
     </div>
+    </MessagesScope>
   );
 }

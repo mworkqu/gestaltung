@@ -6,6 +6,7 @@ import { Archive, ArchiveRestore, Loader2, Plus } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentUser } from "@/lib/supabase/guest";
 import { deriveProjectStatus, type ProjectStatusKind } from "@/lib/projects/item-status";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
@@ -76,9 +77,7 @@ export function ProjectList() {
 
     (async () => {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
 
       if (!cancelled) setHasAccount(!!user && user.is_anonymous !== true);
 

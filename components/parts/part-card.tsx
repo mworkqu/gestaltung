@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { Link } from "@/i18n/navigation";
 import { formatPrice, partName, partImageUrl } from "@/lib/parts/format";
+import { CARD_SIZES, IMAGE_WIDTHS, sizedImage, sizedSrcSet } from "@/lib/store/image-url";
 import { arrivesByDate, type ShippingSettings } from "@/lib/store/delivery";
 import { canRequestItem, showMinOrder } from "@/lib/store/product-display";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
@@ -15,7 +16,9 @@ import { truncateAtWord } from "@/lib/text/title";
 
 // Catalog grid card. Server component; the cart action lives in the client
 // AddToCartButton child. Image URLs are admin-pasted from arbitrary hosts, so a
-// plain <img> is used rather than next/image (which needs configured domains).
+// plain <img> is used rather than next/image (which needs configured domains);
+// the Shopify CDN resizes it to the card size (lib/store/image-url.ts). Cards
+// are lazy except the first row of the homepage (`priority`).
 // Reads only StoreCardPart (lib/store/catalog.ts) — the /store list sends no more.
 //
 // The SKU is not shown (owner decision D4); it stays in the product URL.
@@ -26,10 +29,13 @@ export async function PartCard({
   part,
   locale,
   shipping,
+  priority = false,
 }: {
   part: StoreCardPart;
   locale: string;
   shipping?: ShippingSettings | null;
+  /** Above the fold: load eagerly with high priority instead of lazily. */
+  priority?: boolean;
 }) {
   const t = await getTranslations("Parts");
   const name = partName(part, locale);
@@ -54,9 +60,15 @@ export async function PartCard({
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={imageUrl}
+            src={sizedImage(imageUrl, IMAGE_WIDTHS.card)!}
+            srcSet={sizedSrcSet(imageUrl, [300, IMAGE_WIDTHS.card])}
+            sizes={CARD_SIZES}
+            width={IMAGE_WIDTHS.card}
+            height={IMAGE_WIDTHS.card}
             alt={name}
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : undefined}
+            decoding="async"
             className="h-full w-full object-contain transition-transform duration-300 hover:scale-105"
           />
         ) : (
@@ -89,7 +101,7 @@ export async function PartCard({
           {showMinOrder(part.min_order_qty) && (
             <p className="text-[11px] text-mutedtext">{t("minOrder", { qty: part.min_order_qty })}</p>
           )}
-          <AddToCartButton part={part} className={cardBtn} />
+          <AddToCartButton part={{ id: part.id, min_order_qty: part.min_order_qty }} className={cardBtn} />
           {canRequestItem(part.lead_time_class) && (
             <RequestItemButton partId={part.id} partName={name} size="sm" className={cardBtn} />
           )}

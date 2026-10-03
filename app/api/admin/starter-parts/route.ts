@@ -4,6 +4,7 @@ import { digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { mouserSearch } from "@/lib/sourcing/adapters/mouser";
 import { parametersToAttributes } from "@/lib/sourcing/spec-map";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // One-off starter set (owner, 2026-09-28): standard components Voltaat doesn't
 // sell individually, from DigiKey's and Mouser's official APIs (2026-09-29:
@@ -140,5 +141,6 @@ export async function POST() {
     }
     results.push({ name: s.name, status: "added", sku: part.sku, price });
   }
+  revalidateStorefront();
   return Response.json({ calls, results });
 }

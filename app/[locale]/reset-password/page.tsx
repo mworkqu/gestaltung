@@ -3,6 +3,7 @@ import { pageMetadata } from "@/lib/seo";
 
 import { createClient } from "@/lib/supabase/server";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 // Needs the recovery session cookie set by /api/auth/callback; per-request.
 export const dynamic = "force-dynamic";
@@ -32,5 +33,9 @@ export default async function ResetPasswordPage({
   } = await supabase.auth.getUser();
   const hasSession = !!user && user.is_anonymous !== true;
 
-  return <ResetPasswordForm hasSession={hasSession} />;
+  return (
+    <MessagesScope scope="auth">
+      <ResetPasswordForm hasSession={hasSession} />
+    </MessagesScope>
+  );
 }

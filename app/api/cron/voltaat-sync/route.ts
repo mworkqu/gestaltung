@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { runVoltaatSync } from "@/lib/sourcing/voltaat-sync";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // Daily Voltaat price sync (vercel.json cron). Vercel sends CRON_SECRET.
 
@@ -13,5 +14,8 @@ export async function GET(request: Request) {
   }
   const db = createServiceClient();
   if (!db) return Response.json({ error: "no_service_key" }, { status: 500 });
-  return Response.json(await runVoltaatSync(db, "cron"));
+  const result = await runVoltaatSync(db, "cron");
+  // Mirror prices / availability may have moved: refresh the cached storefront.
+  revalidateStorefront();
+  return Response.json(result);
 }

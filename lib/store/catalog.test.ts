@@ -11,7 +11,9 @@ import {
   searchTerms,
   sortOptions,
   storeQuery,
+  STORE_URL_PARAMS,
 } from "@/lib/store/catalog";
+import { readFileSync } from "node:fs";
 
 describe("parseStoreParams", () => {
   it("defaults: no query → name A–Z, page 1", () => {
@@ -157,5 +159,22 @@ describe("searchFilter", () => {
 
   it("an Arabic category word also matches the stored English category", () => {
     expect(searchFilter("حساسات")).toContain('category.in.("Sensors")');
+  });
+});
+
+describe("STORE_URL_PARAMS", () => {
+  // Every param the listing reads must send /store to the dynamic search route,
+  // or the static default listing would be served for a filtered URL.
+  it("matches the /store rewrite list in next.config.mjs", () => {
+    const config = readFileSync("next.config.mjs", "utf8");
+    const m = config.match(/beforeFiles:\s*\[([^\]]*)\]/);
+    expect(m).not.toBeNull();
+    const keys = [...m![1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1]);
+    expect([...keys].sort()).toEqual([...STORE_URL_PARAMS].sort());
+  });
+
+  it("covers every key parseStoreParams reads", () => {
+    const parsed = parseStoreParams(Object.fromEntries(STORE_URL_PARAMS.map((k) => [k, "1"])));
+    expect(Object.keys(parsed).sort()).toEqual([...STORE_URL_PARAMS].sort());
   });
 });

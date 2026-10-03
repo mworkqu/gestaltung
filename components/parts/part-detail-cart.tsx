@@ -14,7 +14,9 @@ import { useCart } from "@/components/parts/cart-provider";
 // delivery date is confirmed after the order (0032). After adding, the button
 // becomes an "Added — View cart" link; changing the quantity brings the add
 // button back so more can be added.
-export function PartDetailCart({ part }: { part: Part }) {
+// Takes only the two fields it uses, so the product page never serialises the
+// full row (description, specs, sourcing) into the client payload.
+export function PartDetailCart({ part }: { part: Pick<Part, "id" | "min_order_qty"> }) {
   const t = useTranslations("Parts");
   const { addItem } = useCart();
   const [qty, setQty] = useState(part.min_order_qty);

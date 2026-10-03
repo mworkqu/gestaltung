@@ -3,6 +3,7 @@ import { pageMetadata } from "@/lib/seo";
 
 import { MyInventory } from "@/components/inventory/my-inventory";
 import { cn } from "@/lib/utils";
+import { MessagesScope } from "@/components/i18n/messages-scope";
 
 export async function generateMetadata({
   params,
@@ -32,6 +33,7 @@ export default async function MyInventoryPage({
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   return (
+    <MessagesScope scope="all">
     <div className="container max-w-3xl space-y-6 py-8">
       <header className="space-y-2">
         <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
@@ -43,5 +45,6 @@ export default async function MyInventoryPage({
 
       <MyInventory />
     </div>
+    </MessagesScope>
   );
 }

@@ -1,6 +1,7 @@
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { runVoltaatSync } from "@/lib/sourcing/voltaat-sync";
+import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // "Run now" from the admin. Same rules as the daily run (including one run a day).
 
@@ -12,5 +13,7 @@ export async function POST() {
   if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
   const db = createServiceClient();
   if (!db) return Response.json({ error: "no_service_key" }, { status: 500 });
-  return Response.json(await runVoltaatSync(db, "manual"));
+  const result = await runVoltaatSync(db, "manual");
+  revalidateStorefront();
+  return Response.json(result);
 }
