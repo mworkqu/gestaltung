@@ -5,7 +5,7 @@
 
 import { escapeHtml } from "@/lib/email";
 import { formatDeliveryDate } from "@/lib/store/delivery";
-import { PAYMENT_DETAILS } from "@/lib/company";
+import { COMPANY, PAYMENT_DETAILS } from "@/lib/company";
 
 type Item = { part_name: string; quantity: number; unit_price_qar: number; lead_time_class: string | null };
 export type OrderForEmail = {
@@ -30,6 +30,7 @@ export function paymentBlock(o: Pick<OrderForEmail, "id" | "total_qar" | "paymen
   const ref = o.id.slice(0, 8);
   const amount = qar(o.total_qar);
   const d = PAYMENT_DETAILS;
+  const legal = COMPANY.legalNameEn;
   const en = locale === "en";
   switch (o.payment_method) {
     case "cash_on_delivery":
@@ -38,12 +39,12 @@ export function paymentBlock(o: Pick<OrderForEmail, "id" | "total_qar" | "paymen
         : `<p><b>الدفع: نقداً عند الاستلام.</b> يرجى تجهيز ${amount} عند وصول طلبك.</p>`;
     case "fawran":
       return en
-        ? `<p><b>Payment: Fawran.</b> Send ${amount} to the Fawran alias <b>${d.fawranAlias}</b> (${e(d.accountName)}, ${e(d.bank)}). Put <b>${ref}</b> in the note.</p>`
-        : `<p><b>الدفع: فوران.</b> حوّل ${amount} إلى معرّف فوران <b dir="ltr">${d.fawranAlias}</b> (${e(d.accountName)}، ${e(d.bank)}). اكتب <b>${ref}</b> في الملاحظة.</p>`;
+        ? `<p><b>Payment: Fawran.</b> Send ${amount} to the Fawran alias <b>${d.fawranAlias}</b>, account name: ${e(d.accountName)} (${e(legal)}), ${e(d.bank)}. Put <b>${ref}</b> in the note.</p>`
+        : `<p><b>الدفع: فوران.</b> حوّل ${amount} إلى معرّف فوران <b dir="ltr">${d.fawranAlias}</b>، اسم الحساب <span dir="ltr">${e(d.accountName)} (${e(legal)})</span>، ${e(d.bank)}. اكتب <b>${ref}</b> في الملاحظة.</p>`;
     case "bank_transfer":
       return en
-        ? `<p><b>Payment: bank transfer.</b> Send ${amount} to:<br/>Account name: <b>${e(d.accountName)}</b><br/>Bank: ${e(d.bank)}<br/>IBAN: <b>${d.iban}</b><br/>Reference: <b>${ref}</b></p>`
-        : `<p><b>الدفع: تحويل بنكي.</b> حوّل ${amount} إلى:<br/>اسم الحساب: <b dir="ltr">${e(d.accountName)}</b><br/>البنك: ${e(d.bank)}<br/>IBAN: <b dir="ltr">${d.iban}</b><br/>المرجع: <b>${ref}</b></p>`;
+        ? `<p><b>Payment: bank transfer.</b> Send ${amount} to:<br/>Account name: <b>${e(d.accountName)}</b> (${e(legal)})<br/>Bank: ${e(d.bank)}<br/>IBAN: <b>${d.iban}</b><br/>Reference: <b>${ref}</b></p>`
+        : `<p><b>الدفع: تحويل بنكي.</b> حوّل ${amount} إلى:<br/>اسم الحساب: <b dir="ltr">${e(d.accountName)}</b> <span dir="ltr">(${e(legal)})</span><br/>البنك: ${e(d.bank)}<br/>IBAN: <b dir="ltr">${d.iban}</b><br/>المرجع: <b>${ref}</b></p>`;
     default:
       return "";
   }
@@ -59,6 +60,10 @@ const TBC_AR = "الموعد يُؤكَّد لاحقاً";
 
 const qar = (n: number) => `QAR ${Number(n).toFixed(2)}`;
 const e = escapeHtml;
+// Free delivery (0044) reads as such, not "QAR 0.00". The handling-fee row is
+// left out entirely when the fee is 0.
+const shipping = (o: Pick<OrderForEmail, "shipping_qar">, locale: "en" | "ar") =>
+  Number(o.shipping_qar) > 0 ? qar(o.shipping_qar) : locale === "en" ? "Free delivery" : "توصيل مجاني";
 
 function dates(o: OrderForEmail, locale: "en" | "ar", hasOnRequest: boolean) {
   // Nothing in the order is datable yet.
@@ -108,8 +113,8 @@ export function confirmationEmail(o: OrderForEmail, items: Item[]) {
 <p>Hi ${e(o.customer_name)},</p>
 <p>Thanks for your order <b>${ref}</b>. ${dates(o, "en", hasOnRequest)}</p>
 <table cellpadding="4" style="border-collapse:collapse">${rows(LEAD_EN, TBC_EN)}
-<tr><td>Shipping — ${tierEn}${o.split_shipments ? " × 2 shipments" : ""}</td><td></td><td align="right">${qar(o.shipping_qar)}</td></tr>
-<tr><td>Handling fee</td><td></td><td align="right">${qar(o.handling_fee_qar)}</td></tr>
+<tr><td>Shipping — ${tierEn}${o.split_shipments ? " × 2 shipments" : ""}</td><td></td><td align="right">${shipping(o, "en")}</td></tr>
+${Number(o.handling_fee_qar) > 0 ? `<tr><td>Handling fee</td><td></td><td align="right">${qar(o.handling_fee_qar)}</td></tr>` : ""}
 <tr><td><b>Total</b></td><td></td><td align="right"><b>${qar(o.total_qar)}</b></td></tr></table>
 ${paymentBlock(o, "en")}
 <p>${o.promised_date ? "If this date is going to change we will email you before it, not after. " : ""}We'll confirm payment and delivery on WhatsApp.</p>
@@ -118,8 +123,8 @@ ${paymentBlock(o, "en")}
 <p>مرحباً ${e(o.customer_name)}،</p>
 <p>شكراً لطلبك <b>${ref}</b>. ${dates(o, "ar", hasOnRequest)}</p>
 <table cellpadding="4" style="border-collapse:collapse">${rows(LEAD_AR, TBC_AR)}
-<tr><td>الشحن — ${tierAr}</td><td></td><td>${qar(o.shipping_qar)}</td></tr>
-<tr><td>رسوم التجهيز</td><td></td><td>${qar(o.handling_fee_qar)}</td></tr>
+<tr><td>الشحن — ${tierAr}</td><td></td><td>${shipping(o, "ar")}</td></tr>
+${Number(o.handling_fee_qar) > 0 ? `<tr><td>رسوم التجهيز</td><td></td><td>${qar(o.handling_fee_qar)}</td></tr>` : ""}
 <tr><td><b>الإجمالي</b></td><td></td><td><b>${qar(o.total_qar)}</b></td></tr></table>
 ${paymentBlock(o, "ar")}
 <p>${o.promised_date ? "إذا تغيّر هذا الموعد فسنراسلك قبله، لا بعده. " : ""}سنؤكد الدفع والتوصيل عبر واتساب.</p>

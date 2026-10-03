@@ -12,6 +12,7 @@ import type { CartItem } from "@/lib/supabase/types";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
 import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
+import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
@@ -67,6 +68,11 @@ export default function CartPage() {
   const loose = items.filter((i) => !i.kitId);
   const anyToConfirm = items.some(toConfirm);
   const standardDate = quote?.tiers?.standard?.date ?? null;
+  // Delivery cost before checkout (0044). The cart total is the goods subtotal
+  // (after the kit discount, before shipping), the same figure the server uses.
+  const deliveryFrom = minDeliveryFrom(quote?.tiers);
+  const freeShipping = activeFreeShipping(quote?.free_shipping);
+  const freeGap = freeDeliveryGap(totalQar, freeShipping);
 
   return (
     <div className="container space-y-8 py-8">
@@ -221,6 +227,25 @@ export default function CartPage() {
               </div>
             </>
           )}
+          <div className="space-y-1 text-[12.5px]">
+            {freeShipping && freeGap === 0 ? (
+              <p className="font-semibold text-buy">
+                {tD("freeDelivery")}
+                <span className="font-normal text-mutedtext">
+                  {" "}
+                  · {freeShipping.tiers.map((k) => tD(`tier_${k}`)).join(" / ")}
+                </span>
+              </p>
+            ) : (
+              deliveryFrom !== null && (
+                <p className="text-body">{tD("deliveryFromCart", { min: qarAmount(deliveryFrom) })}</p>
+              )
+            )}
+            {freeGap !== null && freeGap > 0 && (
+              <p className="font-medium text-heading">{tD("freeDeliveryGap", { n: freeGap })}</p>
+            )}
+            <p className="text-faint">{tD("shippingAtCheckout")}</p>
+          </div>
           {(standardDate || anyToConfirm) && (
             <div className="rounded-xl bg-panel p-3 text-[12.5px] shadow-neu-inset">
               {standardDate && (
@@ -231,7 +256,6 @@ export default function CartPage() {
               )}
               {quote?.held_by && <p className="mt-1 text-mutedtext">{tD("heldBy", { item: quote.held_by })}</p>}
               {anyToConfirm && <p className="mt-1 text-mutedtext">{tD("tbcNote")}</p>}
-              <p className="mt-1 text-faint">{tD("shippingAtCheckout")}</p>
             </div>
           )}
           <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>

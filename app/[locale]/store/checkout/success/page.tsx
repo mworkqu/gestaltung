@@ -112,12 +112,16 @@ export default function CheckoutSuccessPage() {
               <>
                 <div className="flex justify-between gap-3 text-sm">
                   <span className="text-mutedtext">{tD("shippingLine", { tier: tD(`tier_${order.tier}`) })}</span>
-                  <span className="tabular-nums text-heading">{formatPrice(order.shippingQar ?? 0, locale)}</span>
+                  <span className="tabular-nums text-heading">
+                    {(order.shippingQar ?? 0) === 0 ? tD("freeDelivery") : formatPrice(order.shippingQar ?? 0, locale)}
+                  </span>
                 </div>
-                <div className="flex justify-between gap-3 text-sm">
-                  <span className="text-mutedtext">{tD("handlingLine")}</span>
-                  <span className="tabular-nums text-heading">{formatPrice(order.handlingQar ?? 0, locale)}</span>
-                </div>
+                {(order.handlingQar ?? 0) > 0 && (
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="text-mutedtext">{tD("handlingLine")}</span>
+                    <span className="tabular-nums text-heading">{formatPrice(order.handlingQar ?? 0, locale)}</span>
+                  </div>
+                )}
               </>
             )}
             <div className="flex items-center justify-between border-t border-borderstrong/40 pt-3 text-sm">

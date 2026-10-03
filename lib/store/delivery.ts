@@ -10,7 +10,12 @@ export const SHIPPING_TIERS = ["express", "standard", "economy"] as const;
 export type ShippingTier = (typeof SHIPPING_TIERS)[number];
 
 export type TierQuote = {
+  /** What this cart pays for one shipment on this tier (0 when it ships free, 0044). */
   carrier_cost_qar: number;
+  /** The tier's normal price (0044; absent before — then carrier_cost_qar is it). */
+  base_cost_qar?: number;
+  /** This cart ships free on this tier (0044). */
+  free?: boolean;
   transit_days: number;
   /** ISO date; null when nothing in the order can be dated. */
   date: string | null;
@@ -30,6 +35,18 @@ export type DeliveryQuote = {
    * confirmed and they are left out of the tier dates.
    */
   on_request: string[];
+  /**
+   * Free delivery (0044): null/absent when not configured. goods_qar is the
+   * server's goods subtotal for these lines (see lib/store/shipping.ts).
+   */
+  free_shipping?: FreeShippingQuote | null;
+};
+
+export type FreeShippingQuote = {
+  threshold_qar: number;
+  tiers: ShippingTier[];
+  goods_qar?: number;
+  qualifies?: boolean;
 };
 
 /** Upper bound of each class in days — mirrors public.lead_class_days(). */
@@ -49,12 +66,6 @@ export function formatDeliveryDate(iso: string | null | undefined, locale: strin
     month: "long",
     timeZone: "UTC",
   }).format(d);
-}
-
-export function shippingTotal(q: DeliveryQuote, tier: ShippingTier, split: boolean): number {
-  const t = q.tiers[tier];
-  if (!t) return 0;
-  return t.carrier_cost_qar * (split && q.can_split ? 2 : 1);
 }
 
 type DatableLine = { partId: string; leadTimeClass?: LeadTimeClass | null };

@@ -16,6 +16,7 @@ import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { RequestItemButton } from "@/components/parts/request-item-button";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
+import { minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
 import { AddToProjectButton } from "@/components/parts/add-to-project-button";
 import { materialLabel } from "@/lib/parts/part-key";
@@ -86,6 +87,10 @@ export default async function PartDetailPage({
   });
   const quote = (quoteData ?? null) as DeliveryQuote | null;
   const onRequest = !part.lead_time_class;
+  // Cheapest tier at its normal price (0044); shown beside the date.
+  const deliveryFrom = minDeliveryFrom(quote?.tiers);
+  const deliveryFromLine =
+    deliveryFrom !== null ? tDelivery("deliveryFrom", { min: qarAmount(deliveryFrom) }) : null;
 
   const name = partName(part, locale);
   // Specs from the supplier's table or the description's own "Specifications"
@@ -161,13 +166,17 @@ export default async function PartDetailPage({
           </div>
 
           {onRequest ? (
-            <p className="text-sm text-body">{tDelivery("onRequestOrderable")}</p>
+            <div className="space-y-1">
+              <p className="text-sm text-body">{tDelivery("onRequestOrderable")}</p>
+              {deliveryFromLine && <p className="text-sm font-medium text-heading">{deliveryFromLine}</p>}
+            </div>
           ) : (
             quote?.tiers?.standard?.date && (
               <div className="rounded-xl bg-panel p-3 text-sm shadow-neu-inset">
                 <p className="font-semibold text-heading">
                   {tDelivery("arrivesBy", { date: formatDeliveryDate(quote.tiers.standard.date, locale) })}
                   <span className="font-normal text-mutedtext"> · {tDelivery("tier_standard")}</span>
+                  {deliveryFromLine && <span className="font-normal text-body"> · {deliveryFromLine}</span>}
                 </p>
                 <p className="mt-1 text-xs text-mutedtext">
                   {SHIPPING_TIERS.filter((k) => k !== "standard" && quote.tiers[k]?.date)

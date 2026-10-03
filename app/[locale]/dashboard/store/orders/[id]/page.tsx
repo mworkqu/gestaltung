@@ -208,7 +208,8 @@ export default async function OrderDetailPage({
             {ship.shipping_tier &&
               field(
                 tD("shippingLabel"),
-                `${tD(`tier_${ship.shipping_tier}`)}${ship.split_shipments ? ` · ${tD("twoShipments")}` : ""} · ${formatPrice(Number(ship.shipping_qar ?? 0), locale)} + ${formatPrice(Number(ship.handling_fee_qar ?? 0), locale)}`
+                // The handling fee only when one was charged (0 since 0044).
+                `${tD(`tier_${ship.shipping_tier}`)}${ship.split_shipments ? ` · ${tD("twoShipments")}` : ""} · ${Number(ship.shipping_qar ?? 0) > 0 ? formatPrice(Number(ship.shipping_qar), locale) : tD("freeDelivery")}${Number(ship.handling_fee_qar ?? 0) > 0 ? ` + ${formatPrice(Number(ship.handling_fee_qar), locale)}` : ""}`
               )}
             {ship.promised_date &&
               field(

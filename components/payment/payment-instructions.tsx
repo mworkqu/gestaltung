@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Banknote, Check, Copy, Landmark, Smartphone } from "lucide-react";
 
-import { PAYMENT_DETAILS, type PaymentMethod } from "@/lib/company";
+import { COMPANY, COMPANY_WHATSAPP, PAYMENT_DETAILS, type PaymentMethod } from "@/lib/company";
 import { cn } from "@/lib/utils";
 
 export const METHOD_ICON = { cash_on_delivery: Banknote, fawran: Smartphone, bank_transfer: Landmark } as const;
@@ -84,7 +84,8 @@ export function PaymentInstructions({
             <div>
               <dt>{t("accountName")}</dt>
               <dd className="font-semibold text-heading" dir="ltr">
-                {PAYMENT_DETAILS.accountName}
+                {PAYMENT_DETAILS.accountName}{" "}
+                <span className="font-normal text-body">({COMPANY.legalNameEn})</span>
               </dd>
             </div>
           )}
@@ -108,7 +109,20 @@ export function PaymentInstructions({
           )}
         </dl>
       )}
-      {!brief && method !== "cash_on_delivery" && <p className="text-[11px] text-mutedtext">{t("confirmNote")}</p>}
+      {!brief && method !== "cash_on_delivery" && (
+        <p className="text-[11px] text-mutedtext">
+          {t("confirmNote")}{" "}
+          <a
+            href={COMPANY_WHATSAPP.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            dir="ltr"
+            className="inline-block font-semibold text-cobalt hover:underline"
+          >
+            {COMPANY_WHATSAPP.display}
+          </a>
+        </p>
+      )}
     </div>
   );
 }

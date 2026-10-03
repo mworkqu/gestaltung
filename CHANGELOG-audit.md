@@ -63,3 +63,16 @@ No migrations. Pending owner steps: after 0030–0035, walk Plant monitor at 128
 - Cleanup: unused Features/LocalAdvantage/Social copy and the old spec sheet removed.
 - Header = the three paths; projects / inventory / dashboard in the account menu; footer and home without repeats (owner).
 - Tests 267 passed; build green; en/ar parity kept.
+
+# Site review fixes — changelog
+Source: STAGE_SITE_REVIEW_FIXES_PROMPT.md
+
+## Phase A — Money and checkout (2026-10-03)
+- Migration 0044: shipping is a flat QAR 50 on all tiers, handling fee 0; free delivery for goods >= QAR 300 on Standard only (`free_shipping_threshold` setting; Express never free); create_part_order v6 rejects a 0 total and requires an email for bank transfer; set_order_payment_method v2.
+- Delivery cost is shown on the product page and in the cart ("Delivery from QAR 50", free-delivery gap).
+- An empty cart sent to checkout is redirected to the cart on the server (client check stays as a fallback).
+- Handling line hidden at 0; split-shipment option no longer reads "(+QAR 0.00)" when delivery is free.
+- Copy fixes A4-A9: price note ("This is your final price. We confirm your order on WhatsApp."), card-payment "coming soon" once under the method list, Fawran account name shown with the legal name (page and email; IBAN stays email-only), email required with hint and inline error for bank transfer (EN + AR), company WhatsApp +974 6656 7410 link under the payment confirmation note (`COMPANY_WHATSAPP` in lib/company.ts), hint for delivery area "Other".
+- Guest cart persistence verified: @supabase/ssr cookies have a 400-day maxAge, so no change was needed.
+- Tests 319; i18n parity 2295/2295 EN/AR; `scripts/check-i18n-parity.mjs` added.
+- Pending owner steps: run 0044 (after 0043).

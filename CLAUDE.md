@@ -959,6 +959,40 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   per 24 h. Saved versions re-render from stored code with no AI call. No CadQuery (needs a paid Python server).
   Before 0043 the card keeps the stub. 0042 RUN ✔ 2026-10-02 and verified end to end by script (61 checks).
 
+- SITE REVIEW FIXES, PHASE A (2026-10-03, migration 0044 — NOT RUN YET): money and checkout. Source prompt
+  STAGE_SITE_REVIEW_FIXES_PROMPT.md; decisions in "Site review decisions" below.
+  - 0044: flat QAR 50 on every tier, handling 0, free delivery >= QAR 300 goods on Standard only (store_settings
+    free_shipping_threshold). create_part_order v6 refuses a 0 total and a bank transfer without an email;
+    set_order_payment_method v2. lib/store/shipping.ts + checkout.ts hold the TS side (tests in *.test.ts).
+  - Delivery cost shown on the product page and cart; empty-cart checkout redirects to /store/cart on the server
+    (app/[locale]/store/checkout/page.tsx, form in checkout-client.tsx); handling line and "+QAR 0.00" split suffix hidden at 0.
+  - Copy: priceNote = "This is your final price. We confirm your order on WhatsApp."; cardSoon once under the method
+    list; Fawran account name + "(Gestaltung for Trading and Services W.L.L)" (page and email; IBAN only in the email);
+    bank-transfer email required (hint + inline error); WhatsApp link under confirmNote (COMPANY_WHATSAPP in
+    lib/company.ts); areaOtherHint when delivery area is "Other". Guest cart persistence checked: no change needed.
+  - scripts/check-i18n-parity.mjs (run it after any message change); parity 2295/2295. Owner: run 0044 after 0043.
+
+## Site review decisions (owner, 2026-10-03)
+
+Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
+
+- D1 Shipping: QAR 50 for every tier, handling 0. Free delivery over QAR 300 goods subtotal on **Standard only**; Express is never free (Economy also stays QAR 50).
+- D2 Handling fee: removed (0, line hidden when 0).
+- D3 Checkout total is binding. Cart line: "This is your final price. We confirm your order on WhatsApp."
+- D4 Hide VLT codes from customers (cards, product page, cart). Keep them in the product URL, the order confirmation email and admin pages.
+- D5 Guests on /dashboard and /inventory are redirected to /projects.
+- D6 Projects stay in this browser; optional email on /projects/new; when given, email the project link to it.
+- D7 Cookie notice (Accept / Decline); GA4 only after Accept; no Google Signals.
+- D8 Legal pages come from LEGAL_PAGES_DRAFT.md exactly as written (EN + AR, four routes: /delivery-returns, /warranty, /terms, /privacy). Keep "Last updated". Skip the header note. Do not soften wording.
+- D9 Keep all published products.
+- D10 Publish WhatsApp +974 6656 7410 on Contact, footer, checkout, 404.
+- D11 About: founded 2026; Prusa MK4 3D printer, CNC machining, laser cutting, electronics prototyping; no photo for now.
+- D12 Address: Rafal Tower, Lusail, Qatar. Hours not given → omit.
+- D13 Category consolidation: show the mapping table and wait for approval.
+- B7: do NOT publish "1 free revision; you own the files". /design/drawing gets one line "See what the price includes" → /warranty.
+- Phase A: migration 0044 sets shipping outright, makes email required server-side for bank transfer, rejects 0-total orders, adds the free-delivery threshold.
+- Phase I: the 30-day expiry of the QAR 20 redemption runs from the day the credit is earned.
+
 ## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-06-22)
 
 | # | Stage | Migration(s) | Status |
@@ -1032,6 +1066,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0040_firmware.sql — (RUN ✔ 2026-09-29) projects.firmware + 'firmware' ai_usage/analysis_runs feature (RUN AFTER 0039)
 - 0043_cad_generations.sql — cad_generations + cad_begin/cad_set_code/cad_deliver/cad_fail, analysis_runs 'cad'
   (RUN AFTER 0042; until then the 3D model card only shows the cost dialog)
+- 0044_shipping_flat_free_threshold.sql — QAR 50 all tiers + handling 0, free_shipping_threshold (QAR 300, Standard), quote v2, create_part_order v6 (+p_payment_method; bank transfer needs email; total > 0), set_order_payment_method v2 (RUN AFTER 0043; checkout falls back to the old call until then)
 - 0042_ai_credits.sql — (RUN ✔ 2026-10-02) AI access + credits: credits_ledger, projects.status/limit, rate limits, credit RPCs,
   profiles.email sync, ai_usage_log (RUN AFTER 0041; also turn ON "Confirm email" in Supabase Auth)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units

@@ -16,6 +16,13 @@ export const PAYMENT_DETAILS = {
   fawranAlias: "CR-236988",
 } as const;
 
+// The company WhatsApp line (owner, 2026-10-03). Shown as a wa.me link where we
+// confirm payments and delivery.
+export const COMPANY_WHATSAPP = {
+  display: "+974 6656 7410",
+  url: "https://wa.me/97466567410",
+} as const;
+
 export const PAYMENT_METHODS = ["cash_on_delivery", "fawran", "bank_transfer"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
