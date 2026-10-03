@@ -14,8 +14,8 @@ import {
 const MIGRATION = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0048_store_categories.sql"), "utf8");
 const generated = MIGRATION.match(/-- BEGIN GENERATED MAPPING[\s\S]*?-- END GENERATED MAPPING/)?.[0] ?? "";
 const tuples = (sql: string) => [...sql.matchAll(/\(\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'\s*\)/g)].map((m) => [m[1], m[2]] as const);
-const mapSql = generated.slice(generated.indexOf("insert into _m0048_map"));
-const rulesSql = generated.slice(0, generated.indexOf("create temp table"));
+const mapSql = generated.slice(generated.indexOf("insert into public._m0048_map"));
+const rulesSql = generated.slice(0, generated.indexOf("drop table if exists public._m0048_map"));
 const mapping = tuples(mapSql);
 
 describe("store categories", () => {

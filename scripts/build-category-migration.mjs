@@ -156,8 +156,12 @@ insert into public.store_category_rules (source_category, store_category) values
 ${rules}
 on conflict (source_category) do nothing;
 
-create temp table _m0048_map (sku text primary key, store_category text not null) on commit drop;
-insert into _m0048_map (sku, store_category) values
+-- A real, schema-qualified staging table (dropped below, inside this same
+-- transaction): the SQL editor could not see a temp table from later statements.
+drop table if exists public._m0048_map;
+create table public._m0048_map (sku text primary key, store_category text not null);
+alter table public._m0048_map enable row level security;
+insert into public._m0048_map (sku, store_category) values
 ${values};
 -- END GENERATED MAPPING`;
 }

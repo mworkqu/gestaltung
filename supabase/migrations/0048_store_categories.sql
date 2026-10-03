@@ -182,8 +182,12 @@ insert into public.store_category_rules (source_category, store_category) values
   ('3D printer parts', '3D printing')
 on conflict (source_category) do nothing;
 
-create temp table _m0048_map (sku text primary key, store_category text not null) on commit drop;
-insert into _m0048_map (sku, store_category) values
+-- A real, schema-qualified staging table (dropped below, inside this same
+-- transaction): the SQL editor could not see a temp table from later statements.
+drop table if exists public._m0048_map;
+create table public._m0048_map (sku text primary key, store_category text not null);
+alter table public._m0048_map enable row level security;
+insert into public._m0048_map (sku, store_category) values
   ('DK-10ECA1HM100BCTND', 'Chips and ICs'),
   ('DK-1N4148FSCTND', 'Chips and ICs'),
   ('DK-1N5819TPCTND', 'Chips and ICs'),
@@ -1514,9 +1518,11 @@ alter table public.parts disable trigger set_parts_updated_at;
 update public.parts p
    set store_category = m.store_category,
        store_category_review = false
-  from _m0048_map m
+  from public._m0048_map m
  where p.sku = m.sku
    and p.store_category is null;
+
+drop table public._m0048_map;
 
 -- ── 5. Everything else: the rule default (what the trigger would do) ────────
 update public.parts p
