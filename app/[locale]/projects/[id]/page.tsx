@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 
 import { createClient } from "@/lib/supabase/server";
 import { ProjectClaimGate } from "@/components/projects/project-claim-gate";
@@ -15,8 +16,14 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale, id } = await params;
   const t = await getTranslations({ locale, namespace: "Projects" });
-  const tBrand = await getTranslations({ locale, namespace: "Brand" });
-  const fallback = { title: t("metaTitle"), description: t("metaDescription") };
+  // A private workspace: never indexed, whatever the title says.
+  const fallback = pageMetadata({
+    locale,
+    path: "/projects",
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    noindex: true,
+  });
 
   const supabase = await createClient();
   const {
@@ -33,14 +40,17 @@ export async function generateMetadata({
   if (!data?.name) return fallback;
 
   const brief = typeof data.brief === "string" ? data.brief.replace(/\s+/g, " ").trim() : "";
-  return {
-    title: `${data.name} · ${tBrand("name")}`,
+  return pageMetadata({
+    locale,
+    path: "/projects",
+    title: `${data.name} | Gestaltung360`,
     description: brief
       ? brief.length > 150
         ? `${brief.slice(0, 149).trimEnd()}…`
         : brief
-      : fallback.description,
-  };
+      : (fallback.description ?? undefined),
+    noindex: true,
+  });
 }
 
 // The workspace loads its own data through the browser client so that a guest

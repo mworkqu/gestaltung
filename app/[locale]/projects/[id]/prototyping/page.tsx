@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 
 import { PrototypingWorkspace } from "@/components/prototyping/workspace";
 import { providerStatus } from "@/lib/prototyping/providers";
@@ -10,7 +11,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "Prototyping" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return pageMetadata({ locale, path: "/projects", title: t("metaTitle"), description: t("metaDescription"), noindex: true });
 }
 
 // Wider than the project page: this is a workspace, not a document, so it

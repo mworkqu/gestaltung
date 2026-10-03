@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 
 import { cn } from "@/lib/utils";
 import { QuoteRequest } from "@/components/design/quote-request";
@@ -16,7 +17,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "DesignQuote" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return pageMetadata({ locale, path: "/design/quote", title: t("metaTitle"), description: t("metaDescription") });
 }
 
 export default async function DesignQuotePage({

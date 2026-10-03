@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 
 import { createClient } from "@/lib/supabase/server";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
@@ -13,7 +14,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "Auth" });
-  return { title: `${t("resetHeading")} | Gestaltung360` };
+  return pageMetadata({ locale, path: "/reset-password", title: `${t("resetHeading")} | Gestaltung360`, noindex: true });
 }
 
 export default async function ResetPasswordPage({

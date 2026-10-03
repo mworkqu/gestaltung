@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 
@@ -9,7 +10,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "Auth" });
-  return { title: `${t("forgotHeading")} | Gestaltung360` };
+  return pageMetadata({ locale, path: "/forgot-password", title: `${t("forgotHeading")} | Gestaltung360`, noindex: true });
 }
 
 export default async function ForgotPasswordPage({

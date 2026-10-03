@@ -6,6 +6,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { Outfit, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 
 import { routing, type Locale } from "@/i18n/routing";
+import { siteDefaults } from "@/lib/seo";
 import { Header } from "@/components/header";
 import { HeaderGate } from "@/components/header-gate";
 import { Footer } from "@/components/footer";
@@ -44,8 +45,7 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "Meta" });
   return {
-    title: t("siteTitle"),
-    description: t("siteDescription"),
+    ...siteDefaults({ locale, title: t("siteTitle"), description: t("siteDescription") }),
     icons: {
       icon: "/icon.png",
     },

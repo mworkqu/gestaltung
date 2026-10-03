@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { pageMetadata } from "@/lib/seo";
 import { LEGAL_KEYS, loadLegalContent, type LegalSlug } from "@/lib/legal/content";
 import type { Block, Inline } from "@/lib/legal/markdown";
 
@@ -90,7 +91,11 @@ export function legalMetadata(slug: LegalSlug) {
   return async ({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> => {
     const { locale } = await params;
     const t = await getTranslations({ locale, namespace: "Legal" });
-    return { title: t("metaTitle", { title: t(`${LEGAL_KEYS[slug]}Title`) }) };
+    return pageMetadata({
+      locale,
+      path: `/${slug}`,
+      title: t("metaTitle", { title: t(`${LEGAL_KEYS[slug]}Title`) }),
+    });
   };
 }
 

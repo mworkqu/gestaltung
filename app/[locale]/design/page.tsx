@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import { UploadCloud, PencilRuler, ArrowUpRight, Search } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
@@ -21,7 +22,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "DesignHub" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return pageMetadata({ locale, path: "/design", title: t("metaTitle"), description: t("metaDescription") });
 }
 
 export default async function DesignHubPage({

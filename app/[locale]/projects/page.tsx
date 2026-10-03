@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import { Plus } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
@@ -14,7 +15,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "Projects" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return pageMetadata({ locale, path: "/projects", title: t("metaTitle"), description: t("metaDescription"), noindex: true });
 }
 
 // Reads the session to decide on the guest line, so it must not be

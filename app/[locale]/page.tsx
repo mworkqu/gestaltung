@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight, Lightbulb, Plus, Search, ShoppingBag, UploadCloud } from "lucide-react";
 import { categoryLabel } from "@/lib/store/category-label";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
@@ -25,7 +26,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "StoreLanding" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return pageMetadata({ locale, path: "", title: t("metaTitle"), description: t("metaDescription") });
 }
 
 export default async function Home({

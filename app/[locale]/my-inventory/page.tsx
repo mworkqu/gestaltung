@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 
 import { MyInventory } from "@/components/inventory/my-inventory";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,7 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "MyInventory" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return pageMetadata({ locale, path: "/my-inventory", title: t("metaTitle"), description: t("metaDescription"), noindex: true });
 }
 
 // The CLIENT's own inventory — not the workshop's production stock at

@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import {
   ArrowRight,
   Boxes,
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "HowItWorks" });
-  return { title: t("metaTitle"), description: t("metaDescription") };
+  return pageMetadata({ locale, path: "/how-it-works", title: t("metaTitle"), description: t("metaDescription") });
 }
 
 // How it works (audit #14): the three ways to work with us — buy parts, make a

@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { pageMetadata } from "@/lib/seo";
 import { ArrowRight } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
@@ -15,10 +16,12 @@ export async function generateMetadata({
   const { locale } = await params;
   const forDrawing = (await searchParams).for === "drawing";
   const t = await getTranslations({ locale, namespace: "Projects" });
-  return {
+  return pageMetadata({
+    locale,
+    path: "/projects/new",
     title: forDrawing ? t("drawingPageTitle") : t("newPageTitle"),
     description: forDrawing ? t("drawingIntro") : t("metaDescription"),
-  };
+  });
 }
 
 // No sign-in wall. The anonymous session is created by the form, on submit.
