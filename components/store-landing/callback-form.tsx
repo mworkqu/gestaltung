@@ -96,6 +96,7 @@ export function HomeCallback() {
             )}
             {t("callbackSubmit")}
           </Button>
+          <p className="text-xs text-mutedtext">{t("callbackSla")}</p>
         </form>
       )}
     </section>

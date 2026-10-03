@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Loader2 } from "lucide-react";
 
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardPathForRole } from "@/lib/auth/redirects";
 import type { Role } from "@/lib/supabase/types";
@@ -101,6 +101,15 @@ export function SignInForm() {
             placeholder={t("passwordPlaceholder")}
             className={authFieldClass}
           />
+        </div>
+
+        <div className="-mt-2 text-end">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-semibold text-azure transition-colors hover:text-cobalt-hover"
+          >
+            {t("forgotLink")}
+          </Link>
         </div>
 
         {error && (

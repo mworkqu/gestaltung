@@ -8,6 +8,7 @@ import { useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, isGuest } from "@/lib/supabase/guest";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
+import { isPlausibleEmail } from "@/lib/store/shipping";
 import { Button } from "@/components/ui/button";
 
 // Starting a project is the one thing that must never hit a sign-in wall. The
@@ -16,6 +17,11 @@ import { Button } from "@/components/ui/button";
 //
 // `forDrawing` (audit #11, "help me draw it"): the same project, plus what to
 // draw and a WhatsApp number; the owner is told so the drawing can be quoted.
+//
+// Optional email (owner decision D6, migration 0045): after the project is
+// created, /api/projects/recovery-email sends a link with a secret key that
+// opens (moves) this guest project in any other browser. Only offered to
+// visitors without an account — an account already works on every device.
 export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean }) {
   const t = useTranslations("Projects");
   const locale = useLocale();
@@ -24,6 +30,9 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
   const [name, setName] = useState("");
   const [brief, setBrief] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  // True once we know the visitor is signed in with a real account.
+  const [isAccount, setIsAccount] = useState(false);
   // A visitor without an account gives a WhatsApp number instead (owner,
   // 2026-09-29: "a phone number is enough"). It's saved on their profile, so
   // the project has a way to reach them. Signed-in accounts skip it.
@@ -32,7 +41,10 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return;
-      if (!isGuest(data.user)) return setNeedsPhone(false);
+      if (!isGuest(data.user)) {
+        setIsAccount(true);
+        return setNeedsPhone(false);
+      }
       const { data: prof } = await supabase.from("profiles").select("phone").eq("id", data.user.id).maybeSingle();
       if (prof?.phone) setNeedsPhone(false);
     });
@@ -56,6 +68,11 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
       setError(t("phoneRequired"));
       return;
     }
+    const contactEmail = isAccount ? "" : email.trim();
+    if (contactEmail && !isPlausibleEmail(contactEmail)) {
+      setError(t("emailInvalid"));
+      return;
+    }
 
     setError(null);
     setLoading(true);
@@ -76,6 +93,15 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
         await supabase.from("profiles").update({ phone: normalizePhone(phone) }).eq("id", user.id);
       }
 
+      if (contactEmail && isGuest(user)) {
+        // Best-effort: emails the project link (needs 0045; skipped before).
+        await fetch("/api/projects/recovery-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId: data.id, email: contactEmail, locale }),
+        }).catch(() => {});
+      }
+
       if (forDrawing) {
         // Best-effort: the project exists either way.
         await fetch("/api/store-lead", {
@@ -85,6 +111,7 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
             source: "drawing_request",
             name: trimmed,
             phone: phone.trim(),
+            ...(contactEmail ? { email: contactEmail } : {}),
             locale,
             message: `Drawing request for project "${trimmed}" (${data.id}).
 
@@ -150,11 +177,31 @@ ${brief.trim()}`,
             inputMode="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            placeholder="+974 5555 5555"
+            placeholder="+974 5XXX XXXX"
             dir="ltr"
             className="w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-base text-heading shadow-neu-inset outline-none placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
           />
           <p className="text-[11px] text-mutedtext">{t(forDrawing ? "drawingPhoneHint" : "phoneHint")}</p>
+        </div>
+      )}
+
+      {!isAccount && (
+        <div className="space-y-2">
+          <label htmlFor="project-email" className="block text-sm font-medium text-heading">
+            {t("emailLabel")}
+          </label>
+          <input
+            id="project-email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="name@example.com"
+            dir="ltr"
+            className="w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-base text-heading shadow-neu-inset outline-none placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
+          />
+          <p className="text-[11px] text-mutedtext">{t("emailHint")}</p>
         </div>
       )}
 
@@ -167,7 +214,7 @@ ${brief.trim()}`,
             {t("creating")}
           </>
         ) : (
-          t("create")
+          t(forDrawing ? "drawingSubmit" : "create")
         )}
       </Button>
     </form>

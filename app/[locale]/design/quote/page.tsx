@@ -42,6 +42,7 @@ export default async function DesignQuotePage({
         <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
           {t("heading")}
         </h1>
+        <p className="mt-2 text-sm font-semibold text-cobalt sm:text-base">{t("promise")}</p>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-body sm:text-base">
           {t("subheading")}
         </p>

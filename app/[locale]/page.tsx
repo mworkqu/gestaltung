@@ -92,7 +92,7 @@ export default async function Home({
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* 1 — Buy parts */}
+          {/* 1 — Shop parts */}
           <div className="neu animate-fade-up flex flex-col gap-5 p-6 sm:p-8">
             <ChoiceHead icon={<ShoppingBag className="h-5 w-5" />} step="1" title={t("choiceBuyTitle")} text={t("choiceBuyText")} />
             <form action={`/${locale}/store`} className="flex items-stretch gap-2">
@@ -115,13 +115,21 @@ export default async function Home({
             </Link>
           </div>
 
-          {/* 2 — Make my part (I have a file) */}
+          {/* 2 — Get a part made (I have a file) */}
           <div className="neu animate-fade-up delay-1 flex flex-col gap-5 p-6 sm:p-8">
             <ChoiceHead icon={<UploadCloud className="h-5 w-5" />} step="2" title={t("choiceMakeTitle")} text={t("choiceMakeText")} />
             <DesignDropzone compact />
+            {/* No file: we draw it from a sketch (one extra link, not a fourth path). */}
+            <Link
+              href="/design/drawing"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+            >
+              {t("drawLink")}
+              <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+            </Link>
           </div>
 
-          {/* 3 — Turn an idea into a product (prototyping) */}
+          {/* 3 — Plan a product (prototyping) */}
           <div className="neu animate-fade-up delay-2 flex flex-col gap-5 p-6 sm:p-8">
             <ChoiceHead icon={<Lightbulb className="h-5 w-5" />} step="3" title={t("choiceIdeaTitle")} text={t("choiceIdeaText")} />
             <ol className="space-y-1.5 text-sm text-body">

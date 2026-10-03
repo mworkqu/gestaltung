@@ -7,6 +7,7 @@ import {
   Cpu,
   Factory,
   Lightbulb,
+  MessageCircle,
   PackageCheck,
   Search,
   ShoppingBag,
@@ -18,6 +19,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
+import { COMPANY_WHATSAPP } from "@/lib/company";
 import { cn } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
@@ -34,7 +36,6 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
 
   const t = await getTranslations("HowItWorks");
   const tHero = await getTranslations("Hero");
-  const tHome = await getTranslations("Home");
   const isRtl = locale === "ar";
 
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -121,19 +122,21 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
               </li>
             ))}
           </ol>
+
+          {/* What a guest can do before signing up (idea tool only). */}
+          {key === "idea" && <p className="mt-5 text-sm text-mutedtext">{t("ideaLimits")}</p>}
         </section>
       ))}
 
-      {/* Closing CTA band */}
+      {/* Closing CTA band: one WhatsApp link for people who need design help. */}
       <section className="animate-fade-up overflow-hidden rounded-[1.75rem] bg-ink p-8 sm:p-12">
         <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
-          <div className="relative space-y-2">
-            <span className={mono("text-[10px] text-white/45")}>{tHome("ctaTag")}</span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{tHome("ctaHeading")}</h2>
-          </div>
-          <Button asChild size="lg" variant="secondary" className="relative rounded-full px-7">
-            <Link href="/contact">{tHome("ctaButton")}</Link>
+          <Button asChild size="lg" variant="secondary" className="relative h-auto whitespace-normal rounded-full px-7 py-3 text-start">
+            <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer">
+              <MessageCircle className="h-4 w-4 shrink-0" />
+              {t("helpCta")}
+            </a>
           </Button>
         </div>
       </section>

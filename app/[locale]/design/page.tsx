@@ -48,7 +48,7 @@ export default async function DesignHubPage({
       icon: UploadCloud,
       title: t("uploadTitle"),
       copy: t("uploadCopy"),
-      meta: "STL · STEP · DXF · IGES",
+      meta: tHero("formats"),
       accent: true,
     },
     {

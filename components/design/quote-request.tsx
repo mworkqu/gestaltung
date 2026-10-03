@@ -46,6 +46,9 @@ export function QuoteRequest() {
   const locale = useLocale();
   const isRtl = locale === "ar";
   const inputRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const techniqueRef = useRef<HTMLSelectElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [email, setEmail] = useState("");
@@ -54,6 +57,11 @@ export function QuoteRequest() {
   const [technique, setTechnique] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Field-level errors, shown under the field they belong to. A failed check
+  // never clears what was typed.
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [contactError, setContactError] = useState<string | null>(null);
+  const [techniqueError, setTechniqueError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<Done>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -70,31 +78,48 @@ export function QuoteRequest() {
   function pickFile(f: File | undefined) {
     if (!f) return;
     if (!ACCEPT_EXTENSIONS.includes(extOf(f.name))) {
-      setError(t("errorFileType"));
+      setFileError(t("errorFileType"));
       return;
     }
     if (f.size > MAX_FILE_BYTES) {
-      setError(t("errorTooLarge"));
+      setFileError(t("errorTooLarge"));
       return;
     }
+    setFileError(null);
     setError(null);
     setFile(f);
+  }
+
+  // Email or phone, at least one. Returns the message to show, or null.
+  function contactProblem(nextEmail: string, nextPhone: string): string | null {
+    if (!nextEmail.trim() && !nextPhone.trim()) return t("errorContact");
+    if (nextPhone.trim() && !isValidPhone(nextPhone)) return tPhone("invalid");
+    return null;
+  }
+
+  // Checked when a contact field loses focus, unless focus is only moving to
+  // the other contact field (the visitor is still filling them in).
+  function onContactBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const to = e.relatedTarget as Node | null;
+    if (to && (to === emailRef.current || to === phoneRef.current)) return;
+    setContactError(contactProblem(email, phone));
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
 
-    if (!email.trim() && !phone.trim()) {
-      setError(t("errorContact"));
+    // The file is optional (see the label); contact and method are required.
+    const cErr = contactProblem(email, phone);
+    const tErr = technique ? null : t("errorTechnique");
+    setContactError(cErr);
+    setTechniqueError(tErr);
+    if (cErr) {
+      (!email.trim() && phone.trim() ? phoneRef : emailRef).current?.focus();
       return;
     }
-    if (phone.trim() && !isValidPhone(phone)) {
-      setError(tPhone("invalid"));
-      return;
-    }
-    if (!technique) {
-      setError(t("errorTechnique"));
+    if (tErr) {
+      techniqueRef.current?.focus();
       return;
     }
 
@@ -229,9 +254,13 @@ export function QuoteRequest() {
 
   return (
     <form onSubmit={handleSubmit} className="neu mt-8 space-y-6 p-6 sm:p-8">
-      {/* File */}
+      <p className="text-[11px] text-faint">{t("requiredNote")}</p>
+
+      {/* File (optional) */}
       <div className="space-y-2">
-        <span className={mono("block text-[10px] text-mutedtext")}>{t("fileLabel")}</span>
+        <span className={mono("block text-[10px] text-mutedtext")}>
+          {t("fileLabel")} <span className="lowercase text-faint">({t("fileOptional")})</span>
+        </span>
         {file ? (
           <div className="flex items-center gap-3 rounded-xl bg-panel px-3 py-2.5 shadow-neu-sm">
             <FileBox className="h-4 w-4 shrink-0 text-cobalt" />
@@ -271,32 +300,61 @@ export function QuoteRequest() {
           }}
           className="sr-only"
         />
+        {fileError && (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            {fileError}
+          </p>
+        )}
       </div>
 
       {/* Contact */}
       <div className="space-y-2">
-        <span className={mono("block text-[10px] text-mutedtext")}>{t("contactLabel")}</span>
+        <span className={mono("block text-[10px] text-mutedtext")}>
+          {t("contactLabel")} <span aria-hidden className="text-destructive">*</span>
+        </span>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <input
+            ref={emailRef}
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (contactError) setContactError(contactProblem(e.target.value, phone));
+            }}
+            onBlur={onContactBlur}
             placeholder={t("emailPlaceholder")}
             aria-label={t("emailLabel")}
+            aria-invalid={contactError ? true : undefined}
+            aria-describedby="q-contact-msg"
             className={fieldClass}
             dir="ltr"
           />
           <input
+            ref={phoneRef}
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              if (contactError) setContactError(contactProblem(email, e.target.value));
+            }}
+            onBlur={onContactBlur}
             placeholder={t("phonePlaceholder")}
             aria-label={t("phoneLabel")}
+            aria-invalid={contactError ? true : undefined}
+            aria-describedby="q-contact-msg"
             className={fieldClass}
             dir="ltr"
           />
         </div>
-        <p className="text-[11px] text-faint">{t("contactHint")}</p>
+        {contactError ? (
+          <p id="q-contact-msg" role="alert" className="text-sm font-medium text-destructive">
+            {contactError}
+          </p>
+        ) : (
+          <p id="q-contact-msg" className="text-[11px] text-faint">
+            {t("contactHint")}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -317,12 +375,20 @@ export function QuoteRequest() {
         {/* Technique */}
         <div className="space-y-2">
           <label htmlFor="q-technique" className={mono("block text-[10px] text-mutedtext")}>
-            {t("techniqueLabel")}
+            {t("techniqueLabel")} <span aria-hidden className="text-destructive">*</span>
           </label>
           <select
             id="q-technique"
+            ref={techniqueRef}
             value={technique}
-            onChange={(e) => setTechnique(e.target.value)}
+            onChange={(e) => {
+              setTechnique(e.target.value);
+              setTechniqueError(null);
+            }}
+            onBlur={() => setTechniqueError(technique ? null : t("errorTechnique"))}
+            aria-required
+            aria-invalid={techniqueError ? true : undefined}
+            aria-describedby={techniqueError ? "q-technique-msg" : undefined}
             className={cn(fieldClass, isRtl && "text-right")}
           >
             <option value="" disabled>
@@ -334,6 +400,11 @@ export function QuoteRequest() {
               </option>
             ))}
           </select>
+          {techniqueError && (
+            <p id="q-technique-msg" role="alert" className="text-sm font-medium text-destructive">
+              {techniqueError}
+            </p>
+          )}
         </div>
       </div>
 

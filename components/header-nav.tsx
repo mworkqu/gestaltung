@@ -1,7 +1,7 @@
 "use client";
 
-// Site navigation (audit #13, #53; owner decision 8a): Shop parts · Make a
-// part · How it works for everyone; My projects once the visitor has a session
+// Site navigation (audit #13, #53; owner decision 8a): Shop parts · Get a part
+// made · Plan a product for everyone; My projects once the visitor has a session
 // (a guest who started a project too); Inventory + Dashboard + Sign out for a
 // signed-in account. Desktop: links + account menu. Under 1024 px: a menu
 // button opening a panel with everything.
@@ -64,7 +64,7 @@ export function HeaderNav({ isRtl, children }: { isRtl: boolean; children?: Reac
   const primary = [
     { href: "/store", label: t("pathBuy") },
     { href: "/design", label: t("pathMake") },
-    { href: session.kind === "none" ? "/projects/new" : "/projects", label: t("pathIdea") },
+    { href: "/projects/new", label: t("pathIdea") },
   ];
   const accountLinks = [
     { href: "/projects", label: t("myProjects") },

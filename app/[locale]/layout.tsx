@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages, setRequestLocale } from "next-intl/server";
+import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { Outfit, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 
@@ -33,14 +33,24 @@ const sansArabic = IBM_Plex_Sans_Arabic({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Gestaltung — Manufacturing, made simple in Qatar",
-  description:
-    "Gestaltung is a manufacturing marketplace and inventory platform for Qatar. Upload a CAD file, we match it to the right production method and partner workshop, and deliver the finished part.",
-  icons: {
-    icon: "/icon.png",
-  },
-};
+// Sitewide default title and description, in the visitor's language. Written
+// for customers (shop parts, get a part made, plan a product); pages override
+// it with their own generateMetadata.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "Meta" });
+  return {
+    title: t("siteTitle"),
+    description: t("siteDescription"),
+    icons: {
+      icon: "/icon.png",
+    },
+  };
+}
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));

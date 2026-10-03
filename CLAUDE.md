@@ -972,6 +972,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     lib/company.ts); areaOtherHint when delivery area is "Other". Guest cart persistence checked: no change needed.
   - scripts/check-i18n-parity.mjs (run it after any message change); parity 2295/2295. Owner: run 0044 after 0043.
 
+- SITE REVIEW FIXES, PHASE B (2026-10-03, migration 0045 — NOT RUN YET): copy, naming and jargon. One name per path (Shop parts / Get a part made / Plan a product / My projects, EN + AR); nav "Plan a product" → /projects/new. /projects/new has the three explanation lines, optional email and "My projects" link; with an email the project link is sent once (lib/projects/recovery.ts, link-email.ts, /api/projects/recovery-email, /api/projects/claim, components/projects/project-claim-gate.tsx; claim_project() moves guest-owned projects only and rotates the key). Client dashboard shows My orders / My projects (no customer orders page exists yet). About rewritten from owner facts. Forgot/reset password pages + /api/auth/callback added (Supabase redirect URL allow-list needed). Tests 325, parity 2337/2337.
+
 ## Site review decisions (owner, 2026-10-03)
 
 Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
@@ -1067,6 +1069,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0043_cad_generations.sql — cad_generations + cad_begin/cad_set_code/cad_deliver/cad_fail, analysis_runs 'cad'
   (RUN AFTER 0042; until then the 3D model card only shows the cost dialog)
 - 0044_shipping_flat_free_threshold.sql — QAR 50 all tiers + handling 0, free_shipping_threshold (QAR 300, Standard), quote v2, create_part_order v6 (+p_payment_method; bank transfer needs email; total > 0), set_order_payment_method v2 (RUN AFTER 0043; checkout falls back to the old call until then)
+- 0045_project_recovery_link.sql — D6 project link by email: projects.contact_email/recovery_token/recovery_emailed_at (guarded), project_recovery_begin(), claim_project() (moves a GUEST project to the session holding the #key= link, key rotated, new link emailed), storage read/delete by project owner (RUN AFTER 0044; until then /projects/new skips the email and #key= links show "not available")
 - 0042_ai_credits.sql — (RUN ✔ 2026-10-02) AI access + credits: credits_ledger, projects.status/limit, rate limits, credit RPCs,
   profiles.email sync, ai_usage_log (RUN AFTER 0041; also turn ON "Confirm email" in Supabase Auth)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units

@@ -76,3 +76,16 @@ Source: STAGE_SITE_REVIEW_FIXES_PROMPT.md
 - Guest cart persistence verified: @supabase/ssr cookies have a 400-day maxAge, so no change was needed.
 - Tests 319; i18n parity 2295/2295 EN/AR; `scripts/check-i18n-parity.mjs` added.
 - Pending owner steps: run 0044 (after 0043).
+
+## Phase B — Copy, naming and jargon (2026-10-03)
+- One name per path in nav, home, H1s, how-it-works, meta: Shop parts / Get a part made / Plan a product / My projects (EN + AR). "Plan a product" in the nav opens /projects/new.
+- /projects/new: three explanation lines, new hint, "+974 5XXX XXXX" placeholder, optional email, "My projects" link, drawing-request wording for ?for=drawing.
+- D6 (migration 0045, not run): projects.contact_email + recovery key; the project link is emailed once at creation; opening it in another browser moves a guest-owned project there (key rotates, signed-up owners never lose a project); storage policies follow the project owner.
+- Dashboard for clients: "My orders" and "My projects" blocks; tenant/role info only for admin and workshop users.
+- About rewritten for customers (founded 2026, Rafal Tower Lusail, Prusa MK4 / CNC / laser / electronics, partner workshops, WhatsApp CTA, no photo).
+- Home, /design, /design/quote (inline validation, file marked optional), /design/drawing (single primary + secondary button, "See what the price includes" -> /warranty), /how-it-works (short hero, guest limits, WhatsApp CTA).
+- Auth: new intro copy; forgot-password and reset-password pages plus /api/auth/callback (none existed).
+- Sitewide metadata localized (Meta.siteTitle / siteDescription).
+- Tests 325; i18n parity 2337/2337.
+- Pending owner steps: run 0045 (after 0044); add https://gestaltung360.com/** to Supabase Auth redirect URLs.
+- Known gap: there is no customer orders page; "My orders" shows the count and links to the store.

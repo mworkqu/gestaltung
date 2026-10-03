@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
-import { ProjectWorkspace } from "@/components/projects/project-workspace";
+import { ProjectClaimGate } from "@/components/projects/project-claim-gate";
 
 // Tab title = the project's name (audit #23). Read with the request's own
 // session, scoped to the signed-in owner exactly like the workspace, so a
@@ -45,7 +45,8 @@ export async function generateMetadata({
 
 // The workspace loads its own data through the browser client so that a guest
 // (whose session cookie is written client-side) and a signed-in client behave
-// identically. RLS scopes both to their own auth.uid().
+// identically. RLS scopes both to their own auth.uid(). ProjectClaimGate first
+// handles an emailed link's #key= (D6, 0045), then renders the workspace.
 export const dynamic = "force-dynamic";
 
 export default async function ProjectPage({
@@ -58,7 +59,7 @@ export default async function ProjectPage({
 
   return (
     <div className="container max-w-3xl py-8">
-      <ProjectWorkspace projectId={id} />
+      <ProjectClaimGate projectId={id} />
     </div>
   );
 }

@@ -19,6 +19,7 @@ function extOf(name: string) {
 // page (email/phone + method), keeping the blueprint aesthetic of the old box.
 export function DesignDropzone({ compact = false }: { compact?: boolean }) {
   const t = useTranslations("StoreLanding");
+  const tHero = useTranslations("Hero");
   const locale = useLocale();
   const router = useRouter();
   const isRtl = locale === "ar";
@@ -82,7 +83,7 @@ export function DesignDropzone({ compact = false }: { compact?: boolean }) {
 
         <div className="relative flex flex-col items-center">
           <GMark className="h-16 w-16" />
-          <p className={mono("mt-3 text-[10px] text-faint")}>STL · STEP · DXF · IGES</p>
+          <p className={mono("mt-3 text-[10px] text-faint")}>{tHero("formats")}</p>
 
           <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-heading">
             <UploadCloud className="h-4 w-4 text-cobalt" strokeWidth={1.75} />

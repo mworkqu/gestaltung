@@ -5,11 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
-
-// The business WhatsApp number, digits only (e.g. 974XXXXXXXX). When unset, all
-// CTAs fall back to the contact page instead of a broken wa.me link.
-const WHATSAPP_DIGITS =
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
+import { COMPANY_WHATSAPP } from "@/lib/company";
 
 export const generateMetadata = metaFor("drawing");
 
@@ -27,8 +23,6 @@ export default async function CadAssistancePage({
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-
-  const waHref = WHATSAPP_DIGITS ? `https://wa.me/${WHATSAPP_DIGITS}` : null;
 
   const specs = [
     { label: t("specTurnaroundLabel"), value: t("specTurnaroundValue") },
@@ -48,25 +42,20 @@ export default async function CadAssistancePage({
     { name: t("tier3Name"), desc: t("tier3Desc"), price: t("tier3Price") },
   ];
 
-  // Primary CTA (audit #11): start a drawing project — the request, the brief
-  // and any files live on one project. WhatsApp stays as the second option.
+  // The only CTAs on the page: "Start a drawing request" is primary (the
+  // request, the brief and any files live on one project), "Chat on WhatsApp"
+  // the secondary. One of each; the page has no second copy lower down.
   const cta = (
     <div className="flex flex-wrap items-center gap-3">
       <Button asChild size="lg" className="rounded-full px-7">
         <Link href={{ pathname: "/projects/new", query: { for: "drawing" } }}>{t("ctaProject")}</Link>
       </Button>
-      {waHref ? (
-        <Button asChild size="lg" variant="outline" className="rounded-full px-6">
-          <a href={waHref} target="_blank" rel="noopener noreferrer">
-            <MessageCircle className="h-4 w-4" />
-            {t("ctaWhatsApp")}
-          </a>
-        </Button>
-      ) : (
-        <Link href="/contact" className="text-sm font-semibold text-cobalt hover:underline">
-          {t("ctaFallback")}
-        </Link>
-      )}
+      <Button asChild size="lg" variant="outline" className="rounded-full px-6">
+        <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer">
+          <MessageCircle className="h-4 w-4" />
+          {t("ctaWhatsApp")}
+        </a>
+      </Button>
     </div>
   );
 
@@ -154,33 +143,13 @@ export default async function CadAssistancePage({
             </div>
           ))}
         </div>
-      </section>
 
-      {/* Closing CTA band */}
-      <section className="animate-fade-up delay-3 overflow-hidden rounded-[1.75rem] bg-ink p-8 sm:p-12">
-        <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-          <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
-          <div className="relative space-y-2">
-            <span className={mono("text-[10px] text-white/45")}>{t("ctaTag")}</span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-              {t("ctaHeading")}
-            </h2>
-          </div>
-          <div className="relative">
-            {waHref ? (
-              <Button asChild size="lg" variant="secondary" className="rounded-full px-7">
-                <a href={waHref} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="h-4 w-4" />
-                  {t("ctaWhatsApp")}
-                </a>
-              </Button>
-            ) : (
-              <Button asChild size="lg" variant="secondary" className="rounded-full px-7">
-                <Link href="/contact">{t("ctaFallback")}</Link>
-              </Button>
-            )}
-          </div>
-        </div>
+        {/* One line to the terms: what the price covers (owner: no extra claims here). */}
+        <p className="mt-5 text-sm">
+          <Link href="/warranty" className="font-semibold text-cobalt hover:underline">
+            {t("priceIncludes")}
+          </Link>
+        </p>
       </section>
     </div>
   );
