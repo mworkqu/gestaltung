@@ -1,6 +1,6 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ChevronRight, FileText } from "lucide-react";
+import { ChevronRight, ExternalLink, FileText } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
@@ -15,14 +15,16 @@ import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { RequestItemButton } from "@/components/parts/request-item-button";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
-import { formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
+import { arrivesByDate, formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
+import { loadShippingSettings } from "@/lib/store/shipping-settings";
+import { canRequestItem, showMinOrder } from "@/lib/store/product-display";
 import { minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
 import { AddToProjectButton } from "@/components/parts/add-to-project-button";
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
-import { productSpecs } from "@/lib/store/specs";
+import { productSpecs, tidyDescription } from "@/lib/store/specs";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +89,11 @@ export default async function PartDetailPage({
   });
   const quote = (quoteData ?? null) as DeliveryQuote | null;
   const onRequest = !part.lead_time_class;
+  // Standard-tier date: the quote's, else the same sum computed in TS (the
+  // card's formula) if the quote couldn't load.
+  const standardDate =
+    quote?.tiers?.standard?.date ??
+    (onRequest ? null : arrivesByDate(part.lead_time_class, await loadShippingSettings()));
   // Cheapest tier at its normal price (0044); shown beside the date.
   const deliveryFrom = minDeliveryFrom(quote?.tiers);
   const deliveryFromLine =
@@ -95,10 +102,13 @@ export default async function PartDetailPage({
   const name = partName(part, locale);
   // Specs from the supplier's table or the description's own "Specifications"
   // section, shown once as a table (owner, 2026-09-29).
-  const { text: description, specs: specRows } = productSpecs({
+  const { text: rawDescription, specs: specRows } = productSpecs({
     specs: (part as { specs?: unknown }).specs,
     description: partDescription(part, locale),
   });
+  // The title is the H1 only: lines repeating it are dropped. A "Links" list
+  // keeps only entries that carry a URL (rendered as links), else it goes.
+  const { text: description, links } = tidyDescription(rawDescription, [part.name, part.name_ar]);
   const datasheet = (part as { datasheet_url?: string | null }).datasheet_url ?? null;
   const imageUrl = partImageUrl(part);
 
@@ -143,12 +153,11 @@ export default async function PartDetailPage({
         {/* Details */}
         <div className="space-y-6">
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-md bg-panel px-2 py-0.5 font-mono text-[11px] text-mutedtext">
-                {part.sku}
-              </span>
-              <LeadTimeBadge leadClass={part.lead_time_class} />
-            </div>
+            {onRequest && (
+              <div className="flex flex-wrap items-center gap-3">
+                <LeadTimeBadge leadClass={null} />
+              </div>
+            )}
             <h1 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
               {name}
             </h1>
@@ -158,11 +167,9 @@ export default async function PartDetailPage({
                 {t("perUnit")}
               </span>
             </p>
-            <p className="text-sm text-mutedtext">
-              {part.min_order_qty > 1
-                ? t("minOrder", { qty: part.min_order_qty })
-                : t("noMinimum")}
-            </p>
+            {showMinOrder(part.min_order_qty) && (
+              <p className="text-sm text-mutedtext">{t("minOrder", { qty: part.min_order_qty })}</p>
+            )}
           </div>
 
           {onRequest ? (
@@ -171,18 +178,20 @@ export default async function PartDetailPage({
               {deliveryFromLine && <p className="text-sm font-medium text-heading">{deliveryFromLine}</p>}
             </div>
           ) : (
-            quote?.tiers?.standard?.date && (
+            standardDate && (
               <div className="rounded-xl bg-panel p-3 text-sm shadow-neu-inset">
                 <p className="font-semibold text-heading">
-                  {tDelivery("arrivesBy", { date: formatDeliveryDate(quote.tiers.standard.date, locale) })}
+                  {tDelivery("arrivesBy", { date: formatDeliveryDate(standardDate, locale) })}
                   <span className="font-normal text-mutedtext"> · {tDelivery("tier_standard")}</span>
                   {deliveryFromLine && <span className="font-normal text-body"> · {deliveryFromLine}</span>}
                 </p>
-                <p className="mt-1 text-xs text-mutedtext">
-                  {SHIPPING_TIERS.filter((k) => k !== "standard" && quote.tiers[k]?.date)
-                    .map((k) => `${tDelivery(`tier_${k}`)}: ${formatDeliveryDate(quote.tiers[k]!.date, locale)}`)
-                    .join(" · ")}
-                </p>
+                {quote && (
+                  <p className="mt-1 text-xs text-mutedtext">
+                    {SHIPPING_TIERS.filter((k) => k !== "standard" && quote.tiers[k]?.date)
+                      .map((k) => `${tDelivery(`tier_${k}`)}: ${formatDeliveryDate(quote.tiers[k]!.date, locale)}`)
+                      .join(" · ")}
+                  </p>
+                )}
               </div>
             )
           )}
@@ -190,7 +199,9 @@ export default async function PartDetailPage({
           <div className="flex flex-wrap items-center gap-3">
             <PartDetailCart part={part} />
             <AddToProjectButton partId={part.id} partName={name} />
-            <RequestItemButton partId={part.id} partName={name} variant="outline" />
+            {canRequestItem(part.lead_time_class) && (
+              <RequestItemButton partId={part.id} partName={name} variant="outline" />
+            )}
           </div>
           <DemandBeacon kind="view" partId={part.id} />
 
@@ -202,6 +213,27 @@ export default async function PartDetailPage({
               <p className="whitespace-pre-line text-sm leading-relaxed text-body">
                 {description}
               </p>
+            </div>
+          )}
+
+          {links.length > 0 && (
+            <div className="space-y-2">
+              <h2 className={mono("text-[10px] text-mutedtext")}>{t("linksLabel")}</h2>
+              <ul className="flex flex-wrap gap-2">
+                {links.map((l) => (
+                  <li key={l.url}>
+                    <a
+                      href={l.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-cobalt shadow-neu-sm hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -246,7 +278,7 @@ export default async function PartDetailPage({
             {spec(t("specCategory"), categoryLabel(part.category, locale))}
             {spec(t("specMaterial"), materialLabel(part.material) || null)}
             {spec(t("specStandard"), part.standard)}
-            {spec(t("specMinOrder"), String(part.min_order_qty))}
+            {spec(t("specMinOrder"), showMinOrder(part.min_order_qty) ? String(part.min_order_qty) : null)}
           </dl>
         </div>
       </div>

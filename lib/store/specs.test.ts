@@ -27,3 +27,30 @@ describe("productSpecs", () => {
     expect(r.text).toBe(voltaat);
   });
 });
+
+import { tidyDescription } from "./specs";
+
+describe("tidyDescription", () => {
+  it("drops the repeated title and a Links section with no URL", () => {
+    const r = tidyDescription("L298N Motor Driver\nDrives two motors.\nLinks\n• 3D Model\nTutorials\n• Wiring", ["L298N Motor Driver"]);
+    expect(r.links).toEqual([]);
+    expect(r.text).toBe("Drives two motors.\nTutorials\n• Wiring");
+  });
+  it("matches the title ignoring case and punctuation", () => {
+    expect(tidyDescription("l298n  motor driver:\nBody", ["L298N Motor Driver"]).text).toBe("Body");
+  });
+  it("keeps a Links entry that has a URL as a real link", () => {
+    const r = tidyDescription("Body\nLinks\n• 3D Model https://example.com/model.step\n• Datasheet", []);
+    expect(r.links).toEqual([{ label: "3D Model", url: "https://example.com/model.step" }]);
+    expect(r.text).toBe("Body");
+  });
+  it("reads a one-line Links entry and uses the host when there is no label", () => {
+    expect(tidyDescription("Body\nLinks • https://www.example.com/a", []).links).toEqual([
+      { label: "example.com", url: "https://www.example.com/a" },
+    ]);
+    expect(tidyDescription("Links • 3D Model", []).text).toBeNull();
+  });
+  it("does not touch ordinary text that merely starts with Links", () => {
+    expect(tidyDescription("Links-based design", []).text).toBe("Links-based design");
+  });
+});

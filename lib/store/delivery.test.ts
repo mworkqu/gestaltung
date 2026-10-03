@@ -74,3 +74,50 @@ describe("reviewPromise (delivery-promises cron)", () => {
     expect(r).toEqual({ changed: [0], newDate: null });
   });
 });
+
+import { arrivesByDate, parseShippingSettings, todayIso } from "@/lib/store/delivery";
+
+describe("parseShippingSettings", () => {
+  it("reads handling, buffer and the standard tier's transit days", () => {
+    expect(
+      parseShippingSettings({ handling_days: 1, buffer_days: 3, tiers: { standard: { transit_days: 2 }, express: { transit_days: 1 } } })
+    ).toEqual({ handlingDays: 1, bufferDays: 3, standardTransitDays: 2 });
+  });
+  it("uses the SQL defaults for missing days (handling 1, buffer 3, transit 0)", () => {
+    expect(parseShippingSettings({ tiers: { standard: {} } })).toEqual({ handlingDays: 1, bufferDays: 3, standardTransitDays: 0 });
+    expect(parseShippingSettings({ handling_days: 0, buffer_days: 0, tiers: { standard: { transit_days: 0 } } })).toEqual({
+      handlingDays: 0,
+      bufferDays: 0,
+      standardTransitDays: 0,
+    });
+  });
+  it("is null without a standard tier or a usable value", () => {
+    expect(parseShippingSettings({ tiers: { express: { transit_days: 1 } } })).toBeNull();
+    expect(parseShippingSettings(null)).toBeNull();
+    expect(parseShippingSettings("x")).toBeNull();
+  });
+});
+
+describe("arrivesByDate (mirrors order_delivery_quote, Standard tier)", () => {
+  const settings = { handlingDays: 1, bufferDays: 3, standardTransitDays: 2 };
+
+  it("is from + lead class days + handling + transit + buffer", () => {
+    // in_stock = 2 days: 2 + 1 + 2 + 3 = 8
+    expect(arrivesByDate("in_stock", settings, "2026-10-03")).toBe("2026-10-11");
+    // 3_5_days = 5: 5 + 6 = 11
+    expect(arrivesByDate("3_5_days", settings, "2026-10-03")).toBe("2026-10-14");
+    // 1_2_weeks = 14: 14 + 6 = 20
+    expect(arrivesByDate("1_2_weeks", settings, "2026-10-03")).toBe("2026-10-23");
+    // 2_4_weeks = 28: 28 + 6 = 34, across a month and year end
+    expect(arrivesByDate("2_4_weeks", settings, "2026-12-01")).toBe("2027-01-04");
+  });
+  it("has no date for a product on request or without settings", () => {
+    expect(arrivesByDate(null, settings, "2026-10-03")).toBeNull();
+    expect(arrivesByDate(undefined, settings, "2026-10-03")).toBeNull();
+    expect(arrivesByDate("in_stock", null, "2026-10-03")).toBeNull();
+  });
+  it("defaults the start to today (UTC)", () => {
+    expect(arrivesByDate("in_stock", settings)).toBe(arrivesByDate("in_stock", settings, todayIso()));
+    expect(todayIso(new Date("2026-10-03T23:30:00Z"))).toBe("2026-10-03");
+  });
+});

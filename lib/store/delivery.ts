@@ -97,6 +97,58 @@ function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Today as an ISO date in UTC — what Postgres current_date is on Supabase. */
+export function todayIso(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+/** The parts of store_settings.shipping a date needs (standard tier). */
+export type ShippingSettings = {
+  handlingDays: number;
+  bufferDays: number;
+  standardTransitDays: number;
+};
+
+const wholeDays = (v: unknown, fallback: number): number => {
+  if (v === null || v === undefined || v === "") return fallback;
+  const n = Math.trunc(Number(v));
+  return Number.isFinite(n) ? n : fallback;
+};
+
+/**
+ * Read store_settings.shipping into what card dates need. Defaults mirror
+ * order_delivery_quote (handling 1, buffer 3, transit 0). Null when the
+ * standard tier isn't configured, because then SQL gives no date either.
+ */
+export function parseShippingSettings(value: unknown): ShippingSettings | null {
+  if (!value || typeof value !== "object") return null;
+  const cfg = value as { handling_days?: unknown; buffer_days?: unknown; tiers?: Record<string, { transit_days?: unknown } | null> };
+  const standard = cfg.tiers?.standard;
+  if (!standard || typeof standard !== "object") return null;
+  return {
+    handlingDays: wholeDays(cfg.handling_days, 1),
+    bufferDays: wholeDays(cfg.buffer_days, 3),
+    standardTransitDays: wholeDays(standard.transit_days, 0),
+  };
+}
+
+/**
+ * "Arrives by" for one product on the Standard tier, without a database call:
+ * from + lead-class days + handling + standard transit + buffer. The same sum
+ * as order_delivery_quote's tiers.standard.date for a single line (quantity
+ * does not move dates). Null for a product on request (no lead class) or when
+ * the settings are missing.
+ */
+export function arrivesByDate(
+  leadTimeClass: LeadTimeClass | null | undefined,
+  settings: ShippingSettings | null | undefined,
+  from: string = todayIso()
+): string | null {
+  if (!leadTimeClass || !settings) return null;
+  const lead = LEAD_CLASS_DAYS[leadTimeClass] ?? 28;
+  return addDays(from, lead + settings.handlingDays + settings.standardTransitDays + settings.bufferDays);
+}
+
 /** One order line as the delivery-promises cron sees it. */
 export type PromiseLine = {
   /** Lead-time class snapshotted on the line (null = sold on request). */

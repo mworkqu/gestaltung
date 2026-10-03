@@ -1,32 +1,37 @@
 "use client";
 
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { Loader2, Search, X } from "lucide-react";
 
 import { useRouter, usePathname } from "@/i18n/navigation";
-import { LEAD_TIME_CLASSES } from "@/lib/store/sourcing";
+import {
+  hasActiveFilters,
+  LEAD_FILTER_OPTIONS,
+  sortOptions,
+  storeQuery,
+  type StorePatch,
+  type StoreState,
+} from "@/lib/store/catalog";
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
 
-type Current = {
-  q?: string;
-  category?: string;
-  material?: string;
-  stock?: string;
-};
+const DEBOUNCE_MS = 300;
 
-// Filter bar for the public catalog. Pushes ?q=&category=&material=&stock=
-// query params; the server component re-reads them and filters. The search term
-// is carried through untouched so filtering never silently discards it.
-// No client pagination.
+// Search + filter bar for the public catalog. The URL is the single source of
+// truth: every control navigates to /store?… (storeQuery: empty values drop,
+// any change resets to page 1) and the server component re-reads it. Typing
+// is debounced; Enter searches at once; the × clears the search. Categories
+// and materials come from the data, never from a list in code.
 export function PartsFilters({
   categories,
   materials,
-  current,
+  state,
 }: {
   categories: string[];
   materials: string[];
-  current: Current;
+  state: StoreState;
 }) {
   const t = useTranslations("Parts");
   const tD = useTranslations("Delivery");
@@ -34,19 +39,65 @@ export function PartsFilters({
   const isRtl = locale === "ar";
   const router = useRouter();
   const pathname = usePathname();
+  const [pending, startTransition] = useTransition();
+
+  const [text, setText] = useState(state.q);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The q we last navigated to: a URL change to anything else (back button,
+  // "Clear filters", a link) replaces the box; our own navigation doesn't, so
+  // a slow response never overwrites what is being typed.
+  const lastSent = useRef(state.q);
+  useEffect(() => {
+    if (state.q !== lastSent.current) {
+      lastSent.current = state.q;
+      setText(state.q);
+    }
+  }, [state.q]);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  // Merge a patch into the current params and navigate. Empty values drop.
-  function apply(patch: Current) {
-    const next: Record<string, string> = {};
-    const merged = { ...current, ...patch };
-    if (merged.q) next.q = merged.q;
-    if (merged.category) next.category = merged.category;
-    if (merged.material) next.material = merged.material;
-    if (merged.stock) next.stock = merged.stock;
-    router.push({ pathname, query: next });
+  function go(patch: StorePatch, mode: "push" | "replace" = "push") {
+    // A filter clicked mid-typing carries the typed text with it.
+    if (timer.current && !("q" in patch)) {
+      cancelTyping();
+      const q = text.replace(/\s+/g, " ").trim();
+      lastSent.current = q;
+      patch = { ...patch, q };
+    }
+    const query = storeQuery(state, patch);
+    startTransition(() => {
+      if (mode === "replace") router.replace({ pathname, query }, { scroll: false });
+      else router.push({ pathname, query }, { scroll: false });
+    });
+  }
+
+  function cancelTyping() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }
+
+  function search(value: string, mode: "push" | "replace") {
+    cancelTyping();
+    const q = value.replace(/\s+/g, " ").trim();
+    if (q === state.q) return;
+    lastSent.current = q;
+    go({ q }, mode);
+  }
+
+  function onType(value: string) {
+    setText(value);
+    cancelTyping();
+    // Typing replaces the history entry instead of adding one per pause.
+    timer.current = setTimeout(() => search(value, "replace"), DEBOUNCE_MS);
+  }
+
+  function clearAll() {
+    cancelTyping();
+    setText("");
+    lastSent.current = "";
+    startTransition(() => router.push({ pathname, query: {} }, { scroll: false }));
   }
 
   const fieldClass =
@@ -60,8 +111,54 @@ export function PartsFilters({
         : "bg-panel text-mutedtext shadow-neu-sm hover:text-heading"
     );
 
+  const hasQuery = !!state.q;
+
   return (
-    <div className="neu flex flex-col gap-4 p-4 sm:p-5">
+    <div className="neu flex flex-col gap-4 p-4 sm:p-5" aria-busy={pending}>
+      {/* Search */}
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          search(text, "push");
+        }}
+        className="space-y-2"
+      >
+        <label htmlFor="store-search" className={mono("block text-[10px] text-mutedtext")}>
+          {t("searchLabel")}
+        </label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mutedtext" aria-hidden />
+          <input
+            id="store-search"
+            type="search"
+            value={text}
+            onChange={(e) => onType(e.target.value)}
+            placeholder={t("searchPlaceholder")}
+            autoComplete="off"
+            enterKeyHint="search"
+            maxLength={100}
+            className={cn(fieldClass, "w-full ps-9 pe-10 [&::-webkit-search-cancel-button]:hidden")}
+          />
+          <span className="absolute end-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            {pending && <Loader2 className="h-4 w-4 animate-spin text-mutedtext" aria-hidden />}
+            {text && (
+              <button
+                type="button"
+                onClick={() => {
+                  setText("");
+                  search("", "push");
+                }}
+                aria-label={t("searchClear")}
+                className="rounded-full p-1 text-mutedtext hover:text-heading focus:outline-none focus:ring-2 focus:ring-cobalt/60"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </span>
+        </div>
+      </form>
+
       {/* Category chips */}
       {categories.length > 0 && (
         <div className="space-y-2">
@@ -69,8 +166,9 @@ export function PartsFilters({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => apply({ category: "" })}
-              className={chip(!current.category)}
+              onClick={() => go({ category: "" })}
+              aria-pressed={!state.category}
+              className={chip(!state.category)}
             >
               {t("filterAll")}
             </button>
@@ -78,8 +176,9 @@ export function PartsFilters({
               <button
                 key={c}
                 type="button"
-                onClick={() => apply({ category: c })}
-                className={chip(current.category === c)}
+                onClick={() => go({ category: c })}
+                aria-pressed={state.category === c}
+                className={chip(state.category === c)}
               >
                 {categoryLabel(c, locale)}
               </button>
@@ -97,8 +196,8 @@ export function PartsFilters({
             </label>
             <select
               id="material"
-              value={current.material ?? ""}
-              onChange={(e) => apply({ material: e.target.value })}
+              value={state.material ?? ""}
+              onChange={(e) => go({ material: e.target.value })}
               className={cn(fieldClass, isRtl && "text-right")}
             >
               <option value="">{t("filterAllMaterials")}</option>
@@ -111,31 +210,50 @@ export function PartsFilters({
           </div>
         )}
 
-        {/* Lead-time select (never "out of stock") */}
+        {/* Delivery time (lead-time ranges; never "out of stock") */}
         <div className="space-y-2">
           <label htmlFor="stock" className={mono("block text-[10px] text-mutedtext")}>
             {tD("filterLead")}
           </label>
           <select
             id="stock"
-            value={current.stock ?? ""}
-            onChange={(e) => apply({ stock: e.target.value })}
+            value={state.stock ?? ""}
+            onChange={(e) => go({ stock: e.target.value as StorePatch["stock"] })}
             className={cn(fieldClass, isRtl && "text-right")}
           >
             <option value="">{tD("filterAllLead")}</option>
-            {LEAD_TIME_CLASSES.map((s) => (
-              <option key={s} value={s}>
-                {tD(`lt_${s}`)}
+            {LEAD_FILTER_OPTIONS.map((o) => (
+              <option key={o} value={o}>
+                {tD(`leadOpt_${o}`)}
               </option>
             ))}
           </select>
         </div>
 
-        {(current.category || current.material || current.stock) && (
+        {/* Sort */}
+        <div className="space-y-2">
+          <label htmlFor="sort" className={mono("block text-[10px] text-mutedtext")}>
+            {t("sortLabel")}
+          </label>
+          <select
+            id="sort"
+            value={state.sort}
+            onChange={(e) => go({ sort: e.target.value as StorePatch["sort"] })}
+            className={cn(fieldClass, isRtl && "text-right")}
+          >
+            {sortOptions(hasQuery).map((s) => (
+              <option key={s} value={s}>
+                {t(`sort_${s}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {hasActiveFilters(state) && (
           <button
             type="button"
-            onClick={() => router.push({ pathname, query: {} })}
-            className="text-xs font-medium text-cobalt hover:underline"
+            onClick={clearAll}
+            className="pb-2 text-xs font-medium text-cobalt hover:underline"
           >
             {t("clearFilters")}
           </button>

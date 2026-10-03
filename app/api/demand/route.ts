@@ -20,8 +20,35 @@ export async function POST(request: Request) {
   const partId = str("partId", 36);
   if (partId && !UUID.test(partId)) return new Response(null, { status: 400 });
   const quantity = Number(body?.quantity);
+  const qty = Number.isFinite(quantity) && quantity >= 1 ? Math.trunc(quantity) : 1;
 
   const supabase = await createClient();
+
+  // "Request this item" for something we don't sell (a store search with no
+  // results): no product id, the item is the typed text. record_demand() only
+  // stores requests for existing products, so the term is kept as a
+  // zero_search signal (restock dashboard) and the request itself is emailed.
+  if (kind === "request" && !partId) {
+    const item = str("searchTerm", 200)?.trim() ?? "";
+    const email = str("email", 200)?.trim() ?? "";
+    if (!item || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return Response.json({ error: "email" }, { status: 400 });
+    const { error: recErr } = await supabase.rpc("record_demand", {
+      p_kind: "zero_search",
+      p_source_page: str("sourcePage", 300),
+      p_search_term: item,
+    });
+    const e = (s: string | null) => escapeHtml(s ?? "");
+    const emailed = await sendEmail({
+      to: [OWNER_EMAIL],
+      replyTo: email,
+      subject: `Item request (not in the store): ${item}`,
+      html: `<p><b>${e(item)}</b> — not in the store</p>
+<p>Email: ${e(email)}<br/>Quantity: ${qty}<br/>Page: ${e(str("sourcePage", 300))}</p>
+<p>${e(str("note", 1000))}</p>`,
+    });
+    if (!emailed && recErr) return Response.json({ error: "failed" }, { status: 500 });
+    return Response.json({ ok: true, emailed });
+  }
   const { error } = await supabase.rpc("record_demand", {
     p_kind: kind,
     p_part_id: partId,
@@ -44,7 +71,7 @@ export async function POST(request: Request) {
       replyTo: str("email", 200) ?? undefined,
       subject: `Item request: ${part?.name ?? partId}`,
       html: `<p><b>${e(part?.name ?? "")}</b> (${e(part?.sku ?? "")})</p>
-<p>Email: ${e(str("email", 200))}<br/>Quantity: ${e(String(Number.isFinite(quantity) && quantity >= 1 ? Math.trunc(quantity) : 1))}<br/>Page: ${e(str("sourcePage", 300))}</p>
+<p>Email: ${e(str("email", 200))}<br/>Quantity: ${qty}<br/>Page: ${e(str("sourcePage", 300))}</p>
 <p>${e(str("note", 1000))}</p>`,
     });
   }

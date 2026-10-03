@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, Minus, Plus, ShoppingCart } from "lucide-react";
+import { Minus, Plus, ShoppingCart } from "lucide-react";
 
 import type { Part } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
+import { AddedViewCart } from "@/components/parts/added-view-cart";
 import { useCart } from "@/components/parts/cart-provider";
 
 // Quantity stepper + add-to-cart for the product detail page. Products
 // "available on request" use it too: they sell at the listed price and their
-// delivery date is confirmed after the order (0032).
+// delivery date is confirmed after the order (0032). After adding, the button
+// becomes an "Added — View cart" link; changing the quantity brings the add
+// button back so more can be added.
 export function PartDetailCart({ part }: { part: Part }) {
   const t = useTranslations("Parts");
   const { addItem } = useCart();
@@ -20,7 +23,11 @@ export function PartDetailCart({ part }: { part: Part }) {
   function handleAdd() {
     addItem(part, qty);
     setAdded(true);
-    window.setTimeout(() => setAdded(false), 1500);
+  }
+
+  function changeQty(next: (q: number) => number) {
+    setQty(next);
+    setAdded(false);
   }
 
   return (
@@ -29,7 +36,7 @@ export function PartDetailCart({ part }: { part: Part }) {
         <button
           type="button"
           aria-label={t("decrease")}
-          onClick={() => setQty((q) => Math.max(part.min_order_qty, q - 1))}
+          onClick={() => changeQty((q) => Math.max(part.min_order_qty, q - 1))}
           className="flex h-10 w-10 items-center justify-center rounded-full text-mutedtext hover:text-heading disabled:opacity-40"
           disabled={qty <= part.min_order_qty}
         >
@@ -41,26 +48,23 @@ export function PartDetailCart({ part }: { part: Part }) {
         <button
           type="button"
           aria-label={t("increase")}
-          onClick={() => setQty((q) => q + 1)}
+          onClick={() => changeQty((q) => q + 1)}
           className="flex h-10 w-10 items-center justify-center rounded-full text-mutedtext hover:text-heading"
         >
           <Plus className="h-4 w-4" />
         </button>
       </div>
 
-      <Button type="button" size="lg" onClick={handleAdd} className="rounded-full">
+      <div aria-live="polite" className="contents">
         {added ? (
-          <>
-            <Check className="h-4 w-4" />
-            {t("added")}
-          </>
+          <AddedViewCart size="lg" />
         ) : (
-          <>
+          <Button type="button" size="lg" onClick={handleAdd} className="rounded-full">
             <ShoppingCart className="h-4 w-4" />
             {t("addToCart")}
-          </>
+          </Button>
         )}
-      </Button>
+      </div>
     </div>
   );
 }

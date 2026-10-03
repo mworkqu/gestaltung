@@ -99,3 +99,12 @@ Source: STAGE_SITE_REVIEW_FIXES_PROMPT.md
 - Guests (anonymous sessions) on /dashboard and /inventory are redirected to /projects (lib/auth/guest-redirect.ts, tested); header shows "Sign in" for guests. No RLS change.
 - Arabic brand spelling unified to the owner's spelling in two site strings.
 - Tests 385; i18n parity 2385/2385.
+
+## Phase C — Store discovery (2026-10-03; C5 category consolidation awaits owner approval)
+- /store: search box (?q=, debounced), sort (Relevance, Price low/high, Name A–Z), server-side filtering and paging; URL is the source of truth. Search matches name (EN/AR), SKU, category and material.
+- Relevance ranking in lib/store/search.ts (title match first, then category weight, accessory penalty); "esp32" lists boards before jumper wires. Unit tested.
+- Empty search state: "We don't have "{q}" yet…" with "Request this item" (pre-filled, emails the owner) and "Clear search", plus WhatsApp number.
+- Filter renamed "Delivery time" (3–5 days / 1–2 weeks / 2–4 weeks); "In stock" option dropped; "Clear filters" in both locales from one rule.
+- Cards and product page: "Arrives by {date}" (lib/store/delivery.ts arrivesByDate, same formula as the SQL quote), SKU codes hidden (kept in URLs, admin, order email), "Min. order: N" only when N > 1, "Request this item" only for on-request items, "Save to a project" tooltip, "Added — View cart", title once, dead "3D Model" text removed (real links only).
+- Store list sends cards only the fields they need (StoreCardPart) through a cookie-free client (lib/supabase/public.ts).
+- Tests 500; i18n parity 2424/2424.

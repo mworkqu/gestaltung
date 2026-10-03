@@ -976,6 +976,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 
 - SITE REVIEW FIXES, PHASE D (2026-10-03, no migration): contact + footer with WhatsApp/address/C.R./payment badges; legal pages /delivery-returns, /warranty, /terms, /privacy rendered from content/legal/*.md, generated verbatim from LEGAL_PAGES_DRAFT.md by scripts/split-legal-draft.mjs (re-run it with --check after any edit to the draft; never hand-edit the content files); branded 404 via app/[locale]/[...rest]; guest sessions redirected from /dashboard and /inventory to /projects (lib/auth/guest-redirect.ts). Hours are omitted until the owner supplies them.
 
+- SITE REVIEW FIXES, PHASE C (2026-10-03, no migration yet): store search/sort/ranking (lib/store/catalog.ts = URL contract + StoreCardPart, lib/store/search.ts = ranking and CATEGORY_WEIGHTS), new empty states, "Delivery time" filter, cards with "Arrives by" dates (arrivesByDate mirrors order_delivery_quote), SKUs hidden from customers. C5 (18 → 8/9 categories) is NOT applied: the mapping was shown to the owner and waits for approval; it must land as data (migration), not in components.
+
 ## Site review decisions (owner, 2026-10-03)
 
 Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
@@ -1072,6 +1074,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   (RUN AFTER 0042; until then the 3D model card only shows the cost dialog)
 - 0044_shipping_flat_free_threshold.sql — QAR 50 all tiers + handling 0, free_shipping_threshold (QAR 300, Standard), quote v2, create_part_order v6 (+p_payment_method; bank transfer needs email; total > 0), set_order_payment_method v2 (RUN AFTER 0043; checkout falls back to the old call until then)
 - 0045_project_recovery_link.sql — D6 project link by email: projects.contact_email/recovery_token/recovery_emailed_at (guarded), project_recovery_begin(), claim_project() (moves a GUEST project to the session holding the #key= link, key rotated, new link emailed), storage read/delete by project owner (RUN AFTER 0044; until then /projects/new skips the email and #key= links show "not available")
+- 0046_notification_outbox.sql — Phase I credit/milestone emails: notification_outbox (+ unique dedupe index) + notification_prefs (unsubscribe token), triggers on credits_ledger/projects, claim_notifications / mark_notification / notification_unsubscribe (service_role), store_settings.notifications (discount_ready OFF) (RUN AFTER 0045; until then /api/cron/notifications answers 500 claim_failed and nothing is queued)
 - 0042_ai_credits.sql — (RUN ✔ 2026-10-02) AI access + credits: credits_ledger, projects.status/limit, rate limits, credit RPCs,
   profiles.email sync, ai_usage_log (RUN AFTER 0041; also turn ON "Confirm email" in Supabase Auth)
 - 0027_bought_units_are_owned.sql — create_part_order also sets project_items.qty_from_inventory, so units

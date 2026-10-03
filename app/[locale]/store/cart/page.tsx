@@ -120,8 +120,7 @@ export default function CartPage() {
                   {lines.map((i) => (
                     <li key={i.rowId} className="flex items-center justify-between gap-3 py-1.5">
                       <span className="min-w-0 truncate text-heading">
-                        {nameOf(i)} <span className="font-mono text-[10.5px] text-faint">{i.sku}</span>{" "}
-                        <LeadTimeBadge leadClass={i.leadTimeClass} />
+                        {nameOf(i)} <LeadTimeBadge leadClass={i.leadTimeClass} />
                         {toConfirm(i) && <span className="ms-1 text-[10.5px] text-mutedtext">{tD("dateTbc")}</span>}
                       </span>
                       <span className="shrink-0 tabular-nums text-mutedtext">
@@ -157,8 +156,8 @@ export default function CartPage() {
                   >
                     {name}
                   </Link>
-                  <p className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-mutedtext">
-                    {item.sku} <LeadTimeBadge leadClass={item.leadTimeClass} />
+                  <p className="flex flex-wrap items-center gap-2 text-[11px] text-mutedtext">
+                    <LeadTimeBadge leadClass={item.leadTimeClass} />
                   </p>
                   {toConfirm(item) && (
                     <p className="text-[11px] font-medium text-mutedtext">{tD("dateTbc")}</p>

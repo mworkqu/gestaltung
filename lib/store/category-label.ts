@@ -22,6 +22,15 @@ const AR: Record<string, string> = {
   Other: "أخرى",
 };
 
+/** Stored categories whose Arabic label contains this Arabic text (search "حساسات" → Sensors). */
+export function categoriesForArabicTerm(term: string): string[] {
+  const t = term.trim();
+  if (t.length < 3 || !/[؀-ۿ]/.test(t)) return [];
+  return Object.entries(AR)
+    .filter(([, label]) => label.includes(t))
+    .map(([category]) => category);
+}
+
 export function categoryLabel(category: string | null | undefined, locale: string): string {
   if (!category) return "";
   return locale === "ar" ? AR[category] ?? category : category;

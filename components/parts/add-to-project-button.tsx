@@ -5,7 +5,7 @@
 // its quantity if it's already there — and links to that project. A visitor
 // with no projects yet can start one here; the product is added to it.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, FolderPlus, Loader2 } from "lucide-react";
 
@@ -26,6 +26,7 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
   const [limit, setLimit] = useState(false);
   const [newName, setNewName] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
+  const hintId = useId();
 
   useEffect(() => {
     if (!open || projects) return;
@@ -104,11 +105,29 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
   }
 
   return (
-    <div className="relative" ref={boxRef}>
-      <Button type="button" variant="outline" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="rounded-full">
+    <div className="group relative" ref={boxRef}>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-describedby={hintId}
+        className="rounded-full"
+      >
         <FolderPlus className="h-4 w-4" />
         {t("addToProject")}
       </Button>
+      {/* Tooltip: shown on hover and keyboard focus, read out as the button's description. */}
+      <span
+        id={hintId}
+        role="tooltip"
+        className={
+          "pointer-events-none absolute start-0 bottom-full z-20 mb-2 w-max max-w-[16rem] rounded-lg bg-ink px-3 py-1.5 text-xs font-medium text-white opacity-0 shadow-neu-sm transition-opacity group-focus-within:opacity-100 group-hover:opacity-100" +
+          (open ? " !opacity-0" : "")
+        }
+      >
+        {t("addToProjectHint")}
+      </span>
       {open && (
         <div className="neu absolute start-0 top-full z-30 mt-2 w-72 space-y-1 p-2">
           {projects === null ? (

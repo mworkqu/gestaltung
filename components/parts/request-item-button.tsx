@@ -1,7 +1,9 @@
 "use client";
 
 // "Request this item" (Task 18b, strongest demand signal): email, optional
-// quantity and note. Free to press, on every product.
+// quantity and note. Free to press, on every product. Without a partId (a
+// store search that found nothing) it asks what they need, pre-filled with
+// `itemName` (the search text), and /api/demand emails it to the owner.
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
@@ -16,12 +18,15 @@ const field =
 export function RequestItemButton({
   partId,
   partName,
+  itemName,
   variant = "outline",
   size = "lg",
   className,
 }: {
-  partId: string;
-  partName: string;
+  partId?: string;
+  partName?: string;
+  /** No product: the item to request, editable (e.g. the search text). */
+  itemName?: string;
   variant?: "outline" | "default";
   size?: "sm" | "default" | "lg";
   className?: string;
@@ -39,7 +44,8 @@ export function RequestItemButton({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         kind: "request",
-        partId,
+        partId: partId ?? null,
+        searchTerm: partId ? undefined : String(f.get("item") ?? "").trim(),
         email: String(f.get("email") ?? "").trim(),
         quantity: Number(f.get("quantity") || 1),
         note: String(f.get("note") ?? ""),
@@ -72,7 +78,7 @@ export function RequestItemButton({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-heading">{t("requestTitle")}</h2>
-                <p className="mt-1 text-sm text-mutedtext">{partName}</p>
+                {partId && partName && <p className="mt-1 text-sm text-mutedtext">{partName}</p>}
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label={t("close")} className="text-mutedtext hover:text-heading">
                 <X className="h-5 w-5" />
@@ -86,7 +92,13 @@ export function RequestItemButton({
             ) : (
               <form onSubmit={submit} className="space-y-3">
                 <p className="text-xs text-mutedtext">{t("requestHelp")}</p>
-                <input name="email" type="email" required autoFocus placeholder={t("requestEmail")} className={field} dir="ltr" />
+                {!partId && (
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-heading">{t("requestWhat")}</span>
+                    <input name="item" required maxLength={200} defaultValue={itemName ?? ""} className={field} />
+                  </label>
+                )}
+                <input name="email" type="email" required autoFocus placeholder={t("requestEmail")} aria-label={t("requestEmail")} className={field} dir="ltr" />
                 <input name="quantity" type="number" min={1} defaultValue={1} placeholder={t("requestQty")} className={field} />
                 <textarea name="note" rows={3} placeholder={t("requestNote")} className={cn(field, "resize-y")} />
                 {state === "email" && <p className="text-sm text-destructive">{t("requestEmailError")}</p>}
