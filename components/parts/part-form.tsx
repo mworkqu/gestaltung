@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Part } from "@/lib/supabase/types";
 import { STOCK_STATUSES } from "@/lib/parts/constants";
+import { STORE_CATEGORIES } from "@/lib/store/store-categories";
+import { categoryLabel } from "@/lib/store/category-label";
 import {
   createPart,
   updatePart,
@@ -76,6 +78,29 @@ export function PartForm({
           />
         </div>
       </div>
+
+      {/* C5 (0048): the storefront category. Shown only once the column exists
+          (the edit page reads the row with select("*")); new products get
+          theirs from the supplier category via the DB trigger. */}
+      {mode === "edit" && part && "store_category" in part && (
+        <div className="space-y-2">
+          {label("store_category", t("storeCategoryLabel"))}
+          <select
+            id="store_category"
+            name="store_category"
+            defaultValue={part.store_category ?? ""}
+            className={cn(fieldClass, isRtl && "text-right")}
+          >
+            <option value="">{t("storeCategoryAuto")}</option>
+            {STORE_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {categoryLabel(c, locale)}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] leading-snug text-faint">{t("storeCategoryNote")}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <div className="space-y-2">

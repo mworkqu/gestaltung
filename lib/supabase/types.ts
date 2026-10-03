@@ -73,6 +73,10 @@ export type Part = {
   // product it was merged into; absent before that migration.
   name_key?: string | null;
   merged_into?: string | null;
+  // 0048. Storefront category (one of nine, lib/store/store-categories.ts);
+  // `category` stays the supplier/source category. Absent before 0048.
+  store_category?: string | null;
+  store_category_review?: boolean;
   created_at: string;
   updated_at: string;
 };

@@ -90,6 +90,24 @@ describe("rankProducts — esp32", () => {
     expect(scoreProduct("الحساس", ar)).toBeGreaterThan(scoreProduct("الحساس", other));
   });
 
+  it("keeps ESP32 boards first with the nine store categories (C5)", () => {
+    const nine: SearchableProduct[] = [
+      p("1", "2-pin jumper wire for ESP32", "Cables and connectors", 2),
+      p("2", "Laser module (ESP32 compatible)", "Modules", 9),
+      p("3", "Arduino Uno R3", "Boards and microcontrollers", 45),
+      p("4", "ESP32-CAM WiFi Bluetooth Camera Module", "Modules", 38),
+      p("5", "Breadboard 830 points", "Tools and accessories", 12),
+      p("6", "ESP32 Development Board (30 pin)", "Boards and microcontrollers", 42),
+      p("7", "ESP32 case for 3D printing", "3D printing", 8),
+      p("8", "USB cable for ESP32 boards", "Cables and connectors", 8),
+    ];
+    const ranked = ids(rankProducts("esp32", nine));
+    expect(ranked.slice(0, 2)).toEqual(["6", "4"]);
+    expect(ranked.indexOf("6")).toBeLessThan(ranked.indexOf("7"));
+    expect(ranked.indexOf("6")).toBeLessThan(ranked.indexOf("1"));
+    expect(ranked.slice(-2).sort()).toEqual(["3", "5"]);
+  });
+
   it("returns 0 for an empty query", () => {
     expect(scoreProduct("   ", FIXTURE[0])).toBe(0);
   });
@@ -101,6 +119,8 @@ describe("categoryWeight", () => {
     expect(categoryWeight("Boards and microcontrollers")).toBeGreaterThan(categoryWeight("Cables and connectors"));
     expect(categoryWeight("Microcontrollers")).toBeGreaterThan(categoryWeight("Prototyping"));
     expect(categoryWeight("Modules")).toBeGreaterThan(categoryWeight("Tools and accessories"));
+    expect(categoryWeight("3D printing")).toBeGreaterThan(categoryWeight("Cables and connectors"));
+    expect(categoryWeight("3D printing")).toBeLessThan(categoryWeight("Boards and microcontrollers"));
   });
 
   it("gives an unknown or empty category the default weight", () => {

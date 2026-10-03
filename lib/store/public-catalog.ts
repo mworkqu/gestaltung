@@ -14,6 +14,7 @@ import type { Part } from "@/lib/supabase/types";
 import { createPublicClient } from "@/lib/supabase/public";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { isListed, listedCategories } from "@/lib/store/categories";
+import { isStoreCategory, storeCategoryOf } from "@/lib/store/store-categories";
 import {
   leadClassesFor,
   searchFilter,
@@ -32,8 +33,31 @@ const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
 // hundred to ~1,000 products, so this stays a handful of slim rows.
 const MAX_SEARCH_ROWS = 3000;
 
-/** Keep only the card's fields (a full row must never reach a client prop). */
-function toCard(p: StoreCardPart): StoreCardPart {
+/**
+ * Does parts.store_category exist yet (C5, migration 0048)? Selecting a
+ * missing column is an error in PostgREST, so every storefront read asks this
+ * first (one tiny cached request per cache window) and names the column only
+ * when it exists; before 0048 everything reads parts.category as before. Any
+ * error counts as "not yet": the fallback is always safe.
+ */
+export const hasStoreCategory = unstable_cache(
+  async (): Promise<boolean> => {
+    const supabase = createPublicClient();
+    if (!supabase) return false;
+    const { error } = await supabase.from("parts").select("store_category").limit(1);
+    return !error;
+  },
+  ["store:has-store-category"],
+  CACHE,
+);
+
+/** Card columns, plus store_category once 0048 has run. */
+const cardColumns = (store: boolean): string => (store ? `${STORE_CARD_COLUMNS}, store_category` : STORE_CARD_COLUMNS);
+
+type CardRow = StoreCardPart & { store_category?: string | null };
+
+/** Keep only the card's fields (a full row must never reach a client prop); category = the storefront one. */
+function toCard(p: CardRow): StoreCardPart {
   return {
     id: p.id,
     sku: p.sku,
@@ -41,23 +65,30 @@ function toCard(p: StoreCardPart): StoreCardPart {
     name_ar: p.name_ar,
     unit_price: p.unit_price,
     image_url: p.image_url,
-    category: p.category,
+    category: storeCategoryOf(p) ?? p.category,
     min_order_qty: p.min_order_qty,
     lead_time_class: p.lead_time_class ?? null,
   };
 }
 
-type FacetRow = { category: string | null; material: string | null; is_published: boolean; merged_into: string | null };
+type FacetRow = {
+  category: string | null;
+  store_category?: string | null;
+  material: string | null;
+  is_published: boolean;
+  merged_into: string | null;
+};
 
 /** Every listed category and material (filter options, home quick-links). Paged past PostgREST's 1,000 cap. */
 export const getStoreFacets = unstable_cache(
   async (): Promise<{ categories: string[]; materials: string[] }> => {
     const supabase = createPublicClient();
     if (!supabase) return { categories: [], materials: [] };
+    const store = await hasStoreCategory();
     const { rows } = await fetchAllRows<FacetRow>((from, to) =>
       supabase
         .from("parts")
-        .select("category, material, is_published, merged_into")
+        .select(store ? "category, store_category, material, is_published, merged_into" : "category, material, is_published, merged_into")
         .eq("is_published", true)
         .not("lead_time_class", "is", null)
         .order("id")
@@ -81,17 +112,22 @@ export const getStoreListing = unstable_cache(
   async (state: StoreState, locale: string): Promise<{ parts: StoreCardPart[]; total: number }> => {
     const supabase = createPublicClient();
     if (!supabase) return { parts: [], total: 0 };
-    const filter = searchFilter(state.q);
+    const store = await hasStoreCategory();
+    const filter = searchFilter(state.q, { storeCategory: store });
+    // ?category= is a store category once 0048 has run; an older source
+    // category in a saved link (e.g. "Microcontrollers") still filters
+    // parts.category, so the link keeps working.
+    const categoryColumn = store && isStoreCategory(state.category) ? "store_category" : "category";
     const base = (withCount: boolean) => {
       let query = supabase
         .from("parts")
-        .select(STORE_CARD_COLUMNS, withCount ? { count: "exact" } : undefined)
+        .select(cardColumns(store), withCount ? { count: "exact" } : undefined)
         .eq("is_published", true)
         .is("merged_into", null)
         // Nothing without a delivery date is listed (owner, 2026-09-29); its
         // page still opens from an old link.
         .not("lead_time_class", "is", null);
-      if (state.category) query = query.eq("category", state.category);
+      if (state.category) query = query.eq(categoryColumn, state.category);
       if (state.material) query = query.eq("material", state.material);
       if (state.stock) query = query.in("lead_time_class", leadClassesFor(state.stock));
       if (filter) query = query.or(filter);
@@ -100,9 +136,10 @@ export const getStoreListing = unstable_cache(
     const from = (state.page - 1) * STORE_PAGE_SIZE;
     if (filter) {
       // Search: every matching slim row, ranked / sorted here, then one page.
-      const { rows } = await fetchAllRows<StoreCardPart>((a, b) => base(false).order("id").range(a, b), 1000, MAX_SEARCH_ROWS);
-      const sorted = sortProducts(rows, state.sort, state.q, locale);
-      return { parts: sorted.slice(from, from + STORE_PAGE_SIZE).map(toCard), total: sorted.length };
+      const { rows } = await fetchAllRows<CardRow>((a, b) => base(false).order("id").range(a, b), 1000, MAX_SEARCH_ROWS);
+      // Rank on the storefront category (its weight), not the source one.
+      const sorted = sortProducts(rows.map(toCard), state.sort, state.q, locale);
+      return { parts: sorted.slice(from, from + STORE_PAGE_SIZE), total: sorted.length };
     }
     // Browse: sorted and paged in the database.
     let query = base(true);
@@ -112,7 +149,7 @@ export const getStoreListing = unstable_cache(
     if (locale === "ar") query = query.order("name_ar", { ascending: true, nullsFirst: false });
     query = query.order("name", { ascending: true }).order("id", { ascending: true });
     const { data, count } = await query.range(from, from + STORE_PAGE_SIZE - 1);
-    const parts = ((data ?? []) as StoreCardPart[]).map(toCard);
+    const parts = ((data ?? []) as unknown as CardRow[]).map(toCard);
     return { parts, total: count ?? parts.length };
   },
   ["store:listing"],
@@ -128,19 +165,22 @@ export const getFeaturedParts = unstable_cache(
   async (): Promise<StoreCardPart[]> => {
     const supabase = createPublicClient();
     if (!supabase) return [];
+    const store = await hasStoreCategory();
     const { data } = await supabase
       .from("parts")
-      .select(`${STORE_CARD_COLUMNS}, is_published, merged_into`)
+      .select(`${cardColumns(store)}, is_published, merged_into`)
       .eq("is_published", true)
       .eq("lead_time_class", "in_stock")
       .not("image_url", "is", null)
       .order("updated_at", { ascending: false })
       .limit(200);
-    const pool = ((data ?? []) as (StoreCardPart & { is_published: boolean; merged_into: string | null })[]).filter(isListed);
+    const pool = ((data ?? []) as unknown as (CardRow & { is_published: boolean; merged_into: string | null })[])
+      .filter(isListed)
+      .map(toCard);
     const byCategory = new Map<string, StoreCardPart>();
     for (const p of pool) if (!byCategory.has(p.category ?? "")) byCategory.set(p.category ?? "", p);
     const firsts = new Set(byCategory.values());
-    return [...firsts, ...pool.filter((p) => !firsts.has(p))].slice(0, 8).map(toCard);
+    return [...firsts, ...pool.filter((p) => !firsts.has(p))].slice(0, 8);
   },
   ["store:featured"],
   CACHE,

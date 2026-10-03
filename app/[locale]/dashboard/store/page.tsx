@@ -7,6 +7,7 @@ import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/parts/format";
+import { categoryLabel } from "@/lib/store/category-label";
 import { StockBadge } from "@/components/parts/stock-badge";
 import { PublishedToggle } from "@/components/parts/published-toggle";
 import { DeletePartButton } from "@/components/parts/delete-part-button";
@@ -24,11 +25,13 @@ export default async function PartsCatalogManager({
     stock?: string;
     published?: string;
     merged?: string;
+    review?: string;
   }>;
 }) {
   const { locale } = await params;
-  const { category, stock, published, merged } = await searchParams;
+  const { category, stock, published, merged, review } = await searchParams;
   const showMerged = merged === "1";
+  const reviewOnly = review === "1";
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
@@ -47,10 +50,15 @@ export default async function PartsCatalogManager({
   // Before 0030 the column does not exist, so nothing counts as merged.
   const skuById = new Map(all.map((p) => [p.id, p.sku]));
   const mergedCount = all.filter((p) => p.merged_into).length;
+  // C5 (0048): published products whose supplier category had no store
+  // category rule, so they got "Tools and accessories" — listed for review.
+  // Before 0048 the column is absent and nothing counts.
+  const reviewCount = all.filter((p) => p.store_category_review && p.is_published && !p.merged_into).length;
   const parts = all.filter(
     (p) =>
       (showMerged || !p.merged_into) &&
-      (!category || p.category === category) &&
+      (!reviewOnly || (p.store_category_review && p.is_published)) &&
+      (!category || p.category === category || p.store_category === category) &&
       (!stock || p.stock_status === stock) &&
       (!published ||
         (published === "published" ? p.is_published : !p.is_published))
@@ -78,6 +86,14 @@ export default async function PartsCatalogManager({
                 className="text-xs font-semibold text-azure hover:underline"
               >
                 {showMerged ? t("filter_hide_merged") : t("filter_show_merged")}
+              </Link>
+            )}
+            {(reviewCount > 0 || reviewOnly) && (
+              <Link
+                href={{ pathname: "/dashboard/store", query: reviewOnly ? {} : { review: "1" } }}
+                className="text-xs font-semibold text-amber-700 hover:underline"
+              >
+                {reviewOnly ? t("filter_review_all") : t("filter_review_needed", { count: reviewCount })}
               </Link>
             )}
           </div>
@@ -179,7 +195,20 @@ export default async function PartsCatalogManager({
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-body">{p.category}</td>
+                  <td className="px-4 py-3 text-body">
+                    {p.store_category ? (
+                      <>
+                        <span className={cn(p.store_category_review && "font-semibold text-amber-700")}>
+                          {categoryLabel(p.store_category, locale)}
+                        </span>
+                        <span className="block text-[11px] text-faint">
+                          {t("storeCategorySource", { category: p.category })}
+                        </span>
+                      </>
+                    ) : (
+                      p.category
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-end tabular-nums text-body">
                     {formatPrice(p.unit_price, locale)}
                   </td>

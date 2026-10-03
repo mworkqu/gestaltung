@@ -27,6 +27,27 @@ describe("listedCategories", () => {
     ).toEqual(["Motors"]);
   });
 
+  it("reads store_category (0048) and lists the nine in the owner's order", () => {
+    expect(
+      listedCategories([
+        { category: "3D printers", store_category: "3D printing", is_published: true },
+        { category: "Prototyping", store_category: "Cables and connectors", is_published: true },
+        { category: "Microcontrollers", store_category: "Boards and microcontrollers", is_published: true },
+        { category: "Sensors", store_category: "Sensors", is_published: true },
+        { category: "Other", store_category: "Tools and accessories", is_published: false },
+      ])
+    ).toEqual(["Boards and microcontrollers", "Sensors", "Cables and connectors", "3D printing"]);
+  });
+
+  it("falls back to the source category for rows read before 0048", () => {
+    expect(
+      listedCategories([
+        { category: "Microcontrollers", is_published: true },
+        { category: "Kits", store_category: null, is_published: true },
+      ])
+    ).toEqual(["Kits", "Microcontrollers"]);
+  });
+
   it("returns an empty list for an empty catalog", () => {
     expect(listedCategories([])).toEqual([]);
   });

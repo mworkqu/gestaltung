@@ -11,6 +11,7 @@ import { isDuplicateProductError } from "@/lib/parts/part-key";
 import { parseSheet, type ExistingPart, type SkippedRow } from "@/lib/parts/sheet-import";
 import type { StockStatus } from "@/lib/supabase/types";
 import { revalidateStorefront } from "@/lib/cache/storefront";
+import { isStoreCategory, type StoreCategory } from "@/lib/store/store-categories";
 
 export type PartFormState = { error?: string };
 
@@ -34,6 +35,10 @@ type ParsedPart = {
   stock_status: StockStatus;
   image_url: string | null;
   is_published: boolean;
+  // 0048: only sent when the form showed the field (the column exists).
+  // null = "Automatic" → the DB trigger re-derives it from the supplier category.
+  store_category?: StoreCategory | null;
+  store_category_review?: boolean;
 };
 
 async function parsePart(
@@ -71,6 +76,15 @@ async function parsePart(
     return v === "" ? null : v;
   };
 
+  // Store category (C5): an explicit choice is the product's override and
+  // clears the review flag; "Automatic" (empty) lets the trigger decide.
+  let storeCategory: Pick<ParsedPart, "store_category" | "store_category_review"> = {};
+  if (formData.has("store_category")) {
+    const sc = opt("store_category");
+    if (sc !== null && !isStoreCategory(sc)) return { error: t("error_store_category") };
+    storeCategory = sc ? { store_category: sc, store_category_review: false } : { store_category: null };
+  }
+
   return {
     sku,
     name,
@@ -85,6 +99,7 @@ async function parsePart(
     stock_status: stockStatus as StockStatus,
     image_url: opt("image_url"),
     is_published: formData.get("is_published") === "on",
+    ...storeCategory,
   };
 }
 

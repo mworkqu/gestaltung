@@ -160,6 +160,23 @@ describe("searchFilter", () => {
   it("an Arabic category word also matches the stored English category", () => {
     expect(searchFilter("حساسات")).toContain('category.in.("Sensors")');
   });
+
+  it("before 0048 never names store_category (the column may not exist)", () => {
+    expect(searchFilter("طابعة")).not.toContain("store_category");
+    expect(searchFilter("esp32")).not.toContain("store_category");
+  });
+
+  it("after 0048 searches store_category too, and Arabic words match either column (C5)", () => {
+    const f = searchFilter("طابعة", { storeCategory: true })!;
+    expect(f).toContain("store_category.ilike.%طابعة%");
+    expect(f).toContain('store_category.in.("3D printing")');
+    expect(f).toContain('category.in.("3D printing")');
+    const kits = searchFilter("أطقم", { storeCategory: true })!;
+    expect(kits).toContain('category.in.("Kits")');
+    const boards = searchFilter("متحكمات", { storeCategory: true })!;
+    expect(boards).toContain("Boards and microcontrollers");
+    expect(boards).toContain("Microcontrollers");
+  });
 });
 
 describe("STORE_URL_PARAMS", () => {

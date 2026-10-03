@@ -155,7 +155,8 @@ export function buildImportRows(
     const v = priced.find((x) => x.available) ?? priced[0];
     const name = p.title.trim().slice(0, 160);
     const key = partKey(name, null, 1);
-    if (!v || !name || seen.has(key)) {
+    // Voltaat's own gift cards are not ours to sell (owner, C5 2026-10-04).
+    if (!v || !name || seen.has(key) || isGiftCard(p)) {
       skippedDuplicate++;
       continue;
     }
@@ -194,6 +195,11 @@ export function buildImportRows(
     });
   }
   return { rows, skippedMapped, skippedDuplicate };
+}
+
+/** A Voltaat gift card (Shopify product type "Gift Card" or the word in the title). Never imported. */
+export function isGiftCard(p: Pick<RawVoltaatProduct, "title" | "product_type">): boolean {
+  return /gift\s*card/i.test(p.title) || /gift\s*card/i.test(p.product_type ?? "");
 }
 
 /** Option names worth showing ("Default Title" is Shopify's name for none). */

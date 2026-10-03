@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { partKey } from "@/lib/parts/part-key";
-import { buildImportRows, categoryFor, stripHtml } from "./voltaat-catalogue";
+import { buildImportRows, categoryFor, isGiftCard, stripHtml } from "./voltaat-catalogue";
 
 describe("categoryFor", () => {
   it("maps Voltaat product types to our categories", () => {
@@ -71,5 +71,13 @@ describe("buildImportRows", () => {
     });
     expect(rows).toHaveLength(0);
     expect(skippedDuplicate).toBe(1);
+  });
+
+  it("never imports Voltaat's gift card (C5)", () => {
+    const gift = { id: 9, handle: "gift-card", title: "Voltaat Gift Card", product_type: "Gift Card", variants: [{ id: 91, title: "100 QAR", price: "100.00", available: true }] };
+    const { rows } = buildImportRows([gift, products[2]], { mappedKeys: new Set(), existingPartKeys: new Set(), publish: true });
+    expect(rows.map((r) => r.part.name)).toEqual(["Arduino Uno"]);
+    expect(isGiftCard({ title: "Gift card – 50", product_type: null })).toBe(true);
+    expect(isGiftCard({ title: "Arduino Uno", product_type: "DEVB_Arduino" })).toBe(false);
   });
 });

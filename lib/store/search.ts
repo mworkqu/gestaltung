@@ -27,20 +27,22 @@ export type SearchableProduct = {
 
 // ── Category weights ─────────────────────────────────────────────────────────
 // Keyed by category name, matched after normalising case, "&"/"and" and
-// spacing, so "Chips & ICs" and "Chips and ICs" are the same row. Holds today's
-// names and the planned consolidated ones; an unknown category gets
-// DEFAULT_CATEGORY_WEIGHT, so a renamed category never breaks search.
+// spacing, so "Chips & ICs" and "Chips and ICs" are the same row. Holds the
+// nine store categories (C5, 0048) and the older source categories (rows read
+// before 0048); an unknown category gets DEFAULT_CATEGORY_WEIGHT, so a renamed
+// category never breaks search.
 export const CATEGORY_WEIGHTS: Record<string, number> = {
-  // Planned consolidated categories.
+  // The nine store categories (parts.store_category).
   "Boards and microcontrollers": 4,
   Sensors: 3,
   Modules: 3,
   "Chips and ICs": 2.5,
   Power: 2,
   "Motors and mechanical": 2,
+  "3D printing": 1.5,
   "Cables and connectors": 0,
   "Tools and accessories": 0,
-  // Today's categories (not repeated above).
+  // Source categories (parts.category; not repeated above).
   "Raspberry Pi": 4,
   Microcontrollers: 4,
   Displays: 3,

@@ -22,6 +22,7 @@ import { PartDetailCart } from "@/components/parts/part-detail-cart";
 import { AddToProjectButton } from "@/components/parts/add-to-project-button";
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
+import { storeCategoryOf } from "@/lib/store/store-categories";
 import { cn } from "@/lib/utils";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { productDetailsForLocale } from "@/lib/store/product-details";
@@ -138,6 +139,8 @@ export default async function PartDetailPage({
   );
   const datasheet = (part as { datasheet_url?: string | null }).datasheet_url ?? null;
   const imageUrl = partImageUrl(part);
+  // Storefront category (0048 store_category, else the source category).
+  const storeCategory = storeCategoryOf(part) ?? part.category;
 
   const spec = (label: string, value: string | null) =>
     value ? (
@@ -156,8 +159,8 @@ export default async function PartDetailPage({
           {t("breadcrumbStore")}
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
-        <Link href={{ pathname: "/store", query: { category: part.category } }} className="inline-flex items-center hover:text-heading max-md:min-h-11">
-          {categoryLabel(part.category, locale)}
+        <Link href={{ pathname: "/store", query: { category: storeCategory } }} className="inline-flex items-center hover:text-heading max-md:min-h-11">
+          {categoryLabel(storeCategory, locale)}
         </Link>
         <ChevronRight className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
         <span className="min-w-0 break-words text-heading">{name}</span>
@@ -313,7 +316,7 @@ export default async function PartDetailPage({
           )}
 
           <dl className="neu p-4">
-            {spec(t("specCategory"), categoryLabel(part.category, locale))}
+            {spec(t("specCategory"), categoryLabel(storeCategory, locale))}
             {spec(t("specMaterial"), materialLabel(part.material) || null)}
             {spec(t("specStandard"), part.standard)}
             {spec(t("specMinOrder"), showMinOrder(part.min_order_qty) ? String(part.min_order_qty) : null)}

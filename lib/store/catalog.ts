@@ -2,7 +2,9 @@
 // the server page and the client filter bar share one reading of the URL and
 // it can be unit-tested. The URL is the single source of truth:
 //   ?q=        search text (all words must match somewhere)
-//   ?category= exact parts.category value (from data, never hard-coded)
+//   ?category= exact storefront category: parts.store_category (0048), or
+//              parts.category before 0048 / for an older source-category link
+//              (from data, never hard-coded)
 //   ?material= exact parts.material value
 //   ?stock=    delivery-time option (LEAD_FILTER_OPTIONS); the param keeps its
 //              old name so shared links survive; unknown values are ignored
@@ -24,6 +26,8 @@ import type { ProductSort } from "@/lib/store/search";
  * (it may be hidden on the card but stays in the link). `lead_time_class` is
  * also the stock flag: null = "available on request". Part satisfies this
  * type, so callers holding a full row (the homepage) can pass it unchanged.
+ * `category` on a card is the STOREFRONT category: lib/store/public-catalog.ts
+ * fills it from parts.store_category (0048), else parts.category.
  */
 export type StoreCardPart = Pick<
   Part,
@@ -210,12 +214,21 @@ export function searchTerms(q: string): string[] {
  * One PostgREST `or` filter: every word must match at least one column
  * (case-insensitive substring). An Arabic word that names a category ("حساسات")
  * also matches that category's stored English value. Null when nothing is left.
+ *
+ * `storeCategory` (0048 has run): parts.store_category is searched too, and
+ * an Arabic category word matches either column — the store category
+ * ("طابعة" → 3D printing) or an older source category ("أطقم" → Kits).
  */
-export function searchFilter(q: string): string | null {
+export function searchFilter(q: string, opts: { storeCategory?: boolean } = {}): string | null {
+  const catColumns = opts.storeCategory ? ["category", "store_category"] : ["category"];
   const groups = searchTerms(q).map((w) => {
     const alts: string[] = SEARCH_COLUMNS.map((c) => `${c}.ilike.%${w}%`);
+    if (opts.storeCategory) alts.push(`store_category.ilike.%${w}%`);
     const cats = categoriesForArabicTerm(w);
-    if (cats.length) alts.push(`category.in.(${cats.map((c) => `"${c.replace(/"/g, "")}"`).join(",")})`);
+    if (cats.length) {
+      const list = cats.map((c) => `"${c.replace(/"/g, "")}"`).join(",");
+      for (const col of catColumns) alts.push(`${col}.in.(${list})`);
+    }
     return alts.join(",");
   });
   if (!groups.length) return null;

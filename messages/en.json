@@ -723,7 +723,14 @@
     "import_err_no_rows": "The sheet has headers but no product rows.",
     "import_err_empty": "No valid products were found in the sheet.",
     "import_err_duplicate": "A row matches a product that is already in the store under a different SKU, so nothing was saved. Check the product names for stray or unusual characters, then import again.",
-    "import_err_db": "Couldn't save the products. Please try again."
+    "import_err_db": "Couldn't save the products. Please try again.",
+    "storeCategoryLabel": "Store category",
+    "storeCategoryAuto": "Automatic (from the supplier category)",
+    "storeCategoryNote": "What customers see in the store. The Category field above is the supplier's category and stays as it is.",
+    "storeCategorySource": "Supplier: {category}",
+    "filter_review_needed": "{count, plural, one {# product needs} other {# products need}} a store category check",
+    "filter_review_all": "Show all products",
+    "error_store_category": "Choose one of the store categories."
   },
   "StoreLanding": {
     "metaTitle": "Shop parts or get a part made | Gestaltung360",
