@@ -108,3 +108,14 @@ Source: STAGE_SITE_REVIEW_FIXES_PROMPT.md
 - Cards and product page: "Arrives by {date}" (lib/store/delivery.ts arrivesByDate, same formula as the SQL quote), SKU codes hidden (kept in URLs, admin, order email), "Min. order: N" only when N > 1, "Request this item" only for on-request items, "Save to a project" tooltip, "Added — View cart", title once, dead "3D Model" text removed (real links only).
 - Store list sends cards only the fields they need (StoreCardPart) through a cookie-free client (lib/supabase/public.ts).
 - Tests 500; i18n parity 2424/2424.
+
+## Phase I — Credit and milestone emails (2026-10-03)
+- Migration 0046 (not run): notification_outbox (unique on user, kind, payload ref), notification_prefs (unsubscribe token), triggers on credits_ledger and projects, claim_notifications() with row locking, store_settings.notifications per-kind switch.
+- Kinds: credits_order_delivered, credits_admin_grant, first_project, first_circuit, discount_ready (built but switched OFF: 0042 dates the QAR 20 redemption from the day the credit is spent, and the ledger cannot tell when that credit was earned).
+- /api/cron/notifications (Bearer CRON_SECRET) drains up to 50 rows, sends through Resend with List-Unsubscribe and an idempotency key; /api/notifications/unsubscribe (GET confirm page, POST one-click).
+- Cron schedule in vercel.json is DAILY (04:30 UTC), not every 15 minutes: the existing crons are all daily, which points to the Vercel Hobby plan, where a */15 schedule blocks deploys. On a Pro plan change it to "*/15 * * * *".
+- Templates in lib/email/templates (EN + AR, RTL, plain text + HTML, brand strip, unsubscribe footer).
+- /dashboard/notifications (super admin): outbox table with status filter, "Send test to me".
+- Guests without an email are stored as skipped (no_email).
+- Tests 500 (templates in both languages, decide/skip rules, cron auth).
+- Pending owner steps: run 0046 (after 0045); CRON_SECRET must be set in Vercel.

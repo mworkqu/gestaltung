@@ -71,6 +71,7 @@ export default async function DashboardLayout({
           label: t("group_settings"),
           items: [
             { href: "/dashboard/usage", label: t("aiUsage") },
+            { href: "/dashboard/notifications", label: t("notifications") },
             { href: "/inventory", label: t("inventory") },
           ],
         },

@@ -26,6 +26,10 @@
     {
       "path": "/api/cron/supplier-refresh",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/notifications",
+      "schedule": "30 4 * * *"
     }
   ]
 }

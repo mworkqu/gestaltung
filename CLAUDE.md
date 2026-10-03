@@ -978,6 +978,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 
 - SITE REVIEW FIXES, PHASE C (2026-10-03, no migration yet): store search/sort/ranking (lib/store/catalog.ts = URL contract + StoreCardPart, lib/store/search.ts = ranking and CATEGORY_WEIGHTS), new empty states, "Delivery time" filter, cards with "Arrives by" dates (arrivesByDate mirrors order_delivery_quote), SKUs hidden from customers. C5 (18 → 8/9 categories) is NOT applied: the mapping was shown to the owner and waits for approval; it must land as data (migration), not in components.
 
+- SITE REVIEW FIXES, PHASE I (2026-10-03, migration 0046 — NOT RUN YET): credit and milestone emails. Outbox + triggers in 0046; drainer app/api/cron/notifications (lib/notifications/decide.ts, links.ts); templates lib/email/templates/*; unsubscribe app/api/notifications/unsubscribe; admin /dashboard/notifications. Kind names must stay in sync in three places (0046 check constraint, OUTBOX_KINDS, NOTIFICATION_KINDS). discount_ready is OFF in store_settings.notifications until spend_credit/redeem_credits can date a credit from when it was earned (owner rule: 30 days from the day earned). vercel.json cron is daily (Hobby-safe); */15 needs Pro.
+
 ## Site review decisions (owner, 2026-10-03)
 
 Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
