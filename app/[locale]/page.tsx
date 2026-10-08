@@ -41,6 +41,7 @@ export default async function Home({
 
   const t = await getTranslations("StoreLanding");
   const tv = await getTranslations("Videos");
+  const tBrand = await getTranslations("Brand");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -74,7 +75,7 @@ export default async function Home({
         <div className="animate-fade-up space-y-3 px-1 pt-2">
           <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
             <span className="h-2 w-2 rounded-full bg-cobalt" />
-            <span className={mono("text-[10px] text-mutedtext")}>{t("tagline")}</span>
+            <span className={mono("text-[10px] text-mutedtext")}>{tBrand("tagline")}</span>
           </span>
           <h1 className="max-w-3xl text-[2.1rem] font-extrabold leading-[1.08] tracking-tight text-heading sm:text-5xl">
             {t("heroChoose")}

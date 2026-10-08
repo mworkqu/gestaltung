@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { PROVIDERS, dayStart, guardThreshold, nextReset, providerLimits, type ProviderId } from "@/lib/ai/limits";
 import { cn } from "@/lib/utils";
+import { AI_PRICE_QAR } from "@/lib/credits/constants";
 import { AiPricing } from "@/components/admin/ai-pricing";
 import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL } from "@/lib/prototyping/providers/gemini-client";
 
@@ -191,7 +192,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
         </div>
       </section>
 
-      {pricing && <AiPricing locale={locale} perCall={Number(pricing.per_call_qar ?? 1)} charging={Boolean(pricing.charging)} />}
+      {pricing && <AiPricing locale={locale} perCall={Number(pricing.per_call_qar ?? AI_PRICE_QAR)} charging={Boolean(pricing.charging)} />}
 
       {error && (
         <p className="text-sm font-medium text-destructive">

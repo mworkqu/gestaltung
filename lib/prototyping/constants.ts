@@ -15,7 +15,7 @@ export const PROCESSES = [
 export type Process = (typeof PROCESSES)[number];
 
 // No lead times here: we have no measured figure per process, so the UI shows
-// none. A real lead time comes from the partner workshop when we quote.
+// none. A real lead time comes from our engineer when we quote.
 
 // Materials. The first twelve are PROJECT_MATERIALS from lib/projects — the
 // same keys and the same Projects.material_* translations, so a material

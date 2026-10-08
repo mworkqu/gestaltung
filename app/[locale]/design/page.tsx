@@ -34,7 +34,6 @@ export default async function DesignHubPage({
   setRequestLocale(locale);
 
   const t = await getTranslations("DesignHub");
-  const tHome = await getTranslations("Home");
   const tHero = await getTranslations("Hero");
   const isRtl = locale === "ar";
 

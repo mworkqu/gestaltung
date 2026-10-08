@@ -3,6 +3,8 @@
 // for labels only. Change a rule there first, then here.
 
 export const CREDIT_QAR = 20;
+/** What one AI call is worth in QAR. Always equals the credit price (one call = one credit). Used as the default for store_settings.ai_pricing.per_call_qar (0050). */
+export const AI_PRICE_QAR = CREDIT_QAR;
 export const REDEEM_DAYS = 30;
 export const PROJECT_LIMIT = 3;
 /** Generations/refinements included in one CAD session (1 cad credit). */

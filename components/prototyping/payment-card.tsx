@@ -1,7 +1,7 @@
 "use client";
 
 // Payment summary on the project's Quote step (reviewer + owner, 2026-09-28).
-// Payment-ready without a gateway: AI generations priced per call (1 QAR),
+// Payment-ready without a gateway: AI generations priced per call (QAR 20, the credit price),
 // parts to buy now, the total, and what's due — 0 while it's free during
 // launch. The two ways to pay the reviewer asked for are shown: card
 // (including international cards, coming soon) or in person at our office
@@ -47,22 +47,23 @@ export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQ
     <div className="space-y-3 rounded-xl bg-panel/60 p-4 shadow-neu-inset">
       <p className="text-sm font-bold text-heading">{t("title")}</p>
       <dl className="space-y-1.5 text-sm">
-        <div className="flex justify-between gap-3">
-          <dt className="text-mutedtext">{t("aiLine", { count: charges.calls, price: money(charges.per_call_qar) })}</dt>
-          <dd className="tabular-nums text-heading">{money(s.lines[0].amountQar)}</dd>
-        </div>
+        {charges.charging && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-mutedtext">{t("aiLine", { count: charges.calls, price: money(charges.per_call_qar) })}</dt>
+            <dd className="tabular-nums text-heading">{money(s.lines[0].amountQar)}</dd>
+          </div>
+        )}
         <div className="flex justify-between gap-3">
           <dt className="text-mutedtext">{t("partsLine")}</dt>
           <dd className="tabular-nums text-heading">{money(s.lines[1].amountQar)}</dd>
         </div>
         <div className="flex justify-between gap-3 border-t border-borderstrong/40 pt-1.5">
           <dt className="font-semibold text-heading">{t("total")}</dt>
-          <dd className="font-bold tabular-nums text-heading">{money(s.totalQar)}</dd>
+          <dd className="font-bold tabular-nums text-heading">{money(charges.charging ? s.totalQar : s.lines[1].amountQar)}</dd>
         </div>
         {!charges.charging && (
           <div className="flex justify-between gap-3 text-emerald-700">
             <dt className="font-semibold">{t("freeDuringLaunch")}</dt>
-            <dd className="font-semibold tabular-nums">−{money(s.waivedQar)}</dd>
           </div>
         )}
       </dl>

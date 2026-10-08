@@ -29,6 +29,7 @@ export function AiPricing({ locale, perCall, charging }: { locale: string; perCa
           dir="ltr"
           className="w-24 rounded-lg border border-white/60 bg-surface px-2 py-1 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60"
         />
+        <span className="block text-[11px] text-mutedtext">{t("adminPriceHint")}</span>
       </label>
       <label className="flex items-center gap-2 pb-1.5 text-sm text-body">
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} />
