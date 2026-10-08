@@ -11,7 +11,7 @@
 
 import { MIN_BRIEF_CHARS } from "./constants";
 import { isMakeable, partNeeds, type PartContext, type PartLike } from "./parts";
-import { rowOf, type Spec } from "./spec";
+import { isAnalysed, rowOf, type Spec } from "./spec";
 import type { BomKind, LineStatus } from "./bom";
 import { describeHard, hardFlagId, hardRules, type Netlist } from "./netlist";
 import { isStandardFact } from "./analysis";
@@ -124,7 +124,7 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
   const spec = p.spec ?? null;
   add(
     { id: "understanding", group: "understanding", label: t("req_understanding"), satisfied: !!spec?.confirmed },
-    spec ? t("block_specUnconfirmed") : t("block_notAnalysed")
+    isAnalysed(spec) ? t("block_specUnconfirmed") : t("block_notAnalysed")
   );
 
   // Needs your input: one requirement per open question that changes the plan

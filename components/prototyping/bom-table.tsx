@@ -54,6 +54,7 @@ import { Tag } from "@/components/ui/tag";
 import { Card, PrimaryButton, SoftButton, selectClass } from "@/components/prototyping/ui";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
 import {
   bomCost,
@@ -123,8 +124,22 @@ export function CostSummary({
  * (/api/store-lead, source bom_quote: saved to inquiries and emailed with the
  * items, the note and a link to the project), with a single confirmation and
  * a single success message.
+ *
+ * P1-11 / CC-1: with a phone on the profile the phone field is skipped and the
+ * stored number is sent; otherwise the typed number is saved to the profile
+ * after a successful request, so it is never asked again.
  */
-function QuoteRequest({ projectId, lines }: { projectId: string; lines: ProjectLine[] }) {
+function QuoteRequest({
+  projectId,
+  lines,
+  profilePhone,
+  onPhoneSaved,
+}: {
+  projectId: string;
+  lines: ProjectLine[];
+  profilePhone?: string | null;
+  onPhoneSaved?: (phone: string) => void;
+}) {
   const t = useTranslations("Prototyping");
   const tC = useTranslations("Contact");
   const tD = useTranslations("Delivery");
@@ -142,6 +157,7 @@ function QuoteRequest({ projectId, lines }: { projectId: string; lines: ProjectL
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
+    const typedPhone = String(f.get("phone") ?? "").trim();
     setState("sending");
     try {
       // The route writes the message (items, note, project link and name).
@@ -150,7 +166,7 @@ function QuoteRequest({ projectId, lines }: { projectId: string; lines: ProjectL
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: String(f.get("name") ?? "").trim(),
-          phone: String(f.get("phone") ?? "").trim(),
+          phone: profilePhone || typedPhone,
           email: String(f.get("email") ?? "").trim(),
           note: String(f.get("note") ?? "").trim(),
           items: lines.map((l) => ({ function: l.function, spec: l.spec, quantity: l.quantity })),
@@ -161,6 +177,15 @@ function QuoteRequest({ projectId, lines }: { projectId: string; lines: ProjectL
       });
       if (!res.ok) throw new Error(`store-lead ${res.status}`);
       setState("sent");
+      if (!profilePhone && isValidPhone(typedPhone)) {
+        // Best-effort: the request went out either way.
+        const user = await getCurrentUser();
+        if (user) {
+          const phone = normalizePhone(typedPhone);
+          const { error } = await createClient().from("profiles").update({ phone }).eq("id", user.id);
+          if (!error) onPhoneSaved?.(phone);
+        }
+      }
     } catch (err) {
       console.error("bom: quote request failed", err);
       setState("error");
@@ -227,17 +252,19 @@ function QuoteRequest({ projectId, lines }: { projectId: string; lines: ProjectL
                   <span className="text-[11px] font-semibold text-mutedtext">{tC("nameLabel")}</span>
                   <input name="name" required autoFocus placeholder={tC("namePlaceholder")} className={field} />
                 </label>
-                <div className="space-y-1">
-                  <label htmlFor="bom-quote-phone" className="block text-[11px] font-semibold text-mutedtext">
-                    {tC("whatsappLabel")}
-                  </label>
-                  <PhoneInput
-                    id="bom-quote-phone"
-                    name="phone"
-                    placeholder={tC("whatsappPlaceholder")}
-                    codeAriaLabel={tC("countryCode")}
-                  />
-                </div>
+                {!profilePhone && (
+                  <div className="space-y-1">
+                    <label htmlFor="bom-quote-phone" className="block text-[11px] font-semibold text-mutedtext">
+                      {tC("whatsappLabel")}
+                    </label>
+                    <PhoneInput
+                      id="bom-quote-phone"
+                      name="phone"
+                      placeholder={tC("whatsappPlaceholder")}
+                      codeAriaLabel={tC("countryCode")}
+                    />
+                  </div>
+                )}
                 <label className="block space-y-1">
                   <span className="text-[11px] font-semibold text-mutedtext">{tC("emailOptional")}</span>
                   <input name="email" type="email" dir="ltr" placeholder={tC("emailPlaceholder")} className={field} />
@@ -302,6 +329,8 @@ export function BomTable({
   showTotal,
   before,
   inCircuit,
+  profilePhone,
+  onPhoneSaved,
 }: {
   projectId: string;
   lines: ProjectLine[];
@@ -320,6 +349,9 @@ export function BomTable({
   before?: React.ReactNode;
   /** Line ids a part of the stored circuit points at (netlist bomIds): these can't be removed. */
   inCircuit?: ReadonlySet<string>;
+  /** profiles.phone: the quote request skips its phone field when set (P1-11 / CC-1). */
+  profilePhone?: string | null;
+  onPhoneSaved?: (phone: string) => void;
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale();
@@ -426,7 +458,7 @@ export function BomTable({
           {failed && <p className="text-xs font-medium text-destructive">{t("bomMatchFailed")}</p>}
           {unstocked.length > 0 && (
             <div className="flex justify-end">
-              <QuoteRequest projectId={projectId} lines={unstocked} />
+              <QuoteRequest projectId={projectId} lines={unstocked} profilePhone={profilePhone} onPhoneSaved={onPhoneSaved} />
             </div>
           )}
           {groups.map(({ g, lines: gl }) => {

@@ -5,16 +5,33 @@
 // brief. Nothing is added until the client presses "Add to my brief".
 // Messages can be read out loud. Sending anything needs the same consent as
 // analysing the brief (audit #10); ticking it here records it for both.
+//
+// Direct-to-AI creation (P1-11 / CC-1): a project started from "Describe your
+// idea" opens here with ?start=chat. `initialOpen` reads the first turn the
+// new-project page left in sessionStorage (removed at once), opens the chat
+// with that history and carries on from it — no new first question.
 
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Loader2, MessageCircleQuestion, Plus, Send, X } from "lucide-react";
+import { MessageCircleQuestion, Plus, X } from "lucide-react";
 
 import { PrimaryButton, SoftButton } from "@/components/prototyping/ui";
-import { ReadAloud } from "@/components/prototyping/read-aloud";
-import { cn } from "@/lib/utils";
+import { ChatConsent, ChatInput, ChatMessages } from "@/components/prototyping/chat-thread";
+import { chatStorageKey, parseHandoff, type ChatHandoff, type ChatMsg } from "@/lib/projects/create-from-chat";
 
-type Msg = { role: "user" | "assistant"; text: string };
+type Msg = ChatMsg;
+
+/** Reads and removes the first-turn handoff; null when absent or storage is blocked. */
+function takeHandoff(projectId: string): ChatHandoff | null {
+  try {
+    const key = chatStorageKey(projectId);
+    const raw = sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    return parseHandoff(raw);
+  } catch {
+    return null;
+  }
+}
 
 export function BriefChat({
   projectId,
@@ -23,6 +40,8 @@ export function BriefChat({
   consented,
   onConsent,
   onAdd,
+  initialOpen = false,
+  initialThread,
 }: {
   projectId: string;
   brief: string;
@@ -31,6 +50,10 @@ export function BriefChat({
   consented: boolean;
   onConsent: () => void;
   onAdd: (text: string) => Promise<void>;
+  /** Open on mount with the stored first turn (?start=chat). */
+  initialOpen?: boolean;
+  /** The first turn, when the caller already has it (else read from sessionStorage). */
+  initialThread?: ChatHandoff | null;
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale();
@@ -43,8 +66,21 @@ export function BriefChat({
   const [error, setError] = useState(false);
   const [ticked, setTicked] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  // StrictMode runs effects twice; the handoff is read (and removed) once.
+  const took = useRef(false);
 
   useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [msgs, busy, addition]);
+
+  useEffect(() => {
+    if (!initialOpen || took.current || !destination) return;
+    took.current = true;
+    const thread = initialThread ?? takeHandoff(projectId);
+    if (!thread) return;
+    setMsgs(thread.messages);
+    setAddition(thread.addition);
+    setError(Boolean(thread.error));
+    setOpen(true);
+  }, [initialOpen, initialThread, projectId, destination]);
 
   if (!destination) return null;
 
@@ -112,46 +148,16 @@ export function BriefChat({
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-              {msgs.length === 0 && !busy ? (
+              {msgs.length === 0 && !busy && (
                 <div className="space-y-3">
                   <p className="text-sm text-body">{t("chatWelcome")}</p>
-                  {!consented && (
-                    <label className="flex items-start gap-2 text-[12px] leading-relaxed text-heading">
-                      <input
-                        type="checkbox"
-                        checked={ticked}
-                        onChange={(e) => setTicked(e.target.checked)}
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-cobalt"
-                      />
-                      {t("aiConsentLabel", { destination })}
-                    </label>
-                  )}
+                  {!consented && <ChatConsent destination={destination} checked={ticked} onChange={setTicked} id="brief-chat-consent" />}
                   <PrimaryButton onClick={start} disabled={!consented && !ticked}>
                     {t("chatStart")}
                   </PrimaryButton>
                 </div>
-              ) : (
-                msgs.map((m, i) => (
-                  <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-                    <div
-                      className={cn(
-                        "max-w-[85%] space-y-1 rounded-2xl px-3 py-2 text-sm",
-                        m.role === "user" ? "bg-cobalt text-white" : "bg-panel text-heading shadow-neu-sm"
-                      )}
-                    >
-                      <p className="whitespace-pre-wrap">{m.text}</p>
-                      {m.role === "assistant" && <ReadAloud text={m.text} className="shadow-none" />}
-                    </div>
-                  </div>
-                ))
               )}
-              {busy && (
-                <p className="flex items-center gap-2 text-[12px] text-mutedtext">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {t("chatThinking")}
-                </p>
-              )}
-              {error && <p className="text-[12px] font-medium text-destructive">{t("chatFailed")}</p>}
+              <ChatMessages msgs={msgs} busy={busy} error={error} />
               {addition && (
                 <div className="space-y-2 rounded-xl border-s-4 border-emerald-500 bg-emerald-50/60 p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">{t("chatAddition")}</p>
@@ -175,29 +181,17 @@ export function BriefChat({
             </div>
 
             {msgs.length > 0 && (
-              <div className="flex items-center gap-2 border-t border-borderstrong/40 px-3 py-3">
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submit()}
-                  placeholder={t("chatPlaceholder")}
-                  aria-label={t("chatPlaceholder")}
-                  disabled={busy}
-                  className="min-w-0 flex-1 rounded-xl border border-white/60 bg-panel px-3 py-2 text-sm text-heading shadow-neu-inset outline-none placeholder:text-faint"
-                />
-                <button
-                  type="button"
-                  onClick={submit}
-                  disabled={busy || !input.trim()}
-                  aria-label={t("chatSend")}
-                  className="grid h-9 w-9 place-items-center rounded-xl bg-cobalt text-white disabled:opacity-50"
-                >
-                  <Send className={cn("h-4 w-4", locale === "ar" && "-scale-x-100")} />
-                </button>
+              <ChatInput
+                value={input}
+                onChange={setInput}
+                onSubmit={submit}
+                busy={busy}
+                className="border-t border-borderstrong/40 px-3 py-3"
+              >
                 <button type="button" onClick={reset} className="text-[11px] font-semibold text-mutedtext hover:text-heading">
                   {t("chatRestart")}
                 </button>
-              </div>
+              </ChatInput>
             )}
           </div>
         </div>

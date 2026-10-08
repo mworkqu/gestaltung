@@ -128,6 +128,15 @@ export function mergeAnalysis(
 /** A spec before any analysis: lets a choice (e.g. power) be saved first. */
 export const EMPTY_SPEC: Spec = { summary: "", rows: [], questions: [], confirmed: false, provider: "", fallback: null };
 
+/**
+ * True once a reader has filled the spec. A spec holding only the AI consent
+ * (a project started from the chat, P1-11 / CC-1, or the chat's own consent)
+ * has not been analysed yet.
+ */
+export function isAnalysed(spec: Spec | null | undefined): spec is Spec {
+  return !!spec && (Boolean(spec.provider) || spec.rows.length > 0 || spec.questions.length > 0 || Boolean(spec.summary));
+}
+
 /** The client sets a fact, from the spec sheet or from a question. */
 export function setFact(spec: Spec, fact: { id: string; label: string }, value: string | null): Spec {
   const exists = spec.rows.some((r) => r.id === fact.id);

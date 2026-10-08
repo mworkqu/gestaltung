@@ -15,7 +15,7 @@ import { Check, Pencil, RotateCcw } from "lucide-react";
 
 import { STANDARD_FACTS, briefStates, isStandardFact } from "@/lib/prototyping/analysis";
 import { factFocus, factLabel } from "@/lib/prototyping/readiness";
-import { keptAnswer, rowOf, setFact, type Spec, type SpecRow } from "@/lib/prototyping/spec";
+import { isAnalysed, keptAnswer, rowOf, setFact, type Spec, type SpecRow } from "@/lib/prototyping/spec";
 import { Tag } from "@/components/ui/tag";
 import { Card, PrimaryButton } from "@/components/prototyping/ui";
 import { FactControl, controlType, formatFact } from "@/components/prototyping/spec-sheet";
@@ -93,7 +93,8 @@ export function UnderstoodPanel({
       </Card>
     );
   }
-  if (!spec) return null;
+  // Nothing read yet (null, or only the AI consent from the chat).
+  if (!isAnalysed(spec)) return null;
 
   const questions = spec.questions ?? [];
   const answered = (id: string) => !!rowOf(spec, id)?.edited;

@@ -6,6 +6,8 @@ import { Link } from "@/i18n/navigation";
 import { NewProjectForm } from "@/components/projects/new-project-form";
 import { cn } from "@/lib/utils";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { DescribeIdea } from "@/components/projects/describe-idea";
+import { providerStatus } from "@/lib/prototyping/providers";
 
 export async function generateMetadata({
   params,
@@ -25,7 +27,10 @@ export async function generateMetadata({
   });
 }
 
-// No sign-in wall. The anonymous session is created by the form, on submit.
+// No sign-in wall. The anonymous session is created on the first write.
+// Plain /projects/new is "Describe your idea" (P1-11 / CC-1): a chat whose
+// first message creates the project (components/projects/describe-idea.tsx).
+// With no AI provider configured it falls back to the name form below.
 // `?for=drawing` is the drawing-request variant: "drawing request" wording,
 // and of the three explanation lines only "why your number" applies.
 export default async function NewProjectPage({
@@ -38,6 +43,12 @@ export default async function NewProjectPage({
   const { locale } = await params;
   const forDrawing = (await searchParams).for === "drawing";
   setRequestLocale(locale);
+
+  if (!forDrawing) {
+    // Only the provider's public name crosses to the client — never its key.
+    const { destination } = await providerStatus();
+    if (destination) return <DescribeIdea locale={locale} destination={destination} />;
+  }
 
   const t = await getTranslations("Projects");
   const isRtl = locale === "ar";

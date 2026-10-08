@@ -26,10 +26,15 @@ export const dynamic = "force-dynamic";
 
 export default async function PrototypingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ start?: string | string[] }>;
 }) {
   const { locale, id } = await params;
+  // ?start=chat: opened from "Describe your idea" (P1-11 / CC-1) — the brief
+  // chat opens with the first turn, and the project gets a name from its brief.
+  const startChat = (await searchParams).start === "chat";
   setRequestLocale(locale);
   // Only the provider's public name crosses to the client — never its key.
   const { destination } = await providerStatus();
@@ -37,7 +42,7 @@ export default async function PrototypingPage({
   return (
     <MessagesScope scope="all">
     <div className="mx-auto w-full max-w-[1760px] px-4 py-4 sm:px-6">
-      <PrototypingWorkspace projectId={id} briefDestination={destination} />
+      <PrototypingWorkspace projectId={id} briefDestination={destination} startChat={startChat} />
     </div>
     </MessagesScope>
   );

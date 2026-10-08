@@ -1025,7 +1025,22 @@
     "limitFull": "{used} of {limit} projects used. Archive one to create another.",
     "limitRestore": "You already have {limit} active projects. Archive one before restoring this one.",
     "archivedHeading": "Archived ({count})",
-    "limitReached": "You already have 3 active projects. Archive one in My projects to create another."
+    "limitReached": "You already have 3 active projects. Archive one in My projects to create another.",
+    "describeHeading": "Describe what it must do.",
+    "describeSub": "One sentence is enough. We'll ask the rest.",
+    "chatFirst": "What should it do? One sentence is enough.",
+    "chatStartButton": "Start",
+    "limitArchiveLink": "Archive a project",
+    "saveLink": "Save my project link",
+    "saveLinkSent": "We sent your project link to {email}.",
+    "saveLinkHint": "We email you a link that opens this project on any device. It can be sent once, within an hour of starting the project.",
+    "saveLinkFailed": "We couldn't send the link. It can only be sent once, within an hour of starting the project.",
+    "phonePromptBom": "Where can we reach you about this parts list?",
+    "phonePromptSaveLink": "Keep this project: add your WhatsApp number and, if you like, an email.",
+    "phonePromptQuote": "Where should we send your price?",
+    "phoneSave": "Save",
+    "phoneNotNow": "Not now",
+    "phoneSaved": "Saved. We'll WhatsApp you only about this project."
   },
   "Search": {
     "inInventory": "In your inventory",

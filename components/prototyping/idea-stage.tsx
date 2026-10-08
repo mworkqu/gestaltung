@@ -29,6 +29,7 @@ import {
   EMPTY_SPEC,
   aiConsentOf,
   answersOf,
+  isAnalysed,
   mergeAnalysis,
   type AiConsent,
   type Spec,
@@ -96,6 +97,7 @@ export function IdeaStage({
   onChanged,
   onSpec,
   briefDestination,
+  startChat = false,
 }: {
   project: Project;
   parts: ProjectPart[];
@@ -103,6 +105,8 @@ export function IdeaStage({
   onSpec: (next: Spec) => void;
   /** Who receives the brief for analysis; null = the rules reader on our server. */
   briefDestination: string | null;
+  /** Opened from "Describe your idea": the chat opens with the first turn. */
+  startChat?: boolean;
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale() === "ar" ? "ar" : "en";
@@ -280,7 +284,8 @@ export function IdeaStage({
     setRunning(false);
   }
 
-  const analysed = !!spec;
+  // A consent-only spec (from the chat) is not an analysis yet.
+  const analysed = isAnalysed(spec);
   const current = ANALYSIS_STEPS.find((s) => !done.includes(s));
 
   return (
@@ -335,6 +340,7 @@ export function IdeaStage({
                 onSpec({ ...(spec ?? EMPTY_SPEC), aiConsent: { at: new Date().toISOString(), destination: briefDestination } });
             }}
             onAdd={addToBrief}
+            initialOpen={startChat}
           />
           <ReadAloud text={brief} />
           <PrimaryButton

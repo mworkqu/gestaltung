@@ -102,6 +102,9 @@ import { Card, GhostButton, PrimaryButton, Warn, useMono } from "@/components/pr
 import { cn } from "@/lib/utils";
 import type { Project, ProjectPart, ProjectSchematicRevision } from "@/lib/supabase/types";
 import { FirmwareCard } from "@/components/prototyping/firmware-card";
+import { PhonePrompt } from "@/components/projects/phone-prompt";
+import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
+import { phonePromptDismissKey, saveLinkAvailable, shouldShowPhonePrompt } from "@/lib/projects/phone-prompt";
 import type { Firmware } from "@/lib/prototyping/firmware";
 
 /** Where a part's drawings are shown. */
@@ -131,10 +134,13 @@ function savedPanels(): Panels | null {
 export function PrototypingWorkspace({
   projectId,
   briefDestination,
+  startChat = false,
 }: {
   projectId: string;
   /** Who receives the brief text for analysis; null = our own server only. */
   briefDestination: string | null;
+  /** Opened from "Describe your idea" (?start=chat): Brief with the chat open, and name the project. */
+  startChat?: boolean;
 }) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
@@ -171,6 +177,16 @@ export function PrototypingWorkspace({
   const [matches, setMatches] = useState<Map<string, LineMatch>>(new Map());
   const [matchState, setMatchState] = useState<"idle" | "loading" | "failed">("idle");
   const specTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Who is here, for the phone prompt and "Save my project link" (P1-11 / CC-1).
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isGuestUser, setIsGuestUser] = useState(false);
+  // profiles.phone, read once; undefined while loading (the prompt waits).
+  const [profilePhone, setProfilePhone] = useState<string | null | undefined>(undefined);
+  const [phoneDismissed, setPhoneDismissed] = useState(false);
+  const [saveLinkOpen, setSaveLinkOpen] = useState(false);
+  const [saveLinkSent, setSaveLinkSent] = useState(false);
+  const profileRead = useRef(false);
+  const nameAsked = useRef(false);
 
   const loadMatches = useCallback(async () => {
     setMatchState("loading");
@@ -204,6 +220,22 @@ export function PrototypingWorkspace({
       return;
     }
     setSignedIn(!!user && user.is_anonymous !== true);
+    if (user && !profileRead.current) {
+      profileRead.current = true;
+      setUserId(user.id);
+      setIsGuestUser(user.is_anonymous === true);
+      try {
+        setPhoneDismissed(localStorage.getItem(phonePromptDismissKey(user.id)) === "1");
+      } catch {
+        // Storage blocked: the prompt can show again next visit.
+      }
+      void supabase
+        .from("profiles")
+        .select("phone")
+        .eq("id", user.id)
+        .maybeSingle()
+        .then(({ data }) => setProfilePhone((data?.phone as string | null | undefined) ?? null));
+    }
     if (!user) {
       // No session at all (not even a guest one): nothing here can be theirs.
       setMissing(true);
@@ -271,6 +303,8 @@ export function PrototypingWorkspace({
     setCurrent(
       (c) =>
         c ??
+        // From "Describe your idea": the brief, where the chat continues.
+        (startChat ? "brief" : null) ??
         initialNode(
           { stage: loaded.stage, spec: loaded.spec, disciplines: loaded.disciplines, parts: loadedParts },
           visibleNodes(branches(loaded.disciplines, loaded.brief, loadedParts))
@@ -299,11 +333,29 @@ export function PrototypingWorkspace({
     }
 
     setLoading(false);
-  }, [projectId, loadMatches]);
+  }, [projectId, loadMatches, startChat]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // A project started from the chat is called "New project" until its brief
+  // names it (/api/projects/name). Asked once; the client can rename it later.
+  const placeholderName = project?.name === DEFAULT_PROJECT_NAME;
+  useEffect(() => {
+    if (!startChat || !placeholderName || nameAsked.current) return;
+    nameAsked.current = true;
+    void fetch("/api/projects/name", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ projectId, locale }),
+    })
+      .then((r) => r.json() as Promise<{ name?: string | null }>)
+      .then(({ name }) => {
+        if (name) setProject((p) => (p && p.name === DEFAULT_PROJECT_NAME ? { ...p, name } : p));
+      })
+      .catch(() => {});
+  }, [startChat, placeholderName, projectId, locale]);
 
   // A saved choice wins; otherwise both panels start collapsed where they
   // would squeeze the centre. Read after mount: the server has no window.
@@ -425,6 +477,23 @@ export function PrototypingWorkspace({
   const states = nodeStates(ready, parts, spec, visible, tr, buildRoute);
   const node = toNode(current ?? project.stage, visible);
   const open = ready.requirements.filter((r) => !r.satisfied);
+
+  // The phone is asked once the parts list exists, never at the start
+  // (P1-11 / CC-1); it disappears everywhere once saved.
+  const phonePrompt =
+    userId &&
+    liveLines.length > 0 &&
+    shouldShowPhonePrompt({ profilePhone, isAccount: !isGuestUser, dismissed: phoneDismissed }) ? (
+      <PhonePrompt
+        userId={userId}
+        variant="bom"
+        onSaved={(phone) => setProfilePhone(phone)}
+        onDismiss={() => setPhoneDismissed(true)}
+      />
+    ) : null;
+  // Guests can have the project link emailed, but the recovery RPC (0045)
+  // only accepts a project under an hour old that was never emailed.
+  const canSaveLink = isGuestUser && !saveLinkSent && saveLinkAvailable(project.created_at, Date.now());
 
   const designOf = (d: Discipline) => parts.filter((p) => disciplineOf(p) === d);
   const schematicsOf = (ps: ProjectPart[]) =>
@@ -567,6 +636,8 @@ export function PrototypingWorkspace({
         intro={kind === "all" ? t("bomIntro") : t("bomBranchIntro")}
         showTotal={kind === "all"}
         before={before}
+        profilePhone={profilePhone}
+        onPhoneSaved={(phone) => setProfilePhone(phone)}
       />
     );
   };
@@ -672,6 +743,17 @@ export function PrototypingWorkspace({
             <h1 className="truncate text-base font-extrabold tracking-tight text-heading">
               {project.name}
             </h1>
+            {canSaveLink && (
+              <button
+                type="button"
+                onClick={() => setSaveLinkOpen((v) => !v)}
+                aria-expanded={saveLinkOpen}
+                aria-controls="save-link-panel"
+                className="text-[11px] font-semibold text-cobalt hover:underline"
+              >
+                {tProj("saveLink")}
+              </button>
+            )}
           </div>
           <button
             type="button"
@@ -719,6 +801,21 @@ export function PrototypingWorkspace({
             )}
           </div>
         )
+      )}
+
+      {saveLinkOpen && userId && (
+        <div id="save-link-panel">
+          <PhonePrompt
+            userId={userId}
+            variant="save-link"
+            withEmail
+            projectId={project.id}
+            existingPhone={profilePhone}
+            onSaved={(phone) => setProfilePhone(phone)}
+            onDismiss={() => setSaveLinkOpen(false)}
+            onEmailSent={() => setSaveLinkSent(true)}
+          />
+        </div>
       )}
 
       <div
@@ -828,6 +925,7 @@ export function PrototypingWorkspace({
               onChanged={load}
               onSpec={saveSpec}
               briefDestination={briefDestination}
+              startChat={startChat}
             />
           )}
 
@@ -852,6 +950,7 @@ export function PrototypingWorkspace({
             </>
           )}
 
+          {node === "bom" && phonePrompt}
           {node === "bom" && bomTable("all")}
 
           {node === "mechanical.parts" && (
@@ -956,6 +1055,7 @@ export function PrototypingWorkspace({
               />
             </div>
           )}
+          {node === "electronics.components" && phonePrompt}
           {node === "electronics.components" && bomTable("electronics", levelFlags)}
           {node === "electronics.components" && (
             <ComponentsCard
