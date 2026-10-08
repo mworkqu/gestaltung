@@ -238,7 +238,7 @@ export function NetlistView({
           </div>
           <p className="text-[11px] text-mutedtext">{t(`circuitViewNote_${view}`)}</p>
 
-          <SvgFrame svg={svg} fileName={`circuit-${view}`} title={t(`circuitView_${view}`)} />
+          <SvgFrame svg={svg} fileName={`circuit-${view}`} title={t(`circuitView_${view}`)} minHeight={720} />
 
           {netlist.notes.length > 0 && (
             <ul className="list-disc space-y-0.5 ps-5 text-[12px] text-mutedtext">

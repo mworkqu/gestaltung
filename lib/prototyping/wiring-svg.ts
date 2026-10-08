@@ -242,7 +242,7 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
     kx += w + 12;
   }
   const height = ky + PAD;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" width="${width}" height="${height}" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif">
 <rect width="100%" height="100%" fill="#ffffff"/>
 ${wires.join("\n")}
 ${boxes.join("\n")}

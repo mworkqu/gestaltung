@@ -15,6 +15,7 @@ import { isAnalysed, rowOf, type Spec } from "./spec";
 import type { BomKind, LineStatus } from "./bom";
 import { describeHard, hardFlagId, hardRules, type Netlist } from "./netlist";
 import { isStandardFact } from "./analysis";
+import { humanName } from "./human-name";
 
 /** Which area of the workspace a requirement belongs to. */
 export type RequirementGroup = "brief" | "understanding" | "inputs" | "parts" | "bom" | "route";
@@ -154,10 +155,12 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
   }
   for (const part of p.parts) {
     const needs = partNeeds(part, partCtx);
+    // The part's name as people read it, never a raw concept id (P0-07).
+    const name = humanName(part.name, part.code);
     add(
-      { id: `part:${part.id}`, group: "parts", label: `${part.code} ${part.name}`, satisfied: !needs.length },
+      { id: `part:${part.id}`, group: "parts", label: `${part.code} ${name}`, satisfied: !needs.length },
       needs.length
-        ? t("block_part", { code: part.code, name: part.name, need: t(`partNeed_${needs[0]}`) })
+        ? t("block_part", { code: part.code, name, need: t(`partNeed_${needs[0]}`) })
         : ""
     );
   }
@@ -198,7 +201,7 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
         n ? t("block_circuitClean") : t("block_circuitMissing")
       );
       for (const c of orphans) {
-        const text = t("block_circuitOrphan", { ref: `${c.ref} (${c.function})` });
+        const text = t("block_circuitOrphan", { ref: `${c.ref} (${humanName(c.function, c.bomId)})` });
         add({ id: `circuit:orphan:${c.ref}`, group: "bom", label: text, satisfied: false, focus: CIRCUIT_FOCUS, bomKind: "electronics" }, text);
       }
       const seen = new Set<string>();
@@ -216,9 +219,10 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
   // client's pick. Matched, owned and not-stocked lines need nothing from them.
   for (const l of p.bom?.lines ?? []) {
     if (p.bom!.matches.get(l.id)?.status !== "choose") continue;
+    const fn = humanName(l.function, l.id);
     add(
-      { id: `bom:${l.id}`, group: "bom", label: l.function, satisfied: false, focus: `bom-${l.id}`, bomKind: l.kind },
-      t("block_bomChoose", { function: l.function })
+      { id: `bom:${l.id}`, group: "bom", label: fn, satisfied: false, focus: `bom-${l.id}`, bomKind: l.kind },
+      t("block_bomChoose", { function: fn })
     );
   }
 

@@ -21,7 +21,6 @@ import {
   MAX_PROJECT_IMAGE_BYTES,
   PROJECT_IMAGE_ACCEPT,
   PROJECT_IMAGE_BUCKET,
-  PROJECT_MATERIALS,
 } from "@/lib/projects/constants";
 import {
   adjustCart,
@@ -37,8 +36,11 @@ import {
   type StatusCartRow,
   type StatusOrderLine,
 } from "@/lib/projects/item-status";
+import { activeLines, type LineMatch, type ProjectBom } from "@/lib/prototyping/bom";
+import { costState, toBuyNow } from "@/lib/prototyping/bom-cost";
 import { ProjectCadCard } from "@/components/projects/project-cad-card";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tag } from "@/components/ui/tag";
 import { ProjectUnavailable } from "@/components/projects/project-unavailable";
 import { Button } from "@/components/ui/button";
@@ -48,7 +50,6 @@ import type {
   Project,
   ProjectBlock,
   ProjectItem,
-  ProjectMaterial,
 } from "@/lib/supabase/types";
 
 // The project workspace. Everything reads and writes through the browser
@@ -72,7 +73,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
 
   const [project, setProject] = useState<Project | null>(null);
   const [blocks, setBlocks] = useState<ProjectBlock[]>([]);
-  const [materials, setMaterials] = useState<ProjectMaterial[]>([]);
   const [items, setItems] = useState<ItemWithPart[]>([]);
   const [cartRows, setCartRows] = useState<StatusCartRow[]>([]);
   const [orderLines, setOrderLines] = useState<StatusOrderLine[]>([]);
@@ -124,13 +124,12 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     }
     setProject(proj as Project);
 
-    const [blockRes, matRes, itemRes, cartRes, orderRes] = await Promise.all([
+    const [blockRes, itemRes, cartRes, orderRes] = await Promise.all([
       supabase
         .from("project_blocks")
         .select("*")
         .eq("project_id", projectId)
         .order("position", { ascending: true }),
-      supabase.from("project_materials").select("*").eq("project_id", projectId),
       supabase
         .from("project_items")
         .select("*, part:parts(*)")
@@ -151,12 +150,11 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     ]);
 
     setPartialError(
-      !!(blockRes.error || matRes.error || itemRes.error || cartRes.error || orderRes.error)
+      !!(blockRes.error || itemRes.error || cartRes.error || orderRes.error)
     );
 
     const loadedBlocks = (blockRes.data ?? []) as ProjectBlock[];
     setBlocks(loadedBlocks);
-    setMaterials((matRes.data ?? []) as ProjectMaterial[]);
     setItems((itemRes.data ?? []) as ItemWithPart[]);
     setCartRows((cartRes.data ?? []) as StatusCartRow[]);
     setOrderLines(
@@ -190,13 +188,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
     void load();
   }, [load]);
 
-  if (loading) {
-    return (
-      <div className="neu flex items-center justify-center p-16">
-        <Loader2 className="h-5 w-5 animate-spin text-mutedtext" />
-      </div>
-    );
-  }
+  if (loading) return <ProjectSkeleton label={t("loadingProject")} />;
 
   if (fatalError) {
     return (
@@ -256,7 +248,7 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         guestPhone={guestPhone}
         onRenamed={(name) => setProject((p) => (p ? { ...p, name } : p))}
       />
-      <PrototypingCard projectId={projectId} />
+      <PrototypingCard projectId={projectId} bom={project.bom?.lines ? project.bom : null} />
       <BriefCard project={project} />
       <BlocksCard
         projectId={projectId}
@@ -264,7 +256,6 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         imageUrls={imageUrls}
         onChanged={load}
       />
-      <MaterialsCard projectId={projectId} materials={materials} onChanged={load} />
       <ProjectCadCard projectId={projectId} />
       <ItemsCard projectId={projectId} items={items} statuses={statuses} onChanged={load} />
       <DangerZoneCard
@@ -345,21 +336,96 @@ function ProjectHeader({
 // part of this page: different job, different shape, and this page has to keep
 // working on its own.
 
-function PrototypingCard({ projectId }: { projectId: string }) {
+function PrototypingCard({ projectId, bom }: { projectId: string; bom: ProjectBom | null }) {
   const t = useTranslations("Prototyping");
+  const locale = useLocale();
+  const lines = activeLines(bom);
+  // The same store matches the workspace reads (/api/bom/match) feed the same
+  // toBuyNow(), so this page and the workspace never show two different totals
+  // (audit "project page QAR total ≠ BOM To buy now").
+  const [matches, setMatches] = useState<Map<string, LineMatch>>(new Map());
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const hasLines = lines.length > 0;
+
+  useEffect(() => {
+    if (!hasLines) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/bom/match", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ projectId }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { matches: list } = (await res.json()) as { matches: LineMatch[] };
+        if (cancelled) return;
+        setMatches(new Map(list.map((m) => [m.lineId, m])));
+        setLoaded(true);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, hasLines]);
+
+  const state = costState({ lineCount: lines.length, matchesLoaded: loaded, matchFailed: failed });
+
   return (
-    <section className="neu flex flex-wrap items-center gap-4 p-6 sm:p-8">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-surface shadow-neu-sm">
-        <Sparkles className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <h2 className="text-sm font-semibold text-heading">{t("kicker")}</h2>
-        <p className="mt-1 text-sm text-mutedtext">{t("openIntro")}</p>
+    <section className="neu space-y-4 p-6 sm:p-8">
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-surface shadow-neu-sm">
+          <Sparkles className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-heading">{t("kicker")}</h2>
+          <p className="mt-1 text-sm text-mutedtext">{t("openIntro")}</p>
+        </div>
+        <Button asChild>
+          <Link href={`/projects/${projectId}/prototyping`}>{t("open")}</Link>
+        </Button>
       </div>
-      <Button asChild>
-        <Link href={`/projects/${projectId}/prototyping`}>{t("open")}</Link>
-      </Button>
+      {hasLines && (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl bg-panel/60 px-4 py-3 shadow-neu-inset">
+          <p className="text-[10px] uppercase tracking-wider text-faint">{t("costToBuyNow")}</p>
+          {state === "loading" ? (
+            <>
+              <span className="sr-only">{t("costLoading")}</span>
+              <Skeleton className="h-4 w-24" />
+            </>
+          ) : state === "failed" ? (
+            <p className="text-xs text-mutedtext">{t("costUnavailable")}</p>
+          ) : (
+            <p className="font-mono text-sm font-bold tabular-nums text-heading">{formatPrice(toBuyNow(bom, matches), locale)}</p>
+          )}
+          <p className="text-[11px] text-mutedtext">{t("projectToBuyNote")}</p>
+        </div>
+      )}
     </section>
+  );
+}
+
+/** The project page while it loads: the page's own shape in grey bars, not a bare spinner (audit #59). */
+function ProjectSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-6" role="status" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <Skeleton className="h-3 w-40" />
+      <div className="neu space-y-3 p-6 shadow-neu-inset sm:p-8">
+        <Skeleton className="h-6 w-1/2" />
+        <Skeleton className="h-3 w-1/3" />
+      </div>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="neu space-y-3 p-6 sm:p-8">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-4/5" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -643,67 +709,6 @@ function IconBtn({
   );
 }
 
-// ── Materials ───────────────────────────────────────────────────────────────
-
-function MaterialsCard({
-  projectId,
-  materials,
-  onChanged,
-}: {
-  projectId: string;
-  materials: ProjectMaterial[];
-  onChanged: () => Promise<void>;
-}) {
-  const t = useTranslations("Projects");
-  const [busy, setBusy] = useState(false);
-  const chosen = new Set(materials.map((m) => m.material));
-
-  async function toggle(key: string) {
-    setBusy(true);
-    const supabase = createClient();
-    if (chosen.has(key)) {
-      await supabase
-        .from("project_materials")
-        .delete()
-        .eq("project_id", projectId)
-        .eq("material", key);
-    } else {
-      await supabase.from("project_materials").insert({ project_id: projectId, material: key });
-    }
-    await onChanged();
-    setBusy(false);
-  }
-
-  return (
-    <section className="neu space-y-3 p-6 sm:p-8">
-      <h2 className="text-sm font-semibold text-heading">{t("materialsHeading")}</h2>
-      <p className="text-sm text-mutedtext">{t("materialsIntro")}</p>
-      <div className="flex flex-wrap gap-2 pt-1">
-        {PROJECT_MATERIALS.map((key) => {
-          const on = chosen.has(key);
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => toggle(key)}
-              disabled={busy}
-              aria-pressed={on}
-              className={cn(
-                "rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-60",
-                on
-                  ? "bg-cobalt text-white shadow-neu-sm"
-                  : "bg-panel text-mutedtext shadow-neu-sm hover:text-heading"
-              )}
-            >
-              {t(`material_${key}`)}
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 // ── Items ───────────────────────────────────────────────────────────────────
 
 function ItemsCard({
@@ -906,7 +911,7 @@ function ItemsCard({
           </ul>
 
           <div className="flex items-center justify-between border-t border-borderstrong/40 pt-3">
-            <span className="text-sm text-mutedtext">{t("itemsHeading")}</span>
+            <span className="text-sm text-mutedtext">{t("itemsTotal")}</span>
             <span className="text-base font-bold tabular-nums text-heading">
               {formatPrice(total, locale)}
             </span>

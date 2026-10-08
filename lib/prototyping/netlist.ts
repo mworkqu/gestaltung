@@ -17,6 +17,8 @@
 //
 // Pure and client-safe.
 
+import { humanName } from "./human-name";
+
 export const PIN_TYPES = [
   "power_in",
   "power_out",
@@ -333,7 +335,7 @@ type T = (key: string, params?: Record<string, string | number>) => string;
 export function describeHard(f: HardFlag, n: Netlist, t: T): string {
   const who = (ref: string) => {
     const c = n.components.find((x) => x.ref === ref);
-    return c ? `${ref} (${c.function})` : ref;
+    return c ? `${ref} (${humanName(c.function, c.bomId)})` : ref;
   };
   switch (f.code) {
     case "inductive_on_gpio":

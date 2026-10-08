@@ -50,6 +50,7 @@ import { Link } from "@/i18n/navigation";
 import { useCart } from "@/components/parts/cart-provider";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { PhoneInput } from "@/components/phone-input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tag } from "@/components/ui/tag";
 import { Card, PrimaryButton, SoftButton, selectClass } from "@/components/prototyping/ui";
 import { createClient } from "@/lib/supabase/client";
@@ -69,6 +70,7 @@ import {
   type ProjectLine,
 } from "@/lib/prototyping/bom";
 import { packLineCount, weakSuggestion } from "@/lib/prototyping/bom-match";
+import { costOfLines, type CostState } from "@/lib/prototyping/bom-cost";
 import { fulfilledLabel, fulfilledOrderIds } from "@/lib/prototyping/fulfilled";
 import type { BomGroup } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
@@ -88,15 +90,37 @@ export function CostSummary({
   lines: given,
   matches,
   compact = false,
+  state = "ready",
 }: {
   lines: ProjectLine[];
   matches: Map<string, LineMatch>;
   compact?: boolean;
+  /** Until the first store match arrives there are no prices: a skeleton, never QAR 0.00 (audit #59). */
+  state?: CostState;
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale();
+  if (state !== "ready") {
+    return (
+      <div
+        className={cn("space-y-2", !compact && "rounded-xl bg-panel/60 p-3 shadow-neu-inset")}
+        aria-busy={state === "loading"}
+      >
+        <p className="text-[10px] uppercase tracking-wider text-faint">{t("costToBuyNow")}</p>
+        {state === "loading" ? (
+          <>
+            <span className="sr-only">{t("costLoading")}</span>
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-2.5 w-full max-w-[14rem]" />
+          </>
+        ) : (
+          <p className="text-[10.5px] text-mutedtext">{t("costUnavailable")}</p>
+        )}
+      </div>
+    );
+  }
   const lines = dedupeLines(given);
-  const c = bomCost(lines, matches);
+  const c = costOfLines(given, matches);
   const packLines = packLineCount(lines, matches);
   const counts = [
     t("costCounts", { notStocked: c.notStocked, fabrication: c.fabrication, ordered: c.bought }),
@@ -321,6 +345,7 @@ export function BomTable({
   matches,
   loading,
   failed,
+  costState = "ready",
   onChoose,
   onDismiss,
   kicker,
@@ -339,6 +364,8 @@ export function BomTable({
   matches: Map<string, LineMatch>;
   loading: boolean;
   failed: boolean;
+  /** "loading" until the first store match is back, so the summary is a skeleton, not QAR 0.00 (audit #59). */
+  costState?: CostState;
   onChoose: (lineId: string, productId: string | null) => Promise<void>;
   onDismiss: (lineIds: string[], removed: boolean) => Promise<void>;
   kicker: string;
@@ -449,7 +476,7 @@ export function BomTable({
   return (
     <Card kicker={kicker} title={title} intro={intro}>
       {before}
-      {showTotal && lines.length > 0 && <CostSummary lines={lines} matches={matches} />}
+      {showTotal && lines.length > 0 && <CostSummary lines={lines} matches={matches} state={costState} />}
 
       {lines.length === 0 ? (
         <p className="text-sm text-mutedtext">{t("bomEmpty")}</p>

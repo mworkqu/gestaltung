@@ -119,7 +119,27 @@ const viewLabel = (x: number, y: number, t: string) =>
 export const TITLE_Y = 30;
 export const LINE_GAP = 16;
 
-const clip = (v: string, n: number) => (v.length > n ? `${v.slice(0, n - 1)}…` : v);
+/**
+ * `text` cut to at most `maxChars` characters, the last one an ellipsis when
+ * anything was dropped (counted in characters, not UTF-16 units, so Arabic and
+ * emoji never split). Never longer than the room the drawing has for it.
+ */
+export function fitText(text: string, maxChars: number): string {
+  const chars = Array.from(text);
+  if (chars.length <= maxChars) return text;
+  if (maxChars <= 1) return maxChars === 1 ? "…" : "";
+  return `${chars.slice(0, maxChars - 1).join("").trimEnd()}…`;
+}
+
+/** A text element that never overruns its room; the full text is its tooltip (a <title> child). */
+const fitted = (attrs: string, text: string, maxChars: number) => {
+  const shown = fitText(text, maxChars);
+  return `<text ${attrs}>${esc(shown)}${shown === text ? "" : `<title>${esc(text)}</title>`}</text>`;
+};
+
+// A title-block cell is 200 px wide at 12 px semibold: 24 characters fit even
+// in capitals (audit leftover: values clipped from ~26 characters).
+const CELL_CHARS = 24;
 
 export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): string {
   const W = 640;
@@ -134,9 +154,7 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
   const viewY = area.y + 10;
 
   parts.push(
-    `<text data-role="title" x="${area.x - 10}" y="${TITLE_Y}" font-size="13" font-weight="700" fill="${INK}">${esc(
-      clip(`${p.code} ${p.name}`, 70)
-    )}</text>`
+    fitted(`data-role="title" x="${area.x - 10}" y="${TITLE_Y}" font-size="13" font-weight="700" fill="${INK}"`, `${p.code} ${p.name}`, 70)
   );
 
   if (!s) {
@@ -245,7 +263,7 @@ export function renderDimensionDrawing(p: DimensionedPart, L: DrawingLabels): st
       const cy = ty + Math.floor(i / 3) * 40;
       return `<rect x="${cx}" y="${cy}" width="${cw}" height="40" fill="none" stroke="${INK}" stroke-width="1"/>
         <text x="${cx + 8}" y="${cy + 14}" font-size="9" fill="${MUTED}" letter-spacing="0.06em">${esc(k.toUpperCase())}</text>
-        <text x="${cx + 8}" y="${cy + 31}" font-size="12" font-weight="600" fill="${INK}">${esc(v.length > 34 ? `${v.slice(0, 33)}…` : v)}</text>`;
+        ${fitted(`data-role="cell" x="${cx + 8}" y="${cy + 31}" font-size="12" font-weight="600" fill="${INK}"`, v, CELL_CHARS)}`;
     })
     .join("");
 

@@ -68,20 +68,7 @@ export const isConcept = (p: { source?: PartSource | null; status: string }) =>
 export const partsForList = <P extends { source?: PartSource | null; status: string }>(parts: readonly P[]): P[] =>
   parts.filter((p) => !isConcept(p));
 
-/** An identifier-style name the analysis sometimes returns, e.g. monitor_firmware. */
-const IDENTIFIER_NAME = /^[a-z0-9]+(_[a-z0-9]+)+$/;
-
-/**
- * A part's name as people read it. An identifier ("monitor_firmware") shows
- * as "Monitor firmware"; any other name is shown exactly as stored. Display
- * only — the stored name never changes (audit #34).
- */
-export function humanPartName(name: string): string {
-  const trimmed = name.trim();
-  if (!IDENTIFIER_NAME.test(trimmed)) return name;
-  const words = trimmed.replace(/_/g, " ");
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
+export { humanName, humanPartName, titleCaseId } from "./human-name";
 
 /** A to-design part's discipline. Rows from before 0022 fall back to process. */
 export const disciplineOf = (p: PartLike): Discipline | null =>

@@ -17,10 +17,12 @@ import { formatPrice } from "@/lib/parts/format";
 import { paymentSummary } from "@/lib/store/payment";
 import { PAYMENT_METHODS } from "@/lib/company";
 import { METHOD_ICON } from "@/components/payment/payment-instructions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Charges = { calls: number; per_call_qar: number; charging: boolean };
 
-export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQar: number }) {
+/** `partsQar` is null until the store prices have arrived: a skeleton, never a fake QAR 0.00 (audit #59). */
+export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQar: number | null }) {
   const t = useTranslations("Payment");
   const tPay = useTranslations("PayMethods");
   const locale = useLocale();
@@ -40,7 +42,7 @@ export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQ
   }, [projectId]);
 
   if (!charges) return null;
-  const s = paymentSummary({ aiCalls: charges.calls, perCallQar: charges.per_call_qar, partsQar, charging: charges.charging });
+  const s = paymentSummary({ aiCalls: charges.calls, perCallQar: charges.per_call_qar, partsQar: partsQar ?? 0, charging: charges.charging });
   const money = (n: number) => formatPrice(n, locale);
 
   return (
@@ -55,11 +57,15 @@ export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQ
         )}
         <div className="flex justify-between gap-3">
           <dt className="text-mutedtext">{t("partsLine")}</dt>
-          <dd className="tabular-nums text-heading">{money(s.lines[1].amountQar)}</dd>
+          <dd className="tabular-nums text-heading">
+            {partsQar === null ? <Skeleton className="h-4 w-16" /> : money(s.lines[1].amountQar)}
+          </dd>
         </div>
         <div className="flex justify-between gap-3 border-t border-borderstrong/40 pt-1.5">
           <dt className="font-semibold text-heading">{t("total")}</dt>
-          <dd className="font-bold tabular-nums text-heading">{money(charges.charging ? s.totalQar : s.lines[1].amountQar)}</dd>
+          <dd className="font-bold tabular-nums text-heading">
+            {partsQar === null ? <Skeleton className="h-4 w-20" /> : money(charges.charging ? s.totalQar : s.lines[1].amountQar)}
+          </dd>
         </div>
         {!charges.charging && (
           <div className="flex justify-between gap-3 text-emerald-700">

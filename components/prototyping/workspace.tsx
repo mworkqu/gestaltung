@@ -70,14 +70,13 @@ import { nodeClick } from "@/lib/prototyping/node-click";
 import type { Discipline } from "@/lib/prototyping/constants";
 import {
   activeLines,
-  bomCost,
-  dedupeLines,
   originOf,
   viewLines,
   type BomView,
   type LineMatch,
   type ProjectBom,
 } from "@/lib/prototyping/bom";
+import { costState, toBuyNow } from "@/lib/prototyping/bom-cost";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
 import { PartsList, type StoreLine } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
@@ -176,6 +175,9 @@ export function PrototypingWorkspace({
   // Live store matches for the bill of materials, by line id (/api/bom/match).
   const [matches, setMatches] = useState<Map<string, LineMatch>>(new Map());
   const [matchState, setMatchState] = useState<"idle" | "loading" | "failed">("idle");
+  // True once the first store match has come back: until then there are no
+  // prices, and the cost panel shows a skeleton instead of QAR 0.00 (audit #59).
+  const [matchesLoaded, setMatchesLoaded] = useState(false);
   const specTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Who is here, for the phone prompt and "Save my project link" (P1-11 / CC-1).
   const [userId, setUserId] = useState<string | null>(null);
@@ -199,6 +201,7 @@ export function PrototypingWorkspace({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { matches: list } = (await res.json()) as { matches: LineMatch[] };
       setMatches(new Map(list.map((m) => [m.lineId, m])));
+      setMatchesLoaded(true);
       setMatchState("idle");
     } catch {
       setMatchState("failed");
@@ -449,6 +452,11 @@ export function PrototypingWorkspace({
   const electronicsActive = bs.some((b) => b.discipline === "electronics" && b.active);
   const buildRoute = (project.build_route ?? null) as BuildRoute | null;
   const liveLines = activeLines(bom);
+  const costStatus = costState({
+    lineCount: liveLines.length,
+    matchesLoaded,
+    matchFailed: matchState === "failed",
+  });
   const ready = projectReadiness(
     {
       brief: project.brief,
@@ -628,6 +636,7 @@ export function PrototypingWorkspace({
         matches={matches}
         loading={matchState === "loading"}
         failed={matchState === "failed"}
+        costState={costStatus}
         onChoose={chooseProduct}
         onDismiss={dismissLines}
         inCircuit={inCircuit}
@@ -1086,7 +1095,7 @@ export function PrototypingWorkspace({
                 onAccept={acceptRoute}
               />
               <Card kicker={t("node_quote")} title={t("stageTitle_quote")} intro={t("quoteIntro")}>
-                <PaymentCard projectId={projectId} partsQar={bomCost(dedupeLines(liveLines), matches).availableNow} />
+                <PaymentCard projectId={projectId} partsQar={costStatus === "ready" ? toBuyNow(bom, matches) : null} />
                 <div className="flex flex-wrap items-center gap-3">
                   {stageAction("quote", "/design/quote", <Receipt className="h-3.5 w-3.5" />, t("requestQuote"))}
                 </div>
@@ -1170,7 +1179,7 @@ export function PrototypingWorkspace({
                   className="block w-full rounded-xl bg-panel/60 p-3 text-start shadow-neu-inset transition-colors hover:ring-1 hover:ring-cobalt/30"
                 >
                   <p className="mb-1.5 text-[11px] font-bold text-heading">{t("costTitle")}</p>
-                  <CostSummary lines={liveLines} matches={matches} compact />
+                  <CostSummary lines={liveLines} matches={matches} compact state={costStatus} />
                 </button>
               )}
               {open.length ? (

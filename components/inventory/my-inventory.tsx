@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { ImagePlus, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -13,9 +13,11 @@ import {
   PROJECT_IMAGE_ACCEPT,
   PROJECT_IMAGE_BUCKET,
 } from "@/lib/projects/constants";
+import { inventoryEdit } from "@/lib/inventory/edit";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { ClientInventoryItem, Part } from "@/lib/supabase/types";
 
 // ── The client's own inventory ──────────────────────────────────────────────
@@ -34,7 +36,6 @@ type Row = ClientInventoryItem & { part: Part | null };
 
 export function MyInventory() {
   const t = useTranslations("MyInventory");
-  const locale = useLocale();
 
   const [rows, setRows] = useState<Row[] | null>(null);
   const [guest, setGuest] = useState(false);
@@ -101,17 +102,27 @@ export function MyInventory() {
     }
   }
 
-  async function setQuantity(row: Row, quantity: number) {
+  /** Save an edited row (quantity, and the name of a custom item). True when saved. */
+  async function saveRow(row: Row, quantity: number, name: string | null): Promise<boolean> {
+    const { error } = await createClient()
+      .from("client_inventory_items")
+      .update(name === null ? { quantity } : { quantity, custom_name: name })
+      .eq("id", row.id);
+    if (error) return false;
+    await load();
+    return true;
+  }
+
+  /** Delete a row and its photo. True when deleted. */
+  async function removeRow(row: Row): Promise<boolean> {
     const supabase = createClient();
-    if (quantity <= 0) {
-      if (row.image_path) {
-        await supabase.storage.from(PROJECT_IMAGE_BUCKET).remove([row.image_path]);
-      }
-      await supabase.from("client_inventory_items").delete().eq("id", row.id);
-    } else {
-      await supabase.from("client_inventory_items").update({ quantity }).eq("id", row.id);
+    const { error } = await supabase.from("client_inventory_items").delete().eq("id", row.id);
+    if (error) return false;
+    if (row.image_path) {
+      await supabase.storage.from(PROJECT_IMAGE_BUCKET).remove([row.image_path]);
     }
     await load();
+    return true;
   }
 
   if (rows === null) {
@@ -158,51 +169,194 @@ export function MyInventory() {
         ) : (
           <ul className="space-y-2">
             {rows.map((row) => (
-              <li
-                key={row.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-panel px-3 py-2.5 shadow-neu-sm"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-heading">
-                    {row.part ? partName(row.part, locale) : row.custom_name}
-                  </span>
-                  {row.part && (
-                    <span className="block truncate font-mono text-[11px] text-mutedtext">
-                      {row.part.sku} · {formatPrice(row.part.unit_price, locale)}
-                    </span>
-                  )}
-                </span>
-
-                <Tag variant={row.part ? "buy" : "neutral"}>
-                  {row.part ? t("fromStore") : t("own")}
-                </Tag>
-
-                <input
-                  type="number"
-                  min={0}
-                  value={row.quantity}
-                  aria-label={t("quantity")}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value, 10);
-                    if (Number.isFinite(n)) void setQuantity(row, n);
-                  }}
-                  className="w-16 rounded-lg border border-white/60 bg-surface px-2 py-1 text-center text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60"
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setQuantity(row, 0)}
-                  aria-label={t("remove")}
-                  className="shrink-0 rounded-md p-1.5 text-mutedtext transition-colors hover:text-destructive"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </li>
+              <InventoryRow key={row.id} row={row} onSave={saveRow} onRemove={removeRow} />
             ))}
           </ul>
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * One row of the list: name, a visible quantity, and clear Edit / Delete
+ * buttons (44 px). Edit opens the quantity (and the name of a custom item)
+ * right in the row; Delete asks once, inline, before anything is removed
+ * (audit #60). The stored quantity is shown as text, never only inside an
+ * input.
+ */
+function InventoryRow({
+  row,
+  onSave,
+  onRemove,
+}: {
+  row: Row;
+  onSave: (row: Row, quantity: number, name: string | null) => Promise<boolean>;
+  onRemove: (row: Row) => Promise<boolean>;
+}) {
+  const t = useTranslations("MyInventory");
+  const locale = useLocale();
+  const [mode, setMode] = useState<"view" | "edit" | "confirm">("view");
+  const [name, setName] = useState(row.custom_name ?? "");
+  const [qty, setQty] = useState(String(row.quantity));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const shownName = row.part ? partName(row.part, locale) : (row.custom_name ?? "");
+  const btn =
+    "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-semibold shadow-neu-sm transition-colors disabled:opacity-60";
+
+  function startEdit() {
+    setName(row.custom_name ?? "");
+    setQty(String(row.quantity));
+    setError(null);
+    setMode("edit");
+  }
+
+  async function save() {
+    const r = inventoryEdit({ name, quantity: qty }, { custom: !row.part });
+    if (!r.ok) {
+      setError(r.error === "name" ? t("nameRequired") : t("quantityInvalid"));
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const ok = await onSave(row, r.quantity, r.name);
+    setBusy(false);
+    if (ok) setMode("view");
+    else setError(t("saveFailed"));
+  }
+
+  async function remove() {
+    setBusy(true);
+    setError(null);
+    const ok = await onRemove(row);
+    if (!ok) {
+      setBusy(false);
+      setError(t("deleteFailed"));
+    }
+  }
+
+  const field =
+    "rounded-lg border border-white/60 bg-surface px-2 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
+
+  return (
+    <li className="space-y-2 rounded-xl bg-panel px-3 py-2.5 shadow-neu-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-heading">{shownName}</span>
+          {row.part && (
+            <span className="block truncate font-mono text-[11px] text-mutedtext">
+              {row.part.sku} · {formatPrice(row.part.unit_price, locale)}
+            </span>
+          )}
+        </span>
+
+        <Tag variant={row.part ? "buy" : "neutral"}>{row.part ? t("fromStore") : t("own")}</Tag>
+
+        <span className="shrink-0 text-sm font-semibold tabular-nums text-heading">
+          {t("quantityShown", { count: row.quantity })}
+        </span>
+
+        {mode === "view" && (
+          <span className="flex shrink-0 items-center gap-1.5">
+            <button type="button" onClick={startEdit} className={cn(btn, "bg-surface text-heading hover:text-cobalt")}>
+              <Pencil className="h-3.5 w-3.5" />
+              {t("edit")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setMode("confirm");
+              }}
+              className={cn(btn, "bg-surface text-mutedtext hover:text-destructive")}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {t("delete")}
+            </button>
+          </span>
+        )}
+      </div>
+
+      {mode === "edit" && (
+        <form
+          className="flex flex-wrap items-end gap-3 border-t border-borderstrong/40 pt-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save();
+          }}
+        >
+          {!row.part && (
+            <label className="min-w-0 flex-1 space-y-1 text-xs font-medium text-mutedtext">
+              {t("customName")}
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={cn(field, "block min-h-11 w-full min-w-[10rem]")}
+              />
+            </label>
+          )}
+          <label className="space-y-1 text-xs font-medium text-mutedtext">
+            {t("quantity")}
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              className={cn(field, "block min-h-11 w-24 text-center")}
+            />
+          </label>
+          <button type="submit" disabled={busy} className={cn(btn, "bg-cobalt text-white hover:bg-cobalt-hover")}>
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {t("save")}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setMode("view")}
+            className={cn(btn, "bg-surface text-mutedtext hover:text-heading")}
+          >
+            {t("cancel")}
+          </button>
+        </form>
+      )}
+
+      {mode === "confirm" && (
+        <div
+          role="alertdialog"
+          aria-label={t("deleteConfirm", { name: shownName })}
+          className="flex flex-wrap items-center gap-3 border-t border-borderstrong/40 pt-2"
+        >
+          <p className="min-w-0 flex-1 text-sm font-medium text-heading">{t("deleteConfirm", { name: shownName })}</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void remove()}
+            className={cn(btn, "bg-destructive text-white hover:opacity-90")}
+          >
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {t("deleteYes")}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setMode("view")}
+            className={cn(btn, "bg-surface text-mutedtext hover:text-heading")}
+          >
+            {t("cancel")}
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs font-medium text-destructive">
+          {error}
+        </p>
+      )}
+    </li>
   );
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   DIMS,
+  fitText,
   hasDrawableView,
   renderDimensionDrawing,
   type Dim,
@@ -98,5 +99,41 @@ describe("hasDrawableView (audit #37: no empty frames)", () => {
     expect(hasDrawableView(part({ shape: "block", length_mm: -5, width_mm: 80 }))).toBe(false);
     expect(hasDrawableView(part({ shape: "block", length_mm: "abc", width_mm: 80 }))).toBe(false);
     expect(hasDrawableView(part({ shape: "block", length_mm: "100", width_mm: "80" }))).toBe(true);
+  });
+});
+
+describe("fitText (title block, P0-07)", () => {
+  it("leaves text that fits exactly as it is", () => {
+    expect(fitText("Front panel", 24)).toBe("Front panel");
+    expect(fitText("x".repeat(24), 24)).toBe("x".repeat(24));
+  });
+  it("cuts with an ellipsis, never longer than maxChars", () => {
+    const out = fitText("P-03 Plant monitor enclosure lid", 24);
+    expect(Array.from(out)).toHaveLength(24);
+    expect(out.endsWith("…")).toBe(true);
+  });
+  it("counts characters, not UTF-16 units, and drops a trailing space before the ellipsis", () => {
+    expect(fitText("غلاف الجهاز الخارجي الكبير جدا", 10)).toHaveLength(10);
+    expect(fitText("abcd efgh", 6)).toBe("abcd…");
+  });
+  it("handles tiny limits", () => {
+    expect(fitText("abc", 1)).toBe("…");
+    expect(fitText("abc", 0)).toBe("");
+  });
+});
+
+describe("title block with a long part name (P0-07)", () => {
+  it("truncates the cell with an ellipsis and keeps the full text as a tooltip", () => {
+    const name = "plant monitor enclosure with sensor window";
+    const svg = renderDimensionDrawing(part({ name, process: "laser_cutting", length_mm: 100, width_mm: 80, thickness_mm: 3 }), L);
+    const cell = /<text data-role="cell"[^>]*>(P-03[^<]*)<title>([^<]*)<\/title><\/text>/.exec(svg);
+    expect(cell).not.toBeNull();
+    expect(Array.from(cell![1])).toHaveLength(24);
+    expect(cell![1].endsWith("…")).toBe(true);
+    expect(cell![2]).toBe(`P-03 ${name}`);
+  });
+  it("adds no tooltip when the value fits", () => {
+    const svg = renderDimensionDrawing(part({ process: "laser_cutting", length_mm: 100, width_mm: 80, thickness_mm: 3 }), L);
+    expect(svg).not.toContain("<title>");
   });
 });
