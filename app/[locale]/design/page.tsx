@@ -5,6 +5,7 @@ import { UploadCloud, PencilRuler, ArrowUpRight, Search } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
+import { FeatureVideoSection } from "@/components/feature-video-section";
 import { cn } from "@/lib/utils";
 
 // The custom-manufacturing hub — the single destination the store landing's
@@ -175,6 +176,16 @@ export default async function DesignHubPage({
               </span>
             </Link>
           ))}
+        </div>
+
+        {/* Two short clips, outside the path cards (those are whole links). */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="neu min-w-0 p-4 sm:p-5">
+            <FeatureVideoSection slug="file-to-part" locale={locale} size="small" href="/design/quote" />
+          </div>
+          <div className="neu min-w-0 p-4 sm:p-5">
+            <FeatureVideoSection slug="sketch-to-drawing" locale={locale} size="small" href="/design/drawing" />
+          </div>
         </div>
       </section>
 

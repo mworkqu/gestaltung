@@ -18,6 +18,7 @@ import { CircleAlert, Cpu, Loader2, RefreshCw } from "lucide-react";
 
 import { Card, PrimaryButton, SoftButton, Warn } from "@/components/prototyping/ui";
 import { SvgFrame } from "@/components/prototyping/svg-frame";
+import { FeatureVideoClient } from "@/components/feature-video-client";
 import type { LineMatch, ProjectBom } from "@/lib/prototyping/bom";
 import {
   describeHard,
@@ -182,6 +183,13 @@ export function NetlistView({
             </ul>
           ) : null}
         </Warn>
+      )}
+
+      {/* Before the first circuit: what the check does (poster first, click to play). */}
+      {!netlist && (
+        <div className="max-w-md">
+          <FeatureVideoClient slug="wiring-check" size="small" posterOnly />
+        </div>
       )}
 
       {netlist && (

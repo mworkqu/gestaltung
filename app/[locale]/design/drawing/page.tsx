@@ -3,6 +3,7 @@ import { MessageCircle, PencilRuler, FileCheck2, Send } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { FeatureVideoSection } from "@/components/feature-video-section";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
 import { COMPANY_WHATSAPP } from "@/lib/company";
@@ -111,6 +112,13 @@ export default async function CadAssistancePage({
               <p className="mt-2 text-sm leading-relaxed text-mutedtext">{copy}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Short clip: photo + three dimensions to a drawing */}
+      <section className="neu animate-fade-up delay-1 p-6 sm:p-8">
+        <div className="max-w-2xl">
+          <FeatureVideoSection slug="sketch-to-drawing" locale={locale} size="large" />
         </div>
       </section>
 

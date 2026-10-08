@@ -16,6 +16,7 @@ import { Box, Check, Download, Loader2, Wand2 } from "lucide-react";
 
 import { Card, PrimaryButton, SoftButton, Warn, fieldClass } from "@/components/prototyping/ui";
 import { AccessNote, CostLabel } from "@/components/credits/access-note";
+import { FeatureVideoClient } from "@/components/feature-video-client";
 import { classifyCadRequest, type CadTier } from "@/lib/credits/classify";
 import { CAD_GENERATIONS, CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
@@ -272,6 +273,12 @@ export function CadCard({ projectId, brief }: { projectId: string; brief: string
           placeholder={t("cadPlaceholder")}
         />
       </label>
+      {/* Before the first generation: what you get (poster first, click to play). */}
+      {built === null && versions.length === 0 && (
+        <div className="max-w-md">
+          <FeatureVideoClient slug="cad-model" size="small" posterOnly />
+        </div>
+      )}
       <AccessNote reason={blocked} step="cad" />
       {done && <p className="rounded-xl bg-buy-bg px-3 py-2 text-xs font-medium text-buy">{t("cadStub", { tier: t(`tier_${done}`) })}</p>}
       {error && <p className="text-xs text-destructive">{t("cadError")}</p>}

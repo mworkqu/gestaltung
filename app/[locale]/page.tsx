@@ -9,8 +9,10 @@ import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { FeatureVideoSection } from "@/components/feature-video-section";
 import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
+import { VIDEOS, videoBase, videoJsonLd } from "@/lib/videos";
 
 // ISR (Phase G): static per locale, re-rendered at most every 5 minutes, or at
 // once when an admin edit calls revalidateStorefront() (tag "parts"). Nothing
@@ -38,6 +40,7 @@ export default async function Home({
   setRequestLocale(locale);
 
   const t = await getTranslations("StoreLanding");
+  const tv = await getTranslations("Videos");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -48,6 +51,20 @@ export default async function Home({
   // featured eight, so they never lead to an empty page (audit #15). Both are
   // cached, card fields only; empty without Supabase env (fresh local checkout).
   const [products, { categories }] = await Promise.all([getFeaturedParts(), getStoreFacets()]);
+
+  // VideoObject structured data only for a clip that is really uploaded
+  // (lib/videos.ts `published`); never for a placeholder.
+  const heroVideo = VIDEOS.find((v) => v.slug === "idea-to-kit");
+  const heroVideoLd =
+    heroVideo?.published
+      ? videoJsonLd({
+          entry: heroVideo,
+          base: videoBase(process.env.NEXT_PUBLIC_SUPABASE_URL),
+          name: tv(heroVideo.titleKey),
+          description: tv(heroVideo.descriptionKey),
+          locale,
+        })
+      : null;
 
   return (
     <MessagesScope scope="home">
@@ -127,6 +144,36 @@ export default async function Home({
             </div>
           </div>
         </div>
+      </section>
+
+      {/* See it work: three short self-hosted clips (components/feature-video.tsx). */}
+      <section className="animate-fade-up delay-1 space-y-6">
+        <div className="space-y-1 px-1">
+          <span className={mono("text-[10px] text-cobalt")}>{tv("seeItWorkKicker")}</span>
+          <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+            {tv("seeItWorkHeading")}
+          </h2>
+          <p className="text-sm text-mutedtext">{tv("seeItWorkSub")}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="neu min-w-0 p-4 sm:p-5 lg:col-span-2">
+            <FeatureVideoSection slug="idea-to-kit" locale={locale} size="large" />
+          </div>
+          <div className="flex min-w-0 flex-col gap-6">
+            <div className="neu min-w-0 p-4">
+              <FeatureVideoSection slug="file-to-part" locale={locale} size="small" />
+            </div>
+            <div className="neu min-w-0 p-4">
+              <FeatureVideoSection slug="store-to-door" locale={locale} size="small" />
+            </div>
+          </div>
+        </div>
+        {heroVideoLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(heroVideoLd).replace(/</g, "\\u003c") }}
+          />
+        )}
       </section>
 
       {/* Featured products */}

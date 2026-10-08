@@ -2577,5 +2577,31 @@
     "colOk": "Succeeded",
     "colTokensIn": "Tokens in",
     "colTokensOut": "Tokens out"
+  },
+  "Videos": {
+    "seeItWorkKicker": "Short videos",
+    "seeItWorkHeading": "See it work",
+    "seeItWorkSub": "Three short clips, about 45 seconds each.",
+    "play": "Play video",
+    "pause": "Pause video",
+    "replay": "Replay video",
+    "idea-to-kitTitle": "From one sentence to a parts list",
+    "idea-to-kitCaption": "Describe it. We list the parts, draw the wiring and put the kit in your cart.",
+    "idea-to-kitDescription": "A short walkthrough of the Gestaltung idea tool: describe a product in one sentence, get a parts list and a wiring diagram, and put the kit in your cart.",
+    "file-to-partTitle": "Drop a file, get the part",
+    "file-to-partCaption": "Our engineer reviews it and we make it in our Lusail studio.",
+    "file-to-partDescription": "How to send a CAD file to Gestaltung for a quote: upload it, our engineer reviews it, and the part is made in our Lusail studio.",
+    "sketch-to-drawingTitle": "A photo and three dimensions",
+    "sketch-to-drawingCaption": "We turn them into a manufacturing-ready drawing you own, from QAR 200.",
+    "sketch-to-drawingDescription": "How a photo of a sketch and three dimensions become a manufacturing-ready drawing that you own.",
+    "wiring-checkTitle": "Every connection checked",
+    "wiring-checkCaption": "Driver, flyback, resistor, power budget. Your first circuit is free.",
+    "wiring-checkDescription": "How the circuit check reviews every connection of a wiring diagram: driver, flyback diode, resistors and power budget.",
+    "cad-modelTitle": "The board needs a box",
+    "cad-modelCaption": "Pick a tier, get up to three versions on one credit.",
+    "cad-modelDescription": "How to describe an enclosure for your board, pick a tier and get up to three 3D model versions on one credit.",
+    "store-to-doorTitle": "Stocked in Qatar or sourced for you",
+    "store-to-doorCaption": "See the date before you pay. Every delivered order earns AI credits.",
+    "store-to-doorDescription": "How an order works in the Gestaltung store: parts stocked in Qatar or sourced for you, a delivery date shown before you pay, and AI credits earned on every delivered order."
   }
 }

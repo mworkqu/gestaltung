@@ -20,6 +20,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
+import { FeatureVideoSection } from "@/components/feature-video-section";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { cn } from "@/lib/utils";
 
@@ -41,10 +42,10 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
 
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  const paths: { key: string; icon: LucideIcon; href: string; steps: LucideIcon[] }[] = [
-    { key: "buy", icon: ShoppingBag, href: "/store", steps: [Search, Boxes, CreditCard, Truck] },
-    { key: "make", icon: UploadCloud, href: "/design", steps: [UploadCloud, Cpu, Factory, PackageCheck] },
-    { key: "idea", icon: Lightbulb, href: "/projects/new", steps: [Lightbulb, CircuitBoard, Boxes, Factory] },
+  const paths: { key: string; icon: LucideIcon; href: string; video: string; steps: LucideIcon[] }[] = [
+    { key: "buy", icon: ShoppingBag, href: "/store", video: "store-to-door", steps: [Search, Boxes, CreditCard, Truck] },
+    { key: "make", icon: UploadCloud, href: "/design", video: "file-to-part", steps: [UploadCloud, Cpu, Factory, PackageCheck] },
+    { key: "idea", icon: Lightbulb, href: "/projects/new", video: "idea-to-kit", steps: [Lightbulb, CircuitBoard, Boxes, Factory] },
   ];
 
   return (
@@ -88,7 +89,7 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
         </div>
       </section>
 
-      {paths.map(({ key, icon: PathIcon, href, steps }, n) => (
+      {paths.map(({ key, icon: PathIcon, href, video, steps }, n) => (
         <section key={key} id={key} className="neu animate-fade-up scroll-mt-28 p-8 sm:p-10">
           <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-4">
@@ -107,6 +108,11 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
                 <ArrowRight className={cn("ms-1 h-4 w-4", isRtl && "-scale-x-100")} />
               </Link>
             </Button>
+          </div>
+
+          {/* One short clip per path, above its four steps. */}
+          <div className="mb-8 max-w-2xl">
+            <FeatureVideoSection slug={video} locale={locale} size="large" />
           </div>
 
           <ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
