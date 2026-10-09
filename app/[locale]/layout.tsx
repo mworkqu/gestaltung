@@ -10,6 +10,8 @@ import { pickMessages } from "@/lib/i18n/pick-messages";
 import { BASE_MESSAGES } from "@/lib/i18n/scopes";
 import { Header } from "@/components/header";
 import { HeaderGate } from "@/components/header-gate";
+import { TrustBlock } from "@/components/trust-block";
+import { TrustGate } from "@/components/trust-gate";
 import { Footer } from "@/components/footer";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { CookieNotice } from "@/components/cookie-notice";
@@ -109,6 +111,10 @@ export default async function LocaleLayout({
                   <Header locale={locale as Locale} />
                 </HeaderGate>
                 <main className="flex-1">{children}</main>
+                {/* P1-04: trust block above the footer; hidden where the header is hidden and on /trust. */}
+                <TrustGate>
+                  <TrustBlock />
+                </TrustGate>
                 <Footer />
               </div>
             </CartProvider>

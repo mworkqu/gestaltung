@@ -175,6 +175,8 @@ export default async function Home({
           {/* Plan a product (prototyping) */}
           <div className="neu animate-fade-up delay-1 flex min-w-0 flex-col gap-4 p-5">
             <ChoiceHead icon={<Lightbulb className="h-4 w-4" />} title={t("choiceIdeaTitle")} text={t("choiceIdeaText")} />
+            {/* P1-05: where the wiring comes from. */}
+            <p className="text-[11px] leading-relaxed text-mutedtext">{t("choiceIdeaDatasheet")}</p>
             <div className="mt-auto space-y-2">
               <Button asChild size="lg" className="w-full rounded-2xl">
                 <Link href="/projects/new">

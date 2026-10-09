@@ -26,6 +26,7 @@ import {
 import { sortProducts } from "@/lib/store/search";
 import type { DeliveryQuote } from "@/lib/store/delivery";
 import { CATALOG_TAG, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
+import { parseTrustedBy, TRUSTED_BY_KEY, type TrustedLogo } from "@/lib/trust";
 
 const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
 
@@ -225,4 +226,21 @@ export const getProductDeliveryQuote = unstable_cache(
   },
   ["store:delivery-quote"],
   { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG, SETTINGS_TAG] },
+);
+
+/**
+ * store_settings.trusted_by → the "Trusted by" logos (P1-04). Same cookie-free
+ * anon client + unstable_cache + "store-settings" tag as the other settings
+ * reads, so the site-wide trust block (rendered in the locale layout) keeps
+ * static / ISR pages static. Empty when the key is missing, malformed or [].
+ */
+export const getTrustedBy = unstable_cache(
+  async (): Promise<TrustedLogo[]> => {
+    const supabase = createPublicClient();
+    if (!supabase) return [];
+    const { data } = await supabase.from("store_settings").select("value").eq("key", TRUSTED_BY_KEY).maybeSingle();
+    return parseTrustedBy(data?.value);
+  },
+  ["store-settings:trusted-by"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
 );

@@ -175,6 +175,12 @@ describe("sitemapEntries", () => {
     expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/students");
   });
 
+  it("lists the trust page", () => {
+    expect(SITEMAP_STATIC_PATHS).toContain("/trust");
+    expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/trust");
+    expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/en/trust");
+  });
+
   it("has both locales for every static page", () => {
     for (const path of SITEMAP_STATIC_PATHS) {
       expect(entries.map((e) => e.url)).toContain(absoluteUrl("en", path));

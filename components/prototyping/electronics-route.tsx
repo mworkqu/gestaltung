@@ -226,6 +226,8 @@ export function GenerateComponents({
   return (
     <div id="route-card" tabIndex={-1} className="outline-none">
       <Card kicker={t("elecStep", { n: 3 })} title={t("componentsGenTitle")} intro={t("componentsGenIntro")}>
+        {/* P1-05: where the wiring comes from, in one muted line. */}
+        <p className="max-w-[62ch] text-[11.5px] leading-relaxed text-mutedtext">{t("datasheetLine")}</p>
         <div className="flex flex-wrap gap-2">
           {done(t("boardTitle"), route ? t(`route_${route}`) : null, onGoBoard)}
           {done(t("powerTitle"), power ? t(`powerOpt_${power}`) : null, onGoPower)}

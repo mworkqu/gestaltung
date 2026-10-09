@@ -10,12 +10,17 @@ const APP_PREFIXES = [
   "/inventory",
 ];
 
-export function HeaderGate({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const isApp =
+/** Dashboard, inventory and the prototyping workspace: the app areas without the public header. */
+export function isAppPath(pathname: string): boolean {
+  return (
     APP_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
     // The prototyping workspace carries its own bar (logo, back, language).
-    /^\/projects\/[^/]+\/prototyping(\/|$)/.test(pathname);
-  if (isApp) return null;
+    /^\/projects\/[^/]+\/prototyping(\/|$)/.test(pathname)
+  );
+}
+
+export function HeaderGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  if (isAppPath(pathname)) return null;
   return <>{children}</>;
 }
