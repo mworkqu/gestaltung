@@ -51,3 +51,7 @@ brand-assets/
 
 # Local design/planning assets, kept out of the repo
 _archive/
+
+# playwright (P3-10)
+test-results/
+playwright-report/
