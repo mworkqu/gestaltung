@@ -1,6 +1,6 @@
 "use client";
 
-// The signed-in user's balances and redeemable refunds, on /credits.
+// The signed-in user's balances and redeemable refunds, on /pricing#credits.
 
 import { useLocale, useTranslations } from "next-intl";
 

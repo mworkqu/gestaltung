@@ -27,6 +27,7 @@ export async function Footer() {
     { href: "/about", label: tNav("about") },
     { href: "/students", label: t("students") },
     { href: "/trust", label: t("trust") },
+    { href: "/pricing", label: t("pricing") },
     { href: "/contact", label: tNav("contact") },
   ];
   const policyLinks = LEGAL_SLUGS.map((slug) => ({

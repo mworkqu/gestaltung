@@ -80,6 +80,14 @@ const nextConfig = {
         destination: "/:locale/design/quote",
         permanent: true,
       },
+      // P1-06: "Get credits" became the #credits section of /pricing. Next drops a
+      // hash in a redirect destination, so the links we control carry
+      // "/pricing#credits" themselves.
+      {
+        source: "/:locale(en|ar)/credits",
+        destination: "/:locale/pricing",
+        permanent: true,
+      },
       // Stage 4: inventory is its own top-level signed-in area now.
       {
         source: "/:locale(en|ar)/dashboard/inventory",

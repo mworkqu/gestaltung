@@ -40,7 +40,7 @@ export async function HomeTrust() {
           <PaymentInstructions method="fawran" brief />
           <PaymentInstructions method="bank_transfer" brief className="sm:col-span-2" />
         </div>
-        <p className="text-[11px] text-mutedtext">{t("cardSoon")}</p>
+        <p className="text-[11px] text-mutedtext">{t("methodsLine")}</p>
       </div>
     </section>
   );

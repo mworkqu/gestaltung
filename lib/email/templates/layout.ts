@@ -130,7 +130,8 @@ const COPY = {
 } as const;
 
 export function creditsPageUrl(links: NotificationLinks, locale: NotificationLocale): string {
-  return `${links.siteUrl.replace(/\/+$/, "")}/${locale}/credits`;
+  // "How credits work" lives on /pricing#credits (P1-06); old /credits links 308 there.
+  return `${links.siteUrl.replace(/\/+$/, "")}/${locale}/pricing#credits`;
 }
 
 // ─── the shell ──────────────────────────────────────────────────────────────

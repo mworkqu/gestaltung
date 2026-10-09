@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
 import { FeatureVideoSection } from "@/components/feature-video-section";
 import { cn } from "@/lib/utils";
+import { getServicePrices } from "@/lib/store/public-catalog";
+import { formatQar } from "@/lib/pricing/plans";
 
 // The custom-manufacturing hub — the single destination the store landing's
 // "Design" button points to. Public. Two paths: send a ready CAD file for a
@@ -35,6 +37,9 @@ export default async function DesignHubPage({
 
   const t = await getTranslations("DesignHub");
   const tHero = await getTranslations("Hero");
+  const tPricing = await getTranslations("Pricing");
+  // P1-07: starting prices are data (store_settings.service_prices, 0051), same as /pricing.
+  const prices = await getServicePrices();
   const isRtl = locale === "ar";
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
@@ -175,6 +180,32 @@ export default async function DesignHubPage({
               </span>
             </Link>
           ))}
+        </div>
+
+        {/* Prices from: the same three starting prices as /pricing. */}
+        <div className="neu flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+          <span className={mono("text-[10px] text-cobalt")}>{tPricing("pricesFromTag")}</span>
+          <dl className="grid flex-1 gap-3 sm:grid-cols-3 lg:max-w-3xl">
+            {[
+              { label: tPricing("enclosureTitle"), n: prices.enclosure_from },
+              { label: tPricing("drawingTitle"), n: prices.drawing_simple },
+              { label: tPricing("sprintTitle"), n: prices.sprint_from },
+            ].map(({ label, n }) => (
+              <div key={label} className="rounded-xl bg-panel px-4 py-3 shadow-neu-sm">
+                <dt className="text-xs font-semibold text-mutedtext">{label}</dt>
+                <dd className="mt-0.5 text-sm font-extrabold tabular-nums text-heading">
+                  {tPricing("fromQar", { n: formatQar(n) })}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <Link
+            href="/pricing"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+          >
+            {tPricing("seeAll")}
+            <ArrowUpRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} aria-hidden />
+          </Link>
         </div>
 
         {/* Two short clips, outside the path cards (those are whole links). */}

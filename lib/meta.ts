@@ -17,11 +17,11 @@ export type MetaKey =
   | "drawing"
   | "students"
   | "trust"
+  | "pricing"
   | "signIn"
   | "signUp"
   | "inventory"
-  | "dashboard"
-  | "credits";
+  | "dashboard";
 
 // Where each page lives (no locale prefix) and whether it is private. Layouts
 // that use metaFor() cover whole areas, so a private area is noindex.
@@ -35,11 +35,11 @@ const PAGES: Record<MetaKey, { path: string; noindex?: boolean }> = {
   drawing: { path: "/design/drawing" },
   students: { path: "/students" },
   trust: { path: "/trust" },
+  pricing: { path: "/pricing" },
   signIn: { path: "/sign-in", noindex: true },
   signUp: { path: "/sign-up", noindex: true },
   inventory: { path: "/inventory", noindex: true },
   dashboard: { path: "/dashboard", noindex: true },
-  credits: { path: "/credits", noindex: true },
 };
 
 export async function pageMeta(locale: string, key: MetaKey): Promise<Metadata> {

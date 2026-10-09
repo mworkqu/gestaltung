@@ -48,9 +48,13 @@ const SOURCES: Record<
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ITEMS = 60;
 
-// contact_form only: /contact?kind=school (from /students) tags the lead. The message
-// (saved and emailed) starts with this tag, so no column is needed.
-const SCHOOL_TAG = "School / class project";
+// contact_form only: /contact?kind=school (from /students) or ?kind=institution (from
+// /pricing) tags the lead. The message (saved and emailed) starts with the tag and the
+// email subject gets the suffix, so no column is needed.
+const CONTACT_KINDS: Record<string, { tag: string; subject: string }> = {
+  school: { tag: "School / class project", subject: " (school / class project)" },
+  institution: { tag: "Institution / team plan", subject: " (institution / team plan)" },
+};
 
 type QuoteItem = { function: string; spec: string; quantity: number };
 
@@ -81,7 +85,7 @@ export async function POST(request: Request) {
     message?: string;
     locale?: string;
     source?: string;
-    // contact_form only: "school" from /contact?kind=school.
+    // contact_form only: "school" | "institution" from /contact?kind=....
     kind?: string;
     // bom_quote only.
     items?: unknown;
@@ -101,15 +105,18 @@ export async function POST(request: Request) {
   const src = SOURCES[body.source ?? ""] ?? SOURCES.store_callback;
   const isQuote = body.source === "bom_quote";
   const items = isQuote ? quoteItems(body.items) : [];
-  const isSchool = body.source === "contact_form" && body.kind === "school";
+  const contactKind =
+    body.source === "contact_form" && typeof body.kind === "string" && Object.hasOwn(CONTACT_KINDS, body.kind)
+      ? CONTACT_KINDS[body.kind]
+      : null;
 
   if (!name || !phone || (isQuote && !items.length)) {
     return NextResponse.json({ error: "missing_fields" }, { status: 422 });
   }
 
   let message = String(body.message ?? "").trim().slice(0, 4000) || src.fallbackMessage;
-  if (isSchool && !message.toLowerCase().startsWith(SCHOOL_TAG.toLowerCase())) {
-    message = `${SCHOOL_TAG}: ${message}`.slice(0, 4000);
+  if (contactKind && !message.toLowerCase().startsWith(contactKind.tag.toLowerCase())) {
+    message = `${contactKind.tag}: ${message}`.slice(0, 4000);
   }
   if (isQuote) {
     // The project link, and its name as the caller's own RLS lets them read
@@ -171,7 +178,7 @@ export async function POST(request: Request) {
           from: RESEND_FROM,
           to: [LEAD_EMAIL],
           reply_to: email || LEAD_EMAIL,
-          subject: src.subject(name, { count: items.length }) + (isSchool ? " (school / class project)" : ""),
+          subject: src.subject(name, { count: items.length }) + (contactKind?.subject ?? ""),
           text:
             `New ${src.label.toLowerCase()} from the Gestaltung website.\n\n` +
             `Name: ${name}\n` +

@@ -181,6 +181,12 @@ describe("sitemapEntries", () => {
     expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/en/trust");
   });
 
+  it("lists the pricing page", () => {
+    expect(SITEMAP_STATIC_PATHS).toContain("/pricing");
+    expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/pricing");
+    expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/en/pricing");
+  });
+
   it("has both locales for every static page", () => {
     for (const path of SITEMAP_STATIC_PATHS) {
       expect(entries.map((e) => e.url)).toContain(absoluteUrl("en", path));

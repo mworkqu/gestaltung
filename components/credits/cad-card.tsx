@@ -15,6 +15,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Box, Check, Download, Loader2, Wand2 } from "lucide-react";
 
 import { Card, PrimaryButton, SoftButton, Warn, fieldClass } from "@/components/prototyping/ui";
+import { Link } from "@/i18n/navigation";
 import { AccessNote, CostLabel } from "@/components/credits/access-note";
 import { FeatureVideoClient } from "@/components/feature-video-client";
 import { classifyCadRequest, type CadTier } from "@/lib/credits/classify";
@@ -425,6 +426,13 @@ export function CadCard({ projectId, brief }: { projectId: string; brief: string
                   ? t("cadDialogAdmin", { tier: t(`tier_${dialog.tier}`) })
                   : t("cadDialogBody", { tier: t(`tier_${dialog.tier}`), qar: CREDIT_QAR, days: REDEEM_DAYS })}
             </p>
+            <Link
+              href="/pricing#credits"
+              target="_blank"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+            >
+              {t("howCreditsLink")}
+            </Link>
             <div className="flex items-center justify-end gap-3">
               <SoftButton onClick={() => setDialog(null)} disabled={busy}>
                 {t("cancel")}

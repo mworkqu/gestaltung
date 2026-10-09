@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import { Warn } from "@/components/prototyping/ui";
+import { CREDIT_QAR } from "@/lib/credits/constants";
 
 export function AccessNote({ reason, step }: { reason: string | null | undefined; step: "wiring" | "cad" }) {
   const t = useTranslations("Credits");
@@ -27,7 +28,7 @@ export function AccessNote({ reason, step }: { reason: string | null | undefined
       <Warn
         blocking={false}
         action={
-          <Link href="/credits" className="text-xs font-semibold text-cobalt hover:text-cobalt-hover">
+          <Link href="/pricing#credits" className="text-xs font-semibold text-cobalt hover:text-cobalt-hover">
             {t("getCreditsCta")}
           </Link>
         }
@@ -44,7 +45,7 @@ export function CostLabel({ cost, regens }: { cost: string | null | undefined; r
   if (!cost || cost === "none") return null;
   return (
     <span className="rounded-full bg-cobalt/10 px-2 py-0.5 text-[10.5px] font-semibold text-cobalt">
-      {cost === "free" ? t("costFree") : cost === "included" ? t("costIncluded", { n: regens ?? 0 }) : t("costCredit", { qar: 20 })}
+      {cost === "free" ? t("costFree") : cost === "included" ? t("costIncluded", { n: regens ?? 0 }) : t("costCredit", { qar: CREDIT_QAR })}
     </span>
   );
 }

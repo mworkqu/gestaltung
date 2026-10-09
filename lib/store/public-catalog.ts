@@ -27,6 +27,8 @@ import { sortProducts } from "@/lib/store/search";
 import type { DeliveryQuote } from "@/lib/store/delivery";
 import { CATALOG_TAG, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
 import { parseTrustedBy, TRUSTED_BY_KEY, type TrustedLogo } from "@/lib/trust";
+import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServicePrices } from "@/lib/pricing/defaults";
+import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
 
 const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
 
@@ -242,5 +244,29 @@ export const getTrustedBy = unstable_cache(
     return parseTrustedBy(data?.value);
   },
   ["store-settings:trusted-by"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/** Plans for /pricing (P1-06): store_settings.pricing_plans (0051), else the identical defaults. */
+export const getPricingPlans = unstable_cache(
+  async (): Promise<PricingPlans> => {
+    const supabase = createPublicClient();
+    if (!supabase) return parsePricingPlans(null);
+    const { data } = await supabase.from("store_settings").select("value").eq("key", PRICING_PLANS_KEY).maybeSingle();
+    return parsePricingPlans(data?.value);
+  },
+  ["store-settings:pricing-plans"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/** "Services, from" prices (P1-07): store_settings.service_prices (0051), else the identical defaults. */
+export const getServicePrices = unstable_cache(
+  async (): Promise<ServicePrices> => {
+    const supabase = createPublicClient();
+    if (!supabase) return parseServicePrices(null);
+    const { data } = await supabase.from("store_settings").select("value").eq("key", SERVICE_PRICES_KEY).maybeSingle();
+    return parseServicePrices(data?.value);
+  },
+  ["store-settings:service-prices"],
   { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
 );

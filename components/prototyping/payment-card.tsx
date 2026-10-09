@@ -3,13 +3,13 @@
 // Payment summary on the project's Quote step (reviewer + owner, 2026-09-28).
 // Payment-ready without a gateway: AI generations priced per call (QAR 20, the credit price),
 // parts to buy now, the total, and what's due — 0 while it's free during
-// launch. The two ways to pay the reviewer asked for are shown: card
-// (including international cards, coming soon) or in person at our office
-// after a free chat.
+// launch. Ways to pay: the three real methods (cash on delivery, Fawran, bank
+// transfer) and in person at our office after a free chat. No card row until
+// card payments exist (P1-10).
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Building2, CreditCard } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -93,10 +93,6 @@ export function PaymentCard({ projectId, partsQar }: { projectId: string; partsQ
             <Link href="/contact" className="ms-auto font-semibold text-cobalt hover:underline">
               {t("bookChat")}
             </Link>
-          </li>
-          <li className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-mutedtext">
-            <CreditCard className="h-4 w-4 shrink-0" />
-            {t("cardTitle")}
           </li>
         </ul>
       </div>

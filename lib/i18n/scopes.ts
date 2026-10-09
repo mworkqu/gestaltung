@@ -41,7 +41,16 @@ export const MESSAGE_SCOPES = {
   checkoutSuccess: ["Checkout", "Delivery", "PayMethods"],
   contact: ["Contact", "Phone"],
   designQuote: ["DesignQuote", "Phone"],
-  credits: ["Credits"],
+  // /pricing#credits: only the signed-in balance (CreditsOverview) is a client component.
+  pricing: [
+    "Credits.overviewSignIn",
+    "Credits.signInCta",
+    "Credits.overviewAdmin",
+    "Credits.kind_wiring",
+    "Credits.kind_cad",
+    "Credits.overviewRedeemable",
+    "Credits.overviewExpiry",
+  ],
   auth: ["Auth"],
   projects: ["Projects"],
   project: ["PartsDashboard", "ProjectCad", "Projects", "Prototyping", "Search"],

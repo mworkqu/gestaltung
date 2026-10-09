@@ -15,6 +15,8 @@ import { isValidPhone } from "@/lib/phone";
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
 
+type ContactKind = "school" | "institution";
+
 export function ContactForm() {
   const t = useTranslations("Contact");
   const tPhone = useTranslations("Phone");
@@ -23,20 +25,23 @@ export function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // /contact?kind=school (from /students): the message starts with a school prefix and the
-  // lead is tagged. Read in an effect, not from searchParams, so the page stays static.
-  const kindRef = useRef<"school" | null>(null);
+  // /contact?kind=school (from /students) or ?kind=institution (from /pricing): the message
+  // starts with a prefix and the lead is tagged. Read in an effect, not from searchParams,
+  // so the page stays static.
+  const kindRef = useRef<ContactKind | null>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
+    let kind: string | null = null;
     try {
-      if (new URLSearchParams(window.location.search).get("kind") !== "school") return;
+      kind = new URLSearchParams(window.location.search).get("kind");
     } catch {
       return;
     }
-    kindRef.current = "school";
+    if (kind !== "school" && kind !== "institution") return;
+    kindRef.current = kind;
     const box = messageRef.current;
-    if (box && !box.value) box.value = t("schoolPrefill");
+    if (box && !box.value) box.value = kind === "school" ? t("schoolPrefill") : t("institutionPrefill");
   }, [t]);
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.

@@ -7,6 +7,8 @@ import { FeatureVideoSection } from "@/components/feature-video-section";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
 import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getServicePrices } from "@/lib/store/public-catalog";
+import { formatQar } from "@/lib/pricing/plans";
 
 export const generateMetadata = metaFor("drawing");
 
@@ -19,6 +21,9 @@ export default async function CadAssistancePage({
   setRequestLocale(locale);
 
   const t = await getTranslations("CadAssistance");
+  const tPricing = await getTranslations("Pricing");
+  // Tier prices are data (store_settings.service_prices, 0051), shared with /pricing.
+  const prices = await getServicePrices();
   const isRtl = locale === "ar";
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
@@ -28,7 +33,7 @@ export default async function CadAssistancePage({
   const specs = [
     { label: t("specTurnaroundLabel"), value: t("specTurnaroundValue") },
     { label: t("specOutputLabel"), value: t("specOutputValue") },
-    { label: t("specPriceLabel"), value: t("specPriceValue") },
+    { label: t("specPriceLabel"), value: t("specPriceValue", { n: formatQar(prices.drawing_simple) }) },
   ];
 
   const steps = [
@@ -38,9 +43,9 @@ export default async function CadAssistancePage({
   ];
 
   const tiers = [
-    { name: t("tier1Name"), desc: t("tier1Desc"), price: t("tier1Price") },
-    { name: t("tier2Name"), desc: t("tier2Desc"), price: t("tier2Price") },
-    { name: t("tier3Name"), desc: t("tier3Desc"), price: t("tier3Price") },
+    { name: t("tier1Name"), desc: t("tier1Desc"), price: t("tier1Price", { n: formatQar(prices.drawing_simple) }) },
+    { name: t("tier2Name"), desc: t("tier2Desc"), price: t("tier2Price", { n: formatQar(prices.drawing_assembly) }) },
+    { name: t("tier3Name"), desc: t("tier3Desc"), price: t("tier3Price", { n: formatQar(prices.drawing_complex_from) }) },
   ];
 
   // The only CTAs on the page: "Start a drawing request" is primary (the
@@ -152,10 +157,14 @@ export default async function CadAssistancePage({
           ))}
         </div>
 
-        {/* One line to the terms: what the price covers (owner: no extra claims here). */}
-        <p className="mt-5 text-sm">
-          <Link href="/warranty" className="font-semibold text-cobalt hover:underline">
+        {/* One line to the terms: what the price covers (owner: no extra claims here),
+            and one to the plans and the other service prices. */}
+        <p className="mt-5 flex flex-wrap gap-x-6 text-sm">
+          <Link href="/warranty" className="inline-flex min-h-11 items-center font-semibold text-cobalt hover:underline">
             {t("priceIncludes")}
+          </Link>
+          <Link href="/pricing" className="inline-flex min-h-11 items-center font-semibold text-cobalt hover:underline">
+            {tPricing("seeAll")}
           </Link>
         </p>
       </section>

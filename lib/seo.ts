@@ -192,6 +192,7 @@ export const SITEMAP_STATIC_PATHS = [
   "/contact",
   "/students",
   "/trust",
+  "/pricing",
   "/projects/new",
   "/delivery-returns",
   "/warranty",

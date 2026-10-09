@@ -9,6 +9,8 @@ export const REDEEM_DAYS = 30;
 export const PROJECT_LIMIT = 3;
 /** Generations/refinements included in one CAD session (1 cad credit). */
 export const CAD_GENERATIONS = 3;
+/** Credits added once when a store order is marked delivered (0042 trigger). */
+export const ORDER_DELIVERED_CREDITS = { wiring: 3, cad: 1 } as const;
 
 export type CreditKind = "wiring" | "cad";
 export type AiStep = "bom" | "wiring" | "cad";

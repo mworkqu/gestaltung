@@ -407,7 +407,7 @@ export default function CheckoutClient() {
               })}
             </div>
             <PaymentInstructions method={payMethod} amount={formatPrice(grandTotal, locale)} />
-            <p className="text-[11px] text-faint">{tPay("cardSoon")}</p>
+            <p className="text-[11px] text-faint">{tPay("methodsLine")}</p>
           </fieldset>
 
           <div className="space-y-2">
@@ -479,7 +479,10 @@ export default function CheckoutClient() {
                       month: "short",
                       year: "numeric",
                     }),
-                  })}
+                  })}{" "}
+                  <Link href="/pricing#credits" className="font-semibold text-cobalt hover:underline">
+                    {tCr("howCreditsLink")}
+                  </Link>
                 </p>
               )}
             </div>
