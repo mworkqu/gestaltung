@@ -16,7 +16,7 @@ import { isValidPhone } from "@/lib/phone";
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
 
-type ContactKind = "school" | "institution";
+type ContactKind = "school" | "institution" | "partner";
 
 // turnstileEnabled (P2-08): the store_settings switch from the server page.
 // Off (default) = no widget, no token, the same POST as before.
@@ -31,7 +31,7 @@ export function ContactForm({ turnstileEnabled = false }: { turnstileEnabled?: b
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // /contact?kind=school (from /students) or ?kind=institution (from /pricing): the message
+  // /contact?kind=school (from /students), ?kind=institution (from /pricing) or ?kind=partner (from /partners/*): the message
   // starts with a prefix and the lead is tagged. Read in an effect, not from searchParams,
   // so the page stays static.
   const kindRef = useRef<ContactKind | null>(null);
@@ -44,10 +44,13 @@ export function ContactForm({ turnstileEnabled = false }: { turnstileEnabled?: b
     } catch {
       return;
     }
-    if (kind !== "school" && kind !== "institution") return;
+    if (kind !== "school" && kind !== "institution" && kind !== "partner") return;
     kindRef.current = kind;
     const box = messageRef.current;
-    if (box && !box.value) box.value = kind === "school" ? t("schoolPrefill") : t("institutionPrefill");
+    if (box && !box.value) {
+      box.value =
+        kind === "school" ? t("schoolPrefill") : kind === "institution" ? t("institutionPrefill") : t("partnerPrefill");
+    }
   }, [t]);
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.

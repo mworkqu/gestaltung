@@ -56,6 +56,7 @@ const MAX_ITEMS = 60;
 const CONTACT_KINDS: Record<string, { tag: string; subject: string }> = {
   school: { tag: "School / class project", subject: " (school / class project)" },
   institution: { tag: "Institution / team plan", subject: " (institution / team plan)" },
+  partner: { tag: "Partnership", subject: " (partnership)" },
 };
 
 type QuoteItem = { function: string; spec: string; quantity: number };

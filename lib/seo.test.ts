@@ -195,6 +195,14 @@ describe("sitemapEntries", () => {
     expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/en/pricing");
   });
 
+  it("lists both partner pages", () => {
+    for (const path of ["/partners/schools", "/partners/accelerators"]) {
+      expect(SITEMAP_STATIC_PATHS).toContain(path);
+      expect(entries.map((e) => e.url)).toContain(`https://gestaltung360.com/en${path}`);
+      expect(entries.map((e) => e.url)).toContain(`https://gestaltung360.com/ar${path}`);
+    }
+  });
+
   it("lists case studies only once one is published", () => {
     expect(caseStudyPaths([])).toEqual([]);
     expect(entries.map((e) => e.url).some((u) => u.includes("/case-studies"))).toBe(false);

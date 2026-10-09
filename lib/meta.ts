@@ -21,6 +21,8 @@ export type MetaKey =
   | "institutionsProposal"
   | "pricing"
   | "caseStudies"
+  | "partnersSchools"
+  | "partnersAccelerators"
   | "signIn"
   | "signUp"
   | "inventory"
@@ -43,6 +45,8 @@ const PAGES: Record<MetaKey, { path: string; noindex?: boolean }> = {
   institutionsProposal: { path: "/institutions/proposal", noindex: true },
   pricing: { path: "/pricing" },
   caseStudies: { path: "/case-studies" },
+  partnersSchools: { path: "/partners/schools" },
+  partnersAccelerators: { path: "/partners/accelerators" },
   signIn: { path: "/sign-in", noindex: true },
   signUp: { path: "/sign-up", noindex: true },
   inventory: { path: "/inventory", noindex: true },
