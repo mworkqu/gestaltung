@@ -13,10 +13,16 @@ import {
 } from "./videos";
 
 describe("video registry", () => {
-  it("has one entry per slug, none published yet", () => {
+  it("has one entry per slug; the four guest clips are published", () => {
     expect(VIDEOS.map((v) => v.slug)).toEqual([...VIDEO_SLUGS]);
-    expect(VIDEOS.every((v) => v.published === false)).toBe(true);
-    expect(VIDEOS.map((v) => v.durationSeconds)).toEqual([45, 45, 42, 42, 40, 42]);
+    expect(VIDEOS.filter((v) => v.published).map((v) => v.slug)).toEqual([
+      "idea-to-kit",
+      "file-to-part",
+      "sketch-to-drawing",
+      "store-to-door",
+    ]);
+    expect(VIDEOS.filter((v) => v.published).every((v) => v.uploadDate === "2026-10-10")).toBe(true);
+    expect(VIDEOS.map((v) => v.durationSeconds)).toEqual([45, 35, 33, 42, 40, 40]);
   });
 
   it("every slug has exactly five file names with the right extensions", () => {
@@ -82,7 +88,7 @@ describe("videoJsonLd", () => {
     expect(ld.description).toBe("Desc.");
     expect(ld.thumbnailUrl).toBe(`${base}/idea-to-kit/idea-to-kit.jpg`);
     expect(ld.contentUrl).toBe(`${base}/idea-to-kit/idea-to-kit.mp4`);
-    expect(ld.uploadDate).toBe("2026-10-08");
+    expect(ld.uploadDate).toBe("2026-10-10");
     expect(ld.duration).toBe("PT45S");
     expect(ld.inLanguage).toBe("en");
   });

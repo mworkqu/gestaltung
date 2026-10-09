@@ -1,0 +1,82 @@
+{
+  "sources": [
+    "file-to-part/raw.webm"
+  ],
+  "segments": [
+    {
+      "src": 0,
+      "from": 4.8,
+      "to": 11.4,
+      "speed": 1.1
+    },
+    {
+      "src": 0,
+      "from": 11.4,
+      "to": 13,
+      "speed": 1
+    },
+    {
+      "src": 0,
+      "from": 13,
+      "to": 22.4,
+      "speed": 1.2
+    },
+    {
+      "src": 0,
+      "from": 22.4,
+      "to": 26.2,
+      "speed": 2.5
+    },
+    {
+      "src": 0,
+      "from": 26.2,
+      "to": 34.2,
+      "speed": 1.15
+    },
+    {
+      "src": 0,
+      "from": 34.2,
+      "to": 42.2,
+      "speed": 2
+    },
+    {
+      "src": 0,
+      "from": 42.2,
+      "to": 50.5,
+      "speed": 1.1
+    }
+  ],
+  "cues": [
+    {
+      "src": 0,
+      "at": 4.8,
+      "en": "Drop your 3D or drawing file.",
+      "ar": "أفلِت ملفك ثلاثي الأبعاد أو ملف الرسم."
+    },
+    {
+      "src": 0,
+      "at": 13,
+      "en": "Our engineer reviews it and quotes the best method within one working day.",
+      "ar": "يراجعه مهندسنا ويسعّر لك أفضل طريقة تصنيع خلال يوم عمل واحد."
+    },
+    {
+      "src": 0,
+      "at": 26.2,
+      "en": "Made in our Lusail studio and delivered in Qatar.",
+      "ar": "نصنعها في ورشتنا في لوسيل ونوصلها إليك في قطر."
+    },
+    {
+      "src": 0,
+      "at": 38,
+      "en": "3D printing, CNC machining, laser cutting and EDM.",
+      "ar": "طباعة ثلاثية الأبعاد، وتشغيل CNC، وقطع بالليزر، وتشكيل بالشرارة الكهربائية (EDM)."
+    },
+    {
+      "src": 0,
+      "at": 47,
+      "en": "One contact, one price.",
+      "ar": "جهة تواصل واحدة، وسعر واحد."
+    }
+  ],
+  "poster": "file-to-part/poster-quote.jpg"
+}

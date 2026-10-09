@@ -1,0 +1,58 @@
+{
+  "sources": [
+    "sketch-to-drawing/raw.webm"
+  ],
+  "segments": [
+    {
+      "src": 0,
+      "from": 4,
+      "to": 12.1,
+      "speed": 1
+    },
+    {
+      "src": 0,
+      "from": 12.1,
+      "to": 24.9,
+      "speed": 1.15
+    },
+    {
+      "src": 0,
+      "from": 24.9,
+      "to": 38.3,
+      "speed": 1.25
+    },
+    {
+      "src": 0,
+      "from": 38.3,
+      "to": 41,
+      "speed": 1
+    }
+  ],
+  "cues": [
+    {
+      "src": 0,
+      "at": 4,
+      "en": "No file? A photo and a few dimensions are enough.",
+      "ar": "لا تملك ملفًا؟ تكفي صورة وبعض الأبعاد."
+    },
+    {
+      "src": 0,
+      "at": 12.1,
+      "en": "Typically 2–3 working days, from QAR 200.",
+      "ar": "عادةً خلال 2–3 أيام عمل، ابتداءً من 200 ر.ق."
+    },
+    {
+      "src": 0,
+      "at": 24.9,
+      "en": "We turn it into a manufacturing-ready drawing.",
+      "ar": "نحوّلها إلى رسم جاهز للتصنيع."
+    },
+    {
+      "src": 0,
+      "at": 35,
+      "en": "We reply on WhatsApp with a price.",
+      "ar": "نرد عليك عبر واتساب بالسعر."
+    }
+  ],
+  "poster": "sketch-to-drawing/poster-tiers.jpg"
+}

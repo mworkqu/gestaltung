@@ -1,0 +1,82 @@
+{
+  "sources": [
+    "store-to-door/raw.webm"
+  ],
+  "segments": [
+    {
+      "src": 0,
+      "from": 4.4,
+      "to": 13.8,
+      "speed": 1.6
+    },
+    {
+      "src": 0,
+      "from": 13.8,
+      "to": 17,
+      "speed": 1.5
+    },
+    {
+      "src": 0,
+      "from": 17,
+      "to": 33.4,
+      "speed": 1.1
+    },
+    {
+      "src": 0,
+      "from": 33.4,
+      "to": 39.2,
+      "speed": 1.6
+    },
+    {
+      "src": 0,
+      "from": 39.2,
+      "to": 50.5,
+      "speed": 1.5
+    },
+    {
+      "src": 0,
+      "from": 50.5,
+      "to": 56,
+      "speed": 1
+    }
+  ],
+  "cues": [
+    {
+      "src": 0,
+      "at": 4.4,
+      "en": "Search for the part you need.",
+      "ar": "ابحث عن القطعة التي تحتاجها."
+    },
+    {
+      "src": 0,
+      "at": 20.2,
+      "en": "Every product shows its delivery date before you pay.",
+      "ar": "كل منتج يعرض موعد تسليمه قبل أن تدفع."
+    },
+    {
+      "src": 0,
+      "at": 25,
+      "en": "Stocked in Qatar or sourced for you.",
+      "ar": "متوفرة في قطر أو نوفّرها لك."
+    },
+    {
+      "src": 0,
+      "at": 33.1,
+      "en": "Add it to your cart and check out.",
+      "ar": "أضِفها إلى سلتك وأكمل الطلب."
+    },
+    {
+      "src": 0,
+      "at": 46.5,
+      "en": "Pay by cash on delivery, Fawran or bank transfer.",
+      "ar": "ادفع نقدًا عند الاستلام أو عبر فوران أو بالتحويل البنكي."
+    },
+    {
+      "src": 0,
+      "at": 52.6,
+      "en": "Delivered orders earn AI credits for your next project.",
+      "ar": "كل طلب يُسلَّم يمنحك أرصدة ذكاء اصطناعي لمشروعك القادم."
+    }
+  ],
+  "poster": "store-to-door/poster-product.jpg"
+}

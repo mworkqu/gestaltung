@@ -36,10 +36,12 @@ export type FeatureVideoEntry = {
   published: boolean;
 };
 
+/** `uploaded` = ISO date of the real upload; it also marks the clip published. */
 function entry(
   slug: VideoSlug,
   pages: readonly string[],
   durationSeconds: number,
+  uploaded?: string,
 ): FeatureVideoEntry {
   return {
     slug,
@@ -48,18 +50,21 @@ function entry(
     descriptionKey: `${slug}Description`,
     pages,
     durationSeconds,
-    uploadDate: "2026-10-08",
-    published: false,
+    uploadDate: uploaded ?? "2026-10-08",
+    published: uploaded !== undefined,
   };
 }
 
 export const VIDEOS: readonly FeatureVideoEntry[] = [
-  entry("idea-to-kit", ["/", "/how-it-works"], 45),
-  entry("file-to-part", ["/", "/how-it-works", "/design"], 45),
-  entry("sketch-to-drawing", ["/design", "/design/drawing"], 42),
+  // Recorded from the live site as a guest and uploaded 2026-10-10
+  // (scripts/record-videos/). wiring-check and cad-model need a signed-in
+  // account with credits, so they stay unpublished placeholders.
+  entry("idea-to-kit", ["/", "/how-it-works"], 45, "2026-10-10"),
+  entry("file-to-part", ["/", "/how-it-works", "/design"], 35, "2026-10-10"),
+  entry("sketch-to-drawing", ["/design", "/design/drawing"], 33, "2026-10-10"),
   entry("wiring-check", ["/projects/[id]/prototyping"], 42),
   entry("cad-model", ["/projects/[id]/prototyping"], 40),
-  entry("store-to-door", ["/", "/how-it-works"], 42),
+  entry("store-to-door", ["/", "/how-it-works"], 40, "2026-10-10"),
 ];
 
 export function videoEntry(slug: string): FeatureVideoEntry | undefined {

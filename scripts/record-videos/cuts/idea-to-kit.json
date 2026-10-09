@@ -1,0 +1,102 @@
+{
+  "sources": [
+    "idea-to-kit/raw.webm",
+    "idea-to-kit-2/raw.webm",
+    "idea-to-kit-3/raw.webm"
+  ],
+  "segments": [
+    {
+      "src": 0,
+      "from": 4.6,
+      "to": 9.3,
+      "speed": 1.2
+    },
+    {
+      "src": 0,
+      "from": 9.3,
+      "to": 21.6,
+      "speed": 2
+    },
+    {
+      "src": 0,
+      "from": 21.6,
+      "to": 26.4,
+      "speed": 3
+    },
+    {
+      "src": 0,
+      "from": 26.4,
+      "to": 33.6,
+      "speed": 1.2
+    },
+    {
+      "src": 0,
+      "from": 33.6,
+      "to": 42.2,
+      "speed": 3
+    },
+    {
+      "src": 1,
+      "from": 14.3,
+      "to": 28.9,
+      "speed": 2
+    },
+    {
+      "src": 1,
+      "from": 28.9,
+      "to": 37.4,
+      "speed": 3
+    },
+    {
+      "src": 2,
+      "from": 15.97,
+      "to": 33.8,
+      "speed": 1.25
+    }
+  ],
+  "cues": [
+    {
+      "src": 0,
+      "at": 4.6,
+      "en": "Describe what it must do. One sentence is enough.",
+      "ar": "صِف ما يجب أن يفعله. جملة واحدة تكفي."
+    },
+    {
+      "src": 0,
+      "at": 26.4,
+      "en": "We ask what we need to know.",
+      "ar": "نسألك عمّا نحتاج إلى معرفته."
+    },
+    {
+      "src": 0,
+      "at": 31,
+      "en": "One click reads your brief and plans the build.",
+      "ar": "بنقرة واحدة نقرأ وصفك ونخطّط للبناء."
+    },
+    {
+      "src": 1,
+      "at": 14.3,
+      "en": "Pick the board and the power. We list the electronics.",
+      "ar": "اختر اللوحة ومصدر الطاقة، ونحدّد لك القطع الإلكترونية."
+    },
+    {
+      "src": 2,
+      "at": 15.97,
+      "en": "Every part listed and priced in QAR, matched to our store.",
+      "ar": "كل قطعة مُدرجة ومسعّرة بالريال القطري ومطابَقة مع متجرنا."
+    },
+    {
+      "src": 2,
+      "at": 21,
+      "en": "In stock in Qatar, ready for your cart.",
+      "ar": "متوفرة في قطر وجاهزة لسلتك."
+    },
+    {
+      "src": 2,
+      "at": 26.5,
+      "en": "The parts list is free. Wiring and 3D models use credits.",
+      "ar": "قائمة القطع مجانية. مخططات التوصيل والنماذج ثلاثية الأبعاد تُحتسب بالأرصدة."
+    }
+  ],
+  "poster": "idea-to-kit-3/poster-sensors.jpg"
+}
