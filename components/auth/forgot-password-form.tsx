@@ -7,21 +7,39 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
 
-export function ForgotPasswordForm({ expired = false }: { expired?: boolean }) {
+// turnstileEnabled (P2-08): Supabase's CAPTCHA protection also covers the
+// password-reset email, so this form carries the widget too. Off (default) =
+// no widget and the exact same resetPasswordForEmail call as before.
+export function ForgotPasswordForm({
+  expired = false,
+  turnstileEnabled = false,
+}: {
+  expired?: boolean;
+  turnstileEnabled?: boolean;
+}) {
   const t = useTranslations("Auth");
+  const tCheck = useTranslations("Turnstile");
   const locale = useLocale();
   const isRtl = locale === "ar";
 
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [captcha, setCaptcha] = useState<string | null>(null);
 
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setError(null);
+    if (turnstileActive(turnstileEnabled) && !captcha) {
+      setError(tCheck("required"));
+      return;
+    }
     setLoading(true);
 
     const email = String(new FormData(e.currentTarget).get("email"));
@@ -32,6 +50,7 @@ export function ForgotPasswordForm({ expired = false }: { expired?: boolean }) {
     try {
       await createClient().auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/api/auth/callback?next=${next}`,
+        ...(captcha ? { captchaToken: captcha } : {}),
       });
     } catch {
       // Intentionally ignored; see above.
@@ -77,6 +96,10 @@ export function ForgotPasswordForm({ expired = false }: { expired?: boolean }) {
               className={authFieldClass}
             />
           </div>
+
+          <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} action="password_reset" />
+
+          {error && <p className="text-sm font-medium text-destructive">{error}</p>}
 
           <Button
             type="submit"

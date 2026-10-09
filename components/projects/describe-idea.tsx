@@ -4,6 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { NewProjectChat } from "@/components/projects/new-project-chat";
+import { TurnstileChallenge } from "@/components/turnstile-challenge";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { cn } from "@/lib/utils";
 
 // Server part of the "Describe your idea" screen on /projects/new (P1-11 /
@@ -12,6 +14,7 @@ import { cn } from "@/lib/utils";
 // keeps the smaller "projects" scope. The page calls setRequestLocale first.
 export async function DescribeIdea({ locale, destination }: { locale: string; destination: string }) {
   const t = await getTranslations("Projects");
+  const turnstileEnabled = await turnstileEnabledForPages();
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
@@ -33,7 +36,8 @@ export async function DescribeIdea({ locale, destination }: { locale: string; de
           <p className="text-base leading-relaxed text-body">{t("describeSub")}</p>
         </header>
 
-        <NewProjectChat destination={destination} />
+        <NewProjectChat destination={destination} turnstileEnabled={turnstileEnabled} />
+        <TurnstileChallenge enabled={turnstileEnabled} />
       </div>
     </MessagesScope>
   );

@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { DescribeIdea } from "@/components/projects/describe-idea";
 import { providerStatus } from "@/lib/prototyping/providers";
+import { TurnstileChallenge } from "@/components/turnstile-challenge";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 
 export async function generateMetadata({
   params,
@@ -55,6 +57,7 @@ export default async function NewProjectPage({
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
+  const turnstileEnabled = await turnstileEnabledForPages();
   const explain = forDrawing ? ["explainWhy"] : ["explainNext", "explainFree", "explainWhy"];
 
   return (
@@ -86,7 +89,8 @@ export default async function NewProjectPage({
         ))}
       </ul>
 
-      <NewProjectForm forDrawing={forDrawing} />
+      <NewProjectForm forDrawing={forDrawing} turnstileEnabled={turnstileEnabled} />
+      <TurnstileChallenge enabled={turnstileEnabled} />
     </div>
     </MessagesScope>
   );

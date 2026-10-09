@@ -20,6 +20,8 @@ import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { TurnstileChallenge } from "@/components/turnstile-challenge";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { TrackClick } from "@/components/analytics/track-click";
 import { FeatureVideoSection } from "@/components/feature-video-section";
 import { IsolatedTitle } from "@/components/ltr-isolate";
@@ -63,7 +65,11 @@ export default async function Home({
   // Quick-links: every category with a listed product, not just those in the
   // featured eight, so they never lead to an empty page (audit #15). Both are
   // cached, card fields only; empty without Supabase env (fresh local checkout).
-  const [products, { categories }] = await Promise.all([getFeaturedParts(), getStoreFacets()]);
+  const [products, { categories }, turnstileEnabled] = await Promise.all([
+    getFeaturedParts(),
+    getStoreFacets(),
+    turnstileEnabledForPages(),
+  ]);
 
   // VideoObject structured data only for a clip that is really uploaded
   // (lib/videos.ts `published`); never for a placeholder.
@@ -300,7 +306,9 @@ export default async function Home({
       </section>
 
       {/* Callback CTA */}
-      <HomeCallback />
+      <HomeCallback turnstileEnabled={turnstileEnabled} />
+      {/* Add to cart may mint a guest session: the on-demand check (renders nothing while off). */}
+      <TurnstileChallenge enabled={turnstileEnabled} />
     </div>
     </MessagesScope>
   );

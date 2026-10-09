@@ -6,6 +6,7 @@ import { COMPANY, COMPANY_ADDRESS, COMPANY_PHONE, COMPANY_WHATSAPP } from "@/lib
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 
 export const generateMetadata = metaFor("contact");
 
@@ -19,6 +20,8 @@ export default async function ContactPage({
 
   const t = await getTranslations("Contact");
   const tCompany = await getTranslations("Company");
+  // Cached public read (tag "store-settings"): the page stays static / ISR.
+  const turnstileEnabled = await turnstileEnabledForPages();
   const isRtl = locale === "ar";
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
@@ -62,7 +65,7 @@ export default async function ContactPage({
               {t("formTag")}
             </span>
           </div>
-          <ContactForm />
+          <ContactForm turnstileEnabled={turnstileEnabled} />
         </div>
 
         {/* Details card */}

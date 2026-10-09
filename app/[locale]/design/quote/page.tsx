@@ -4,6 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { QuoteRequest } from "@/components/design/quote-request";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 
 // Public quote-request page. The homepage dropzone hands off a CAD file here;
 // this page collects the visitor's email/phone + preferred method and submits a
@@ -29,6 +30,8 @@ export default async function DesignQuotePage({
   setRequestLocale(locale);
 
   const t = await getTranslations("DesignQuote");
+  // Cached public read (tag "store-settings"): the page stays static / ISR.
+  const turnstileEnabled = await turnstileEnabledForPages();
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -49,7 +52,7 @@ export default async function DesignQuotePage({
           {t("subheading")}
         </p>
 
-        <QuoteRequest />
+        <QuoteRequest turnstileEnabled={turnstileEnabled} />
       </div>
     </div>
     </MessagesScope>

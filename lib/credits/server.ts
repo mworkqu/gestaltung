@@ -74,7 +74,9 @@ export type RateResult = { allowed: boolean; used: number; limit: number | null 
 
 /** Counts one BOM run against today's allowance (anonymous 5, user 30, admin ∞). */
 export async function bomRate(supabase: SupabaseClient, request: Request): Promise<RateResult> {
-  // TODO(turnstile): verify a Cloudflare Turnstile token here for anonymous callers.
+  // Turnstile (P2-08): guests' /api/analyse calls are checked in the route
+  // (lib/turnstile-server.ts checkTurnstile) before this runs, while the
+  // store_settings switch is on. /api/bom/electronics is not checked yet.
   const { data, error } = await supabase.rpc("bom_rate_check", { p_ip_hash: ipHash(request) });
   if (error) {
     if (!missing(error)) console.error("[credits] bom_rate_check failed:", error.message);

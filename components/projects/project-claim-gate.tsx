@@ -14,6 +14,12 @@ import { ProjectWorkspace } from "@/components/projects/project-workspace";
 // session (a guest gets an anonymous one — they asked to open their project),
 // hand the key to /api/projects/claim, then drop it from the address bar. With
 // no key this renders the workspace straight away, exactly as before.
+//
+// Turnstile (P2-08): the gate has no form for an inline widget, so when the
+// switch is on ensureSession() asks the page's <TurnstileChallenge> dialog
+// (app/[locale]/projects/[id]/page.tsx) for a token. Closing the dialog fails
+// the claim ("claimError", the workspace still opens); with the switch off
+// there is no dialog and the call is exactly the old one.
 
 type Notice = "claimMoved" | "claimMovedEmailed" | "claimInvalid" | "claimHasAccount" | "claimLimit" | "claimError";
 

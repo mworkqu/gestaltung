@@ -11,6 +11,7 @@ import { ensureSession, getCurrentUser, isGuest } from "@/lib/supabase/guest";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { isPlausibleEmail } from "@/lib/store/shipping";
 import { Button } from "@/components/ui/button";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 
 // Starting a project is the one thing that must never hit a sign-in wall. The
 // anonymous session is minted here, at the first write — not on page load — so
@@ -23,7 +24,17 @@ import { Button } from "@/components/ui/button";
 // created, /api/projects/recovery-email sends a link with a secret key that
 // opens (moves) this guest project in any other browser. Only offered to
 // visitors without an account — an account already works on every device.
-export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean }) {
+//
+// Turnstile (P2-08): with the switch on and no session yet, the widget's token
+// goes to ensureSession() (anonymous sign-in); without one the page's challenge
+// dialog is asked. Switch off = no widget, ensureSession() exactly as before.
+export function NewProjectForm({
+  forDrawing = false,
+  turnstileEnabled = false,
+}: {
+  forDrawing?: boolean;
+  turnstileEnabled?: boolean;
+}) {
   const t = useTranslations("Projects");
   const locale = useLocale();
   const router = useRouter();
@@ -38,10 +49,16 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
   // 2026-09-29: "a phone number is enough"). It's saved on their profile, so
   // the project has a way to reach them. Signed-in accounts skip it.
   const [needsPhone, setNeedsPhone] = useState(true);
+  const [needsCheck, setNeedsCheck] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   useEffect(() => {
     const supabase = createClient();
     getCurrentUser().then(async (user) => {
-      if (!user) return;
+      if (!user) {
+        setNeedsCheck(turnstileActive(turnstileEnabled));
+        return;
+      }
       if (!isGuest(user)) {
         setIsAccount(true);
         return setNeedsPhone(false);
@@ -49,7 +66,7 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
       const { data: prof } = await supabase.from("profiles").select("phone").eq("id", user.id).maybeSingle();
       if (prof?.phone) setNeedsPhone(false);
     });
-  }, []);
+  }, [turnstileEnabled]);
   const askPhone = needsPhone || forDrawing;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,7 +96,13 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
     setLoading(true);
 
     try {
-      const user = await ensureSession();
+      let user: Awaited<ReturnType<typeof ensureSession>>;
+      try {
+        user = await ensureSession({ captchaToken: captcha });
+      } finally {
+        // Single-use token: a retry needs a fresh one.
+        if (captcha) setCaptchaReset((k) => k + 1);
+      }
       const supabase = createClient();
       const { data, error: insertError } = await supabase
         .from("projects")
@@ -205,6 +228,10 @@ ${brief.trim()}`,
           />
           <p className="text-[11px] text-mutedtext">{t("emailHint")}</p>
         </div>
+      )}
+
+      {needsCheck && (
+        <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="new_project" />
       )}
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}

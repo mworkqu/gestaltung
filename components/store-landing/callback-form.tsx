@@ -7,6 +7,7 @@ import { CheckCircle2, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isValidPhone } from "@/lib/phone";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 
 // Homepage lead capture, neu style. Collects a name + number and tells the
 // visitor we'll contact them; POSTs to /api/store-lead which saves the lead
@@ -14,9 +15,14 @@ import { isValidPhone } from "@/lib/phone";
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset outline-none transition placeholder:text-faint focus:ring-2 focus:ring-cobalt/60";
 
-export function HomeCallback() {
+// turnstileEnabled (P2-08): the store_settings switch from the home page.
+// Off (default) = no widget, no token, the same POST as before.
+export function HomeCallback({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
   const t = useTranslations("StoreLanding");
   const tPhone = useTranslations("Phone");
+  const tCheck = useTranslations("Turnstile");
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const locale = useLocale();
   const isRtl = locale === "ar";
   const [loading, setLoading] = useState(false);
@@ -40,19 +46,35 @@ export function HomeCallback() {
       setError(tPhone("invalid"));
       return;
     }
+    if (turnstileActive(turnstileEnabled) && !captcha) {
+      setError(tCheck("required"));
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/store-lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone, locale, source: "store_callback" }),
+        body: JSON.stringify({
+          name,
+          phone,
+          locale,
+          source: "store_callback",
+          ...(captcha ? { turnstileToken: captcha } : {}),
+        }),
       });
+      if (res.status === 403) {
+        setError(tCheck("captchaFailed"));
+        return;
+      }
       if (!res.ok) throw new Error("bad status");
       setDone(true);
     } catch {
       setError(t("callbackError"));
     } finally {
       setLoading(false);
+      // The token is single-use: get a fresh one for any next attempt.
+      if (captcha) setCaptchaReset((k) => k + 1);
     }
   }
 
@@ -87,6 +109,7 @@ export function HomeCallback() {
               className={cn(fieldClass, isRtl && "text-right")}
             />
           </div>
+          <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="callback" />
           {error && <p className="text-sm font-medium text-destructive">{error}</p>}
           <Button type="submit" size="lg" disabled={loading} className="w-full rounded-full sm:w-auto sm:px-8">
             {loading ? (

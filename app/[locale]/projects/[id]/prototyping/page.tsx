@@ -4,6 +4,8 @@ import { pageMetadata } from "@/lib/seo";
 import { PrototypingWorkspace } from "@/components/prototyping/workspace";
 import { providerStatus } from "@/lib/prototyping/providers";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { TurnstileChallenge } from "@/components/turnstile-challenge";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 
 export async function generateMetadata({
   params,
@@ -38,11 +40,19 @@ export default async function PrototypingPage({
   setRequestLocale(locale);
   // Only the provider's public name crosses to the client — never its key.
   const { destination } = await providerStatus();
+  // P2-08: guests need a Turnstile token for /api/analyse while the switch is on.
+  const turnstileEnabled = await turnstileEnabledForPages();
 
   return (
     <MessagesScope scope="all">
     <div className="mx-auto w-full max-w-[1760px] px-4 py-4 sm:px-6">
-      <PrototypingWorkspace projectId={id} briefDestination={destination} startChat={startChat} />
+      <PrototypingWorkspace
+        projectId={id}
+        briefDestination={destination}
+        startChat={startChat}
+        turnstileEnabled={turnstileEnabled}
+      />
+      <TurnstileChallenge enabled={turnstileEnabled} />
     </div>
     </MessagesScope>
   );

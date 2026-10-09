@@ -8,7 +8,8 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession } from "@/lib/supabase/guest";
+import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { takePendingUpload } from "@/lib/design/pending-upload";
 import {
   ACCEPT_ATTR,
@@ -41,7 +42,11 @@ function sanitize(name: string) {
 
 type Done = "sent" | "sent_large" | "sent_nofile" | null;
 
-export function QuoteRequest() {
+// turnstileEnabled (P2-08): with the switch on and no session yet, the widget's
+// token goes to ensureSession() (anonymous sign-in for the project). If that
+// still fails the request falls back to the plain quote upload, as before — the
+// lead is never lost. Switch off = no widget, exactly as before.
+export function QuoteRequest({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
   const t = useTranslations("DesignQuote");
   const tPhone = useTranslations("Phone");
   const locale = useLocale();
@@ -66,6 +71,13 @@ export function QuoteRequest() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<Done>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [needsCheck, setNeedsCheck] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  useEffect(() => {
+    if (!turnstileActive(turnstileEnabled)) return;
+    void getCurrentUser().then((u) => setNeedsCheck(!u));
+  }, [turnstileEnabled]);
 
   // Pick up the file the homepage dropzone handed off (client-only).
   useEffect(() => {
@@ -137,7 +149,13 @@ export function QuoteRequest() {
       let bucket: "cad" | "quote" = "quote";
       let newProject: string | null = null;
       try {
-        const user = await ensureSession();
+        let user: Awaited<ReturnType<typeof ensureSession>>;
+        try {
+          user = await ensureSession({ captchaToken: captcha });
+        } finally {
+          // Single-use token: a retry needs a fresh one.
+          if (captcha) setCaptchaReset((k) => k + 1);
+        }
         const supabase = createClient();
         const title = (file?.name.replace(/\.[^.]+$/, "") || name.trim() || t("projectDefaultName")).slice(0, 120);
         const { data: proj, error: projErr } = await supabase
@@ -425,6 +443,10 @@ export function QuoteRequest() {
           className={cn(fieldClass, "resize-y")}
         />
       </div>
+
+      {needsCheck && (
+        <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="quote" />
+      )}
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}
 

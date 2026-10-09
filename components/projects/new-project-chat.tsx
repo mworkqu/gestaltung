@@ -11,15 +11,21 @@
 //   4. the turn (or its failure) goes to sessionStorage and the workspace
 //      opens with ?start=chat, where BriefChat picks it up and carries on.
 // The 3-active-projects cap (0042) stops at step 2 with a link to archive one.
+//
+// Turnstile (P2-08): with the switch on and no session yet, the widget shows
+// under the consent box and its token goes to ensureSession() (anonymous
+// sign-in). Without an inline token ensureSession() asks the page's challenge
+// dialog. Switch off = no widget, ensureSession() exactly as before.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { Link, useRouter } from "@/i18n/navigation";
 import { ChatConsent, ChatInput, ChatMessages } from "@/components/prototyping/chat-thread";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession } from "@/lib/supabase/guest";
+import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import {
   buildFirstTurn,
   buildHandoff,
@@ -29,7 +35,7 @@ import {
   type ChatMsg,
 } from "@/lib/projects/create-from-chat";
 
-export function NewProjectChat({ destination }: { destination: string }) {
+export function NewProjectChat({ destination, turnstileEnabled = false }: { destination: string; turnstileEnabled?: boolean }) {
   const t = useTranslations("Projects");
   const locale = useLocale();
   const router = useRouter();
@@ -40,6 +46,14 @@ export function NewProjectChat({ destination }: { destination: string }) {
   const [sent, setSent] = useState<string | null>(null);
   const [limit, setLimit] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Only a visitor without a session needs the check (it guards signInAnonymously).
+  const [needsCheck, setNeedsCheck] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  useEffect(() => {
+    if (!turnstileActive(turnstileEnabled)) return;
+    void getCurrentUser().then((u) => setNeedsCheck(!u));
+  }, [turnstileEnabled]);
 
   const first: ChatMsg = { role: "assistant", text: t("chatFirst") };
   const msgs: ChatMsg[] = sent ? [first, { role: "user", text: sent }] : [first];
@@ -54,7 +68,13 @@ export function NewProjectChat({ destination }: { destination: string }) {
 
     let projectId: string;
     try {
-      const user = await ensureSession();
+      let user: Awaited<ReturnType<typeof ensureSession>>;
+      try {
+        user = await ensureSession({ captchaToken: captcha });
+      } finally {
+        // Single-use token: a retry needs a fresh one.
+        if (captcha) setCaptchaReset((k) => k + 1);
+      }
       const { data, error: insertError } = await createClient()
         .from("projects")
         .insert(newProjectInsert({ userId: user.id, text, destination, now: new Date() }))
@@ -134,6 +154,9 @@ export function NewProjectChat({ destination }: { destination: string }) {
         autoFocus
       />
       <ChatConsent destination={destination} checked={ticked} onChange={setTicked} disabled={busy} withHint id="new-project-consent" />
+      {needsCheck && (
+        <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="new_project" />
+      )}
     </div>
   );
 }

@@ -5,6 +5,9 @@ import { PROVIDERS, dayStart, guardThreshold, nextReset, providerLimits, type Pr
 import { cn } from "@/lib/utils";
 import { AI_PRICE_QAR } from "@/lib/credits/constants";
 import { AiPricing } from "@/components/admin/ai-pricing";
+import { SafetySettings, type CleanupRun } from "@/components/admin/safety-settings";
+import { TURNSTILE_KEY, parseTurnstileSettings, turnstileEnv } from "@/lib/turnstile";
+import { CLEANUP_KEY, parseCleanupSettings } from "@/lib/cleanup/anonymous";
 import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL } from "@/lib/prototyping/providers/gemini-client";
 
 // AI usage against the free allowances (migration 0023's ai_usage).
@@ -150,6 +153,19 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   const { data: pricingRow } = await supabase.from("store_settings").select("value").eq("key", "ai_pricing").maybeSingle();
   const pricing = (pricingRow?.value ?? null) as { per_call_qar?: number; charging?: boolean } | null;
 
+  // P2-08 / P2-09 settings (rows from 0055; missing rows read as the defaults:
+  // Turnstile off, cleanup on + dry run + 30 days) and the last five runs.
+  const [{ data: safetyRows }, runsRes] = await Promise.all([
+    supabase.from("store_settings").select("key, value").in("key", [TURNSTILE_KEY, CLEANUP_KEY]),
+    supabase
+      .from("cleanup_runs")
+      .select("id, ran_at, dry_run, days, candidates, deleted")
+      .order("ran_at", { ascending: false })
+      .limit(5),
+  ]);
+  const safetyValue = (key: string) => (safetyRows ?? []).find((r) => r.key === key)?.value;
+  const keys = turnstileEnv();
+
   return (
     <div className="space-y-8">
       <div>
@@ -193,6 +209,17 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
       </section>
 
       {pricing && <AiPricing locale={locale} perCall={Number(pricing.per_call_qar ?? AI_PRICE_QAR)} charging={Boolean(pricing.charging)} />}
+
+      <SafetySettings
+        locale={locale}
+        turnstile={{
+          enabled: parseTurnstileSettings(safetyValue(TURNSTILE_KEY)).enabled,
+          siteKeySet: !!keys.siteKey?.trim(),
+          secretSet: !!keys.secret?.trim(),
+        }}
+        cleanup={parseCleanupSettings(safetyValue(CLEANUP_KEY))}
+        runs={runsRes.error ? null : ((runsRes.data ?? []) as CleanupRun[])}
+      />
 
       {error && (
         <p className="text-sm font-medium text-destructive">

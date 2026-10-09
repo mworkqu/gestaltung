@@ -10,10 +10,15 @@ import { isGuest } from "@/lib/supabase/guest";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
 import { PhoneInput } from "@/components/phone-input";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
 
-export function SignUpForm() {
+// turnstileEnabled (P2-08): the store_settings switch from the server page.
+// Off (default) = no widget and the exact same signUp call as before. The guest
+// upgrade (updateUser) is not a CAPTCHA-protected endpoint and sends no token.
+export function SignUpForm({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
   const t = useTranslations("Auth");
+  const tCheck = useTranslations("Turnstile");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
@@ -21,6 +26,8 @@ export function SignUpForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -64,16 +71,23 @@ export function SignUpForm() {
       // there is never a ready-to-use session on this path.
       hasSession = false;
     } else {
+      if (turnstileActive(turnstileEnabled) && !captcha) {
+        setError(tCheck("required"));
+        setLoading(false);
+        return;
+      }
       // full_name + phone + locale go into user metadata; the
       // handle_new_user() trigger copies them into the new profiles row.
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: metadata },
+        options: captcha ? { data: metadata, captchaToken: captcha } : { data: metadata },
       });
+      // The token is single-use: get a fresh one for any next attempt.
+      if (captcha) setCaptchaReset((k) => k + 1);
 
       if (signUpError) {
-        setError(signUpError.message);
+        setError(/captcha/i.test(signUpError.message) ? tCheck("captchaFailed") : signUpError.message);
         setLoading(false);
         return;
       }
@@ -188,6 +202,8 @@ export function SignUpForm() {
             className={authFieldClass}
           />
         </div>
+
+        <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="sign_up" />
 
         {error && (
           <p className="text-sm font-medium text-destructive">{error}</p>

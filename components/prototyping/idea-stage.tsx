@@ -15,6 +15,10 @@ import { Check, Loader2, Sparkles } from "lucide-react";
 
 import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
+import { getCurrentUser, isGuest } from "@/lib/supabase/guest";
+import { TURNSTILE_HEADER } from "@/lib/turnstile";
+import { requestTurnstileToken } from "@/lib/turnstile-client";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 import {
   ANALYSIS_STEPS,
   type Analysis,
@@ -99,6 +103,7 @@ export function IdeaStage({
   onSpec,
   briefDestination,
   startChat = false,
+  turnstileEnabled = false,
 }: {
   project: Project;
   parts: ProjectPart[];
@@ -108,15 +113,31 @@ export function IdeaStage({
   briefDestination: string | null;
   /** Opened from "Describe your idea": the chat opens with the first turn. */
   startChat?: boolean;
+  /**
+   * P2-08 store_settings switch. On (with a site key) and the visitor is a
+   * guest: /api/analyse needs a Turnstile token (header x-turnstile-token), so
+   * the widget shows above "Analyse brief"; without its token the page's
+   * challenge dialog is asked. Off = no widget, no header, as before.
+   */
+  turnstileEnabled?: boolean;
 }) {
   const t = useTranslations("Prototyping");
+  const tCheck = useTranslations("Turnstile");
   const locale = useLocale() === "ar" ? "ar" : "en";
   const [brief, setBrief] = useState(project.brief ?? "");
   const [savedBrief, setSavedBrief] = useState(project.brief ?? "");
   const [saveState, setSaveState] = useState<SaveState>("clean");
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState<AnalysisStep[]>([]);
-  const [problem, setProblem] = useState<"short" | "schema" | "failed" | null>(null);
+  const [problem, setProblem] = useState<"short" | "schema" | "failed" | "captchaRequired" | "captchaFailed" | null>(null);
+  const [guest, setGuest] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const needsCheck = turnstileActive(turnstileEnabled) && guest;
+  useEffect(() => {
+    if (!turnstileActive(turnstileEnabled)) return;
+    void getCurrentUser().then((u) => setGuest(isGuest(u)));
+  }, [turnstileEnabled]);
   const spec = project.spec ?? null;
   // Before the first analysis with an outside provider, the client must agree
   // to send their brief there (audit #10). The rules reader never leaves our
@@ -192,12 +213,19 @@ export function IdeaStage({
     const text = briefOverride ?? brief;
     if (looksLikeSchema(text)) return setProblem("schema");
     if (text.trim().length < MIN_BRIEF_CHARS) return setProblem("short");
+    // A guest's analysis needs a fresh Turnstile token while the switch is on.
+    let checkToken: string | null = null;
+    if (needsCheck) {
+      checkToken = captcha ?? (await requestTurnstileToken().catch(() => null));
+      if (!checkToken) return setProblem("captchaRequired");
+    }
     setProblem(null);
     setDone([]);
     setRunning(true);
     const started = Date.now();
     const mark = (s: AnalysisStep) => setDone((d) => (d.includes(s) ? d : [...d, s]));
     const supabase = createClient();
+    let captchaRejected = false;
 
     try {
       if (briefOverride === undefined && !(await saveBrief())) throw new Error("brief not saved");
@@ -213,7 +241,10 @@ export function IdeaStage({
 
       const res = await fetch("/api/analyse", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(checkToken ? { [TURNSTILE_HEADER]: checkToken } : {}),
+        },
         // The route validates its body with a non-strict schema, so it accepts
         // (and for now ignores) the consent timestamp.
         body: JSON.stringify({
@@ -224,6 +255,12 @@ export function IdeaStage({
           ...(consentAt ? { consentAt } : {}),
         }),
       });
+      // The token is single-use: get a fresh one for the next analysis.
+      if (checkToken) setCaptchaReset((k) => k + 1);
+      if (res.status === 403) {
+        captchaRejected = true;
+        throw new Error("captcha_failed");
+      }
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const result = await streamAnalysis(res, mark);
       if (!result) throw new Error("no result");
@@ -294,7 +331,7 @@ export function IdeaStage({
       }
       mark("gaps");
     } catch {
-      setProblem("failed");
+      setProblem(captchaRejected ? "captchaFailed" : "failed");
     }
 
     const wait = MIN_VISIBLE_MS - (Date.now() - started);
@@ -319,14 +356,21 @@ export function IdeaStage({
         />
         {problem && (
           <p className="text-xs font-medium text-destructive">
-            {t(
-              problem === "short"
-                ? "briefTooShort"
-                : problem === "schema"
-                  ? "block_briefSchema"
-                  : "analyseFailed"
-            )}
+            {problem === "captchaRequired"
+              ? tCheck("required")
+              : problem === "captchaFailed"
+                ? tCheck("captchaFailed")
+                : t(
+                    problem === "short"
+                      ? "briefTooShort"
+                      : problem === "schema"
+                        ? "block_briefSchema"
+                        : "analyseFailed"
+                  )}
           </p>
+        )}
+        {needsCheck && (
+          <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="analyse" />
         )}
         {needsConsent && briefDestination && (
           <div className="space-y-1">

@@ -10,16 +10,22 @@ import { dashboardPathForRole } from "@/lib/auth/redirects";
 import type { Role } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
 
-export function SignInForm() {
+// turnstileEnabled (P2-08): the store_settings switch from the server page.
+// Off (default) = no widget and the exact same signInWithPassword call as before.
+export function SignInForm({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
   const t = useTranslations("Auth");
+  const tCheck = useTranslations("Turnstile");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -33,12 +39,22 @@ export function SignInForm() {
     const email = String(data.get("email"));
     const password = String(data.get("password"));
 
+    if (turnstileActive(turnstileEnabled) && !captcha) {
+      setError(tCheck("required"));
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
     const { data: signInData, error: signInError } =
-      await supabase.auth.signInWithPassword({ email, password });
+      await supabase.auth.signInWithPassword(
+        captcha ? { email, password, options: { captchaToken: captcha } } : { email, password }
+      );
+    // The token is single-use: get a fresh one for any next attempt.
+    if (captcha) setCaptchaReset((k) => k + 1);
 
     if (signInError) {
-      setError(t("errorInvalid"));
+      setError(/captcha/i.test(signInError.message) ? tCheck("captchaFailed") : t("errorInvalid"));
       setLoading(false);
       return;
     }
@@ -111,6 +127,8 @@ export function SignInForm() {
             {t("forgotLink")}
           </Link>
         </div>
+
+        <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="sign_in" />
 
         {error && (
           <p className="text-sm font-medium text-destructive">{error}</p>

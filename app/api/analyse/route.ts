@@ -15,6 +15,8 @@ import {
 } from "@/lib/prototyping/analysis-schema";
 import { logUsage, quota } from "@/lib/ai/usage";
 import { bomRate } from "@/lib/credits/server";
+import { readTurnstileToken } from "@/lib/turnstile";
+import { checkTurnstile } from "@/lib/turnstile-server";
 import type { ProviderId } from "@/lib/ai/limits";
 import { configuredProviderName, loadProvider } from "@/lib/prototyping/providers";
 import { readWithRules } from "@/lib/prototyping/providers/rules";
@@ -52,6 +54,15 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return new Response(null, { status: 401 });
+
+  // Cloudflare Turnstile for guests (P2-08; was TODO(turnstile) in 0042 /
+  // lib/credits/server.ts). Switch off or a key missing → not checked, as
+  // before. On → an anonymous session must send a fresh token in the
+  // x-turnstile-token header (IdeaStage renders the widget for guests).
+  if (user.is_anonymous) {
+    const check = await checkTurnstile(request, readTurnstileToken(request.headers));
+    if (!check.ok) return Response.json({ error: "captcha_failed" }, { status: 403 });
+  }
 
   const parsed = AnalysisRequestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return new Response(null, { status: 400 });

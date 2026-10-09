@@ -2890,5 +2890,43 @@
     "faq5A": "Yes. Schools, colleges and companies can pay by invoice on an Institutions plan. <contact>Contact us</contact> and we set it up.",
     "faq6Q": "What counts as an active project?",
     "faq6A": "Any project you have not archived. Maker allows {n} at a time; archive one to start another."
+  },
+  "Turnstile": {
+    "loading": "Loading the verification check…",
+    "failed": "Verification could not load. Try again or <wa>message us on WhatsApp</wa>.",
+    "retry": "Try again",
+    "required": "Please complete the verification check first.",
+    "captchaFailed": "The verification check did not pass. Please try again.",
+    "challengeTitle": "One quick check",
+    "challengeIntro": "This keeps automated sign-ups out. It takes a second.",
+    "cancel": "Cancel"
+  },
+  "Safety": {
+    "kicker": "Safety",
+    "turnstileTitle": "Bot check (Cloudflare Turnstile)",
+    "turnstileHelp": "When on, sign-in, sign-up, password reset, new guest sessions, the contact and callback forms and guest analyses ask for a quick Cloudflare check. When off, nothing asks for a check.",
+    "turnstileOn": "Bot check on",
+    "turnstileSiteKey": "Site key (NEXT_PUBLIC_TURNSTILE_SITE_KEY)",
+    "turnstileSecret": "Secret key (TURNSTILE_SECRET_KEY)",
+    "keySet": "set",
+    "keyMissing": "missing",
+    "turnstileWarning": "Order matters. Deploy this code, set both keys in Vercel, switch this on and check that sign-in still works. Only then turn on Supabase → Authentication → Attack Protection → CAPTCHA (Turnstile, same secret key). Turning the Supabase switch on first breaks every sign-in, as on 18 September 2026. To turn it off, switch Supabase off first, then this.",
+    "save": "Save",
+    "saved": "Saved.",
+    "cleanupTitle": "Guest account cleanup",
+    "cleanupHelp": "Every Sunday at 05:00 UTC, guest accounts older than the number of days below that own nothing (no project, order, cart line, inventory row, credit or file) are counted, and deleted when dry run is off. You get an email when anything is deleted.",
+    "cleanupEnabled": "Run the weekly job",
+    "cleanupDryRun": "Dry run (count only, delete nothing)",
+    "cleanupDays": "Older than (days)",
+    "cleanupDaysHint": "At least 7.",
+    "cleanupRuns": "Last runs",
+    "colRan": "Ran",
+    "colMode": "Mode",
+    "colCandidates": "Candidates",
+    "colDeleted": "Deleted",
+    "modeDry": "Dry run",
+    "modeReal": "Delete",
+    "noRuns": "No runs yet.",
+    "needsMigration": "Run migration 0055 to see the run log."
   }
 }

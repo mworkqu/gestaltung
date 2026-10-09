@@ -33,14 +33,14 @@ export const BASE_MESSAGES = [
 ] as const;
 
 export const MESSAGE_SCOPES = {
-  home: ["Delivery", "Hero", "Parts", "Phone", "StoreLanding"],
-  store: ["Delivery", "Parts"],
-  product: ["Delivery", "Parts"],
+  home: ["Delivery", "Hero", "Parts", "Phone", "StoreLanding", "Turnstile"],
+  store: ["Delivery", "Parts", "Turnstile"],
+  product: ["Delivery", "Parts", "Turnstile"],
   cart: ["Cart", "Delivery", "Parts"],
   checkout: ["Checkout", "Credits", "Delivery", "Parts", "PayMethods", "Phone"],
   checkoutSuccess: ["Checkout", "Delivery", "PayMethods"],
-  contact: ["Contact", "Phone"],
-  designQuote: ["DesignQuote", "Phone"],
+  contact: ["Contact", "Phone", "Turnstile"],
+  designQuote: ["DesignQuote", "Phone", "Turnstile"],
   // /pricing#credits: only the signed-in balance (CreditsOverview) is a client component.
   pricing: [
     "Credits.overviewSignIn",
@@ -51,12 +51,12 @@ export const MESSAGE_SCOPES = {
     "Credits.overviewRedeemable",
     "Credits.overviewExpiry",
   ],
-  auth: ["Auth"],
-  projects: ["Projects"],
+  auth: ["Auth", "Turnstile"],
+  projects: ["Projects", "Turnstile"],
   // /orders/[id]: only PaymentInstructions is a client component; the rest of
   // the Orders namespace is read on the server.
   orders: ["PayMethods"],
-  project: ["PartsDashboard", "ProjectCad", "Projects", "Prototyping", "Search"],
+  project: ["PartsDashboard", "ProjectCad", "Projects", "Prototyping", "Search", "Turnstile"],
 } as const satisfies Record<string, readonly string[]>;
 
 export type MessageScope = keyof typeof MESSAGE_SCOPES | "all";

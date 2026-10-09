@@ -5,6 +5,8 @@ import { pageMetadata } from "@/lib/seo";
 import { createClient } from "@/lib/supabase/server";
 import { ProjectClaimGate } from "@/components/projects/project-claim-gate";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { TurnstileChallenge } from "@/components/turnstile-challenge";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 
 // Tab title = the project's name (audit #23). Read with the request's own
 // session, scoped to the signed-in owner exactly like the workspace, so a
@@ -72,6 +74,9 @@ export default async function ProjectPage({
     <MessagesScope scope="project">
     <div className="container max-w-3xl py-8">
       <ProjectClaimGate projectId={id} />
+      {/* P2-08: the claim gate (a #key= link in a fresh browser) mints a guest
+          session; ensureSession() asks this dialog for the token. Off = nothing. */}
+      <TurnstileChallenge enabled={await turnstileEnabledForPages()} />
     </div>
     </MessagesScope>
   );

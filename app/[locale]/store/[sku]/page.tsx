@@ -37,6 +37,8 @@ import {
 import { backupLine, leadInSentence, sourceLine } from "@/lib/store/part-source";
 import { GALLERY_SIZES, IMAGE_WIDTHS, sizedImage, sizedSrcSet } from "@/lib/store/image-url";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { TurnstileChallenge } from "@/components/turnstile-challenge";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 
 // ISR (Phase G): each product page is rendered on its first visit per locale,
 // then served from the CDN and re-rendered at most every 5 minutes (prices,
@@ -166,6 +168,9 @@ export default async function PartDetailPage({
   const imageUrl = partImageUrl(part);
   // Storefront category (0048 store_category, else the source category).
   const storeCategory = storeCategoryOf(part) ?? part.category;
+  // Add to cart / Add to project may mint a guest session (P2-08). Cached
+  // public read, tag "store-settings": the page stays ISR.
+  const turnstileEnabled = await turnstileEnabledForPages();
 
   const spec = (label: string, value: string | null) =>
     value ? (
@@ -365,6 +370,7 @@ export default async function PartDetailPage({
           </dl>
         </div>
       </div>
+      <TurnstileChallenge enabled={turnstileEnabled} />
     </div>
     </MessagesScope>
   );

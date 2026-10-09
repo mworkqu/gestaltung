@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { normalizePhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
+import { readTurnstileToken } from "@/lib/turnstile";
+import { checkTurnstile, turnstileEnforced } from "@/lib/turnstile-server";
 
 // Single lead/contact endpoint. Every contact touchpoint on the site posts here
 // and each is handled as its own "case" (distinct email subject): the homepage
@@ -58,6 +60,28 @@ const CONTACT_KINDS: Record<string, { tag: string; subject: string }> = {
 
 type QuoteItem = { function: string; spec: string; quantity: number };
 
+/**
+ * Cloudflare Turnstile (P2-08). Switch off or a key missing → always allowed
+ * (today's behaviour). Switch on → the body's turnstileToken must pass
+ * siteverify, UNLESS the caller already holds a Supabase session (guest or
+ * account): minting that session was itself CAPTCHA-checked by Supabase, and
+ * the in-workspace forms (bom_quote, drawing_request after ensureSession) have
+ * no widget of their own.
+ */
+async function leadAllowed(request: Request, token: string | null): Promise<boolean> {
+  if (!(await turnstileEnforced())) return true;
+  if (token && (await checkTurnstile(request, token)).ok) return true;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return !!user;
+  } catch {
+    return false;
+  }
+}
+
 /** The BOM lines of a bom_quote, trimmed and capped; anything malformed is dropped. */
 function quoteItems(raw: unknown): QuoteItem[] {
   if (!Array.isArray(raw)) return [];
@@ -91,11 +115,16 @@ export async function POST(request: Request) {
     items?: unknown;
     note?: string;
     projectId?: string;
+    // P2-08: the Turnstile token from the contact / callback forms.
+    turnstileToken?: string;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
+  if (!(await leadAllowed(request, readTurnstileToken(body as Record<string, unknown> | null)))) {
+    return NextResponse.json({ error: "captcha_failed" }, { status: 403 });
   }
 
   const name = String(body.name ?? "").trim().slice(0, 120);

@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { shareInflight } from "@/lib/dedupe";
 import { createClient } from "@/lib/supabase/client";
+import { requestTurnstileToken } from "@/lib/turnstile-client";
 
 // ── Guest sessions ──────────────────────────────────────────────────────────
 //
@@ -20,8 +21,16 @@ import { createClient } from "@/lib/supabase/client";
 /**
  * Returns the current user, creating an anonymous one if there is no session.
  * Call this immediately before the first write of any guest-initiated action.
+ *
+ * CAPTCHA (P2-08, FINDINGS #8): once Supabase's Attack Protection → CAPTCHA is
+ * on, signInAnonymously needs a Turnstile token. Callers with their own widget
+ * pass it as `captchaToken`; otherwise the page's challenge dialog is asked
+ * for one (requestTurnstileToken). With the store_settings switch off there is
+ * no widget and no dialog, the token is null, and the call is exactly the old
+ * signInAnonymously() with no options. A token is single-use: callers reset
+ * their widget after this resolves or throws.
  */
-export async function ensureSession(): Promise<User> {
+export async function ensureSession(opts: { captchaToken?: string | null } = {}): Promise<User> {
   const supabase = createClient();
 
   const {
@@ -29,7 +38,10 @@ export async function ensureSession(): Promise<User> {
   } = await supabase.auth.getSession();
   if (session?.user) return session.user;
 
-  const { data, error } = await supabase.auth.signInAnonymously();
+  const captchaToken = opts.captchaToken || (await requestTurnstileToken());
+  const { data, error } = captchaToken
+    ? await supabase.auth.signInAnonymously({ options: { captchaToken } })
+    : await supabase.auth.signInAnonymously();
   if (error) throw error;
   if (!data.user) throw new Error("Anonymous sign-in returned no user");
 

@@ -75,6 +75,8 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
     setBusy(true);
     setError(false);
     try {
+      // P2-08: a visitor without a session gets the page's Turnstile dialog
+      // (store/[sku] page) when the switch is on; off = as before.
       const user = await ensureSession();
       const { data, error: err } = await createClient()
         .from("projects")

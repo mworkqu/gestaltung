@@ -30,6 +30,10 @@
     {
       "path": "/api/cron/notifications",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/anonymous-cleanup",
+      "schedule": "0 5 * * 0"
     }
   ]
 }

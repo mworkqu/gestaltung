@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/phone-input";
+import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
 import { isValidPhone } from "@/lib/phone";
 
@@ -17,9 +18,14 @@ const fieldClass =
 
 type ContactKind = "school" | "institution";
 
-export function ContactForm() {
+// turnstileEnabled (P2-08): the store_settings switch from the server page.
+// Off (default) = no widget, no token, the same POST as before.
+export function ContactForm({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
   const t = useTranslations("Contact");
   const tPhone = useTranslations("Phone");
+  const tCheck = useTranslations("Turnstile");
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const locale = useLocale();
   const isRtl = locale === "ar";
   const [submitted, setSubmitted] = useState(false);
@@ -60,6 +66,11 @@ export function ContactForm() {
       setLoading(false);
       return;
     }
+    if (turnstileActive(turnstileEnabled) && !captcha) {
+      setError(tCheck("required"));
+      setLoading(false);
+      return;
+    }
     const payload = {
       name: String(data.get("name")).trim(),
       phone: String(data.get("phone")).trim(), // WhatsApp — primary contact
@@ -68,6 +79,7 @@ export function ContactForm() {
       locale,
       source: "contact_form",
       ...(kindRef.current ? { kind: kindRef.current } : {}),
+      ...(captcha ? { turnstileToken: captcha } : {}),
     };
 
     try {
@@ -78,6 +90,10 @@ export function ContactForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (res.status === 403) {
+        setError(tCheck("captchaFailed"));
+        return;
+      }
       if (!res.ok) throw new Error("bad status");
       setSubmitted(true);
       form.reset();
@@ -85,6 +101,8 @@ export function ContactForm() {
       setError(t("errorSubmit"));
     } finally {
       setLoading(false);
+      // The token is single-use: get a fresh one for any next attempt.
+      if (captcha) setCaptchaReset((k) => k + 1);
     }
   }
 
@@ -157,6 +175,8 @@ export function ContactForm() {
           className={cn(fieldClass, "resize-y")}
         />
       </div>
+
+      <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="contact" />
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}
 

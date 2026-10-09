@@ -134,12 +134,15 @@ export function PrototypingWorkspace({
   projectId,
   briefDestination,
   startChat = false,
+  turnstileEnabled = false,
 }: {
   projectId: string;
   /** Who receives the brief text for analysis; null = our own server only. */
   briefDestination: string | null;
   /** Opened from "Describe your idea" (?start=chat): Brief with the chat open, and name the project. */
   startChat?: boolean;
+  /** P2-08 store_settings switch: guests verify with Turnstile before "Analyse brief". */
+  turnstileEnabled?: boolean;
 }) {
   const t = useTranslations("Prototyping");
   const tProj = useTranslations("Projects");
@@ -935,6 +938,7 @@ export function PrototypingWorkspace({
               onSpec={saveSpec}
               briefDestination={briefDestination}
               startChat={startChat}
+              turnstileEnabled={turnstileEnabled}
             />
           )}
 

@@ -9,6 +9,8 @@ import { BackToTop } from "@/components/back-to-top";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
 import { RequestItemButton } from "@/components/parts/request-item-button";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { TurnstileChallenge } from "@/components/turnstile-challenge";
+import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { emptyState, storeQuery, STORE_PAGE_SIZE, type StoreState } from "@/lib/store/catalog";
 import { getStoreFacets, getStoreListing } from "@/lib/store/public-catalog";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
@@ -29,10 +31,11 @@ export async function StoreListing({ locale, state }: { locale: string; state: S
 
   // Filter options (every listed category/material) and one page of cards,
   // plus the Standard-tier delivery settings for every card's "Arrives by".
-  const [{ categories, materials }, { parts, total }, shipping] = await Promise.all([
+  const [{ categories, materials }, { parts, total }, shipping, turnstileEnabled] = await Promise.all([
     getStoreFacets(),
     getStoreListing(state, locale),
     loadShippingSettings(),
+    turnstileEnabledForPages(),
   ]);
 
   const pages = Math.max(1, Math.ceil(total / STORE_PAGE_SIZE));
@@ -131,6 +134,8 @@ export async function StoreListing({ locale, state }: { locale: string; state: S
           </>
         )}
         <BackToTop />
+        {/* Add to cart may mint a guest session: the on-demand check (renders nothing while off). */}
+        <TurnstileChallenge enabled={turnstileEnabled} />
       </div>
     </MessagesScope>
   );
