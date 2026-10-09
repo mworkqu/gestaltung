@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowRight, CalendarCheck, CreditCard, Warehouse } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
+import { OccasionBanner } from "@/components/store/occasion-banner";
 import { BlueprintDecor, V2_TITLE } from "@/components/marketing/v2";
 import { parseStoreParams } from "@/lib/store/catalog";
 import { v2PageMetadata } from "@/lib/site-v2-server";
@@ -63,7 +64,7 @@ export default async function StoreV2({ params }: { params: Promise<{ locale: st
           </div>
         </section>
 
-        {/* P3-07: occasion banner goes here */}
+        <OccasionBanner locale={locale} />
       </div>
 
       {/* The same listing as /store: search, category chips, filters, cards, paging. */}

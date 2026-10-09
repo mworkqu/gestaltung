@@ -11,7 +11,8 @@ import { RequestItemButton } from "@/components/parts/request-item-button";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
-import { emptyState, storeQuery, STORE_PAGE_SIZE, type StoreState } from "@/lib/store/catalog";
+import { OccasionBanner } from "@/components/store/occasion-banner";
+import { emptyState, hasActiveFilters, storeQuery, STORE_PAGE_SIZE, type StoreState } from "@/lib/store/catalog";
 import { getStoreFacets, getStoreListing } from "@/lib/store/public-catalog";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { COMPANY_WHATSAPP } from "@/lib/company";
@@ -78,6 +79,9 @@ export async function StoreListing({
           </p>
         </header>
         )}
+
+        {/* P3-07: the seasonal banner, only on the default listing (no search, filter, sort or page) and not under the v2 hero, which has its own. */}
+        {!hideHeader && !hasActiveFilters(state) && state.page === 1 && <OccasionBanner locale={locale} />}
 
         <PartsFilters categories={categories} materials={materials} state={state} />
 

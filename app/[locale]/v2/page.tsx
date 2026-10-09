@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
+import { OccasionBanner } from "@/components/store/occasion-banner";
 import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
@@ -113,7 +114,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
           </div>
         </section>
 
-        {/* P3-07: occasion banner goes here */}
+        <OccasionBanner locale={locale} />
 
         {/* 2. Built for founders: three outcomes as flat tiles. */}
         <section aria-labelledby="v2-founders" className="neu animate-fade-up space-y-6 card-pad">

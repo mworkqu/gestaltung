@@ -30,6 +30,7 @@ import { parseTrustedBy, TRUSTED_BY_KEY, type TrustedLogo } from "@/lib/trust";
 import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServicePrices } from "@/lib/pricing/defaults";
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
 import { HOLIDAYS_KEY, parseHolidays, type Holidays } from "@/lib/store/working-days";
+import { OCCASIONS_KEY, parseOccasions, type Occasion } from "@/lib/occasions";
 import { parsePartSource, withoutPrivateFields, type PartSource } from "@/lib/store/part-source";
 import {
   inSkuOrder,
@@ -297,6 +298,47 @@ export const getHolidays = unstable_cache(
   },
   ["store-settings:holidays"],
   { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/**
+ * store_settings.occasions (P3-07, 0056): the seasonal campaigns, validated
+ * (invalid entries dropped). Empty when the row is missing or malformed. Same
+ * cookie-free anon client + "store-settings" tag as the other settings reads,
+ * so the pages showing the banner stay static / ISR. Which one is ON today is
+ * decided by the caller (activeOccasions + qatarToday) at render time.
+ */
+export const getOccasions = unstable_cache(
+  async (): Promise<Occasion[]> => {
+    const supabase = createPublicClient();
+    if (!supabase) return [];
+    const { data } = await supabase.from("store_settings").select("value").eq("key", OCCASIONS_KEY).maybeSingle();
+    return parseOccasions(data?.value);
+  },
+  ["store-settings:occasions"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/**
+ * An occasion's explicit product list (P3-07): listed products (published,
+ * unmerged, with a delivery date) for these SKUs, in the given order, card
+ * fields only. A SKU that is missing or unpublished is simply skipped.
+ */
+export const getCardsBySkus = unstable_cache(
+  async (skus: string[]): Promise<StoreCardPart[]> => {
+    const supabase = createPublicClient();
+    if (!supabase || skus.length === 0) return [];
+    const store = await hasStoreCategory();
+    const { data } = await supabase
+      .from("parts")
+      .select(cardColumns(store))
+      .in("sku", skus)
+      .eq("is_published", true)
+      .is("merged_into", null)
+      .not("lead_time_class", "is", null);
+    return inSkuOrder(((data ?? []) as unknown as CardRow[]).map(toCard), skus);
+  },
+  ["store:cards-by-sku"],
+  CACHE,
 );
 
 /**
