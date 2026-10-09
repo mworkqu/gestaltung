@@ -31,6 +31,7 @@ import {
 import { renderSchematic } from "@/lib/prototyping/schematic-svg";
 import { renderWiring, wiringProducts, type WiringProduct } from "@/lib/prototyping/wiring-svg";
 import { loadExamplePhotos } from "@/lib/prototyping/example-photos";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { AccessNote, CostLabel } from "@/components/credits/access-note";
@@ -114,6 +115,7 @@ export function NetlistView({
     setBlocked(null);
     if (access && !access.allowed) {
       setBlocked(access.reason);
+      track("circuit_generated", { cost: "blocked" });
       return;
     }
     setBusy(true);
@@ -124,9 +126,14 @@ export function NetlistView({
         body: JSON.stringify({ projectId, locale }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: ErrorCode | "sign_in" | "no_credits"; problems?: string[] };
-      if (data.error === "sign_in" || data.error === "no_credits") setBlocked(data.error);
-      else if (!res.ok) setError({ code: data.error ?? "failed", problems: data.problems });
-      else await onSaved();
+      if (data.error === "sign_in" || data.error === "no_credits") {
+        setBlocked(data.error);
+        track("circuit_generated", { cost: "blocked" });
+      } else if (!res.ok) setError({ code: data.error ?? "failed", problems: data.problems });
+      else {
+        track("circuit_generated", { cost: "credit" });
+        await onSaved();
+      }
       creditsChanged();
     } catch {
       setError({ code: "failed" });

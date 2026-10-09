@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser, isGuest } from "@/lib/supabase/guest";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
@@ -87,6 +88,7 @@ export function NewProjectForm({ forDrawing = false }: { forDrawing?: boolean })
         .single();
 
       if (insertError) throw insertError;
+      track("project_created", { method: forDrawing ? "drawing" : "form" });
 
       if (askPhone && isGuest(user)) {
         // Best-effort: the project exists either way.

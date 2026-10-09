@@ -16,6 +16,8 @@ import {
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { PricingViewed } from "@/components/analytics/pricing-viewed";
+import { TrackClick } from "@/components/analytics/track-click";
 import { CreditsOverview } from "@/components/credits/credits-overview";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { COMPANY_WHATSAPP } from "@/lib/company";
@@ -113,16 +115,18 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </Button>
       );
     return (
-      <Button asChild size="lg" variant={variant} className={cls}>
-        <a
-          href={whatsappFor(t("whatsappText", { plan: t(`plan_${plan.id}`) }))}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <MessageCircle className="h-4 w-4" aria-hidden />
-          {t("ctaWhatsApp")}
-        </a>
-      </Button>
+      <TrackClick event="pricing_viewed" params={{ plan: plan.id }}>
+        <Button asChild size="lg" variant={variant} className={cls}>
+          <a
+            href={whatsappFor(t("whatsappText", { plan: t(`plan_${plan.id}`) }))}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <MessageCircle className="h-4 w-4" aria-hidden />
+            {t("ctaWhatsApp")}
+          </a>
+        </Button>
+      </TrackClick>
     );
   };
 
@@ -209,6 +213,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
   return (
     <div className="container space-y-6 py-6">
+      <PricingViewed />
       {/* Hero */}
       <section className="neu animate-fade-up flex flex-col gap-5 p-8 sm:p-10 lg:p-12">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">

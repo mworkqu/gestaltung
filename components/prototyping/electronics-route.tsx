@@ -20,6 +20,7 @@ import { Card, PrimaryButton, SoftButton, Warn } from "@/components/prototyping/
 import type { BuildRoute, RouteRecommendation } from "@/lib/prototyping/analysis";
 import type { LevelFlag } from "@/lib/prototyping/electronics-rules";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { creditsChanged } from "@/lib/credits/use-credits";
 
 const optionClass = (on: boolean) =>
@@ -202,6 +203,8 @@ export function GenerateComponents({
       else {
         if (data.circuit === "failed") setWarning(true);
         if (data.circuit === "skipped") setSkipped(data.circuitReason ?? "no_credits");
+        if (data.circuit === "ok") track("circuit_generated", { cost: "credit" });
+        else if (data.circuit === "skipped") track("circuit_generated", { cost: "blocked" });
         await onBuilt();
       }
       creditsChanged();

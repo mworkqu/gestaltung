@@ -6,6 +6,7 @@ import { Loader2, UploadCloud, FileBox, X, CheckCircle2 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession } from "@/lib/supabase/guest";
 import { takePendingUpload } from "@/lib/design/pending-upload";
@@ -146,6 +147,7 @@ export function QuoteRequest() {
           .single();
         if (projErr) throw projErr;
         newProject = proj.id as string;
+        track("project_created", { method: "quote" });
         const ext = file ? EXT_ALIASES[extOf(file.name)] : undefined;
         if (file && ext) {
           const path = `${user.id}/${newProject}/${crypto.randomUUID()}-${sanitize(file.name)}`;
@@ -203,6 +205,7 @@ export function QuoteRequest() {
       // "sent" = file safely stored; "sent_large" = had a file but upload
       // failed (ask them to send it another way); "sent_nofile" = no file.
       setProjectId(newProject);
+      if (phone.trim()) track("phone_captured", { where: "quote" });
       setDone(!file ? "sent_nofile" : storagePath ? "sent" : "sent_large");
     } catch {
       setError(t("errorGeneric"));

@@ -11,6 +11,7 @@ import {
 
 import type { CartItem, Part } from "@/lib/supabase/types";
 import { cartItemCount, cartTotal, getCart, saveCart, toCartItem } from "@/lib/parts/cart";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { trackDemand } from "@/lib/store/demand-client";
@@ -48,7 +49,7 @@ export type CartError = "load" | "save";
 type CartContextValue = {
   items: CartItem[];
   /** Resolves false when the line was not saved (and `error` is "save"). */
-  addItem: (part: Pick<Part, "id" | "min_order_qty">, qty: number, projectId?: string | null, opts?: AddOptions) => Promise<boolean>;
+  addItem: (part: Pick<Part, "id" | "min_order_qty"> & { sku?: string }, qty: number, projectId?: string | null, opts?: AddOptions) => Promise<boolean>;
   /** Row-level: a product can sit on several lines (loose, per project, in a kit). */
   updateQty: (rowId: string, qty: number) => Promise<boolean>;
   removeItem: (rowId: string) => Promise<boolean>;
@@ -209,7 +210,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [reload]);
 
   const addItem = useCallback(
-    async (part: Pick<Part, "id" | "min_order_qty">, qty: number, projectId: string | null = null, opts: AddOptions = {}) => {
+    async (part: Pick<Part, "id" | "min_order_qty"> & { sku?: string }, qty: number, projectId: string | null = null, opts: AddOptions = {}) => {
       const quantity = Math.max(part.min_order_qty, Math.trunc(qty) || part.min_order_qty);
       let user: Awaited<ReturnType<typeof ensureSession>>;
       try {
@@ -255,6 +256,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             ...(kitId ? { kit_id: kitId } : {}),
           });
       if (saveError) return failed("add", saveError);
+      track("add_to_cart", { sku: part.sku ?? part.id, qty: quantity });
       await reload();
       return true;
     },

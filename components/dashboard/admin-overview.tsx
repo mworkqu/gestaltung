@@ -27,9 +27,27 @@ export async function AdminOverview({ locale }: { locale: string }) {
 
   const db = await createClient();
   const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+  const monthAgo = new Date(Date.now() - 30 * 864e5).toISOString();
   const count = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => r.count ?? 0, () => 0);
 
-  const [newLeads, openOrders, requests, gaps, activeProjects, onRequest, leads, orders] = await Promise.all([
+  const [
+    newLeads,
+    openOrders,
+    requests,
+    gaps,
+    activeProjects,
+    onRequest,
+    leads,
+    orders,
+    fProjects,
+    fBoms,
+    fCircuits,
+    fCad,
+    fOrders,
+    fDelivered,
+    fSpends,
+    fRedemptions,
+  ] = await Promise.all([
     count(db.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "new")),
     count(
       db
@@ -56,7 +74,39 @@ export async function AdminOverview({ locale }: { locale: string }) {
       .not("is_test", "is", true)
       .order("created_at", { ascending: false })
       .limit(5),
+    // Funnel (P1-08): last 30 days, one head-count query per figure. The server
+    // client applies RLS, and the admin sees every row. Test projects/orders left out.
+    count(db.from("projects").select("id", { count: "exact", head: true }).gte("created_at", monthAgo).not("is_test", "is", true)),
+    count(
+      db.from("analysis_runs").select("id", { count: "exact", head: true }).eq("feature", "analyse").eq("outcome", "ok").gte("created_at", monthAgo)
+    ),
+    count(
+      db.from("analysis_runs").select("id", { count: "exact", head: true }).eq("feature", "netlist").eq("outcome", "ok").gte("created_at", monthAgo)
+    ),
+    count(db.from("cad_generations").select("id", { count: "exact", head: true }).eq("status", "delivered").gte("delivered_at", monthAgo)),
+    count(db.from("part_orders").select("id", { count: "exact", head: true }).gte("created_at", monthAgo).not("is_test", "is", true)),
+    count(
+      db
+        .from("part_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "delivered")
+        .gte("created_at", monthAgo)
+        .not("is_test", "is", true)
+    ),
+    count(db.from("credits_ledger").select("id", { count: "exact", head: true }).like("reason", "spend:%").gte("created_at", monthAgo)),
+    count(db.from("credits_ledger").select("id", { count: "exact", head: true }).like("reason", "redeemed:%").gte("created_at", monthAgo)),
   ]);
+
+  const funnel: { key: string; value: number }[] = [
+    { key: "funnelProjects", value: fProjects },
+    { key: "funnelBoms", value: fBoms },
+    { key: "funnelCircuits", value: fCircuits },
+    { key: "funnelCad", value: fCad },
+    { key: "funnelOrders", value: fOrders },
+    { key: "funnelDelivered", value: fDelivered },
+    { key: "funnelSpends", value: fSpends },
+    { key: "funnelRedemptions", value: fRedemptions },
+  ];
 
   const cards: { icon: LucideIcon; key: string; value: number; href: string; urgent: boolean }[] = [
     { icon: Inbox, key: "newLeads", value: newLeads, href: "/dashboard/leads", urgent: newLeads > 0 },
@@ -102,6 +152,31 @@ export async function AdminOverview({ locale }: { locale: string }) {
           </Link>
         ))}
       </div>
+
+      <section className="neu p-6">
+        <h2 className="text-sm font-bold text-heading">{t("funnelTitle")}</h2>
+        <p className="mt-1 text-xs text-mutedtext">{t("funnelNote")}</p>
+        <table className="mt-4 w-full text-sm">
+          <thead>
+            <tr className={mono("text-[10px] text-mutedtext")}>
+              <th scope="col" className="pb-2 text-start font-semibold">
+                {t("funnelStep")}
+              </th>
+              <th scope="col" className="pb-2 text-end font-semibold">
+                {t("funnelCount")}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {funnel.map((f) => (
+              <tr key={f.key} className="border-t border-borderstrong/40">
+                <td className="py-2 text-body">{t(f.key)}</td>
+                <td className="py-2 text-end font-semibold tabular-nums text-heading">{f.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="neu p-6">

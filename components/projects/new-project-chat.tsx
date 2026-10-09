@@ -17,6 +17,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { Link, useRouter } from "@/i18n/navigation";
 import { ChatConsent, ChatInput, ChatMessages } from "@/components/prototyping/chat-thread";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession } from "@/lib/supabase/guest";
 import {
@@ -61,6 +62,7 @@ export function NewProjectChat({ destination }: { destination: string }) {
         .single();
       if (insertError) throw insertError;
       projectId = data.id as string;
+      track("project_created", { method: "chat" });
     } catch (err) {
       const message = err instanceof Error ? err.message : ((err as { message?: string })?.message ?? String(err));
       if (isProjectLimitError(message)) setLimit(true);

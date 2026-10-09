@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { METHOD_ICON, PaymentInstructions } from "@/components/payment/payment-instructions";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/company";
 import { useTranslations, useLocale } from "next-intl";
@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/parts/cart-provider";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/parts/format";
 import { DELIVERY_AREAS, LAST_ORDER_KEY } from "@/lib/parts/constants";
@@ -96,6 +97,14 @@ export default function CheckoutClient() {
       router.replace("/store/cart");
     }
   }, [ready, items.length, submitting, router]);
+
+  // Funnel (P1-08): once per visit, when the cart has loaded with lines in it.
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (!ready || items.length === 0 || startedRef.current) return;
+    startedRef.current = true;
+    track("checkout_started", { items: items.length, total_qar: totalQar });
+  }, [ready, items.length, totalQar]);
 
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -248,6 +257,7 @@ export default function CheckoutClient() {
       keepalive: true,
     }).catch(() => {});
 
+    track("order_placed", { order_id: orderId, total_qar: placedTotal, method: payMethod });
     clearCart();
     router.push({ pathname: "/store/checkout/success", query: { order: orderId } });
   }

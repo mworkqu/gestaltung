@@ -6,6 +6,7 @@ import { UploadCloud, ArrowUpRight } from "lucide-react";
 
 import { useRouter, Link } from "@/i18n/navigation";
 import { GMark } from "@/components/g-mark";
+import { track } from "@/lib/analytics";
 import { setPendingUpload } from "@/lib/design/pending-upload";
 import { ACCEPT_ATTR, ACCEPT_EXTENSIONS } from "@/lib/design/constants";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ export function DesignDropzone({ compact = false }: { compact?: boolean }) {
     }
     setError(null);
     setPendingUpload(file);
+    track("path_chosen", { path: "make" });
     router.push("/design/quote");
   }
 

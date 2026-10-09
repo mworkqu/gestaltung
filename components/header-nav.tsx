@@ -12,6 +12,7 @@ import { ChevronDown, LogOut, Menu, User, X } from "lucide-react";
 
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -70,9 +71,9 @@ export function HeaderNav({
   // The site's three paths (owner, 2026-09-29) — nothing else in the bar.
   // Projects and inventory live behind the account menu.
   const primary = [
-    { href: "/store", label: t("pathBuy") },
-    { href: "/design", label: t("pathMake") },
-    { href: "/projects/new", label: t("pathIdea") },
+    { href: "/store", label: t("pathBuy"), path: "shop" as const },
+    { href: "/design", label: t("pathMake"), path: "make" as const },
+    { href: "/projects/new", label: t("pathIdea"), path: "plan" as const },
   ];
   const accountLinks = [
     { href: "/projects", label: t("myProjects") },
@@ -91,7 +92,13 @@ export function HeaderNav({
     <>
       <nav className="hidden items-center gap-1 lg:flex" aria-label={t("menu")}>
         {primary.map((l) => (
-          <Link key={l.href} href={l.href} className={linkClass(l.href)} aria-current={active(l.href) ? "page" : undefined}>
+          <Link
+            key={l.href}
+            href={l.href}
+            onClick={() => track("path_chosen", { path: l.path })}
+            className={linkClass(l.href)}
+            aria-current={active(l.href) ? "page" : undefined}
+          >
             {l.label}
           </Link>
         ))}
@@ -158,7 +165,12 @@ export function HeaderNav({
         <div id="mobile-menu" className="neu absolute inset-x-4 top-full z-50 mt-2 max-h-[calc(100dvh-8rem)] space-y-1 overflow-y-auto p-3 lg:hidden">
           {credits && <div className="px-1 pb-1 sm:hidden empty:hidden [&_a]:min-h-11">{credits}</div>}
           {primary.map((l) => (
-            <Link key={l.href} href={l.href} className="flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-heading hover:bg-panel">
+            <Link
+              key={l.href}
+              href={l.href}
+              onClick={() => track("path_chosen", { path: l.path })}
+              className="flex min-h-11 items-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-heading hover:bg-panel"
+            >
               {l.label}
             </Link>
           ))}

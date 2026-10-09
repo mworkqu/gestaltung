@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Check, Loader2, Sparkles } from "lucide-react";
 
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import {
   ANALYSIS_STEPS,
@@ -235,6 +236,7 @@ export function IdeaStage({
           .update({ bom: mergeBom(project.bom, result.analysis.bom) })
           .eq("id", project.id);
         if (bomSave.error) console.warn("Bill of materials not saved (migration 0023?):", bomSave.error.message);
+        else track("bom_generated", { lines: result.analysis.bom.length });
       }
 
       // Suggested parts become to-design concepts — but only for a discipline

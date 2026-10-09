@@ -13,6 +13,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Check, Loader2 } from "lucide-react";
 
 import { PrimaryButton } from "@/components/prototyping/ui";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { phonePromptDismissKey } from "@/lib/projects/phone-prompt";
@@ -93,6 +94,7 @@ export function PhonePrompt({
         setBusy(false);
         return;
       }
+      track("phone_captured", { where: variant });
       onSaved(normalised);
     }
 

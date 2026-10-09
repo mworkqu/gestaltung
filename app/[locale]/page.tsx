@@ -20,6 +20,7 @@ import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { TrackClick } from "@/components/analytics/track-click";
 import { FeatureVideoSection } from "@/components/feature-video-section";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
@@ -89,16 +90,20 @@ export default async function Home({
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-body sm:text-lg">{t("heroSub")}</p>
         <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-6">
-          <Button asChild size="lg" className="w-full rounded-full sm:w-auto">
-            <Link href="/projects/new">{t("heroPrimary")}</Link>
-          </Button>
-          <Link
-            href="/store"
-            className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
-          >
-            {t("heroSecondary")}
-            <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
-          </Link>
+          <TrackClick event="path_chosen" params={{ path: "plan" }}>
+            <Button asChild size="lg" className="w-full rounded-full sm:w-auto">
+              <Link href="/projects/new">{t("heroPrimary")}</Link>
+            </Button>
+          </TrackClick>
+          <TrackClick event="path_chosen" params={{ path: "shop" }}>
+            <Link
+              href="/store"
+              className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+            >
+              {t("heroSecondary")}
+              <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+            </Link>
+          </TrackClick>
         </div>
         <p
           className={mono(
@@ -152,10 +157,12 @@ export default async function Home({
                 {t("searchBtn")}
               </Button>
             </form>
-            <Link href="/store" className="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11">
-              {t("choiceBuyCta")}
-              <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
-            </Link>
+            <TrackClick event="path_chosen" params={{ path: "shop" }}>
+              <Link href="/store" className="mt-auto inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11">
+                {t("choiceBuyCta")}
+                <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+              </Link>
+            </TrackClick>
           </div>
 
           {/* Get a part made (I have a file) */}
@@ -163,13 +170,15 @@ export default async function Home({
             <ChoiceHead icon={<UploadCloud className="h-4 w-4" />} title={t("choiceMakeTitle")} text={t("choiceMakeText")} />
             <DesignDropzone compact />
             {/* No file: we draw it from a sketch (one extra link, not a fourth path). */}
-            <Link
-              href="/design/drawing"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11"
-            >
-              {t("drawLink")}
-              <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
-            </Link>
+            <TrackClick event="path_chosen" params={{ path: "make" }}>
+              <Link
+                href="/design/drawing"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11"
+              >
+                {t("drawLink")}
+                <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+              </Link>
+            </TrackClick>
           </div>
 
           {/* Plan a product (prototyping) */}
@@ -178,12 +187,14 @@ export default async function Home({
             {/* P1-05: where the wiring comes from. */}
             <p className="text-[11px] leading-relaxed text-mutedtext">{t("choiceIdeaDatasheet")}</p>
             <div className="mt-auto space-y-2">
-              <Button asChild size="lg" className="w-full rounded-2xl">
-                <Link href="/projects/new">
-                  <Plus className="me-2 h-4 w-4" />
-                  {t("choiceIdeaCta")}
-                </Link>
-              </Button>
+              <TrackClick event="path_chosen" params={{ path: "plan" }}>
+                <Button asChild size="lg" className="w-full rounded-2xl">
+                  <Link href="/projects/new">
+                    <Plus className="me-2 h-4 w-4" />
+                    {t("choiceIdeaCta")}
+                  </Link>
+                </Button>
+              </TrackClick>
               <p className="text-center text-[11px] text-mutedtext">{t("choiceIdeaNote")}</p>
             </div>
           </div>

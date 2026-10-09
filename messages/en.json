@@ -360,7 +360,19 @@
     "seeAll": "See all",
     "noLeads": "No messages yet.",
     "noOrders": "No orders yet.",
-    "statusNew": "New"
+    "statusNew": "New",
+    "funnelTitle": "Funnel, last 30 days",
+    "funnelNote": "GA4 has the per-visitor funnel; this is from our own tables.",
+    "funnelStep": "Step",
+    "funnelCount": "Count",
+    "funnelProjects": "Projects created",
+    "funnelBoms": "Parts lists (BOM) made",
+    "funnelCircuits": "Circuits made",
+    "funnelCad": "3D models delivered",
+    "funnelOrders": "Orders placed",
+    "funnelDelivered": "Of those, delivered",
+    "funnelSpends": "Credits spent",
+    "funnelRedemptions": "Credits redeemed on orders"
   },
   "Inventory": {
     "kicker": "Inventory",

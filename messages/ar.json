@@ -360,7 +360,19 @@
     "seeAll": "عرض الكل",
     "noLeads": "لا توجد رسائل بعد.",
     "noOrders": "لا توجد طلبات بعد.",
-    "statusNew": "جديد"
+    "statusNew": "جديد",
+    "funnelTitle": "المسار، آخر 30 يوماً",
+    "funnelNote": "في GA4 مسار كل زائر؛ وهذه الأرقام من جداولنا نحن.",
+    "funnelStep": "المرحلة",
+    "funnelCount": "العدد",
+    "funnelProjects": "مشاريع أُنشئت",
+    "funnelBoms": "قوائم قطع (BOM) أُنشئت",
+    "funnelCircuits": "دوائر أُنشئت",
+    "funnelCad": "نماذج ثلاثية الأبعاد سُلّمت",
+    "funnelOrders": "طلبات قُدّمت",
+    "funnelDelivered": "منها سُلّمت",
+    "funnelSpends": "أرصدة أُنفقت",
+    "funnelRedemptions": "أرصدة استُردّت على طلبات"
   },
   "Inventory": {
     "kicker": "المخزون",

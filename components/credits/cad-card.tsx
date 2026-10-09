@@ -22,6 +22,7 @@ import { classifyCadRequest, type CadTier } from "@/lib/credits/classify";
 import { CAD_GENERATIONS, CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { renderScad, stlStats } from "@/lib/cad/render";
+import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -206,6 +207,7 @@ export function CadCard({
       return fail("deliver");
     }
     creditsChanged();
+    track("cad_generated");
     setVersions((vs) => [...vs, { id, request: label, scad }]);
     setBuilt({ id, stl: r.stl, size: stats.size });
     setSummary(body.summary || null);
