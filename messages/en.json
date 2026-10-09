@@ -117,6 +117,8 @@
     "kicker": "About us",
     "heading": "A small studio in Lusail, Qatar.",
     "lead": "We make parts and prototypes, and sell electronics and mechanical parts in Qatar.",
+    "whyKicker": "Why",
+    "whyBody": "Gestaltung exists so hardware founders in Qatar can build a first product here, instead of waiting on suppliers abroad. One studio in Lusail for parts, wiring, 3D models and fabrication, with one person to talk to.",
     "whoTitle": "Who we are",
     "whoBody": "Gestaltung for Trading and Services W.L.L (C.R. 236988) is a studio in Rafal Tower, Lusail, Qatar. We started in 2026.",
     "makeTitle": "What we make",
@@ -165,7 +167,8 @@
     "contactTitle": "Contact",
     "infoTitle": "Information",
     "policiesTitle": "Policies",
-    "payTitle": "We accept"
+    "payTitle": "We accept",
+    "why": "Gestaltung exists so hardware founders in Qatar can build a first product here, instead of waiting on suppliers abroad. One studio in Lusail for parts, wiring, 3D models and fabrication, with one person to talk to."
   },
   "Legal": {
     "kicker": "Legal",
@@ -697,8 +700,8 @@
     "error_store_category": "Choose one of the store categories."
   },
   "StoreLanding": {
-    "metaTitle": "Shop parts or get a part made | Gestaltung360",
-    "metaDescription": "Shop parts, get a part made from your file, or plan a product. Delivered across Qatar.",
+    "metaTitle": "From idea to prototype in Qatar | Gestaltung360",
+    "metaDescription": "Parts, wiring, 3D models and fabrication from one studio in Lusail. Start a project free, shop parts, or get a part made. Delivered across Qatar.",
     "navStore": "Store",
     "signIn": "Sign in",
     "dashboard": "Dashboard",
@@ -761,7 +764,11 @@
     "choiceIdeaStep3": "Buy the kit or get it made",
     "choiceIdeaCta": "Plan a product",
     "choiceIdeaNote": "Free, no account needed.",
-    "heroChooseIntro": "Shop ready parts, get a part made from your file, or start from an idea. Each path takes four steps, and all of them end at your door in Qatar."
+    "heroH1": "From idea to a working prototype — in Qatar.",
+    "heroSub": "Parts, wiring, 3D models and fabrication from one studio in Lusail, so you don't juggle suppliers abroad.",
+    "heroPrimary": "Start a project — free",
+    "heroSecondary": "Shop parts",
+    "heroProof": "50 projects delivered since March 2026 · Prusa MK4 · CNC · laser · parts from Voltaat, DigiKey and Mouser"
   },
   "DesignQuote": {
     "metaTitle": "Get a free quote | Gestaltung360",

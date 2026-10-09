@@ -41,6 +41,10 @@ export async function Footer() {
   return (
     <footer className="container pb-8 pt-4">
       <div className="neu flex flex-col gap-6 px-6 py-6">
+        {/* P1-09: why the studio exists, two sentences, above the link columns. */}
+        <p className="max-w-2xl border-b border-borderstrong/40 pb-5 text-sm leading-relaxed text-mutedtext">
+          {t("why")}
+        </p>
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1">
             <h2 className={heading}>{t("contactTitle")}</h2>

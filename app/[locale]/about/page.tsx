@@ -48,8 +48,16 @@ export default async function AboutPage({
         </p>
       </section>
 
+      {/* Why (P1-09): two sentences on why the studio exists */}
+      <section className="neu animate-fade-up delay-1 flex flex-col gap-3 p-8 sm:p-10">
+        <span className={mono("text-[10px] text-cobalt")}>{t("whyKicker")}</span>
+        <p className="max-w-3xl text-lg font-semibold leading-relaxed text-heading sm:text-xl">
+          {t("whyBody")}
+        </p>
+      </section>
+
       {/* Who / what / partners */}
-      <section className="animate-fade-up delay-1 grid gap-6 md:grid-cols-3">
+      <section className="animate-fade-up delay-2 grid gap-6 md:grid-cols-3">
         {sections.map(({ icon: Icon, title, paragraphs }) => (
           <div key={title} className="neu p-7">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-panel shadow-neu-sm">

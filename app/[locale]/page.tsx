@@ -10,6 +10,7 @@ import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { FeatureVideoSection } from "@/components/feature-video-section";
+import { IsolatedTitle } from "@/components/ltr-isolate";
 import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
 import { VIDEOS, videoBase, videoJsonLd } from "@/lib/videos";
@@ -41,7 +42,6 @@ export default async function Home({
 
   const t = await getTranslations("StoreLanding");
   const tv = await getTranslations("Videos");
-  const tBrand = await getTranslations("Brand");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -70,34 +70,52 @@ export default async function Home({
   return (
     <MessagesScope scope="home">
     <div className="container space-y-6 py-6">
-      {/* Hero (audit #12): one line of who we are, then three clear choices. */}
-      <section className="space-y-6">
-        <div className="animate-fade-up space-y-3 px-1 pt-2">
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
-            <span className="h-2 w-2 rounded-full bg-cobalt" />
-            <span className={mono("text-[10px] text-mutedtext")}>{tBrand("tagline")}</span>
-          </span>
-          <h1 className="max-w-3xl text-[2.1rem] font-extrabold leading-[1.08] tracking-tight text-heading sm:text-5xl">
-            {t("heroChoose")}
-          </h1>
-          <p className="max-w-2xl text-base leading-relaxed text-body">{t("heroChooseIntro")}</p>
+      {/* Hero (P1-01): outcome, one sub line, ONE primary CTA, proof line. Nothing else
+          above the fold (no search box, no dropzone). */}
+      <section className="neu animate-fade-up space-y-4 px-5 pb-8 pt-6 sm:space-y-5 sm:p-10">
+        <h1 className="max-w-3xl text-balance text-3xl font-extrabold leading-[1.15] tracking-tight text-heading sm:text-5xl sm:leading-[1.1]">
+          {t("heroH1")}
+        </h1>
+        <p className="max-w-2xl text-base leading-relaxed text-body sm:text-lg">{t("heroSub")}</p>
+        <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-6">
+          <Button asChild size="lg" className="w-full rounded-full sm:w-auto">
+            <Link href="/projects/new">{t("heroPrimary")}</Link>
+          </Button>
+          <Link
+            href="/store"
+            className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+          >
+            {t("heroSecondary")}
+            <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+          </Link>
         </div>
+        <p
+          className={mono(
+            "border-t border-borderstrong/40 pt-4 text-[11px] normal-case leading-relaxed tracking-normal text-mutedtext"
+          )}
+        >
+          <IsolatedTitle text={t("heroProof")} locale={locale} />
+        </p>
+      </section>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {/* 1 — Shop parts */}
-          <div className="neu animate-fade-up flex min-w-0 flex-col gap-5 p-6 sm:p-8">
-            <ChoiceHead icon={<ShoppingBag className="h-5 w-5" />} step="1" title={t("choiceBuyTitle")} text={t("choiceBuyText")} />
+      {/* Paths (P1-01): the three ways in, demoted to a compact row. */}
+      <section className="space-y-3">
+        <h2 className="sr-only">{t("heroChoose")}</h2>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* Shop parts */}
+          <div className="neu animate-fade-up delay-1 flex min-w-0 flex-col gap-4 p-5">
+            <ChoiceHead icon={<ShoppingBag className="h-4 w-4" />} title={t("choiceBuyTitle")} text={t("choiceBuyText")} />
             <form action={`/${locale}/store`} className="flex items-stretch gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3.5 shadow-neu-inset">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3 shadow-neu-inset">
                 <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
                 <input
                   name="q"
                   aria-label={t("searchPh")}
                   placeholder={t("searchPh")}
-                  className="w-full min-w-0 flex-1 bg-transparent py-3 text-sm text-heading outline-none placeholder:text-faint"
+                  className="w-full min-w-0 flex-1 bg-transparent py-2.5 text-sm text-heading outline-none placeholder:text-faint"
                 />
               </div>
-              <Button type="submit" className="rounded-2xl px-5">
+              <Button type="submit" className="rounded-2xl px-4">
                 {t("searchBtn")}
               </Button>
             </form>
@@ -107,9 +125,9 @@ export default async function Home({
             </Link>
           </div>
 
-          {/* 2 — Get a part made (I have a file) */}
-          <div className="neu animate-fade-up delay-1 flex min-w-0 flex-col gap-5 p-6 sm:p-8">
-            <ChoiceHead icon={<UploadCloud className="h-5 w-5" />} step="2" title={t("choiceMakeTitle")} text={t("choiceMakeText")} />
+          {/* Get a part made (I have a file) */}
+          <div className="neu animate-fade-up delay-1 flex min-w-0 flex-col gap-4 p-5">
+            <ChoiceHead icon={<UploadCloud className="h-4 w-4" />} title={t("choiceMakeTitle")} text={t("choiceMakeText")} />
             <DesignDropzone compact />
             {/* No file: we draw it from a sketch (one extra link, not a fourth path). */}
             <Link
@@ -121,19 +139,9 @@ export default async function Home({
             </Link>
           </div>
 
-          {/* 3 — Plan a product (prototyping) */}
-          <div className="neu animate-fade-up delay-2 flex min-w-0 flex-col gap-5 p-6 sm:p-8">
-            <ChoiceHead icon={<Lightbulb className="h-5 w-5" />} step="3" title={t("choiceIdeaTitle")} text={t("choiceIdeaText")} />
-            <ol className="space-y-1.5 text-sm text-body">
-              {(["choiceIdeaStep1", "choiceIdeaStep2", "choiceIdeaStep3"] as const).map((k, i) => (
-                <li key={k} className="flex items-start gap-2">
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-panel text-[11px] font-bold text-cobalt shadow-neu-sm">
-                    {i + 1}
-                  </span>
-                  {t(k)}
-                </li>
-              ))}
-            </ol>
+          {/* Plan a product (prototyping) */}
+          <div className="neu animate-fade-up delay-1 flex min-w-0 flex-col gap-4 p-5">
+            <ChoiceHead icon={<Lightbulb className="h-4 w-4" />} title={t("choiceIdeaTitle")} text={t("choiceIdeaText")} />
             <div className="mt-auto space-y-2">
               <Button asChild size="lg" className="w-full rounded-2xl">
                 <Link href="/projects/new">
@@ -230,18 +238,15 @@ export default async function Home({
   );
 }
 
-function ChoiceHead({ icon, step, title, text }: { icon: React.ReactNode; step: string; title: string; text: string }) {
+function ChoiceHead({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-panel text-cobalt shadow-neu-sm" aria-hidden>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-panel text-cobalt shadow-neu-sm" aria-hidden>
           {icon}
         </span>
-        <span className="text-xs font-semibold text-faint" aria-hidden>
-          {step}
-        </span>
+        <h3 className="text-base font-bold text-heading">{title}</h3>
       </div>
-      <h2 className="text-xl font-bold text-heading">{title}</h2>
       <p className="text-sm leading-relaxed text-body">{text}</p>
     </div>
   );
