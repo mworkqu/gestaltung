@@ -20,6 +20,7 @@
 import type { BomKind, BomLine } from "./analysis";
 import { buyable, orderQty, packOf, type Candidate, type LineMatch, type ProjectLine, type ScoredCandidate, type Strength } from "./bom";
 import { compareField, fieldsOf, isAttrClass, type Attributes } from "@/lib/store/attributes";
+import { guardAccessory, guardText } from "./bom-intent";
 
 export type InventoryRow = {
   productId: string | null;
@@ -99,7 +100,21 @@ export function scoreText(line: Pick<BomLine, "function" | "spec">, text: string
   };
 }
 
-type Scored = { p: Candidate; strength: Strength; score: number; why: string[] };
+/**
+ * True when none of the line's own words is in the product's name, category or
+ * tags, i.e. the product only mentions it in its description ("breadboard
+ * friendly" on a transistor, "for Arduino" on a shield).
+ */
+function describedOnly(line: BomLine, p: Candidate): boolean {
+  const fn = [...new Set(tokens(line.function).filter((w) => !GENERIC.has(w)))];
+  if (!fn.length) return false;
+  const core = new Set(
+    tokens(`${p.name.replace(/\b[\w:-]+[ -](?:friendly|compatible)\b/gi, " ")} ${p.category} ${(p.tags ?? []).join(" ")}`)
+  );
+  return !fn.some((w) => core.has(w));
+}
+
+type Scored = { p: Candidate; strength: Strength; score: number; why: string[]; doubt?: boolean; compared?: number };
 
 const OHMS = /\b(\d+(?:\.\d+)?)\s?(?:([kKM])\b|([kKM])?\s?(?:ohms?|Ω))/g;
 const FARADS = /\b(\d+(?:\.\d+)?)\s?([pnuµm]?)F\b/g;
@@ -139,6 +154,7 @@ function scoreAttributes(line: BomLine, p: Candidate): Scored | null {
     p,
     strength: unknown === 0 ? "strong" : "weak",
     score: 100 + known * 10 - unknown,
+    compared: known + unknown,
     why: [`class ${line.class}`, ...why],
   };
 }
@@ -161,7 +177,7 @@ const CLASS_WORDS: Record<string, RegExp> = {
   header: /\b(header|connector|terminal|jst|dupont|socket)\b/i,
   power: /\b(battery|batteries|holder|adapter|supply|psu|solar|charger|usb cable)\b/i,
   consumable: /\b(breadboard|jumper|perfboard|stripboard|wire|heat.?shrink|solder|tape|cable)\b/i,
-  fastener: /\b(screw|bolt|nut|washer|standoff|rivet)\b/i,
+  fastener: /\b(screw|bolt|nut|washer|standoff|spacer|rivet)\b/i,
 };
 
 // Some classes cover very different products, and the line's own attribute
@@ -233,7 +249,20 @@ export function matchLine(
       // Both sides typed: attributes decide, text is not consulted.
       if (cls !== line.class) continue;
       const s = scoreAttributes(line, p);
-      if (s) scored.push(s);
+      if (!s) continue;
+      // A product named "Expansion Shield" is not the board the line asks for,
+      // whatever class it carries.
+      const acc = guardAccessory(line, p);
+      if (!acc.ok) continue;
+      if (s.compared === 0) {
+        // The line asked for no attribute, so "same class" proves nothing: the
+        // product's name has to fit what the line asks for, and it is only weak.
+        const g = guardText(line, p);
+        if (!g.ok) continue;
+        scored.push({ ...s, strength: "weak", score: s.score + g.bonus, doubt: acc.doubt || g.doubt || undefined, why: [...s.why, "line names no attribute", ...g.why] });
+        continue;
+      }
+      scored.push(acc.doubt ? { ...s, doubt: true, why: [...s.why, ...acc.why] } : s);
       continue;
     }
     // Untyped product (or untyped line): text, and never better than weak.
@@ -243,21 +272,31 @@ export function matchLine(
     if (valueContradicts(line, text)) continue;
     const t = scoreText(line, text);
     const byClass = classWordsFor(line)?.test(text) ?? false;
-    if (t.score > 0 || byClass)
+    if (t.score > 0 || byClass) {
+      // Words are not enough: accessories, the core noun and fastener type/size
+      // are checked against the product's name (lib/prototyping/bom-intent.ts).
+      const g = guardText(line, p);
+      if (!g.ok) continue;
+      const doubtful = g.doubt || describedOnly(line, p);
       scored.push({
         p,
         strength: "weak",
-        score: t.score || 1,
+        score: (t.score || 1) + g.bonus,
+        ...(doubtful ? { doubt: true } : {}),
         why: [
           isAttrClass(cls) ? "line has no attributes" : "product has no attributes",
           ...(t.why.length ? t.why : [`a ${line.class} by its name`]),
+          ...g.why,
+          ...(!g.doubt && doubtful ? ["only its description mentions it"] : []),
         ],
       });
+    }
   }
 
   const ranked = dedupe(scored).sort(
     (a, b) =>
       Number(b.strength === "strong") - Number(a.strength === "strong") ||
+      Number(!!a.doubt) - Number(!!b.doubt) ||
       b.score - a.score ||
       leadRank(a.p) - leadRank(b.p) ||
       (STOCK_ORDER[a.p.stock_status] ?? 3) - (STOCK_ORDER[b.p.stock_status] ?? 3) ||
@@ -265,7 +304,7 @@ export function matchLine(
   );
   const candidates: ScoredCandidate[] = ranked
     .slice(0, MAX_CANDIDATES)
-    .map((s) => ({ ...s.p, strength: s.strength, why: s.why }));
+    .map((s) => ({ ...s.p, strength: s.strength, why: s.why, ...(s.doubt ? { doubt: true } : {}) }));
 
   const strong = candidates.filter((c) => c.strength === "strong");
   // The client's own pick wins while it is still a candidate; then a single
@@ -274,7 +313,9 @@ export function matchLine(
   // `auto` so the table says so and offers the alternatives.
   const chosen = line.choice ? candidates.find((c) => c.id === line.choice) ?? null : null;
   const decided = chosen ?? (strong.length === 1 ? strong[0] : null);
-  const auto = !decided && candidates.length > 0;
+  // A doubtful best candidate (a kit, a USB cable of unstated connector) is never
+  // picked for the client: the line is "choose" and the suggestion is offered.
+  const auto = !decided && candidates.length > 0 && !candidates[0].doubt;
   const product = decided ?? (auto ? candidates[0] : null);
 
   const ownedProduct = inventory.find(

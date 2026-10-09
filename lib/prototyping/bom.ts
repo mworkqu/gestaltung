@@ -64,7 +64,12 @@ export type Candidate = Part & {
 /** strong = attributes checked and all agree; weak = text only, or attributes missing. */
 export type Strength = "strong" | "weak";
 
-export type ScoredCandidate = Candidate & { strength: Strength; why: string[] };
+export type ScoredCandidate = Candidate & {
+  strength: Strength;
+  why: string[];
+  /** Shown as an option but never picked automatically (kit, connector type not stated). */
+  doubt?: boolean;
+};
 
 export type LineMatch = {
   lineId: string;
