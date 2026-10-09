@@ -28,7 +28,9 @@ import { cn } from "@/lib/utils";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { productDetailsForLocale } from "@/lib/store/product-details";
 import { clipText, ogProductImage, pageMetadata } from "@/lib/seo";
+import { ReviewTiles } from "@/components/reviews/review-tiles";
 import {
+  getApprovedReviewsForSku,
   getFrequentlyBoughtTogether,
   getHolidays,
   getMergedRedirectSku,
@@ -177,6 +179,10 @@ export default async function PartDetailPage({
   // heading says which. Cached anon read (tag "parts"): the page stays ISR.
   const upsell = await getFrequentlyBoughtTogether(part.sku, storeCategory ?? null);
   const tUpsell = await getTranslations("Upsell");
+  // P4-03: approved reviews from orders that contained this SKU (0058). Cached anon
+  // read (tag "parts"); empty until the owner approves one, so the page stays ISR.
+  const reviews = await getApprovedReviewsForSku(part.sku);
+  const tReviews = await getTranslations("Reviews");
 
   const spec = (label: string, value: string | null) =>
     value ? (
@@ -376,6 +382,14 @@ export default async function PartDetailPage({
           </dl>
         </div>
       </div>
+      {reviews.length > 0 && (
+        <section aria-labelledby="reviews-heading" className="neu space-y-4 p-5 sm:p-6">
+          <h2 id="reviews-heading" className="title-section">
+            {tReviews("heading")}
+          </h2>
+          <ReviewTiles reviews={reviews} locale={locale} />
+        </section>
+      )}
       {upsell.parts.length > 0 && (
         <section aria-labelledby="upsell-heading" className="space-y-4 pt-2">
           <h2 id="upsell-heading" className="title-section">

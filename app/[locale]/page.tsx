@@ -18,6 +18,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
+import { ReviewsStrip } from "@/components/home/reviews-strip";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
@@ -281,6 +282,9 @@ export default async function Home({
           </div>
         )}
       </section>
+
+      {/* Approved customer reviews (P4-03): nothing until three are approved. */}
+      <ReviewsStrip locale={locale} />
 
       {/* Schools and students (P1-02): one slim row, the full story is on /students. */}
       <section className="neu animate-fade-up delay-2 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">

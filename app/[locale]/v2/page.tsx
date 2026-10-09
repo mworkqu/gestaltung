@@ -19,6 +19,7 @@ import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { YourWorkStrip } from "@/components/home/your-work-strip";
+import { ReviewsStrip } from "@/components/home/reviews-strip";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { TrackClick } from "@/components/analytics/track-click";
@@ -292,6 +293,9 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
             </div>
           )}
         </section>
+
+        {/* 5b. Approved customer reviews (P4-03): nothing until three are approved. */}
+        <ReviewsStrip locale={locale} />
 
         {/* 6. How credits work: one diagram, then the full rules on /pricing#credits. */}
         <CreditsFlow locale={locale} />

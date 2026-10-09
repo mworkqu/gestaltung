@@ -329,7 +329,8 @@
     "overviewStore": "Sourcing overview",
     "aiCredits": "AI credits",
     "notifications": "Notifications",
-    "occasions": "Occasions"
+    "occasions": "Occasions",
+    "reviews": "Reviews"
   },
   "Notifications": {
     "kicker": "Settings",
@@ -3064,5 +3065,37 @@
     "err_banner_ar": "Arabic banner line is too long (90 characters at most).",
     "err_duplicate_id": "This id is already used by another collection.",
     "err_row": "This row could not be read, or there are too many collections (12 at most)."
+  },
+  "Reviews": {
+    "kicker": "Customer reviews",
+    "heading": "What customers said",
+    "rated": "Rated {score} out of 5",
+    "byline": "— {name}",
+    "anonymous": "A customer in Qatar",
+    "adminKicker": "Customers",
+    "adminTitle": "Reviews",
+    "adminIntro": "Ratings and one-line comments from delivered orders. Nothing appears on the website until you approve it, and any later change by the customer sends it back to Pending.",
+    "needsMigration": "Run migration 0058 first.",
+    "updateFailed": "That review could not be updated. Please try again.",
+    "tab_pending": "Pending",
+    "tab_approved": "Approved",
+    "tab_rejected": "Rejected",
+    "colDate": "Date",
+    "colScore": "Score",
+    "colComment": "Comment",
+    "colName": "First name",
+    "colLocale": "Language",
+    "colSkus": "Products",
+    "colOrder": "Order",
+    "scoreOf": "{score}/5",
+    "noComment": "Score only",
+    "noName": "No name",
+    "lang_en": "English",
+    "lang_ar": "Arabic",
+    "approve": "Approve",
+    "reject": "Reject",
+    "backToPending": "Back to pending",
+    "empty": "No reviews here yet.",
+    "limitNote": "Showing the newest {n} reviews."
   }
 }

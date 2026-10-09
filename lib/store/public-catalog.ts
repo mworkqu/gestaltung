@@ -32,6 +32,7 @@ import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
 import { HOLIDAYS_KEY, parseHolidays, type Holidays } from "@/lib/store/working-days";
 import { OCCASIONS_KEY, parseOccasions, type Occasion } from "@/lib/occasions";
 import { parsePartSource, withoutPrivateFields, type PartSource } from "@/lib/store/part-source";
+import { parseApprovedReviews, parseReviewCount, type ApprovedReview } from "@/lib/reviews/reviews";
 import {
   inSkuOrder,
   mergeBoughtTogether,
@@ -438,5 +439,58 @@ export const getFrequentlyBoughtTogether = unstable_cache(
     return mergeBoughtTogether({ together, fallback, currentSku: sku });
   },
   ["store:bought-together"],
+  CACHE,
+);
+
+// Approved customer reviews (P4-03, migration 0058). approved_reviews() and
+// approved_review_count() are anon-callable and return only approved rows with
+// the first name — never an order id, email or surname. Before 0058 runs the
+// calls fail with PGRST202: everything below answers "no reviews" silently, so
+// the sections that use it render nothing. Any other error is warned once.
+export const REVIEWS_PER_SECTION = 6;
+let reviewsWarned = false;
+function reviewsFailed(what: string, error: { code?: string; message: string }): void {
+  if (error.code === "PGRST202" || error.code === "42P01" || error.code === "42883") return;
+  if (reviewsWarned) return;
+  reviewsWarned = true;
+  console.warn(`[store] ${what} failed: ${error.message}`);
+}
+
+/** Up to six approved reviews from orders that contained this SKU, newest first. */
+export const getApprovedReviewsForSku = unstable_cache(
+  async (sku: string): Promise<ApprovedReview[]> => {
+    const supabase = createPublicClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase.rpc("approved_reviews", { p_sku: sku, p_limit: REVIEWS_PER_SECTION });
+    if (error) {
+      reviewsFailed("approved_reviews", error);
+      return [];
+    }
+    return parseApprovedReviews(data);
+  },
+  ["store:reviews-by-sku"],
+  CACHE,
+);
+
+/** The home strip: how many approved reviews exist, plus the newest six. */
+export const getHomeReviews = unstable_cache(
+  async (): Promise<{ count: number; reviews: ApprovedReview[] }> => {
+    const supabase = createPublicClient();
+    if (!supabase) return { count: 0, reviews: [] };
+    const counted = await supabase.rpc("approved_review_count");
+    if (counted.error) {
+      reviewsFailed("approved_review_count", counted.error);
+      return { count: 0, reviews: [] };
+    }
+    const count = parseReviewCount(counted.data);
+    if (count === 0) return { count, reviews: [] };
+    const { data, error } = await supabase.rpc("approved_reviews", { p_limit: REVIEWS_PER_SECTION });
+    if (error) {
+      reviewsFailed("approved_reviews", error);
+      return { count: 0, reviews: [] };
+    }
+    return { count, reviews: parseApprovedReviews(data) };
+  },
+  ["store:home-reviews"],
   CACHE,
 );
