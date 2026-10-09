@@ -103,8 +103,21 @@ export type VideoSources = {
   captions: { en: string; ar: string };
 };
 
+/**
+ * Cache-busting suffix for a clip. Files in the bucket are served with a
+ * one-year cache and replaced at the SAME URL when the real clip is uploaded,
+ * so a published entry carries `?v=<uploadDate>` on every file URL (Supabase
+ * ignores the query). Re-uploading a clip = bump its uploadDate. Unpublished
+ * placeholders get no suffix.
+ */
+export function videoVersionSuffix(slug: string): string {
+  const e = videoEntry(slug);
+  return e?.published ? `?v=${e.uploadDate}` : "";
+}
+
 export function videoSources(base: string, slug: string): VideoSources {
-  const file = (ext: VideoFile) => `${base}/${slug}/${slug}.${ext}`;
+  const v = videoVersionSuffix(slug);
+  const file = (ext: VideoFile) => `${base}/${slug}/${slug}.${ext}${v}`;
   return {
     mp4: file("mp4"),
     webm: file("webm"),

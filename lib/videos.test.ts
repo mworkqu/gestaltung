@@ -10,6 +10,7 @@ import {
   videoFileNames,
   videoJsonLd,
   videoSources,
+  videoVersionSuffix,
 } from "./videos";
 
 describe("video registry", () => {
@@ -62,6 +63,23 @@ describe("urls", () => {
       ar: `${base}/cad-model/cad-model.ar.vtt`,
     });
   });
+
+  it("published clips carry ?v=<uploadDate> on every file URL, placeholders do not", () => {
+    const base = videoBase("https://abc.supabase.co");
+    const pub = videoSources(base, "idea-to-kit");
+    expect(pub.mp4).toBe(`${base}/idea-to-kit/idea-to-kit.mp4?v=2026-10-10`);
+    expect(pub.webm).toBe(`${base}/idea-to-kit/idea-to-kit.webm?v=2026-10-10`);
+    expect(pub.poster).toBe(`${base}/idea-to-kit/idea-to-kit.jpg?v=2026-10-10`);
+    expect(pub.captions.en).toBe(`${base}/idea-to-kit/idea-to-kit.en.vtt?v=2026-10-10`);
+    expect(pub.captions.ar).toBe(`${base}/idea-to-kit/idea-to-kit.ar.vtt?v=2026-10-10`);
+    for (const v of VIDEOS) {
+      const urls = Object.values(videoSources(base, v.slug)).flatMap((u) =>
+        typeof u === "string" ? [u] : Object.values(u),
+      );
+      expect(urls.every((u) => u.includes("?v=") === v.published)).toBe(true);
+    }
+    expect(videoVersionSuffix("no-such-clip")).toBe("");
+  });
 });
 
 describe("canAutoplay", () => {
@@ -86,8 +104,8 @@ describe("videoJsonLd", () => {
     expect(ld["@type"]).toBe("VideoObject");
     expect(ld.name).toBe("Name");
     expect(ld.description).toBe("Desc.");
-    expect(ld.thumbnailUrl).toBe(`${base}/idea-to-kit/idea-to-kit.jpg`);
-    expect(ld.contentUrl).toBe(`${base}/idea-to-kit/idea-to-kit.mp4`);
+    expect(ld.thumbnailUrl).toBe(`${base}/idea-to-kit/idea-to-kit.jpg?v=2026-10-10`);
+    expect(ld.contentUrl).toBe(`${base}/idea-to-kit/idea-to-kit.mp4?v=2026-10-10`);
     expect(ld.uploadDate).toBe("2026-10-10");
     expect(ld.duration).toBe("PT45S");
     expect(ld.inLanguage).toBe("en");
