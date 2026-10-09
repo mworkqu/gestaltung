@@ -14,16 +14,18 @@ import {
 } from "./videos";
 
 describe("video registry", () => {
-  it("has one entry per slug; the four guest clips are published", () => {
+  it("has one entry per slug; all six clips are published", () => {
     expect(VIDEOS.map((v) => v.slug)).toEqual([...VIDEO_SLUGS]);
     expect(VIDEOS.filter((v) => v.published).map((v) => v.slug)).toEqual([
       "idea-to-kit",
       "file-to-part",
       "sketch-to-drawing",
+      "wiring-check",
+      "cad-model",
       "store-to-door",
     ]);
     expect(VIDEOS.filter((v) => v.published).every((v) => v.uploadDate === "2026-10-10")).toBe(true);
-    expect(VIDEOS.map((v) => v.durationSeconds)).toEqual([45, 35, 33, 42, 40, 40]);
+    expect(VIDEOS.map((v) => v.durationSeconds)).toEqual([45, 35, 33, 31, 31, 40]);
   });
 
   it("every slug has exactly five file names with the right extensions", () => {
@@ -55,12 +57,13 @@ describe("urls", () => {
     const base = videoBase("https://abc.supabase.co/");
     expect(base).toBe("https://abc.supabase.co/storage/v1/object/public/videos");
     const s = videoSources(base, "cad-model");
-    expect(s.mp4).toBe(`${base}/cad-model/cad-model.mp4`);
-    expect(s.webm).toBe(`${base}/cad-model/cad-model.webm`);
-    expect(s.poster).toBe(`${base}/cad-model/cad-model.jpg`);
+    const v = "?v=2026-10-10";
+    expect(s.mp4).toBe(`${base}/cad-model/cad-model.mp4${v}`);
+    expect(s.webm).toBe(`${base}/cad-model/cad-model.webm${v}`);
+    expect(s.poster).toBe(`${base}/cad-model/cad-model.jpg${v}`);
     expect(s.captions).toEqual({
-      en: `${base}/cad-model/cad-model.en.vtt`,
-      ar: `${base}/cad-model/cad-model.ar.vtt`,
+      en: `${base}/cad-model/cad-model.en.vtt${v}`,
+      ar: `${base}/cad-model/cad-model.ar.vtt${v}`,
     });
   });
 

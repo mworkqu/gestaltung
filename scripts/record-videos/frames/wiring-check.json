@@ -1,0 +1,18 @@
+{
+  "frames": [
+    { "file": "frame_01.png", "hold": 7.5 },
+    { "file": "frame_03.png", "hold": 6 },
+    { "file": "frame_04.png", "hold": 5.5 },
+    { "file": "frame_05.png", "hold": 4.5 },
+    { "file": "frame_07.png", "hold": 4 },
+    { "file": "frame_08.png", "hold": 5.5 }
+  ],
+  "poster": "frame_04.png",
+  "cues": [
+    { "frame": 0, "at": 0, "en": "One click lists the parts and draws the circuit.", "ar": "بنقرة واحدة تُعرض القطع وتُرسم الدائرة." },
+    { "frame": 0, "at": 3.8, "en": "Every connection comes from the parts' datasheets.", "ar": "كل توصيلة مأخوذة من أوراق بيانات القطع." },
+    { "frame": 1, "at": 0, "en": "Our checks flag problems: voltage levels, drivers, flyback diodes, LED resistors, power budget.", "ar": "فحوصاتنا تنبّه إلى المشكلات: مستويات الجهد، والترانزستورات، ودايودات الحماية، ومقاومات LED، وميزانية الطاقة." },
+    { "frame": 2, "at": 0, "en": "A wiring picture with the real store parts, and a schematic.", "ar": "صورة توصيل بالقطع الحقيقية من المتجر، ومخطط كهربائي." },
+    { "frame": 5, "at": 2, "en": "Each circuit costs one credit.", "ar": "كل دائرة تكلّف رصيدًا واحدًا." }
+  ]
+}

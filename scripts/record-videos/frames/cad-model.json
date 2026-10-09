@@ -1,0 +1,19 @@
+{
+  "frames": [
+    { "file": "frame_03.png", "hold": 5 },
+    { "file": "frame_07.png", "hold": 4.5 },
+    { "file": "frame_08.png", "hold": 5 },
+    { "file": "frame_10.png", "hold": 4.5 },
+    { "file": "frame_12.png", "hold": 5 },
+    { "file": "frame_13.png", "hold": 4.5 },
+    { "file": "frame_14.png", "hold": 5.5 }
+  ],
+  "poster": "frame_08.png",
+  "cues": [
+    { "frame": 0, "at": 0, "en": "Describe the part: size, walls, openings.", "ar": "صِف القطعة: الحجم وسماكة الجدران والفتحات." },
+    { "frame": 1, "at": 0, "en": "We write the model and build it in 3D.", "ar": "نكتب النموذج ونبنيه بشكل ثلاثي الأبعاد." },
+    { "frame": 3, "at": 0, "en": "Turn it around and check the size.", "ar": "أدِره من كل الجهات وتحقق من الحجم." },
+    { "frame": 5, "at": 0, "en": "One credit covers up to three versions.", "ar": "رصيد واحد يغطي حتى ثلاث نسخ." },
+    { "frame": 6, "at": 0, "en": "Printed in our Lusail studio on request.", "ar": "تُطبع في استوديو لوسيل لدينا عند الطلب." }
+  ]
+}

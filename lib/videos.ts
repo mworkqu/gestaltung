@@ -56,14 +56,14 @@ function entry(
 }
 
 export const VIDEOS: readonly FeatureVideoEntry[] = [
-  // Recorded from the live site as a guest and uploaded 2026-10-10
-  // (scripts/record-videos/). wiring-check and cad-model need a signed-in
-  // account with credits, so they stay unpublished placeholders.
+  // Recorded from the live site and uploaded 2026-10-10 (scripts/record-videos/):
+  // four as a guest, wiring-check and cad-model (30.5 s / 31 s) from the
+  // owner's signed-in Chrome, built from step snapshots (edit-frames.mjs).
   entry("idea-to-kit", ["/", "/how-it-works"], 45, "2026-10-10"),
   entry("file-to-part", ["/", "/how-it-works", "/design"], 35, "2026-10-10"),
   entry("sketch-to-drawing", ["/design", "/design/drawing"], 33, "2026-10-10"),
-  entry("wiring-check", ["/projects/[id]/prototyping"], 42),
-  entry("cad-model", ["/projects/[id]/prototyping"], 40),
+  entry("wiring-check", ["/projects/[id]/prototyping"], 31, "2026-10-10"),
+  entry("cad-model", ["/projects/[id]/prototyping"], 31, "2026-10-10"),
   entry("store-to-door", ["/", "/how-it-works"], 40, "2026-10-10"),
 ];
 
