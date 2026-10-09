@@ -20,6 +20,7 @@ import { PricingViewed } from "@/components/analytics/pricing-viewed";
 import { TrackClick } from "@/components/analytics/track-click";
 import { CreditsOverview } from "@/components/credits/credits-overview";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { InvitePrice } from "@/components/pricing/invite-price";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { CAD_GENERATIONS, ORDER_DELIVERED_CREDITS, PROJECT_LIMIT } from "@/lib/credits/constants";
 import { metaFor } from "@/lib/meta";
@@ -315,6 +316,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         {/* The signed-in visitor's own balance (client; nothing until it loads). */}
         <MessagesScope scope="pricing">
           <CreditsOverview />
+          {/* Price experiment (P4-02): display only, read in the browser so the page stays static. */}
+          <InvitePrice listed={pricing.overage_per_credit_qar} />
         </MessagesScope>
 
         <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">

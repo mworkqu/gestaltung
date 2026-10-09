@@ -12,6 +12,8 @@ import { Link } from "@/i18n/navigation";
 import { Warn } from "@/components/prototyping/ui";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { CREDIT_QAR } from "@/lib/credits/constants";
+import { formatQar } from "@/lib/pricing/plans";
+import { usePriceQuote } from "@/lib/pricing/use-price-quote";
 
 const linkCls = "inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-cobalt hover:text-cobalt-hover";
 
@@ -26,6 +28,8 @@ export function AccessNote({
   projectName?: string | null;
 }) {
   const t = useTranslations("Credits");
+  // Price experiment (display only): the invited price when this person has one, else the listed price.
+  const invited = usePriceQuote();
   if (reason === "sign_in")
     return (
       <Warn
@@ -45,7 +49,7 @@ export function AccessNote({
     return (
       <Warn blocking={false}>
         <span className="block font-semibold">{t(step === "wiring" ? "blockedNoWiring" : "blockedNoCad")}</span>
-        <span className="mt-0.5 block">{t("buyCreditsText", { price: CREDIT_QAR })}</span>
+        <span className="mt-0.5 block">{t("buyCreditsText", { price: invited !== null ? formatQar(invited) : CREDIT_QAR })}</span>
         <span className="mt-1 flex flex-wrap items-center gap-x-4">
           <a
             href={`${COMPANY_WHATSAPP.url}?text=${encodeURIComponent(text)}`}

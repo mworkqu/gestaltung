@@ -51,6 +51,7 @@ export const MESSAGE_SCOPES = {
     "Credits.kind_cad",
     "Credits.overviewRedeemable",
     "Credits.overviewExpiry",
+    "PriceInvite",
   ],
   auth: ["Auth", "Turnstile"],
   projects: ["Projects", "Turnstile"],

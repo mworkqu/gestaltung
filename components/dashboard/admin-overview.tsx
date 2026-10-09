@@ -13,6 +13,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/parts/format";
+import { conversionPct, parseCohortFunnel, type CohortFunnelRow } from "@/lib/pricing/experiment";
 import { cn } from "@/lib/utils";
 
 // "Today" — the owner's first screen (owner, 2026-09-29: the dashboard was
@@ -107,6 +108,13 @@ export async function AdminOverview({ locale }: { locale: string }) {
     count(db.from("credits_ledger").select("id", { count: "exact", head: true }).like("reason", "redeemed:%").gte("created_at", monthAgo)),
   ]);
 
+  // Price experiment (P4-02): per invite-code cohort. Missing before 0060 (PGRST202) or
+  // not a super admin = no rows, and the block below is not rendered.
+  const priceCohorts: CohortFunnelRow[] = await Promise.resolve(db.rpc("price_cohort_funnel")).then(
+    (r) => (r.error ? [] : parseCohortFunnel(r.data)),
+    () => [],
+  );
+
   const funnel: { key: string; value: number }[] = [
     { key: "funnelProjects", value: fProjects },
     { key: "funnelBoms", value: fBoms },
@@ -189,6 +197,55 @@ export async function AdminOverview({ locale }: { locale: string }) {
             </tbody>
           </table>
         </div>
+
+        {priceCohorts.length > 0 && (
+          <div className="mt-6 border-t border-borderstrong/40 pt-4">
+            <h3 className="text-sm font-bold text-heading">{t("priceExpTitle")}</h3>
+            <div className="overflow-x-auto">
+              <table className="mt-3 w-full text-sm">
+                <thead>
+                  <tr className={mono("text-[10px] text-mutedtext")}>
+                    <th scope="col" className="pb-2 text-start font-semibold">
+                      {t("priceExpCohort")}
+                    </th>
+                    <th scope="col" className="pb-2 text-end font-semibold">
+                      {t("priceExpUsers")}
+                    </th>
+                    <th scope="col" className="pb-2 text-end font-semibold">
+                      {t("priceExpProject")}
+                    </th>
+                    <th scope="col" className="pb-2 text-end font-semibold">
+                      {t("priceExpCredits")}
+                    </th>
+                    <th scope="col" className="pb-2 text-end font-semibold">
+                      {t("priceExpOrder")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {priceCohorts.map((c) => (
+                    <tr key={c.cohort} className="border-t border-borderstrong/40">
+                      <td className="py-2 text-start font-semibold text-heading">
+                        <bdi>{c.cohort}</bdi>
+                      </td>
+                      <td className="py-2 text-end font-semibold tabular-nums text-heading">{c.users}</td>
+                      <td className="py-2 text-end tabular-nums text-body">{c.withProject}</td>
+                      <td className="py-2 text-end tabular-nums text-body">
+                        {c.boughtCredits}
+                        <span className="ms-1 text-xs text-mutedtext">({conversionPct(c.boughtCredits, c.users)})</span>
+                      </td>
+                      <td className="py-2 text-end tabular-nums text-body">
+                        {c.withOrder}
+                        <span className="ms-1 text-xs text-mutedtext">({conversionPct(c.withOrder, c.users)})</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-xs text-mutedtext">{t("priceExpNote")}</p>
+          </div>
+        )}
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">

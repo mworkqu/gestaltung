@@ -424,7 +424,14 @@
     "funnelKitOrders": "Of those, with a project kit",
     "funnelDelivered": "Of those, delivered",
     "funnelSpends": "Credits spent",
-    "funnelRedemptions": "Credits redeemed on orders"
+    "funnelRedemptions": "Credits redeemed on orders",
+    "priceExpTitle": "Price experiment",
+    "priceExpCohort": "Invite code",
+    "priceExpUsers": "Users",
+    "priceExpProject": "With a project",
+    "priceExpCredits": "Bought credits",
+    "priceExpOrder": "With an order",
+    "priceExpNote": "Display only — credits are still granted by hand at the price you agree."
   },
   "Inventory": {
     "kicker": "Inventory",
@@ -3257,5 +3264,17 @@
     "aHonest2": "We do not promise outcomes for your teams. An engineer reviews each design before anything is made.",
     "aHonest3": "Credits pay for each wiring diagram and 3D model. The parts list is the only thing without one.",
     "aCtaHeading": "Planning a cohort?"
+  },
+  "PriceInvite": {
+    "title": "Have an invite code?",
+    "hint": "Enter it to see your invited credit price.",
+    "label": "Invite code",
+    "placeholder": "Invite code",
+    "apply": "Apply",
+    "checking": "Checking",
+    "quoted": "Your invited price: QAR {invited} per credit (listed price QAR {listed})",
+    "payNote": "Credits are still paid by bank transfer or in person, at the price shown here.",
+    "saved": "Saved to your account.",
+    "inactive": "This code is not active."
   }
 }
