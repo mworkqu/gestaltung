@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>Confirm your email · تأكيد بريدك الإلكتروني — Gestaltung</title>
+</head>
+<!-- Supabase template: Confirm signup. Subject: Confirm your email · تأكيد بريدك الإلكتروني — Gestaltung -->
+
+<body style="margin:0;padding:0;background-color:#eef2f7;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#eef2f7" style="background-color:#eef2f7;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;background-color:#fcfdfe;border:1px solid #d3dbe6;border-radius:16px;">
+          <tr>
+            <td dir="ltr" align="left" style="padding:28px 32px 20px 32px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+              <span style="font-size:20px;line-height:24px;font-weight:700;letter-spacing:0.2px;color:#1c2434;">Gestaltung</span>
+            </td>
+          </tr>
+
+          <!-- English -->
+          <tr>
+            <td dir="ltr" lang="en" align="left" style="padding:0 32px 28px 32px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;text-align:left;">
+              <h1 style="margin:0 0 12px 0;font-size:22px;line-height:30px;font-weight:700;color:#1c2434;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Confirm your email</h1>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:#475569;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">Thanks for joining Gestaltung. Press the button to confirm your email and activate your account.</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px 0;">
+                <tr>
+                  <td bgcolor="#0e59c5" style="border-radius:10px;background-color:#0e59c5;">
+                    <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 26px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">Confirm email</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 6px 0;font-size:13px;line-height:20px;color:#64748b;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">If the button does not work, copy this link into your browser:</p>
+              <p dir="ltr" style="margin:0 0 16px 0;font-size:12px;line-height:18px;color:#64748b;word-break:break-all;text-align:left;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{{ .ConfirmationURL }}</p>
+              <p style="margin:0;font-size:13px;line-height:20px;color:#64748b;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">If you didn't ask for this, ignore this email.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 32px;"><div style="height:1px;line-height:1px;font-size:1px;background-color:#d3dbe6;">&nbsp;</div></td>
+          </tr>
+
+          <!-- Arabic -->
+          <tr>
+            <td dir="rtl" lang="ar" align="right" style="padding:8px 32px 28px 32px;font-family:Tahoma,'Segoe UI',Arial,sans-serif;text-align:right;">
+              <h1 style="margin:0 0 12px 0;font-size:22px;line-height:30px;font-weight:700;color:#1c2434;font-family:Tahoma,'Segoe UI',Arial,sans-serif;">أكّد بريدك الإلكتروني</h1>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:26px;color:#475569;font-family:Tahoma,'Segoe UI',Arial,sans-serif;">شكرًا لانضمامك إلى جِشتالتُونج. اضغط الزر أدناه لتأكيد بريدك الإلكتروني وتفعيل حسابك.</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px 0;">
+                <tr>
+                  <td bgcolor="#0e59c5" style="border-radius:10px;background-color:#0e59c5;">
+                    <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:13px 26px;font-family:Tahoma,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:20px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">تأكيد البريد الإلكتروني</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 6px 0;font-size:13px;line-height:22px;color:#64748b;font-family:Tahoma,'Segoe UI',Arial,sans-serif;">إذا لم يعمل الزر، انسخ هذا الرابط والصقه في المتصفح:</p>
+              <p dir="ltr" style="margin:0 0 16px 0;font-size:12px;line-height:18px;color:#64748b;word-break:break-all;text-align:right;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">{{ .ConfirmationURL }}</p>
+              <p style="margin:0;font-size:13px;line-height:22px;color:#64748b;font-family:Tahoma,'Segoe UI',Arial,sans-serif;">إذا لم تطلب ذلك، تجاهل هذه الرسالة.</p>
+            </td>
+          </tr>
+        </table>
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;">
+          <tr>
+            <td align="center" style="padding:16px 16px 0 16px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#64748b;">Gestaltung &middot; Lusail, Qatar</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -21,7 +21,7 @@
 - Google Analytics 4: analytics, after cookie consent.
 - Google Drive and Shopify CDN: product photos.
 - Google Gemini and Groq Whisper: the planning tool's text and voice features. Your input is sent to them when you use those features.
-- Partner workshops: they receive only the files and details needed to make your part.
+- Partners: when a job needs a partner, they receive only the files and details needed to make your part.
 
 **5. We do not sell your data.** We never sell it and never rent it.
 

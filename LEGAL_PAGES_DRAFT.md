@@ -171,7 +171,7 @@
 
 **2. Who may order.** You must be 18 or older. Children under 18 may not order.
 
-**3. What we offer.** (a) An online store for electronics, sensors, motors, 3D-printing supplies and hardware. (b) Custom manufacturing from your files (3D printing, CNC, laser cutting, EDM) through partner workshops. (c) A paid CAD drawing service with fixed tiers, delivered as STEP or IGES. (d) A free "Turn an idea into a product" planning tool.
+**3. What we offer.** (a) An online store for electronics, sensors, motors, 3D-printing supplies and hardware. (b) Custom manufacturing from your files (3D printing, CNC, laser cutting, EDM) through partners. (c) A paid CAD drawing service with fixed tiers, delivered as STEP or IGES. (d) A free "Turn an idea into a product" planning tool.
 
 **4. Orders.** An order is binding once we confirm it on WhatsApp. Until then it is a request only.
 
@@ -213,7 +213,7 @@
 
 **2. من يحق له الطلب.** يجب أن يكون عمرك 18 عامًا أو أكثر. لا يجوز لمن هم دون 18 عامًا تقديم الطلبات.
 
-**3. ما نقدّمه.** (أ) متجر إلكتروني للإلكترونيات والحسّاسات والمحرّكات ومستلزمات الطباعة ثلاثية الأبعاد والعدد والأدوات. (ب) تصنيع مخصّص من ملفاتك (طباعة ثلاثية الأبعاد، وقطع بالتحكم الرقمي CNC، وقطع بالليزر، وقطع بالتفريغ الكهربائي EDM) عبر ورش شريكة. (ج) خدمة رسم هندسي (CAD) مدفوعة بباقات ثابتة، وتُسلَّم بصيغة STEP أو IGES. (د) أداة تخطيط مجانية بعنوان "حوّل فكرتك إلى منتج".
+**3. ما نقدّمه.** (أ) متجر إلكتروني للإلكترونيات والحسّاسات والمحرّكات ومستلزمات الطباعة ثلاثية الأبعاد والعدد والأدوات. (ب) تصنيع مخصّص من ملفاتك (طباعة ثلاثية الأبعاد، وقطع بالتحكم الرقمي CNC، وقطع بالليزر، وقطع بالتفريغ الكهربائي EDM) عبر شركاء. (ج) خدمة رسم هندسي (CAD) مدفوعة بباقات ثابتة، وتُسلَّم بصيغة STEP أو IGES. (د) أداة تخطيط مجانية بعنوان "حوّل فكرتك إلى منتج".
 
 **4. الطلبات.** يصبح الطلب ملزمًا عندما نؤكده على واتساب. وقبل ذلك يُعدّ مجرد طلب.
 
@@ -274,7 +274,7 @@
 - Google Analytics 4: analytics, after cookie consent.
 - Google Drive and Shopify CDN: product photos.
 - Google Gemini and Groq Whisper: the planning tool's text and voice features. Your input is sent to them when you use those features.
-- Partner workshops: they receive only the files and details needed to make your part.
+- Partners: when a job needs a partner, they receive only the files and details needed to make your part.
 
 **5. We do not sell your data.** We never sell it and never rent it.
 
@@ -322,7 +322,7 @@
 - Google Analytics 4: التحليلات، بعد الموافقة على ملفات تعريف الارتباط.
 - Google Drive وShopify CDN: صور المنتجات.
 - Google Gemini وGroq Whisper: ميزتا النص والصوت في أداة التخطيط، وتُرسَل مدخلاتك إليهما عند استخدام هاتين الميزتين.
-- الورش الشريكة: لا تتلقى إلا الملفات والتفاصيل اللازمة لتصنيع قطعتك.
+- الشركاء: عندما يحتاج العمل إلى شريك، لا يتلقى إلا الملفات والتفاصيل اللازمة لتصنيع قطعتك.
 
 **5. لا نبيع بياناتك.** لا نبيعها ولا نؤجّرها.
 
