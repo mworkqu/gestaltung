@@ -77,6 +77,7 @@ import {
   type ProjectBom,
 } from "@/lib/prototyping/bom";
 import { costState, toBuyNow } from "@/lib/prototyping/bom-cost";
+import type { StoreCardPart } from "@/lib/store/catalog";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
 import { PartsList, type StoreLine } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
@@ -177,6 +178,8 @@ export function PrototypingWorkspace({
   const [addingExisting, setAddingExisting] = useState(false);
   // Live store matches for the bill of materials, by line id (/api/bom/match).
   const [matches, setMatches] = useState<Map<string, LineMatch>>(new Map());
+  // "Also useful" under the BOM (P3-06), from the same /api/bom/match answer.
+  const [alsoUseful, setAlsoUseful] = useState<StoreCardPart[]>([]);
   const [matchState, setMatchState] = useState<"idle" | "loading" | "failed">("idle");
   // True once the first store match has come back: until then there are no
   // prices, and the cost panel shows a skeleton instead of QAR 0.00 (audit #59).
@@ -202,8 +205,9 @@ export function PrototypingWorkspace({
         body: JSON.stringify({ projectId }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { matches: list } = (await res.json()) as { matches: LineMatch[] };
+      const { matches: list, alsoUseful: extra } = (await res.json()) as { matches: LineMatch[]; alsoUseful?: StoreCardPart[] };
       setMatches(new Map(list.map((m) => [m.lineId, m])));
+      setAlsoUseful(Array.isArray(extra) ? extra : []);
       setMatchesLoaded(true);
       setMatchState("idle");
     } catch {
@@ -647,6 +651,7 @@ export function PrototypingWorkspace({
         title={kind === "all" ? t("bomTitle") : t(`bomTitle_${kind}`)}
         intro={kind === "all" ? t("bomIntro") : t("bomBranchIntro")}
         showTotal={kind === "all"}
+        alsoUseful={kind === "all" ? alsoUseful : undefined}
         before={before}
         profilePhone={profilePhone}
         onPhoneSaved={(phone) => setProfilePhone(phone)}

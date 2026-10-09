@@ -415,6 +415,7 @@
     "funnelCircuits": "دوائر أُنشئت",
     "funnelCad": "نماذج ثلاثية الأبعاد سُلّمت",
     "funnelOrders": "طلبات قُدّمت",
+    "funnelKitOrders": "منها بحزمة مشروع",
     "funnelDelivered": "منها سُلّمت",
     "funnelSpends": "أرصدة أُنفقت",
     "funnelRedemptions": "أرصدة استُردّت على طلبات"
@@ -1165,6 +1166,17 @@
     "metaDescription": "تتبّع القطع والمواد التي تملكها.",
     "imageTooLarge": "حجم الصورة يتجاوز 10 ميغابايت.",
     "uploadFailed": "تعذّر رفع الصورة."
+  },
+  "Upsell": {
+    "boughtTogether": "يُشترى معه عادةً",
+    "mayAlsoNeed": "قد تحتاج أيضاً",
+    "kitTitle": "اشترِ القائمة كاملة كحزمة واحدة",
+    "kitText": "كل القطع المتوفرة في متجرنا من هذه القائمة، كعنصر واحد في السلة مع القطع مدرجة تحتها.",
+    "alsoUseful": "مفيد أيضاً",
+    "alsoUsefulIntro": "من فئات المتجر نفسها التي في قائمة القطع، وليست فيها بعد.",
+    "add": "أضف إلى السلة",
+    "addNamed": "أضف {name} إلى السلة",
+    "added": "أُضيفت — افتح السلة"
   },
   "Prototyping": {
     "metaTitle": "النمذجة | Gestaltung360",
@@ -2928,6 +2940,28 @@
     "modeReal": "حذف",
     "noRuns": "لا توجد تشغيلات بعد.",
     "needsMigration": "شغّل الترحيل 0055 لعرض سجل التشغيل."
+  },
+  "YourWork": {
+    "kicker": "أعمالك",
+    "allProjects": "كل المشاريع",
+    "openProject": "فتح",
+    "openProjectAria": "فتح {name}",
+    "untitled": "مشروع بلا اسم",
+    "projectLine": "نشط · آخر تحديث {date}",
+    "lastOrder": "آخر طلب",
+    "reorder": "إعادة الطلب",
+    "reorderAria": "إعادة طلب القطع من الطلب رقم #{id}",
+    "reorderFrom": "من الطلب رقم #{id}",
+    "reordering": "جارٍ الإضافة…",
+    "reordered": "{form, select, zero {لم تُضف أي عناصر} one {أُضيف عنصر واحد إلى سلتك} two {أُضيف عنصران إلى سلتك} few {أُضيفت {count} عناصر إلى سلتك} other {أُضيف {count} عنصرًا إلى سلتك}}",
+    "viewCart": "عرض السلة",
+    "unavailableLabel": "لم تعد متوفرة:",
+    "reorderNone": "لم يعد أي من هذه العناصر متوفرًا.",
+    "reorderError": "تعذّرت إضافة هذه العناصر. حاول مرة أخرى.",
+    "toBuyLabel": "قطع للشراء الآن",
+    "toBuyCount": "{form, select, one {قطعة واحدة} two {قطعتان} few {{count} قطع} other {{count} قطعة}}",
+    "toBuyNone": "كل ما في قوائمك تم شراؤه.",
+    "toBuyUnknown": "افتح قائمة القطع لترى ما يجب شراؤه."
   },
   "SiteV2": {
     "planNote": "قائمة القطع لا تحتاج رصيدًا ولا حسابًا.",

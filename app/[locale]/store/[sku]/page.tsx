@@ -19,6 +19,7 @@ import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { canRequestItem, showMinOrder } from "@/lib/store/product-display";
 import { minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
 import { PartDetailCart } from "@/components/parts/part-detail-cart";
+import { PartCard } from "@/components/parts/part-card";
 import { AddToProjectButton } from "@/components/parts/add-to-project-button";
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
@@ -28,6 +29,7 @@ import { IsolatedTitle } from "@/components/ltr-isolate";
 import { productDetailsForLocale } from "@/lib/store/product-details";
 import { clipText, ogProductImage, pageMetadata } from "@/lib/seo";
 import {
+  getFrequentlyBoughtTogether,
   getHolidays,
   getMergedRedirectSku,
   getPartSource,
@@ -171,6 +173,10 @@ export default async function PartDetailPage({
   // Add to cart / Add to project may mint a guest session (P2-08). Cached
   // public read, tag "store-settings": the page stays ISR.
   const turnstileEnabled = await turnstileEnabledForPages();
+  // P3-06: co-purchased products (0057), else same-category ones — the
+  // heading says which. Cached anon read (tag "parts"): the page stays ISR.
+  const upsell = await getFrequentlyBoughtTogether(part.sku, storeCategory ?? null);
+  const tUpsell = await getTranslations("Upsell");
 
   const spec = (label: string, value: string | null) =>
     value ? (
@@ -370,6 +376,18 @@ export default async function PartDetailPage({
           </dl>
         </div>
       </div>
+      {upsell.parts.length > 0 && (
+        <section aria-labelledby="upsell-heading" className="space-y-4 pt-2">
+          <h2 id="upsell-heading" className="title-section">
+            {upsell.source === "together" ? tUpsell("boughtTogether") : tUpsell("mayAlsoNeed")}
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+            {upsell.parts.map((p) => (
+              <PartCard key={p.id} part={p} locale={locale} upsell="product" />
+            ))}
+          </div>
+        </section>
+      )}
       <TurnstileChallenge enabled={turnstileEnabled} />
     </div>
     </MessagesScope>

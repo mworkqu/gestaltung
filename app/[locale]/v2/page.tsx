@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
+import { YourWorkStrip } from "@/components/home/your-work-strip";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { TrackClick } from "@/components/analytics/track-click";
@@ -77,7 +78,8 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
   return (
     <MessagesScope scope="home">
       <div className="container page-stack">
-        {/* P3-05: signed-in "Your work" strip goes here */}
+        {/* P3-05: signed-in "Your work" strip. Client-only: renders nothing until a session exists. */}
+        <YourWorkStrip />
 
         {/* 1. Hero: outcome, one sub line, ONE primary CTA, a small shop link, the proof line. */}
         <section className="neu animate-fade-up relative overflow-hidden px-5 pb-8 pt-8 sm:px-12 sm:pb-12 sm:pt-14 lg:px-16 lg:pb-16 lg:pt-20">

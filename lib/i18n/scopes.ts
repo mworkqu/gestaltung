@@ -33,7 +33,8 @@ export const BASE_MESSAGES = [
 ] as const;
 
 export const MESSAGE_SCOPES = {
-  home: ["Delivery", "Hero", "Parts", "Phone", "StoreLanding", "Turnstile"],
+  // YourWork + Orders: the signed-in "Your work" strip on the v2 home (P3-05).
+  home: ["Delivery", "Hero", "Orders", "Parts", "Phone", "StoreLanding", "Turnstile", "YourWork"],
   store: ["Delivery", "Parts", "Turnstile"],
   product: ["Delivery", "Parts", "Turnstile"],
   cart: ["Cart", "Delivery", "Parts"],

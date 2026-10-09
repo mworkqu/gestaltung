@@ -28,6 +28,11 @@ export type AnalyticsEvents = {
   order_placed: { order_id: string; total_qar: number; method: string };
   phone_captured: { where: "bom" | "save-link" | "quote" };
   pricing_viewed: { plan?: string };
+  // P3-06 kit attach rate: a whole BOM added as one project kit, and an
+  // upsell product added from the BOM ("Also useful") or a product page
+  // ("Frequently bought together" / "You may also need").
+  kit_added: { lines: number; total_qar: number };
+  upsell_added: { sku: string; where: "bom" | "product" };
 };
 
 export type AnalyticsEvent = keyof AnalyticsEvents;

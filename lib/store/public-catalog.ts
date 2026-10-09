@@ -31,6 +31,14 @@ import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServiceP
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
 import { HOLIDAYS_KEY, parseHolidays, type Holidays } from "@/lib/store/working-days";
 import { parsePartSource, withoutPrivateFields, type PartSource } from "@/lib/store/part-source";
+import {
+  inSkuOrder,
+  mergeBoughtTogether,
+  parseCoPurchased,
+  rankInStockFirst,
+  UPSELL_COUNT,
+  type UpsellPick,
+} from "@/lib/store/bought-together";
 
 const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
 
@@ -310,4 +318,83 @@ export const getPartSource = unstable_cache(
   },
   ["store:part-source"],
   { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG, SETTINGS_TAG] },
+);
+
+// ── Upsell (P3-06 / WF-34) ──────────────────────────────────────────────────
+
+// Enough candidates per category set that a BOM's own SKUs can be left out
+// and three still remain.
+const UPSELL_POOL = 36;
+
+const upsellPool = unstable_cache(
+  async (categories: string[]): Promise<StoreCardPart[]> => {
+    const supabase = createPublicClient();
+    if (!supabase || !categories.length) return [];
+    const store = await hasStoreCategory();
+    const column = store ? "store_category" : "category";
+    // Two small reads instead of one sorted one: the lead class is text, so
+    // "in stock first" cannot be an ORDER BY. Newest first inside each.
+    const base = () =>
+      supabase
+        .from("parts")
+        .select(cardColumns(store))
+        .eq("is_published", true)
+        .is("merged_into", null)
+        .in(column, categories)
+        .order("updated_at", { ascending: false })
+        .limit(UPSELL_POOL);
+    const [inStock, later] = await Promise.all([
+      base().eq("lead_time_class", "in_stock"),
+      base().not("lead_time_class", "is", null).neq("lead_time_class", "in_stock"),
+    ]);
+    const rows = [...((inStock.data ?? []) as unknown as CardRow[]), ...((later.data ?? []) as unknown as CardRow[])];
+    return rankInStockFirst(rows.map(toCard)).slice(0, UPSELL_POOL);
+  },
+  ["store:upsell-pool"],
+  CACHE,
+);
+
+/**
+ * Listed products (published, unmerged, with a delivery date) in these store
+ * categories, in stock first, card fields only. The key is the sorted set, so
+ * the same categories in another order hit the same cache entry. Used by the
+ * product page's fallback and the BOM's "Also useful" (/api/bom/match).
+ */
+export function getUpsellPool(categories: readonly string[]): Promise<StoreCardPart[]> {
+  const set = [...new Set(categories.map((c) => c.trim()).filter(Boolean))].sort().slice(0, 9);
+  return set.length ? upsellPool(set) : Promise.resolve([]);
+}
+
+/**
+ * The product page's "Frequently bought together" (P3-06). co_purchased()
+ * (migration 0057, SECURITY DEFINER, anon) ranks the SKUs bought in the same
+ * orders — it returns only SKU + order count; the cards are read here from the
+ * public catalogue. Until 0057 runs the call errors (PGRST202) and the list is
+ * same-category products; fewer than three co-purchased products are topped
+ * up the same way. `source` says which, so the heading stays honest.
+ */
+export const getFrequentlyBoughtTogether = unstable_cache(
+  async (sku: string, storeCategory: string | null): Promise<UpsellPick> => {
+    const supabase = createPublicClient();
+    if (!supabase) return { parts: [], source: "category" };
+    let together: StoreCardPart[] = [];
+    const { data, error } = await supabase.rpc("co_purchased", { p_sku: sku, p_limit: UPSELL_COUNT });
+    if (error && error.code !== "PGRST202") console.warn(`[store] co_purchased failed: ${error.message}`);
+    const ranked = error ? [] : parseCoPurchased(data);
+    if (ranked.length) {
+      const store = await hasStoreCategory();
+      const { data: rows } = await supabase
+        .from("parts")
+        .select(cardColumns(store))
+        .in("sku", ranked)
+        .eq("is_published", true)
+        .is("merged_into", null)
+        .not("lead_time_class", "is", null);
+      together = inSkuOrder(((rows ?? []) as unknown as CardRow[]).map(toCard), ranked);
+    }
+    const fallback = together.length >= UPSELL_COUNT || !storeCategory ? [] : await getUpsellPool([storeCategory]);
+    return mergeBoughtTogether({ together, fallback, currentSku: sku });
+  },
+  ["store:bought-together"],
+  CACHE,
 );

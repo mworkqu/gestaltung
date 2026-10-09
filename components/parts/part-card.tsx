@@ -30,12 +30,15 @@ export async function PartCard({
   locale,
   shipping,
   priority = false,
+  upsell,
 }: {
   part: StoreCardPart;
   locale: string;
   shipping?: ShippingSettings | null;
   /** Above the fold: load eagerly with high priority instead of lazily. */
   priority?: boolean;
+  /** Shown as an upsell (P3-06): Add to cart also fires upsell_added with this placement. */
+  upsell?: "product";
 }) {
   const t = await getTranslations("Parts");
   const name = partName(part, locale);
@@ -101,7 +104,11 @@ export async function PartCard({
           {showMinOrder(part.min_order_qty) && (
             <p className="text-[11px] text-mutedtext">{t("minOrder", { qty: part.min_order_qty })}</p>
           )}
-          <AddToCartButton part={{ id: part.id, min_order_qty: part.min_order_qty }} className={cardBtn} />
+          <AddToCartButton
+            part={{ id: part.id, min_order_qty: part.min_order_qty, ...(upsell ? { sku: part.sku } : {}) }}
+            className={cardBtn}
+            upsell={upsell}
+          />
           {canRequestItem(part.lead_time_class) && (
             <RequestItemButton partId={part.id} partName={name} size="sm" className={cardBtn} />
           )}

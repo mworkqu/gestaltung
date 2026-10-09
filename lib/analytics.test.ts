@@ -72,6 +72,16 @@ describe("track", () => {
     expect(gtag).toHaveBeenCalledWith("event", "add_to_cart", { sku: "ESP32-01", qty: 2 });
   });
 
+  it("sends the kit attach-rate events (P3-06) with their scalar params", () => {
+    const gtag = vi.fn();
+    install({ gtag });
+    accept();
+    track("kit_added", { lines: 7, total_qar: 142.5 });
+    track("upsell_added", { sku: "VLT-1", where: "bom" });
+    expect(gtag).toHaveBeenCalledWith("event", "kit_added", { lines: 7, total_qar: 142.5 });
+    expect(gtag).toHaveBeenCalledWith("event", "upsell_added", { sku: "VLT-1", where: "bom" });
+  });
+
   it("notices a later Accept without a reload, and a cookie alone is enough", () => {
     const gtag = vi.fn();
     install({ gtag });

@@ -26,7 +26,9 @@
 // price, and the summary says so) — and, apart from it, a line of counts (audit
 // #26). Group subtotals are the still-to-buy lines, plus what the group's
 // ordered lines cost (audit #27). One buy action: the whole buyable list as a
-// project kit (audit #28). Lines two sources both listed show once
+// project kit (audit #28) — since P3-06 a prominent box at the TOP of the
+// project BOM, right under the cost summary, with "Also useful" (three more
+// products from the same store categories) beneath it. Lines two sources both listed show once
 // (dedupeLines, audit #29); group counts come from the shared groupLines.
 // The matcher's reasons (`why`) are debug text: shown to super_admin only.
 
@@ -75,6 +77,9 @@ import { fulfilledLabel, fulfilledOrderIds } from "@/lib/prototyping/fulfilled";
 import type { BomGroup } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
+import type { StoreCardPart } from "@/lib/store/catalog";
+import { track } from "@/lib/analytics";
+import { AlsoUseful } from "@/components/prototyping/also-useful";
 
 /**
  * ONE money figure — to buy now — and, on its own line, the counts: not
@@ -356,6 +361,7 @@ export function BomTable({
   inCircuit,
   profilePhone,
   onPhoneSaved,
+  alsoUseful,
 }: {
   projectId: string;
   lines: ProjectLine[];
@@ -379,8 +385,11 @@ export function BomTable({
   /** profiles.phone: the quote request skips its phone field when set (P1-11 / CC-1). */
   profilePhone?: string | null;
   onPhoneSaved?: (phone: string) => void;
+  /** Project view only: "Also useful" products under the kit box (P3-06, from /api/bom/match). */
+  alsoUseful?: StoreCardPart[];
 }) {
   const t = useTranslations("Prototyping");
+  const tU = useTranslations("Upsell");
   const locale = useLocale();
   const { addItem, kitDiscountPct } = useCart();
   const admin = useIsSuperAdmin();
@@ -445,12 +454,18 @@ export function BomTable({
         .select("id")
         .single();
       if (error || !data) throw error ?? new Error("no kit");
+      let goods = 0;
       for (const l of toBuy) {
         const p = buyable(l, matches.get(l.id))!;
-        const ok = await addItem(p, orderQty(l.quantity, p), projectId, { bomLines: [l.id], kitId: data.id as string });
+        const qty = orderQty(l.quantity, p);
+        const ok = await addItem(p, qty, projectId, { bomLines: [l.id], kitId: data.id as string });
         if (!ok) throw new Error("kit line not saved");
+        goods += Number(p.unit_price) * qty;
       }
       setKitDone(true);
+      // Kit attach rate (P3-06): the kit's goods after the kit discount, as the cart prices it.
+      const total = Math.round(goods * (1 - kitDiscountPct / 100) * 100) / 100;
+      track("kit_added", { lines: toBuy.length, total_qar: total });
     } catch (err) {
       console.error("bom: kit not added", err);
       setKitFailed(true);
@@ -477,6 +492,35 @@ export function BomTable({
     <Card kicker={kicker} title={title} intro={intro}>
       {before}
       {showTotal && lines.length > 0 && <CostSummary lines={lines} matches={matches} state={costState} />}
+
+      {/* The ONE kit button (audit #28), prominent at the top since P3-06. */}
+      {showTotal && lines.length > 0 && (toBuy.length > 0 || kitDone || adding === "kit") && (
+        <div className="space-y-2 rounded-xl bg-panel/60 p-3 shadow-neu-inset sm:p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <p className="flex items-center gap-1.5 text-[13px] font-bold text-heading">
+                <Package className="h-4 w-4 text-cobalt" />
+                {tU("kitTitle")}
+              </p>
+              <p className="text-[11.5px] text-mutedtext">{tU("kitText")}</p>
+            </div>
+            {kitDone ? (
+              <Link href="/store/cart" className="inline-flex items-center gap-1 text-xs font-semibold text-buy max-md:min-h-11">
+                <PackageCheck className="h-3.5 w-3.5" />
+                {t("kitAdded")}
+              </Link>
+            ) : (
+              <PrimaryButton onClick={buyKit} disabled={!toBuy.length || adding !== null} title={t("kitHint")}>
+                {adding === "kit" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}
+                {t("addKit", { count: toBuy.length })}
+                {kitDiscountPct > 0 && ` ${t("kitDiscountNote", { pct: kitDiscountPct })}`}
+              </PrimaryButton>
+            )}
+          </div>
+          {kitFailed && <p className="text-end text-[11.5px] text-destructive">{t("kitFailed")}</p>}
+        </div>
+      )}
+      {showTotal && lines.length > 0 && alsoUseful && alsoUseful.length > 0 && <AlsoUseful parts={alsoUseful} />}
 
       {lines.length === 0 ? (
         <p className="text-sm text-mutedtext">{t("bomEmpty")}</p>
@@ -565,22 +609,7 @@ export function BomTable({
           )}
 
           {showTotal && (
-            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-borderstrong/40 pt-3">
-              <span className="me-auto text-[12px] text-mutedtext">{t("bomTotalNote")}</span>
-              {kitDone ? (
-                <Link href="/store/cart" className="inline-flex items-center gap-1 text-xs font-semibold text-buy">
-                  <PackageCheck className="h-3.5 w-3.5" />
-                  {t("kitAdded")}
-                </Link>
-              ) : (
-                <PrimaryButton onClick={buyKit} disabled={!toBuy.length || adding !== null} title={t("kitHint")}>
-                  {adding === "kit" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}
-                  {t("addKit", { count: toBuy.length })}
-                  {kitDiscountPct > 0 && ` ${t("kitDiscountNote", { pct: kitDiscountPct })}`}
-                </PrimaryButton>
-              )}
-              {kitFailed && <p className="w-full text-end text-[11.5px] text-destructive">{t("kitFailed")}</p>}
-            </div>
+            <p className="border-t border-borderstrong/40 pt-3 text-[12px] text-mutedtext">{t("bomTotalNote")}</p>
           )}
         </>
       )}

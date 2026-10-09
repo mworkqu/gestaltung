@@ -415,6 +415,7 @@
     "funnelCircuits": "Circuits made",
     "funnelCad": "3D models delivered",
     "funnelOrders": "Orders placed",
+    "funnelKitOrders": "Of those, with a project kit",
     "funnelDelivered": "Of those, delivered",
     "funnelSpends": "Credits spent",
     "funnelRedemptions": "Credits redeemed on orders"
@@ -1165,6 +1166,17 @@
     "metaDescription": "Track the parts and materials you own.",
     "imageTooLarge": "That image is over 10 MB.",
     "uploadFailed": "That image could not be uploaded."
+  },
+  "Upsell": {
+    "boughtTogether": "Frequently bought together",
+    "mayAlsoNeed": "You may also need",
+    "kitTitle": "Buy the whole list as one kit",
+    "kitText": "Every part we stock from this list, as one cart entry with the parts listed underneath.",
+    "alsoUseful": "Also useful",
+    "alsoUsefulIntro": "From the same store categories as your parts list, and not on it yet.",
+    "add": "Add to cart",
+    "addNamed": "Add {name} to cart",
+    "added": "Added — view cart"
   },
   "Prototyping": {
     "metaTitle": "Prototyping | Gestaltung360",
@@ -2928,6 +2940,28 @@
     "modeReal": "Delete",
     "noRuns": "No runs yet.",
     "needsMigration": "Run migration 0055 to see the run log."
+  },
+  "YourWork": {
+    "kicker": "Your work",
+    "allProjects": "All projects",
+    "openProject": "Open",
+    "openProjectAria": "Open {name}",
+    "untitled": "Untitled project",
+    "projectLine": "Active · Updated {date}",
+    "lastOrder": "Last order",
+    "reorder": "Reorder",
+    "reorderAria": "Reorder the items from order #{id}",
+    "reorderFrom": "From order #{id}",
+    "reordering": "Adding…",
+    "reordered": "{form, select, one {Added {count} item to your cart} other {Added {count} items to your cart}}",
+    "viewCart": "View cart",
+    "unavailableLabel": "Not available any more:",
+    "reorderNone": "None of these items are available any more.",
+    "reorderError": "We could not add these items. Please try again.",
+    "toBuyLabel": "Parts to buy now",
+    "toBuyCount": "{form, select, one {{count} part} other {{count} parts}}",
+    "toBuyNone": "Everything on your lists is bought.",
+    "toBuyUnknown": "Open the bill of materials to see what to buy."
   },
   "SiteV2": {
     "planNote": "The parts list needs no credit and no account.",

@@ -44,6 +44,7 @@ export async function AdminOverview({ locale }: { locale: string }) {
     fCircuits,
     fCad,
     fOrders,
+    fKitOrders,
     fDelivered,
     fSpends,
     fRedemptions,
@@ -85,6 +86,15 @@ export async function AdminOverview({ locale }: { locale: string }) {
     ),
     count(db.from("cad_generations").select("id", { count: "exact", head: true }).eq("status", "delivered").gte("delivered_at", monthAgo)),
     count(db.from("part_orders").select("id", { count: "exact", head: true }).gte("created_at", monthAgo).not("is_test", "is", true)),
+    // P3-06 kit attach rate: orders holding at least one kit line (inner join, so one count per order).
+    count(
+      db
+        .from("part_orders")
+        .select("id, part_order_items!inner(kit_id)", { count: "exact", head: true })
+        .not("part_order_items.kit_id", "is", null)
+        .gte("created_at", monthAgo)
+        .not("is_test", "is", true)
+    ),
     count(
       db
         .from("part_orders")
@@ -103,6 +113,7 @@ export async function AdminOverview({ locale }: { locale: string }) {
     { key: "funnelCircuits", value: fCircuits },
     { key: "funnelCad", value: fCad },
     { key: "funnelOrders", value: fOrders },
+    { key: "funnelKitOrders", value: fKitOrders },
     { key: "funnelDelivered", value: fDelivered },
     { key: "funnelSpends", value: fSpends },
     { key: "funnelRedemptions", value: fRedemptions },
