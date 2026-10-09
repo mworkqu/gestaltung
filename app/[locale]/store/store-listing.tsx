@@ -16,13 +16,24 @@ import { getStoreFacets, getStoreListing } from "@/lib/store/public-catalog";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { arabicCountForm } from "@/lib/text/count";
+import { cn } from "@/lib/utils";
 
 // The /store list, shared by the static default listing (store/page.tsx, no
 // query params) and the dynamic search/filter route (store/search/page.tsx,
 // reached through the next.config.mjs rewrite when the URL has any of
 // STORE_URL_PARAMS). Reads only cached, cookie-free data
 // (lib/store/public-catalog.ts) and sends cards only StoreCardPart fields.
-export async function StoreListing({ locale, state }: { locale: string; state: StoreState }) {
+// `hideHeader` (v2 store, P3-03): the v2 landing renders its own hero above, so the
+// plain title block (and its top padding) is left out; everything else is identical.
+export async function StoreListing({
+  locale,
+  state,
+  hideHeader = false,
+}: {
+  locale: string;
+  state: StoreState;
+  hideHeader?: boolean;
+}) {
   const t = await getTranslations("Parts");
 
   // Filter options (every listed category/material) and one page of cards,
@@ -55,7 +66,8 @@ export async function StoreListing({ locale, state }: { locale: string; state: S
 
   return (
     <MessagesScope scope="store">
-      <div className="container page-stack">
+      <div className={cn("container page-stack", hideHeader && "pt-0")}>
+        {!hideHeader && (
         <header className="space-y-3">
           <p className="kicker text-azure">{t("kicker")}</p>
           <h1 className="title-page">
@@ -65,6 +77,7 @@ export async function StoreListing({ locale, state }: { locale: string; state: S
             {t("subtext")}
           </p>
         </header>
+        )}
 
         <PartsFilters categories={categories} materials={materials} state={state} />
 

@@ -18,7 +18,7 @@ function extOf(name: string) {
 // The homepage "custom manufacturing" panel, now an interactive drag-and-drop
 // zone. Picking or dropping a CAD file carries it to the public /design/quote
 // page (email/phone + method), keeping the blueprint aesthetic of the old box.
-export function DesignDropzone({ compact = false }: { compact?: boolean }) {
+export function DesignDropzone({ compact = false, hideExplore = false }: { compact?: boolean; hideExplore?: boolean }) {
   const t = useTranslations("StoreLanding");
   const tHero = useTranslations("Hero");
   const locale = useLocale();
@@ -113,13 +113,16 @@ export function DesignDropzone({ compact = false }: { compact?: boolean }) {
         ) : (
           <p className="text-sm leading-relaxed text-body">{t("dropText")}</p>
         )}
-        <Link
-          href="/design"
-          className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11"
-        >
-          {t("dropExplore")}
-          <ArrowUpRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
-        </Link>
+        {/* hideExplore: on /design itself (v2) this link would point at the page you are on. */}
+        {!hideExplore && (
+          <Link
+            href="/design"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover max-md:min-h-11"
+          >
+            {t("dropExplore")}
+            <ArrowUpRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+          </Link>
+        )}
       </div>
     </div>
   );
