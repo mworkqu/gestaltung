@@ -3,10 +3,13 @@ import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { dateChangeEmail, type OrderForEmail } from "@/lib/store/order-email";
 import { reviewPromise } from "@/lib/store/delivery";
 import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
+import { HOLIDAYS_KEY, parseHolidays } from "@/lib/store/working-days";
 
 // Daily (vercel.json cron): for every open order whose promised date hasn't
 // passed, compare each item's lead-time class now with the one it was sold
-// at. If any changed, recompute the date the same way checkout did and email
+// at. If any changed, recompute the date the same way checkout did (supplier
+// lead in calendar days, then handling + transit + buffer in Qatar working
+// days, lib/store/working-days.ts — mirrors order_delivery_quote v3) and email
 // the customer — BEFORE the promised date, never after:
 //   later date   → "new date is …" and the order's promise moves;
 //   same/earlier → "your date still holds";
@@ -37,6 +40,10 @@ export async function GET(request: Request) {
     buffer_days?: number;
     tiers?: Record<string, { transit_days?: number }>;
   };
+  // Qatar weekend + public holidays (0054), the same rule order_delivery_quote
+  // uses; no row = calendar days, as the database does before 0054.
+  const { data: holidaysRow } = await db.from("store_settings").select("value").eq("key", HOLIDAYS_KEY).maybeSingle();
+  const holidays = holidaysRow ? parseHolidays(holidaysRow.value) : null;
 
   const { data: orders } = await db
     .from("part_orders")
@@ -62,6 +69,7 @@ export async function GET(request: Request) {
         handlingDays: cfg.handling_days ?? 1,
         transitDays: cfg.tiers?.[order.shipping_tier ?? "standard"]?.transit_days ?? 0,
         bufferDays: cfg.buffer_days ?? 3,
+        holidays,
       }
     );
     if (!review) continue;
@@ -70,7 +78,9 @@ export async function GET(request: Request) {
 
     let sent = false;
     if (order.customer_email) {
-      const mail = dateChangeEmail(order as OrderForEmail, oldDate, newDate, changed.map((c) => c.part_name));
+      const mail = dateChangeEmail(order as OrderForEmail, oldDate, newDate, changed.map((c) => c.part_name), {
+        workingDays: Boolean(holidays),
+      });
       sent = await sendEmail({ to: [order.customer_email], ...mail });
     }
 

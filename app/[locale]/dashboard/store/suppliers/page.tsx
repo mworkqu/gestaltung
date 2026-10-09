@@ -10,6 +10,8 @@ import {
   type CoveragePart,
 } from "@/components/admin/offer-coverage";
 import { ShippingSettingsEditor } from "@/components/admin/shipping-settings";
+import { HolidaySettingsEditor } from "@/components/admin/holiday-settings";
+import { HOLIDAYS_KEY, parseHolidays } from "@/lib/store/working-days";
 import type { ShippingSettings } from "@/app/[locale]/dashboard/store/sourcing/actions";
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
@@ -79,13 +81,16 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
       supabase.from("supplier_offers").select("part_id, supplier_id, active").order("id").range(from, to)
     ),
     loadPublishedParts(supabase),
-    supabase.from("store_settings").select("key, value").in("key", ["margin_floor_pct", "fx_to_qar", "shipping"]),
+    supabase.from("store_settings").select("key, value").in("key", ["margin_floor_pct", "fx_to_qar", "shipping", HOLIDAYS_KEY]),
   ]);
 
   const suppliers = (suppliersRes.data ?? []) as Supplier[];
   const counts: Record<string, number> = {};
   for (const o of offersRes.rows) counts[o.supplier_id] = (counts[o.supplier_id] ?? 0) + 1;
   const setting = (k: string) => settingsRes.data?.find((r) => r.key === k)?.value;
+  // null = no holidays row yet (0054 not run): the editor says so and cannot save.
+  const holidaysRow = settingsRes.data?.find((r) => r.key === HOLIDAYS_KEY);
+  const holidays = holidaysRow ? parseHolidays(holidaysRow.value) : null;
 
   const coverage: Coverage | null =
     offersRes.error || partsRes.error
@@ -141,6 +146,7 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
       {Boolean(setting("shipping")) && (
         <ShippingSettingsEditor locale={locale} initial={setting("shipping") as ShippingSettings} />
       )}
+      <HolidaySettingsEditor locale={locale} initial={holidays} />
     </div>
   );
 }

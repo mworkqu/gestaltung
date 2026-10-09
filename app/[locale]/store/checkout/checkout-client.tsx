@@ -393,7 +393,10 @@ export default function CheckoutClient() {
             )}
             {anyToConfirm && <p className="text-[12px] text-mutedtext">{tD("tbcNote")}</p>}
             {quoteError && <p className="text-[12px] font-medium text-destructive">{tD("quoteError")}</p>}
-            <p className="text-[11px] text-faint">{tD("promiseNote")}</p>
+            <p className="text-[11px] text-faint">
+              {tD("promiseNote")}
+              {quote?.working_days && <> {tD("workingDaysNote")}</>}
+            </p>
           </fieldset>
 
           <fieldset className="space-y-2">

@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmail } from "@/lib/email";
 import { confirmationEmail, type OrderForEmail } from "@/lib/store/order-email";
+import { HOLIDAYS_KEY } from "@/lib/store/working-days";
 
 // Order confirmation email with the promised date(s) (Task 18d). Called by
 // checkout right after create_part_order. A guest can't read their own order
@@ -43,10 +44,13 @@ export async function POST(request: Request) {
     ? await db.from("parts").select("id, name_ar").in("id", partIds)
     : { data: [] as { id: string; name_ar: string | null }[] };
   const arById = new Map((arNames ?? []).map((p) => [p.id, p.name_ar] as const));
+  // 0054: the promised dates are working-day dates once store_settings.holidays exists.
+  const { data: holidaysRow } = await db.from("store_settings").select("key").eq("key", HOLIDAYS_KEY).maybeSingle();
   const mail = confirmationEmail(
     order as OrderForEmail,
     (items ?? []).map(({ part_id, ...i }) => ({ ...i, part_name_ar: part_id ? arById.get(part_id) ?? null : null })),
     locale,
+    { workingDays: Boolean(holidaysRow) },
   );
   const sent = await sendEmail({ to: [order.customer_email], ...mail });
   if (!sent) await db.from("part_orders").update({ confirmation_emailed_at: null }).eq("id", orderId);

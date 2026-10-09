@@ -160,3 +160,24 @@ describe("confirmationEmail Arabic half", () => {
 import { paymentBlock as paymentBlockImport } from "./order-email";
 const paymentBlockAr = () =>
   paymentBlockImport({ id: "abcdef12-0000-0000-0000-000000000000", total_qar: 125.5, payment_method: "bank_transfer" }, "ar");
+
+import { dateChangeEmail, WORKING_DAYS_NOTE_AR, WORKING_DAYS_NOTE_EN } from "@/lib/store/order-email";
+
+describe("working-days note (P2-06)", () => {
+  const items = [{ part_name: "Relay", quantity: 1, unit_price_qar: 12, lead_time_class: "in_stock" }];
+  it("is in both halves of a dated confirmation when the dates are working-day dates", () => {
+    const html = confirmationEmail({ ...base, promised_date: "2026-12-28" }, items, "en", { workingDays: true }).html;
+    expect(html).toContain(WORKING_DAYS_NOTE_EN);
+    expect(html).toContain(WORKING_DAYS_NOTE_AR);
+    expect(html.split(WORKING_DAYS_NOTE_EN).length).toBe(2); // once
+  });
+  it("is left out without a date or before 0054", () => {
+    expect(confirmationEmail(base, items, "en", { workingDays: true }).html).not.toContain(WORKING_DAYS_NOTE_EN);
+    expect(confirmationEmail({ ...base, promised_date: "2026-12-28" }, items).html).not.toContain(WORKING_DAYS_NOTE_EN);
+  });
+  it("is in the date-change email when there is a new date", () => {
+    expect(dateChangeEmail(base, "2026-12-28", "2026-12-31", ["Relay"], { workingDays: true }).html).toContain(WORKING_DAYS_NOTE_EN);
+    expect(dateChangeEmail(base, "2026-12-28", null, ["Relay"], { workingDays: true }).html).not.toContain(WORKING_DAYS_NOTE_EN);
+    expect(dateChangeEmail(base, "2026-12-28", "2026-12-31", ["Relay"]).html).not.toContain(WORKING_DAYS_NOTE_EN);
+  });
+});

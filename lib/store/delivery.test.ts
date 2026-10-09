@@ -121,3 +121,41 @@ describe("arrivesByDate (mirrors order_delivery_quote, Standard tier)", () => {
     expect(todayIso(new Date("2026-10-03T23:30:00Z"))).toBe("2026-10-03");
   });
 });
+
+import { promiseDate } from "@/lib/store/delivery";
+
+describe("working days (P2-06, mirrors order_delivery_quote v3)", () => {
+  const QA = { weekend: [5, 6], dates: ["2026-12-18", "2026-12-19"] };
+
+  it("promiseDate: supplier lead in calendar days, our days in working days", () => {
+    // Worked example: Thu 17 Dec, in_stock lead 2 (→ Sat 19), then 1 handling + 3 transit + 3 buffer = 7
+    // working days: Sun 20 … Thu 24 (5), Sun 27 (6), Mon 28 (7).
+    expect(promiseDate("2026-12-17", 2, 7, QA)).toBe("2026-12-28");
+    // Without a lead the answer is the same here (Fri 18 / Sat 19 are skipped anyway).
+    expect(promiseDate("2026-12-17", 0, 7, QA)).toBe("2026-12-28");
+    // No holidays row (before 0054): calendar days, as the 0044 quote.
+    expect(promiseDate("2026-12-17", 2, 7, null)).toBe("2026-12-26");
+  });
+  it("promiseDate with 0 own days still rolls off a weekend", () => {
+    expect(promiseDate("2026-10-14", 2, 0, QA)).toBe("2026-10-18"); // Wed + 2 = Fri → Sun
+  });
+  it("arrivesByDate uses the holidays in the settings", () => {
+    const settings = { handlingDays: 1, bufferDays: 3, standardTransitDays: 3, holidays: QA };
+    expect(arrivesByDate("in_stock", settings, "2026-12-17")).toBe("2026-12-28");
+    // 1_2_weeks: 17 Dec + 14 = Thu 31 Dec, + 7 working days: Sun 3 … Thu 7 (5), Sun 10 (6), Mon 11 (7).
+    expect(arrivesByDate("1_2_weeks", settings, "2026-12-17")).toBe("2027-01-11");
+    expect(arrivesByDate("in_stock", { ...settings, holidays: null }, "2026-12-17")).toBe("2026-12-26");
+  });
+  it("reviewPromise recomputes with working days", () => {
+    const r = reviewPromise([{ sold: "in_stock", current: "3_5_days" }], {
+      orderDate: "2026-12-17",
+      oldDate: "2026-12-28",
+      handlingDays: 1,
+      transitDays: 3,
+      bufferDays: 3,
+      holidays: QA,
+    });
+    // 17 Dec + 5 = Tue 22 Dec, + 7 working days: Wed 23, Thu 24, Sun 27, Mon 28, Tue 29, Wed 30, Thu 31.
+    expect(r).toEqual({ changed: [0], newDate: "2026-12-31" });
+  });
+});

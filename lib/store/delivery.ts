@@ -5,6 +5,7 @@
 // are "date to be confirmed", the cron's re-check of a promised date).
 
 import type { LeadTimeClass } from "@/lib/store/sourcing";
+import { addWorkingDays, type Holidays } from "@/lib/store/working-days";
 
 export const SHIPPING_TIERS = ["express", "standard", "economy"] as const;
 export type ShippingTier = (typeof SHIPPING_TIERS)[number];
@@ -40,6 +41,8 @@ export type DeliveryQuote = {
    * server's goods subtotal for these lines (see lib/store/shipping.ts).
    */
   free_shipping?: FreeShippingQuote | null;
+  /** 0054: the dates skip the Qatar weekend + public holidays (absent before). */
+  working_days?: boolean;
 };
 
 export type FreeShippingQuote = {
@@ -107,7 +110,28 @@ export type ShippingSettings = {
   handlingDays: number;
   bufferDays: number;
   standardTransitDays: number;
+  /**
+   * store_settings.holidays (0054), parsed. null/absent = the row does not
+   * exist yet (0054 not run): calendar days, exactly like the 0044 quote.
+   */
+  holidays?: Holidays | null;
 };
+
+/**
+ * The promise date (mirrors order_delivery_quote v3, 0054): the supplier lead
+ * in CALENDAR days, then our handling + transit + buffer in Qatar WORKING
+ * days, rolled forward off a weekend/holiday. Without a holidays setting
+ * (before 0054) everything is calendar days, as the 0044 quote does.
+ */
+export function promiseDate(
+  from: string,
+  leadDays: number,
+  ourDays: number,
+  holidays: Holidays | null | undefined
+): string {
+  if (!holidays) return addDays(from, leadDays + ourDays);
+  return addWorkingDays(addDays(from, leadDays), ourDays, holidays);
+}
 
 const wholeDays = (v: unknown, fallback: number): number => {
   if (v === null || v === undefined || v === "") return fallback;
@@ -134,9 +158,9 @@ export function parseShippingSettings(value: unknown): ShippingSettings | null {
 
 /**
  * "Arrives by" for one product on the Standard tier, without a database call:
- * from + lead-class days + handling + standard transit + buffer. The same sum
- * as order_delivery_quote's tiers.standard.date for a single line (quantity
- * does not move dates). Null for a product on request (no lead class) or when
+ * promiseDate(from, lead-class days, handling + standard transit + buffer).
+ * The same date as order_delivery_quote's tiers.standard.date for a single
+ * line (quantity does not move dates). Null for a product on request (no lead class) or when
  * the settings are missing.
  */
 export function arrivesByDate(
@@ -146,7 +170,7 @@ export function arrivesByDate(
 ): string | null {
   if (!leadTimeClass || !settings) return null;
   const lead = LEAD_CLASS_DAYS[leadTimeClass] ?? 28;
-  return addDays(from, lead + settings.handlingDays + settings.standardTransitDays + settings.bufferDays);
+  return promiseDate(from, lead, settings.handlingDays + settings.standardTransitDays + settings.bufferDays, settings.holidays);
 }
 
 /** One order line as the delivery-promises cron sees it. */
@@ -166,13 +190,21 @@ export type PromiseLine = {
  */
 export function reviewPromise(
   lines: readonly PromiseLine[],
-  o: { orderDate: string; oldDate: string; handlingDays: number; transitDays: number; bufferDays: number }
+  o: {
+    orderDate: string;
+    oldDate: string;
+    handlingDays: number;
+    transitDays: number;
+    bufferDays: number;
+    /** store_settings.holidays parsed; null = row missing (calendar days, pre-0054). */
+    holidays?: Holidays | null;
+  }
 ): { changed: number[]; newDate: string | null } | null {
   const datable = lines.map((l, i) => ({ ...l, i })).filter((l) => l.sold !== null);
   const changed = datable.filter((l) => l.current !== l.sold).map((l) => l.i);
   if (!changed.length) return null;
   if (datable.some((l) => !l.current)) return { changed, newDate: null };
   const lead = Math.max(...datable.map((l) => LEAD_CLASS_DAYS[l.current as LeadTimeClass] ?? 28));
-  const recomputed = addDays(o.orderDate, lead + o.handlingDays + o.transitDays + o.bufferDays);
+  const recomputed = promiseDate(o.orderDate, lead, o.handlingDays + o.transitDays + o.bufferDays, o.holidays);
   return { changed, newDate: recomputed > o.oldDate ? recomputed : o.oldDate };
 }

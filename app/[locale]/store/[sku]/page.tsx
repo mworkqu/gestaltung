@@ -27,7 +27,14 @@ import { cn } from "@/lib/utils";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { productDetailsForLocale } from "@/lib/store/product-details";
 import { clipText, ogProductImage, pageMetadata } from "@/lib/seo";
-import { getMergedRedirectSku, getProductDeliveryQuote, getPublishedPart } from "@/lib/store/public-catalog";
+import {
+  getHolidays,
+  getMergedRedirectSku,
+  getPartSource,
+  getProductDeliveryQuote,
+  getPublishedPart,
+} from "@/lib/store/public-catalog";
+import { backupLine, leadInSentence, sourceLine } from "@/lib/store/part-source";
 import { GALLERY_SIZES, IMAGE_WIDTHS, sizedImage, sizedSrcSet } from "@/lib/store/image-url";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 
@@ -112,6 +119,24 @@ export default async function PartDetailPage({
   const standardDate =
     quote?.tiers?.standard?.date ??
     (onRequest ? null : arrivesByDate(part.lead_time_class, await loadShippingSettings()));
+  // Dates skip the Qatar weekend + holidays once 0054 has run (the quote says
+  // so; the TS fallback has the setting) — then the note is shown once.
+  const workingDays = Boolean(quote?.working_days) || (!quote && Boolean(await getHolidays()));
+  // Source line (P2-07): supplier name + lead class only — never a cost.
+  const source = await getPartSource(part.id);
+  const srcLine = sourceLine(source, part.lead_time_class);
+  const sourceText =
+    !srcLine || srcLine.kind === "on_request" // the LeadTimeBadge above already says "Available on request"
+      ? null
+      : srcLine.kind === "stocked_local"
+        ? t("sourceStockedLocal", { supplier: srcLine.supplier })
+        : srcLine.kind === "sourced"
+          ? t("sourceFrom", { supplier: srcLine.supplier })
+          : t("sourceFromLead", {
+              supplier: srcLine.supplier,
+              lead: leadInSentence(tDelivery(`lt_${srcLine.leadTimeClass}`), locale),
+            });
+  const backup = backupLine(source);
   // Cheapest tier at its normal price (0044); shown beside the date.
   const deliveryFrom = minDeliveryFrom(quote?.tiers);
   const deliveryFromLine =
@@ -228,8 +253,25 @@ export default async function PartDetailPage({
                       .join(" · ")}
                   </p>
                 )}
+                {workingDays && <p className="mt-1 text-xs text-mutedtext">{tDelivery("workingDaysNote")}</p>}
               </div>
             )
+          )}
+
+          {(sourceText || backup) && (
+            <div className="space-y-0.5 text-sm">
+              {sourceText && <p className="text-body">{sourceText}</p>}
+              {backup && (
+                <p className="text-mutedtext">
+                  <Link
+                    href={`/store/${encodeURIComponent(backup.sku)}`}
+                    className="inline-flex items-center hover:text-heading hover:underline max-md:min-h-11"
+                  >
+                    {t("sourceBackup", { supplier: backup.supplier })}
+                  </Link>
+                </p>
+              )}
+            </div>
           )}
 
           <div className="flex flex-wrap items-center gap-3">

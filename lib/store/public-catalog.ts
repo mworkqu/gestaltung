@@ -29,6 +29,8 @@ import { CATALOG_TAG, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/st
 import { parseTrustedBy, TRUSTED_BY_KEY, type TrustedLogo } from "@/lib/trust";
 import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServicePrices } from "@/lib/pricing/defaults";
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
+import { HOLIDAYS_KEY, parseHolidays, type Holidays } from "@/lib/store/working-days";
+import { parsePartSource, withoutPrivateFields, type PartSource } from "@/lib/store/part-source";
 
 const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
 
@@ -189,14 +191,15 @@ export const getFeaturedParts = unstable_cache(
   CACHE,
 );
 
-/** A published product by SKU (full row: the product page needs description/specs), or null. */
+/** A published product by SKU (the product page needs description/specs; private sourcing fields dropped), or null. */
 export const getPublishedPart = unstable_cache(
   async (sku: string): Promise<Part | null> => {
     const supabase = createPublicClient();
     if (!supabase) return null;
     // select("*"): specs_ar (0047) may not exist yet, so no named columns here.
     const { data } = await supabase.from("parts").select("*").eq("sku", sku).eq("is_published", true).maybeSingle();
-    return (data as Part | null) ?? null;
+    // Cost / income / sourcing internals never enter the cached public row (P2-07).
+    return data ? withoutPrivateFields(data as Part) : null;
   },
   ["store:part"],
   CACHE,
@@ -269,4 +272,42 @@ export const getServicePrices = unstable_cache(
   },
   ["store-settings:service-prices"],
   { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/**
+ * store_settings.holidays (P2-06, 0054): the weekend + public holidays that
+ * every promise date skips. null when the row does not exist (0054 not run):
+ * callers then keep calendar days, exactly like the database before 0054.
+ */
+export const getHolidays = unstable_cache(
+  async (): Promise<Holidays | null> => {
+    const supabase = createPublicClient();
+    if (!supabase) return null;
+    const { data, error } = await supabase.from("store_settings").select("value").eq("key", HOLIDAYS_KEY).maybeSingle();
+    if (error || !data) return null;
+    return parseHolidays(data.value);
+  },
+  ["store-settings:holidays"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/**
+ * Where a product comes from, for the product page's "Source" line (P2-07):
+ * part_public_source() (0054, SECURITY DEFINER) returns ONLY the preferred
+ * offer's supplier code, the lead class and the backup product's sku /
+ * supplier code / lead class — never a cost, landed cost, income or margin
+ * (suppliers and supplier_offers stay admin-only). null before 0054 runs or
+ * when the product is not published. Same tags as the product read: offer and
+ * supplier writes call revalidateStorefront().
+ */
+export const getPartSource = unstable_cache(
+  async (partId: string): Promise<PartSource | null> => {
+    const supabase = createPublicClient();
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc("part_public_source", { p_part: partId });
+    if (error) return null;
+    return parsePartSource(data);
+  },
+  ["store:part-source"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG, SETTINGS_TAG] },
 );

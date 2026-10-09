@@ -84,6 +84,20 @@ const bdi = (text: string) => `<bdi>${e(text)}</bdi>`;
 const shipping = (o: Pick<OrderForEmail, "shipping_qar">, locale: "en" | "ar") =>
   Number(o.shipping_qar) > 0 ? (locale === "en" ? qar(o.shipping_qar) : qarAr(o.shipping_qar)) : locale === "en" ? "Free delivery" : "توصيل مجاني";
 
+// P2-06 (0054): promise dates skip the Qatar weekend and public holidays.
+// Said once per email, only when the dates were computed that way.
+export const WORKING_DAYS_NOTE_EN = "Working days are Sun–Thu; weekends and Qatar public holidays are not counted.";
+export const WORKING_DAYS_NOTE_AR = "أيام العمل من الأحد إلى الخميس؛ ولا تُحتسب عطلة نهاية الأسبوع والعطلات الرسمية في قطر.";
+
+/** Options shared by the order emails. */
+export type OrderEmailOptions = {
+  /** The dates are working-day dates (store_settings.holidays exists, 0054). */
+  workingDays?: boolean;
+};
+
+const workingDaysNote = (locale: "en" | "ar") =>
+  `<p style="font-size:12px;color:#555">${locale === "en" ? WORKING_DAYS_NOTE_EN : WORKING_DAYS_NOTE_AR}</p>`;
+
 function dates(o: OrderForEmail, locale: "en" | "ar", hasOnRequest: boolean) {
   // Nothing in the order is datable yet.
   if (!o.promised_date) {
@@ -120,8 +134,14 @@ function datedLine(o: OrderForEmail, locale: "en" | "ar") {
  * customer's language). `locale` only decides which half comes first: the
  * Arabic half leads for an Arabic checkout, and the subject follows.
  */
-export function confirmationEmail(o: OrderForEmail, items: Item[], locale: "en" | "ar" = "en") {
+export function confirmationEmail(
+  o: OrderForEmail,
+  items: Item[],
+  locale: "en" | "ar" = "en",
+  opts: OrderEmailOptions = {}
+) {
   const ref = o.id.slice(0, 8);
+  const note = (l: "en" | "ar") => (opts.workingDays && o.promised_date ? workingDaysNote(l) : "");
   const hasOnRequest = o.has_on_request ?? items.some((i) => !i.lead_time_class);
   const rows = (lead: Record<string, string>, tbc: string, ar: boolean) =>
     items
@@ -136,6 +156,7 @@ export function confirmationEmail(o: OrderForEmail, items: Item[], locale: "en" 
   const enBlock = `<div>
 <p>Hi ${e(o.customer_name)},</p>
 <p>Thanks for your order <b>${ref}</b>. ${dates(o, "en", hasOnRequest)}</p>
+${note("en")}
 <table cellpadding="4" style="border-collapse:collapse">${rows(LEAD_EN, TBC_EN, false)}
 <tr><td>Shipping — ${tierEn}${o.split_shipments ? " × 2 shipments" : ""}</td><td></td><td align="right">${shipping(o, "en")}</td></tr>
 ${Number(o.handling_fee_qar) > 0 ? `<tr><td>Handling fee</td><td></td><td align="right">${qar(o.handling_fee_qar)}</td></tr>` : ""}
@@ -146,6 +167,7 @@ ${paymentBlock(o, "en")}
   const arBlock = `<div dir="rtl">
 <p>مرحباً ${bdi(o.customer_name)}،</p>
 <p>شكراً لطلبك <b dir="ltr">${ref}</b>. ${dates(o, "ar", hasOnRequest)}</p>
+${note("ar")}
 <table cellpadding="4" style="border-collapse:collapse">${rows(LEAD_AR, TBC_AR, true)}
 <tr><td>الشحن — ${tierAr}${o.split_shipments ? " × شحنتين" : ""}</td><td></td><td>${shipping(o, "ar")}</td></tr>
 ${Number(o.handling_fee_qar) > 0 ? `<tr><td>رسوم التجهيز</td><td></td><td>${qarAr(o.handling_fee_qar)}</td></tr>` : ""}
@@ -170,7 +192,14 @@ ${arBlock}`}
 }
 
 /** newDate null = we can no longer date it (the supplier offer is gone). */
-export function dateChangeEmail(o: OrderForEmail, oldDate: string, newDate: string | null, changed: string[]) {
+export function dateChangeEmail(
+  o: OrderForEmail,
+  oldDate: string,
+  newDate: string | null,
+  changed: string[],
+  opts: OrderEmailOptions = {}
+) {
+  const note = (l: "en" | "ar") => (opts.workingDays && newDate ? workingDaysNote(l) : "");
   const ref = o.id.slice(0, 8);
   const list = changed.map((c) => e(c)).join(", ");
   const listAr = changed.map((c) => bdi(c)).join("، ");
@@ -187,6 +216,6 @@ export function dateChangeEmail(o: OrderForEmail, oldDate: string, newDate: stri
       : `تغيّرت مدة توريد ${listAr}. موعد التوصيل <b>${formatDeliveryDate(oldDate, "ar")}</b> ما زال قائماً.`;
   return {
     subject: later ? `Order ${ref}: new delivery date | موعد جديد لطلبك` : `Order ${ref}: delivery date unchanged | موعد طلبك`,
-    html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111"><p>Hi ${e(o.customer_name)},</p><p>${en}</p><hr/><div dir="rtl"><p>${ar}</p></div></div>`,
+    html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111"><p>Hi ${e(o.customer_name)},</p><p>${en}</p>${note("en")}<hr/><div dir="rtl"><p>${ar}</p>${note("ar")}</div></div>`,
   };
 }

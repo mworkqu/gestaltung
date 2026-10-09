@@ -1,4 +1,4 @@
-// Reads store_settings.shipping (anon client; the setting is public) so every
+// Reads store_settings.shipping + holidays (anon client; both are public) so every
 // product card on a page can compute its "Arrives by" date without a database
 // call of its own. React's cache() dedupes the read within a render;
 // unstable_cache keeps it across renders (tag "store-settings", 5 minutes) so
@@ -10,6 +10,7 @@ import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/public";
 import { parseShippingSettings, type ShippingSettings } from "@/lib/store/delivery";
 import { SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
+import { getHolidays } from "@/lib/store/public-catalog";
 
 const readShippingValue = unstable_cache(
   async (): Promise<unknown> => {
@@ -22,6 +23,9 @@ const readShippingValue = unstable_cache(
   { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
 );
 
+/** Shipping settings + the working-day calendar (0054; null before it runs). */
 export const loadShippingSettings = cache(async (): Promise<ShippingSettings | null> => {
-  return parseShippingSettings(await readShippingValue());
+  const [value, holidays] = await Promise.all([readShippingValue(), getHolidays()]);
+  const settings = parseShippingSettings(value);
+  return settings ? { ...settings, holidays } : null;
 });

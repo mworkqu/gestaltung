@@ -6,6 +6,7 @@ import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { AVAILABILITIES, PRICING_MODES, type Availability, type PricingMode } from "@/lib/store/sourcing";
 import { revalidateStorefront } from "@/lib/cache/storefront";
+import { HOLIDAYS_KEY, isIsoDate, parseHolidays } from "@/lib/store/working-days";
 
 // Suppliers, supplier offers and pricing modes (Task 16). super_admin only —
 // checked here and again by RLS. The derived product fields are recomputed by
@@ -197,4 +198,30 @@ export async function saveShippingSettings(locale: string, s: ShippingSettings) 
   if (error) return { error: error.message };
   revalidate(locale);
   return { ok: true };
+}
+
+/**
+ * Public-holiday dates (P2-06, store_settings.holidays from 0054). Only the
+ * dates are edited here; the weekend already stored is kept as it is. The row
+ * must exist (0054 creates it): saving before 0054 would make the TS dates
+ * skip holidays while the database quote still counted calendar days.
+ */
+export async function saveHolidays(locale: string, dates: string[]) {
+  await requireAdmin();
+  const clean = Array.from(new Set((Array.isArray(dates) ? dates : []).filter(isIsoDate))).sort();
+  const supabase = await createClient();
+  const { data: row, error: readError } = await supabase
+    .from("store_settings")
+    .select("value")
+    .eq("key", HOLIDAYS_KEY)
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!row) return { error: "run_0054" };
+  const value = { weekend: parseHolidays(row.value).weekend, dates: clean };
+  const { error } = await supabase
+    .from("store_settings")
+    .upsert({ key: HOLIDAYS_KEY, value, updated_at: new Date().toISOString() });
+  if (error) return { error: error.message };
+  revalidate(locale);
+  return { ok: true, dates: clean };
 }
