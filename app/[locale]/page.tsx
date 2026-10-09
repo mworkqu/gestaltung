@@ -25,6 +25,7 @@ import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { TrackClick } from "@/components/analytics/track-click";
 import { FeatureVideoSection } from "@/components/feature-video-section";
+import { YoutubeLinks } from "@/components/marketing/youtube-links";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
@@ -237,6 +238,9 @@ export default async function Home({
           />
         )}
       </section>
+
+      {/* Watch on YouTube: links only, renders nothing until the owner adds some. */}
+      <YoutubeLinks locale={locale} />
 
       {/* Featured products */}
       <section className="animate-fade-up delay-2 space-y-6">

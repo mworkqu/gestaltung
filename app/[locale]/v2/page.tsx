@@ -24,6 +24,7 @@ import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { TrackClick } from "@/components/analytics/track-click";
 import { FeatureVideoSection } from "@/components/feature-video-section";
+import { YoutubeLinks } from "@/components/marketing/youtube-links";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { BlueprintDecor, ChoiceHead, CreditsFlow, SectionHead, V2_TITLE } from "@/components/marketing/v2";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
@@ -251,6 +252,9 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
             />
           )}
         </section>
+
+        {/* 4b. Watch on YouTube: links only, renders nothing until the owner adds some. */}
+        <YoutubeLinks locale={locale} />
 
         {/* 5. Featured products (kits join this row once P3-07 lands). */}
         <section className="animate-fade-up delay-2 space-y-6">

@@ -31,6 +31,7 @@ import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServiceP
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
 import { HOLIDAYS_KEY, parseHolidays, type Holidays } from "@/lib/store/working-days";
 import { OCCASIONS_KEY, parseOccasions, type Occasion } from "@/lib/occasions";
+import { EMPTY_YOUTUBE, parseYoutube, YOUTUBE_KEY, type Youtube } from "@/lib/youtube";
 import { parsePartSource, withoutPrivateFields, type PartSource } from "@/lib/store/part-source";
 import { parseApprovedReviews, parseReviewCount, type ApprovedReview } from "@/lib/reviews/reviews";
 import {
@@ -316,6 +317,23 @@ export const getOccasions = unstable_cache(
     return parseOccasions(data?.value);
   },
   ["store-settings:occasions"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/**
+ * The studio's YouTube channel and video links (P4-05): store_settings.youtube,
+ * invalid entries dropped. Empty when the row is missing or the read fails. Same
+ * cookie-free anon client + "store-settings" tag as getOccasions, so the pages
+ * showing it stay static / ISR.
+ */
+export const getYoutube = unstable_cache(
+  async (): Promise<Youtube> => {
+    const supabase = createPublicClient();
+    if (!supabase) return EMPTY_YOUTUBE;
+    const { data } = await supabase.from("store_settings").select("value").eq("key", YOUTUBE_KEY).maybeSingle();
+    return parseYoutube(data?.value);
+  },
+  ["store-settings:youtube"],
   { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
 );
 

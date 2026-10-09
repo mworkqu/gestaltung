@@ -61,6 +61,7 @@ export default async function DashboardLayout({
             { href: "/dashboard/store/gaps", label: t("sourcingGaps") },
             { href: "/dashboard/store/occasions", label: t("occasions") },
             { href: "/dashboard/store/discounts", label: t("discounts") },
+            { href: "/dashboard/store/youtube", label: t("youtube") },
           ],
         },
         {

@@ -11,6 +11,14 @@ const nextConfig = {
   // root" warning. Vercel builds from a clean checkout and are unaffected.
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
 
+  // P4-04: the case-study pages and the sitemap read content/case-studies at
+  // ISR time (fs), so the markdown files must ship with those functions.
+  outputFileTracingIncludes: {
+    "/[locale]/case-studies": ["./content/case-studies/**/*"],
+    "/[locale]/case-studies/[slug]": ["./content/case-studies/**/*"],
+    "/sitemap.xml": ["./content/case-studies/**/*"],
+  },
+
   // Phase G caching: /<locale>/store without query params is a static (ISR)
   // page. With any listing param (lib/store/catalog.ts STORE_URL_PARAMS —
   // keep the two lists in step; catalog.test.ts checks) the request is

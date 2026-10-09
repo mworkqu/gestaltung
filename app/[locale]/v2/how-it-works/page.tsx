@@ -19,6 +19,7 @@ import {
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { FeatureVideoSection } from "@/components/feature-video-section";
+import { YoutubeLinks } from "@/components/marketing/youtube-links";
 import { BlueprintDecor, V2_TITLE } from "@/components/marketing/v2";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { v2PageMetadata } from "@/lib/site-v2-server";
@@ -147,6 +148,9 @@ export default async function HowItWorksV2({ params }: { params: Promise<{ local
           {key === "idea" && <p className="text-sm text-mutedtext">{t("ideaLimits")}</p>}
         </section>
       ))}
+
+      {/* Watch on YouTube: links only, renders nothing until the owner adds some. */}
+      <YoutubeLinks locale={locale} />
 
       {/* Closing band: one WhatsApp link for people who need design help. */}
       <section className="animate-fade-up overflow-hidden rounded-[1.75rem] bg-ink p-8 sm:p-12">

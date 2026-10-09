@@ -21,6 +21,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
 import { FeatureVideoSection } from "@/components/feature-video-section";
+import { YoutubeLinks } from "@/components/marketing/youtube-links";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { cn } from "@/lib/utils";
 
@@ -134,6 +135,9 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
           {key === "idea" && <p className="mt-5 text-sm text-mutedtext">{t("ideaLimits")}</p>}
         </section>
       ))}
+
+      {/* Watch on YouTube: links only, renders nothing until the owner adds some. */}
+      <YoutubeLinks locale={locale} />
 
       {/* Closing CTA band: one WhatsApp link for people who need design help. */}
       <section className="animate-fade-up overflow-hidden rounded-[1.75rem] bg-ink p-8 sm:p-12">
