@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_KIND_SETTINGS,
+  ORDER_KINDS,
+  OUTBOX_KINDS,
   decide,
+  discountWindow,
+  isTransactional,
   dedupeKey,
   isRetryable,
   kindSettings,
@@ -55,9 +59,10 @@ describe("decide", () => {
     expect(decide(row({ email: null }), settings, prefs({ all_off: true }))).toEqual({ skip: "disabled" });
   });
 
-  it("discount_ready is disabled by default (missing setting)", () => {
-    expect(decide(row({ kind: "discount_ready" }), kindSettings(null), prefs())).toEqual({ skip: "disabled" });
-    expect(decide(row({ kind: "discount_ready" }), kindSettings({}), prefs())).toEqual({ skip: "disabled" });
+  it("discount_ready is ON by default since 0053 (missing setting), and the owner can switch it off", () => {
+    expect(decide(row({ kind: "discount_ready" }), kindSettings(null), prefs())).toBe("send");
+    expect(decide(row({ kind: "discount_ready" }), kindSettings({}), prefs())).toBe("send");
+    expect(decide(row({ kind: "discount_ready" }), kindSettings({ discount_ready: false }), prefs())).toEqual({ skip: "disabled" });
   });
 
   it("skips unknown kinds and rows without an unsubscribe token", () => {
@@ -72,7 +77,8 @@ describe("kindSettings", () => {
     const s = kindSettings({ first_project: false, first_circuit: "no", extra: true });
     expect(s.first_project).toBe(false);
     expect(s.first_circuit).toBe(true);
-    expect(s.discount_ready).toBe(false);
+    expect(s.discount_ready).toBe(true);
+    expect(s.order_delivered).toBe(true);
     expect(kindSettings([true])).toEqual(DEFAULT_KIND_SETTINGS);
   });
 });
@@ -121,5 +127,59 @@ describe("normaliseLocale", () => {
     expect(normaliseLocale("en")).toBe("en");
     expect(normaliseLocale("fr")).toBe("en");
     expect(normaliseLocale(null)).toBe("en");
+  });
+});
+
+describe("order status kinds (0053)", () => {
+  const order = (over: Partial<OutboxRow> = {}) => row({ kind: "order_shipped", payload: { ref: "ord1", order_id: "ord1" }, ...over });
+
+  it("are outbox kinds and transactional; credit kinds are not", () => {
+    for (const k of ORDER_KINDS) {
+      expect(OUTBOX_KINDS).toContain(k);
+      expect(isTransactional(k)).toBe(true);
+    }
+    expect(isTransactional("discount_ready")).toBe(false);
+    expect(isTransactional("nope")).toBe(false);
+  });
+
+  it("send without an unsubscribe token and ignore the per-kind / all opt-out", () => {
+    expect(decide(order(), allOn, null)).toBe("send");
+    expect(decide(order(), allOn, prefs({ token: null }))).toBe("send");
+    expect(decide(order(), allOn, prefs({ all_off: true, unsubscribed_kinds: ["order_shipped"] }))).toBe("send");
+  });
+
+  it("still need an email and respect the owner switch", () => {
+    expect(decide(order({ email: null }), allOn, null)).toEqual({ skip: "no_email" });
+    expect(decide(order(), kindSettings({ order_shipped: false }), null)).toEqual({ skip: "disabled" });
+  });
+});
+
+describe("discountWindow (30 days from the EARN day)", () => {
+  const now = new Date("2026-10-20T12:00:00Z");
+
+  it("uses valid_until (a Qatar day counts to its end)", () => {
+    const w = discountWindow({ earned_at: "2026-10-01", valid_until: "2026-10-31" }, now);
+    expect(w.validUntil).toBe("2026-10-31T20:59:59.000Z");
+    expect(w.earnedAt).toBe("2026-09-30T21:00:00.000Z");
+    expect(w.expired).toBe(false);
+  });
+
+  it("derives valid_until = earned_at + 30 days when the payload has none", () => {
+    const w = discountWindow({ earned_at: "2026-09-01T08:00:00Z" }, now);
+    expect(w.validUntil).toBe("2026-10-01T08:00:00.000Z");
+    expect(w.expired).toBe(true);
+  });
+
+  it("no dates → nothing expired, nothing to show", () => {
+    expect(discountWindow({}, now)).toEqual({ earnedAt: null, validUntil: null, expired: false });
+    expect(discountWindow(null, now)).toEqual({ earnedAt: null, validUntil: null, expired: false });
+    expect(discountWindow({ valid_until: "nonsense" }, now).validUntil).toBeNull();
+  });
+
+  it("decide skips an expired discount_ready (never emails a closed window)", () => {
+    const r = row({ kind: "discount_ready", payload: { ref: "s1", earned_at: "2026-09-01", valid_until: "2026-10-01" } });
+    expect(decide(r, allOn, prefs(), now)).toEqual({ skip: "expired" });
+    const open = row({ kind: "discount_ready", payload: { ref: "s2", earned_at: "2026-10-10", valid_until: "2026-11-09" } });
+    expect(decide(open, allOn, prefs(), now)).toBe("send");
   });
 });

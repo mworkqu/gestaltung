@@ -14,10 +14,13 @@
 //
 // Pure — the caller reads the rows (RLS scopes them to the signed-in user).
 
+// The 0053 set plus the two old values rows may still carry before 0053 runs.
 export type OrderStatus =
   | "pending"
   | "confirmed"
+  | "paid"
   | "processing"
+  | "sourcing"
   | "shipped"
   | "delivered"
   | "cancelled";

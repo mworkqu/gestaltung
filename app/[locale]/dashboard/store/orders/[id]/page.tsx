@@ -8,7 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/parts/format";
 import { DELIVERY_AREAS } from "@/lib/parts/constants";
-import { OrderStatusSelect } from "@/components/parts/order-status-select";
+import { OrderStatusControl } from "@/components/admin/order-status-control";
+import { normaliseOrderStatus } from "@/lib/orders/status";
 import { WhatsappSentToggle } from "@/components/parts/whatsapp-sent-toggle";
 import { cn } from "@/lib/utils";
 import { formatDeliveryDate } from "@/lib/store/delivery";
@@ -43,6 +44,17 @@ export default async function OrderDetailPage({
     .eq("order_id", id);
   // project_id arrives with 0025 (set only for a customer's own project).
   const items = (itemData ?? []) as (PartOrderItem & { project_id?: string | null })[];
+
+  // Status history (0053). Missing table before 0053 → null ("starts with 0053").
+  const { data: historyData, error: historyError } = await supabase
+    .from("order_status_history")
+    .select("id, status, note, changed_at, changed_by")
+    .eq("order_id", id)
+    .order("changed_at", { ascending: false });
+  const history = historyError
+    ? null
+    : ((historyData ?? []) as { id: string; status: string; note: string | null; changed_at: string; changed_by: string | null }[]);
+  const currentStatus = normaliseOrderStatus(order.status) ?? "confirmed";
 
   // Order <-> project (SITE_AUDIT #47): each line bought for a project links to
   // it (/projects/<id>; super_admin can open any project under RLS).
@@ -223,9 +235,38 @@ export default async function OrderDetailPage({
           <div className="neu space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
               <span className={mono("text-[10px] text-mutedtext")}>{t("colStatus")}</span>
-              <OrderStatusSelect id={order.id} status={order.status} />
+              <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-heading shadow-neu-inset">
+                {t(`order_status_${currentStatus}`)}
+              </span>
             </div>
-            <div className="flex items-center justify-between gap-3">
+            <div className="border-t border-borderstrong/40 pt-4">
+              <p className={mono("mb-3 text-[10px] text-mutedtext")}>{t("statusChange")}</p>
+              <OrderStatusControl key={currentStatus} id={order.id} status={currentStatus} />
+            </div>
+            <div className="border-t border-borderstrong/40 pt-4">
+              <p className={mono("mb-3 text-[10px] text-mutedtext")}>{t("historyTitle")}</p>
+              {history === null ? (
+                <p className="text-sm text-mutedtext">{t("historyNeedsMigration")}</p>
+              ) : history.length === 0 ? (
+                <p className="text-sm text-mutedtext">{t("historyEmpty")}</p>
+              ) : (
+                <ol className="space-y-3">
+                  {history.map((h) => {
+                    const s = normaliseOrderStatus(h.status);
+                    return (
+                      <li key={h.id} className="text-sm">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="font-semibold text-heading">{s ? t(`order_status_${s}`) : h.status}</span>
+                          <span className="text-[12px] text-mutedtext">{dateFmt.format(new Date(h.changed_at))}</span>
+                        </div>
+                        {h.note && <p className="mt-0.5 whitespace-pre-line text-body">{h.note}</p>}
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-borderstrong/40 pt-4">
               <span className={mono("text-[10px] text-mutedtext")}>{t("whatsappSent")}</span>
               <WhatsappSentToggle id={order.id} sent={order.whatsapp_sent} />
             </div>

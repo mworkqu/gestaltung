@@ -53,6 +53,9 @@ export const MESSAGE_SCOPES = {
   ],
   auth: ["Auth"],
   projects: ["Projects"],
+  // /orders/[id]: only PaymentInstructions is a client component; the rest of
+  // the Orders namespace is read on the server.
+  orders: ["PayMethods"],
   project: ["PartsDashboard", "ProjectCad", "Projects", "Prototyping", "Search"],
 } as const satisfies Record<string, readonly string[]>;
 

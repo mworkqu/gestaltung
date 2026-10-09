@@ -13,6 +13,11 @@ export type NotificationLinks = {
   projectsUrl: string;
   storeUrl: string;
   projectUrl?: string;
+  /** /<locale>/orders/<id>, order emails only. */
+  orderUrl?: string;
+  /** Five one-tap score links (1 → 5), order_delivered only. */
+  ratingUrls?: string[];
+  /** Empty for transactional (order) emails: the footer then has no unsubscribe line. */
   unsubscribeUrl: string;
   whatsappUrl: string;
 };
@@ -114,6 +119,7 @@ const COPY = {
     help: "Questions? Message us on WhatsApp",
     unsubscribe: "Unsubscribe from these emails",
     reason: "You are receiving this email because you have an account on Gestaltung360.",
+    orderReason: "You are receiving this email because you placed an order with Gestaltung360.",
   },
   ar: {
     brandStrip: `${COMPANY.legalNameAr} · س.ت ${COMPANY.crNumber}`,
@@ -126,6 +132,7 @@ const COPY = {
     help: "لديك سؤال؟ راسلنا على واتساب",
     unsubscribe: "إلغاء الاشتراك في هذه الرسائل",
     reason: "وصلتك هذه الرسالة لأن لديك حسابًا في Gestaltung360.",
+    orderReason: "وصلتك هذه الرسالة لأنك طلبت من Gestaltung360.",
   },
 } as const;
 
@@ -148,6 +155,10 @@ export type EmailDoc = {
   cta: { label: string; url: string };
   /** Include the shared "how to use your credits" block (default true). */
   howTo?: boolean;
+  /** One-tap rating row under the button: a question + one link per score. */
+  rating?: { question: string; options: { label: string; url: string }[] };
+  /** Order emails: "because you placed an order" instead of "because you have an account". */
+  orderEmail?: boolean;
 };
 
 export function buildEmail(doc: EmailDoc): Rendered {
@@ -156,6 +167,9 @@ export function buildEmail(doc: EmailDoc): Rendered {
   const ar = locale === "ar";
   const howTo = doc.howTo !== false;
   const learnUrl = creditsPageUrl(links, locale);
+  const unsub = links.unsubscribeUrl.trim();
+  const reason = doc.orderEmail ? c.orderReason : c.reason;
+  const rating = doc.rating?.options.length ? doc.rating : null;
 
   // ── plain text
   const text = [
@@ -167,12 +181,13 @@ export function buildEmail(doc: EmailDoc): Rendered {
     ...(doc.facts?.length ? [...doc.facts.map((f) => `${f.label}: ${f.value}`), ""] : []),
     `${doc.cta.label}: ${doc.cta.url}`,
     "",
+    ...(rating ? [rating.question, ...rating.options.map((o) => `${o.label}: ${o.url}`), ""] : []),
     ...(howTo ? [c.howTitle, ...c.how.flatMap((p) => ["", p]), "", `${c.howLink}: ${learnUrl}`, ""] : []),
     `${c.help}: ${COMPANY_WHATSAPP.display} ${links.whatsappUrl}`,
     "",
     "--",
-    c.reason,
-    `${c.unsubscribe}: ${links.unsubscribeUrl}`,
+    reason,
+    ...(unsub ? [`${c.unsubscribe}: ${unsub}`] : []),
   ].join("\n");
 
   // ── html (inline styles only)
@@ -185,6 +200,17 @@ export function buildEmail(doc: EmailDoc): Rendered {
             `<tr><td style="padding:2px ${ar ? "0 2px 14px" : "14px 2px 0"};color:#475569">${e(f.label)}</td><td style="padding:2px 0;font-weight:bold">${e(f.value)}</td></tr>`
         )
         .join("")}</table>`
+    : "";
+  const ratingHtml = rating
+    ? [
+        `<p style="margin:18px 0 8px;font-weight:bold;color:#0f172a">${e(rating.question)}</p>`,
+        `<table role="presentation" style="border-collapse:separate;border-spacing:6px 0;margin:0 0 6px"><tr>`,
+        ...rating.options.map(
+          (o) =>
+            `<td><a href="${e(o.url)}" style="display:inline-block;min-width:40px;padding:10px 0;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a;text-align:center;text-decoration:none;font-weight:bold;font-size:16px">${e(o.label)}</a></td>`
+        ),
+        `</tr></table>`,
+      ].join("")
     : "";
   const how = howTo
     ? [
@@ -203,11 +229,12 @@ export function buildEmail(doc: EmailDoc): Rendered {
     ...doc.paragraphs.map(para),
     facts,
     `<p style="margin:18px 0"><a href="${e(doc.cta.url)}" style="display:inline-block;padding:11px 20px;border-radius:10px;background:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:bold">${e(doc.cta.label)}</a></p>`,
+    ratingHtml,
     how,
     `<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 14px"/>`,
     `<p style="margin:0 0 8px;font-size:12px;color:#64748b">${e(c.help)}: <a href="${e(links.whatsappUrl)}" dir="ltr" style="color:#1d4ed8">${e(COMPANY_WHATSAPP.display)}</a></p>`,
-    `<p style="margin:0 0 4px;font-size:12px;color:#64748b">${e(c.reason)}</p>`,
-    `<p style="margin:0;font-size:12px"><a href="${e(links.unsubscribeUrl)}" style="color:#64748b">${e(c.unsubscribe)}</a></p>`,
+    `<p style="margin:0 0 4px;font-size:12px;color:#64748b">${e(reason)}</p>`,
+    unsub ? `<p style="margin:0;font-size:12px"><a href="${e(unsub)}" style="color:#64748b">${e(c.unsubscribe)}</a></p>` : "",
     `</div>`,
   ].join("");
 

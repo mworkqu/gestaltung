@@ -53,7 +53,7 @@ export async function AdminOverview({ locale }: { locale: string }) {
       db
         .from("part_orders")
         .select("id", { count: "exact", head: true })
-        .in("status", ["pending", "confirmed", "processing"])
+        .in("status", ["pending", "confirmed", "processing", "paid", "sourcing"])
         .not("is_test", "is", true)
     ),
     count(db.from("demand_signals").select("id", { count: "exact", head: true }).eq("kind", "request").is("served_at", null)),

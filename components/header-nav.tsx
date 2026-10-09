@@ -77,6 +77,7 @@ export function HeaderNav({
   ];
   const accountLinks = [
     { href: "/projects", label: t("myProjects") },
+    { href: "/orders", label: t("myOrders") },
     { href: "/my-inventory", label: t("myInventory") },
     { href: "/dashboard", label: t("dashboard") },
   ];

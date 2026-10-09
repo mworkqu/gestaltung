@@ -13,6 +13,7 @@ const links: NotificationLinks = {
   whatsappUrl: "https://wa.me/97466567410",
 };
 const LOCALES = ["en", "ar"] as const;
+const ORDER = "1a2b3c4d-0000-4000-8000-000000000001";
 const EVIL = "<script>alert(1)</script>";
 
 const payloads: Record<NotificationKind, Record<string, unknown>> = {
@@ -21,6 +22,12 @@ const payloads: Record<NotificationKind, Record<string, unknown>> = {
   first_project: { ref: "r3", project_id: "p1", project_name: "Plant monitor" },
   first_circuit: { ref: "r4", project_id: "p1", project_name: "Plant monitor", circuit_balance: 2, cad_balance: 1 },
   discount_ready: { ref: "r5", amount_qar: 20, valid_until: "2026-11-02T10:00:00Z" },
+  order_confirmed: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "confirmed", total_qar: 53.5 },
+  order_paid: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "paid", total_qar: 53.5 },
+  order_sourcing: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "sourcing" },
+  order_shipped: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "shipped", note: "Driver calls before noon" },
+  order_delivered: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "delivered" },
+  order_cancelled: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "cancelled" },
 };
 
 describe.each(NOTIFICATION_KINDS)("%s", (kind) => {
@@ -238,5 +245,107 @@ describe("helpers", () => {
     expect(formatDate("2026-11-02T10:00:00Z", "ar")).toMatch(/^2 .+ 2026$/);
     expect(formatDate("nope", "en")).toBeNull();
     expect(formatDate(undefined, "en")).toBeNull();
+  });
+});
+
+describe("order status emails", () => {
+  const ORDER_KINDS = ["order_confirmed", "order_paid", "order_sourcing", "order_shipped", "order_delivered", "order_cancelled"] as const;
+  const RATE = [1, 2, 3, 4, 5].map((n) => `https://gestaltung360.com/api/orders/rate?order=${ORDER}&score=${n}&l=en&t=tok${n}`);
+  const orderLinks: NotificationLinks = {
+    ...links,
+    unsubscribeUrl: "",
+    orderUrl: `https://gestaltung360.com/en/orders/${ORDER}`,
+    ratingUrls: RATE,
+  };
+
+  it.each(ORDER_KINDS)("%s: order number, order link, no unsubscribe, no credits block", (kind) => {
+    for (const locale of LOCALES) {
+      const o = renderNotification(kind, { locale, payload: payloads[kind], links: orderLinks });
+      expect(o.subject).toContain("1a2b3c4d");
+      expect(o.html).toContain(`href="${orderLinks.orderUrl}"`);
+      expect(o.text).toContain(orderLinks.orderUrl!);
+      expect(o.text).not.toContain(locale === "ar" ? "إلغاء الاشتراك" : "Unsubscribe");
+      expect(o.html).not.toContain("/api/notifications/unsubscribe");
+      expect(o.text).not.toContain(locale === "ar" ? "كيف تستخدم أرصدتك" : "How to use your credits");
+      expect(o.text).toContain(locale === "ar" ? "لأنك طلبت من" : "because you placed an order");
+    }
+  });
+
+  it("EN wording per status", () => {
+    const sub = (k: (typeof ORDER_KINDS)[number]) => renderNotification(k, { locale: "en", payload: payloads[k], links: orderLinks }).subject;
+    expect(sub("order_confirmed")).toBe("Order #1a2b3c4d confirmed");
+    expect(sub("order_paid")).toBe("Payment received for order #1a2b3c4d");
+    expect(sub("order_sourcing")).toBe("We are preparing order #1a2b3c4d");
+    expect(sub("order_shipped")).toBe("Order #1a2b3c4d is on its way");
+    expect(sub("order_delivered")).toBe("Order #1a2b3c4d delivered");
+    expect(sub("order_cancelled")).toBe("Order #1a2b3c4d cancelled");
+  });
+
+  it("AR wording", () => {
+    const o = renderNotification("order_shipped", { locale: "ar", payload: payloads.order_shipped, links: orderLinks });
+    expect(o.subject).toBe("طلبك رقم 1a2b3c4d في الطريق إليك");
+    expect(o.html).toContain('dir="rtl"');
+  });
+
+  it("shows the admin note, escaped", () => {
+    const o = renderNotification("order_shipped", { locale: "en", payload: payloads.order_shipped, links: orderLinks });
+    expect(o.text).toContain("Note from us: Driver calls before noon");
+    const evil = renderNotification("order_shipped", { locale: "en", payload: { ...payloads.order_shipped, note: EVIL }, links: orderLinks });
+    expect(evil.html).not.toContain(EVIL);
+    expect(evil.html).toContain(escapeHtml(EVIL));
+  });
+
+  it("total only on confirmed and paid", () => {
+    expect(renderNotification("order_confirmed", { locale: "en", payload: payloads.order_confirmed, links: orderLinks }).text).toContain("Order total: QAR 53.50");
+    expect(renderNotification("order_paid", { locale: "ar", payload: payloads.order_paid, links: orderLinks }).text).toContain("53.50 ر.ق");
+    expect(renderNotification("order_shipped", { locale: "en", payload: { ...payloads.order_shipped, total_qar: 10 }, links: orderLinks }).text).not.toContain("Order total");
+  });
+
+  it("delivered: one-tap rating row with five links, in order", () => {
+    const o = renderNotification("order_delivered", { locale: "en", payload: payloads.order_delivered, links: orderLinks });
+    expect(o.text).toContain("How did we do?");
+    RATE.forEach((url, i) => {
+      expect(o.text).toContain(`${i + 1}: ${url}`);
+      expect(o.html).toContain(`href="${escapeHtml(url)}"`);
+    });
+    expect(o.html.indexOf(escapeHtml(RATE[0]))).toBeLessThan(o.html.indexOf(escapeHtml(RATE[4])));
+  });
+
+  it("no rating row on other statuses, or without five links", () => {
+    expect(renderNotification("order_shipped", { locale: "en", payload: payloads.order_shipped, links: orderLinks }).text).not.toContain("How did we do?");
+    const noRate = renderNotification("order_delivered", { locale: "en", payload: payloads.order_delivered, links: { ...orderLinks, ratingUrls: undefined } });
+    expect(noRate.text).not.toContain("How did we do?");
+  });
+
+  it("keeps the unsubscribe link when one is given (preview / old callers)", () => {
+    const o = renderNotification("order_paid", { locale: "en", payload: payloads.order_paid, links });
+    expect(o.text).toContain(links.unsubscribeUrl);
+  });
+
+  it("falls back to /orders without an order link, and strips junk from the reference", () => {
+    const o = renderNotification("order_cancelled", {
+      locale: "en",
+      payload: { order_short: "<b>1a2b3c4d9999</b>" },
+      links: { ...orderLinks, orderUrl: undefined },
+    });
+    expect(o.text).toContain("https://gestaltung360.com/en/orders");
+    expect(o.subject).toBe("Order #b1a2b3c4 cancelled");
+  });
+});
+
+describe("discount_ready dated from the earn day", () => {
+  it("mentions the earn date and uses valid_until", () => {
+    const o = renderNotification("discount_ready", {
+      locale: "en",
+      payload: { amount_qar: 20, earned_at: "2026-10-01", valid_until: "2026-10-31" },
+      links,
+    });
+    expect(o.text).toContain("valid until 31 October 2026");
+    expect(o.text).toContain("from the day you earned the credit (1 October 2026)");
+  });
+
+  it("derives valid_until from earned_at + 30 days when missing", () => {
+    const o = renderNotification("discount_ready", { locale: "en", payload: { earned_at: "2026-10-01T09:00:00Z" }, links });
+    expect(o.text).toContain("valid until 31 October 2026");
   });
 });

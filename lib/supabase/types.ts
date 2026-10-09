@@ -81,10 +81,12 @@ export type Part = {
   updated_at: string;
 };
 
+// 0053 set; rows read before 0053 runs may still say "pending"/"processing"
+// (normaliseOrderStatus in lib/orders/status.ts maps them).
 export type PartOrderStatus =
-  | "pending"
   | "confirmed"
-  | "processing"
+  | "paid"
+  | "sourcing"
   | "shipped"
   | "delivered"
   | "cancelled";

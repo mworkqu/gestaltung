@@ -50,3 +50,28 @@ describe("links", () => {
     expect(h["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
   });
 });
+
+describe("buildLinks: order emails (0053)", () => {
+  const ORDER = "1a2b3c4d-0000-4000-8000-000000000001";
+
+  it("adds the order page and, with a secret, five rating links", () => {
+    const l = buildLinks({ siteUrl: "https://gestaltung360.com/", locale: "ar", token: "t", kind: "order_delivered", orderId: ORDER, ratingSecret: "s3cret", transactional: true });
+    expect(l.orderUrl).toBe(`https://gestaltung360.com/ar/orders/${ORDER}`);
+    expect(l.ratingUrls).toHaveLength(5);
+    expect(l.ratingUrls![0]).toContain(`/api/orders/rate?order=${ORDER}&score=1&l=ar&t=`);
+    expect(l.ratingUrls![4]).toContain("score=5");
+    expect(l.unsubscribeUrl).toBe("");
+  });
+
+  it("no rating links without a secret or a real order id; no order link for junk ids", () => {
+    expect(buildLinks({ siteUrl: "https://x.test", locale: "en", token: "t", kind: "order_delivered", orderId: ORDER }).ratingUrls).toBeUndefined();
+    const junk = buildLinks({ siteUrl: "https://x.test", locale: "en", token: "t", kind: "order_paid", orderId: "../../etc", ratingSecret: "s" });
+    expect(junk.orderUrl).toBeUndefined();
+    expect(junk.ratingUrls).toBeUndefined();
+  });
+
+  it("credit emails keep their unsubscribe link", () => {
+    const l = buildLinks({ siteUrl: "https://x.test", locale: "en", token: "tok", kind: "discount_ready" });
+    expect(l.unsubscribeUrl).toContain("/api/notifications/unsubscribe?token=tok");
+  });
+});

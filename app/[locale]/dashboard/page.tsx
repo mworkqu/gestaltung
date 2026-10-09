@@ -74,7 +74,7 @@ export default async function DashboardPage({
         count: t("ordersCount", { count: orderCount }),
         empty: orderCount === 0,
         emptyCopy: t("ordersEmpty"),
-        href: "/store",
+        href: orderCount === 0 ? "/store" : "/orders",
         linkLabel: orderCount === 0 ? t("ordersEmptyLink") : t("ordersLink"),
       },
       {

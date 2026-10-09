@@ -11,14 +11,13 @@
 // Pure and client-safe.
 
 import type { PartOrderStatus } from "@/lib/supabase/types";
+import { normaliseOrderStatus } from "@/lib/orders/status";
 import type { Fulfilled } from "./bom";
 
 export type FulfilledLabel =
   | { kind: "bought" }
   | { kind: "delivered"; ref: string }
   | { kind: "ordered"; ref: string; status: PartOrderStatus };
-
-const STATUSES: readonly string[] = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 
 /** The short order reference customers see elsewhere (checkout success, admin): first 8 characters. */
 export function orderRef(orderId: string): string {
@@ -46,8 +45,9 @@ export function fulfilledLabel(
   if (!f) return null;
   const id = typeof f.orderId === "string" && f.orderId ? f.orderId : null;
   if (!id || !statuses) return { kind: "bought" };
-  const status = statuses.get(id);
-  if (!status || !STATUSES.includes(status)) return { kind: "bought" };
+  // Old (pre-0053) values map onto the new set: pending → confirmed, processing → sourcing.
+  const status = normaliseOrderStatus(statuses.get(id));
+  if (!status) return { kind: "bought" };
   if (status === "delivered") return { kind: "delivered", ref: orderRef(id) };
   return { kind: "ordered", ref: orderRef(id), status: status as PartOrderStatus };
 }

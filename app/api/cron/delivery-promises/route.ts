@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { dateChangeEmail, type OrderForEmail } from "@/lib/store/order-email";
 import { reviewPromise } from "@/lib/store/delivery";
+import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
 
 // Daily (vercel.json cron): for every open order whose promised date hasn't
 // passed, compare each item's lead-time class now with the one it was sold
@@ -18,7 +19,8 @@ import { reviewPromise } from "@/lib/store/delivery";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const OPEN = ["pending", "confirmed", "processing"];
+// Not yet shipped: the 0053 set (confirmed, paid, sourcing) and the old one (pending, processing).
+const OPEN = OPEN_ORDER_STATUSES.filter((s) => s !== "shipped");
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;

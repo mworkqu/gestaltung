@@ -45,6 +45,7 @@ import { Tag } from "@/components/ui/tag";
 import { ProjectUnavailable } from "@/components/projects/project-unavailable";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { normaliseOrderStatus } from "@/lib/orders/status";
 import type {
   Part,
   Project,
@@ -930,7 +931,8 @@ function ItemStatusTags({ status }: { status: ItemStatus }) {
 
   const orderStatusLabel = (s: string | undefined) => {
     if (!s) return "";
-    const key = `order_status_${s}`;
+    // Pre-0053 rows may say pending/processing: show them as confirmed/sourcing.
+    const key = `order_status_${normaliseOrderStatus(s) ?? s}`;
     return tOrders.has(key) ? tOrders(key) : s;
   };
 
