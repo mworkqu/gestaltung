@@ -147,7 +147,9 @@ export function Dictation({
     setSupport({ live: !!recognitionCtor(), record: canRecord() });
   }, []);
 
-  useEffect(() => onBusy(phase === "live"), [phase, onBusy]);
+  useEffect(() => {
+    onBusy(phase === "live");
+  }, [phase, onBusy]);
 
   // Leaving the page mid-recording must release the microphone.
   useEffect(() => () => release(), []); // eslint-disable-line react-hooks/exhaustive-deps

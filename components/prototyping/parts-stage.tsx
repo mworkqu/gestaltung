@@ -85,7 +85,9 @@ function ScopeField({
   }, []);
 
   // Fit the saved text on first paint, before the client sees a cramped box.
-  useLayoutEffect(() => fit(), [fit]);
+  useLayoutEffect(() => {
+    fit();
+  }, [fit]);
 
   return (
     <label className="flex flex-col gap-1">

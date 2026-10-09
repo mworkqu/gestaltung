@@ -44,7 +44,9 @@ export function FactControl({
 }) {
   const t = useTranslations("Prototyping");
   const [draft, setDraft] = useState(value ?? "");
-  useEffect(() => setDraft(value ?? ""), [value]);
+  useEffect(() => {
+    setDraft(value ?? "");
+  }, [value]);
 
   if (type === "select" || type === "boolean") {
     const opts = type === "boolean" ? ["yes", "no"] : options ?? [];

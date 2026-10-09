@@ -26,6 +26,25 @@ const config = [
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
+    // HOTFIX 2026-10-09: an effect callback must not return a value. Chrome
+    // 140+ returns a Promise from scrollIntoView/scrollTo, and React calls
+    // whatever an effect returns as its cleanup, so
+    // `useEffect(() => el.scrollIntoView())` crashed the workspace with
+    // "destroy is not a function". Use a block body; `() => () => cleanup()`
+    // (an effect that only returns its cleanup) is still allowed.
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.name=/^use(Layout|Insertion)?Effect$/] > ArrowFunctionExpression:first-child[body.type!='BlockStatement'][body.type!='ArrowFunctionExpression']",
+          message:
+            "Give effect callbacks a block body: an expression body returns its value, and React calls a returned non-function (e.g. the Promise Chrome's scrollIntoView returns) as cleanup and crashes.",
+        },
+      ],
+    },
+  },
+  {
     // Tailwind reads its config through CommonJS, so the plugin import
     // has to stay a require().
     files: ["tailwind.config.ts"],

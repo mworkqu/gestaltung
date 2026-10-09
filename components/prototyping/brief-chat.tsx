@@ -69,7 +69,12 @@ export function BriefChat({
   // StrictMode runs effects twice; the handoff is read (and removed) once.
   const took = useRef(false);
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [msgs, busy, addition]);
+  // Block body on purpose: Chrome 140+ returns a Promise from scrollIntoView,
+  // and React calls whatever an effect returns as its cleanup ("destroy is not
+  // a function" on the next change or unmount = the client-side exception).
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [msgs, busy, addition]);
 
   useEffect(() => {
     if (!initialOpen || took.current || !destination) return;
