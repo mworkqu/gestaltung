@@ -159,7 +159,8 @@
     "whatsappLine": "WhatsApp",
     "phoneLabel": "Phone",
     "addressLabel": "Address",
-    "crLine": "C.R. {number}"
+    "crLine": "C.R. {number}",
+    "schoolPrefill": "School / class project: "
   },
   "Footer": {
     "text": "Gestaltung for Trading and Services · Lusail, Qatar",
@@ -168,7 +169,8 @@
     "infoTitle": "Information",
     "policiesTitle": "Policies",
     "payTitle": "We accept",
-    "why": "Gestaltung exists so hardware founders in Qatar can build a first product here, instead of waiting on suppliers abroad. One studio in Lusail for parts, wiring, 3D models and fabrication, with one person to talk to."
+    "why": "Gestaltung exists so hardware founders in Qatar can build a first product here, instead of waiting on suppliers abroad. One studio in Lusail for parts, wiring, 3D models and fabrication, with one person to talk to.",
+    "students": "Schools and students"
   },
   "Legal": {
     "kicker": "Legal",
@@ -768,7 +770,19 @@
     "heroSub": "Parts, wiring, 3D models and fabrication from one studio in Lusail, so you don't juggle suppliers abroad.",
     "heroPrimary": "Start a project — free",
     "heroSecondary": "Shop parts",
-    "heroProof": "50 projects delivered since March 2026 · Prusa MK4 · CNC · laser · parts from Voltaat, DigiKey and Mouser"
+    "heroProof": "50 projects delivered since March 2026 · Prusa MK4 · CNC · laser · parts from Voltaat, DigiKey and Mouser",
+    "foundersKicker": "Built for founders",
+    "foundersHeading": "Built for hardware founders in Qatar",
+    "foundersIntro": "From the first idea to the first working unit, one studio in Lusail works with you.",
+    "founders1Title": "Weeks to a demo-ready prototype",
+    "founders1Text": "Describe what it must do; we list the parts, draw the wiring from the parts' datasheets and model the enclosure, then make it in our Lusail studio.",
+    "founders2Title": "Parts stocked locally, dates shown before you pay",
+    "founders2Text": "Voltaat stock in Qatar, DigiKey and Mouser for the rest. Every product shows its delivery date on the card.",
+    "founders3Title": "One contact from idea to delivery",
+    "founders3Text": "One studio, one price, one person on WhatsApp. Replies within one working day.",
+    "studentsTitle": "School & student projects",
+    "studentsText": "Science fair, exam project or a first robot: the same tool, written for a school budget.",
+    "studentsCta": "See how it works for schools"
   },
   "DesignQuote": {
     "metaTitle": "Get a free quote | Gestaltung360",
@@ -2365,7 +2379,9 @@
     "productTitle": "{name} | Gestaltung360",
     "productDescription": "Buy {name} from Gestaltung, delivered across Qatar.",
     "creditsTitle": "AI credits | Gestaltung360",
-    "creditsDescription": "How AI credits work on Gestaltung and how to get more: store orders or a WhatsApp top-up."
+    "creditsDescription": "How AI credits work on Gestaltung and how to get more: store orders or a WhatsApp top-up.",
+    "studentsTitle": "Schools and students | Gestaltung360",
+    "studentsDescription": "Build a school or student electronics project: a parts list with prices in QAR, wiring checked by rules and parts delivered in Qatar."
   },
   "CookieNotice": {
     "label": "Cookie notice",
@@ -2586,5 +2602,28 @@
     "store-to-doorTitle": "Stocked in Qatar or sourced for you",
     "store-to-doorCaption": "See the date before you pay. Every delivered order earns AI credits.",
     "store-to-doorDescription": "How an order works in the Gestaltung store: parts stocked in Qatar or sourced for you, a delivery date shown before you pay, and AI credits earned on every delivered order."
+  },
+  "Students": {
+    "kicker": "Schools and students",
+    "heading": "Build the project, not the shopping list.",
+    "sub": "Describe what your project must do. You get a parts list with prices in QAR, a wiring diagram checked by rules, and the parts delivered in Qatar.",
+    "ctaPrimary": "Start a project — free",
+    "ctaSecondary": "Shop parts",
+    "getHeading": "What you get",
+    "get1Title": "A parts list you can order",
+    "get1Text": "Each part we stock links to its product page with the delivery date. For a part we do not stock, we send you a quote.",
+    "get2Title": "Wiring that is checked",
+    "get2Text": "We check the driver, flyback diode, LED resistor and power budget. Your first circuit on each project is free.",
+    "get3Title": "A 3D case when you need one",
+    "get3Text": "One credit gives you up to three versions of the model. We print it in our Lusail studio on request.",
+    "kitsHeading": "Builds to start from",
+    "kitsIntro": "Three common school builds. Each link searches the store for the parts.",
+    "kit1": "Line-following robot",
+    "kit2": "Plant monitor",
+    "kit3": "Weather station",
+    "kitSearch": "Search the store",
+    "teachersHeading": "Teachers",
+    "teachersText": "Teaching a class or running a club? Write to us about a class set, a workshop at your school, or a pilot.",
+    "teachersCta": "Write to us"
   }
 }

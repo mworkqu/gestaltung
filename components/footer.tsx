@@ -25,6 +25,7 @@ export async function Footer() {
   const infoLinks = [
     { href: "/how-it-works", label: tNav("howItWorks") },
     { href: "/about", label: tNav("about") },
+    { href: "/students", label: t("students") },
     { href: "/contact", label: tNav("contact") },
   ];
   const policyLinks = LEGAL_SLUGS.map((slug) => ({

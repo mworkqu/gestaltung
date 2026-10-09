@@ -1,6 +1,17 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { pageMetadata } from "@/lib/seo";
-import { ArrowRight, Lightbulb, Plus, Search, ShoppingBag, UploadCloud } from "lucide-react";
+import {
+  ArrowRight,
+  GraduationCap,
+  Lightbulb,
+  MessageCircle,
+  PackageCheck,
+  Plus,
+  Rocket,
+  Search,
+  ShoppingBag,
+  UploadCloud,
+} from "lucide-react";
 import { categoryLabel } from "@/lib/store/category-label";
 
 import { Link } from "@/i18n/navigation";
@@ -96,6 +107,28 @@ export default async function Home({
         >
           <IsolatedTitle text={t("heroProof")} locale={locale} />
         </p>
+      </section>
+
+      {/* Built for founders (P1-02): three outcomes, no numbers. */}
+      <section className="animate-fade-up space-y-5">
+        <div className="space-y-1 px-1">
+          <span className={mono("text-[10px] text-cobalt")}>{t("foundersKicker")}</span>
+          <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+            {t("foundersHeading")}
+          </h2>
+          <p className="max-w-2xl text-sm leading-relaxed text-body sm:text-base">{t("foundersIntro")}</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="neu min-w-0 p-5">
+            <ChoiceHead icon={<Rocket className="h-4 w-4" />} title={t("founders1Title")} text={t("founders1Text")} />
+          </div>
+          <div className="neu min-w-0 p-5">
+            <ChoiceHead icon={<PackageCheck className="h-4 w-4" />} title={t("founders2Title")} text={t("founders2Text")} />
+          </div>
+          <div className="neu min-w-0 p-5">
+            <ChoiceHead icon={<MessageCircle className="h-4 w-4" />} title={t("founders3Title")} text={t("founders3Text")} />
+          </div>
+        </div>
       </section>
 
       {/* Paths (P1-01): the three ways in, demoted to a compact row. */}
@@ -230,6 +263,28 @@ export default async function Home({
         )}
       </section>
 
+      {/* Schools and students (P1-02): one slim row, the full story is on /students. */}
+      <section className="neu animate-fade-up delay-2 flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-panel text-cobalt shadow-neu-sm"
+            aria-hidden
+          >
+            <GraduationCap className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <h3 className="text-base font-bold text-heading">{t("studentsTitle")}</h3>
+            <p className="text-sm leading-relaxed text-body">{t("studentsText")}</p>
+          </div>
+        </div>
+        <Link
+          href="/students"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+        >
+          {t("studentsCta")}
+          <ArrowRight className={cn("h-4 w-4", isRtl && "-scale-x-100")} />
+        </Link>
+      </section>
 
       {/* Callback CTA */}
       <HomeCallback />

@@ -170,6 +170,11 @@ describe("sitemapEntries", () => {
   ];
   const entries = sitemapEntries(products);
 
+  it("lists the schools and students page", () => {
+    expect(SITEMAP_STATIC_PATHS).toContain("/students");
+    expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/students");
+  });
+
   it("has both locales for every static page", () => {
     for (const path of SITEMAP_STATIC_PATHS) {
       expect(entries.map((e) => e.url)).toContain(absoluteUrl("en", path));

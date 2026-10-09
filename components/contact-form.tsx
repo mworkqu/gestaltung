@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
@@ -23,6 +23,21 @@ export function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // /contact?kind=school (from /students): the message starts with a school prefix and the
+  // lead is tagged. Read in an effect, not from searchParams, so the page stays static.
+  const kindRef = useRef<"school" | null>(null);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("kind") !== "school") return;
+    } catch {
+      return;
+    }
+    kindRef.current = "school";
+    const box = messageRef.current;
+    if (box && !box.value) box.value = t("schoolPrefill");
+  }, [t]);
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
   const mono = (extra = "") =>
@@ -47,6 +62,7 @@ export function ContactForm() {
       message: String(data.get("message")).trim(),
       locale,
       source: "contact_form",
+      ...(kindRef.current ? { kind: kindRef.current } : {}),
     };
 
     try {
@@ -129,6 +145,7 @@ export function ContactForm() {
         <textarea
           id="message"
           name="message"
+          ref={messageRef}
           required
           rows={5}
           placeholder={t("messagePlaceholder")}

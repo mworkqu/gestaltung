@@ -190,6 +190,7 @@ export const SITEMAP_STATIC_PATHS = [
   "/how-it-works",
   "/about",
   "/contact",
+  "/students",
   "/projects/new",
   "/delivery-returns",
   "/warranty",
