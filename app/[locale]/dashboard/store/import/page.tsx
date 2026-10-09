@@ -53,7 +53,7 @@ export default async function StoreImportPage({
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Import form */}
         <div className="neu space-y-6 p-6">
           <SheetImportForm locale={locale === "ar" ? "ar" : "en"} defaultUrl={defaultUrl} />

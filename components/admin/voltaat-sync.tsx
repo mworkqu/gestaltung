@@ -130,7 +130,7 @@ export function VoltaatMapForm({ locale }: { locale: string }) {
     >
       <h2 className="text-base font-bold text-heading">{t("mapTitle")}</h2>
       <p className="text-xs text-mutedtext">{t("mapHelp")}</p>
-      <div className="grid gap-3 sm:grid-cols-[10rem_1fr_auto] sm:items-end">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end">
         <label className="block space-y-1">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-mutedtext">{t("ourSku")}</span>
           <input value={sku} onChange={(e) => setSku(e.target.value)} required className={input} dir="ltr" />

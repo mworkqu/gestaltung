@@ -82,7 +82,7 @@ export default async function AboutPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
-          <Button asChild size="lg" className="rounded-full">
+          <Button asChild size="lg" className="h-auto max-w-full whitespace-normal rounded-full py-2.5 text-center">
             <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer">
               <MessageCircle />
               {t("ctaWhatsapp")}
@@ -91,7 +91,7 @@ export default async function AboutPage({
           </Button>
           <Link
             href="/contact"
-            className="text-sm font-semibold text-azure transition-colors hover:text-cobalt-hover"
+            className="inline-flex text-sm font-semibold text-azure transition-colors hover:text-cobalt-hover max-md:min-h-11 max-md:items-center"
           >
             {t("ctaContact")}
           </Link>

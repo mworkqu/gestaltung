@@ -248,31 +248,33 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
             {p.id === "gemini" && p.lim.tokensPerDay == null && (
               <p className="text-[11px] text-mutedtext">{t("noTokenCap")}</p>
             )}
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-faint">
-                  <th className="pb-1 text-start font-medium">{t("feature")}</th>
-                  <th className="pb-1 text-end font-medium">{t("calls")}</th>
-                  <th className="pb-1 text-end font-medium">{p.id === "groq" ? t("audioSeconds") : t("tokens")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-borderstrong/40">
-                {[...p.byFeature.entries()].map(([f, v]) => (
-                  <tr key={f}>
-                    <td className="py-1.5 text-heading">{t(`feature_${f}`)}</td>
-                    <td className="py-1.5 text-end font-mono tabular-nums">{num.format(v.calls)}</td>
-                    <td className="py-1.5 text-end font-mono tabular-nums">
-                      {num.format(p.id === "groq" ? Math.round(v.audio) : v.tokens)}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider text-faint">
+                    <th className="pb-1 text-start font-medium">{t("feature")}</th>
+                    <th className="pb-1 text-end font-medium">{t("calls")}</th>
+                    <th className="pb-1 text-end font-medium">{p.id === "groq" ? t("audioSeconds") : t("tokens")}</th>
                   </tr>
-                ))}
-                {p.byFeature.size === 0 && (
-                  <tr>
-                    <td colSpan={3} className="py-1.5 text-mutedtext">{t("noneToday")}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-borderstrong/40">
+                  {[...p.byFeature.entries()].map(([f, v]) => (
+                    <tr key={f}>
+                      <td className="py-1.5 text-heading">{t(`feature_${f}`)}</td>
+                      <td className="py-1.5 text-end font-mono tabular-nums">{num.format(v.calls)}</td>
+                      <td className="py-1.5 text-end font-mono tabular-nums">
+                        {num.format(p.id === "groq" ? Math.round(v.audio) : v.tokens)}
+                      </td>
+                    </tr>
+                  ))}
+                  {p.byFeature.size === 0 && (
+                    <tr>
+                      <td colSpan={3} className="py-1.5 text-mutedtext">{t("noneToday")}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))}
       </section>

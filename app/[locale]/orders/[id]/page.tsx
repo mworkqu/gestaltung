@@ -130,57 +130,59 @@ export default async function OrderPage({ params }: { params: Promise<{ locale: 
           <h2 id="items-title" className={mono("px-4 pt-3 text-[10px] text-mutedtext")}>
             {t("itemsTitle")}
           </h2>
-          <table className="w-full min-w-[320px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-borderstrong/60 text-[11px] text-mutedtext">
-                <th className="px-4 py-2 text-start font-medium">{t("colItem")}</th>
-                <th className="px-4 py-2 text-end font-medium">{t("colQty")}</th>
-                <th className="px-4 py-2 text-end font-medium">{t("colPrice")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => (
-                <tr key={it.id} className="border-b border-borderstrong/40 last:border-0">
-                  <td className="px-4 py-3 text-heading">{it.part_name}</td>
-                  <td className="px-4 py-3 text-end tabular-nums text-body">{it.quantity}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-heading">
-                    {formatPrice(Number(it.line_total_qar), locale)}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[320px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-borderstrong/60 text-[11px] text-mutedtext">
+                  <th className="px-4 py-2 text-start font-medium">{t("colItem")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("colQty")}</th>
+                  <th className="px-4 py-2 text-end font-medium">{t("colPrice")}</th>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              {hasShipping && (
+              </thead>
+              <tbody>
+                {items.map((it) => (
+                  <tr key={it.id} className="border-b border-borderstrong/40 last:border-0">
+                    <td className="px-4 py-3 text-heading">{it.part_name}</td>
+                    <td className="px-4 py-3 text-end tabular-nums text-body">{it.quantity}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-end tabular-nums text-heading">
+                      {formatPrice(Number(it.line_total_qar), locale)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                {hasShipping && (
+                  <tr className="border-t border-borderstrong/60">
+                    <td colSpan={2} className="px-4 py-2 text-end text-mutedtext">
+                      {t("shipping")}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2 text-end tabular-nums text-body">
+                      {shipping > 0 ? formatPrice(shipping, locale) : t("freeDelivery")}
+                    </td>
+                  </tr>
+                )}
+                {credit > 0 && (
+                  <tr>
+                    <td colSpan={2} className="px-4 py-2 text-end text-mutedtext">
+                      {t("creditDiscount")}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-2 text-end tabular-nums text-buy">
+                      {"−"}
+                      {formatPrice(credit, locale)}
+                    </td>
+                  </tr>
+                )}
                 <tr className="border-t border-borderstrong/60">
-                  <td colSpan={2} className="px-4 py-2 text-end text-mutedtext">
-                    {t("shipping")}
+                  <td colSpan={2} className="px-4 py-3 text-end font-semibold text-heading">
+                    {t("total")}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-2 text-end tabular-nums text-body">
-                    {shipping > 0 ? formatPrice(shipping, locale) : t("freeDelivery")}
-                  </td>
-                </tr>
-              )}
-              {credit > 0 && (
-                <tr>
-                  <td colSpan={2} className="px-4 py-2 text-end text-mutedtext">
-                    {t("creditDiscount")}
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-2 text-end tabular-nums text-buy">
-                    {"−"}
-                    {formatPrice(credit, locale)}
+                  <td className="whitespace-nowrap px-4 py-3 text-end text-base font-bold tabular-nums text-heading">
+                    {formatPrice(Number(order.total_qar), locale)}
                   </td>
                 </tr>
-              )}
-              <tr className="border-t border-borderstrong/60">
-                <td colSpan={2} className="px-4 py-3 text-end font-semibold text-heading">
-                  {t("total")}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-end text-base font-bold tabular-nums text-heading">
-                  {formatPrice(Number(order.total_qar), locale)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </section>
 
         <Button asChild size="lg" className="w-full rounded-full sm:w-auto">

@@ -156,26 +156,28 @@ export async function AdminOverview({ locale }: { locale: string }) {
       <section className="neu p-6">
         <h2 className="text-sm font-bold text-heading">{t("funnelTitle")}</h2>
         <p className="mt-1 text-xs text-mutedtext">{t("funnelNote")}</p>
-        <table className="mt-4 w-full text-sm">
-          <thead>
-            <tr className={mono("text-[10px] text-mutedtext")}>
-              <th scope="col" className="pb-2 text-start font-semibold">
-                {t("funnelStep")}
-              </th>
-              <th scope="col" className="pb-2 text-end font-semibold">
-                {t("funnelCount")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {funnel.map((f) => (
-              <tr key={f.key} className="border-t border-borderstrong/40">
-                <td className="py-2 text-body">{t(f.key)}</td>
-                <td className="py-2 text-end font-semibold tabular-nums text-heading">{f.value}</td>
+        <div className="overflow-x-auto">
+          <table className="mt-4 w-full text-sm">
+            <thead>
+              <tr className={mono("text-[10px] text-mutedtext")}>
+                <th scope="col" className="pb-2 text-start font-semibold">
+                  {t("funnelStep")}
+                </th>
+                <th scope="col" className="pb-2 text-end font-semibold">
+                  {t("funnelCount")}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {funnel.map((f) => (
+                <tr key={f.key} className="border-t border-borderstrong/40">
+                  <td className="py-2 text-body">{t(f.key)}</td>
+                  <td className="py-2 text-end font-semibold tabular-nums text-heading">{f.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-2">

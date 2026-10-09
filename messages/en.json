@@ -1809,6 +1809,8 @@
     "chatFailed": "The helper didn't answer. Try again in a minute.",
     "chatAddition": "Suggested text for your brief",
     "chatAddToBrief": "Add to my brief",
+    "chatAddAndAnalyse": "Add and analyse",
+    "chatAnalyseHint": "Your brief is long enough to analyse.",
     "chatAdded": "Added to your brief. Analyse it when you're ready.",
     "chatPlaceholder": "Your answer…",
     "chatSend": "Send",

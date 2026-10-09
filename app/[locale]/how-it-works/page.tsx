@@ -66,7 +66,7 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
               <a
                 key={p.key}
                 href={`#${p.key}`}
-                className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-semibold text-heading shadow-neu-sm hover:text-cobalt"
+                className="rounded-full bg-panel px-3.5 py-1.5 text-xs font-semibold text-heading shadow-neu-sm hover:text-cobalt max-md:inline-flex max-md:min-h-11 max-md:items-center"
               >
                 {t(`${p.key}Title`)}
               </a>

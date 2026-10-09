@@ -140,7 +140,7 @@ export function PartsList({
             aria-pressed={filter === f}
             onClick={() => setFilter(f)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors max-md:min-h-11",
               filter === f ? "bg-panel text-heading shadow-neu-inset" : "text-mutedtext hover:text-heading"
             )}
           >
@@ -227,7 +227,7 @@ export function PartsList({
                         <button
                           type="button"
                           onClick={() => onOpen(part)}
-                          className="group inline-flex items-center gap-1 text-start text-[13px] font-semibold text-heading hover:text-cobalt"
+                          className="group inline-flex items-center gap-1 text-start text-[13px] font-semibold text-heading hover:text-cobalt max-md:tap-hit"
                         >
                           {humanPartName(part.name)}
                           <ChevronRight className="h-3 w-3 opacity-50 rtl:rotate-180" />
@@ -272,7 +272,7 @@ export function PartsList({
                         type="button"
                         onClick={() => remove(part)}
                         aria-label={`${t("deletePart")} ${part.code}`}
-                        className="rounded p-1 text-faint transition-colors hover:text-destructive"
+                        className="rounded p-1 text-faint transition-colors hover:text-destructive max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

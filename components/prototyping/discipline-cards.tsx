@@ -53,7 +53,7 @@ export function PowerCard({
               <button
                 type="button"
                 onClick={onCircuit}
-                className="flex items-start gap-2 text-start text-[12px] font-semibold text-destructive hover:underline"
+                className="flex items-start gap-2 text-start text-[12px] font-semibold text-destructive hover:underline max-md:tap-hit"
               >
                 <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {t("powerOver", { ma: -b.headroomMa })}

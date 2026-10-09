@@ -228,7 +228,7 @@ export function TreeNav({
                   aria-label={ariaLabel}
                   aria-current={here ? "page" : undefined}
                   className={cn(
-                    "relative grid h-9 w-9 place-items-center rounded-xl bg-surface shadow-neu-sm transition-colors hover:text-cobalt",
+                    "relative grid h-9 w-9 place-items-center rounded-xl bg-surface shadow-neu-sm transition-colors hover:text-cobalt max-md:min-h-11 max-md:min-w-11",
                     FOCUS_RING
                   )}
                 >
@@ -262,7 +262,7 @@ export function TreeNav({
         aria-label={ariaLabel}
         title={title}
         className={cn(
-          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start transition-colors",
+          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-start transition-colors max-md:min-h-11",
           FOCUS_RING,
           here ? "bg-panel text-heading shadow-neu-inset" : "text-mutedtext hover:text-heading"
         )}
@@ -308,7 +308,7 @@ export function TreeNav({
               title={blocked ? t("cantRemoveBranch", { count: b.partCount }) : t("removeBranch", { branch: name })}
               aria-label={t("removeBranch", { branch: name })}
               className={cn(
-                "grid h-6 w-6 shrink-0 place-items-center rounded text-faint transition-[color,opacity] hover:text-destructive",
+                "grid h-6 w-6 shrink-0 place-items-center rounded text-faint transition-[color,opacity] hover:text-destructive max-md:min-h-11 max-md:min-w-11",
                 "[@media(hover:hover)]:opacity-0 focus-visible:opacity-100 group-hover/branch:opacity-100",
                 FOCUS_RING
               )}
@@ -343,7 +343,7 @@ export function TreeNav({
                 title={t("confirmYes")}
                 aria-label={t("confirmYes")}
                 className={cn(
-                  "grid h-6 w-6 shrink-0 place-items-center rounded text-destructive transition-colors hover:bg-destructive/10",
+                  "grid h-6 w-6 shrink-0 place-items-center rounded text-destructive transition-colors hover:bg-destructive/10 max-md:min-h-11 max-md:min-w-11",
                   FOCUS_RING
                 )}
               >
@@ -357,7 +357,7 @@ export function TreeNav({
               title={t("confirmNo")}
               aria-label={t("confirmNo")}
               className={cn(
-                "grid h-6 w-6 shrink-0 place-items-center rounded text-mutedtext transition-colors hover:text-heading",
+                "grid h-6 w-6 shrink-0 place-items-center rounded text-mutedtext transition-colors hover:text-heading max-md:min-h-11 max-md:min-w-11",
                 FOCUS_RING
               )}
             >
@@ -408,7 +408,7 @@ export function TreeNav({
                   aria-describedby={undoMsgId}
                   onClick={() => undoRemove(b.discipline)}
                   className={cn(
-                    "inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-cobalt transition-colors hover:bg-cobalt/10",
+                    "inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-cobalt transition-colors hover:bg-cobalt/10 max-md:min-h-11",
                     FOCUS_RING
                   )}
                 >
@@ -447,7 +447,7 @@ export function TreeNav({
                 type="button"
                 onClick={() => onBranch(b.discipline, true)}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-lg bg-panel px-2.5 py-1 text-[11px] font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt",
+                  "inline-flex items-center gap-1 rounded-lg bg-panel px-2.5 py-1 text-[11px] font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt max-md:min-h-11",
                   FOCUS_RING
                 )}
               >

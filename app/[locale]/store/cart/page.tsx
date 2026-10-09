@@ -83,7 +83,7 @@ export default function CartPage() {
       </h1>
       {errorBar}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <ul className="min-w-0 space-y-3">
           {[...kits.entries()].map(([kitId, lines]) => {
             const sum = lines.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
@@ -162,7 +162,7 @@ export default function CartPage() {
                 <div className="min-w-0 flex-1 basis-40">
                   <Link
                     href={`/store/${item.sku}`}
-                    className="line-clamp-2 break-words text-sm font-semibold text-heading hover:text-cobalt sm:line-clamp-1"
+                    className="line-clamp-2 break-words text-sm font-semibold text-heading hover:text-cobalt max-md:min-h-11 sm:line-clamp-1"
                     title={name}
                   >
                     <IsolatedTitle text={name} locale={locale} />

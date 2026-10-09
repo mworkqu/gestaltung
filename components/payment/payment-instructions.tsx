@@ -35,7 +35,7 @@ function CopyValue({ value, label }: { value: string; label: string }) {
           );
         }}
         aria-label={t("copy", { what: label })}
-        className="rounded p-0.5 text-mutedtext hover:text-cobalt"
+        className="rounded p-0.5 text-mutedtext hover:text-cobalt max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
       >
         {done ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
       </button>

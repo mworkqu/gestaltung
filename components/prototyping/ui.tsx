@@ -97,7 +97,7 @@ export function SoftButton({
       type="button"
       {...props}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt disabled:opacity-60",
+        "inline-flex items-center gap-1.5 rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt disabled:opacity-60 max-md:min-h-11",
         className
       )}
     />
@@ -113,7 +113,7 @@ export function PrimaryButton({
       type="button"
       {...props}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover disabled:opacity-60",
+        "inline-flex items-center gap-1.5 rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover disabled:opacity-60 max-md:min-h-11",
         className
       )}
     />
@@ -129,7 +129,7 @@ export function GhostButton({
       type="button"
       {...props}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-mutedtext transition-colors hover:text-heading disabled:opacity-60",
+        "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-mutedtext transition-colors hover:text-heading disabled:opacity-60 max-md:min-h-11",
         className
       )}
     />

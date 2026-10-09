@@ -112,7 +112,7 @@ export function ChatInput({
           onClick={onSubmit}
           disabled={!enabled}
           aria-label={t("chatSend")}
-          className="grid h-9 w-9 place-items-center rounded-xl bg-cobalt text-white disabled:opacity-50"
+          className="grid h-9 w-9 place-items-center rounded-xl bg-cobalt text-white disabled:opacity-50 max-md:min-h-11 max-md:min-w-11"
         >
           <Send className={cn("h-4 w-4", locale === "ar" && "-scale-x-100")} />
         </button>

@@ -76,6 +76,25 @@
     font-family: var(--font-sans-ar), var(--font-sans), ui-sans-serif,
       system-ui, sans-serif;
   }
+
+  /* Phones (P2-04): form controls are 16 px so iOS Safari does not zoom the
+     page on focus, and at least 44 px tall. A checkbox or radio is tiny by
+     nature, so the label that wraps it is the 44 px target. */
+  @media (max-width: 767.98px) {
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="hidden"], [type="color"]),
+    :is(select, textarea):not([hidden]) {
+      font-size: 16px;
+    }
+    input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="hidden"], [type="color"]),
+    select:not([hidden]) {
+      min-height: 44px;
+    }
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"]) {
+      min-height: 44px;
+      align-items: center;
+    }
+  }
 }
 
 @layer components {

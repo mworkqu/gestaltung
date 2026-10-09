@@ -100,7 +100,7 @@ export function PriceListImport({
   return (
     <div className="space-y-5">
       {/* 1. Supplier + file */}
-      <div className="neu grid gap-4 p-5 sm:grid-cols-[14rem_1fr] sm:items-end">
+      <div className="neu grid grid-cols-1 gap-4 p-5 sm:grid-cols-[14rem_minmax(0,1fr)] sm:items-end">
         <label className="block space-y-1">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-mutedtext">{t("supplier")}</span>
           <select value={supplierId} onChange={(e) => onSupplier(e.target.value)} className={input}>

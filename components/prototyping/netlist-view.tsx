@@ -238,7 +238,7 @@ export function NetlistView({
                 aria-selected={view === v}
                 onClick={() => setView(v)}
                 className={cn(
-                  "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
+                  "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors max-md:min-h-11",
                   view === v ? "bg-surface text-heading shadow-neu-sm" : "text-mutedtext hover:text-heading"
                 )}
               >

@@ -376,7 +376,7 @@ export function CadCard({
                   disabled={working}
                   onClick={() => void open(v)}
                   className={cn(
-                    "flex w-full items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-start text-xs transition-colors disabled:opacity-60",
+                    "flex w-full items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-start text-xs transition-colors disabled:opacity-60 max-md:min-h-11",
                     v.id === built?.id ? "bg-cobalt/10 text-heading" : "text-mutedtext hover:text-heading"
                   )}
                 >

@@ -91,7 +91,7 @@ export default async function DashboardLayout({
   return (
     <MessagesScope scope="all">
     <div className="container py-8">
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="space-y-3">
           <DashboardNav groups={groups} />
           <SignOutButton />

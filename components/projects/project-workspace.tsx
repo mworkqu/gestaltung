@@ -598,7 +598,7 @@ function BlocksCard({
             type="button"
             onClick={addText}
             disabled={busy}
-            className="inline-flex items-center rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt disabled:opacity-60"
+            className="inline-flex items-center rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt disabled:opacity-60 max-md:min-h-11"
           >
             <TypeIcon className="me-1.5 h-3.5 w-3.5" />
             {t("addText")}
@@ -607,7 +607,7 @@ function BlocksCard({
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="inline-flex items-center rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt disabled:opacity-60"
+            className="inline-flex items-center rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt disabled:opacity-60 max-md:min-h-11"
           >
             <ImagePlus className="me-1.5 h-3.5 w-3.5" />
             {t("addImage")}
@@ -701,7 +701,7 @@ function IconBtn({
       aria-label={label}
       title={label}
       className={cn(
-        "rounded-md p-1.5 text-mutedtext transition-colors disabled:opacity-30",
+        "rounded-md p-1.5 text-mutedtext transition-colors disabled:opacity-30 max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center",
         danger ? "hover:text-destructive" : "hover:text-cobalt"
       )}
     >
@@ -903,7 +903,7 @@ function ItemsCard({
                   type="button"
                   onClick={() => setQuantity(item, 0)}
                   aria-label={t("removeItem")}
-                  className="shrink-0 rounded-md p-1.5 text-mutedtext transition-colors hover:text-destructive"
+                  className="shrink-0 rounded-md p-1.5 text-mutedtext transition-colors hover:text-destructive max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

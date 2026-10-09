@@ -157,24 +157,41 @@ export function IdeaStage({
   }
 
   // The chat's paragraph is appended and saved at once (it's the client's click).
-  async function addToBrief(text: string) {
+  // Resolves the saved brief, or null when the write failed.
+  async function addToBrief(text: string): Promise<string | null> {
     const next = [brief.trim(), text.trim()].filter(Boolean).join("\n\n");
     setBrief(next);
     setSaveState("saving");
     const { error } = await createClient().from("projects").update({ brief: next }).eq("id", project.id);
     if (error) {
       setSaveState("error");
-      return;
+      return null;
     }
     setSavedBrief(next);
     setSaveState("saved");
     await onChanged();
+    return next;
   }
 
-  async function runAnalysis() {
+  // "Add and analyse" (P2-03): one click in the chat appends the paragraph and
+  // starts the analysis. The analysis itself is not awaited, so the chat can
+  // close while the progress list shows behind it. Resolves false when the
+  // brief could not be saved (nothing is analysed then).
+  async function addAndAnalyse(text: string): Promise<boolean> {
+    const next = await addToBrief(text);
+    if (next === null) return false;
+    void runAnalysis(next);
+    return true;
+  }
+
+  // `briefOverride` is the brief that was just saved by "Add and analyse",
+  // because this closure still holds the text from before the add.
+  async function runAnalysis(briefOverride?: string) {
+    if (running) return;
     if (needsConsent && !consentTicked) return;
-    if (looksLikeSchema(brief)) return setProblem("schema");
-    if (brief.trim().length < MIN_BRIEF_CHARS) return setProblem("short");
+    const text = briefOverride ?? brief;
+    if (looksLikeSchema(text)) return setProblem("schema");
+    if (text.trim().length < MIN_BRIEF_CHARS) return setProblem("short");
     setProblem(null);
     setDone([]);
     setRunning(true);
@@ -183,7 +200,7 @@ export function IdeaStage({
     const supabase = createClient();
 
     try {
-      if (!(await saveBrief())) throw new Error("brief not saved");
+      if (briefOverride === undefined && !(await saveBrief())) throw new Error("brief not saved");
 
       // The consent covers this send, so it is stamped as the request leaves.
       // It is stored with the analysis's spec below (the one spec write), and
@@ -200,7 +217,7 @@ export function IdeaStage({
         // The route validates its body with a non-strict schema, so it accepts
         // (and for now ignores) the consent timestamp.
         body: JSON.stringify({
-          brief,
+          brief: text,
           answers: answersOf(spec),
           locale,
           projectId: project.id,
@@ -253,7 +270,7 @@ export function IdeaStage({
         .filter((p) => p.kind !== "electronics")
         .filter((p) => !kinds.has(p.kind) && !have.has(p.name.trim().toLowerCase()))
         .map((p) => {
-          const s = specFor(p, brief);
+          const s = specFor(p, text);
           n += 1;
           return {
             project_id: project.id,
@@ -341,12 +358,19 @@ export function IdeaStage({
               if (briefDestination)
                 onSpec({ ...(spec ?? EMPTY_SPEC), aiConsent: { at: new Date().toISOString(), destination: briefDestination } });
             }}
-            onAdd={addToBrief}
+            onAdd={async (text) => void (await addToBrief(text))}
+            onAddAndAnalyse={addAndAnalyse}
+            // Analyse from inside the chat once the brief is long enough, so the
+            // chat never has to be closed first. The analysis re-checks length,
+            // schema and consent itself.
+            onAnalyse={() => void runAnalysis()}
+            canAnalyse={!running && brief.trim().length >= MIN_BRIEF_CHARS}
+            analysed={analysed}
             initialOpen={startChat}
           />
           <ReadAloud text={brief} />
           <PrimaryButton
-            onClick={runAnalysis}
+            onClick={() => void runAnalysis()}
             disabled={running || (needsConsent && !consentTicked)}
             // Tells screen-reader users why the button is disabled.
             aria-describedby={

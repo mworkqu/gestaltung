@@ -206,7 +206,7 @@ export function AddExistingDialog({
               setResults(null);
             }}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors max-md:min-h-11",
               from === k ? "bg-panel text-heading shadow-neu-inset" : "text-mutedtext hover:text-heading"
             )}
           >
@@ -350,7 +350,7 @@ export function CreatePartDialog({
                 <button
                   type="button"
                   onClick={() => setKind(k)}
-                  className="flex w-full items-center gap-3 rounded-xl bg-panel p-4 text-start shadow-neu-sm transition-colors hover:text-cobalt"
+                  className="flex w-full items-center gap-3 rounded-xl bg-panel p-4 text-start shadow-neu-sm transition-colors hover:text-cobalt max-md:min-h-11"
                 >
                   <Icon className="h-5 w-5 shrink-0 text-cobalt" strokeWidth={1.6} />
                   <span className="min-w-0">

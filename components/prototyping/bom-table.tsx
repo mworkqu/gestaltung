@@ -250,7 +250,7 @@ function QuoteRequest({
                 <h2 className="text-base font-bold text-heading">{t("bomRequestQuote")}</h2>
                 <p className="mt-1 text-xs text-mutedtext">{t("bomQuoteHelp")}</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} aria-label={tD("close")} className="text-mutedtext hover:text-heading">
+              <button type="button" onClick={() => setOpen(false)} aria-label={tD("close")} className="text-mutedtext hover:text-heading max-md:tap-hit">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -503,7 +503,7 @@ export function BomTable({
                     })
                   }
                   aria-expanded={open}
-                  className="flex w-full items-center gap-2 border-b border-borderstrong/40 pb-1.5 text-start"
+                  className="flex w-full items-center gap-2 border-b border-borderstrong/40 pb-1.5 text-start max-md:min-h-11"
                 >
                   <ChevronDown className={cn("h-4 w-4 text-mutedtext transition-transform", !open && "-rotate-90 rtl:rotate-90")} />
                   <span className="flex-1 text-[13px] font-bold text-heading">
@@ -556,7 +556,7 @@ export function BomTable({
               <button
                 type="button"
                 onClick={() => onDismiss(dismissed.map((l) => l.id), false)}
-                className="inline-flex items-center gap-1 font-semibold text-cobalt hover:text-cobalt-hover"
+                className="inline-flex items-center gap-1 font-semibold text-cobalt hover:text-cobalt-hover max-md:tap-hit"
               >
                 <RotateCcw className="h-3 w-3" />
                 {t("bomRestore")}
@@ -688,7 +688,7 @@ function Row({
                   type="button"
                   disabled
                   aria-label={t("dismissBlockedCircuit")}
-                  className="cursor-not-allowed rounded p-0.5 text-faint opacity-40"
+                  className="cursor-not-allowed rounded p-0.5 text-faint opacity-40 max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -699,7 +699,7 @@ function Row({
                 onClick={onDismiss}
                 title={t("bomRemove")}
                 aria-label={t("bomRemove")}
-                className="mt-0.5 rounded p-0.5 text-faint transition-colors hover:text-destructive"
+                className="mt-0.5 rounded p-0.5 text-faint transition-colors hover:text-destructive max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -729,7 +729,7 @@ function Row({
               type="button"
               onClick={() => void confirm(suggestion.id)}
               disabled={confirming}
-              className="inline-flex items-center gap-1 text-start text-[11.5px] font-semibold text-cobalt hover:text-cobalt-hover disabled:opacity-60"
+              className="inline-flex items-center gap-1 text-start text-[11.5px] font-semibold text-cobalt hover:text-cobalt-hover disabled:opacity-60 max-md:tap-hit"
             >
               {confirming && <Loader2 className="h-3 w-3 animate-spin" />}
               {t("suggestedConfirm", { name: partName(suggestion, locale) })}
@@ -783,7 +783,7 @@ function Row({
                             disabled={confirming}
                             onClick={() => void confirm(c.id)}
                             title={`${partName(c, locale)} · ${formatPrice(Number(c.unit_price), locale)}`}
-                            className="inline-flex items-center gap-1 align-middle font-medium text-cobalt hover:underline disabled:opacity-60"
+                            className="inline-flex items-center gap-1 align-middle font-medium text-cobalt hover:underline disabled:opacity-60 max-md:tap-hit"
                           >
                             {partImageUrl(c) && (
                               // eslint-disable-next-line @next/next/no-img-element

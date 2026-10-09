@@ -172,7 +172,7 @@ export function ProjectCadCard({ projectId }: { projectId: string }) {
                 onClick={() => remove(f)}
                 disabled={busy}
                 aria-label={t("remove")}
-                className="shrink-0 rounded-md p-1.5 text-mutedtext transition-colors hover:text-destructive disabled:opacity-40"
+                className="shrink-0 rounded-md p-1.5 text-mutedtext transition-colors hover:text-destructive disabled:opacity-40 max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

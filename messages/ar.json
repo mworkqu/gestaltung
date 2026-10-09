@@ -1809,6 +1809,8 @@
     "chatFailed": "لم يُجب المساعد. حاول مرة أخرى بعد دقيقة.",
     "chatAddition": "نص مقترح لوصف مشروعك",
     "chatAddToBrief": "أضفه إلى وصفي",
+    "chatAddAndAnalyse": "أضفه وحلّل",
+    "chatAnalyseHint": "وصفك طويل بما يكفي للتحليل.",
     "chatAdded": "أُضيف إلى وصفك. حلّله عندما تكون جاهزاً.",
     "chatPlaceholder": "إجابتك…",
     "chatSend": "إرسال",

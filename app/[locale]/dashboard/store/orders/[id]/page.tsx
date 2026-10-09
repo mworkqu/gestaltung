@@ -127,7 +127,7 @@ export default async function OrderDetailPage({
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* Line items */}
         <div className="neu overflow-x-auto p-2">
           <table className="w-full min-w-[480px] border-collapse text-sm">

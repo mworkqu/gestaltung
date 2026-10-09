@@ -51,7 +51,7 @@ export function ReadAloud({ text, className }: { text: string; className?: strin
       aria-pressed={speaking}
       title={speaking ? t("readAloudStop") : t("readAloud")}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11.5px] font-semibold text-cobalt shadow-neu-sm transition-colors hover:bg-panel",
+        "inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11.5px] max-md:min-h-11 font-semibold text-cobalt shadow-neu-sm transition-colors hover:bg-panel",
         className
       )}
     >

@@ -41,33 +41,35 @@ export function ShippingSettingsEditor({ locale, initial }: { locale: string; in
         {top("handling_days")}
         {top("buffer_days")}
       </div>
-      <table className="text-sm">
-        <thead>
-          <tr className="text-[10px] uppercase tracking-wider text-mutedtext">
-            <th className="px-2 py-1 text-start" />
-            <th className="px-2 py-1 text-start">{t("s_carrier_cost_qar")}</th>
-            <th className="px-2 py-1 text-start">{t("s_transit_days")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {SHIPPING_TIERS.map((k) => (
-            <tr key={k}>
-              <td className="px-2 py-1 font-semibold text-heading">{t(`tier_${k}`)}</td>
-              {(["carrier_cost_qar", "transit_days"] as const).map((f) => (
-                <td key={f} className="px-2 py-1">
-                  <input
-                    value={String(s.tiers[k][f])}
-                    onChange={(e) => setS({ ...s, tiers: { ...s.tiers, [k]: { ...s.tiers[k], [f]: e.target.value } } })}
-                    inputMode="decimal"
-                    className={input}
-                    dir="ltr"
-                  />
-                </td>
-              ))}
+      <div className="overflow-x-auto">
+        <table className="text-sm">
+          <thead>
+            <tr className="text-[10px] uppercase tracking-wider text-mutedtext">
+              <th className="px-2 py-1 text-start" />
+              <th className="px-2 py-1 text-start">{t("s_carrier_cost_qar")}</th>
+              <th className="px-2 py-1 text-start">{t("s_transit_days")}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {SHIPPING_TIERS.map((k) => (
+              <tr key={k}>
+                <td className="px-2 py-1 font-semibold text-heading">{t(`tier_${k}`)}</td>
+                {(["carrier_cost_qar", "transit_days"] as const).map((f) => (
+                  <td key={f} className="px-2 py-1">
+                    <input
+                      value={String(s.tiers[k][f])}
+                      onChange={(e) => setS({ ...s, tiers: { ...s.tiers, [k]: { ...s.tiers[k], [f]: e.target.value } } })}
+                      inputMode="decimal"
+                      className={input}
+                      dir="ltr"
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className="flex items-center gap-3">
         <button
           type="button"

@@ -45,7 +45,7 @@ function Chips({
 }) {
   const t = useTranslations("Prototyping");
   const opts = type === "boolean" ? ["yes", "no"] : type === "select" ? options ?? [] : [];
-  const chip = "rounded-full bg-surface px-3 py-1.5 text-[12px] font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt";
+  const chip = "rounded-full bg-surface px-3 py-1.5 text-[12px] font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt max-md:min-h-11";
   return (
     <div className="flex flex-wrap items-center gap-2">
       {opts.length > 0 ? (
@@ -175,7 +175,7 @@ export function UnderstoodPanel({
                 <button
                   type="button"
                   onClick={() => set(r, r.value)}
-                  className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1 text-[12px] font-semibold text-emerald-700 shadow-neu-sm"
+                  className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1 text-[12px] font-semibold text-emerald-700 shadow-neu-sm max-md:min-h-11"
                 >
                   <Check className="h-3 w-3" />
                   {t("guessRight")}
@@ -183,7 +183,7 @@ export function UnderstoodPanel({
                 <button
                   type="button"
                   onClick={() => setEditing(r.id)}
-                  className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1 text-[12px] font-semibold text-heading shadow-neu-sm"
+                  className="inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1 text-[12px] font-semibold text-heading shadow-neu-sm max-md:min-h-11"
                 >
                   <Pencil className="h-3 w-3" />
                   {t("guessChange")}
@@ -201,7 +201,7 @@ export function UnderstoodPanel({
               {editing === r.id ? (
                 editRow(r)
               ) : (
-                <button type="button" onClick={() => setEditing(r.id)} className="text-heading hover:text-cobalt">
+                <button type="button" onClick={() => setEditing(r.id)} className="text-heading hover:text-cobalt max-md:tap-hit">
                   {formatFact(r.id, r.value, t)}
                 </button>
               )}
@@ -223,14 +223,14 @@ export function UnderstoodPanel({
               type="button"
               onClick={() => setShowOptional((s) => !s)}
               aria-expanded={showOptional}
-              className="text-[12.5px] font-semibold text-heading"
+              className="text-[12.5px] font-semibold text-heading max-md:tap-hit"
             >
               {t("optionalQuestions", { count: optional.length })}
             </button>
             <button
               type="button"
               onClick={() => onChange(optional.reduce((acc, q) => setFact(acc, q, null), spec))}
-              className="rounded-full bg-surface px-3 py-1 text-[12px] font-semibold text-mutedtext shadow-neu-sm hover:text-heading"
+              className="rounded-full bg-surface px-3 py-1 text-[12px] font-semibold text-mutedtext shadow-neu-sm hover:text-heading max-md:min-h-11"
             >
               {t("skipAll")}
             </button>

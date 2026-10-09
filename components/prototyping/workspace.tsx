@@ -381,7 +381,7 @@ export function PrototypingWorkspace({
   /** The workspace's own top bar: the site header is hidden on this page. */
   const bar = (back: React.ReactNode, rest?: React.ReactNode, below?: React.ReactNode) => (
     <header className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
-      <Link href="/" aria-label={tBrand("name")} className="shrink-0">
+      <Link href="/" aria-label={tBrand("name")} className="inline-flex shrink-0 items-center justify-center max-md:tap-target">
         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-ink shadow-neu-sm">
           <LogoMark title={tBrand("name")} className="h-4 w-4" gradientId="proto-logo" />
         </span>
@@ -401,7 +401,7 @@ export function PrototypingWorkspace({
   const backTo = (href: string, label: string) => (
     <Link
       href={href}
-      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
+      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-mutedtext transition-colors hover:text-heading max-md:min-h-11"
     >
       <ArrowLeft className={cn("h-3.5 w-3.5", isRtl && "rotate-180")} />
       {label}
@@ -758,7 +758,7 @@ export function PrototypingWorkspace({
                 onClick={() => setSaveLinkOpen((v) => !v)}
                 aria-expanded={saveLinkOpen}
                 aria-controls="save-link-panel"
-                className="text-[11px] font-semibold text-cobalt hover:underline"
+                className="text-[11px] font-semibold text-cobalt hover:underline max-md:tap-hit"
               >
                 {tProj("saveLink")}
               </button>
@@ -770,7 +770,7 @@ export function PrototypingWorkspace({
             aria-expanded={showOpen}
             aria-controls="readiness-open"
             title={t("readinessCount", { done: ready.satisfiedCount, total: ready.totalCount })}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-panel"
+            className="flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-panel max-md:min-h-11"
           >
             <span className="hidden text-[11px] text-mutedtext sm:inline">{t("readiness")}</span>
             <span className="h-1.5 w-20 overflow-hidden rounded-full bg-panel shadow-neu-inset">
@@ -799,7 +799,7 @@ export function PrototypingWorkspace({
                     <button
                       type="button"
                       onClick={() => goToRequirement(r)}
-                      className="flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-start text-[12px] text-heading transition-colors hover:text-cobalt"
+                      className="flex w-full items-start gap-2 rounded-md px-1 py-0.5 text-start text-[12px] text-heading transition-colors hover:text-cobalt max-md:min-h-11"
                     >
                       <CircleAlert className="mt-0.5 h-3 w-3 shrink-0 text-inventory" />
                       {r.blockingReason}
@@ -829,7 +829,7 @@ export function PrototypingWorkspace({
 
       <div
         className={cn(
-          "grid items-start gap-4",
+          "grid grid-cols-1 items-start gap-4",
           collapsed.left && collapsed.right && "lg:grid-cols-[56px_minmax(0,1fr)_56px]",
           collapsed.left && !collapsed.right && "lg:grid-cols-[56px_minmax(0,1fr)_300px]",
           !collapsed.left && collapsed.right && "lg:grid-cols-[248px_minmax(0,1fr)_56px]",
@@ -858,7 +858,7 @@ export function PrototypingWorkspace({
               type="button"
               onClick={() => togglePanel("left")}
               aria-label={collapsed.left ? t("expand") : t("collapse")}
-              className="rounded-md p-1 text-mutedtext transition-colors hover:text-cobalt"
+              className="rounded-md p-1 text-mutedtext transition-colors hover:text-cobalt max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
             >
               {collapsed.left !== isRtl ? (
                 <ChevronRight className="h-4 w-4" />
@@ -1123,7 +1123,7 @@ export function PrototypingWorkspace({
             <button
               type="button"
               onClick={() => setShowOpen(true)}
-              className="text-[11px] text-mutedtext transition-colors hover:text-cobalt"
+              className="text-[11px] text-mutedtext transition-colors hover:text-cobalt max-md:tap-hit"
             >
               {t("openItems", { count: open.length })}
             </button>
@@ -1162,7 +1162,7 @@ export function PrototypingWorkspace({
               type="button"
               onClick={() => togglePanel("right")}
               aria-label={collapsed.right ? t("expand") : t("collapse")}
-              className="rounded-md p-1 text-mutedtext transition-colors hover:text-cobalt"
+              className="rounded-md p-1 text-mutedtext transition-colors hover:text-cobalt max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center"
             >
               {collapsed.right !== isRtl ? (
                 <ChevronLeft className="h-4 w-4" />
@@ -1178,7 +1178,7 @@ export function PrototypingWorkspace({
                 <button
                   type="button"
                   onClick={() => goTo("bom")}
-                  className="block w-full rounded-xl bg-panel/60 p-3 text-start shadow-neu-inset transition-colors hover:ring-1 hover:ring-cobalt/30"
+                  className="block w-full rounded-xl bg-panel/60 p-3 text-start shadow-neu-inset transition-colors hover:ring-1 hover:ring-cobalt/30 max-md:min-h-11"
                 >
                   <p className="mb-1.5 text-[11px] font-bold text-heading">{t("costTitle")}</p>
                   <CostSummary lines={liveLines} matches={matches} compact state={costStatus} />

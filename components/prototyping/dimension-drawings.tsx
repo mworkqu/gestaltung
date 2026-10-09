@@ -74,7 +74,7 @@ export function DimensionDrawings({
                   <button
                     type="button"
                     onClick={() => onFix(dimFocus(p.id, missing[0] ?? "shape"))}
-                    className="text-[12px] font-semibold text-cobalt underline underline-offset-2 hover:text-cobalt-hover"
+                    className="text-[12px] font-semibold text-cobalt underline underline-offset-2 hover:text-cobalt-hover max-md:tap-hit"
                   >
                     {t("drawingNoDims")}
                   </button>
@@ -94,7 +94,7 @@ export function DimensionDrawings({
                         key={m}
                         type="button"
                         onClick={() => onFix(dimFocus(p.id, m))}
-                        className="font-semibold underline underline-offset-2 hover:text-heading"
+                        className="font-semibold underline underline-offset-2 hover:text-heading max-md:tap-hit"
                       >
                         {m === "shape" ? t("dimShape") : t(`dim_${m}`)}
                       </button>

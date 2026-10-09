@@ -424,7 +424,7 @@ function AddCustomItem({ onAdded }: { onAdded: () => Promise<void> }) {
     <form onSubmit={submit} className="neu space-y-4 p-6 sm:p-8">
       <h2 className="text-sm font-semibold text-heading">{t("addCustom")}</h2>
 
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div className="space-y-1.5">
           <label htmlFor="inv-name" className="block text-xs font-medium text-mutedtext">
             {t("customName")}
@@ -456,7 +456,7 @@ function AddCustomItem({ onAdded }: { onAdded: () => Promise<void> }) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="inline-flex items-center rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt"
+          className="inline-flex items-center rounded-lg bg-panel px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm transition-colors hover:text-cobalt max-md:min-h-11"
         >
           <ImagePlus className="me-1.5 h-3.5 w-3.5" />
           {t("photo")}

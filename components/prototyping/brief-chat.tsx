@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { MessageCircleQuestion, Plus, X } from "lucide-react";
+import { MessageCircleQuestion, Plus, Sparkles, X } from "lucide-react";
 
 import { PrimaryButton, SoftButton } from "@/components/prototyping/ui";
 import { ChatConsent, ChatInput, ChatMessages } from "@/components/prototyping/chat-thread";
@@ -40,6 +40,10 @@ export function BriefChat({
   consented,
   onConsent,
   onAdd,
+  onAddAndAnalyse,
+  onAnalyse,
+  canAnalyse = false,
+  analysed = false,
   initialOpen = false,
   initialThread,
 }: {
@@ -50,6 +54,14 @@ export function BriefChat({
   consented: boolean;
   onConsent: () => void;
   onAdd: (text: string) => Promise<void>;
+  /** Appends the paragraph AND starts the analysis; false = the brief was not saved. */
+  onAddAndAnalyse?: (text: string) => Promise<boolean>;
+  /** Starts the analysis (P2-03: reachable without closing the chat first). */
+  onAnalyse?: () => void;
+  /** The brief is long enough and no analysis is running. */
+  canAnalyse?: boolean;
+  /** Labels the button "Re-analyse brief" once an analysis exists. */
+  analysed?: boolean;
   /** Open on mount with the stored first turn (?start=chat). */
   initialOpen?: boolean;
   /** The first turn, when the caller already has it (else read from sessionStorage). */
@@ -63,6 +75,7 @@ export function BriefChat({
   const [busy, setBusy] = useState(false);
   const [addition, setAddition] = useState<string | null>(null);
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState(false);
   const [ticked, setTicked] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -147,7 +160,7 @@ export function BriefChat({
                 <p className="text-sm font-bold text-heading">{t("chatTitle")}</p>
                 <p className="text-[11px] text-mutedtext">{t("chatIntro")}</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} aria-label={t("chatClose")} className="rounded-md p-1 text-mutedtext hover:text-heading">
+              <button type="button" onClick={() => setOpen(false)} aria-label={t("chatClose")} className="rounded-md p-1 text-mutedtext hover:text-heading max-md:min-h-11 max-md:min-w-11 max-md:inline-flex max-md:items-center max-md:justify-center">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -170,20 +183,58 @@ export function BriefChat({
                   {added ? (
                     <p className="text-[12px] font-semibold text-emerald-700">{t("chatAdded")}</p>
                   ) : (
-                    <PrimaryButton
-                      onClick={async () => {
-                        await onAdd(addition);
-                        setAdded(true);
-                      }}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      {t("chatAddToBrief")}
-                    </PrimaryButton>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {onAddAndAnalyse && consented && (
+                        <PrimaryButton
+                          disabled={adding}
+                          onClick={async () => {
+                            setAdding(true);
+                            const ok = await onAddAndAnalyse(addition);
+                            setAdding(false);
+                            if (!ok) return;
+                            setAdded(true);
+                            setOpen(false);
+                          }}
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          {t("chatAddAndAnalyse")}
+                        </PrimaryButton>
+                      )}
+                      <SoftButton
+                        disabled={adding}
+                        onClick={async () => {
+                          setAdding(true);
+                          await onAdd(addition);
+                          setAdding(false);
+                          setAdded(true);
+                        }}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        {t("chatAddToBrief")}
+                      </SoftButton>
+                    </div>
                   )}
                 </div>
               )}
               <div ref={endRef} />
             </div>
+
+            {onAnalyse && consented && canAnalyse && (
+              <div className="flex items-center justify-between gap-2 border-t border-borderstrong/40 px-4 py-2">
+                <p className="min-w-0 text-[11px] text-mutedtext">{t("chatAnalyseHint")}</p>
+                <PrimaryButton
+                  className="shrink-0"
+                  disabled={busy || adding}
+                  onClick={() => {
+                    setOpen(false);
+                    onAnalyse();
+                  }}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {analysed ? t("reanalyse") : t("analyse")}
+                </PrimaryButton>
+              </div>
+            )}
 
             {msgs.length > 0 && (
               <ChatInput
@@ -193,7 +244,7 @@ export function BriefChat({
                 busy={busy}
                 className="border-t border-borderstrong/40 px-3 py-3"
               >
-                <button type="button" onClick={reset} className="text-[11px] font-semibold text-mutedtext hover:text-heading">
+                <button type="button" onClick={reset} className="text-[11px] font-semibold text-mutedtext hover:text-heading max-md:tap-hit">
                   {t("chatRestart")}
                 </button>
               </ChatInput>

@@ -230,7 +230,7 @@ export function SchematicsStage({
 
   return (
     <Card kicker={t("schHeading")} title={t("stageTitle_design")} intro={t("schIntro")}>
-      <div className="grid gap-5 lg:grid-cols-[210px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[210px_minmax(0,1fr)]">
         {/* Document list */}
         <ul className="flex gap-2 overflow-x-auto lg:flex-col lg:overflow-visible">
           {schematics.map((s) => {

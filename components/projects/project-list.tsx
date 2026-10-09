@@ -241,7 +241,7 @@ export function ProjectList() {
               type="button"
               onClick={() => setArchived(p.id, !p.archived)}
               disabled={busyId === p.id}
-              className="inline-flex w-fit items-center gap-1.5 self-end rounded-lg px-2 py-1 text-xs font-semibold text-mutedtext transition-colors hover:text-heading disabled:opacity-60"
+              className="inline-flex w-fit items-center gap-1.5 self-end rounded-lg px-2 py-1 text-xs font-semibold text-mutedtext transition-colors hover:text-heading disabled:opacity-60 max-md:min-h-11"
             >
               {busyId === p.id ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

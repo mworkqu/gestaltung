@@ -270,7 +270,7 @@ export default function CheckoutClient() {
         {t("title")}
       </h1>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <form onSubmit={handleSubmit} className="neu space-y-5 p-5 sm:p-6">
           <div className="space-y-2">
             {label("customer_name", t("nameLabel"), true)}

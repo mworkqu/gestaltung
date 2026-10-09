@@ -103,7 +103,7 @@ export function BriefEditor({
             <button
               type="button"
               onClick={onSave}
-              className="inline-flex items-center gap-1 font-semibold text-destructive"
+              className="inline-flex items-center gap-1 font-semibold text-destructive max-md:tap-hit"
             >
               <CircleAlert className="h-3 w-3" />
               {t("saveFailed")}

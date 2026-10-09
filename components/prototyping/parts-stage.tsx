@@ -402,7 +402,7 @@ export function PartsStage({
                       onClick={() =>
                         patch(part, { material: part.ai_material, process: part.ai_process, status: "suggested" })
                       }
-                      className="inline-flex items-center gap-1 font-semibold hover:underline"
+                      className="inline-flex items-center gap-1 font-semibold hover:underline max-md:tap-hit"
                     >
                       <Undo2 className="h-3 w-3" />
                       {t("revert")}
