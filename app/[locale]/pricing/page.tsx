@@ -104,9 +104,19 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     const variant = primary ? "default" : "outline";
     if (isContactPlan(plan))
       return (
-        <Button asChild size="lg" variant={variant} className={cls}>
-          <Link href="/contact?kind=institution">{t("ctaContact")}</Link>
-        </Button>
+        <div className="space-y-1">
+          <Button asChild size="lg" variant={variant} className={cls}>
+            <Link href="/contact?kind=institution">{t("ctaContact")}</Link>
+          </Button>
+          {/* P2-05: the lab licence page. */}
+          <Link
+            href="/institutions"
+            className="flex min-h-11 items-center justify-center gap-1 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
+          >
+            {t("institutionsLearn")}
+            <ArrowRight className={arrow} />
+          </Link>
+        </div>
       );
     if (plan.price_qar_month === 0)
       return (

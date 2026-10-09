@@ -175,6 +175,13 @@ describe("sitemapEntries", () => {
     expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/students");
   });
 
+  it("lists the institutions page but not the print sheet", () => {
+    expect(SITEMAP_STATIC_PATHS).toContain("/institutions");
+    expect(SITEMAP_STATIC_PATHS).not.toContain("/institutions/proposal");
+    expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/institutions");
+    expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/en/institutions");
+  });
+
   it("lists the trust page", () => {
     expect(SITEMAP_STATIC_PATHS).toContain("/trust");
     expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/trust");

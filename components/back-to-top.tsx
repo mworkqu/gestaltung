@@ -34,7 +34,7 @@ export function BackToTop() {
       type="button"
       onClick={toTop}
       aria-label={t("backToTop")}
-      className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-4 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-ink text-white shadow-neu transition-colors hover:bg-cobalt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cobalt/60 focus-visible:ring-offset-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+      className="fixed print:hidden bottom-[calc(1rem+env(safe-area-inset-bottom))] end-4 z-30 flex h-11 w-11 items-center justify-center rounded-full bg-ink text-white shadow-neu transition-colors hover:bg-cobalt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cobalt/60 focus-visible:ring-offset-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
     >
       <ArrowUp className="h-5 w-5" strokeWidth={1.75} aria-hidden />
     </button>

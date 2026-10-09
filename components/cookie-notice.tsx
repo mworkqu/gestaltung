@@ -117,7 +117,7 @@ export function CookieNotice({ gaId }: { gaId?: string }) {
         ref={barRef}
         role="region"
         aria-label={t("label")}
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-borderstrong/60 bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_18px_rgba(163,177,198,0.35)] backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-20 border-t print:hidden border-borderstrong/60 bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_18px_rgba(163,177,198,0.35)] backdrop-blur"
       >
         <div className="container flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <p className="text-sm text-body">
@@ -146,7 +146,7 @@ export function CookieNotice({ gaId }: { gaId?: string }) {
       </div>
       {/* Phones only: from sm up the bar is one thin row, and a spacer on a short
           page would add a scrollbar (a shift) for no benefit. */}
-      <div aria-hidden className="sm:hidden" style={{ height: barHeight }} />
+      <div aria-hidden className="sm:hidden print:hidden" style={{ height: barHeight }} />
     </>
   );
 }

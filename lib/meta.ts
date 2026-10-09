@@ -17,6 +17,8 @@ export type MetaKey =
   | "drawing"
   | "students"
   | "trust"
+  | "institutions"
+  | "institutionsProposal"
   | "pricing"
   | "signIn"
   | "signUp"
@@ -35,6 +37,9 @@ const PAGES: Record<MetaKey, { path: string; noindex?: boolean }> = {
   drawing: { path: "/design/drawing" },
   students: { path: "/students" },
   trust: { path: "/trust" },
+  institutions: { path: "/institutions" },
+  // P2-05: the print sheet is not for search results.
+  institutionsProposal: { path: "/institutions/proposal", noindex: true },
   pricing: { path: "/pricing" },
   signIn: { path: "/sign-in", noindex: true },
   signUp: { path: "/sign-up", noindex: true },

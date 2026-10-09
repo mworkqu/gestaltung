@@ -19,8 +19,13 @@ export function isAppPath(pathname: string): boolean {
   );
 }
 
+/** The printable pilot proposal (P2-05) is a sheet of paper: no site header or trust block, on screen or in print. */
+export function isPrintSheetPath(pathname: string): boolean {
+  return pathname === "/institutions/proposal";
+}
+
 export function HeaderGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (isAppPath(pathname)) return null;
+  if (isAppPath(pathname) || isPrintSheetPath(pathname)) return null;
   return <>{children}</>;
 }

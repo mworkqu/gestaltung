@@ -110,6 +110,16 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
         <div className="max-w-2xl space-y-2">
           <h2 className="text-2xl font-extrabold tracking-tight text-heading">{t("teachersHeading")}</h2>
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("teachersText")}</p>
+          {/* P2-05: teams and institutions. */}
+          <p className="text-sm leading-relaxed text-body sm:text-base">
+            {t.rich("labLine", {
+              lab: (chunks) => (
+                <Link href="/institutions" className="font-semibold text-cobalt hover:underline">
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
         </div>
         <Button asChild size="lg" className="w-full shrink-0 rounded-full sm:w-auto">
           <Link href="/contact?kind=school">{t("teachersCta")}</Link>
