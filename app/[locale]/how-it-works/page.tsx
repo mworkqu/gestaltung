@@ -49,15 +49,15 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
   ];
 
   return (
-    <div className="container space-y-6 py-6">
+    <div className="container page-stack">
       {/* Hero bento */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="neu animate-fade-up flex flex-col justify-center gap-6 p-8 sm:p-10 lg:col-span-7 lg:p-12">
           <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
             <span className="h-2 w-2 rounded-full bg-cobalt" />
-            <span className={mono("text-[10px] text-mutedtext")}>{t("kicker")}</span>
+            <span className="kicker text-mutedtext">{t("kicker")}</span>
           </span>
-          <h1 className="text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl lg:text-[3rem]">
+          <h1 className="title-page">
             {t("headingPaths")}
           </h1>
           <p className="max-w-xl text-base leading-relaxed text-body sm:text-lg">{t("introPaths")}</p>
@@ -90,15 +90,15 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
       </section>
 
       {paths.map(({ key, icon: PathIcon, href, video, steps }, n) => (
-        <section key={key} id={key} className="neu animate-fade-up scroll-mt-28 p-8 sm:p-10">
+        <section key={key} id={key} className="neu animate-fade-up scroll-mt-28 card-pad">
           <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-panel text-cobalt shadow-neu-sm">
                 <PathIcon className="h-6 w-6" strokeWidth={1.5} />
               </span>
               <div className="space-y-1">
-                <p className={mono("text-[10px] text-cobalt")}>{t("pathLabel", { n: n + 1 })}</p>
-                <h2 className="text-2xl font-extrabold tracking-tight text-heading">{t(`${key}Title`)}</h2>
+                <p className="kicker text-cobalt">{t("pathLabel", { n: n + 1 })}</p>
+                <h2 className="title-section">{t(`${key}Title`)}</h2>
                 <p className="max-w-2xl text-sm leading-relaxed text-body">{t(`${key}Intro`)}</p>
               </div>
             </div>
@@ -117,14 +117,14 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
 
           <ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map((Icon, i) => (
-              <li key={i} className="rounded-2xl bg-panel p-5 shadow-neu-sm">
+              <li key={i} className="tile">
                 <div className="flex items-center justify-between">
                   <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface shadow-neu-sm">
                     <Icon className="h-5 w-5 text-cobalt" strokeWidth={1.5} />
                   </span>
                   <span className="font-mono text-xs font-medium text-faint">{String(i + 1).padStart(2, "0")}</span>
                 </div>
-                <h3 className="mt-4 text-base font-bold text-heading">{t(`${key}Step${i + 1}Title`)}</h3>
+                <h3 className="mt-4 title-card">{t(`${key}Step${i + 1}Title`)}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t(`${key}Step${i + 1}Copy`)}</p>
               </li>
             ))}

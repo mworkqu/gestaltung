@@ -20,7 +20,6 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
   // One credit's price (get2Text: "Each circuit costs one credit (QAR {price})"); cached, cookie-free read.
   const price = formatPerOutput(pricing.overage_per_credit_qar);
   const isRtl = locale === "ar";
-  const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
 
   const gets: { key: "get1" | "get2" | "get3"; icon: LucideIcon }[] = [
@@ -37,14 +36,14 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
   ];
 
   return (
-    <div className="container space-y-6 py-6">
+    <div className="container page-stack">
       {/* Hero */}
-      <section className="neu animate-fade-up flex flex-col gap-5 p-8 sm:p-10 lg:p-12">
+      <section className="neu animate-fade-up flex flex-col gap-5 hero-pad">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
           <span className="h-2 w-2 rounded-full bg-cobalt" />
-          <span className={mono("text-[10px] text-mutedtext")}>{t("kicker")}</span>
+          <span className="kicker text-mutedtext">{t("kicker")}</span>
         </span>
-        <h1 className="max-w-3xl text-balance text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl lg:text-[3rem]">
+        <h1 className="max-w-3xl text-balance title-page">
           {t("heading")}
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-body sm:text-lg">{t("sub")}</p>
@@ -63,15 +62,15 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
       </section>
 
       {/* What you get */}
-      <section className="neu animate-fade-up delay-1 p-8 sm:p-10">
-        <h2 className="mb-6 text-2xl font-extrabold tracking-tight text-heading">{t("getHeading")}</h2>
+      <section className="neu animate-fade-up delay-1 card-pad">
+        <h2 className="mb-6 title-section">{t("getHeading")}</h2>
         <ul className="grid gap-5 lg:grid-cols-3">
           {gets.map(({ key, icon: Icon }) => (
-            <li key={key} className="min-w-0 rounded-2xl bg-panel p-5 shadow-neu-sm">
+            <li key={key} className="min-w-0 tile">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
                 <Icon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
               </span>
-              <h3 className="mt-4 text-base font-bold text-heading">{t(`${key}Title`)}</h3>
+              <h3 className="mt-4 title-card">{t(`${key}Title`)}</h3>
               <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t(`${key}Text`, { price })}</p>
             </li>
           ))}
@@ -79,9 +78,9 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
       </section>
 
       {/* Kits: three links into the store search */}
-      <section className="neu animate-fade-up delay-2 p-8 sm:p-10">
+      <section className="neu animate-fade-up delay-2 card-pad">
         <div className="mb-6 space-y-1">
-          <h2 className="text-2xl font-extrabold tracking-tight text-heading">{t("kitsHeading")}</h2>
+          <h2 className="title-section">{t("kitsHeading")}</h2>
           <p className="max-w-2xl text-sm leading-relaxed text-body">{t("kitsIntro")}</p>
         </div>
         <ul className="grid gap-4 sm:grid-cols-3">
@@ -89,7 +88,7 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
             <li key={key}>
               <Link
                 href={{ pathname: "/store", query: { q } }}
-                className="flex min-h-11 items-center gap-3 rounded-2xl bg-panel p-4 shadow-neu-sm transition-colors hover:text-cobalt"
+                className="flex min-h-11 items-center gap-3 tile p-4 transition-colors hover:text-cobalt"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
                   <Icon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
@@ -108,7 +107,7 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
       {/* Teachers */}
       <section className="neu animate-fade-up delay-2 flex flex-col gap-5 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10">
         <div className="max-w-2xl space-y-2">
-          <h2 className="text-2xl font-extrabold tracking-tight text-heading">{t("teachersHeading")}</h2>
+          <h2 className="title-section">{t("teachersHeading")}</h2>
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("teachersText")}</p>
           {/* P2-05: teams and institutions. */}
           <p className="text-sm leading-relaxed text-body sm:text-base">

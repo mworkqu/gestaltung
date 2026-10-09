@@ -79,7 +79,7 @@ export function HomeCallback({ turnstileEnabled = false }: { turnstileEnabled?: 
   }
 
   return (
-    <section className="neu animate-fade-up delay-3 grid gap-8 p-8 sm:p-10 md:grid-cols-2 md:items-center">
+    <section className="neu animate-fade-up delay-3 grid gap-8 card-pad md:grid-cols-2 md:items-center">
       <div className="space-y-3">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
           <span className="h-2 w-2 rounded-full bg-[#25d366]" />

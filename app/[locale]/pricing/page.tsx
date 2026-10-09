@@ -47,7 +47,6 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const t = await getTranslations("Pricing");
   const [pricing, services] = await Promise.all([getPricingPlans(), getServicePrices()]);
   const isRtl = locale === "ar";
-  const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
 
   const price = formatPerOutput(pricing.overage_per_credit_qar);
@@ -222,15 +221,15 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   ];
 
   return (
-    <div className="container space-y-6 py-6">
+    <div className="container page-stack">
       <PricingViewed />
       {/* Hero */}
-      <section className="neu animate-fade-up flex flex-col gap-5 p-8 sm:p-10 lg:p-12">
+      <section className="neu animate-fade-up flex flex-col gap-5 hero-pad">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
           <span className="h-2 w-2 rounded-full bg-cobalt" />
-          <span className={mono("text-[10px] text-mutedtext")}>{t("kicker")}</span>
+          <span className="kicker text-mutedtext">{t("kicker")}</span>
         </span>
-        <h1 className="max-w-3xl text-balance text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl lg:text-[3rem]">
+        <h1 className="max-w-3xl text-balance title-page">
           {t("heading")}
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-body sm:text-lg">{t("sub", { price, days })}</p>
@@ -239,7 +238,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       {/* Plans: Studio first on wide screens (anchor), Maker first on phones. */}
       <section aria-labelledby="plans-heading" className="animate-fade-up delay-1 space-y-5">
         <div className="space-y-1 px-1">
-          <h2 id="plans-heading" className="text-balance text-2xl font-extrabold tracking-tight text-heading">
+          <h2 id="plans-heading" className="text-balance title-section">
             {t("plansHeading")}
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-body">{t("plansIntro")}</p>
@@ -304,10 +303,10 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       </section>
 
       {/* How credits work — explained once; /credits redirects here. */}
-      <section id="credits" className="neu animate-fade-up delay-2 scroll-mt-24 space-y-6 p-8 sm:p-10">
+      <section id="credits" className="neu animate-fade-up delay-2 scroll-mt-24 space-y-6 card-pad">
         <div className="max-w-2xl space-y-2">
-          <span className={mono("text-[10px] text-cobalt")}>{t("creditsKicker")}</span>
-          <h2 className="text-balance text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+          <span className="kicker text-cobalt">{t("creditsKicker")}</span>
+          <h2 className="text-balance title-section">
             {t("creditsHeading")}
           </h2>
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("creditsIntro", { price })}</p>
@@ -320,19 +319,19 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
         <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {creditCards.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="min-w-0 rounded-2xl bg-panel p-5 shadow-neu-sm">
+            <li key={title} className="min-w-0 tile">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
                 <Icon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
               </span>
-              <h3 className="mt-4 text-base font-bold text-heading">{title}</h3>
+              <h3 className="mt-4 title-card">{title}</h3>
               <p className="mt-2 text-sm leading-relaxed text-mutedtext">{text}</p>
             </li>
           ))}
-          <li className="min-w-0 rounded-2xl bg-panel p-5 shadow-neu-sm">
+          <li className="min-w-0 tile">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
               <Gift className="h-5 w-5" strokeWidth={1.5} aria-hidden />
             </span>
-            <h3 className="mt-4 text-base font-bold text-heading">{t("creditTopupTitle")}</h3>
+            <h3 className="mt-4 title-card">{t("creditTopupTitle")}</h3>
             <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t("creditTopupText", { price })}</p>
             <a
               href={whatsappFor(t("topupWhatsappText"))}
@@ -352,21 +351,21 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       </section>
 
       {/* Services, from (P1-07) */}
-      <section aria-labelledby="services-heading" className="neu animate-fade-up delay-2 space-y-6 p-8 sm:p-10">
+      <section aria-labelledby="services-heading" className="neu animate-fade-up delay-2 space-y-6 card-pad">
         <div className="max-w-2xl space-y-2">
-          <span className={mono("text-[10px] text-cobalt")}>{t("servicesKicker")}</span>
-          <h2 id="services-heading" className="text-balance text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+          <span className="kicker text-cobalt">{t("servicesKicker")}</span>
+          <h2 id="services-heading" className="text-balance title-section">
             {t("servicesHeading")}
           </h2>
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("servicesIntro")}</p>
         </div>
         <ul className="grid gap-5 lg:grid-cols-3">
           {serviceCards.map(({ icon: Icon, title, price: from, text, cta, href }) => (
-            <li key={href} className="flex min-w-0 flex-col rounded-2xl bg-panel p-5 shadow-neu-sm">
+            <li key={href} className="flex min-w-0 flex-col tile">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
                 <Icon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
               </span>
-              <h3 className="mt-4 text-base font-bold text-heading">{title}</h3>
+              <h3 className="mt-4 title-card">{title}</h3>
               <p className="mt-1 text-lg font-extrabold tabular-nums text-cobalt">{from}</p>
               <p className="mt-2 flex-1 text-sm leading-relaxed text-mutedtext">{text}</p>
               <Link
@@ -382,8 +381,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       </section>
 
       {/* FAQ */}
-      <section aria-labelledby="faq-heading" className="neu animate-fade-up delay-3 p-8 sm:p-10">
-        <h2 id="faq-heading" className="mb-6 text-balance text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+      <section aria-labelledby="faq-heading" className="neu animate-fade-up delay-3 card-pad">
+        <h2 id="faq-heading" className="mb-6 text-balance title-section">
           {t("faqHeading")}
         </h2>
         <dl className="grid gap-x-10 gap-y-6 lg:grid-cols-2">

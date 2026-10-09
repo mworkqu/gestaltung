@@ -24,7 +24,6 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
   const [t, services] = await Promise.all([getTranslations("Institutions"), getServicePrices()]);
   const price = formatQar(services.pilot_from);
   const isRtl = locale === "ar";
-  const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
   const whatsapp = `${COMPANY_WHATSAPP.url}?text=${encodeURIComponent(t("whatsappText"))}`;
 
@@ -40,14 +39,14 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
   const dot = "mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cobalt";
 
   return (
-    <div className="container space-y-6 py-6">
+    <div className="container page-stack">
       {/* Hero */}
-      <section className="neu animate-fade-up flex flex-col gap-5 p-8 sm:p-10 lg:p-12">
+      <section className="neu animate-fade-up flex flex-col gap-5 hero-pad">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
           <span className="h-2 w-2 rounded-full bg-cobalt" />
-          <span className={mono("text-[10px] text-mutedtext")}>{t("kicker")}</span>
+          <span className="kicker text-mutedtext">{t("kicker")}</span>
         </span>
-        <h1 className="max-w-3xl text-balance text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl lg:text-[3rem]">
+        <h1 className="max-w-3xl text-balance title-page">
           {t("heading")}
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-body sm:text-lg">{t("sub")}</p>
@@ -65,15 +64,15 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
       </section>
 
       {/* Who it is for */}
-      <section className="neu animate-fade-up delay-1 p-8 sm:p-10">
-        <h2 className="mb-6 text-2xl font-extrabold tracking-tight text-heading">{t("forHeading")}</h2>
+      <section className="neu animate-fade-up delay-1 card-pad">
+        <h2 className="mb-6 title-section">{t("forHeading")}</h2>
         <ul className="grid gap-5 md:grid-cols-3">
           {audiences.map(({ key, icon: Icon }) => (
-            <li key={key} className="min-w-0 rounded-2xl bg-panel p-5 shadow-neu-sm">
+            <li key={key} className="min-w-0 tile">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
                 <Icon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
               </span>
-              <h3 className="mt-4 text-base font-bold text-heading">{t(`${key}Title`)}</h3>
+              <h3 className="mt-4 title-card">{t(`${key}Title`)}</h3>
               <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t(`${key}Text`)}</p>
             </li>
           ))}
@@ -81,16 +80,16 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
       </section>
 
       {/* The pilot */}
-      <section aria-labelledby="pilot-heading" className="neu animate-fade-up delay-2 space-y-6 p-8 sm:p-10">
+      <section aria-labelledby="pilot-heading" className="neu animate-fade-up delay-2 space-y-6 card-pad">
         <div className="space-y-1">
-          <span className={mono("text-[10px] text-cobalt")}>{t("pilotKicker")}</span>
-          <h2 id="pilot-heading" className="text-2xl font-extrabold tracking-tight text-heading">
+          <span className="kicker text-cobalt">{t("pilotKicker")}</span>
+          <h2 id="pilot-heading" className="title-section">
             {t("pilotHeading")}
           </h2>
         </div>
 
         <div className="grid gap-5 lg:grid-cols-2">
-          <div className="min-w-0 space-y-5 rounded-2xl bg-panel p-5 shadow-neu-sm">
+          <div className="min-w-0 space-y-5 tile">
             <div className="space-y-2">
               <h3 className={subHeading}>{t("scopeTitle")}</h3>
               <ul className="space-y-1.5">
@@ -108,7 +107,7 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
             </div>
           </div>
 
-          <div className="min-w-0 space-y-2 rounded-2xl bg-panel p-5 shadow-neu-sm">
+          <div className="min-w-0 space-y-2 tile">
             <h3 className={subHeading}>{t("measureTitle")}</h3>
             <p className="text-sm leading-relaxed text-mutedtext">{t("measureIntro")}</p>
             <ul className="space-y-1.5 pt-1">
@@ -121,7 +120,7 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
             </ul>
           </div>
 
-          <div className="min-w-0 space-y-1 rounded-2xl bg-panel p-5 shadow-neu-sm">
+          <div className="min-w-0 space-y-1 tile">
             <h3 className={subHeading}>{t("priceTitle")}</h3>
             <p className="text-3xl font-extrabold tabular-nums tracking-tight text-heading">
               {t("priceValue", { price })}
@@ -129,7 +128,7 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
             <p className="text-sm text-mutedtext">{t("priceNote")}</p>
           </div>
 
-          <div className="min-w-0 space-y-1 rounded-2xl bg-panel p-5 shadow-neu-sm">
+          <div className="min-w-0 space-y-1 tile">
             <h3 className={subHeading}>{t("afterTitle")}</h3>
             <p className="text-sm leading-relaxed text-heading">{t("afterText")}</p>
           </div>
@@ -143,7 +142,7 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
       {/* Invoice and PO */}
       <section className="neu animate-fade-up delay-2 flex flex-col gap-5 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10">
         <div className="max-w-2xl space-y-2">
-          <h2 className="text-2xl font-extrabold tracking-tight text-heading">{t("invoiceTitle")}</h2>
+          <h2 className="title-section">{t("invoiceTitle")}</h2>
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("invoiceText")}</p>
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("contactLine")}</p>
           <p className="text-sm text-mutedtext">

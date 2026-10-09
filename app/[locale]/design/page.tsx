@@ -91,17 +91,17 @@ export default async function DesignHubPage({
   );
 
   return (
-    <div className="container space-y-6 py-6">
+    <div className="container page-stack">
       {/* Hero bento */}
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Intro */}
         <div className="neu animate-fade-up flex flex-col justify-center gap-5 p-6 sm:gap-6 sm:p-10 lg:col-span-7 lg:p-12">
           <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
             <span className="h-2 w-2 rounded-full bg-cobalt" />
-            <span className={mono("text-[10px] text-mutedtext")}>{t("kicker")}</span>
+            <span className="kicker text-mutedtext">{t("kicker")}</span>
           </span>
 
-          <h1 className="text-[2.25rem] font-extrabold leading-[1.05] tracking-tight text-heading sm:text-5xl lg:text-[3rem]">
+          <h1 className="title-page">
             {t("heading")}
           </h1>
 
@@ -137,7 +137,7 @@ export default async function DesignHubPage({
       {/* Two paths */}
       <section className="animate-fade-up delay-2 space-y-6">
         <div className="flex flex-col gap-2 px-1">
-          <span className={mono("text-[10px] text-cobalt")}>{t("pathsTag")}</span>
+          <span className="kicker text-cobalt">{t("pathsTag")}</span>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -167,7 +167,7 @@ export default async function DesignHubPage({
                 />
               </div>
 
-              <h2 className="mt-6 text-xl font-bold text-heading sm:text-2xl">{title}</h2>
+              <h2 className="mt-6 text-xl font-extrabold tracking-tight text-heading sm:text-2xl">{title}</h2>
               <p className="mt-3 flex-1 text-sm leading-relaxed text-mutedtext sm:text-base">
                 {copy}
               </p>
@@ -184,7 +184,7 @@ export default async function DesignHubPage({
 
         {/* Prices from: the same three starting prices as /pricing. */}
         <div className="neu flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-          <span className={mono("text-[10px] text-cobalt")}>{tPricing("pricesFromTag")}</span>
+          <span className="kicker text-cobalt">{tPricing("pricesFromTag")}</span>
           <dl className="grid flex-1 gap-3 sm:grid-cols-3 lg:max-w-3xl">
             {[
               { label: tPricing("enclosureTitle"), n: prices.enclosure_from },
@@ -230,7 +230,7 @@ export default async function DesignHubPage({
           <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
           <div className="relative space-y-2">
             <span className={mono("text-[10px] text-white/45")}>{t("ctaTag")}</span>
-            <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+            <h2 className="title-section text-white">
               {t("ctaHeading")}
             </h2>
           </div>

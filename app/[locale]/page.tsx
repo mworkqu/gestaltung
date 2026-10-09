@@ -87,7 +87,7 @@ export default async function Home({
 
   return (
     <MessagesScope scope="home">
-    <div className="container space-y-6 py-6">
+    <div className="container page-stack">
       {/* Hero (P1-01): outcome, one sub line, ONE primary CTA, proof line. Nothing else
           above the fold (no search box, no dropzone). */}
       <section className="neu animate-fade-up space-y-4 px-5 pb-8 pt-6 sm:space-y-5 sm:p-10">
@@ -123,8 +123,8 @@ export default async function Home({
       {/* Built for founders (P1-02): three outcomes, no numbers. */}
       <section className="animate-fade-up space-y-5">
         <div className="space-y-1 px-1">
-          <span className={mono("text-[10px] text-cobalt")}>{t("foundersKicker")}</span>
-          <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+          <span className="kicker text-cobalt">{t("foundersKicker")}</span>
+          <h2 className="title-section">
             {t("foundersHeading")}
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-body sm:text-base">{t("foundersIntro")}</p>
@@ -210,8 +210,8 @@ export default async function Home({
       {/* See it work: three short self-hosted clips (components/feature-video.tsx). */}
       <section className="animate-fade-up delay-1 space-y-6">
         <div className="space-y-1 px-1">
-          <span className={mono("text-[10px] text-cobalt")}>{tv("seeItWorkKicker")}</span>
-          <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+          <span className="kicker text-cobalt">{tv("seeItWorkKicker")}</span>
+          <h2 className="title-section">
             {tv("seeItWorkHeading")}
           </h2>
           <p className="text-sm text-mutedtext">{tv("seeItWorkSub")}</p>
@@ -241,7 +241,7 @@ export default async function Home({
       <section className="animate-fade-up delay-2 space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4 px-1">
           <div>
-            <h2 className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+            <h2 className="title-section">
               {t("featured")}
             </h2>
             <p className="mt-1 text-sm text-mutedtext">{t("featuredSubOrderable")}</p>
@@ -292,7 +292,7 @@ export default async function Home({
             <GraduationCap className="h-4 w-4" />
           </span>
           <div className="min-w-0 space-y-1">
-            <h3 className="text-base font-bold text-heading">{t("studentsTitle")}</h3>
+            <h3 className="title-card">{t("studentsTitle")}</h3>
             <p className="text-sm leading-relaxed text-body">{t("studentsText")}</p>
           </div>
         </div>
@@ -321,7 +321,7 @@ function ChoiceHead({ icon, title, text }: { icon: React.ReactNode; title: strin
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-panel text-cobalt shadow-neu-sm" aria-hidden>
           {icon}
         </span>
-        <h3 className="text-base font-bold text-heading">{title}</h3>
+        <h3 className="title-card">{title}</h3>
       </div>
       <p className="text-sm leading-relaxed text-body">{text}</p>
     </div>

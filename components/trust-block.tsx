@@ -84,11 +84,11 @@ export async function TrustItemCards({ full = false }: { full?: boolean }) {
   return (
     <ul className={cn("grid gap-4 md:grid-cols-2 lg:grid-cols-3", full && "gap-5")}>
       {ITEMS.map(({ id, icon: Icon }) => (
-        <li key={id} className="flex min-w-0 flex-col gap-2 rounded-2xl bg-panel p-5 shadow-neu-sm">
+        <li key={id} className={cn("flex min-w-0 flex-col gap-2", full ? "neu p-6 sm:p-8" : "tile")}>
           <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
             <Icon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
           </span>
-          <h3 className="mt-2 text-base font-bold text-heading">{t(`${id}Title`)}</h3>
+          <h3 className="mt-2 title-card">{t(`${id}Title`)}</h3>
           {text[id] && <p className="text-sm leading-relaxed text-body">{text[id]}</p>}
           {full && <p className="text-sm leading-relaxed text-mutedtext">{more[id]}</p>}
           <div className="mt-auto">{link(id)}</div>
@@ -147,13 +147,13 @@ export async function TrustBlock() {
   const isRtl = locale === "ar";
   return (
     <section aria-labelledby="trust-heading" className="container pt-6">
-      <div className="neu space-y-6 p-6 sm:p-8">
+      <div className="neu space-y-6 card-pad">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
           <div className="space-y-1">
-            <span className={cn("text-[10px] text-cobalt", isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]")}>
+            <span className="kicker text-cobalt">
               {t("kicker")}
             </span>
-            <h2 id="trust-heading" className="text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
+            <h2 id="trust-heading" className="title-section">
               {t("heading")}
             </h2>
           </div>

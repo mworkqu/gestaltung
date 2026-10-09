@@ -15,7 +15,6 @@ import { emptyState, storeQuery, STORE_PAGE_SIZE, type StoreState } from "@/lib/
 import { getStoreFacets, getStoreListing } from "@/lib/store/public-catalog";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { COMPANY_WHATSAPP } from "@/lib/company";
-import { cn } from "@/lib/utils";
 import { arabicCountForm } from "@/lib/text/count";
 
 // The /store list, shared by the static default listing (store/page.tsx, no
@@ -25,9 +24,6 @@ import { arabicCountForm } from "@/lib/text/count";
 // (lib/store/public-catalog.ts) and sends cards only StoreCardPart fields.
 export async function StoreListing({ locale, state }: { locale: string; state: StoreState }) {
   const t = await getTranslations("Parts");
-  const isRtl = locale === "ar";
-  const mono = (extra = "") =>
-    cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   // Filter options (every listed category/material) and one page of cards,
   // plus the Standard-tier delivery settings for every card's "Arrives by".
@@ -59,10 +55,10 @@ export async function StoreListing({ locale, state }: { locale: string; state: S
 
   return (
     <MessagesScope scope="store">
-      <div className="container space-y-6 py-6 sm:space-y-8 sm:py-8">
+      <div className="container page-stack">
         <header className="space-y-3">
-          <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
-          <h1 className="text-3xl font-extrabold tracking-tight text-heading sm:text-4xl">
+          <p className="kicker text-azure">{t("kicker")}</p>
+          <h1 className="title-page">
             {t("heading")}
           </h1>
           <p className="max-w-2xl text-base leading-relaxed text-body">

@@ -69,3 +69,21 @@ When building a new Gestaltung screen: "Build a [screen] in the Gestaltung light
 Swiss style — cobalt accent, Outfit + JetBrains Mono, bento grid, soft dual shadows, blueprint
 motifs, bilingual EN/AR with correct RTL, all copy from messages/{en,ar}.json." Then run
 `/impeccable polish` or the `redesign-existing-projects` taste skill to refine.
+
+## 10. Scale & rhythm (2026-10 audit)
+One set of tokens for the public pages (home, /how-it-works, /pricing, /trust, /students,
+/institutions, /design, /store). Defined in `app/globals.css` (components layer); use them
+instead of ad-hoc values.
+- **Page stack** `.page-stack` (with `container`): `space-y-6 py-6`. Section gap is 24px everywhere.
+- **Page title (h1)** `.title-page`: 36px, `sm` 48px, `lg` 48px (3rem), weight 800, leading 1.05, tight tracking.
+- **Section title (h2)** `.title-section`: 24px, `sm` 30px, weight 800, tight tracking.
+- **Card title (h3)** `.title-card`: 16px, weight 700.
+- **Card padding** `.card-pad`: `p-8 sm:p-10` for a section card; `.hero-pad`: `p-8 sm:p-10 lg:p-12` for the page hero card. Dark `bg-ink` bands keep `p-8 sm:p-12`.
+- **Kicker** `.kicker`: mono, 10px, uppercase, tracking 0.18em; Arabic gets no uppercase, no tracking
+  and the sans stack. Colour by use: muted in the hero eyebrow, cobalt above a section title.
+- **No cards in cards**: items grouped inside a `.neu` section use `.tile` (recessed `bg-panel`,
+  hairline border, no second shadow). A `.neu-inset` well (video, drop zone, blueprint) is allowed.
+  On /trust the five promises are top-level `.neu` cards; inside the site-wide trust block they are tiles.
+- Deliberate exception: the home hero keeps a smaller phone h1 (30px) and tighter padding so the
+  CTA and proof line stay above the fold at 375x667.
+- The old store-first dark theme (`.store-landing`, `.sl-*` tokens and fonts) is retired and deleted.
