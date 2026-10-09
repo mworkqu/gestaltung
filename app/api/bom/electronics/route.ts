@@ -10,8 +10,8 @@ import { bomRate, canUse, spend } from "@/lib/credits/server";
 // passives, level shifters, consumables and fabrication line (our rules).
 //
 // Credits (0042): listing the parts is the "bom" step (daily rate limit).
-// Wiring them is the "wiring" step: drawn only when the caller may — first
-// circuit per project free, later ones 1 wiring credit, charged after a
+// Wiring them is the "wiring" step: drawn only when the caller may — every
+// circuit costs 1 wiring credit (no free first circuit, 0052), charged after a
 // circuit was saved. Otherwise the list is rebuilt, the circuit is left as it
 // was, and the answer says why (circuit: "skipped", circuitReason).
 

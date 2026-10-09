@@ -40,6 +40,7 @@ type ErrorCode = "paused" | "invalid" | "no_electronics" | "unavailable" | "rate
 
 export function NetlistView({
   projectId,
+  projectName,
   netlist,
   bom,
   matches,
@@ -49,6 +50,8 @@ export function NetlistView({
   /** Shown above the diagrams (our rules' level-shift warnings). */
   extra?: React.ReactNode;
   projectId: string;
+  /** For the "buy credits" WhatsApp message. */
+  projectName?: string | null;
   netlist: ProjectNetlist | null;
   bom: ProjectBom | null;
   matches: Map<string, LineMatch>;
@@ -59,7 +62,7 @@ export function NetlistView({
   const [view, setView] = useState<"wiring" | "schematic">("wiring");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ code: ErrorCode; problems?: string[] } | null>(null);
-  // Credits (0042): first circuit per project free, then 1 wiring credit;
+  // Credits (0042/0052): every circuit costs 1 wiring credit (no free one);
   // guests are asked to sign in. The route re-checks and charges.
   const access = useCanUse("wiring", projectId);
   const [blocked, setBlocked] = useState<string | null>(null);
@@ -170,7 +173,7 @@ export function NetlistView({
       }
     >
       {!hasElectronics && <p className="text-sm text-mutedtext">{t("circuitNeedsBom")}</p>}
-      <AccessNote reason={blocked} step="wiring" />
+      <AccessNote reason={blocked} step="wiring" projectName={projectName} />
 
       {error && (
         <Warn blocking>

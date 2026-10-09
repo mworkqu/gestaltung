@@ -6,12 +6,16 @@
 // Until 0042 runs, the functions do not exist: canUse() and bomRate() then let
 // the call through (today's behaviour) and spend() is a no-op, with a warning
 // in the server console — the feature keeps working, it just isn't metered.
+//
+// No free circuit (owner, 2026-10-09, migration 0052): every wiring call needs
+// and spends 1 wiring credit. Until 0052 runs, the 0042 functions still treat
+// a project's first circuit as free; canUse() and spend() correct that here.
 
 import { createHash } from "node:crypto";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { AiStep, CanUse } from "./constants";
+import { noFreeCircuit, type AiStep, type CanUse, type RawCanUse } from "./constants";
 
 type RpcError = { code?: string; message?: string } | null;
 
@@ -29,14 +33,23 @@ export async function canUse(supabase: SupabaseClient, step: AiStep, projectId: 
     console.error("[credits] credit_can_use failed:", error.message);
     return { allowed: false, reason: "not_ready", cost: null, role: "anonymous" };
   }
-  return data as CanUse;
+  return noFreeCircuit(data as RawCanUse);
 }
 
 export type SpendResult =
-  | { ok: true; charged: boolean; cost: CanUse["cost"]; balance: number | null }
+  | { ok: true; charged: boolean; cost: RawCanUse["cost"]; balance: number | null }
   | { ok: false; error: "sign_in" | "no_credits" | "not_found" | "failed" };
 
 export async function spend(supabase: SupabaseClient, step: "wiring" | "cad", projectId: string): Promise<SpendResult> {
+  const first = await spendOnce(supabase, step, projectId);
+  // Before 0052: spend_credit marks the project's first circuit as used
+  // (free_wiring_used) without charging and answers cost "free". The flag is
+  // now set, so a second call writes the 1-credit spend row.
+  if (first.ok && step === "wiring" && first.cost === "free") return spendOnce(supabase, step, projectId);
+  return first;
+}
+
+async function spendOnce(supabase: SupabaseClient, step: "wiring" | "cad", projectId: string): Promise<SpendResult> {
   const { data, error } = await supabase.rpc("spend_credit", { p_step: step, p_project: projectId });
   if (error) {
     if (missing(error)) return { ok: true, charged: false, cost: "none", balance: null };
@@ -44,7 +57,7 @@ export async function spend(supabase: SupabaseClient, step: "wiring" | "cad", pr
     console.error(`[credits] spend ${step} on ${projectId} failed:`, error.message);
     return { ok: false, error: code ?? "failed" };
   }
-  const d = data as { charged: boolean; cost: CanUse["cost"]; balance: number | null };
+  const d = data as { charged: boolean; cost: RawCanUse["cost"]; balance: number | null };
   return { ok: true, charged: d.charged, cost: d.cost, balance: d.balance };
 }
 

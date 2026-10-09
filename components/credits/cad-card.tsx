@@ -62,7 +62,16 @@ function download(name: string, data: BlobPart, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function CadCard({ projectId, brief }: { projectId: string; brief: string }) {
+export function CadCard({
+  projectId,
+  projectName,
+  brief,
+}: {
+  projectId: string;
+  /** For the "buy credits" WhatsApp message. */
+  projectName?: string | null;
+  brief: string;
+}) {
   const t = useTranslations("Credits");
   const locale = useLocale();
   const access = useCanUse("cad", projectId);
@@ -280,7 +289,7 @@ export function CadCard({ projectId, brief }: { projectId: string; brief: string
           <FeatureVideoClient slug="cad-model" size="small" posterOnly />
         </div>
       )}
-      <AccessNote reason={blocked} step="cad" />
+      <AccessNote reason={blocked} step="cad" projectName={projectName} />
       {done && <p className="rounded-xl bg-buy-bg px-3 py-2 text-xs font-medium text-buy">{t("cadStub", { tier: t(`tier_${done}`) })}</p>}
       {error && <p className="text-xs text-destructive">{t("cadError")}</p>}
 

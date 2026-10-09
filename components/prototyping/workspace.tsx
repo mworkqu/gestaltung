@@ -976,7 +976,7 @@ export function PrototypingWorkspace({
                 onFix={(focus) => goTo("mechanical.parts", focus)}
               />
               {earlier(designOf("mechanical"))}
-              <CadCard projectId={project.id} brief={project.brief ?? ""} />
+              <CadCard projectId={project.id} projectName={project.name} brief={project.brief ?? ""} />
               {/* 3D CAD is still a human service; say so where drawings live. */}
               <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
                 <p className="min-w-0 flex-1 text-[12px] text-mutedtext">{t("engineeringBody")}</p>
@@ -1040,6 +1040,7 @@ export function PrototypingWorkspace({
           {node === "electronics.components" && (
             <GenerateComponents
               projectId={project.id}
+              projectName={project.name}
               route={buildRoute}
               power={rowOf(spec, "power")?.value ?? null}
               builtFor={(bom?.route as BuildRoute | undefined) ?? null}
@@ -1056,6 +1057,7 @@ export function PrototypingWorkspace({
             <div id={CIRCUIT_FOCUS} tabIndex={-1} className="outline-none">
               <NetlistView
                 projectId={project.id}
+                projectName={project.name}
                 netlist={project.netlist ?? null}
                 bom={bom}
                 matches={matches}

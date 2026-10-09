@@ -1,5 +1,5 @@
 import { getLocale, getTranslations } from "next-intl/server";
-import { ArrowRight, Building2, Database, Lock, MessageCircle, RotateCcw, type LucideIcon } from "lucide-react";
+import { ArrowRight, Building2, ClipboardCheck, Database, Lock, MessageCircle, type LucideIcon } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { COMPANY, COMPANY_ADDRESS, COMPANY_WHATSAPP } from "@/lib/company";
@@ -22,7 +22,7 @@ const ITEMS: { id: ItemId; icon: LucideIcon }[] = [
   { id: "data", icon: Database },
   { id: "contact", icon: MessageCircle },
   { id: "registered", icon: Building2 },
-  { id: "warranty", icon: RotateCcw },
+  { id: "warranty", icon: ClipboardCheck },
 ];
 
 const linkCls =
@@ -40,13 +40,14 @@ export async function TrustItemCards({ full = false }: { full?: boolean }) {
     address: COMPANY_ADDRESS[isRtl ? "ar" : "en"],
   });
 
-  // Short text of each item (the warranty item is a title and a link only).
+  // Short text of each item. The warranty item is the engineer-review promise
+  // (owner, 2026-10-09: no reprint/rework promises; we make what was approved).
   const text: Record<ItemId, string | null> = {
     files: t("filesText"),
     data: t("dataText"),
     contact: t("contactText"),
     registered,
-    warranty: null,
+    warranty: t("warrantyText"),
   };
   const more: Record<ItemId, string> = {
     files: t("filesMore"),

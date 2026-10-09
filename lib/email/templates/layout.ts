@@ -107,7 +107,7 @@ const COPY = {
     brandStrip: `${COMPANY.legalNameEn} · C.R. ${COMPANY.crNumber}`,
     howTitle: "How to use your credits",
     how: [
-      `Your first circuit drawing (wiring diagram and schematic) on each project is free; every further one on that project costs 1 circuit credit. 1 CAD credit covers one CAD session for a 3D model, with up to ${CAD_GENERATIONS} versions.`,
+      `Every circuit drawing (wiring diagram and schematic) costs 1 circuit credit; the parts list is free. 1 CAD credit covers one CAD session for a 3D model, with up to ${CAD_GENERATIONS} versions.`,
       `Every credit you spend comes back as a QAR ${CREDIT_QAR} discount on any order with us (parts, 3D printing, laser or CNC) within ${REDEEM_DAYS} days, applied at checkout. Credits are never refunded as cash.`,
     ],
     howLink: "See how credits work",
@@ -119,7 +119,7 @@ const COPY = {
     brandStrip: `${COMPANY.legalNameAr} · س.ت ${COMPANY.crNumber}`,
     howTitle: "كيف تستخدم أرصدتك",
     how: [
-      `أول رسم للدائرة (مخطط التوصيل والمخطط الكهربائي) في كل مشروع مجاني، وكل رسم إضافي في المشروع يكلّف رصيد توصيل واحدًا. رصيد CAD الواحد يغطي جلسة نموذج ثلاثي الأبعاد بحتى ${CAD_GENERATIONS} نسخ.`,
+      `كل رسم للدائرة (مخطط التوصيل والمخطط الكهربائي) يكلّف رصيد توصيل واحدًا، وقائمة القطع مجانية. رصيد CAD الواحد يغطي جلسة نموذج ثلاثي الأبعاد بحتى ${CAD_GENERATIONS} نسخ.`,
       `كل رصيد تستخدمه يعود إليك كخصم ${CREDIT_QAR} ر.ق على أي طلب معنا (قطع، طباعة ثلاثية الأبعاد، قص ليزر أو CNC) خلال ${REDEEM_DAYS} يومًا، ويُطبَّق عند إتمام الطلب. لا تُستردّ الأرصدة نقدًا أبدًا.`,
     ],
     howLink: "تعرّف على كيفية عمل الأرصدة",

@@ -19,7 +19,7 @@ import type { User } from "@supabase/supabase-js";
 import { useAuth } from "@/components/auth/auth-provider";
 import { createSharedLoader } from "@/lib/dedupe";
 import { createClient } from "@/lib/supabase/client";
-import { CREDITS_CHANGED, type AiStep, type CanUse, type CreditSummary } from "./constants";
+import { CREDITS_CHANGED, noFreeCircuit, type AiStep, type CanUse, type CreditSummary, type RawCanUse } from "./constants";
 
 export function creditsChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(CREDITS_CHANGED));
@@ -86,7 +86,8 @@ export function useCanUse(step: AiStep, projectId: string | null): CanUse | null
     let alive = true;
     const load = async () => {
       const { data, error } = await createClient().rpc("credit_can_use", { p_step: step, p_project: projectId });
-      if (alive) setState(error ? null : (data as CanUse));
+      // noFreeCircuit: before 0052 the DB still calls a first circuit "free".
+      if (alive) setState(error ? null : noFreeCircuit(data as RawCanUse));
     };
     void load();
     const on = () => void load();

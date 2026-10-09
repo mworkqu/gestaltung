@@ -13,8 +13,9 @@ import { canUse, spend } from "@/lib/credits/server";
 // nothing is saved or drawn (lib/prototyping/ai-call.ts).
 //
 // Credits (0042): drawing the circuit is the "wiring" step. Anonymous callers
-// are sent to sign in; a user's first circuit per project is free, each later
-// one costs 1 wiring credit — charged only after a circuit was saved.
+// are sent to sign in; every circuit costs 1 wiring credit, the first one on a
+// project too (owner, 2026-10-09, 0052) — charged only after a circuit was saved.
+// Without a credit the answer is 402 no_credits (the UI shows AccessNote).
 //
 // Test hook (never active in production): NETLIST_TEST_BREAK=1 points one
 // connection at a component that does not exist, on every attempt.

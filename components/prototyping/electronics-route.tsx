@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, BatteryFull, Check, CircleAlert, Cpu, Lightbulb, Loader2, Plug, RefreshCw, Sun } from "lucide-react";
 
+import { AccessNote } from "@/components/credits/access-note";
 import { Card, PrimaryButton, SoftButton, Warn } from "@/components/prototyping/ui";
 import type { BuildRoute, RouteRecommendation } from "@/lib/prototyping/analysis";
 import type { LevelFlag } from "@/lib/prototyping/electronics-rules";
@@ -152,6 +153,7 @@ type BuildError = { code: string; problems?: string[] };
 /** Step 3 — one button builds the component list (and the circuit). */
 export function GenerateComponents({
   projectId,
+  projectName,
   route,
   power,
   builtFor,
@@ -160,6 +162,8 @@ export function GenerateComponents({
   onGoPower,
 }: {
   projectId: string;
+  /** For the "buy credits" WhatsApp message when the circuit was skipped. */
+  projectName?: string | null;
   route: BuildRoute | null;
   power: string | null;
   /** The board the current list was built for, if any. */
@@ -261,6 +265,8 @@ export function GenerateComponents({
         )}
         {warning && <Warn blocking={false}>{t("electronicsCircuitFailed")}</Warn>}
         {skipped && <Warn blocking={false}>{tc(skipped === "sign_in" ? "listOnlySignIn" : "listOnlyNoCredits")}</Warn>}
+        {/* The parts list is free; the circuit needs a credit — show how to get one. */}
+        {skipped === "no_credits" && <AccessNote reason="no_credits" step="wiring" projectName={projectName} />}
       </Card>
     </div>
   );

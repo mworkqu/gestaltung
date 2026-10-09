@@ -5,6 +5,8 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
+import { formatPerOutput } from "@/lib/pricing/plans";
+import { getPricingPlans } from "@/lib/store/public-catalog";
 
 export const generateMetadata = metaFor("students");
 
@@ -14,7 +16,9 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
   const { locale } = await params;
   setRequestLocale(locale);
 
-  const t = await getTranslations("Students");
+  const [t, pricing] = await Promise.all([getTranslations("Students"), getPricingPlans()]);
+  // One credit's price (get2Text: "Each circuit costs one credit (QAR {price})"); cached, cookie-free read.
+  const price = formatPerOutput(pricing.overage_per_credit_qar);
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
@@ -68,7 +72,7 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
                 <Icon className="h-5 w-5" strokeWidth={1.5} aria-hidden />
               </span>
               <h3 className="mt-4 text-base font-bold text-heading">{t(`${key}Title`)}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t(`${key}Text`)}</p>
+              <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t(`${key}Text`, { price })}</p>
             </li>
           ))}
         </ul>

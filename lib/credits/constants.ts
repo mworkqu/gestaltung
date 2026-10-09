@@ -19,12 +19,29 @@ export type AiRole = "anonymous" | "user" | "admin";
 export type CanUse = {
   allowed: boolean;
   reason: "sign_in" | "no_credits" | "not_found" | "bad_step" | "not_ready" | null;
-  /** none = not charged (bom, admin); free = first wiring; credit = 1 credit; included = cad regen */
-  cost: "none" | "free" | "credit" | "included" | null;
+  /** none = not charged (bom, admin); credit = 1 credit; included = cad regen. No step is free except bom. */
+  cost: "none" | "credit" | "included" | null;
   role: AiRole;
   balance?: number;
   regens?: number;
 };
+
+/** What credit_can_use may still answer before migration 0052 runs: 0042 called a project's first circuit "free". */
+export type RawCanUse = Omit<CanUse, "cost"> & { cost: CanUse["cost"] | "free" };
+
+/**
+ * Owner rule (2026-10-09, migration 0052): the parts list is the only free AI
+ * step; every circuit costs 1 wiring credit, the first one on a project too.
+ * Before 0052 runs, credit_can_use still answers cost "free" for a project's
+ * first circuit: treat that as a paid circuit (allowed only with a credit).
+ */
+export function noFreeCircuit(c: RawCanUse): CanUse {
+  if (c.cost !== "free") return c as CanUse;
+  const balance = c.balance ?? 0;
+  return balance >= 1
+    ? { ...c, allowed: true, reason: null, cost: "credit", balance }
+    : { ...c, allowed: false, reason: "no_credits", cost: "credit", balance };
+}
 
 export type CreditSummary = {
   role: AiRole;

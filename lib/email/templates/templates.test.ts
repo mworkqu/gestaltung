@@ -160,7 +160,10 @@ describe("first_project", () => {
 describe("first_circuit", () => {
   it("explains the credits and shows balances when present", () => {
     const en = renderNotification("first_circuit", { locale: "en", payload: payloads.first_circuit, links });
-    expect(en.text).toContain("Your first circuit is ready. Your next ones use credits.");
+    expect(en.text).toContain("Your first circuit is ready.");
+    expect(en.text).toContain("used 1 circuit credit");
+    expect(en.text).not.toContain("was free");
+    expect(en.text).not.toMatch(/first circuit[^.]*free/i);
     expect(en.text).toContain("Circuit credits: 2");
     expect(en.text).toContain("CAD credits: 1");
     const ar = renderNotification("first_circuit", { locale: "ar", payload: payloads.first_circuit, links });
