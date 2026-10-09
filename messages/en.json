@@ -330,7 +330,8 @@
     "aiCredits": "AI credits",
     "notifications": "Notifications",
     "occasions": "Occasions",
-    "reviews": "Reviews"
+    "reviews": "Reviews",
+    "discounts": "Discounts given"
   },
   "Notifications": {
     "kicker": "Settings",
@@ -3097,5 +3098,35 @@
     "backToPending": "Back to pending",
     "empty": "No reviews here yet.",
     "limitNote": "Showing the newest {n} reviews."
+  },
+  "Discounts": {
+    "kicker": "Store",
+    "title": "Discounts given",
+    "intro": "What the store gave away in the last six months, by calendar month in Qatar time. Cancelled and test orders are left out.",
+    "currency": "QAR",
+    "amountsIn": "Amounts in {currency}.",
+    "soFar": "so far",
+    "colMonth": "Month",
+    "colKit": "Kit discounts",
+    "colCredit": "Credit redemptions",
+    "colGrants": "Credit grants",
+    "colFree": "Free delivery",
+    "colTotal": "Total",
+    "colGoods": "Goods revenue",
+    "colShare": "Share of goods revenue",
+    "totalRow": "Last 6 months",
+    "grantedCount": "{form, select, one {{count} credit} other {{count} credits}}",
+    "noteHeading": "What each column means",
+    "noteKit": "Kit discounts: the discount taken off project kits (orders' discount).",
+    "noteCredit": "Credit redemptions: spent AI credits that customers used as money off an order.",
+    "noteGrants": "Credit grants: credits you added by hand from the Credits page, valued at QAR {value} each.",
+    "noteFree": "Free delivery: the delivery fee waived on orders that reached the free-delivery amount. Estimated from today's delivery fee for that delivery option.",
+    "noteTotal": "Total: the four columns added together.",
+    "noteGoods": "Goods revenue: what customers paid for goods, after discounts and before delivery and handling.",
+    "noteShare": "Share of goods revenue: the total divided by goods revenue. Shown as a dash when there are no sales that month.",
+    "empty": "No orders in these months yet.",
+    "errorOrders": "Could not load the orders. Try again in a moment.",
+    "errorGrants": "Could not load the credit grants, so that column shows 0.",
+    "noShare": "—"
   }
 }
