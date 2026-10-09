@@ -11,7 +11,7 @@ import type { Block, Inline } from "@/lib/legal/markdown";
 // from content/legal/*.md into a data tree and rendered as React text nodes —
 // no raw HTML is ever injected.
 
-function renderInline(nodes: Inline[]): React.ReactNode {
+export function renderInline(nodes: Inline[]): React.ReactNode {
   return nodes.map((n, i) => {
     if (n.type === "text") return n.value;
     if (n.type === "bold") return <strong key={i} className="font-semibold text-heading">{renderInline(n.children)}</strong>;
@@ -33,7 +33,7 @@ function renderInline(nodes: Inline[]): React.ReactNode {
   });
 }
 
-function renderBlock(b: Block, i: number): React.ReactNode {
+export function renderBlock(b: Block, i: number): React.ReactNode {
   switch (b.type) {
     case "heading": {
       const cls = "mt-8 text-lg font-bold text-heading";

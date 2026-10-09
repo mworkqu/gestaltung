@@ -12,6 +12,7 @@ import {
   pageMetadata,
   robotsRules,
   siteDefaults,
+  caseStudyPaths,
   sitemapEntries,
 } from "./seo";
 
@@ -192,6 +193,24 @@ describe("sitemapEntries", () => {
     expect(SITEMAP_STATIC_PATHS).toContain("/pricing");
     expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/ar/pricing");
     expect(entries.map((e) => e.url)).toContain("https://gestaltung360.com/en/pricing");
+  });
+
+  it("lists case studies only once one is published", () => {
+    expect(caseStudyPaths([])).toEqual([]);
+    expect(entries.map((e) => e.url).some((u) => u.includes("/case-studies"))).toBe(false);
+    expect(SITEMAP_STATIC_PATHS).not.toContain("/case-studies");
+
+    expect(caseStudyPaths(["b-story", " ", "a-story", "b-story"])).toEqual([
+      "/case-studies",
+      "/case-studies/b-story",
+      "/case-studies/a-story",
+    ]);
+    const withStories = sitemapEntries([], undefined, ["a-story"]).map((e) => e.url);
+    for (const l of ["en", "ar"]) {
+      expect(withStories).toContain(`https://gestaltung360.com/${l}/case-studies`);
+      expect(withStories).toContain(`https://gestaltung360.com/${l}/case-studies/a-story`);
+    }
+    expect(sitemapEntries([], undefined, ["a-story"])).toHaveLength(SITEMAP_STATIC_PATHS.length * 2 + 2 * 2);
   });
 
   it("has both locales for every static page", () => {

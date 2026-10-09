@@ -211,13 +211,24 @@ function entryFor(locale: string, path: string, lastModified?: Date): MetadataRo
   };
 }
 
+/**
+ * Case-study paths (P4-04): nothing while no story is published, else the index
+ * plus one page per slug. Pass the PUBLISHED slugs only.
+ */
+export function caseStudyPaths(publishedSlugs: readonly string[]): string[] {
+  const slugs = [...new Set(publishedSlugs.map((s) => s.trim()).filter(Boolean))];
+  if (slugs.length === 0) return [];
+  return ["/case-studies", ...slugs.map((s) => `/case-studies/${encodeURIComponent(s)}`)];
+}
+
 /** One entry per page per locale, each carrying the en/ar/x-default alternates. */
 export function sitemapEntries(
   products: SitemapProduct[],
-  staticPaths: readonly string[] = SITEMAP_STATIC_PATHS
+  staticPaths: readonly string[] = SITEMAP_STATIC_PATHS,
+  caseStudySlugs: readonly string[] = []
 ): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];
-  for (const path of staticPaths) {
+  for (const path of [...staticPaths, ...caseStudyPaths(caseStudySlugs)]) {
     for (const locale of routing.locales) entries.push(entryFor(locale, path));
   }
   const seen = new Set<string>();

@@ -20,6 +20,7 @@ export type MetaKey =
   | "institutions"
   | "institutionsProposal"
   | "pricing"
+  | "caseStudies"
   | "signIn"
   | "signUp"
   | "inventory"
@@ -41,15 +42,22 @@ const PAGES: Record<MetaKey, { path: string; noindex?: boolean }> = {
   // P2-05: the print sheet is not for search results.
   institutionsProposal: { path: "/institutions/proposal", noindex: true },
   pricing: { path: "/pricing" },
+  caseStudies: { path: "/case-studies" },
   signIn: { path: "/sign-in", noindex: true },
   signUp: { path: "/sign-up", noindex: true },
   inventory: { path: "/inventory", noindex: true },
   dashboard: { path: "/dashboard", noindex: true },
 };
 
-export async function pageMeta(locale: string, key: MetaKey): Promise<Metadata> {
+export async function pageMeta(
+  locale: string,
+  key: MetaKey,
+  /** Overrides the page's default robots rule (e.g. /case-studies is noindex while empty). */
+  opts: { noindex?: boolean } = {}
+): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: "Meta" });
-  const { path, noindex } = PAGES[key];
+  const { path } = PAGES[key];
+  const noindex = opts.noindex ?? PAGES[key].noindex;
   return pageMetadata({
     locale,
     path,

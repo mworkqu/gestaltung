@@ -2494,7 +2494,9 @@
     "institutionsTitle": "Lab licence for schools, colleges and companies | Gestaltung360",
     "institutionsDescription": "A lab licence and a 4–6 week pilot for schools, college labs and company teams: parts lists in QAR, checked wiring, 3D models and fabrication in Lusail, with one named engineer.",
     "institutionsProposalTitle": "Pilot proposal | Gestaltung360",
-    "institutionsProposalDescription": "A one-page pilot proposal for a lab licence, ready to print."
+    "institutionsProposalDescription": "A one-page pilot proposal for a lab licence, ready to print.",
+    "caseStudiesTitle": "Case studies | Gestaltung360",
+    "caseStudiesDescription": "Projects made with our clients in Qatar, told plainly and published only with the client's permission."
   },
   "CookieNotice": {
     "label": "Cookie notice",
@@ -3128,5 +3130,24 @@
     "errorOrders": "Could not load the orders. Try again in a moment.",
     "errorGrants": "Could not load the credit grants, so that column shows 0.",
     "noShare": "—"
+  },
+  "CaseStudies": {
+    "kicker": "Case studies",
+    "heading": "Projects made with our clients",
+    "intro": "Each story says what the client wanted, what we did and what came out of it.",
+    "readStory": "Read the story",
+    "backToAll": "All case studies",
+    "emptyHeading": "Stories coming soon",
+    "emptyText": "We publish a project only with the client's permission, so there is nothing here yet.",
+    "emptyCtaStart": "Start a project",
+    "emptyCtaContact": "Talk to us",
+    "sector_startup": "Startup",
+    "sector_college": "College",
+    "sector_school": "School",
+    "outcomeHeading": "Outcome",
+    "ctaHeading": "Have a project of your own?",
+    "ctaText": "Describe what it must do. An engineer reviews it first.",
+    "ctaPrimary": "Start a project",
+    "ctaSecondary": "Shop parts"
   }
 }

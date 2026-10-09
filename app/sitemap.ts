@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { listCaseStudies } from "@/lib/case-studies";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { createPublicClient } from "@/lib/supabase/public";
 import { sitemapEntries, type SitemapProduct } from "@/lib/seo";
@@ -27,5 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     );
     products = rows;
   }
-  return sitemapEntries(products);
+  // Case studies are listed only once at least one story is published.
+  const caseStudySlugs = listCaseStudies({ publishedOnly: true }).map((c) => c.slug);
+  return sitemapEntries(products, undefined, caseStudySlugs);
 }
