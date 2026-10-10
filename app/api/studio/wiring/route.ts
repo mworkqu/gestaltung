@@ -1,5 +1,5 @@
 import { canUse, spend } from "@/lib/credits/server";
-import { getPart } from "@/lib/studio/library";
+import { studioLibrary } from "@/lib/studio/library/remote";
 import { buildWiring } from "@/lib/studio/netlist";
 import { emptyStudioDoc } from "@/lib/studio/schema";
 import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
@@ -21,6 +21,8 @@ export async function POST(request: Request) {
   const ctx = await studioRequest(request, WiringBody, { consent: false });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
+  // Code library + the owner's studio_parts edits (P5-15c), per request.
+  const { getPart } = await studioLibrary();
 
   const current = await loadDoc(supabase, project.id);
   if (current.ok && current.doc && current.doc.checks.length > 0 && current.doc.netlist.nets.length > 0) {

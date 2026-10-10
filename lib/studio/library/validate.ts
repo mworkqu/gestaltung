@@ -13,7 +13,11 @@ export function faceSize(dims: LibraryPart["dims"], face: Face): { w: number; h:
 
 const BBOX_TOLERANCE = 0.1;
 
-export function validatePart(part: LibraryPart): string[] {
+/**
+ * `skipModelCheck`: skip building the model and its bounding-box checks (STL
+ * parts uploaded by the owner — the viewer scales/centres the mesh to dims).
+ */
+export function validatePart(part: LibraryPart, opts: { skipModelCheck?: boolean } = {}): string[] {
   const errors: string[] = [];
   const tag = `${part.id}:`;
 
@@ -46,6 +50,8 @@ export function validatePart(part: LibraryPart): string[] {
       errors.push(`${tag} mount hole ${i + 1} is outside the footprint`);
     }
   }
+
+  if (opts.skipModelCheck) return errors;
 
   if (part.model.kind === "procedural" && !BUILDERS[part.model.builder]) {
     errors.push(`${tag} builder "${part.model.builder}" is not registered`);

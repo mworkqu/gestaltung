@@ -18,7 +18,7 @@ import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { arabicCountForm } from "@/lib/text/count";
 import { downloadBlob, exportObjectsSTL } from "@/lib/studio/export";
 import { layoutComponents } from "@/lib/studio/layout";
-import { getPart } from "@/lib/studio/library";
+import { useStudioLibrary } from "../StudioLibraryProvider";
 import { COLOUR_HEX, STEP_ACCENT } from "@/lib/studio/palette";
 import { COLOURS, FINISHES, type EnclosureSpec, type StudioDoc } from "@/lib/studio/schema";
 import { fileSlug, looksLeftFromVersions } from "@/lib/studio/client/steps";
@@ -45,6 +45,7 @@ export function EnclosureStep({
   ) => void;
   onNext: () => void;
 }) {
+  const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const { locale } = ctx;
   const access = useCanUse("cad", ctx.api.mode === "live" ? ctx.projectId : null);
@@ -63,7 +64,7 @@ export function EnclosureStep({
         const part = getPart(c.partId);
         return part ? [{ c, part }] : [];
       }),
-    [doc.components],
+    [doc.components, getPart],
   );
   const layout = useMemo(
     () =>

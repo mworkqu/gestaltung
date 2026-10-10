@@ -38,6 +38,10 @@ export function adminNavGroups(t: (key: string) => string): NavGroup[] {
       ],
     },
     {
+      label: t("group_studio"),
+      items: [{ href: "/dashboard/studio-library", label: t("studioLibrary") }],
+    },
+    {
       label: t("group_suppliers"),
       items: [
         { href: "/dashboard/store/suppliers", label: t("suppliers") },

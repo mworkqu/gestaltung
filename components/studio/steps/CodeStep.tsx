@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Code2, Copy, Loader2, RefreshCw } from "lucide-react";
 
-import { getPart } from "@/lib/studio/library";
+import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { StudioFirmware } from "@/lib/studio/client/api";
@@ -37,6 +37,7 @@ export function CodeStep({
   /** Go back to the Wiring step. */
   onWiring: () => void;
 }) {
+  const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const mcu = doc.components.map((c) => getPart(c.partId)).find((p) => p?.category === "mcu");
   const wired = doc.netlist.nets.length > 0 && doc.checks.length > 0;

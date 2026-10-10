@@ -15,7 +15,7 @@ import { AccessNote } from "@/components/credits/access-note";
 import { track } from "@/lib/analytics";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { downloadBlob, exportSVG } from "@/lib/studio/export";
-import { getPart } from "@/lib/studio/library";
+import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { renderSchematicSVG, summaryLine } from "@/lib/studio/schematic";
 import type { StudioDoc } from "@/lib/studio/schema";
@@ -46,6 +46,7 @@ export function WiringStep({
   ) => void;
   onNext: () => void;
 }) {
+  const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const { locale } = ctx;
   const access = useCanUse("wiring", ctx.api.mode === "live" ? ctx.projectId : null);
@@ -63,15 +64,15 @@ export function WiringStep({
     } catch {
       return "";
     }
-  }, [drawn, doc.components, doc.netlist.nets, doc.spec.name, locale]);
-  const mcuId = useMemo(() => doc.components.find((c) => getPart(c.partId)?.category === "mcu")?.instanceId ?? null, [doc.components]);
+  }, [drawn, doc.components, doc.netlist.nets, doc.spec.name, locale, getPart]);
+  const mcuId = useMemo(() => doc.components.find((c) => getPart(c.partId)?.category === "mcu")?.instanceId ?? null, [doc.components, getPart]);
   const summary = useMemo(() => {
     try {
       return summaryLine(doc.spec, doc.components, getPart, locale);
     } catch {
       return "";
     }
-  }, [doc.spec, doc.components, locale]);
+  }, [doc.spec, doc.components, locale, getPart]);
 
   async function draw() {
     setProblem(null);

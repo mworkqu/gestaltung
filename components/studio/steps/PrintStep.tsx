@@ -40,7 +40,7 @@ import type { ViewerExtraObject } from "@/components/studio/viewer/types";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { downloadBlob, plateSTL, printableSTL } from "@/lib/studio/export";
 import { layoutComponents } from "@/lib/studio/layout";
-import { getPart } from "@/lib/studio/library";
+import { useStudioLibrary } from "../StudioLibraryProvider";
 import type { BuiltMechPart } from "@/lib/studio/mech/build";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { MechPart, MechTemplate, StudioDoc } from "@/lib/studio/schema";
@@ -107,6 +107,7 @@ export function PrintStep({
   onMech: (mech: MechPart[], serverVersion: number | null) => void;
   onNext: () => void;
 }) {
+  const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const { locale } = ctx;
 
@@ -116,7 +117,7 @@ export function PrintStep({
         const part = getPart(c.partId);
         return part ? [{ c, part }] : [];
       }),
-    [doc.components],
+    [doc.components, getPart],
   );
   const layout = useMemo(
     () =>

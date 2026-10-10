@@ -3,7 +3,7 @@ import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini
 import { ProviderError } from "@/lib/prototyping/providers/types";
 import { FIRMWARE_SCHEMA, circuitForPrompt, cleanFirmware, findController } from "@/lib/prototyping/firmware";
 import type { Netlist } from "@/lib/prototyping/netlist";
-import { getPart } from "@/lib/studio/library";
+import { studioLibrary } from "@/lib/studio/library/remote";
 import { buildWiring } from "@/lib/studio/netlist";
 import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
 import { FirmwareBody } from "@/lib/studio/server/http";
@@ -24,6 +24,8 @@ export async function POST(request: Request) {
   const ctx = await studioRequest(request, FirmwareBody, { consent: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
+  // Code library + the owner's studio_parts edits (P5-15c), per request.
+  const { getPart } = await studioLibrary();
 
   const current = await loadDoc(supabase, project.id);
   const saved = current.ok ? current.doc : null;

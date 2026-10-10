@@ -13,7 +13,7 @@ import { CheckCircle2, Factory, Loader2, ShoppingCart } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
 import { PhonePrompt } from "@/components/projects/phone-prompt";
-import { getPart } from "@/lib/studio/library";
+import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
@@ -69,6 +69,7 @@ function BigOption({
 }
 
 export function MakeStep({ ctx, doc, products }: { ctx: StudioCtx; doc: StudioDoc; products: Map<string, StoreCardPart> }) {
+  const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const router = useRouter();
   const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
@@ -76,7 +77,7 @@ export function MakeStep({ ctx, doc, products }: { ctx: StudioCtx; doc: StudioDo
   const [profile, setProfile] = useState<Profile | null>(null);
 
   async function orderParts() {
-    const { lines } = storeLines(doc.components, products);
+    const { lines } = storeLines(doc.components, products, getPart);
     const ok = await cart.addAll(lines);
     if (ok) router.push("/store/cart");
   }

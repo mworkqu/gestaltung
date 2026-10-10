@@ -1,5 +1,5 @@
 import { canUse } from "@/lib/credits/server";
-import { getPart } from "@/lib/studio/library";
+import { studioLibrary } from "@/lib/studio/library/remote";
 import { templateFor } from "@/lib/studio/enclosure/templates";
 import { emptyStudioDoc, DEFAULT_ENCLOSURE, type EnclosureSpec } from "@/lib/studio/schema";
 import { runEnclosure, safeBbox } from "@/lib/studio/ai/enclosure";
@@ -33,6 +33,8 @@ export async function POST(request: Request) {
   const ctx = await studioRequest(request, EnclosureBody, { consent: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
+  // Code library + the owner's studio_parts edits (P5-15c), per request.
+  const { getPart } = await studioLibrary();
 
   const access = await canUse(supabase, "cad", project.id);
   const denied = creditDenied(access);

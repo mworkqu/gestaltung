@@ -7,12 +7,19 @@
 import { useCallback, useState } from "react";
 
 import { useCart } from "@/components/parts/cart-provider";
-import { getPart } from "@/lib/studio/library";
+import { getPart as codeGetPart } from "@/lib/studio/library";
+import type { LibraryPart } from "@/lib/studio/schema";
+
+type GetPart = (id: string) => LibraryPart | undefined;
 import type { StudioComponent } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
 
 /** The store product sold for a library part (first published SKU), if any. */
-export function productFor(partId: string, products: Map<string, StoreCardPart>): StoreCardPart | null {
+export function productFor(
+  partId: string,
+  products: Map<string, StoreCardPart>,
+  getPart: GetPart = codeGetPart,
+): StoreCardPart | null {
   for (const sku of getPart(partId)?.storeSkus ?? []) {
     const p = products.get(sku);
     if (p) return p;
@@ -23,11 +30,15 @@ export function productFor(partId: string, products: Map<string, StoreCardPart>)
 export const orderQty = (p: StoreCardPart) => Math.max(1, p.min_order_qty ?? 1);
 
 /** Unique store products for the components, and the total of those. */
-export function storeLines(components: StudioComponent[], products: Map<string, StoreCardPart>) {
+export function storeLines(
+  components: StudioComponent[],
+  products: Map<string, StoreCardPart>,
+  getPart: GetPart = codeGetPart,
+) {
   const seen = new Set<string>();
   const lines: StoreCardPart[] = [];
   for (const c of components) {
-    const p = productFor(c.partId, products);
+    const p = productFor(c.partId, products, getPart);
     if (p && !seen.has(p.id)) {
       seen.add(p.id);
       lines.push(p);

@@ -1,5 +1,5 @@
 import { bomRate } from "@/lib/credits/server";
-import { getPart } from "@/lib/studio/library";
+import { studioLibrary } from "@/lib/studio/library/remote";
 import { runMech } from "@/lib/studio/ai/mech";
 import { layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
@@ -19,6 +19,8 @@ export async function POST(request: Request) {
   const ctx = await studioRequest(request, MechBody, { consent: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
+  // Code library + the owner's studio_parts edits (P5-15c), per request.
+  const { getPart } = await studioLibrary();
 
   const current = await loadDoc(supabase, project.id);
   if (!current.ok) return Response.json({ error: current.error }, { status: current.error === "not_found" ? 404 : 500 });

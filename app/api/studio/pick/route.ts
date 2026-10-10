@@ -1,5 +1,5 @@
 import { bomRate } from "@/lib/credits/server";
-import { getPart, libraryIndexForAI } from "@/lib/studio/library";
+import { studioLibrary } from "@/lib/studio/library/remote";
 import { buildWiring } from "@/lib/studio/netlist";
 import { emptyStudioDoc, type StudioComponent } from "@/lib/studio/schema";
 import { runPick } from "@/lib/studio/ai/pick";
@@ -21,6 +21,8 @@ export async function POST(request: Request) {
   const ctx = await studioRequest(request, PickBody, { consent: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
+  // Code library + the owner's studio_parts edits (P5-15c), per request.
+  const { getPart, libraryIndexForAI } = await studioLibrary();
 
   const rate = await bomRate(supabase, request);
   if (!rate.allowed) return Response.json({ error: "daily_limit", limit: rate.limit }, { status: 429 });

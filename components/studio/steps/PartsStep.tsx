@@ -32,7 +32,7 @@ import { StudioViewer } from "@/components/studio/viewer/ViewerLazy";
 import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import type { StoreCardPart } from "@/lib/store/catalog";
-import { getPart, partsByCategory } from "@/lib/studio/library";
+import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { CATEGORIES, type Category, type LibraryPart, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import { nextInstanceId } from "@/lib/studio/client/steps";
@@ -98,6 +98,7 @@ export function PartsStep({
   onComponents: (components: StudioComponent[], serverVersion: number | null, edited: boolean) => void;
   onNext: () => void;
 }) {
+  const { getPart, partsByCategory } = useStudioLibrary();
   const t = useTranslations("Studio");
   const { locale } = ctx;
   const [busy, setBusy] = useState(false);
@@ -152,9 +153,9 @@ export function PartsStep({
 
   const viewerComponents = useMemo(
     () => doc.components.filter((c) => getPart(c.partId)).map((c) => ({ instanceId: c.instanceId, partId: c.partId, label: c.label })),
-    [doc.components],
+    [doc.components, getPart],
   );
-  const { lines, total } = storeLines(doc.components, products);
+  const { lines, total } = storeLines(doc.components, products, getPart);
   const sel = doc.components.find((c) => c.instanceId === selected);
   const selPart = sel ? getPart(sel.partId) : undefined;
   const loading = busy && doc.components.length === 0;
@@ -207,7 +208,7 @@ export function PartsStep({
           </div>
           {sel && selPart && (
             <div className="tile flex items-start gap-3 border-0 p-4 motion-safe:animate-rise" style={{ background: accent.soft }} aria-live="polite">
-              <PartTile part={selPart} product={productFor(sel.partId, products)} size={44} />
+              <PartTile part={selPart} product={productFor(sel.partId, products, getPart)} size={44} />
               <div className="min-w-0">
                 <p className="text-sm font-bold text-heading">{selPart.name[locale]}</p>
                 <p className="text-sm text-body">{selPart.blurb[locale]}</p>
@@ -237,7 +238,7 @@ export function PartsStep({
             <ul className="space-y-2.5" data-testid="studio-parts-list">
               {doc.components.map((c) => {
                 const part = getPart(c.partId);
-                const product = productFor(c.partId, products);
+                const product = productFor(c.partId, products, getPart);
                 const isSel = selected === c.instanceId;
                 return (
                   <li
@@ -372,11 +373,12 @@ function PartChoices({
   empty: string;
   onPick: (p: LibraryPart) => void;
 }) {
+  const { getPart } = useStudioLibrary();
   if (!parts.length) return <p className="text-sm text-mutedtext">{empty}</p>;
   return (
     <ul className="space-y-2">
       {parts.map((p) => {
-        const product = productFor(p.id, products);
+        const product = productFor(p.id, products, getPart);
         return (
           <li key={p.id}>
             <button

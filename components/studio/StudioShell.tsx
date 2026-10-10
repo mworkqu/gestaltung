@@ -18,7 +18,8 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
 import { chatStorageKey, parseHandoff } from "@/lib/projects/create-from-chat";
-import { getPart } from "@/lib/studio/library";
+import type { LibraryPart } from "@/lib/studio/schema";
+import { StudioLibraryProvider, useStudioLibrary } from "./StudioLibraryProvider";
 import { emptyStudioDoc, type EnclosureSpec, type MechPart, type ProductSpec, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { liveStudioApi, type Locale, type StudioApi, type StudioProject } from "@/lib/studio/client/api";
@@ -59,13 +60,7 @@ type Loaded =
 
 const SAVE_DELAY_MS = 700;
 
-export function StudioShell({
-  projectId,
-  destination,
-  startChat = false,
-  requestedStep = null,
-  api: injected,
-}: {
+type ShellProps = {
   projectId: string;
   /** Where the idea goes (providerStatus().destination), for the consent line. */
   destination: string;
@@ -74,8 +69,26 @@ export function StudioShell({
   requestedStep?: string | null;
   /** Test fixture only: a mock StudioApi. */
   api?: StudioApi;
-}) {
+};
+
+/** Owner-edited / new library parts (studio_parts, validated on the server); none = the code library. */
+export function StudioShell({ libraryParts, ...props }: ShellProps & { libraryParts?: LibraryPart[] }) {
+  return (
+    <StudioLibraryProvider overrides={libraryParts}>
+      <StudioShellInner {...props} />
+    </StudioLibraryProvider>
+  );
+}
+
+function StudioShellInner({
+  projectId,
+  destination,
+  startChat = false,
+  requestedStep = null,
+  api: injected,
+}: ShellProps) {
   const t = useTranslations("Studio");
+  const { getPart } = useStudioLibrary();
   const locale: Locale = useLocale() === "ar" ? "ar" : "en";
   const api = useMemo(() => injected ?? liveStudioApi(projectId), [injected, projectId]);
 
@@ -212,7 +225,7 @@ export function StudioShell({
   // ── Store products for the parts (shared by Parts and Make) ──────────────
   const skus = useMemo(
     () => (doc?.components ?? []).flatMap((c) => getPart(c.partId)?.storeSkus ?? []).sort().join(","),
-    [doc?.components],
+    [doc?.components, getPart],
   );
   const [products, setProducts] = useState<Map<string, StoreCardPart>>(new Map());
   const [productsLoading, setProductsLoading] = useState(false);

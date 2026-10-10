@@ -85,13 +85,27 @@ export const LIBRARY: LibraryPart[] = [
 
 const BY_ID = new Map(LIBRARY.map((p) => [p.id, p]));
 
+// Browser-only overlay (P5-15c): owner edits from studio_parts, registered by
+// StudioLibraryProvider so code that still calls the module-level getPart()
+// (the 3D viewer) sees the same parts as the steps. Never set on the server
+// (module state there is shared by every request — routes use makeLibrary()).
+let clientOverlay: Map<string, LibraryPart> | null = null;
+let clientList: LibraryPart[] | null = null;
+
+/** Register the merged library in the browser (no-op on the server). */
+export function setClientLibrary(parts: LibraryPart[] | null): void {
+  if (typeof window === "undefined") return;
+  clientList = parts && parts.length ? parts : null;
+  clientOverlay = clientList ? new Map(clientList.map((p) => [p.id, p])) : null;
+}
+
 export function getPart(id: string): LibraryPart | undefined {
-  return BY_ID.get(id);
+  return clientOverlay?.get(id) ?? BY_ID.get(id);
 }
 
 /** Parts of a category. Helpers (resistor, level shifter…) are hidden unless asked for. */
 export function partsByCategory(cat: Category, includeHelpers = false): LibraryPart[] {
-  return LIBRARY.filter((p) => p.category === cat && (includeHelpers || !p.helper));
+  return (clientList ?? LIBRARY).filter((p) => p.category === cat && (includeHelpers || !p.helper));
 }
 
 export type AIIndexEntry = {
@@ -103,9 +117,8 @@ export type AIIndexEntry = {
   logicV: 3.3 | 5;
 };
 
-/** Compact catalogue handed to the AI picker (helper parts excluded). */
-export function libraryIndexForAI(): AIIndexEntry[] {
-  return LIBRARY.filter((p) => !p.helper).map((p) => ({
+function indexFor(parts: LibraryPart[]): AIIndexEntry[] {
+  return parts.filter((p) => !p.helper).map((p) => ({
     id: p.id,
     category: p.category,
     tags: p.tags,
@@ -114,5 +127,32 @@ export function libraryIndexForAI(): AIIndexEntry[] {
     logicV: p.power.logicV,
   }));
 }
+
+/** Compact catalogue handed to the AI picker (helper parts excluded). */
+export function libraryIndexForAI(): AIIndexEntry[] {
+  return indexFor(LIBRARY);
+}
+
+/** A library over any part list (the merged code + studio_parts list, per request). */
+export type StudioLibrary = {
+  parts: LibraryPart[];
+  getPart: (id: string) => LibraryPart | undefined;
+  partsByCategory: (cat: Category, includeHelpers?: boolean) => LibraryPart[];
+  libraryIndexForAI: () => AIIndexEntry[];
+};
+
+export function makeLibrary(parts: LibraryPart[]): StudioLibrary {
+  const byId = new Map(parts.map((p) => [p.id, p]));
+  return {
+    parts,
+    getPart: (id) => byId.get(id),
+    partsByCategory: (cat, includeHelpers = false) =>
+      parts.filter((p) => p.category === cat && (includeHelpers || !p.helper)),
+    libraryIndexForAI: () => indexFor(parts),
+  };
+}
+
+/** The code library as a StudioLibrary (the default everywhere). */
+export const CODE_LIBRARY: StudioLibrary = makeLibrary(LIBRARY);
 
 export { validatePart } from "./validate";
