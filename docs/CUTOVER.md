@@ -90,11 +90,11 @@ Open each in EN and AR; check status, final URL and that it is the v2 page where
 
 | Page | Lighthouse mobile before (flag OFF) | Lighthouse mobile after (flag ON) |
 |---|---|---|
-| `/en` | | |
-| `/en/store` | | |
-| `/en/pricing` | | |
+| `/en` | 81 | 79 |
+| `/en/store` | 83 | 76 |
+| `/en/pricing` | 89 | 87 |
 
-Date: ________   Run by: ________   Notes (LCP, TBT, CLS): ________
+Date: 2026-10-10   Run by: Claude Code from the owner's PC (Lighthouse 13.5.0, median of 3)   Notes: "before" = the plan's 10 Oct status note (flag OFF). "After" = live with site_v2 ON (flipped 2026-10-09 18:55 UTC) plus commits 2c16bc1 (hero without opacity 0) and a78a202 (supabase-js lazy, -65 kB first-load JS). CLS 0 everywhere, TBT 60-360 ms, simulated LCP 3-5 s; observed (unthrottled) LCP = FCP about 1.5 s. Run-to-run spread is about 8 points from this connection. The 90 target is not met; the owner accepted these scores on 2026-10-10.
 
 ## 7. After the cut-over (separate task, later; do not do it now)
 
