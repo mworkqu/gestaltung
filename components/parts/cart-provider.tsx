@@ -6,11 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
 import type { CartItem, Part } from "@/lib/supabase/types";
 import { cartItemCount, cartTotal, getCart, saveCart, toCartItem } from "@/lib/parts/cart";
+import { clearCartSnapshot, readCartSnapshot, writeCartSnapshot } from "@/lib/parts/cart-snapshot";
+import { useAuth } from "@/components/auth/auth-provider";
 import { track } from "@/lib/analytics";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { loadSupabase } from "@/lib/supabase/lazy";
@@ -73,12 +76,16 @@ type CartContextValue = {
   totalQar: number;
   kitDiscountPct: number;
   ready: boolean;
+  /** Lines come from the last-known snapshot and are not yet confirmed; checkout waits. */
+  stale: boolean;
   /** The last read or write failure; the lines shown are the last good read. */
   error: CartError | null;
   /** Read the cart again (clears `error` when it succeeds). */
   retry: () => Promise<void>;
   reload: () => Promise<void>;
 };
+
+const DEV_TIMING = process.env.NODE_ENV === "development";
 
 const CartContext = createContext<CartContextValue | null>(null);
 
@@ -97,29 +104,50 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [kitDiscountPct, setKitDiscountPct] = useState(0);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<CartError | null>(null);
+  // True while the lines shown come from the localStorage snapshot and the real
+  // read has not confirmed them yet.
+  const [stale, setStale] = useState(false);
+  const staleRef = useRef(false);
+  const discountRef = useRef(0);
+  discountRef.current = kitDiscountPct;
+  const auth = useAuth();
 
   const reload = useCallback(async () => {
-    const supabase = await loadSupabase();
-    const user = await getCurrentUser();
+    const t0 = DEV_TIMING ? performance.now() : 0;
+    // The import and the session read start together (the session read joins the
+    // import itself, and shares its answer with AuthProvider: no extra request).
+    const [supabase, user] = await Promise.all([loadSupabase(), getCurrentUser()]);
+    if (DEV_TIMING) console.debug(`[cart] client+session ready after ${Math.round(performance.now() - t0)} ms`);
 
     if (!user) {
+      clearCartSnapshot();
       setItems([]);
+      staleRef.current = false;
+      setStale(false);
       setError(null);
       setReady(true);
       return;
     }
 
-    // Kit columns arrive with migration 0025; before it, read the plain cart.
-    const full = await supabase
-      .from("cart_items")
-      .select("id, quantity, project_id, kit_id, bom_lines, part:parts(*), project:projects(name)")
-      .order("created_at", { ascending: true });
-    const res = full.error
-      ? await supabase
-          .from("cart_items")
-          .select("id, quantity, project_id, part:parts(*)")
-          .order("created_at", { ascending: true })
-      : full;
+    // Lines and the kit discount are independent: ask for both at once (one
+    // round-trip instead of two in a row). Kit columns arrive with migration
+    // 0025; before it, the plain cart is read.
+    const settingQuery = supabase.from("store_settings").select("value").eq("key", "kit_discount_pct").maybeSingle();
+    const linesQuery = (async () => {
+      const full = await supabase
+        .from("cart_items")
+        .select("id, quantity, project_id, kit_id, bom_lines, part:parts(*), project:projects(name)")
+        .order("created_at", { ascending: true });
+      const res = full.error
+        ? await supabase
+            .from("cart_items")
+            .select("id, quantity, project_id, part:parts(*)")
+            .order("created_at", { ascending: true })
+        : full;
+      return { full, res };
+    })();
+    const [{ full, res }, { data: setting, error: settingError }] = await Promise.all([linesQuery, settingQuery]);
+    if (DEV_TIMING) console.debug(`[cart] lines read after ${Math.round(performance.now() - t0)} ms`);
 
     if (res.error) {
       // Keep the last good lines: showing an empty cart here would be wrong.
@@ -130,33 +158,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
 
     const rows = (res.data ?? []) as unknown as Row[];
-    setItems(
-      rows
-        .filter((r): r is Row & { part: Part } => Boolean(r.part))
-        .map((r) => ({
-          ...toCartItem(r.part, r.quantity),
-          rowId: r.id,
-          projectId: r.project_id,
-          projectName: r.project?.name ?? null,
-          kitId: r.kit_id ?? null,
-          bomLines: r.bom_lines ?? [],
-        }))
-    );
+    const nextItems = rows
+      .filter((r): r is Row & { part: Part } => Boolean(r.part))
+      .map((r) => ({
+        ...toCartItem(r.part, r.quantity),
+        rowId: r.id,
+        projectId: r.project_id,
+        projectName: r.project?.name ?? null,
+        kitId: r.kit_id ?? null,
+        bomLines: r.bom_lines ?? [],
+      }));
+    setItems(nextItems);
+    staleRef.current = false;
+    setStale(false);
 
-    const { data: setting, error: settingError } = await supabase
-      .from("store_settings")
-      .select("value")
-      .eq("key", "kit_discount_pct")
-      .maybeSingle();
+    let pct = discountRef.current;
     if (settingError) {
       // The kit price shown would be wrong; keep the last known discount.
       console.error("cart: kit discount load failed", settingError);
       setError("load");
     } else {
-      const pct = Number(setting?.value);
-      setKitDiscountPct(Number.isFinite(pct) ? Math.min(Math.max(pct, 0), 90) : 0);
+      const n = Number(setting?.value);
+      pct = Number.isFinite(n) ? Math.min(Math.max(n, 0), 90) : 0;
+      setKitDiscountPct(pct);
       setError(null);
     }
+    writeCartSnapshot({ userId: user.id, items: nextItems, kitDiscountPct: pct });
     setReady(true);
   }, []);
 
@@ -170,6 +197,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     },
     [reload]
   );
+
+  // Show the last known cart at once (after mount, so server and client HTML
+  // match). It is replaced by the real read below; until then it is `stale`.
+  useEffect(() => {
+    const snap = readCartSnapshot();
+    if (!snap) return;
+    setItems((cur) => (cur.length === 0 ? snap.items : cur));
+    setKitDiscountPct((cur) => cur || snap.kitDiscountPct);
+    staleRef.current = true;
+    setStale(true);
+  }, []);
+
+  // The session AuthProvider already holds tells us whose cart the snapshot is:
+  // a different or missing user means it must not be shown.
+  useEffect(() => {
+    if (!auth.ready) return;
+    const snap = readCartSnapshot();
+    if (snap && snap.userId !== auth.user?.id) {
+      clearCartSnapshot();
+      if (staleRef.current) {
+        staleRef.current = false;
+        setItems([]);
+        setKitDiscountPct(0);
+        setStale(false);
+      }
+    }
+  }, [auth.ready, auth.user?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -359,6 +413,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const { error: e } = await supabase.from("cart_items").delete().eq("user_id", user.id);
       if (e) return failed("clear", e);
     }
+    clearCartSnapshot();
     setItems([]);
     return true;
   }, [failed]);
@@ -381,11 +436,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       totalQar: Math.round((subtotal - discount) * 100) / 100,
       kitDiscountPct,
       ready,
+      stale,
       error,
       retry: reload,
       reload,
     };
-  }, [items, addItem, updateQty, removeItem, removeKit, addKit, clearCart, kitDiscountPct, ready, error, reload]);
+  }, [items, addItem, updateQty, removeItem, removeKit, addKit, clearCart, kitDiscountPct, ready, stale, error, reload]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

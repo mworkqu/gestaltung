@@ -17,26 +17,59 @@ import { IsolatedTitle } from "@/components/ltr-isolate";
 import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
 import { kitDiscountQar as kitDiscountOf } from "@/lib/prototyping/kit-plan";
 import { arabicCountForm } from "@/lib/text/count";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
 // Lines "available on request" can be checked out at their listed price; their
 // delivery date is to be confirmed after the order (0032).
 
+/** Same grid as the loaded cart: title, a few line cards, the summary card. */
+function CartSkeleton() {
+  return (
+    <div className="container space-y-6 py-6 sm:space-y-8 sm:py-8" aria-busy="true">
+      <Skeleton className="h-8 w-40 sm:h-9" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <ul className="min-w-0 space-y-3">
+          {[0, 1, 2].map((n) => (
+            <li key={n} className="neu flex min-w-0 items-center gap-4 p-3 sm:p-4">
+              <Skeleton className="h-16 w-16 shrink-0 rounded-xl" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/4" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <Skeleton className="h-8 w-24 rounded-full" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            </li>
+          ))}
+        </ul>
+        <aside className="neu h-fit min-w-0 space-y-4 p-5">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-3 w-3/4" />
+          <Skeleton className="h-11 w-full rounded-full" />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 export default function CartPage() {
   const t = useTranslations("Parts");
   const tD = useTranslations("Delivery");
   const tC = useTranslations("Cart");
   const locale = useLocale();
-  const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready, error, retry } =
+  const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready, stale, error, retry } =
     useCart();
   const { quote } = useDeliveryQuote(items);
   const toConfirm = (i: CartItem) => isOnRequest(i, quote ? quote.on_request : null);
 
-  // Avoid a hydration flash before the cart is read.
-  if (!ready) {
-    return <div className="container py-16" />;
-  }
+  // Until the first read finishes (or the last-known cart is on hand) show the
+  // layout as a skeleton: never "QAR 0.00" or an empty-cart message.
+  if (!ready && !stale) return <CartSkeleton />;
 
   // A failed read or write: say so; never an empty cart that is not empty (#3).
   const errorBar = error && (
@@ -277,9 +310,16 @@ export default function CartPage() {
             </div>
           )}
           <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>
-          <Button asChild size="lg" className="w-full rounded-full">
-            <Link href="/store/checkout">{t("checkoutCta")}</Link>
-          </Button>
+          {stale && !ready ? (
+            // Lines are the last known cart; checkout waits for the real read.
+            <Button size="lg" className="w-full rounded-full" disabled aria-busy="true">
+              {t("checkoutCta")}
+            </Button>
+          ) : (
+            <Button asChild size="lg" className="w-full rounded-full">
+              <Link href="/store/checkout">{t("checkoutCta")}</Link>
+            </Button>
+          )}
           <Button asChild variant="ghost" className="w-full rounded-full">
             <Link href="/store">{t("continueShopping")}</Link>
           </Button>

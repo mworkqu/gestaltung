@@ -11,7 +11,7 @@ import { arabicCountForm } from "@/lib/text/count";
 // cart page.
 export function CartIcon() {
   const t = useTranslations("Parts");
-  const { itemCount, ready } = useCart();
+  const { itemCount, ready, stale } = useCart();
 
   return (
     <Link
@@ -20,7 +20,7 @@ export function CartIcon() {
       className="relative flex h-9 w-9 items-center justify-center rounded-full text-mutedtext transition-colors duration-300 hover:text-heading max-md:h-11 max-md:w-11"
     >
       <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={1.75} />
-      {ready && itemCount > 0 && (
+      {(ready || stale) && itemCount > 0 && (
         <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-cobalt px-1 text-[10px] font-bold leading-none text-white">
           {itemCount > 99 ? "99+" : itemCount}
         </span>
