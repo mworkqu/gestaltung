@@ -1218,7 +1218,18 @@ Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
 - Phase A: migration 0044 sets shipping outright, makes email required server-side for bank transfer, rejects 0-total orders, adds the free-delivery threshold.
 - Phase I: the 30-day expiry of the QAR 20 redemption runs from the day the credit is earned.
 
-## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-10-09)
+## FULL BUILD SEQUENCE — STATUS SUMMARY (updated 2026-10-10)
+
+**2026-10-10 — PHASES 0–4 COMPLETE.** Tracker: 43 Done, P4-01 Dropped (no SkipCash), P0-02 In progress (owner live re-test). site_v2 ON since 2026-10-09 (P3-09 Done). All migrations 0043–0061 RUN. Lighthouse mobile live 79 / 76 / 87 (home / store / pricing), below the 90 target, accepted by the owner 2026-10-10. Cut-over checks green: typecheck, lint, vitest 1300, parity 3140/3140, build, e2e 56/56, live cache HIT. Test-data dry run done (docs/TEST_DATA_CLEANUP.md, 10 rows), deletes wait for the owner's "delete".
+
+**Owner to confirm (defaults still live on the site):**
+- Proof line "50 projects delivered since March 2026" (home hero).
+- Plan prices: Builder QAR 149/mo, Studio QAR 399/mo and their allowances (/pricing, store_settings.pricing_plans).
+- Drawing turnaround "Typically 2–3 working days" and "STEP, plus IGES on request" (/design/drawing).
+- Institution pilot "from QAR 15,000" (/institutions) and prototype sprint "from QAR 20,000" (/pricing, /design).
+- Occasion dates (Dashboard → Store → Occasions; taken from the QU academic calendar).
+- Support hours "Sun–Thu, replies within one working day" (/trust, contact).
+
 
 **2026-10-09 — QRDI upgrade plan Phases 0–2 COMPLETE in code (prompt pack 05 §1).** Phase 0: migrations confirmed, copy audit (no partner workshops / auto method, one SLA, one tagline, one AI price), re-test pack, first-run polish. Phase 1: outcome-led hero + proof line, founder section + /students, trust block + /trust, /pricing (parts list free, every circuit a credit, engineer review instead of reprint), funnel events. Phase 2: /orders + status emails + rating + credit earn-date rule, 5-click onboarding, 375 px, /institutions + proposal, working-day delivery dates + supplier source, Turnstile (OFF) + guest cleanup. Migrations 0052–0055 RUN ✔ 2026-10-09. Owner defaults to confirm: D4 plan numbers, D5 turnaround, pilot price, Sun–Thu hours. Phase 3 NOT started (owner decides).
 
