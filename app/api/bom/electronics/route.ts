@@ -27,10 +27,13 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return new Response(null, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as { projectId?: unknown; locale?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { projectId?: unknown; locale?: unknown; listOnly?: unknown } | null;
   const projectId = typeof body?.projectId === "string" ? body.projectId : null;
   const locale = body?.locale === "ar" ? "ar" : "en";
   if (!projectId) return new Response(null, { status: 400 });
+  // Client view (P5-04): "Find my parts" lists the electronics and draws nothing,
+  // so no wiring credit is ever touched; "Draw my wiring" is its own step.
+  const listOnly = body?.listOnly === true;
 
   const { data: project, error } = await supabase
     .from("projects")
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
   const rate = await bomRate(supabase, request);
   if (!rate.allowed) return Response.json({ error: "daily_limit", limit: rate.limit }, { status: 429 });
 
-  const wiring = await canUse(supabase, "wiring", project.id);
+  const wiring = listOnly ? { allowed: false, reason: "list_only" as const } : await canUse(supabase, "wiring", project.id);
   const r = await buildElectronics({ supabase, project, locale, relist: true, drawCircuit: wiring.allowed });
   if (!r.ok)
     return Response.json(

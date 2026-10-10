@@ -70,12 +70,24 @@ function skuOf(p: WiringProduct): string {
   }
 }
 
+/**
+ * The client view (P5-04): the same picture with plain words. Designators,
+ * pin names, net names and SKUs are replaced by what the callbacks return
+ * ("Motion sensor", "Signal", "Power"); the product name stays under the part.
+ */
+export type PlainWiring = {
+  component: (ref: string) => string;
+  pin: (ref: string, pinId: string, type: PinType) => string;
+  net: (name: string) => string;
+};
+
 export type WiringInput = {
   netlist: Netlist;
   flags: Flag[];
   /** By BOM line id: the product the line resolved to, if any. */
   products: Map<string, WiringProduct | null>;
   labels: { noPhoto: string; noProduct: string; example?: string; key?: string };
+  plain?: PlainWiring;
 };
 
 /** Wire colours: ground black, power red, signals in order (distinct, readable on white). */
@@ -116,7 +128,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 
 type Anchor = { x: number; y: number; side: 1 | -1; row: number };
 
-export function renderWiring({ netlist: n, flags, products, labels }: WiringInput): string {
+export function renderWiring({ netlist: n, flags, products, labels, plain }: WiringInput): string {
   const flagged = flaggedRefs(flags);
   const colours = netColours(n);
   const pinNet = new Map<string, string>();
@@ -175,17 +187,24 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
             anchors.set(`${c.ref}.${p.id}`, { x: px, y: py, side, row: r });
             const col = colourOf(c.ref, p.id);
             return `<circle cx="${px}" cy="${py}" r="4.5" fill="${col}" stroke="#ffffff" stroke-width="1.5"/>
-              <text x="${side === -1 ? x + 10 : x + BOX_W - 10}" y="${py + 4}" font-size="11" font-weight="600" fill="${col}" text-anchor="${side === -1 ? "start" : "end"}">${esc(clip(p.name, 14))}</text>`;
+              <text x="${side === -1 ? x + 10 : x + BOX_W - 10}" y="${py + 4}" font-size="11" font-weight="600" fill="${col}" text-anchor="${side === -1 ? "start" : "end"}">${esc(clip(plain ? plain.pin(c.ref, p.id, p.type) : p.name, 14))}</text>`;
           })
           .join("");
 
+      // Client view: the plain name in bold, the product's name under it; no
+      // designator, no function text, no SKU.
+      const heading = plain ? plain.component(c.ref) : c.ref;
+      const sub = plain ? (prod && !prod.example ? prod.name : "") : c.function;
+      const productLine = plain
+        ? ""
+        : `<text x="${x + 10}" y="${y + IMG_H + 46}" font-size="10.5" fill="${prod && !prod.example ? COBALT : MUTED}">${esc(clip(prod && !prod.example ? prod.name : labels.noProduct, 34))}</text>`;
       const card = `<g>
         <rect x="${x}" y="${y}" width="${BOX_W}" height="${h}" rx="10" fill="#ffffff" stroke="${bad ? ALERT : LINE}" stroke-width="${bad ? 2.5 : 1.2}"/>
         ${photo}
-        <text x="${x + 10}" y="${y + IMG_H + 18}" font-size="13" font-weight="700" fill="${bad ? ALERT : INK}">${esc(c.ref)}${bad ? " ⚠" : ""}</text>
-        <text x="${x + 10}" y="${y + IMG_H + 32}" font-size="11" fill="${MUTED}">${esc(clip(c.function, 30))}</text>
-        <text x="${x + 10}" y="${y + IMG_H + 46}" font-size="10.5" fill="${prod && !prod.example ? COBALT : MUTED}">${esc(clip(prod && !prod.example ? prod.name : labels.noProduct, 34))}</text>
-        ${sku && !prod?.example ? `<text x="${x + 10}" y="${y + IMG_H + 59}" font-size="10" font-family="ui-monospace, monospace" fill="${MUTED}">${esc(clip(sku, 34))}</text>` : ""}
+        <text x="${x + 10}" y="${y + IMG_H + 18}" font-size="13" font-weight="700" fill="${bad ? ALERT : INK}">${esc(clip(heading, plain ? 24 : 30))}${bad ? " ⚠" : ""}</text>
+        <text x="${x + 10}" y="${y + IMG_H + 32}" font-size="11" fill="${MUTED}">${esc(clip(sub, 30))}</text>
+        ${productLine}
+        ${!plain && sku && !prod?.example ? `<text x="${x + 10}" y="${y + IMG_H + 59}" font-size="10" font-family="ui-monospace, monospace" fill="${MUTED}">${esc(clip(sku, 34))}</text>` : ""}
         <line x1="${x}" x2="${x + BOX_W}" y1="${y + HEAD - 4}" y2="${y + HEAD - 4}" stroke="${LINE}"/>
         ${pinRows(s.left, -1)}${pinRows(s.right, 1)}
       </g>`;
@@ -216,7 +235,7 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
     if (!rest.length)
       wires.push(`<path d="M${hub.x} ${hub.y} H${laneA}" fill="none" stroke="${ALERT}" stroke-width="1.6" stroke-dasharray="3 2"/>`);
     wires.push(
-      `<text x="${laneA + hub.side * 3}" y="${hub.y - 4}" font-size="10" font-weight="600" fill="${colour}" text-anchor="${hub.side === 1 ? "start" : "end"}">${esc(net.name)}</text>`
+      `<text x="${laneA + hub.side * 3}" y="${hub.y - 4}" font-size="10" font-weight="600" fill="${colour}" text-anchor="${hub.side === 1 ? "start" : "end"}">${esc(plain ? plain.net(net.name) : net.name)}</text>`
     );
   });
 
@@ -230,14 +249,15 @@ export function renderWiring({ netlist: n, flags, products, labels }: WiringInpu
   if (labels.key) keyItems.push(`<text x="${kx}" y="${ky}" font-size="11" font-weight="700" fill="${MUTED}">${esc(labels.key)}</text>`);
   ky += 20;
   for (const net of n.nets) {
-    const w = 34 + clip(net.name, 18).length * 7;
+    const keyName = plain ? plain.net(net.name) : net.name;
+    const w = 34 + clip(keyName, 18).length * 7;
     if (kx + w > width - PAD) {
       kx = PAD;
       ky += 20;
     }
     keyItems.push(
       `<line x1="${kx}" x2="${kx + 22}" y1="${ky - 4}" y2="${ky - 4}" stroke="${colours.get(net.name) ?? INK}" stroke-width="4" stroke-linecap="round"/>
-<text x="${kx + 28}" y="${ky}" font-size="11" fill="${INK}">${esc(clip(net.name, 18))}</text>`
+<text x="${kx + 28}" y="${ky}" font-size="11" fill="${INK}">${esc(clip(keyName, 18))}</text>`
     );
     kx += w + 12;
   }

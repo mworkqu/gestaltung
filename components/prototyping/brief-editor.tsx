@@ -31,7 +31,10 @@ export function BriefEditor({
   onSave,
   state,
   projectId,
+  simple = false,
 }: {
+  /** Client view: a plain box, no voice tools, no word count. */
+  simple?: boolean;
   projectId?: string;
   value: string;
   onChange: (value: string) => void;
@@ -63,13 +66,15 @@ export function BriefEditor({
 
   return (
     <div className="space-y-2">
-      <Dictation
-        value={value}
-        onChange={(v) => onChange(v.slice(0, MAX_BRIEF_CHARS))}
-        onBusy={onBusy}
-        onDone={focusEnd}
-        projectId={projectId}
-      />
+      {!simple && (
+        <Dictation
+          value={value}
+          onChange={(v) => onChange(v.slice(0, MAX_BRIEF_CHARS))}
+          onBusy={onBusy}
+          onDone={focusEnd}
+          projectId={projectId}
+        />
+      )}
       <textarea
         ref={ref}
         id="brief-editor"
@@ -78,13 +83,13 @@ export function BriefEditor({
         onBlur={onSave}
         readOnly={dictating}
         aria-busy={dictating}
-        rows={MIN_ROWS}
+        rows={simple ? 5 : MIN_ROWS}
         placeholder={t("briefPlaceholder")}
         aria-label={t("briefHeading")}
         className={cn(fieldClass, "resize-none overflow-hidden")}
       />
       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-mutedtext">
-        <span className="tabular-nums">{t("wordCount", { count: wordCount(value) })}</span>
+        {simple ? <span /> : <span className="tabular-nums">{t("wordCount", { count: wordCount(value) })}</span>}
         <span aria-live="polite" className="inline-flex items-center gap-1.5">
           {state === "dirty" && t("unsaved")}
           {state === "saving" && (

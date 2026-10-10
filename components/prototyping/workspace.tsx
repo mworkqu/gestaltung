@@ -35,6 +35,8 @@ import {
   Receipt,
   Send,
   ListTree,
+  Wrench,
+  UserRound,
 } from "lucide-react";
 
 import { isAuthSessionMissingError } from "@supabase/supabase-js";
@@ -79,6 +81,8 @@ import {
 import { costState, toBuyNow } from "@/lib/prototyping/bom-cost";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { IdeaStage } from "@/components/prototyping/idea-stage";
+import { ClientWorkspace } from "@/components/prototyping/client/client-workspace";
+import { VIEW_MODE_KEY, parseViewMode, resolveViewMode, type ViewMode } from "@/lib/prototyping/view-mode";
 import { PartsList, type StoreLine } from "@/components/prototyping/parts-list";
 import { PartsStage } from "@/components/prototyping/parts-stage";
 import { AddExistingDialog } from "@/components/prototyping/part-dialogs";
@@ -136,6 +140,7 @@ export function PrototypingWorkspace({
   briefDestination,
   startChat = false,
   turnstileEnabled = false,
+  enclosureFrom = null,
 }: {
   projectId: string;
   /** Who receives the brief text for analysis; null = our own server only. */
@@ -144,8 +149,11 @@ export function PrototypingWorkspace({
   startChat?: boolean;
   /** P2-08 store_settings switch: guests verify with Turnstile before "Analyse brief". */
   turnstileEnabled?: boolean;
+  /** service_prices.enclosure_from, formatted (client view, "Get it made"); null = unknown. */
+  enclosureFrom?: string | null;
 }) {
   const t = useTranslations("Prototyping");
+  const tClient = useTranslations("ClientView");
   const tProj = useTranslations("Projects");
   const tBrand = useTranslations("Brand");
   const mono = useMono();
@@ -193,7 +201,11 @@ export function PrototypingWorkspace({
   const [phoneDismissed, setPhoneDismissed] = useState(false);
   const [saveLinkOpen, setSaveLinkOpen] = useState(false);
   const [saveLinkSent, setSaveLinkSent] = useState(false);
+  // Client view (default) or Engineer view (super_admin only, remembered per browser, P5-04).
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [savedView, setSavedView] = useState<ViewMode | null>(null);
   const profileRead = useRef(false);
+  const profileWait = useRef<PromiseLike<unknown> | null>(null);
   const nameAsked = useRef(false);
 
   const loadMatches = useCallback(async () => {
@@ -239,12 +251,16 @@ export function PrototypingWorkspace({
       } catch {
         // Storage blocked: the prompt can show again next visit.
       }
-      void supabase
+      // The role decides Client or Engineer view, so it is waited for before the page shows.
+      profileWait.current = supabase
         .from("profiles")
-        .select("phone")
+        .select("phone, role")
         .eq("id", user.id)
         .maybeSingle()
-        .then(({ data }) => setProfilePhone((data?.phone as string | null | undefined) ?? null));
+        .then(({ data }) => {
+          setProfilePhone((data?.phone as string | null | undefined) ?? null);
+          setIsAdmin((data as { role?: string } | null)?.role === "super_admin");
+        });
     }
     if (!user) {
       // No session at all (not even a guest one): nothing here can be theirs.
@@ -342,6 +358,11 @@ export function PrototypingWorkspace({
       setSchematics([]);
     }
 
+    try {
+      await profileWait.current;
+    } catch {
+      // No role: the client view, which is also the safe one.
+    }
     setLoading(false);
   }, [projectId, loadMatches, startChat]);
 
@@ -374,6 +395,24 @@ export function PrototypingWorkspace({
     if (saved) setCollapsed(saved);
     else if (window.matchMedia(NARROW).matches) setCollapsed({ left: true, right: true });
   }, []);
+
+  // The saved view is read after mount: the server has no localStorage.
+  useEffect(() => {
+    try {
+      setSavedView(parseViewMode(localStorage.getItem(VIEW_MODE_KEY)));
+    } catch {
+      // Storage blocked: the default applies.
+    }
+  }, []);
+
+  function chooseView(mode: ViewMode) {
+    setSavedView(mode);
+    try {
+      localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch {
+      // Storage blocked: the view still switches, it just isn't remembered.
+    }
+  }
 
   function togglePanel(side: keyof Panels) {
     const next = { ...collapsed, [side]: !collapsed[side] };
@@ -747,6 +786,88 @@ export function PrototypingWorkspace({
     />
   );
 
+  const saveLinkPanel =
+    saveLinkOpen && userId ? (
+      <div id="save-link-panel">
+        <PhonePrompt
+          userId={userId}
+          variant="save-link"
+          withEmail
+          projectId={project.id}
+          existingPhone={profilePhone}
+          onSaved={(phone) => setProfilePhone(phone)}
+          onDismiss={() => setSaveLinkOpen(false)}
+          onEmailSent={() => setSaveLinkSent(true)}
+        />
+      </div>
+    ) : null;
+
+  // Client view (default for everyone) or Engineer view (super_admin's choice).
+  const viewMode = resolveViewMode({ isAdmin, saved: savedView });
+  const viewToggle = isAdmin ? (
+    <button
+      type="button"
+      onClick={() => chooseView(viewMode === "client" ? "engineer" : "client")}
+      aria-pressed={viewMode === "engineer"}
+      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-mutedtext transition-colors hover:text-heading max-md:min-h-11"
+    >
+      {viewMode === "client" ? <Wrench className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+      {viewMode === "client" ? tClient("engineerView") : tClient("clientView")}
+    </button>
+  ) : null;
+
+  if (viewMode === "client") {
+    return (
+      <div className="space-y-4">
+        {bar(
+          backTo(`/projects/${project.id}`, t("backToProject")),
+          <>
+            <span className="hidden h-6 w-px bg-borderstrong sm:block" />
+            <div className="order-last min-w-0 basis-full sm:order-none sm:basis-auto sm:flex-1">
+              <h1 className="truncate text-base font-extrabold tracking-tight text-heading">{project.name}</h1>
+              {canSaveLink && (
+                <button
+                  type="button"
+                  onClick={() => setSaveLinkOpen((v) => !v)}
+                  aria-expanded={saveLinkOpen}
+                  aria-controls="save-link-panel"
+                  className="text-[11px] font-semibold text-cobalt hover:underline max-md:tap-hit"
+                >
+                  {tProj("saveLink")}
+                </button>
+              )}
+            </div>
+            {viewToggle}
+          </>
+        )}
+        {saveLinkPanel}
+        {specSaveFailed && <Warn blocking>{t("specSaveFailed")}</Warn>}
+        <main className="mx-auto w-full max-w-2xl space-y-5 pb-10">
+          <ClientWorkspace
+            project={project}
+            parts={parts}
+            bom={bom}
+            spec={spec}
+            matches={matches}
+            pricesState={costStatus}
+            electronicsActive={electronicsActive}
+            alsoUseful={alsoUseful}
+            briefDestination={briefDestination}
+            startChat={startChat}
+            turnstileEnabled={turnstileEnabled}
+            enclosureFrom={enclosureFrom}
+            phonePrompt={phonePrompt}
+            onChanged={load}
+            onSpec={saveSpec}
+            onChoose={chooseProduct}
+            patchProject={patchProject}
+            reloadMatches={loadMatches}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Top bar */}
@@ -772,6 +893,7 @@ export function PrototypingWorkspace({
               </button>
             )}
           </div>
+          {viewToggle}
           <button
             type="button"
             onClick={() => setShowOpen((v) => !v)}
@@ -820,20 +942,7 @@ export function PrototypingWorkspace({
         )
       )}
 
-      {saveLinkOpen && userId && (
-        <div id="save-link-panel">
-          <PhonePrompt
-            userId={userId}
-            variant="save-link"
-            withEmail
-            projectId={project.id}
-            existingPhone={profilePhone}
-            onSaved={(phone) => setProfilePhone(phone)}
-            onDismiss={() => setSaveLinkOpen(false)}
-            onEmailSent={() => setSaveLinkSent(true)}
-          />
-        </div>
-      )}
+      {saveLinkPanel}
 
       <div
         className={cn(

@@ -6,6 +6,8 @@ import { providerStatus } from "@/lib/prototyping/providers";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+import { getServicePrices } from "@/lib/store/public-catalog";
+import { formatQar } from "@/lib/pricing/plans";
 
 export async function generateMetadata({
   params,
@@ -42,6 +44,10 @@ export default async function PrototypingPage({
   const { destination } = await providerStatus();
   // P2-08: guests need a Turnstile token for /api/analyse while the switch is on.
   const turnstileEnabled = await turnstileEnabledForPages();
+  // "Get it made" (client view) quotes the enclosure price from store_settings.service_prices.
+  const enclosureFrom = await getServicePrices()
+    .then((p) => formatQar(p.enclosure_from))
+    .catch(() => null);
 
   return (
     <MessagesScope scope="all">
@@ -51,6 +57,7 @@ export default async function PrototypingPage({
         briefDestination={destination}
         startChat={startChat}
         turnstileEnabled={turnstileEnabled}
+        enclosureFrom={enclosureFrom}
       />
       <TurnstileChallenge enabled={turnstileEnabled} />
     </div>

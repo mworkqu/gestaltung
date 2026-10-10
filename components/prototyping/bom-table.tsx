@@ -83,6 +83,7 @@ import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { track } from "@/lib/analytics";
 import { AlsoUseful } from "@/components/prototyping/also-useful";
+import { MIN_ALSO_USEFUL } from "@/lib/store/also-useful-relevance";
 
 /**
  * ONE money figure — to buy now — and, on its own line, the counts: not
@@ -535,7 +536,7 @@ export function BomTable({
           {kitFailed && <p className="text-end text-[11.5px] text-destructive">{t("kitFailed")}</p>}
         </div>
       )}
-      {showTotal && lines.length > 0 && alsoUseful && alsoUseful.length > 0 && <AlsoUseful parts={alsoUseful} />}
+      {showTotal && lines.length > 0 && alsoUseful && alsoUseful.length >= MIN_ALSO_USEFUL && <AlsoUseful parts={alsoUseful} />}
 
       {lines.length === 0 ? (
         <p className="text-sm text-mutedtext">{t("bomEmpty")}</p>

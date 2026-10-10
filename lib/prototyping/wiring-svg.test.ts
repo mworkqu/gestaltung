@@ -113,3 +113,40 @@ describe("wiringProducts", () => {
     expect(map.get("c")).toBeNull();
   });
 });
+
+describe("renderWiring in plain (client) mode", () => {
+  const products = new Map<string, WiringProduct | null>([
+    ["l-board", { name: "ESP32 DevKit", sku: "GR-011", href: "/en/store/GR-011", image: null }],
+    ["l-led", null],
+  ]);
+  const svg = renderWiring({
+    netlist,
+    flags: [],
+    products,
+    labels: { noPhoto: "No photo yet", noProduct: "We'll pick this part for you", key: "Wires" },
+    plain: {
+      component: (ref) => (ref === "U1" ? "Main board" : "Status light"),
+      pin: (_r, _p, type) => (type === "ground" ? "Ground" : type === "power_in" ? "Power" : "Signal"),
+      net: (name) => (name === "GND" ? "Ground" : "Signal · Status light"),
+    },
+  });
+
+  it("shows plain words and none of the engineering ones", () => {
+    expect(svg).toContain(">Main board</text>");
+    expect(svg).toContain(">Status light</text>");
+    expect(svg).toContain("ESP32 DevKit");
+    expect(svg).toContain("Signal · Status light");
+    expect(svg).not.toContain(">U1");
+    expect(svg).not.toContain(">D1");
+    expect(svg).not.toContain("GR-011</text>");
+    expect(svg).not.toContain(">VIN<");
+    expect(svg).not.toContain(">SIG<");
+    expect(svg).not.toContain("Microcontroller");
+  });
+
+  it("keeps the engineer picture as it was", () => {
+    const eng = renderWiring({ netlist, flags: [], products, labels });
+    expect(eng).toContain(">U1</text>");
+    expect(eng).toContain(">GR-011</text>");
+  });
+});

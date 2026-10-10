@@ -29,11 +29,14 @@ export function SvgFrame({
   fileName,
   title,
   minHeight = 0,
+  simple = false,
 }: {
   svg: string;
   fileName: string;
   title: string;
   minHeight?: number;
+  /** Client view: zoom only, no percentage, no download, no print. */
+  simple?: boolean;
 }) {
   const t = useTranslations("Prototyping");
   const [zoom, setZoom] = useState(2); // index into STEPS; 1 = fit width
@@ -70,7 +73,9 @@ export function SvgFrame({
         <GhostButton onClick={() => step(-1)} aria-label={t("zoomOut")} className={`px-2 ${TOUCH}`} disabled={zoom === 0}>
           <Minus className="h-3.5 w-3.5" />
         </GhostButton>
-        <span className="w-12 text-center font-mono text-[11px] tabular-nums text-mutedtext">{Math.round(scale * 100)}%</span>
+        {!simple && (
+          <span className="w-12 text-center font-mono text-[11px] tabular-nums text-mutedtext">{Math.round(scale * 100)}%</span>
+        )}
         <GhostButton onClick={() => step(1)} aria-label={t("zoomIn")} className={`px-2 ${TOUCH}`} disabled={zoom === STEPS.length - 1}>
           <Plus className="h-3.5 w-3.5" />
         </GhostButton>
@@ -78,14 +83,18 @@ export function SvgFrame({
           <Maximize2 className="h-3.5 w-3.5" />
         </GhostButton>
         <span className="flex-1" />
-        <GhostButton onClick={download} className={`px-2 ${TOUCH}`}>
-          <Download className="h-3.5 w-3.5" />
-          {t("downloadSvg")}
-        </GhostButton>
-        <GhostButton onClick={print} className={`px-2 ${TOUCH}`}>
-          <Printer className="h-3.5 w-3.5" />
-          {t("print")}
-        </GhostButton>
+        {!simple && (
+          <>
+            <GhostButton onClick={download} className={`px-2 ${TOUCH}`}>
+              <Download className="h-3.5 w-3.5" />
+              {t("downloadSvg")}
+            </GhostButton>
+            <GhostButton onClick={print} className={`px-2 ${TOUCH}`}>
+              <Printer className="h-3.5 w-3.5" />
+              {t("print")}
+            </GhostButton>
+          </>
+        )}
       </div>
       <div className="max-h-[80vh] overflow-auto rounded-xl bg-white shadow-neu-inset" dir="ltr">
         <div

@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import type { ProjectBom } from "@/lib/prototyping/bom";
+import { activeLines, type ProjectBom } from "@/lib/prototyping/bom";
 import type { LineMatch } from "@/lib/prototyping/bom";
 import { matchProjectBom } from "@/lib/prototyping/bom-server";
 import type { StoreCardPart } from "@/lib/store/catalog";
-import { categoriesOf, pickAlsoUseful } from "@/lib/store/bought-together";
+import { categoriesOf } from "@/lib/store/bought-together";
+import { relevantAlsoUseful } from "@/lib/store/also-useful-relevance";
 import { getUpsellPool } from "@/lib/store/public-catalog";
 import { storeCategoryOf } from "@/lib/store/store-categories";
 
@@ -72,17 +73,25 @@ export async function POST(request: Request) {
     if (demandError) console.warn(`[bom] demand not recorded: ${demandError.message}`);
   }
 
-  return Response.json({ matches, alsoUseful: await alsoUsefulFor(matches) });
+  return Response.json({ matches, alsoUseful: await alsoUsefulFor(matches, bom) });
 }
 
 /** "Also useful" under the BOM; any failure is just an empty list. */
-async function alsoUsefulFor(matches: LineMatch[]): Promise<StoreCardPart[]> {
+async function alsoUsefulFor(matches: LineMatch[], bom: ProjectBom): Promise<StoreCardPart[]> {
   try {
     const products = matches.map((m) => m.product).filter((p): p is NonNullable<LineMatch["product"]> => !!p);
     const categories = categoriesOf(products.map((p) => ({ category: storeCategoryOf(p as { category?: string | null; store_category?: string | null }) })));
     if (!categories.length) return [];
     const onBom = matches.flatMap((m) => [m.product?.sku, ...m.candidates.map((c) => c.sku)]).filter((s): s is string => !!s);
-    return pickAlsoUseful({ pool: await getUpsellPool(categories), excludeSkus: onBom });
+    // Only products that share a function category with the project (P5-04):
+    // no camera, soldering iron, servo or stepper for a desk lamp; none at all
+    // when fewer than two qualify.
+    return relevantAlsoUseful({
+      pool: await getUpsellPool(categories),
+      excludeSkus: onBom,
+      lines: activeLines(bom),
+      productNames: products.map((p) => p.name),
+    });
   } catch (e) {
     console.warn(`[bom] also useful skipped: ${e instanceof Error ? e.message : e}`);
     return [];

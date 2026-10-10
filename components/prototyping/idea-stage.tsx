@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import type { Project, ProjectPart } from "@/lib/supabase/types";
 import { BriefChat } from "@/components/prototyping/brief-chat";
 import { ReadAloud } from "@/components/prototyping/read-aloud";
+import { BigButton } from "@/components/prototyping/client/step-card";
 
 /** Long enough that a fast analysis doesn't flash its progress. */
 const MIN_VISIBLE_MS = 400;
@@ -104,7 +105,10 @@ export function IdeaStage({
   briefDestination,
   startChat = false,
   turnstileEnabled = false,
+  simple = false,
 }: {
+  /** Client view (P5-04): the chat and the short answers only, as the body of a step card. */
+  simple?: boolean;
   project: Project;
   parts: ProjectPart[];
   onChanged: () => Promise<void>;
@@ -123,6 +127,7 @@ export function IdeaStage({
 }) {
   const t = useTranslations("Prototyping");
   const tCheck = useTranslations("Turnstile");
+  const tClient = useTranslations("ClientView");
   const locale = useLocale() === "ar" ? "ar" : "en";
   const [brief, setBrief] = useState(project.brief ?? "");
   const [savedBrief, setSavedBrief] = useState(project.brief ?? "");
@@ -343,6 +348,99 @@ export function IdeaStage({
   // A consent-only spec (from the chat) is not an analysis yet.
   const analysed = isAnalysed(spec);
   const current = ANALYSIS_STEPS.find((s) => !done.includes(s));
+
+  if (simple) {
+    const problemKey =
+      problem === "captchaRequired"
+        ? null
+        : problem === "captchaFailed"
+          ? null
+          : problem === "short"
+            ? "briefTooShort"
+            : problem === "schema"
+              ? "block_briefSchema"
+              : problem === "failed"
+                ? "analyseFailed"
+                : null;
+    return (
+      <div className="space-y-5">
+        {!savedBrief.trim() ? (
+          <BriefEditor
+            simple
+            value={brief}
+            onChange={onBriefChange}
+            onSave={() => void saveBrief()}
+            state={saveState}
+            projectId={project.id}
+          />
+        ) : (
+          <p className="line-clamp-4 whitespace-pre-wrap text-sm leading-relaxed text-heading" dir="auto">
+            {savedBrief}
+          </p>
+        )}
+        {problem && (
+          <p className="text-sm font-medium text-destructive">
+            {problem === "captchaRequired"
+              ? tCheck("required")
+              : problem === "captchaFailed"
+                ? tCheck("captchaFailed")
+                : problemKey
+                  ? t(problemKey)
+                  : null}
+          </p>
+        )}
+        {needsCheck && (
+          <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="analyse" />
+        )}
+        {needsConsent && briefDestination && (
+          <label className="flex min-h-11 items-start gap-2 text-sm leading-relaxed text-heading">
+            <input
+              type="checkbox"
+              checked={consentTicked}
+              onChange={(e) => setConsentTicked(e.target.checked)}
+              disabled={running}
+              className="mt-1 h-4 w-4 shrink-0 accent-cobalt"
+            />
+            <span>{t("aiConsentLabel", { destination: briefDestination })}</span>
+          </label>
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <BriefChat
+            projectId={project.id}
+            brief={brief}
+            destination={briefDestination}
+            consented={!needsConsent}
+            onConsent={() => {
+              if (briefDestination)
+                onSpec({ ...(spec ?? EMPTY_SPEC), aiConsent: { at: new Date().toISOString(), destination: briefDestination } });
+            }}
+            onAdd={async (text) => void (await addToBrief(text))}
+            onAddAndAnalyse={addAndAnalyse}
+            onAnalyse={() => void runAnalysis()}
+            canAnalyse={!running && brief.trim().length >= MIN_BRIEF_CHARS}
+            analysed={analysed}
+            initialOpen={startChat}
+          />
+          {!analysed && brief.trim().length >= MIN_BRIEF_CHARS && (
+            <BigButton
+              onClick={() => void runAnalysis()}
+              disabled={running || (needsConsent && !consentTicked)}
+            >
+              {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {running ? tClient("ideaReading") : tClient("ideaFind")}
+            </BigButton>
+          )}
+        </div>
+        {running && analysed && (
+          <p className="flex items-center gap-2 text-sm text-mutedtext" aria-live="polite">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {tClient("ideaReading")}
+          </p>
+        )}
+        <UnderstoodPanel simple spec={spec} brief={savedBrief} running={running} onChange={onSpec} />
+      </div>
+    );
+  }
 
   return (
     <>

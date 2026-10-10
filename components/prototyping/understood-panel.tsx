@@ -71,7 +71,10 @@ export function UnderstoodPanel({
   brief,
   running,
   onChange,
+  simple = false,
 }: {
+  /** Client view: only the unanswered short questions, as chips. No legend, no guesses, no confirm. */
+  simple?: boolean;
   spec: Spec | null;
   /** The saved brief, to check each "from your brief" against. */
   brief?: string;
@@ -79,9 +82,11 @@ export function UnderstoodPanel({
   onChange: (next: Spec) => void;
 }) {
   const t = useTranslations("Prototyping");
+  const tC = useTranslations("ClientView");
   const [editing, setEditing] = useState<string | null>(null);
   const [showOptional, setShowOptional] = useState(false);
 
+  if (running && simple) return null;
   if (running) {
     return (
       <Card kicker={t("claimsHeading")} title={t("understoodTitle")}>
@@ -107,6 +112,26 @@ export function UnderstoodPanel({
   const guesses = rows.filter((r) => !r.edited && !fromBrief(r));
   const settled = rows.filter((r) => r.edited || fromBrief(r));
   const set = (fact: { id: string; label: string }, v: string | null) => onChange(setFact(spec, fact, v));
+
+  if (simple) {
+    // The short answers only. Our guesses stay as they are; nothing to confirm.
+    return ask.length > 0 ? (
+      <div className="space-y-4">
+        <p className="text-sm font-semibold text-heading">{tC("questionsTitle")}</p>
+        {ask.map((q) => (
+          <div key={q.id} id={factFocus(q.id)} tabIndex={-1} className="space-y-2 outline-none">
+            <p className="text-sm text-heading">{factLabel(q.id, q.label, t)}</p>
+            <Chips id={q.id} type={q.type} options={q.options} onPick={(v) => set(q, v)} />
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="flex items-center gap-2 text-sm text-emerald-700">
+        <Check className="h-4 w-4" aria-hidden />
+        {tC("questionsDone")}
+      </p>
+    );
+  }
 
   const readText = [
     spec.summary,

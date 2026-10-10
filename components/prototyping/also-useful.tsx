@@ -21,6 +21,7 @@ import { track } from "@/lib/analytics";
 import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
+import { MIN_ALSO_USEFUL } from "@/lib/store/also-useful-relevance";
 
 export function AlsoUseful({ parts }: { parts: StoreCardPart[] }) {
   const t = useTranslations("Upsell");
@@ -29,7 +30,8 @@ export function AlsoUseful({ parts }: { parts: StoreCardPart[] }) {
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<Set<string>>(new Set());
 
-  if (!parts.length) return null;
+  // Fewer than two relevant products is not worth a block (P5-04).
+  if (parts.length < MIN_ALSO_USEFUL) return null;
 
   async function add(p: StoreCardPart) {
     setAdding(p.id);
