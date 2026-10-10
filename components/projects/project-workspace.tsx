@@ -38,7 +38,8 @@ import {
   type StatusOrderLine,
 } from "@/lib/projects/item-status";
 import { activeLines, type LineMatch, type ProjectBom } from "@/lib/prototyping/bom";
-import { costState, toBuyNow } from "@/lib/prototyping/bom-cost";
+import { costState, type CostState } from "@/lib/prototyping/bom-cost";
+import { ProjectPartsList } from "@/components/projects/project-parts-list";
 import { projectUsesAi } from "@/lib/projects/uses-ai";
 import { isPdfPath } from "@/lib/projects/drawing-attachment";
 import { ProjectCadCard } from "@/components/projects/project-cad-card";
@@ -70,6 +71,45 @@ type OrderLineRow = {
   order: StatusOrderLine["order"] | StatusOrderLine["order"][];
 };
 
+/**
+ * The live store matches for a project's bill of materials (/api/bom/match),
+ * read once for the page: the parts list and the prototyping card both use
+ * them, the same matches the workspace reads.
+ */
+function useBomMatches(projectId: string, bom: ProjectBom | null): { matches: Map<string, LineMatch>; state: CostState } {
+  const [matches, setMatches] = useState<Map<string, LineMatch>>(new Map());
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const lineCount = activeLines(bom).length;
+  const hasLines = lineCount > 0;
+
+  useEffect(() => {
+    if (!hasLines) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/bom/match", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ projectId }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { matches: list } = (await res.json()) as { matches: LineMatch[] };
+        if (cancelled) return;
+        setMatches(new Map(list.map((m) => [m.lineId, m])));
+        setLoaded(true);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, hasLines]);
+
+  return { matches, state: costState({ lineCount, matchesLoaded: loaded, matchFailed: failed }) };
+}
+
 export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const t = useTranslations("Projects");
   const router = useRouter();
@@ -91,6 +131,8 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
   const [fatalError, setFatalError] = useState(false);
   // Something around the project (items, cart, orders…) failed to load.
   const [partialError, setPartialError] = useState(false);
+  const bom = project?.bom?.lines ? (project.bom as ProjectBom) : null;
+  const bomMatches = useBomMatches(projectId, bom);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -253,9 +295,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         onRenamed={(name) => setProject((p) => (p ? { ...p, name } : p))}
       />
       {/* Drawing-only / quote projects never used the AI: no prototyping block. */}
-      {projectUsesAi(project) && (
-        <PrototypingCard projectId={projectId} bom={project.bom?.lines ? project.bom : null} />
-      )}
+      {projectUsesAi(project) && <PrototypingCard projectId={projectId} />}
+      {/* The workspace's bill of materials, one status per line (P5-03). */}
+      <ProjectPartsList projectId={projectId} bom={bom} matches={bomMatches.matches} state={bomMatches.state} />
       <BriefCard project={project} />
       <BlocksCard
         projectId={projectId}
@@ -264,7 +306,13 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         onChanged={load}
       />
       <ProjectCadCard projectId={projectId} />
-      <ItemsCard projectId={projectId} items={items} statuses={statuses} onChanged={load} />
+      <ItemsCard
+        projectId={projectId}
+        items={items}
+        statuses={statuses}
+        onChanged={load}
+        hasPartsList={activeLines(bom).length > 0}
+      />
       <DangerZoneCard
         project={project}
         // Own-shelf units only (bought units are not "returned"), the same
@@ -343,43 +391,8 @@ function ProjectHeader({
 // part of this page: different job, different shape, and this page has to keep
 // working on its own.
 
-function PrototypingCard({ projectId, bom }: { projectId: string; bom: ProjectBom | null }) {
+function PrototypingCard({ projectId }: { projectId: string }) {
   const t = useTranslations("Prototyping");
-  const locale = useLocale();
-  const lines = activeLines(bom);
-  // The same store matches the workspace reads (/api/bom/match) feed the same
-  // toBuyNow(), so this page and the workspace never show two different totals
-  // (audit "project page QAR total ≠ BOM To buy now").
-  const [matches, setMatches] = useState<Map<string, LineMatch>>(new Map());
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const hasLines = lines.length > 0;
-
-  useEffect(() => {
-    if (!hasLines) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/bom/match", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ projectId }),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const { matches: list } = (await res.json()) as { matches: LineMatch[] };
-        if (cancelled) return;
-        setMatches(new Map(list.map((m) => [m.lineId, m])));
-        setLoaded(true);
-      } catch {
-        if (!cancelled) setFailed(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, hasLines]);
-
-  const state = costState({ lineCount: lines.length, matchesLoaded: loaded, matchFailed: failed });
 
   return (
     <section className="neu space-y-4 p-6 sm:p-8">
@@ -395,22 +408,6 @@ function PrototypingCard({ projectId, bom }: { projectId: string; bom: ProjectBo
           <Link href={`/projects/${projectId}/prototyping`}>{t("open")}</Link>
         </Button>
       </div>
-      {hasLines && (
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl bg-panel/60 px-4 py-3 shadow-neu-inset">
-          <p className="text-[10px] uppercase tracking-wider text-faint">{t("costToBuyNow")}</p>
-          {state === "loading" ? (
-            <>
-              <span className="sr-only">{t("costLoading")}</span>
-              <Skeleton className="h-4 w-24" />
-            </>
-          ) : state === "failed" ? (
-            <p className="text-xs text-mutedtext">{t("costUnavailable")}</p>
-          ) : (
-            <p className="font-mono text-sm font-bold tabular-nums text-heading">{formatPrice(toBuyNow(bom, matches), locale)}</p>
-          )}
-          <p className="text-[11px] text-mutedtext">{t("projectToBuyNote")}</p>
-        </div>
-      )}
     </section>
   );
 }
@@ -733,11 +730,14 @@ function ItemsCard({
   items,
   statuses,
   onChanged,
+  hasPartsList,
 }: {
   projectId: string;
   items: ItemWithPart[];
   statuses: Record<string, ItemStatus>;
   onChanged: () => Promise<void>;
+  /** The project has a parts list (BOM) above: never call it empty. */
+  hasPartsList: boolean;
 }) {
   const t = useTranslations("Projects");
   const locale = useLocale();
@@ -855,8 +855,8 @@ function ItemsCard({
   return (
     <section className="neu space-y-4 p-6 sm:p-8">
       <div>
-        <h2 className="text-sm font-semibold text-heading">{t("itemsHeading")}</h2>
-        <p className="mt-1 text-sm text-mutedtext">{t("itemsIntroStatus")}</p>
+        <h2 className="text-sm font-semibold text-heading">{hasPartsList ? t("itemsHeadingMore") : t("itemsHeading")}</h2>
+        <p className="mt-1 text-sm text-mutedtext">{hasPartsList ? t("itemsIntroMore") : t("itemsIntroStatus")}</p>
       </div>
 
       <UnifiedSearch
@@ -873,7 +873,7 @@ function ItemsCard({
       )}
 
       {items.length === 0 ? (
-        <p className="pt-1 text-sm text-mutedtext">{t("emptyProject")}</p>
+        hasPartsList ? null : <p className="pt-1 text-sm text-mutedtext">{t("emptyProject")}</p>
       ) : (
         <>
           <ul className="space-y-2">
