@@ -26,6 +26,9 @@ export default defineConfig({
     command: "npm run start",
     url: "http://localhost:3000/en",
     reuseExistingServer: true,
+    // Turns on the test-only routes under /{locale}/e2e-fixtures (lib/e2e-fixtures.ts;
+    // never reachable on Vercel). A server you started yourself needs E2E_FIXTURES=1 too.
+    env: { E2E_FIXTURES: "1" },
     timeout: 120_000,
   },
   projects: [

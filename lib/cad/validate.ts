@@ -79,3 +79,44 @@ export function validateScad(code: string): string[] {
 
   return problems;
 }
+
+// ─── CadQuery (cloud engine) ────────────────────────────────────────────────
+// A cheap pre-check before the code goes to the worker (which runs it in its
+// own sandbox): size, the `result` variable, imports limited to cadquery and
+// math, and no file / process / dynamic-code access.
+
+export const CADQUERY_MAX_BYTES = 20_000;
+
+const PY_ALLOWED_MODULES = new Set(["cadquery", "math"]);
+const PY_FORBIDDEN: [RegExp, string][] = [
+  [/\b(open|exec|eval|compile|__import__|globals|locals|getattr|setattr|input)\s*\(/, "file access and dynamic code (open, exec, eval, __import__ …) are not allowed"],
+  [/\b(os|sys|subprocess|socket|shutil|pathlib|importlib)\s*\./, "only cadquery and math may be used"],
+  [/__\w+__/, "dunder names are not allowed"],
+  [/\b(exportStep|exportStl|export|show_object)\s*\(|cq\.exporters\b/, "do not export or show: leave the final shape in `result`"],
+];
+
+/** The Python with comments and string contents blanked. */
+function stripPython(code: string): string {
+  return code
+    .replace(/("""|''')[\s\S]*?\1/g, '""')
+    .replace(/"(?:\.|[^"\\n])*"|'(?:\.|[^'\\n])*'/g, '""')
+    .replace(/#.*$/gm, "");
+}
+
+/** Problems with model-written CadQuery; empty means it may go to the worker. */
+export function validateCadQuery(code: string): string[] {
+  const problems: string[] = [];
+  if (!code.trim()) return ["the code is empty"];
+  const bytes = new TextEncoder().encode(code).length;
+  if (bytes >= CADQUERY_MAX_BYTES) problems.push(`the file is ${bytes} bytes; keep it under ${CADQUERY_MAX_BYTES}`);
+  const bare = stripPython(code);
+
+  for (const m of bare.matchAll(/^\s*(?:import\s+([\w.]+)(?:\s+as\s+\w+)?|from\s+([\w.]+)\s+import\b)/gm)) {
+    const mod = (m[1] ?? m[2] ?? "").split(".")[0];
+    if (!PY_ALLOWED_MODULES.has(mod)) problems.push(`import of "${mod}" is not allowed — only cadquery and math`);
+  }
+  if (!/^\s*(import\s+cadquery\b|from\s+cadquery\b)/m.test(bare)) problems.push('the file must start with "import cadquery as cq"');
+  if (!/^result\s*=/m.test(bare)) problems.push("the final shape must be assigned to a top-level variable named `result`");
+  for (const [re, msg] of PY_FORBIDDEN) if (re.test(bare)) problems.push(msg);
+  return [...new Set(problems)];
+}

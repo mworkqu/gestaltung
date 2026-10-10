@@ -8,6 +8,12 @@
 // charges. Saved versions re-open from their stored code — no AI call, no
 // charge. Before migration 0043 the card keeps the stub: Confirm stores the
 // tier (set_cad_request) and generates nothing.
+//
+// Cloud engine (store_settings.cad_engine, 0067): /api/cad may build the model
+// on the server (CadQuery worker) and deliver it itself — its answer then has
+// engine "cloud" and the files sit in the cad-files bucket; this card only
+// shows them (CadCloudResult). Saved CadQuery versions re-open from those
+// files. `engineer` (super_admin's Engineer view) adds code, log and checks.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -22,6 +28,9 @@ import { classifyCadRequest, type CadTier } from "@/lib/credits/classify";
 import { CAD_GENERATIONS, CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { renderScad, stlStats } from "@/lib/cad/render";
+import { cloudFilePaths, isCadQueryCode, parseManifest, type CloudManifest } from "@/lib/cad/engine";
+import { CAD_BUCKET } from "@/lib/design/constants";
+import { CadCloudResult } from "@/components/credits/cad-cloud-result";
 import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -31,8 +40,12 @@ const CadViewer = dynamic(() => import("./cad-viewer"), {
   loading: () => <div className="h-72 w-full sm:h-80" />,
 });
 
-type Version = { id: string; request: string; scad: string };
-type Built = { id: string; stl: ArrayBuffer; size: [number, number, number] };
+type Version = { id: string; request: string; scad: string; user_id?: string | null };
+type CloudFiles = ReturnType<typeof cloudFilePaths>;
+type Built =
+  | { kind: "browser"; id: string; stl: ArrayBuffer; size: [number, number, number] }
+  | { kind: "cloud"; id: string; manifest: CloudManifest; previewUrl: string | null; files: CloudFiles };
+type CloudAnswer = { id: string; engine: "cloud"; code: string; summary?: string; manifest: CloudManifest; files: CloudFiles };
 type Phase = "idle" | "opening" | "writing" | "building" | "repairing" | "done";
 type Pending = { tier: CadTier; engine: string; request: string; parentId: string | null };
 type Problem = { code: string; log?: string };
@@ -48,11 +61,21 @@ const ERROR_KEY: Record<string, string> = {
   unavailable: "cadErr_unavailable",
   invalid: "cadErr_invalid",
   render: "cadErr_render",
+  checks: "cadErr_checks",
   timeout: "cadErr_timeout",
   load: "cadErr_load",
   deliver: "cadErr_deliver",
   open: "cadErr_open",
+  open_cloud: "cadErr_openCloud",
 };
+
+/** A short-lived signed URL for a file in the private cad-files bucket. */
+async function signedUrl(path: string, download?: string): Promise<string | null> {
+  const { data } = await createClient()
+    .storage.from(CAD_BUCKET)
+    .createSignedUrl(path, 300, download ? { download } : undefined);
+  return data?.signedUrl ?? null;
+}
 
 function download(name: string, data: BlobPart, type: string) {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -67,11 +90,14 @@ export function CadCard({
   projectId,
   projectName,
   brief,
+  engineer = false,
 }: {
   projectId: string;
   /** For the "buy credits" WhatsApp message. */
   projectName?: string | null;
   brief: string;
+  /** super_admin's Engineer view: code, worker log and every check. */
+  engineer?: boolean;
 }) {
   const t = useTranslations("Credits");
   const locale = useLocale();
@@ -90,6 +116,8 @@ export function CadCard({
   const [phase, setPhase] = useState<Phase>("idle");
   const [problem, setProblem] = useState<Problem | null>(null);
   const [refine, setRefine] = useState("");
+  const [fellBack, setFellBack] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const openToken = useRef(0);
 
   const working = phase !== "idle" && phase !== "done";
@@ -102,20 +130,37 @@ export function CadCard({
     setProblem(null);
     setSummary(null);
     setPhase("opening");
+    // A cloud version (CadQuery): its files are already built — read them back.
+    if (isCadQueryCode(v.scad)) {
+      const files = v.user_id ? cloudFilePaths(v.user_id, projectId, v.id) : null;
+      const manifest = files
+        ? await createClient()
+            .storage.from(CAD_BUCKET)
+            .download(files.manifest)
+            .then(async ({ data }) => (data ? parseManifest(JSON.parse(await data.text())) : null))
+            .catch(() => null)
+        : null;
+      const previewUrl = files && manifest ? await signedUrl(files.svg).catch(() => null) : null;
+      if (token !== openToken.current) return;
+      setPhase("idle");
+      if (!files || !manifest) return setProblem({ code: "open_cloud" });
+      setBuilt({ kind: "cloud", id: v.id, manifest, previewUrl, files });
+      return;
+    }
     const r = await renderScad(v.scad);
     if (token !== openToken.current) return;
     setPhase("idle");
     const stats = r.ok ? stlStats(r.stl) : null;
     if (!r.ok || !stats) return setProblem({ code: !r.ok && r.error !== "render" ? r.error : "open", log: r.ok ? undefined : r.log });
-    setBuilt({ id: v.id, stl: r.stl, size: stats.size });
-  }, []);
+    setBuilt({ kind: "browser", id: v.id, stl: r.stl, size: stats.size });
+  }, [projectId]);
 
   useEffect(() => {
     let gone = false;
     (async () => {
       const { data, error: e } = await createClient()
         .from("cad_generations")
-        .select("id, request, scad")
+        .select("id, request, scad, user_id")
         .eq("project_id", projectId)
         .eq("status", "delivered")
         .order("created_at", { ascending: true });
@@ -158,7 +203,14 @@ export function CadCard({
     setPhase(repair ? "repairing" : "writing");
     const supabase = createClient();
 
-    let body: { id?: string; scad?: string; summary?: string; error?: string } = {};
+    let body: {
+      id?: string;
+      scad?: string;
+      summary?: string;
+      error?: string;
+      engine?: "browser" | "cloud";
+      fallback?: boolean;
+    } & Partial<Omit<CloudAnswer, "engine">> = {};
     try {
       const res = await fetch("/api/cad", {
         method: "POST",
@@ -169,6 +221,21 @@ export function CadCard({
       if (!res.ok && !body.error) body.error = "failed";
     } catch {
       body = { error: "unavailable" };
+    }
+    // The cloud engine built AND delivered it on the server (credit spent there,
+    // through the same cad_deliver): show the stored files, nothing to render.
+    if (!body.error && body.engine === "cloud" && body.id && body.code && body.manifest && body.files) {
+      const { id, code, manifest, files } = body;
+      const previewUrl = await signedUrl(files.svg).catch(() => null);
+      creditsChanged();
+      track("cad_generated");
+      setFellBack(false);
+      setVersions((vs) => [...vs, { id, request: label, scad: code, user_id: files.manifest.split("/")[0] }]);
+      setBuilt({ kind: "cloud", id, manifest, previewUrl, files });
+      setSummary(body.summary || null);
+      setRefine("");
+      setPhase("done");
+      return;
     }
     if (body.error || !body.id || !body.scad) {
       const code = body.error ?? "failed";
@@ -184,6 +251,7 @@ export function CadCard({
       return fail(code);
     }
     const { id, scad } = body;
+    if (!repair) setFellBack(body.fallback === true);
 
     setPhase(repair ? "repairing" : "building");
     const r = await renderScad(scad);
@@ -209,10 +277,23 @@ export function CadCard({
     creditsChanged();
     track("cad_generated");
     setVersions((vs) => [...vs, { id, request: label, scad }]);
-    setBuilt({ id, stl: r.stl, size: stats.size });
+    setBuilt({ kind: "browser", id, stl: r.stl, size: stats.size });
     setSummary(body.summary || null);
     setRefine("");
     setPhase("done");
+  }
+
+  /** Download a cloud version's STL or STEP through a short-lived signed URL. */
+  async function downloadCloud(b: Extract<Built, { kind: "cloud" }>, kind: "stl" | "step") {
+    const n = versions.findIndex((v) => v.id === b.id) + 1;
+    setDownloading(true);
+    const url = await signedUrl(b.files[kind], `gestaltung-cad-v${n || 1}.${kind}`).catch(() => null);
+    setDownloading(false);
+    if (!url) return setProblem({ code: "open_cloud" });
+    const a = document.createElement("a");
+    a.href = url;
+    a.rel = "noopener";
+    a.click();
   }
 
   function gate(): boolean {
@@ -338,7 +419,21 @@ export function CadCard({
         </Warn>
       )}
 
-      {built && (
+      {engineer && fellBack && <p className="text-xs text-mutedtext">{t("cadEngFallback")}</p>}
+
+      {built?.kind === "cloud" && (
+        <CadCloudResult
+          manifest={built.manifest}
+          previewUrl={built.previewUrl}
+          engineer={engineer}
+          code={current?.scad ?? null}
+          summary={summary}
+          busy={downloading}
+          onDownload={(kind) => void downloadCloud(built, kind)}
+        />
+      )}
+
+      {built?.kind === "browser" && (
         <div className="space-y-3">
           <div className="neu-inset overflow-hidden">
             <CadViewer stl={built.stl} label={t("cadTitle")} />

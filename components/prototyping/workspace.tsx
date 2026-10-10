@@ -1094,7 +1094,7 @@ export function PrototypingWorkspace({
                 onFix={(focus) => goTo("mechanical.parts", focus)}
               />
               {earlier(designOf("mechanical"))}
-              <CadCard projectId={project.id} projectName={project.name} brief={project.brief ?? ""} />
+              <CadCard projectId={project.id} projectName={project.name} brief={project.brief ?? ""} engineer={isAdmin} />
               {/* 3D CAD is still a human service; say so where drawings live. */}
               <div className="neu flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
                 <p className="min-w-0 flex-1 text-[12px] text-mutedtext">{t("engineeringBody")}</p>

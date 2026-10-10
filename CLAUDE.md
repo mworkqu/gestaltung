@@ -961,6 +961,37 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
   versions); failed builds never charge and get one automatic repair. Cap: 5 undelivered-with-code generations
   per 24 h. Saved versions re-render from stored code with no AI call. No CadQuery (needs a paid Python server).
   Before 0043 the card keeps the stub. 0042 RUN ✔ 2026-10-02 and verified end to end by script (61 checks).
+  * CLOUD ENGINE (2026-10-10, migration 0067 — NOT RUN): server-side CadQuery on Cloud Run (worker code in
+    services/cad-worker/, built separately). Switch store_settings.cad_engine {"engine": "browser" (default) |
+    "admin" (cloud for super_admin only) | "cloud" (everyone), "min_wall_mm": 1.2}; no row / bad value = browser
+    (lib/cad/engine.ts parseCadEngineSetting + resolveCadEngine; cached read lib/cad/engine-server.ts, tag
+    "store-settings"). lib/cad/cloud.ts (server-only): Google ID token for GCP_CAD_URL (audience = service URL)
+    from GCP_CAD_SA_KEY (raw JSON or base64) via google-auth-library, client + token cached, never logged; POST
+    /build with a 60 s AbortController, zod-checked; buildWithRetry = one retry when down; nextCloudStep decides
+    deliver / repair / fallback / fail. lib/cad/cloud-flow.ts runCloudCad (called by /api/cad when the engine is
+    cloud and not a browser repair): Gemini writes CadQuery (prompt.ts CADQUERY_SYSTEM/cadQueryPrompt: named
+    dimensions on top, mm, final shape in `result`, imports cadquery/math only; validate.ts validateCadQuery),
+    must_contain_box = largest known project board (footprints.ts, audit #5 logic; height BOARD_HEIGHT_MM 12),
+    ONE automatic repair (new row, parent = failed one) fed with the worker's error + failed checks. ONLY a model
+    that built AND passed every check is delivered (worker keeps ok=true when only min_wall / must_contain_box
+    fail, so checks are read on their own); still failing after the repair = nothing delivered, nothing charged,
+    error "checks" (Credits.cadErr_checks "did not pass our size and wall checks … Nothing was charged") or
+    "render". Optional shared secret: env CAD_WORKER_TOKEN sent as header X-Cad-Worker-Token (Authorization
+    carries the Google ID token). Credits
+    unchanged: same cad_begin / cad_set_code / cad_deliver / cad_fail; the SERVER calls cad_deliver only after
+    the files are saved (charged on the first delivered result, failed builds never charge, versions count, 24 h
+    cap). Code is stored only after the worker ran it, so a worker outage never counts against the cap. Files:
+    cad-files bucket <user_id>/<project_id>/cad/<generation_id>.{step,stl,svg,json} (json = manifest: bbox,
+    volume, checks, log, min wall, board). Worker down twice (or env missing) → row failed without code, an
+    ai_usage row provider "cad-worker" error_code "fallback_browser:<reason>" (see /dashboard/usage), then the
+    browser OpenSCAD path (answer flagged fallback). Card (components/credits/cad-card.tsx +
+    cad-cloud-result.tsx): client = SVG preview, outside size, one plain check line ("Fits your board · walls 2
+    mm"), "Download for 3D printing (STL)", "Download CAD file (STEP)" (signed URLs), "Get it made" →
+    /design/quote; engineer (workspace.tsx, isAdmin) adds every check, volume, CadQuery code, worker log and a
+    fallback note. Saved CadQuery versions re-open from the manifest (isCadQueryCode). Test-only route
+    /{locale}/e2e-fixtures/cad-cloud (lib/e2e-fixtures.ts: E2E_FIXTURES=1 and not on Vercel; Playwright sets it)
+    + e2e/cad-cloud.spec.ts. OWNER: set GCP_CAD_URL + GCP_CAD_SA_KEY (+ optional CAD_WORKER_TOKEN, same value as on the worker) in Vercel, run 0067, set engine "admin",
+    test on his account, then "cloud".
 
 - SITE REVIEW FIXES, PHASE A (2026-10-03, migration 0044 — RUN ✔ 2026-10-08): money and checkout. Source prompt
   STAGE_SITE_REVIEW_FIXES_PROMPT.md; decisions in "Site review decisions" below.
@@ -1342,6 +1373,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - 0048_store_categories.sql — (RUN ✔ 2026-10-08, confirmed by live probe) C5: parts.store_category (nine values, check constraint) + store_category_review, store_category_rules + trigger for new products, per-SKU mapping of 1,323 published products, gift card unpublished (RUN AFTER 0047, does not depend on it; until then the store shows the old categories; afterwards press any Dashboard → Store save or wait 5 min)
 - 0049_videos_bucket.sql — (RUN ✔ 2026-10-08) CC-2: public `videos` bucket (public read, super-admin write, 50 MB, mp4/webm/jpeg/vtt) for the feature videos (RUN AFTER 0048, does not depend on it; until then the video slots fall back to the poster / placeholder, nothing breaks; then `node scripts/upload-video.mjs <folder>` per clip)
 - 0062_edm_price_drawing_uploads.sql — RUN ✔ 2026-10-10 (owner; verified edm_from 350, bucket 20 MB) P5-05/P5-06: adds store_settings.service_prices.edm_from = 350 (only when missing; OWNER TO CONFIRM) and raises the private project-images bucket limit 10 MB -> 20 MB for drawing-request uploads (RUN AFTER 0061; until then the app uses the same edm_from default from lib/pricing/defaults.ts and a drawing-request file over 10 MB fails to upload - the request is still sent and the confirmation asks the client to WhatsApp the file)
+- 0067_cad_engine.sql — NOT RUN. Cloud CAD engine switch: seeds store_settings.cad_engine = {"engine": "browser", "min_wall_mm": 1.2} (on conflict do nothing; no new table/function; RLS unchanged) (RUN AFTER 0066; safe to re-run; until then — and while it says "browser" — every 3D model is built in the browser as today. To test the cloud worker: set GCP_CAD_URL + GCP_CAD_SA_KEY in Vercel, then `update public.store_settings set value = '{"engine": "admin", "min_wall_mm": 1.2}'::jsonb where key = 'cad_engine';` and any Dashboard → Store save)
 - 0066_qatar_holidays.sql — RUN ✔ 2026-10-10 (owner; verified 10 dates) Group 8 / P5-08: merges Qatar public holidays into store_settings.holidays.dates without removing owner entries or the weekend: National Day 2026-12-18/19 + 2027-12-18, National Sports Day 2027-02-09 (2nd Tuesday of Feb), and the EXPECTED Eid al-Fitr 2027-03-09..11 / Eid al-Adha 2027-05-16..18 (owner confirms when announced; the admin editor tags them "Expected" via QATAR_EXPECTED_HOLIDAYS in lib/store/working-days.ts). Code fallback = DEFAULT_HOLIDAYS (RUN AFTER 0054; safe to re-run)
 - 0064_normalise_phones.sql — RUN ✔ 2026-10-10 (owner; verified phones +974XXXXXXXX) Group 7 / P5-07: stores every Qatar phone as bare E.164 (+974XXXXXXXX): spaced, bare 8-digit and doubled-country-code values in inquiries.phone, profiles.phone and part_orders.customer_phone (read-only check: 6 / 0 / 3 rows would change; foreign and junk numbers untouched; dry-run query in the header) (RUN AFTER 0063; the app already normalises new writes and DISPLAYS +974 XXXX XXXX via lib/phone.ts formatPhoneDisplay)
 - 0061_price_funnel_fix.sql — (RUN ✔ 2026-10-10) P4-02 follow-up: re-creates price_cohort_funnel() so "bought credits" counts only admin_grant / topup: rows, not credits earned from delivered orders (RUN AFTER 0060; safe to re-run; until then the Funnel card's "bought credits" may include earned credits)
