@@ -18,7 +18,7 @@ import type { User } from "@supabase/supabase-js";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { createSharedLoader } from "@/lib/dedupe";
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { CREDITS_CHANGED, noFreeCircuit, type AiStep, type CanUse, type CreditSummary, type RawCanUse } from "./constants";
 
 export function creditsChanged() {
@@ -31,7 +31,7 @@ export function creditsChanged() {
 // creditsChanged() forces a fresh read.
 const summaries = createSharedLoader<string, CreditSummary | null>(
   async () => {
-    const { data, error } = await createClient().rpc("credit_summary");
+    const { data, error } = await (await loadSupabase()).rpc("credit_summary");
     return error ? null : (data as CreditSummary);
   },
   { ttlMs: 10_000 }
@@ -85,7 +85,7 @@ export function useCanUse(step: AiStep, projectId: string | null): CanUse | null
     }
     let alive = true;
     const load = async () => {
-      const { data, error } = await createClient().rpc("credit_can_use", { p_step: step, p_project: projectId });
+      const { data, error } = await (await loadSupabase()).rpc("credit_can_use", { p_step: step, p_project: projectId });
       // noFreeCircuit: before 0052 the DB still calls a first circuit "free".
       if (alive) setState(error ? null : noFreeCircuit(data as RawCanUse));
     };

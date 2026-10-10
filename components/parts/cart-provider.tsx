@@ -12,8 +12,8 @@ import {
 import type { CartItem, Part } from "@/lib/supabase/types";
 import { cartItemCount, cartTotal, getCart, saveCart, toCartItem } from "@/lib/parts/cart";
 import { track } from "@/lib/analytics";
-import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { trackDemand } from "@/lib/store/demand-client";
 
 // ── The cart ────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<CartError | null>(null);
 
   const reload = useCallback(async () => {
-    const supabase = createClient();
+    const supabase = await loadSupabase();
     const user = await getCurrentUser();
 
     if (!user) {
@@ -169,7 +169,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (legacy.length > 0) {
         try {
           const user = await ensureSession();
-          const supabase = createClient();
+          const supabase = await loadSupabase();
           const { data: parts } = await supabase
             .from("parts")
             .select("id, sku")
@@ -219,7 +219,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return failed("add (session)", e);
       }
       trackDemand("add_to_cart", { partId: part.id });
-      const supabase = createClient();
+      const supabase = await loadSupabase();
       const kitId = opts.kitId ?? null;
 
       // `.is(col, null)` and `.eq(col, value)` are different operators in
@@ -268,7 +268,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       const line = items.find((i) => i.rowId === rowId);
       if (!line) return false;
       const quantity = Math.max(line.minOrderQty, Math.trunc(qty) || line.minOrderQty);
-      const { error: e } = await createClient().from("cart_items").update({ quantity }).eq("id", rowId);
+      const { error: e } = await (await loadSupabase()).from("cart_items").update({ quantity }).eq("id", rowId);
       if (e) return failed("update quantity", e);
       await reload();
       return true;
@@ -278,7 +278,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeItem = useCallback(
     async (rowId: string) => {
-      const { error: e } = await createClient().from("cart_items").delete().eq("id", rowId);
+      const { error: e } = await (await loadSupabase()).from("cart_items").delete().eq("id", rowId);
       if (e) return failed("remove", e);
       await reload();
       return true;
@@ -288,7 +288,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const removeKit = useCallback(
     async (kitId: string) => {
-      const supabase = createClient();
+      const supabase = await loadSupabase();
       const lines = await supabase.from("cart_items").delete().eq("kit_id", kitId);
       if (lines.error) return failed("remove kit (lines)", lines.error);
       const kit = await supabase.from("project_kits").delete().eq("id", kitId);
@@ -300,7 +300,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   );
 
   const clearCart = useCallback(async () => {
-    const supabase = createClient();
+    const supabase = await loadSupabase();
     const user = await getCurrentUser();
     if (user) {
       const { error: e } = await supabase.from("cart_items").delete().eq("user_id", user.id);

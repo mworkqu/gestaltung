@@ -16,7 +16,7 @@ import { useTranslations } from "next-intl";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { normaliseCode, parseQuote, readCodeFromSearch, storeCode } from "@/lib/pricing/experiment";
 import { formatQar } from "@/lib/pricing/plans";
 
@@ -52,7 +52,7 @@ export function InvitePrice({ listed }: { /** The listed credit price (store_set
     claimed.current = null;
     let invited: number | null = null;
     try {
-      const res = await createClient().rpc("price_experiment_quote", { p_code: code });
+      const res = await (await loadSupabase()).rpc("price_experiment_quote", { p_code: code });
       invited = res.error ? null : parseQuote(res.data);
     } catch {
       invited = null;
@@ -82,7 +82,7 @@ export function InvitePrice({ listed }: { /** The listed credit price (store_set
     const my = run.current;
     void (async () => {
       try {
-        const res = await createClient().rpc("claim_price_cohort", { p_code: code });
+        const res = await (await loadSupabase()).rpc("claim_price_cohort", { p_code: code });
         if (!res.error && parseQuote(res.data) !== null && my === run.current) setSaved(true);
       } catch {
         // the code stays in this browser; AccessNote claims it later

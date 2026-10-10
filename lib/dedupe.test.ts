@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createSharedLoader, shareInflight } from "./dedupe";
+import { createSharedLoader, onceUntilFailure, shareInflight } from "./dedupe";
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -112,5 +112,31 @@ describe("createSharedLoader", () => {
     await expect(loader.get("u1")).rejects.toThrow("rpc down");
     expect(loader.peek("u1")).toBeUndefined();
     await expect(loader.get("u1")).resolves.toBe(5);
+  });
+});
+
+describe("onceUntilFailure", () => {
+  it("runs once and hands every caller, now and later, the same result", async () => {
+    const fn = vi.fn(async () => ({ mod: 1 }));
+    const once = onceUntilFailure(fn);
+    const a = once();
+    const b = once();
+    expect(a).toBe(b);
+    const first = await a;
+    expect(await once()).toBe(first);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets a failure so the next call retries", async () => {
+    const d = deferred<number>();
+    const fn = vi.fn().mockReturnValueOnce(d.promise).mockResolvedValueOnce(7);
+    const once = onceUntilFailure(fn as () => Promise<number>);
+    const a = once();
+    expect(once()).toBe(a);
+    d.reject(new Error("chunk load failed"));
+    await expect(a).rejects.toThrow("chunk load failed");
+    await expect(once()).resolves.toBe(7);
+    await expect(once()).resolves.toBe(7);
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 });

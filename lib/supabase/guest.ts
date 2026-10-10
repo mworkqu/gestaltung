@@ -3,7 +3,7 @@
 import type { User } from "@supabase/supabase-js";
 
 import { shareInflight } from "@/lib/dedupe";
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { requestTurnstileToken } from "@/lib/turnstile-client";
 
 // ── Guest sessions ──────────────────────────────────────────────────────────
@@ -17,6 +17,10 @@ import { requestTurnstileToken } from "@/lib/turnstile-client";
 // that needs to be saved (starts a project, adds to a cart). Merely reading a
 // page never creates one. See FINDINGS.md for the cleanup rule that reaps
 // anonymous users who never went on to own anything.
+//
+// The client is loaded lazily (lib/supabase/lazy.ts): this module is imported
+// by site-wide providers, so a static import would put supabase-js in the
+// first-load JS of every page.
 
 /**
  * Returns the current user, creating an anonymous one if there is no session.
@@ -31,7 +35,7 @@ import { requestTurnstileToken } from "@/lib/turnstile-client";
  * their widget after this resolves or throws.
  */
 export async function ensureSession(opts: { captchaToken?: string | null } = {}): Promise<User> {
-  const supabase = createClient();
+  const supabase = await loadSupabase();
 
   const {
     data: { session },
@@ -66,6 +70,6 @@ export function isGuest(user: User | null | undefined): boolean {
 export const getCurrentUser: () => Promise<User | null> = shareInflight(async () => {
   const {
     data: { session },
-  } = await createClient().auth.getSession();
+  } = await (await loadSupabase()).auth.getSession();
   return session?.user ?? null;
 });

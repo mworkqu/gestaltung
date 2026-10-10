@@ -12,8 +12,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 
-import { createClient } from "@/lib/supabase/client";
 import { getCurrentUser } from "@/lib/supabase/guest";
+import { loadSupabase } from "@/lib/supabase/lazy";
 
 export type AuthState = {
   /** False until the first read finished; `user` is null until then. */
@@ -46,10 +46,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     void getCurrentUser().then(set, () => set(null));
-    const { data } = createClient().auth.onAuthStateChange((_event, session) => set(session?.user ?? null));
+    // The client loads lazily (keeps supabase-js out of every page's first-load
+    // JS). If we unmount before it arrives, don't subscribe at all; otherwise
+    // the cleanup below drops the subscription. A new subscription immediately
+    // receives INITIAL_SESSION, so nothing that happened while loading is missed.
+    let unsubscribe: (() => void) | null = null;
+    void loadSupabase().then(
+      (supabase) => {
+        if (!alive) return;
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => set(session?.user ?? null));
+        unsubscribe = () => data.subscription.unsubscribe();
+      },
+      () => {}
+    );
     return () => {
       alive = false;
-      data.subscription.unsubscribe();
+      unsubscribe?.();
     };
   }, []);
 

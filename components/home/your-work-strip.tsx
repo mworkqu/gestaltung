@@ -8,7 +8,7 @@ import { Link } from "@/i18n/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useCart } from "@/components/parts/cart-provider";
 import { Skeleton } from "@/components/ui/skeleton";
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { normaliseOrderStatus, orderShort, type OrderStatus } from "@/lib/orders/status";
 import { arabicCountForm } from "@/lib/text/count";
 import {
@@ -62,7 +62,7 @@ type ReorderState =
   | { phase: "error" };
 
 async function loadYourWork(userId: string): Promise<Data | null> {
-  const supabase = createClient();
+  const supabase = await loadSupabase();
 
   const listProjects = async (): Promise<WorkProjectRow[]> => {
     // `status` arrives with migration 0042; before it every project is active.
@@ -184,7 +184,7 @@ function Strip({ data }: { data: Data }) {
     if (!lastDelivered || reorder.phase === "busy") return;
     setReorder({ phase: "busy" });
     try {
-      const supabase = createClient();
+      const supabase = await loadSupabase();
       const items = await supabase.from("part_order_items").select("part_sku, part_name, quantity").eq("order_id", lastDelivered.id);
       if (items.error) throw items.error;
       const lines = (items.data ?? []) as unknown as OrderedLine[];

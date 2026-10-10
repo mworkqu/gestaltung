@@ -83,3 +83,23 @@ export function createSharedLoader<K extends string, V>(
     },
   };
 }
+
+/**
+ * Wrap an async function so it runs at most once: every call gets the first
+ * run's promise. A failure is not kept (a chunk that failed to download should
+ * be fetched again on the next call), so after a rejection the next call
+ * starts a fresh run.
+ */
+export function onceUntilFailure<T>(fn: () => Promise<T>): () => Promise<T> {
+  let result: Promise<T> | null = null;
+  return () => {
+    if (!result) {
+      const run = fn();
+      result = run;
+      run.catch(() => {
+        if (result === run) result = null;
+      });
+    }
+    return result;
+  };
+}

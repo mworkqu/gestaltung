@@ -13,7 +13,7 @@ import { ChevronDown, LogOut, Menu, User, X } from "lucide-react";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { track } from "@/lib/analytics";
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { cn } from "@/lib/utils";
 
 type Session = { kind: "none" | "guest" | "account"; email?: string | null };
@@ -63,7 +63,7 @@ export function HeaderNav({
   }, []);
 
   async function signOut() {
-    await createClient().auth.signOut();
+    await (await loadSupabase()).auth.signOut();
     router.push("/");
     router.refresh();
   }
