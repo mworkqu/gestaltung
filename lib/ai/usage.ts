@@ -13,13 +13,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { dayStart, guardThreshold, providerLimits, type ProviderId } from "./limits";
 
-export type Feature = "analyse" | "netlist" | "transcribe" | "electronics" | "firmware" | "cad";
+// "studio" (Design Studio, 0068): until 0068 runs the ai_usage check constraint
+// rejects it — logUsage only warns, so the user's call is never affected.
+export type Feature = "analyse" | "netlist" | "transcribe" | "electronics" | "firmware" | "cad" | "studio";
 
 export type UsageRow = {
   provider: ProviderId;
   model?: string | null;
   projectId?: string | null;
   feature: Feature;
+  /** Sub-step within a feature (e.g. studio: spec | pick | enclosure | mech). ai_usage has no
+   *  step column yet, so it goes to the server console line only. */
+  step?: string | null;
   promptTokens?: number | null;
   completionTokens?: number | null;
   totalTokens?: number | null;
@@ -34,7 +39,7 @@ export type UsageRow = {
 export async function logUsage(supabase: SupabaseClient, u: UsageRow): Promise<void> {
   // Server console too, so usage is visible even before 0023 runs.
   console.info(
-    `[ai] ${u.feature} ${u.provider}${u.model ? ` (${u.model})` : ""} ${u.outcome}${
+    `[ai] ${u.feature}${u.step ? `/${u.step}` : ""} ${u.provider}${u.model ? ` (${u.model})` : ""} ${u.outcome}${
       u.errorCode ? `:${u.errorCode}` : ""
     } tokens in=${u.promptTokens ?? "-"} out=${u.completionTokens ?? "-"} total=${u.totalTokens ?? "-"}${
       u.audioSeconds != null ? ` audio=${u.audioSeconds}s` : ""

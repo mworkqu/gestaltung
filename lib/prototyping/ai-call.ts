@@ -12,7 +12,10 @@ import { logUsage, quota } from "@/lib/ai/usage";
 import { callGemini, geminiConfigured } from "./providers/gemini-client";
 import { ProviderError, type TokenUsage } from "./providers/types";
 
-export type CallFeature = "netlist" | "electronics" | "cad";
+export type CallFeature = "netlist" | "electronics" | "cad" | "studio";
+
+/** The provider call; tests inject a fake (then the key check is skipped). */
+export type ModelCaller = typeof callGemini;
 
 export type CallResult<T> =
   | { ok: true; value: T; model: string | null }
@@ -26,11 +29,20 @@ export async function validatedCall<T>(opts: {
   prompt: string;
   schema: object;
   validate: (raw: unknown) => { value: T | null; errors: string[] };
+  /** Sub-step, written to the usage log line and the analysis_runs error text. */
+  step?: string;
+  /** Defaults to 0.1 (existing callers). */
+  temperature?: number;
+  /** Defaults to 90 s (existing callers). */
+  timeoutMs?: number;
+  /** Injected provider call (tests). Defaults to callGemini. */
+  caller?: ModelCaller;
 }): Promise<CallResult<T>> {
-  const { supabase, projectId, feature } = opts;
-  if (!geminiConfigured()) return { ok: false, error: "unavailable", problems: [] };
+  const { supabase, projectId, feature, step } = opts;
+  const caller = opts.caller ?? callGemini;
+  if (!opts.caller && !geminiConfigured()) return { ok: false, error: "unavailable", problems: [] };
   if ((await quota(supabase, "gemini")).paused) {
-    await logUsage(supabase, { provider: "gemini", projectId, feature, outcome: "blocked", errorCode: "paused" });
+    await logUsage(supabase, { provider: "gemini", projectId, feature, step, outcome: "blocked", errorCode: "paused" });
     return { ok: false, error: "paused", problems: [] };
   }
 
@@ -45,7 +57,7 @@ export async function validatedCall<T>(opts: {
       raw_response: row.raw ?? null,
       parsed_response: row.parsed ?? null,
       outcome: row.outcome,
-      error: row.errors.length ? row.errors.join("\n") : null,
+      error: row.errors.length ? `${step ? `[${step}] ` : ""}${row.errors.join("\n")}` : null,
     });
     if (error) console.warn(`[${feature}] run not recorded: ${error.message}`);
   };
@@ -63,7 +75,13 @@ export async function validatedCall<T>(opts: {
     let raw: unknown = null;
     let value: T | null = null;
     try {
-      const r = await callGemini({ system: opts.system, prompt, schema: opts.schema, temperature: 0.1, timeoutMs: 90_000 });
+      const r = await caller({
+        system: opts.system,
+        prompt,
+        schema: opts.schema,
+        temperature: opts.temperature ?? 0.1,
+        timeoutMs: opts.timeoutMs ?? 90_000,
+      });
       ({ usage, latencyMs } = r);
       rawText = r.rawText;
       raw = r.raw;
@@ -79,7 +97,7 @@ export async function validatedCall<T>(opts: {
       if (e instanceof ProviderError && e.reason !== "malformed") {
         await record({ model, attempt, rawText, raw: null, parsed: null, outcome: "error", errors });
         await logUsage(supabase, {
-          provider: "gemini", model, projectId, feature,
+          provider: "gemini", model, projectId, feature, step,
           promptTokens: usage?.input, completionTokens: usage?.output, totalTokens: usage?.total,
           latencyMs, outcome: "error", errorCode: e.reason,
         });
@@ -87,7 +105,7 @@ export async function validatedCall<T>(opts: {
       }
     }
     await logUsage(supabase, {
-      provider: "gemini", model, projectId, feature,
+      provider: "gemini", model, projectId, feature, step,
       promptTokens: usage?.input, completionTokens: usage?.output, totalTokens: usage?.total,
       latencyMs, outcome: value ? "ok" : "error", errorCode: value ? null : "invalid",
     });
