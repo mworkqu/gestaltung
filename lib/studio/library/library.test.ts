@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { LIBRARY, getPart, libraryIndexForAI, partsByCategory, validatePart } from "./index";
+import { LIBRARY, getPart, libraryIndexForAI, partsByCategory } from "./index";
+import { validatePart } from "./validate";
 import { BUILDERS, buildPartModel } from "../models";
 import { LibraryPartSchema, CATEGORIES, PORT_KINDS, PIN_ROLES, DEFAULT_SPEC, type StudioComponent } from "../schema";
 import {

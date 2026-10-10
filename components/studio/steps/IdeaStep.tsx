@@ -19,6 +19,7 @@ import type { ProductSpec, StudioDoc } from "@/lib/studio/schema";
 import { answersFrom, factKeys, historyFrom, type IdeaMessage } from "@/lib/studio/client/steps";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { cn } from "@/lib/utils";
+import { preloadStudioViewer } from "@/components/studio/viewer/ViewerLazy";
 import type { StudioCtx } from "../StudioShell";
 import { linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { problemKey } from "./problem";
@@ -120,6 +121,12 @@ export function IdeaStep({
   useEffect(() => {
     if (mode === "chat") focusInput();
   }, [mode]);
+
+  // The Parts step opens on the 3D plate: fetch the viewer while the visitor talks to us
+  // (never during the first load, so the page itself stays light).
+  useEffect(() => {
+    if (idea || spec) preloadStudioViewer();
+  }, [idea, spec]);
 
   useEffect(() => {
     const el = logRef.current;

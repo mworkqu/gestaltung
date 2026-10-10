@@ -6,8 +6,10 @@
 // the 3D-model copy). The browser builds the case itself (StudioViewer,
 // turntable). Colour and finish are local edits (no credit, saved to the doc);
 // X-ray shows the parts inside; "Download STL (rough)" exports base and lid.
+// "Name on the lid" (optional, ≤ 16) is a local edit too: debounced 400 ms,
+// then the geometry worker raises it on the lid (no API call, no credit).
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Download, Eye, Loader2, Sparkles } from "lucide-react";
 
@@ -16,11 +18,13 @@ import { StudioViewer, type ViewerApi } from "@/components/studio/viewer/ViewerL
 import { track } from "@/lib/analytics";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { arabicCountForm } from "@/lib/text/count";
-import { downloadBlob, exportObjectsSTL } from "@/lib/studio/export";
+import { downloadBlob } from "@/lib/studio/download";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
+import { labelSupport } from "@/lib/studio/enclosure/label-font";
 import { layoutComponents } from "@/lib/studio/layout";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { COLOUR_HEX, STEP_ACCENT } from "@/lib/studio/palette";
-import { COLOURS, FINISHES, type EnclosureSpec, type StudioDoc } from "@/lib/studio/schema";
+import { COLOURS, FINISHES, LIMITS, type EnclosureSpec, type StudioDoc } from "@/lib/studio/schema";
 import { fileSlug, looksLeftFromVersions } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
@@ -29,6 +33,8 @@ import { ShareActions } from "./share";
 import { accessReason, problemKey } from "./problem";
 
 const accent = STEP_ACCENT.enclosure;
+/** Typing pause before the lid is rebuilt with the new name. */
+const LABEL_DEBOUNCE_MS = 400;
 
 export function EnclosureStep({
   ctx,
@@ -107,16 +113,69 @@ export function EnclosureStep({
       creditsChanged();
     }
     setLooksLeft(r.data.versionsLeft);
-    onEnclosure(r.data.enclosure, { serverVersion: r.data.docVersion, fresh: true, layout: layout.layout });
+    // A new look keeps the visitor's lid name.
+    const kept = encRef.current?.label;
+    const next = kept && !r.data.enclosure.label ? { ...r.data.enclosure, label: kept } : r.data.enclosure;
+    onEnclosure(next, { serverVersion: r.data.docVersion, fresh: true, layout: layout.layout });
   }
+
+  // Latest spec for delayed edits (a colour tap during the label debounce must survive).
+  const encRef = useRef(doc.enclosure);
+  encRef.current = doc.enclosure;
 
   function restyle(change: Partial<EnclosureSpec>) {
-    if (doc.enclosure) onEnclosure({ ...doc.enclosure, ...change }, {});
+    if (encRef.current) onEnclosure({ ...encRef.current, ...change }, {});
   }
 
-  function downloadStl() {
+  // ── Name on the lid ──────────────────────────────────────────────────────
+  const labelId = useId();
+  const [labelDraft, setLabelDraft] = useState(doc.enclosure?.label ?? "");
+  const labelTimer = useRef<number | null>(null);
+  const committedLabel = doc.enclosure?.label ?? "";
+  useEffect(() => {
+    // Someone else changed it (a reload, a conflict) and the visitor is not typing: follow.
+    if (labelTimer.current === null) setLabelDraft(committedLabel);
+  }, [committedLabel]);
+  useEffect(
+    () => () => {
+      if (labelTimer.current !== null) window.clearTimeout(labelTimer.current);
+    },
+    [],
+  );
+  function onLabelChange(value: string) {
+    setLabelDraft(value);
+    if (labelTimer.current !== null) window.clearTimeout(labelTimer.current);
+    labelTimer.current = window.setTimeout(() => {
+      labelTimer.current = null;
+      const enc = encRef.current;
+      if (!enc) return;
+      const text = value.replace(/\s+/g, " ").trim();
+      if (text === (enc.label ?? "")) return;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { label: _old, ...rest } = enc;
+      onEnclosure(text ? { ...rest, label: text } : rest, {});
+    }, LABEL_DEBOUNCE_MS);
+  }
+  // What the last built case said about its label (only trusted for the text it was built with).
+  const [labelBuilt, setLabelBuilt] = useState<{ text: string; skipped?: string } | null>(null);
+  const onEnclosureMeta = useCallback((meta: EnclosureMeta | null) => {
+    setLabelBuilt(meta ? { text: encRef.current?.label ?? "", skipped: meta.labelSkipped } : null);
+  }, []);
+  const support = labelSupport(labelDraft);
+  const draftText = labelDraft.replace(/\s+/g, " ").trim();
+  const labelProblem =
+    !support.ok && support.reason === "script"
+      ? t("labelScript")
+      : !support.ok && support.reason === "chars"
+        ? t("labelChars")
+        : labelBuilt?.skipped === "space" && labelBuilt.text === draftText && draftText === committedLabel
+          ? t("labelSpace")
+          : null;
+
+  async function downloadStl() {
     const objects = viewer.current?.getObjects().filter((o) => o.name === "enclosure_base" || o.name === "enclosure_lid") ?? [];
     if (!objects.length) return;
+    const { exportObjectsSTL } = await import("@/lib/studio/export");
     const slug = fileSlug(ctx.projectName);
     for (const f of exportObjectsSTL(objects)) {
       const which = f.name.replace(/^enclosure_/, "").replace(/\.stl$/, "");
@@ -158,7 +217,7 @@ export function EnclosureStep({
               {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />}
               {busy ? t("drawingIt") : anotherLabel}
             </button>
-            <button type="button" className={linkCls} onClick={downloadStl}>
+            <button type="button" className={linkCls} onClick={() => void downloadStl()}>
               <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               {t("downloadStl")}
             </button>
@@ -182,6 +241,7 @@ export function EnclosureStep({
           onReady={(api) => {
             viewer.current = api;
           }}
+          onEnclosureMeta={onEnclosureMeta}
         />
         {enclosure && (
           <button
@@ -210,6 +270,31 @@ export function EnclosureStep({
 
       {enclosure && (
         <div className="space-y-4 motion-safe:animate-rise">
+          <div className="space-y-2">
+            <label htmlFor={labelId} className="block text-sm font-bold text-heading">
+              {t("labelName")}
+            </label>
+            <input
+              id={labelId}
+              type="text"
+              value={labelDraft}
+              maxLength={LIMITS.label.max}
+              onChange={(e) => onLabelChange(e.target.value)}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              dir="auto"
+              aria-invalid={labelProblem ? true : undefined}
+              aria-describedby={labelProblem ? `${labelId}-msg` : undefined}
+              data-testid="studio-lid-label"
+              className="min-h-12 w-full max-w-xs rounded-full border border-white/60 bg-panel px-4 text-base uppercase text-heading shadow-neu-inset outline-none placeholder:normal-case placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
+            />
+            {labelProblem && (
+              <p id={`${labelId}-msg`} className="text-sm font-medium text-amber-800" role="status" data-testid="studio-lid-label-msg">
+                {labelProblem}
+              </p>
+            )}
+          </div>
           <fieldset className="space-y-2">
             <legend className="text-sm font-bold text-heading">{t("colour")}</legend>
             <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label={t("colour")}>

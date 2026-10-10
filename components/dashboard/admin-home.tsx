@@ -16,11 +16,6 @@ import { cn } from "@/lib/utils";
 // Test data never counts (lib/admin/test-data.ts). A number that cannot be read
 // shows a dash, never a wrong 0.
 export async function AdminHome({ locale }: { locale: string }) {
-  const t = await getTranslations("AdminHome");
-  const tNav = await getTranslations("DashboardNav");
-  const isRtl = locale === "ar";
-  const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-
   const db = await createClient();
 
   const reply = Promise.resolve(
@@ -49,7 +44,16 @@ export async function AdminHome({ locale }: { locale: string }) {
   );
 
   const [r, c, b, f] = await Promise.all([reply, confirm, buy, fix]);
-  const tiles = buildTiles({ reply: r ?? -1, confirm: c ?? -1, buy: b ?? -1, fix: f ?? -1 });
+  return <AdminHomeView locale={locale} counts={{ reply: r ?? -1, confirm: c ?? -1, buy: b ?? -1, fix: f ?? -1 }} />;
+}
+
+/** The four tiles + More menu for given counts (-1 = could not be read). No I/O (e2e fixture renders it too). */
+export async function AdminHomeView({ locale, counts }: { locale: string; counts: Record<TileKey, number> }) {
+  const t = await getTranslations("AdminHome");
+  const tNav = await getTranslations("DashboardNav");
+  const isRtl = locale === "ar";
+  const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
+  const tiles = buildTiles(counts);
 
   const groups = adminNavGroups((k) => tNav(k));
 

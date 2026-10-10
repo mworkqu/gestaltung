@@ -5,8 +5,9 @@
 //  * on entry with an enclosure and no doc.mech → POST /api/studio/mech (free);
 //    any failure falls back to the same deterministic list in the browser
 //    (defaultMechParts), so the step always has parts;
-//  * the browser builds them (lib/studio/mech/build.ts, loaded on demand with
-//    the enclosure CSG) and the viewer shows case + components + every part,
+//  * the browser builds them in the Studio geometry worker (lib/studio/geometry,
+//    loaded on demand, cached and shared with the viewer's case) and the viewer
+//    shows case + components + every part,
 //    with a "Take it apart" slider (the viewer eases it; reduced motion jumps);
 //  * the list says what each part is in plain words, its material and grams;
 //  * main button "Request printing from Gestaltung360": the STLs go to the
@@ -38,8 +39,8 @@ import { PhonePrompt } from "@/components/projects/phone-prompt";
 import { StudioViewer } from "@/components/studio/viewer/ViewerLazy";
 import type { ViewerExtraObject } from "@/components/studio/viewer/types";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
-import { downloadBlob, plateSTL, printableSTL } from "@/lib/studio/export";
-import { layoutComponents } from "@/lib/studio/layout";
+import { downloadBlob } from "@/lib/studio/download";
+import { layoutComponents, layoutResultOf } from "@/lib/studio/layout";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import type { BuiltMechPart } from "@/lib/studio/mech/build";
 import { STEP_ACCENT } from "@/lib/studio/palette";
@@ -180,16 +181,15 @@ export function PrintStep({
     let alive = true;
     void (async () => {
       try {
-        const [{ buildEnclosure }, { buildMechParts }] = await Promise.all([
-          import("@/lib/studio/enclosure/build"),
-          import("@/lib/studio/mech/build"),
-        ]);
+        // Off the main thread; the case is the viewer's own cached build (same key).
+        const { getEnclosureGeometry, getMechGeometry, mechObjects } = await import("@/lib/studio/geometry/client");
         const parts = new Map(placed.map(({ c, part }) => [c.instanceId, part]));
-        const enc = buildEnclosure(enclosure, layout, parts);
-        // Standoffs fill floor → board underside where the parts stand in THIS case.
-        const list = buildMechParts(doc.mech, { ...layout, layout: enc.meta.layout }, parts, { base: enc.base, lid: enc.lid, dims: enc.meta.dims }, {
-          environment: doc.spec.environment,
-        });
+        const lr = layoutResultOf(layout.layout, parts);
+        const [enc, mech] = await Promise.all([
+          getEnclosureGeometry(enclosure, lr, parts),
+          getMechGeometry(enclosure, lr, parts, doc.mech, doc.spec.environment),
+        ]);
+        const list = mechObjects(mech, enc);
         if (alive) {
           setBuilt(list);
           setBuildFailed(false);
@@ -206,7 +206,11 @@ export function PrintStep({
   }, [encKey, mechKey, layout, placed]);
   useEffect(
     () => () => {
-      for (const b of built ?? []) (b.object as THREE.Mesh).geometry?.dispose();
+      // Geometry belongs to the geometry cache; only the per-part materials are ours.
+      for (const b of built ?? []) {
+        const mesh = b.object as THREE.Mesh;
+        if (!mesh.userData.shell) (mesh.material as THREE.Material | undefined)?.dispose();
+      }
     },
     [built],
   );
@@ -225,11 +229,14 @@ export function PrintStep({
   // ── Downloads ────────────────────────────────────────────────────────────
   const slug = fileSlug(ctx.projectName);
   const fileName = (b: BuiltMechPart) => `${slug}-${b.id}.stl`;
-  function downloadAll() {
+  // The STL writer (three.js exporter) loads on first use.
+  async function downloadAll() {
     if (!built?.length) return;
+    const { plateSTL } = await import("@/lib/studio/export");
     downloadBlob(`${slug}-print-parts.stl`, plateSTL(built.map((b) => b.object)), "model/stl");
   }
-  function downloadRow(row: Row) {
+  async function downloadRow(row: Row) {
+    const { printableSTL } = await import("@/lib/studio/export");
     for (const b of row.parts) downloadBlob(fileName(b), printableSTL(b.object), "model/stl");
   }
 
@@ -240,6 +247,7 @@ export function PrintStep({
   async function send(p: Profile, phone: string) {
     if (!built?.length) return;
     setReq("sending");
+    const { printableSTL } = await import("@/lib/studio/export");
     const files = built.map((b) => ({ name: fileName(b), data: printableSTL(b.object) }));
     const paths = await ctx.api.uploadPrintFiles(files).catch(() => [] as string[]);
     const ok = await ctx.api.requestPrint({
@@ -305,7 +313,7 @@ export function PrintStep({
       }
       secondary={
         <>
-          <button type="button" className={linkCls} onClick={downloadAll} disabled={!ready}>
+          <button type="button" className={linkCls} onClick={() => void downloadAll()} disabled={!ready}>
             <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
             {t("downloadAllStl")}
           </button>
@@ -388,7 +396,7 @@ export function PrintStep({
                     </span>
                     <button
                       type="button"
-                      onClick={() => downloadRow(r)}
+                      onClick={() => void downloadRow(r)}
                       aria-label={t("downloadPartStl", { name })}
                       title={t("downloadPartStl", { name })}
                       className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-cobalt hover:bg-white"

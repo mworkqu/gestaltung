@@ -6,7 +6,7 @@
 // /api/studio/* routes plus a few RLS-scoped browser reads/writes (project
 // name, AI consent, store products, phone) exactly like the rest of the site.
 
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { CAD_BUCKET } from "@/lib/design/constants";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
 import { EMPTY_SPEC, hasAiConsent, type Spec } from "@/lib/prototyping/spec";
@@ -116,20 +116,21 @@ async function postJson<T>(url: string, body: unknown): Promise<Res<T>> {
 }
 
 export function liveStudioApi(projectId: string): StudioApi {
-  const db = () => createClient();
+  // supabase-js loads on first use (its own chunk, shared with the site header).
+  const db = () => loadSupabase();
   return {
     mode: "live",
     projectId,
 
     async load() {
-      const { data: project, error } = await db()
+      const { data: project, error } = await (await db())
         .from("projects")
         .select("id, name, brief, spec")
         .eq("id", projectId)
         .maybeSingle();
       if (error) return { ok: false, error: "failed" };
       if (!project) {
-        const { data: auth } = await db().auth.getUser();
+        const { data: auth } = await (await db()).auth.getUser();
         return { ok: false, error: auth.user ? "not_found" : "sign_in" };
       }
       const row = project as { name: string | null; brief: string | null; spec: Spec | null };
@@ -182,7 +183,7 @@ export function liveStudioApi(projectId: string): StudioApi {
     firmware: (spec, components, locale) => postJson("/api/studio/firmware", { projectId, locale, spec, components }),
 
     async uploadPrintFiles(files) {
-      const { data: auth } = await db().auth.getUser();
+      const { data: auth } = await (await db()).auth.getUser();
       const uid = auth.user?.id;
       if (!uid) return [];
       // 0018 / 0045: the visitor may write under <user_id>/…; <project_id> second keeps the
@@ -193,7 +194,7 @@ export function liveStudioApi(projectId: string): StudioApi {
         const safe = f.name.replace(/[^\w.-]+/g, "_").slice(0, 80) || "part.stl";
         const path = `${uid}/${projectId}/print/${stamp}/${safe}`;
         const body = new Blob([f.data], { type: "model/stl" });
-        const { error } = await db().storage.from(CAD_BUCKET).upload(path, body, { contentType: "model/stl", upsert: false });
+        const { error } = await (await db()).storage.from(CAD_BUCKET).upload(path, body, { contentType: "model/stl", upsert: false });
         if (!error) out.push(`${CAD_BUCKET}/${path}`);
       }
       return out;
@@ -215,9 +216,9 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     async giveConsent(destination) {
-      const { data } = await db().from("projects").select("spec").eq("id", projectId).maybeSingle();
+      const { data } = await (await db()).from("projects").select("spec").eq("id", projectId).maybeSingle();
       const spec = ((data as { spec: Spec | null } | null)?.spec ?? EMPTY_SPEC) as Spec;
-      const { error } = await db()
+      const { error } = await (await db())
         .from("projects")
         .update({ spec: { ...spec, aiConsent: { at: new Date().toISOString(), destination } } })
         .eq("id", projectId);
@@ -227,14 +228,14 @@ export function liveStudioApi(projectId: string): StudioApi {
     async rename(name) {
       const clean = name.trim().slice(0, 80);
       if (!clean) return;
-      await db().from("projects").update({ name: clean }).eq("id", projectId).eq("name", DEFAULT_PROJECT_NAME);
+      await (await db()).from("projects").update({ name: clean }).eq("id", projectId).eq("name", DEFAULT_PROJECT_NAME);
     },
 
     async storeProducts(skus) {
       const out = new Map<string, StoreCardPart>();
       const wanted = [...new Set(skus.filter(Boolean))];
       if (!wanted.length) return out;
-      const { data } = await db()
+      const { data } = await (await db())
         .from("parts")
         .select(STORE_CARD_COLUMNS)
         .in("sku", wanted)
@@ -245,10 +246,10 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     async profile() {
-      const { data: auth } = await db().auth.getUser();
+      const { data: auth } = await (await db()).auth.getUser();
       const user = auth.user;
       if (!user) return { userId: null, phone: null, fullName: null };
-      const { data } = await db().from("profiles").select("phone, full_name").eq("id", user.id).maybeSingle();
+      const { data } = await (await db()).from("profiles").select("phone, full_name").eq("id", user.id).maybeSingle();
       const row = (data ?? {}) as { phone?: string | null; full_name?: string | null };
       return { userId: user.id, phone: row.phone?.trim() || null, fullName: row.full_name?.trim() || null };
     },

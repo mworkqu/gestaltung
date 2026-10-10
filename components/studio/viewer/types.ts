@@ -2,6 +2,7 @@
 // type props without pulling three.js into their bundle.
 
 import type * as THREE from "three";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
 import type { EnclosureSpec, LayoutItem } from "@/lib/studio/schema";
 
 export type ViewerComponent = { instanceId: string; partId: string; label: string };
@@ -46,4 +47,9 @@ export type ViewerProps = {
   /** Slow turntable when idle (default true; always off with prefers-reduced-motion). */
   autoRotate?: boolean;
   onReady?(api: ViewerApi): void;
+  /**
+   * The plan the shown case was cut for (dims, settled layout, openings, label / labelSkipped),
+   * once the geometry worker has built it; null without a case or when the build failed.
+   */
+  onEnclosureMeta?(meta: EnclosureMeta | null): void;
 };

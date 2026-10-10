@@ -10,7 +10,7 @@
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/auth-provider";
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { parseQuote, parseQuoteRows, readStoredCode } from "@/lib/pricing/experiment";
 
 // One lookup per user per page load; every AccessNote on the page shares it.
@@ -18,7 +18,7 @@ const cache = new Map<string, Promise<number | null>>();
 
 async function lookup(): Promise<number | null> {
   try {
-    const supabase = createClient();
+    const supabase = await loadSupabase();
     const mine = await supabase.rpc("my_price_quote");
     if (!mine.error) {
       const quote = parseQuoteRows(mine.data);

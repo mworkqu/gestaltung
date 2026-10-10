@@ -14,6 +14,10 @@
 //     └─ offset group (-centre) → content group (rotation -90° X, Z-up frame)
 //          ├─ plate (plate mode) · components · enclosure base/lid · extras
 //          └─ ExplodeController (moves studio objects, Z-up maths)
+//
+// The enclosure is built OFF the main thread (lib/studio/geometry: Web Worker,
+// cached by shape key). While the first build runs the skeleton covers the
+// canvas; a rebuild (new label, new look) keeps showing the previous case.
 
 import {
   useCallback,
@@ -26,14 +30,18 @@ import {
   type RefObject,
 } from "react";
 import * as THREE from "three";
-import { Canvas, invalidate as invalidateAll, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, OrbitControls } from "@react-three/drei";
+import { invalidate as invalidateAll, useFrame, useThree } from "@react-three/fiber";
+// Deep paths: only these two drei modules (drei has no "exports" map, so this is supported).
+import { ContactShadows } from "@react-three/drei/core/ContactShadows";
+import { OrbitControls } from "@react-three/drei/core/OrbitControls";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { cn } from "@/lib/utils";
 import { getPart } from "@/lib/studio/library";
-import { pokeStats, worldBox, type LayoutResult } from "@/lib/studio/layout";
+import { layoutResultOf } from "@/lib/studio/layout";
 import { contentOffsetOf, placePart } from "@/lib/studio/placement";
-import { buildEnclosure } from "@/lib/studio/enclosure/build";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
+import { enclosureKey } from "@/lib/studio/geometry/key";
+import { enclosureMeshes, getEnclosureGeometry, warmGeometryWorker } from "@/lib/studio/geometry/client";
 import { BASE_DROP_MM, explodeFrame, explodeOffset, type ExplodeFrame, type Vec3 } from "@/lib/studio/explode";
 import type { LayoutItem, LibraryPart } from "@/lib/studio/schema";
 import { ViewerContext, type ViewerCtx } from "./context";
@@ -45,6 +53,8 @@ import EnclosureMesh from "./EnclosureMesh";
 import MechPartMesh from "./MechPartMesh";
 import ExplodeController from "./ExplodeController";
 import type { ViewerApi, ViewerComponent, ViewerProps } from "./types";
+import { ViewerSkeleton } from "./ViewerSkeleton";
+import { LeanCanvas } from "./LeanCanvas";
 
 export type { ViewerApi, ViewerProps } from "./types";
 
@@ -70,13 +80,78 @@ const ENV_INTENSITY = 0.6;
 /** ...and a little less on bare PCBs (glossy solder mask looked chromed). */
 const PCB_ENV_INTENSITY = 0.38;
 
+type BuiltCase = { key: string; base: THREE.Mesh; lid: THREE.Mesh; meta: EnclosureMeta };
+
 export default function Viewer(props: ViewerProps) {
   const reducedMotion = usePrefersReducedMotion();
   const hidden = useDocumentHidden();
   const lastInteraction = useRef(0);
   const resumeTimer = useRef<number | null>(null);
   const down = useRef<{ x: number; y: number } | null>(null);
-  const { onSelect } = props;
+  const { onSelect, components, layout, enclosure, onEnclosureMeta } = props;
+
+  // --- parts --------------------------------------------------------------------
+  const compKey = components.map((c) => `${c.instanceId}:${c.partId}`).join("|");
+  const parts = useMemo(() => {
+    const m = new Map<string, LibraryPart>();
+    for (const c of components) {
+      const part = getPart(c.partId);
+      if (part) m.set(c.instanceId, part);
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compKey]);
+
+  // --- enclosure (worker build, cached by shape: colour / finish / x-ray never rebuild) ---
+  const layoutKey = layout ? JSON.stringify(layout) : "";
+  const wanted = useMemo(() => {
+    if (!enclosure || !layout || parts.size === 0) return null;
+    const lr = layoutResultOf(layout, parts);
+    return { spec: enclosure, lr, key: enclosureKey(enclosure, lr, parts) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the shape key below
+  }, [enclosure, layoutKey, parts]);
+  // A layout on screen means a case is close (Enclosure / Print / Make): have the worker ready.
+  const hasLayout = !!layout;
+  useEffect(() => {
+    if (hasLayout) warmGeometryWorker();
+  }, [hasLayout]);
+  const wantedKey = wanted?.key ?? "";
+  const [built, setBuilt] = useState<BuiltCase | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!wanted) {
+      setBuilt(null);
+      return;
+    }
+    let alive = true;
+    getEnclosureGeometry(wanted.spec, wanted.lr, parts).then(
+      (g) => {
+        if (!alive) return;
+        setBuilt({ key: g.key, ...enclosureMeshes(g), meta: g.meta });
+        setFailedKey(null);
+      },
+      (err: unknown) => {
+        console.warn("[studio viewer] enclosure build failed", err);
+        if (!alive) return;
+        setBuilt(null);
+        setFailedKey(wanted.key);
+      },
+    );
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuild only when the shape key changes
+  }, [wantedKey]);
+  // A case for a different shape stays on screen until the new one is ready.
+  const enc = wanted ? built : null;
+  const building = !!wanted && built?.key !== wanted.key && failedKey !== wanted.key;
+
+  useEffect(() => {
+    if (!onEnclosureMeta) return;
+    if (!wanted) onEnclosureMeta(null);
+    else if (built?.key === wanted.key) onEnclosureMeta(built.meta);
+    else if (failedKey === wanted.key) onEnclosureMeta(null);
+  }, [onEnclosureMeta, wanted, built, failedKey]);
 
   const touch = useCallback(() => {
     lastInteraction.current = performance.now();
@@ -101,6 +176,7 @@ export default function Viewer(props: ViewerProps) {
       role="img"
       aria-label={props.ariaLabel}
       className={cn("relative h-full w-full touch-none select-none overflow-hidden", props.className)}
+      data-case={wanted ? (building ? "building" : enc ? "ready" : "failed") : "none"}
       style={{ background: BG }}
       onPointerDownCapture={(e) => {
         down.current = { x: e.clientX, y: e.clientY };
@@ -108,7 +184,7 @@ export default function Viewer(props: ViewerProps) {
       }}
       onWheelCapture={touch}
     >
-      <Canvas
+      <LeanCanvas
         frameloop={hidden ? "never" : "demand"}
         dpr={[1, 2]}
         shadows
@@ -117,6 +193,9 @@ export default function Viewer(props: ViewerProps) {
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = EXPOSURE;
+          // Checking every shader for errors makes the main thread wait for each compile
+          // (hundreds of ms on a phone's first frame); our shaders are three.js' own.
+          gl.debug.checkShaderErrors = process.env.NODE_ENV !== "production";
         }}
         onPointerMissed={(e) => {
           const d = down.current;
@@ -124,13 +203,31 @@ export default function Viewer(props: ViewerProps) {
           onSelect?.(null);
         }}
       >
-        <Scene {...props} reducedMotion={reducedMotion} hidden={hidden} lastInteraction={lastInteraction} />
-      </Canvas>
+        <Scene
+          {...props}
+          parts={parts}
+          compKey={compKey}
+          layoutKey={layoutKey}
+          enc={enc}
+          reducedMotion={reducedMotion}
+          hidden={hidden}
+          lastInteraction={lastInteraction}
+        />
+      </LeanCanvas>
+      {building && !enc && (
+        <div className="pointer-events-none absolute inset-0" role="status" aria-busy="true" data-testid="studio-viewer-building">
+          <ViewerSkeleton />
+        </div>
+      )}
     </div>
   );
 }
 
 type SceneProps = ViewerProps & {
+  parts: Map<string, LibraryPart>;
+  compKey: string;
+  layoutKey: string;
+  enc: BuiltCase | null;
   reducedMotion: boolean;
   hidden: boolean;
   lastInteraction: MutableRefObject<number>;
@@ -213,33 +310,8 @@ function platePlacements(components: ViewerComponent[], parts: Map<string, Libra
   return { placements, radius: Math.max(30, best.radius) + PLATE_MARGIN };
 }
 
-/** LayoutResult for the caller's layout (bbox from the same worldBox the layout engine uses). */
-function layoutResultFrom(layout: LayoutItem[], parts: Map<string, LibraryPart>): LayoutResult {
-  const min: Vec3 = [Infinity, Infinity, Infinity];
-  const max: Vec3 = [-Infinity, -Infinity, -Infinity];
-  for (const item of layout) {
-    const part = parts.get(item.instanceId);
-    if (!part) continue;
-    const b = worldBox(item, part);
-    for (let i = 0; i < 3; i++) {
-      min[i] = Math.min(min[i], b.min[i]);
-      max[i] = Math.max(max[i], b.max[i]);
-    }
-  }
-  if (!Number.isFinite(min[0])) {
-    return { layout, bbox: { min: [0, 0, 0], max: [0, 0, 0] }, footprint: { w: 0, d: 0 }, height: 0 };
-  }
-  return {
-    layout,
-    bbox: { min, max },
-    footprint: { w: max[0] - min[0], d: max[1] - min[1] },
-    height: max[2] - Math.min(0, min[2]),
-    ...pokeStats(layout, parts),
-  };
-}
-
 function Scene(p: SceneProps) {
-  const { components, layout, enclosure, extraObjects, reducedMotion, hidden } = p;
+  const { components, layout, enclosure, extraObjects, reducedMotion, hidden, parts, compKey, layoutKey, enc } = p;
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
@@ -264,42 +336,10 @@ function Scene(p: SceneProps) {
     };
   }, [gl, scene, invalidate]);
 
-  // --- parts + placements ----------------------------------------------------
-  const compKey = components.map((c) => `${c.instanceId}:${c.partId}`).join("|");
-  const parts = useMemo(() => {
-    const m = new Map<string, LibraryPart>();
-    for (const c of components) {
-      const part = getPart(c.partId);
-      if (part) m.set(c.instanceId, part);
-    }
-    return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compKey]);
-
-  const layoutKey = layout ? JSON.stringify(layout) : "";
+  // --- placements ----------------------------------------------------------------
   const plate = !layout;
-
-  // --- enclosure geometry (rebuilt only when the shape changes) -------------
-  const encShapeKey = enclosure
-    ? JSON.stringify({ ...enclosure, finish: undefined, colour: undefined, accentColour: undefined })
-    : "";
-  const enc = useMemo(() => {
-    if (!enclosure || !layout || parts.size === 0) return null;
-    try {
-      return buildEnclosure(enclosure, layoutResultFrom(layout, parts), parts);
-    } catch (err) {
-      console.warn("[studio viewer] enclosure build failed", err);
-      return null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [encShapeKey, layoutKey, parts]);
-
-  useEffect(() => {
-    return () => {
-      enc?.base.geometry.dispose();
-      enc?.lid.geometry.dispose();
-    };
-  }, [enc]);
+  // Material-only keys stay out: a colour / finish change re-bakes nothing.
+  const encShapeKey = enc?.key ?? "";
 
   // With a case, parts stand where the case was cut for (poke-through sensors lifted to the lid).
   const shown = enc?.meta.layout ?? layout;
@@ -728,7 +768,14 @@ function CameraRig({
       c.minDistance = r * 1.1;
       c.maxDistance = r * 6;
 
-      goal.current = { pos: sphere.center.clone().addScaledVector(dir, fitDist), target: sphere.center.clone() };
+      // Product views: aim a little above the centre (and step back a touch) so the product sits
+      // lower in the frame, clear of the overlay buttons in the top corner (e.g. "See inside").
+      const aim = sphere.center.clone();
+      if (plate.radius <= 0) {
+        aim.y += r * 0.14;
+        fitDist *= 1.1;
+      }
+      goal.current = { pos: aim.clone().addScaledVector(dir, fitDist), target: aim };
       if (first.current || reducedMotion) {
         camera.position.copy(goal.current.pos);
         c.target.copy(goal.current.target);

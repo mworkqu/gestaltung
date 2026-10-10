@@ -6,20 +6,25 @@
 // everything else downloads the PNG. "Send on WhatsApp" is a plain wa.me link
 // with the name + project link, for when sharing a file is not possible.
 
-import { useState, type RefObject } from "react";
+import { useState, useSyncExternalStore, type RefObject } from "react";
 import { useTranslations } from "next-intl";
 import { ImageDown, Loader2, MessageCircle } from "lucide-react";
 
 import type { ViewerApi } from "@/components/studio/viewer/ViewerLazy";
-import { downloadBlob } from "@/lib/studio/export";
+import { downloadBlob } from "@/lib/studio/download";
 import { fileSlug } from "@/lib/studio/client/steps";
 import type { StudioCtx } from "../StudioShell";
 import { linkCls } from "../ui";
 
 /** The project's Studio link (what the WhatsApp text points to). */
-export function projectLink(ctx: StudioCtx): string {
-  if (typeof window === "undefined") return "";
-  return `${window.location.origin}/${ctx.locale}/projects/${ctx.projectId}/studio`;
+export function projectLink(ctx: StudioCtx, origin: string): string {
+  return `${origin}/${ctx.locale}/projects/${ctx.projectId}/studio`;
+}
+
+const noSubscribe = () => () => undefined;
+/** window.location.origin after hydration ("" in the server HTML, so both renders agree). */
+function useOrigin(): string {
+  return useSyncExternalStore(noSubscribe, () => window.location.origin, () => "");
 }
 
 export function whatsappHref(text: string): string {
@@ -42,7 +47,8 @@ export function ShareActions({
   const t = useTranslations("Studio");
   const [state, setState] = useState<State>("idle");
   const name = ctx.projectName;
-  const text = t("shareText", { name, link: projectLink(ctx) });
+  const origin = useOrigin();
+  const text = t("shareText", { name, link: projectLink(ctx, origin) });
 
   async function share() {
     const api = viewer.current;

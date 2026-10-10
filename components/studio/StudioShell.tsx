@@ -22,7 +22,7 @@ import type { LibraryPart } from "@/lib/studio/schema";
 import { StudioLibraryProvider, useStudioLibrary } from "./StudioLibraryProvider";
 import { emptyStudioDoc, type EnclosureSpec, type MechPart, type ProductSpec, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
-import { liveStudioApi, type Locale, type StudioApi, type StudioProject } from "@/lib/studio/client/api";
+import { liveStudioApi, type LoadResult, type Locale, type StudioApi, type StudioProject } from "@/lib/studio/client/api";
 import {
   FLOW,
   PASS_ONLY,
@@ -69,6 +69,11 @@ type ShellProps = {
   requestedStep?: string | null;
   /** Test fixture only: a mock StudioApi. */
   api?: StudioApi;
+  /**
+   * The first load, already read on the server (lib/studio/server/initial.ts): the step renders
+   * straight away (server HTML), no client load. Absent = the browser loads it (skeleton first).
+   */
+  initial?: Extract<LoadResult, { ok: true }> | null;
 };
 
 /** Owner-edited / new library parts (studio_parts, validated on the server); none = the code library. */
@@ -86,24 +91,27 @@ function StudioShellInner({
   startChat = false,
   requestedStep = null,
   api: injected,
+  initial = null,
 }: ShellProps) {
   const t = useTranslations("Studio");
   const { getPart } = useStudioLibrary();
   const locale: Locale = useLocale() === "ar" ? "ar" : "en";
   const api = useMemo(() => injected ?? liveStudioApi(projectId), [injected, projectId]);
 
-  const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
-  const [doc, setDoc] = useState<StudioDoc | null>(null);
-  const [current, setCurrent] = useState(0);
-  const currentRef = useRef(0);
-  const [visited, setVisited] = useState(0);
+  // Read once: a server-provided first state is applied exactly as a client load would be.
+  const [start0] = useState(() => (initial ? initialStep(initial.doc, requestedStep) : 0));
+  const [loaded, setLoaded] = useState<Loaded>(() => (initial ? { state: "ready", project: initial.project } : { state: "loading" }));
+  const [doc, setDoc] = useState<StudioDoc | null>(initial?.doc ?? null);
+  const [current, setCurrent] = useState(start0);
+  const currentRef = useRef(start0);
+  const [visited, setVisited] = useState(start0);
   const [handoffIdea, setHandoffIdea] = useState<string | null>(null);
-  const [consented, setConsented] = useState(false);
+  const [consented, setConsented] = useState(initial?.project.consented ?? false);
 
   // Save machinery (refs: always the latest values inside async code).
-  const latest = useRef<StudioDoc | null>(null);
-  const version = useRef(0);
-  const persist = useRef(true);
+  const latest = useRef<StudioDoc | null>(initial?.doc ?? null);
+  const version = useRef(initial?.version ?? 0);
+  const persist = useRef(initial?.persist ?? true);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chain = useRef<Promise<void>>(Promise.resolve());
@@ -147,9 +155,26 @@ function StudioShellInner({
     [flush],
   );
 
-  // Load once.
+  // Load once (skipped when the server already did; the /projects/new hand-off still runs here).
+  const [initialUsed] = useState(() => initial);
   useEffect(() => {
     let alive = true;
+    const pickUpHandoff = (doc: StudioDoc | null) => {
+      if (!startChat || doc) return;
+      try {
+        const key = chatStorageKey(projectId);
+        const h = parseHandoff(sessionStorage.getItem(key));
+        sessionStorage.removeItem(key);
+        const first = h?.messages.find((m) => m.role === "user")?.text ?? null;
+        if (first) setHandoffIdea(first);
+      } catch {
+        /* storage blocked: the chat starts empty */
+      }
+    };
+    if (initialUsed) {
+      pickUpHandoff(initialUsed.doc);
+      return;
+    }
     void api.load().then((r) => {
       if (!alive) return;
       if (!r.ok) {
@@ -161,17 +186,7 @@ function StudioShellInner({
       persist.current = r.persist;
       setDoc(r.doc);
       setConsented(r.project.consented);
-      if (startChat && !r.doc) {
-        try {
-          const key = chatStorageKey(projectId);
-          const h = parseHandoff(sessionStorage.getItem(key));
-          sessionStorage.removeItem(key);
-          const first = h?.messages.find((m) => m.role === "user")?.text ?? null;
-          if (first) setHandoffIdea(first);
-        } catch {
-          /* storage blocked: the chat starts empty */
-        }
-      }
+      pickUpHandoff(r.doc);
       const start = initialStep(r.doc, requestedStep);
       setCurrent(start);
       currentRef.current = start;

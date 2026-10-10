@@ -7,6 +7,7 @@ import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { providerStatus } from "@/lib/prototyping/providers";
 import { studioLibraryOverrides } from "@/lib/studio/library/remote";
+import { loadStudioInitial } from "@/lib/studio/server/initial";
 import { pageMetadata } from "@/lib/seo";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 
@@ -39,12 +40,14 @@ export default async function StudioPage({
 
   // Only the provider's public name crosses to the client — never its key.
   // Owner-edited / new library parts (studio_parts, 0070); [] before it runs.
-  const [{ destination }, session, turnstileEnabled, t, libraryParts] = await Promise.all([
+  // The project + its StudioDoc are read here too, so the first step arrives rendered (P5-15e).
+  const [{ destination }, session, turnstileEnabled, t, libraryParts, initial] = await Promise.all([
     providerStatus(),
     getSessionContext().catch(() => null),
     turnstileEnabledForPages(),
     getTranslations({ locale, namespace: "Studio" }),
     studioLibraryOverrides().catch(() => []),
+    loadStudioInitial(id),
   ]);
   const isAdmin = session?.profile.role === "super_admin";
 
@@ -61,7 +64,14 @@ export default async function StudioPage({
             </Link>
           </div>
         )}
-        <StudioShell projectId={id} destination={destination ?? ""} startChat={startChat} requestedStep={step} libraryParts={libraryParts} />
+        <StudioShell
+          projectId={id}
+          destination={destination ?? ""}
+          startChat={startChat}
+          requestedStep={step}
+          libraryParts={libraryParts}
+          initial={initial}
+        />
         <TurnstileChallenge enabled={turnstileEnabled} />
       </div>
     </MessagesScope>

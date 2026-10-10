@@ -156,6 +156,35 @@ export function isPokeSensor(part: LibraryPart): boolean {
 }
 
 /** bodyHeight / pokeHeight of a placed layout (see LayoutResult). */
+/**
+ * LayoutResult for a given layout (bbox from the same worldBox the layout engine uses).
+ * The viewer and the Print step both build the enclosure from THIS, so they share one
+ * cached build (lib/studio/geometry/client.ts).
+ */
+export function layoutResultOf(layout: LayoutItem[], parts: Map<string, LibraryPart>): LayoutResult {
+  const min: Vec3 = [Infinity, Infinity, Infinity];
+  const max: Vec3 = [-Infinity, -Infinity, -Infinity];
+  for (const item of layout) {
+    const part = parts.get(item.instanceId);
+    if (!part) continue;
+    const b = worldBox(item, part);
+    for (let i = 0; i < 3; i++) {
+      min[i] = Math.min(min[i], b.min[i]);
+      max[i] = Math.max(max[i], b.max[i]);
+    }
+  }
+  if (!Number.isFinite(min[0])) {
+    return { layout, bbox: { min: [0, 0, 0], max: [0, 0, 0] }, footprint: { w: 0, d: 0 }, height: 0 };
+  }
+  return {
+    layout,
+    bbox: { min, max },
+    footprint: { w: max[0] - min[0], d: max[1] - min[1] },
+    height: max[2] - Math.min(0, min[2]),
+    ...pokeStats(layout, parts),
+  };
+}
+
 export function pokeStats(layout: LayoutItem[], parts: Map<string, LibraryPart>): { bodyHeight: number; pokeHeight: number } {
   let body = 0;
   let poke = 0;

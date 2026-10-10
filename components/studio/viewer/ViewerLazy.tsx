@@ -10,7 +10,20 @@ export { ViewerSkeleton };
 
 export type { ViewerApi, ViewerProps, ViewerComponent, ViewerExtraObject } from "./types";
 
-export const StudioViewer = dynamic<ViewerProps>(() => import("./Viewer"), {
+const loadViewer = () => import("./Viewer");
+
+let preloading: Promise<unknown> | null = null;
+/**
+ * Start fetching the 3D viewer chunk (three.js + R3F) ahead of the Parts step, e.g. while
+ * the idea chat waits for its answer. Same chunk as StudioViewer, fetched once.
+ */
+export function preloadStudioViewer(): void {
+  preloading ??= loadViewer().catch(() => {
+    preloading = null;
+  });
+}
+
+export const StudioViewer = dynamic<ViewerProps>(loadViewer, {
   ssr: false,
   loading: () => <ViewerSkeleton />,
 });

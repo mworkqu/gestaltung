@@ -8,6 +8,8 @@ import { usePathname } from "@/i18n/navigation";
 const APP_PREFIXES = [
   "/dashboard",
   "/inventory",
+  // Test-only dashboard photo fixture (lib/e2e-fixtures.ts): looks like the real dashboard.
+  "/e2e-fixtures/dashboard",
 ];
 
 /** Dashboard, inventory and the prototyping workspace: the app areas without the public header. */

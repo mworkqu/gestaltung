@@ -14,7 +14,7 @@ import { AlertCircle, CheckCircle2, Download, Loader2, Maximize2, Minus, Plus } 
 import { AccessNote } from "@/components/credits/access-note";
 import { track } from "@/lib/analytics";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
-import { downloadBlob, exportSVG } from "@/lib/studio/export";
+import { downloadBlob, exportSVG } from "@/lib/studio/download";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { renderSchematicSVG, summaryLine } from "@/lib/studio/schematic";

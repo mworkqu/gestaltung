@@ -231,6 +231,102 @@ for (const locale of LOCALES) {
   });
 }
 
+// Phase 3 exit pictures for the owner (P5-15e): 375 × 812, EN, one per step, in
+// test-results/studio-final/. The case is a lantern look (?look=; its label sits on the front face, in view) with "DESK BUDDY"
+// raised on the lid, typed into the new "Name on the lid" field (local edit, no credit).
+const FINAL = path.resolve(__dirname, "..", "test-results", "studio-final");
+
+test("design studio: final phone pictures + name on the lid", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile-375", "phone pictures only");
+  test.setTimeout(240_000);
+  const locale = "en" as const;
+  mkdirSync(FINAL, { recursive: true });
+  const shot = async (name: string) => {
+    await page.waitForTimeout(450); // the step card's slide-in has finished
+    await page.screenshot({ path: path.join(FINAL, name) });
+  };
+  // Still pictures: no turntable drift, the explode slider jumps.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem("gestaltung:cookie-consent", `declined.${Date.now()}`);
+    } catch {
+      /* storage blocked */
+    }
+  });
+  const res = await page.goto(`/${locale}/e2e-fixtures/studio?look=lantern`);
+  expect(res?.status()).toBe(200);
+  const shell = page.getByTestId("studio-shell");
+
+  // 1 · Idea
+  const input = page.getByRole("textbox", { name: msg(locale, "Studio", "ideaPlaceholder") });
+  await typeWhenHydrated(page, input, IDEA[locale]);
+  await input.press("Enter");
+  await page.getByTestId("studio-choices").getByRole("button").first().click();
+  await expect(page.getByTestId("studio-idea-summary")).toBeVisible();
+  await shot("1-idea.png");
+  await page.getByRole("button", { name: msg(locale, "Studio", "looksRight") }).click();
+
+  // 2 · Parts
+  await expect(shell).toHaveAttribute("data-step", "parts");
+  await expectCanvas(page.getByTestId("studio-parts-viewer"));
+  await page.waitForTimeout(800);
+  await scrollUnderBars(page, page.getByTestId("studio-parts-viewer"));
+  await shot("2-parts.png");
+  await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
+
+  // 3 · Wiring
+  await expect(shell).toHaveAttribute("data-step", "wiring");
+  await page.getByRole("button", { name: msg(locale, "Studio", "wiringDrawCredit") }).click();
+  await expect(page.getByTestId("studio-schematic").locator("svg").first()).toBeVisible();
+  await scrollUnderBars(page, page.getByText(msg(locale, "Studio", "headline_wiring")));
+  await shot("3-wiring.png");
+  await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
+
+  // 4 · Enclosure: dome look, then the name on the lid
+  await expect(shell).toHaveAttribute("data-step", "enclosure");
+  await page.getByRole("button", { name: msg(locale, "Studio", "drawItCredit") }).click();
+  const encViewer = page.getByTestId("studio-enclosure-viewer");
+  await expectCanvas(encViewer);
+  const caseState = encViewer.locator("[data-case]");
+  await expect(caseState).toHaveAttribute("data-case", "ready", { timeout: 30_000 });
+  const label = page.getByTestId("studio-lid-label");
+  await expect(label).toHaveAttribute("maxlength", "16");
+  const labelMsg = page.getByTestId("studio-lid-label-msg");
+  await label.fill("مكتبي");
+  await expect(labelMsg).toHaveText(msg(locale, "Studio", "labelScript"));
+  await label.fill("DESK@HOME");
+  await expect(labelMsg).toHaveText(msg(locale, "Studio", "labelChars"));
+  await label.fill("DESK BUDDY");
+  await expect(labelMsg).toHaveCount(0);
+  // 400 ms debounce, then the worker rebuilds the lid (the old case stays on screen meanwhile).
+  await page.waitForTimeout(700);
+  await expect(caseState).toHaveAttribute("data-case", "ready", { timeout: 30_000 });
+  await expect(labelMsg).toHaveCount(0);
+  await page.waitForTimeout(600);
+  await scrollUnderBars(page, encViewer);
+  await shot("4-enclosure.png");
+  await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
+
+  // 5 · Print, taken apart ~0.7
+  await expect(shell).toHaveAttribute("data-step", "print");
+  await expect(page.getByTestId("studio-print-list").locator("li").first()).toBeVisible({ timeout: 30_000 });
+  const slider = page.getByTestId("studio-explode").locator('input[type="range"]');
+  await slider.fill("0.7");
+  await expect(slider).toHaveValue("0.7");
+  await page.waitForTimeout(1200);
+  await scrollUnderBars(page, page.getByTestId("studio-print-viewer"));
+  await shot("5-print.png");
+  await page.getByRole("button", { name: msg(locale, "Studio", "skipToCode") }).click();
+
+  // 6 · Code
+  await expect(shell).toHaveAttribute("data-step", "code");
+  await expect(page.getByTestId("studio-code")).toContainText("void setup()");
+  await scrollUnderBars(page, page.getByTestId("studio-code-board"));
+  await shot("6-code.png");
+  await expectNoHorizontalOverflow(page);
+});
+
 /** Scroll so the end of the step card sits at the bottom of the screen (the sticky bar is then at rest). */
 async function scrollToBottom(page: Page) {
   await page.evaluate(() => {

@@ -155,4 +155,5 @@ export function makeLibrary(parts: LibraryPart[]): StudioLibrary {
 /** The code library as a StudioLibrary (the default everywhere). */
 export const CODE_LIBRARY: StudioLibrary = makeLibrary(LIBRARY);
 
-export { validatePart } from "./validate";
+// validatePart lives in ./validate (three.js + models): import it from there, never
+// re-export it here, or every page that reads the library would ship three.js.

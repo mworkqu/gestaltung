@@ -14,7 +14,7 @@ import { Check, Loader2 } from "lucide-react";
 
 import { PrimaryButton } from "@/components/prototyping/ui";
 import { track } from "@/lib/analytics";
-import { createClient } from "@/lib/supabase/client";
+import { loadSupabase } from "@/lib/supabase/lazy";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { phonePromptDismissKey } from "@/lib/projects/phone-prompt";
 import { isPlausibleEmail } from "@/lib/store/shipping";
@@ -88,7 +88,7 @@ export function PhonePrompt({
 
     if (askPhone) {
       const normalised = normalizePhone(phone);
-      const { error: saveError } = await createClient().from("profiles").update({ phone: normalised }).eq("id", userId);
+      const { error: saveError } = await (await loadSupabase()).from("profiles").update({ phone: normalised }).eq("id", userId);
       if (saveError) {
         setError(t("saveFailed"));
         setBusy(false);
