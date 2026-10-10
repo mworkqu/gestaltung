@@ -117,9 +117,16 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(16px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        // Hero entry (close-out step 2): movement only, never opacity 0, so the
+        // H1 counts as painted at first paint (Lighthouse LCP render delay).
+        rise: {
+          from: { transform: "translateY(16px)" },
+          to: { transform: "translateY(0)" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.7s cubic-bezier(0.32,0.72,0,1) both",
+        rise: "rise 0.7s cubic-bezier(0.32,0.72,0,1) both",
       },
     },
   },

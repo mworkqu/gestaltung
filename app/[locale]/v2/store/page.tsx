@@ -40,7 +40,7 @@ export default async function StoreV2({ params }: { params: Promise<{ locale: st
   return (
     <>
       <div className="container page-stack">
-        <section className="neu animate-fade-up relative overflow-hidden px-5 py-10 sm:px-12 sm:py-14 lg:px-16 lg:py-16">
+        <section className="neu animate-rise relative overflow-hidden px-5 py-10 sm:px-12 sm:py-14 lg:px-16 lg:py-16">
           <BlueprintDecor />
           <div className="relative max-w-4xl space-y-5 sm:space-y-6">
             <span className="kicker block text-mutedtext">{t("kicker")}</span>

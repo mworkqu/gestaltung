@@ -85,7 +85,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
         <YourWorkStrip />
 
         {/* 1. Hero: outcome, one sub line, ONE primary CTA, a small shop link, the proof line. */}
-        <section className="neu animate-fade-up relative overflow-hidden px-5 pb-8 pt-8 sm:px-12 sm:pb-12 sm:pt-14 lg:px-16 lg:pb-16 lg:pt-20">
+        <section className="neu animate-rise relative overflow-hidden px-5 pb-8 pt-8 sm:px-12 sm:pb-12 sm:pt-14 lg:px-16 lg:pb-16 lg:pt-20">
           <BlueprintDecor />
           <div className="relative space-y-4 sm:space-y-7">
             <h1 className={cn(V2_TITLE, "max-w-4xl")}>{t("heroH1")}</h1>

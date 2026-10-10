@@ -225,7 +225,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     <div className="container page-stack">
       <PricingViewed />
       {/* Hero */}
-      <section className="neu animate-fade-up flex flex-col gap-5 hero-pad">
+      <section className="neu animate-rise flex flex-col gap-5 hero-pad">
         <span className="inline-flex w-fit items-center gap-2 rounded-full bg-panel px-3 py-1.5 shadow-neu-sm">
           <span className="h-2 w-2 rounded-full bg-cobalt" />
           <span className="kicker text-mutedtext">{t("kicker")}</span>
