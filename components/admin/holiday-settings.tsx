@@ -11,7 +11,7 @@ import { useTranslations } from "next-intl";
 import { Loader2, Plus, Save, X } from "lucide-react";
 
 import { saveHolidays } from "@/app/[locale]/dashboard/store/sourcing/actions";
-import { isIsoDate, type Holidays } from "@/lib/store/working-days";
+import { isIsoDate, QATAR_EXPECTED_HOLIDAYS, type Holidays } from "@/lib/store/working-days";
 
 const input =
   "rounded-lg border border-white/60 bg-surface px-2 py-1 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -63,6 +63,9 @@ export function HolidaySettingsEditor({ locale, initial }: { locale: string; ini
               {dates.map((d) => (
                 <li key={d} className="inline-flex items-center gap-1 rounded-full bg-panel py-1 pe-1 ps-3 text-sm text-heading shadow-neu-sm">
                   <span>{label(d, locale)}</span>
+                  {QATAR_EXPECTED_HOLIDAYS.includes(d) && (
+                    <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] text-mutedtext">{t("holidaysExpected")}</span>
+                  )}
                   <button
                     type="button"
                     onClick={() => setDates((all) => all.filter((x) => x !== d))}

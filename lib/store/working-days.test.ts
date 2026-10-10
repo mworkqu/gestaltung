@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   addWorkingDays,
+  DEFAULT_HOLIDAYS,
   DEFAULT_WEEKEND,
   isIsoDate,
   isoWeekday,
@@ -147,5 +148,21 @@ describe("migration 0054 matches the TS rules", () => {
     for (const f of ["landed_cost", "income", "cost", "retail_price", "unit_price", "margin"]) {
       expect(body).not.toContain(f);
     }
+  });
+});
+
+describe("Qatar default holidays (0066)", () => {
+  it("National Sports Day 2027 is the 2nd Tuesday of February", () => {
+    expect(isoWeekday("2027-02-09")).toBe(2);
+    expect(isoWeekday("2027-02-02")).toBe(2);
+  });
+
+  it("every default is a valid date and the SQL migration lists the same ones", () => {
+    const sql = readFileSync(join(process.cwd(), "supabase/migrations/0066_qatar_holidays.sql"), "utf8");
+    for (const d of DEFAULT_HOLIDAYS.dates) {
+      expect(isIsoDate(d)).toBe(true);
+      expect(sql).toContain(`'${d}'`);
+    }
+    expect(DEFAULT_HOLIDAYS.dates).toHaveLength(10);
   });
 });

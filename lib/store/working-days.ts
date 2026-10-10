@@ -20,7 +20,33 @@ export type Holidays = {
 
 export const DEFAULT_WEEKEND: readonly number[] = [5, 6];
 
-export const DEFAULT_HOLIDAYS: Holidays = { weekend: [...DEFAULT_WEEKEND], dates: [] };
+/**
+ * Qatar public holidays 2026–2027, editable defaults (migration 0066 merges the
+ * same list into store_settings.holidays without removing owner entries).
+ * National Day 18 Dec (+ the 19th kept from 0054); National Sports Day = 2nd
+ * Tuesday of February (2027-02-09; the 2026 one, 10 Feb, has passed).
+ */
+export const QATAR_FIXED_HOLIDAYS: readonly string[] = [
+  "2026-12-18",
+  "2026-12-19",
+  "2027-02-09",
+  "2027-12-18",
+];
+
+/** Eid dates are moon-sighted: expected, to be confirmed when announced. */
+export const QATAR_EXPECTED_HOLIDAYS: readonly string[] = [
+  "2027-03-09",
+  "2027-03-10",
+  "2027-03-11", // Eid al-Fitr
+  "2027-05-16",
+  "2027-05-17",
+  "2027-05-18", // Eid al-Adha
+];
+
+export const DEFAULT_HOLIDAYS: Holidays = {
+  weekend: [...DEFAULT_WEEKEND],
+  dates: [...QATAR_FIXED_HOLIDAYS, ...QATAR_EXPECTED_HOLIDAYS].sort(),
+};
 
 // Same cap as the SQL loop: unreachable in practice (at most six weekend days
 // and a finite holiday list), it only stops a corrupt setting from hanging.
