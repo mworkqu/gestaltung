@@ -61,7 +61,7 @@ export function ProgressLine({
                 disabled={!reachable || isCurrent}
                 aria-current={isCurrent ? "step" : undefined}
                 className={cn(
-                  "relative z-10 flex min-h-11 min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 text-[10px] font-semibold transition-colors sm:text-[11px]",
+                  "relative z-10 flex min-h-11 min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 text-[9px] font-semibold tracking-tight transition-colors min-[400px]:text-[10px] sm:text-[11px] sm:tracking-normal",
                   isCurrent ? "text-heading" : reachable ? "text-body hover:text-heading" : "cursor-default text-faint",
                 )}
               >

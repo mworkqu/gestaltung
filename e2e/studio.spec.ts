@@ -21,6 +21,7 @@ const IDEA: Record<(typeof LOCALES)[number], string> = {
 };
 
 const SHOTS = path.resolve(__dirname, "..", "test-results", "studio-phase1");
+const SHOTS2 = path.resolve(__dirname, "..", "test-results", "studio-phase2");
 
 for (const locale of LOCALES) {
   test(`design studio: idea to enclosure [${locale}]`, async ({ page }, info) => {
@@ -29,6 +30,13 @@ for (const locale of LOCALES) {
       // Phone pictures for the owner: EN in the folder, AR in ar/ (RTL check).
       if (info.project.name !== "mobile-375") return;
       const dir = locale === "en" ? SHOTS : path.join(SHOTS, locale);
+      mkdirSync(dir, { recursive: true });
+      await page.screenshot({ path: path.join(dir, `${name}.png`) });
+    };
+    // Phase 2 pictures: 375 × 812, EN in the folder, AR in ar/ (RTL check).
+    const shoot2 = async (name: string) => {
+      if (info.project.name !== "mobile-375") return;
+      const dir = locale === "en" ? SHOTS2 : path.join(SHOTS2, locale);
       mkdirSync(dir, { recursive: true });
       await page.screenshot({ path: path.join(dir, `${name}.png`) });
     };
@@ -124,12 +132,60 @@ for (const locale of LOCALES) {
     await expect(progress.locator('[aria-current="step"]')).toContainText(msg(locale, "Studio", "step_enclosure"));
     await expectNoHorizontalOverflow(page);
 
-    // Walk on to Code: now it is current; Enclosure is ticked, Make is still open.
+    // ── Phase 2 · Print parts: case + parts in 3D, "Take it apart", grams ──
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }));
+    await expect(shell).toHaveAttribute("data-step", "print");
+    await expect(progress.locator('[aria-current="step"]')).toContainText(msg(locale, "Studio", "step_print"));
+    await expectCanvas(page.getByTestId("studio-print-viewer"));
+    const list = page.getByTestId("studio-print-list");
+    await expect(list.locator("li").first()).toBeVisible({ timeout: 20_000 });
+    expect(await list.locator("li").count()).toBeGreaterThanOrEqual(3);
+    await expect(list).toContainText(msg(locale, "Studio", "material_PLA"));
+    await expect(page.getByTestId("studio-print-total")).toContainText(/\d/);
+    const slider = page.getByTestId("studio-explode").locator('input[type="range"]');
+    await expect(slider).toHaveValue("0");
+    await page.waitForTimeout(600);
+    await scrollUnderBars(page, page.getByTestId("studio-print-viewer"));
+    await shoot2("5-print-parts");
+    await slider.fill("1");
+    await expect(slider).toHaveValue("1");
+    await page.waitForTimeout(1200); // the viewer eases the parts apart
+    await shoot2("5b-exploded");
+    await scrollToBottom(page);
+    await shoot2("5c-print-list");
+    await expectNoHorizontalOverflow(page);
+
+    // Request printing (mocked lead): the confirmation replaces the request.
+    await page.getByRole("button", { name: msg(locale, "Studio", "requestPrint") }).click();
+    await expect(page.getByTestId("studio-print-received")).toBeVisible();
+    await expect(page.getByTestId("studio-print-received")).toContainText(msg(locale, "Studio", "printReceivedText"));
+
+    // ── Code: real sketch for the chosen board, Copy works ──────────────
+    await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
     await expect(shell).toHaveAttribute("data-step", "code");
     await expect(progress.getByRole("button", { name: new RegExp(msg(locale, "Studio", "step_make")) })).not.toContainText(
       msg(locale, "Studio", "stepDoneSr"),
     );
+    const code = page.getByTestId("studio-code");
+    await expect(code).toBeVisible();
+    await expect(code).toHaveAttribute("dir", "ltr");
+    await expect(code).toContainText("void setup()");
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.getByTestId("studio-copy-code").click();
+    await expect(page.getByTestId("studio-copy-code")).toContainText(msg(locale, "Studio", "copied"));
+    const copiedText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copiedText).toContain("void setup()");
+    await scrollUnderBars(page, page.getByTestId("studio-code-board"));
+    await shoot2("6-code");
+    await expectNoHorizontalOverflow(page);
+
+    // ── Make ───────────────────────────────────────────────────────────
+    await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
+    await expect(shell).toHaveAttribute("data-step", "make");
+    await expect(page.getByRole("button", { name: new RegExp(msg(locale, "Studio", "getMade")) })).toBeVisible();
+    await page.waitForTimeout(800); // the step change scrolls smoothly to the top
+    await scrollUnderBars(page, page.getByText(msg(locale, "Studio", "headline_make")));
+    await shoot2("7-make");
   });
 }
 

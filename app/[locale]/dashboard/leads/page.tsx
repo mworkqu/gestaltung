@@ -109,6 +109,18 @@ export default async function LeadsPage({
     }
     if (!downloadById.has(l.id) && p.downloadUrl) downloadById.set(l.id, p.downloadUrl);
   }
+  // Print requests (Design Studio) carry several STLs: a fresh 1-hour link for each.
+  const leadFilesById = new Map<string, { name: string; url: string }[]>();
+  for (const l of leads) {
+    const p = parsedById.get(l.id)!;
+    if (!svc2 || !p.files.length) continue;
+    const list: { name: string; url: string }[] = [];
+    for (const f of p.files) {
+      const { data: signed } = await svc2.storage.from(f.bucket).createSignedUrl(f.path, 3600);
+      if (signed?.signedUrl) list.push({ name: f.name, url: signed.signedUrl });
+    }
+    if (list.length) leadFilesById.set(l.id, list);
+  }
   const filterHref = (patch: { status?: string; kind?: string | null }) => {
     const q: Record<string, string> = {};
     const s = patch.status ?? statusFilter;
@@ -175,7 +187,8 @@ export default async function LeadsPage({
             const leadDownload = downloadById.get(lead.id) ?? null;
             const projectFiles = projectId ? filesByProject.get(projectId) ?? [] : [];
             // The lead's own file first; project files only when it has none of its own.
-            const files = leadDownload ? [] : projectFiles;
+            const leadFiles = leadFilesById.get(lead.id) ?? [];
+            const files = [...leadFiles, ...(leadDownload || leadFiles.length ? [] : projectFiles)];
             const rows: { label: string; value: string; ltr?: boolean }[] = [
               ...(parsed.method ? [{ label: t("labelMethod"), value: parsed.method }] : []),
               ...(parsed.fileName

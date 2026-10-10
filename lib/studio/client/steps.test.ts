@@ -25,8 +25,8 @@ const withParts = (): StudioDoc => ({
 });
 
 describe("studio flow", () => {
-  it("lists the Phase 1 steps in order", () => {
-    expect(FLOW).toEqual(["idea", "parts", "wiring", "enclosure", "code", "make"]);
+  it("lists the steps in order (Phase 2: Print parts after Enclosure)", () => {
+    expect(FLOW).toEqual(["idea", "parts", "wiring", "enclosure", "print", "code", "make"]);
   });
 
   it("derives done from the doc", () => {
@@ -46,8 +46,11 @@ describe("studio flow", () => {
       netlist: { nets: [{ name: "GND", pins: ["a.1", "b.1"] }] },
       checks: [{ id: "x", ok: true, plain: "ok" }],
       enclosure: DEFAULT_ENCLOSURE,
+      mech: [{ id: "lid_0", template: "lid", params: {}, printable: { material: "PLA", estGrams: 10 } }],
       firmware: { board: "esp32", code: "void setup(){}" },
     };
+    expect(stepDone("print", wired)).toBe(true);
+    expect(stepDone("print", { ...wired, mech: [] })).toBe(false);
     // Everything before Code is done, but Code itself has not been visited yet.
     expect(stepDone("enclosure", wired)).toBe(true);
     expect(stepDone("code", wired)).toBe(false);

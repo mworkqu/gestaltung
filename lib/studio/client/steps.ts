@@ -1,13 +1,13 @@
 // Design Studio client flow (Phase 1): the steps, in order, and what "done"
 // means for each — derived from the saved StudioDoc, never stored separately.
 //
-// Phase 2 adds "print" after "enclosure": one entry in FLOW (and its copy in
-// messages Studio.step_print / kicker_print / title_print / intro_print).
+// Phase 2 (P5-14) adds "print" after "enclosure": the printable parts that
+// hold everything in place (doc.mech), done once they are in the doc.
 
 import type { StepId } from "@/lib/studio/palette";
 import type { ProductSpec, StudioDoc } from "@/lib/studio/schema";
 
-export const FLOW = ["idea", "parts", "wiring", "enclosure", "code", "make"] as const satisfies readonly StepId[];
+export const FLOW = ["idea", "parts", "wiring", "enclosure", "print", "code", "make"] as const satisfies readonly StepId[];
 export type FlowStep = (typeof FLOW)[number];
 
 export function isFlowStep(v: unknown): v is FlowStep {
@@ -46,6 +46,8 @@ export function stepDone(step: FlowStep, doc: StudioDoc | null): boolean {
       return doc.checks.length > 0 && doc.netlist.nets.length > 0;
     case "enclosure":
       return doc.enclosure !== null;
+    case "print":
+      return doc.enclosure !== null && doc.mech.length > 0;
     case "code":
       return hasPassed("code", doc);
     case "make":

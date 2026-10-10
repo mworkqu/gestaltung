@@ -8,7 +8,7 @@ import { pointInCavity } from "../enclosure/templates";
 import { spec } from "../enclosure/test-fixtures";
 import { defaultMechParts, mechSummary } from "../ai/mech-default";
 import { explodeOffset } from "../explode";
-import { exportSTL } from "../export";
+import { exportSTL, plateSTL, printableSTL } from "../export";
 import { getCadBackend } from "../cad-adapter";
 import { buildMechParts, defaultMaterial } from "./build";
 import { dimsFromLayout, placeMechParts } from "./place";
@@ -171,5 +171,57 @@ describe("buildMechParts", () => {
     const obj = await getCadBackend().buildMechPart(all()[1]);
     expect(obj.name).toBe(all()[1].id);
     expect((obj as THREE.Mesh).geometry.getAttribute("position").count).toBeGreaterThan(30);
+  });
+});
+
+describe("boards stand on their standoffs (P5-14)", () => {
+  const cases: [string, [string, string][]][] = [
+    ["arduino_uno alone", [["u1", "arduino_uno"]]],
+    ["pir_hcsr501 alone", [["m1", "pir_hcsr501"]]],
+    ["uno + pir + cell + button + led", [["u1", "arduino_uno"], ["m1", "pir_hcsr501"], ["b1", "cell_18650"], ["k1", "button_6mm"], ["l1", "led_5mm"]]],
+  ];
+  for (const [label, ids] of cases) {
+    it(`standoff top == board underside ±0.2 mm (${label})`, () => {
+      const { lr, parts, enc, mech } = scene(ids);
+      const d = enc.meta.dims;
+      // Where the parts stand in THIS case (poke-through sensors lifted), as the viewer shows them.
+      const shown = { ...lr, layout: enc.meta.layout };
+      const built = buildMechParts(mech, shown, parts, { base: enc.base, lid: enc.lid, dims: d });
+      let checked = 0;
+      for (const [instanceId] of ids) {
+        const part = parts.get(instanceId)!;
+        if (!part.mount?.holes.length) continue;
+        const item = shown.layout.find((l) => l.instanceId === instanceId)!;
+        const underside = item.pos[2] + d.contentOffset[2];
+        const mine = built.filter((b) => b.template === "standoff" && mech.find((m) => m.id === b.id)?.forInstance === instanceId);
+        expect(mine.length).toBe(part.mount.holes.length);
+        for (const b of mine) {
+          const geo = (b.object as THREE.Mesh).geometry;
+          geo.computeBoundingBox();
+          expect(b.object.position.z).toBeCloseTo(d.floorZ, 6);
+          expect(Math.abs(b.object.position.z + geo.boundingBox!.max.z - underside)).toBeLessThanOrEqual(0.2);
+          checked++;
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe("print files (P5-14)", () => {
+  it("one STL per part rests on the bed; the plate holds every part", () => {
+    const { lr, parts, enc, mech } = scene();
+    const built = buildMechParts(mech, { ...lr, layout: enc.meta.layout }, parts, { base: enc.base, lid: enc.lid, dims: enc.meta.dims });
+    // Moving the object (exploded view) never changes its file.
+    const lid = built.find((b) => b.template === "lid")!;
+    const a = new Uint8Array(printableSTL(lid.object));
+    lid.object.position.z += 40;
+    const b = new Uint8Array(printableSTL(lid.object));
+    expect(b).toEqual(a);
+    const tris = (buf: ArrayBuffer) => new DataView(buf).getUint32(80, true);
+    const plate = plateSTL(built.map((x) => x.object));
+    const sum = built.reduce((n, x) => n + tris(printableSTL(x.object)), 0);
+    expect(tris(plate)).toBe(sum);
+    expect(plate.byteLength).toBe(84 + 50 * sum);
   });
 });

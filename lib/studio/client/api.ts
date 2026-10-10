@@ -7,10 +7,11 @@
 // name, AI consent, store products, phone) exactly like the rest of the site.
 
 import { createClient } from "@/lib/supabase/client";
+import { CAD_BUCKET } from "@/lib/design/constants";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
 import { EMPTY_SPEC, hasAiConsent, type Spec } from "@/lib/prototyping/spec";
 import { STORE_CARD_COLUMNS, type StoreCardPart } from "@/lib/store/catalog";
-import type { EnclosureSpec, Net, ProductSpec, StudioCheck, StudioComponent, StudioDoc } from "@/lib/studio/schema";
+import type { EnclosureSpec, MechPart, Net, ProductSpec, StudioCheck, StudioComponent, StudioDoc } from "@/lib/studio/schema";
 import type { IdeaMessage } from "./steps";
 
 export type Locale = "en" | "ar";
@@ -42,6 +43,28 @@ export type EnclosureReply = {
   fallback: boolean;
   docVersion: number | null;
 };
+export type MechReply = { mech: MechPart[]; docVersion: number | null };
+/** The sketch for the chosen board: board + code are saved in doc.firmware; steps / libraries are shown once. */
+export type StudioFirmware = {
+  board: string;
+  code: string;
+  fileName?: string;
+  steps?: string[];
+  libraries?: { name: string; why: string }[];
+};
+export type FirmwareReply = { firmware: StudioFirmware; docVersion: number | null };
+export type PrintFile = { name: string; data: ArrayBuffer | string };
+export type PrintRequest = {
+  name: string;
+  phone: string;
+  locale: Locale;
+  designName: string;
+  /** One line per printable part (quantity is always 1). */
+  parts: { name: string; material: string; grams: number }[];
+  totalGrams: number;
+  /** Storage paths ("cad-files/<user>/<project>/print/…") of the uploaded STLs. */
+  files: string[];
+};
 export type Profile = { userId: string | null; phone: string | null; fullName: string | null };
 export type QuoteRequest = { name: string; phone: string; items: string[]; locale: Locale; designName: string };
 
@@ -60,6 +83,13 @@ export interface StudioApi {
     bbox: { w: number; d: number; h: number },
     locale: Locale,
   ): Promise<Res<EnclosureReply>>;
+  /** Printable parts for the saved enclosure (free). `doc` is what the browser has (the mock uses it). */
+  mech(doc: StudioDoc, dims: { w: number; d: number; h: number } | null): Promise<Res<MechReply>>;
+  /** Starter code for the chosen board from the wiring (free, like /api/firmware). */
+  firmware(spec: ProductSpec, components: StudioComponent[], locale: Locale): Promise<Res<FirmwareReply>>;
+  /** Uploads the STLs to the visitor's own folder in the private cad-files bucket; returns the stored paths. */
+  uploadPrintFiles(files: PrintFile[]): Promise<string[]>;
+  requestPrint(q: PrintRequest): Promise<boolean>;
   giveConsent(destination: string): Promise<boolean>;
   /** Names a "New project" after the idea (never renames a project the user named). */
   rename(name: string): Promise<void>;
@@ -147,6 +177,42 @@ export function liveStudioApi(projectId: string): StudioApi {
         components: components.map((c) => ({ partId: c.partId, label: c.label.slice(0, 60) })),
         bbox,
       }),
+
+    mech: (_doc, dims) => postJson("/api/studio/mech", { projectId, ...(dims ? { dims } : {}) }),
+    firmware: (spec, components, locale) => postJson("/api/studio/firmware", { projectId, locale, spec, components }),
+
+    async uploadPrintFiles(files) {
+      const { data: auth } = await db().auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) return [];
+      // 0018 / 0045: the visitor may write under <user_id>/…; <project_id> second keeps the
+      // owner-by-project read policy working too. A failed file is left out, never fatal.
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const out: string[] = [];
+      for (const f of files) {
+        const safe = f.name.replace(/[^\w.-]+/g, "_").slice(0, 80) || "part.stl";
+        const path = `${uid}/${projectId}/print/${stamp}/${safe}`;
+        const body = new Blob([f.data], { type: "model/stl" });
+        const { error } = await db().storage.from(CAD_BUCKET).upload(path, body, { contentType: "model/stl", upsert: false });
+        if (!error) out.push(`${CAD_BUCKET}/${path}`);
+      }
+      return out;
+    },
+
+    async requestPrint(q) {
+      const r = await postJson<{ ok?: boolean }>("/api/store-lead", {
+        source: "print_request",
+        name: q.name,
+        phone: q.phone,
+        locale: q.locale,
+        projectId,
+        designName: q.designName,
+        items: q.parts.map((p) => ({ function: p.name, spec: `${p.material} · ${p.grams} g`, quantity: 1 })),
+        totalGrams: q.totalGrams,
+        files: q.files,
+      });
+      return r.ok;
+    },
 
     async giveConsent(destination) {
       const { data } = await db().from("projects").select("spec").eq("id", projectId).maybeSingle();

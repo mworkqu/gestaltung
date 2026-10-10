@@ -18,6 +18,8 @@ export type ParsedLead = {
   downloadUrl: string | null;
   /** Where the file lives, when the message says so. */
   storage: { bucket: string; path: string } | null;
+  /** Several stored files ("Files:" block of a print request), each with its file name. */
+  files: { bucket: string; path: string; name: string }[];
   projectId: string | null;
   projectName: string | null;
   /** The customer's notes. */
@@ -40,6 +42,7 @@ export function stripLinksAndIds(text: string): string {
     .replace(/\(\s*export:\s*\)/gi, "")
     .replace(/[ \t]+—[ \t]*$/gm, "")
     .replace(/[ \t]{2,}/g, " ")
+    .replace(/—[ \t]*—/g, "—")
     .replace(/[ \t]+$/gm, "")
     .trim();
 }
@@ -61,6 +64,7 @@ export function parseLeadMessage(message: string | null | undefined): ParsedLead
     uploadFailed: false,
     downloadUrl: null,
     storage: null,
+    files: [],
     projectId: null,
     projectName: null,
     notes: null,
@@ -78,6 +82,7 @@ export function parseLeadMessage(message: string | null | undefined): ParsedLead
   const lines = raw.split("\n");
   const rest: string[] = [];
   let inNotes = false;
+  let inFiles = false;
   const notes: string[] = [];
 
   for (let idx = 0; idx < lines.length; idx++) {
@@ -88,6 +93,20 @@ export function parseLeadMessage(message: string | null | undefined): ParsedLead
       continue;
     }
     let m: RegExpMatchArray | null;
+
+    // "Files:" then one "- <bucket>/<path>" per line (print requests); a line saying none stays readable.
+    if (/^Files:\s*$/i.test(t)) {
+      inFiles = true;
+      continue;
+    }
+    if (inFiles) {
+      const f = t.startsWith("- ") ? storageFrom(t.slice(2)) : null;
+      if (f) {
+        out.files.push({ ...f, name: f.path.split("/").pop() ?? f.path });
+        continue;
+      }
+      inFiles = false;
+    }
 
     if ((m = t.match(/^Notes?:\s*(.*)$/i))) {
       inNotes = true;

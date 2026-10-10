@@ -17,7 +17,7 @@ import {
   type LibraryPart,
   type ProductSpec,
 } from "../schema";
-import { hasTopPort, isPokeSensor, POKE_OUT, worldBox, type LayoutResult, type Vec3 } from "../layout";
+import { hasTopPort, isPokeSensor, mountLift, POKE_OUT, worldBox, type LayoutResult, type Vec3 } from "../layout";
 
 /** Templates the browser builder can make right now. */
 export const BUILDABLE_TEMPLATES = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"] as const;
@@ -317,7 +317,8 @@ export function settlePokes(layout: LayoutItem[], parts: Map<string, LibraryPart
     const part = parts.get(it.instanceId);
     if (!part || !isPokeSensor(part)) return it;
     const y = it.pos[1] + d.contentOffset[1];
-    const z = Math.max(0, topAt(d, y) + POKE_OUT - d.contentOffset[2] - part.dims.z);
+    // Never below its own standoffs (mech/place.ts fills floor → board underside).
+    const z = Math.max(mountLift(part), topAt(d, y) + POKE_OUT - d.contentOffset[2] - part.dims.z);
     return { ...it, pos: [it.pos[0], it.pos[1], Math.round(z * 1000) / 1000] };
   });
 }

@@ -49,6 +49,14 @@ export const MechBody = z.object({
   dims: z.object({ w: Dim, d: Dim, h: Dim }).optional(),
 });
 
+/** Starter code: the saved doc wins; spec + components cover a doc that lives in memory (before 0068). */
+export const FirmwareBody = z.object({
+  projectId: ProjectId,
+  locale: Locale,
+  spec: SpecIn.optional(),
+  components: z.array(StudioComponentSchema).max(40).optional().default([]),
+});
+
 export const DocPutBody = z.object({
   projectId: ProjectId,
   doc: StudioDocSchema,

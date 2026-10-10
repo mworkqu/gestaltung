@@ -3,10 +3,12 @@
 // TEST-ONLY StudioApi for the e2e fixture (/[locale]/e2e-fixtures/studio):
 // no network, no Supabase, no AI, no credit. Answers are canned but go
 // through the same rules the server uses (buildWiring, defaultEnclosureFor),
-// so the schematic and the 3D enclosure are real.
+// so the schematic, the 3D enclosure and the printed parts are real
+// (defaultMechParts); the firmware is a small canned sketch for the chosen board.
 
 import { getPart } from "@/lib/studio/library";
 import { buildWiring } from "@/lib/studio/netlist";
+import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { clampSpec, type StudioComponent } from "@/lib/studio/schema";
 import type { Locale, StudioApi } from "./api";
@@ -85,6 +87,56 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
         ok: true,
         data: { enclosure: { ...defaultEnclosureFor(spec), colour: "coral" }, versionsLeft: 2, fallback: false, docVersion: null },
       };
+    },
+    async mech(doc, dims) {
+      await wait(200);
+      const enclosure = dims ?? layoutBounds(doc.components, doc.layout, getPart) ?? { w: 60, d: 40, h: 25 };
+      const summary = mechSummary({ components: doc.components, layout: doc.layout, getPart, enclosure, template: doc.enclosure?.template });
+      return { ok: true, data: { mech: defaultMechParts(summary), docVersion: null } };
+    },
+    async firmware(spec, components, locale) {
+      await wait(250);
+      const mcu = components.map((c) => getPart(c.partId)).find((p) => p?.category === "mcu");
+      const board = mcu?.id === "arduino_uno" ? "Arduino Uno" : mcu?.id === "pico_w" ? "Raspberry Pi Pico W" : "ESP32 Dev Module";
+      const code = [
+        `// ${spec.name} — starter sketch for the ${board}`,
+        "const int MOTION_PIN = 27; // motion sensor OUT",
+        "const int LED_PIN = 26;    // the small light",
+        "",
+        "void setup() {",
+        "  Serial.begin(115200);",
+        "  pinMode(MOTION_PIN, INPUT);",
+        "  pinMode(LED_PIN, OUTPUT);",
+        "}",
+        "",
+        "void loop() {",
+        "  bool someone = digitalRead(MOTION_PIN) == HIGH;",
+        "  digitalWrite(LED_PIN, someone ? HIGH : LOW);",
+        "  delay(50);",
+        "}",
+      ].join("\n");
+      return {
+        ok: true,
+        data: {
+          firmware: {
+            board,
+            code,
+            fileName: "desk_buddy.ino",
+            steps:
+              locale === "ar"
+                ? ["ثبّت برنامج Arduino IDE.", `اختر اللوحة "${board}".`, "صِلها بكابل USB واضغط Upload."]
+                : ["Install the Arduino IDE.", `Choose the board "${board}".`, "Plug it in with a USB cable and press Upload."],
+          },
+          docVersion: null,
+        },
+      };
+    },
+    async uploadPrintFiles(files) {
+      return files.map((f) => `cad-files/mock/${projectId}/print/${f.name}`);
+    },
+    async requestPrint() {
+      await wait(200);
+      return true;
     },
     async giveConsent() {
       return true;

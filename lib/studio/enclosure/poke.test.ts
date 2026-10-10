@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { getPart } from "../library";
-import { isPokeSensor, layoutComponents, POKE_OUT, worldBox } from "../layout";
+import { isPokeSensor, layoutComponents, mountLift, POKE_OUT, worldBox } from "../layout";
 import { buildEnclosure } from "./build";
 import { cutoutBox } from "./cutouts";
 import { settlePokes } from "./templates";
@@ -34,7 +34,8 @@ describe("poke-through sensor (PIR)", () => {
     const lr = layoutComponents(list, { clearance: 2 });
     const parts = new Map(list.map((i) => [i.instanceId, i.part]));
     const oled = worldBox(lr.layout.find((l) => l.instanceId === "oled")!, parts.get("oled")!);
-    expect(lr.pokeHeight).toBe(getPart("pir_hcsr501")!.dims.z);
+    const pir = getPart("pir_hcsr501")!;
+    expect(lr.pokeHeight).toBe(mountLift(pir) + pir.dims.z); // the dome on its own standoffs
     expect(lr.bodyHeight).toBeCloseTo(oled.max[2], 6); // the OLED is level with the body, not with the dome
     expect(lr.height).toBeGreaterThanOrEqual(lr.bodyHeight!);
   });

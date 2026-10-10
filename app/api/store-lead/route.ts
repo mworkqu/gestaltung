@@ -5,6 +5,7 @@ import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderLeadEmail } from "@/lib/email/lead-email";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { createClient } from "@/lib/supabase/server";
+import { CAD_BUCKET } from "@/lib/design/constants";
 import { readTurnstileToken } from "@/lib/turnstile";
 import { checkTurnstile, turnstileEnforced } from "@/lib/turnstile-server";
 
@@ -50,10 +51,34 @@ const SOURCES: Record<
     subject: (n) => `Design Studio — get it made — ${n}`,
     fallbackMessage: "Design Studio — get it made.",
   },
+  // Design Studio "Request printing" (P5-14): the printable parts of the design,
+  // their material and grams, and the STLs the visitor uploaded to their own
+  // folder of the private cad-files bucket. Quantity is always 1.
+  print_request: {
+    label: "Print request",
+    subject: (n, { count }) => `Print request — ${n} · ${count} part${count === 1 ? "" : "s"}`,
+    fallbackMessage: "Design Studio — print request.",
+  },
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_ITEMS = 60;
+const MAX_FILES = 40;
+/** cad-files/<user>/<project>/print/<stamp>/<file>.stl — the visitor's own folder (0018 insert policy). */
+const PRINT_PATH = /^cad-files\/([0-9a-f-]{36})\/([0-9a-f-]{36})\/print\/[\w-]{1,40}\/[\w.-]{1,80}\.stl$/i;
+
+/** The STL paths of a print request that belong to this user and project; anything else is dropped. */
+function printFiles(raw: unknown, userId: string | null, projectId: string | null): string[] {
+  if (!Array.isArray(raw) || !userId || !projectId) return [];
+  const out: string[] = [];
+  for (const v of raw.slice(0, MAX_FILES)) {
+    if (typeof v !== "string") continue;
+    const m = v.match(PRINT_PATH);
+    if (m && m[1].toLowerCase() === userId.toLowerCase() && m[2].toLowerCase() === projectId.toLowerCase() && v.startsWith(`${CAD_BUCKET}/`))
+      out.push(v);
+  }
+  return [...new Set(out)];
+}
 
 // contact_form only: /contact?kind=school (from /students) or ?kind=institution (from
 // /pricing) tags the lead. The message (saved and emailed) starts with the tag and the
@@ -119,8 +144,11 @@ export async function POST(request: Request) {
     kind?: string;
     // bom_quote / studio_quote only.
     items?: unknown;
-    // studio_quote only: the design (product) name from the Studio.
+    // studio_quote / print_request: the design (product) name from the Studio.
     designName?: string;
+    // print_request only: total grams and the uploaded STL paths.
+    totalGrams?: number;
+    files?: unknown;
     note?: string;
     projectId?: string;
     // P2-08: the Turnstile token from the contact / callback forms.
@@ -136,19 +164,20 @@ export async function POST(request: Request) {
   }
 
   const isStudio = body.source === "studio_quote";
-  const name = String(body.name ?? "").trim().slice(0, 120) || (isStudio ? "Design Studio visitor" : "");
+  const isPrint = body.source === "print_request";
+  const name = String(body.name ?? "").trim().slice(0, 120) || (isStudio || isPrint ? "Design Studio visitor" : "");
   const phone = normalizePhone(String(body.phone ?? "")).slice(0, 40);
   const email = String(body.email ?? "").trim().slice(0, 160) || null;
   const locale = body.locale === "ar" ? "ar" : "en";
   const src = SOURCES[body.source ?? ""] ?? SOURCES.store_callback;
   const isQuote = body.source === "bom_quote";
-  const items = isQuote || isStudio ? quoteItems(body.items) : [];
+  const items = isQuote || isStudio || isPrint ? quoteItems(body.items) : [];
   const contactKind =
     body.source === "contact_form" && typeof body.kind === "string" && Object.hasOwn(CONTACT_KINDS, body.kind)
       ? CONTACT_KINDS[body.kind]
       : null;
 
-  if (!name || !phone || ((isQuote || isStudio) && !items.length)) {
+  if (!name || !phone || ((isQuote || isStudio || isPrint) && !items.length)) {
     return NextResponse.json({ error: "missing_fields" }, { status: 422 });
   }
 
@@ -209,6 +238,43 @@ export async function POST(request: Request) {
       .slice(0, 4000);
   }
 
+  let fileCount = 0;
+  if (isPrint) {
+    // "Print request: <name> — <project link> — N parts, ≈ G g, materials …", then one
+    // line per part and the STL paths (signed links are minted in the admin Leads page).
+    const projectId = typeof body.projectId === "string" && UUID.test(body.projectId) ? body.projectId : null;
+    let projectName: string | null = null;
+    let userId: string | null = null;
+    try {
+      const supabase = await createClient();
+      const { data: auth } = await supabase.auth.getUser();
+      userId = auth.user?.id ?? null;
+      if (projectId) {
+        const { data } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle();
+        projectName = (data?.name as string | undefined) ?? null;
+      }
+    } catch (err) {
+      console.error("store-lead: print request lookup failed", err);
+    }
+    const design = String(body.designName ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || projectName || "Untitled design";
+    const link = projectId ? `${new URL(request.url).origin}/${locale}/projects/${projectId}/studio?step=print` : null;
+    const grams = Math.max(0, Math.round(Number(body.totalGrams) || items.reduce((g, i) => g + (Number(i.spec.match(/(\d+(?:\.\d+)?)\s*g\b/)?.[1]) || 0), 0)));
+    const materials = [...new Set(items.map((i) => i.spec.split("·")[0].trim()).filter(Boolean))];
+    const files = printFiles(body.files, userId, projectId);
+    fileCount = files.length;
+    message = [
+      `Print request: ${design}${link ? ` — ${link}` : ""} — ${items.length} part${items.length === 1 ? "" : "s"}, ≈ ${grams} g${materials.length ? `, materials ${materials.join(", ")}` : ""}`,
+      projectId ? `Project: ${projectName ?? design}${link ? ` — ${link}` : ""}` : null,
+      items.map((i) => `- ${i.function}${i.spec ? ` — ${i.spec}` : ""}`).join("\n"),
+      files.length
+        ? `Files:\n${files.map((f) => `- ${f}`).join("\n")}`
+        : "Files: none uploaded — download them from the project link.",
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 8000);
+  }
+
   let saved = false;
   let emailed = false;
 
@@ -240,7 +306,18 @@ export async function POST(request: Request) {
       type: contactKind?.tag ?? null,
       projectName: parsed.projectName,
       language: locale,
-      notes: { label: "Message", text: [parsed.body, parsed.notes].filter(Boolean).join("\n\n") },
+      notes: {
+        label: "Message",
+        text: [
+          parsed.body,
+          parsed.notes,
+          isPrint && fileCount
+            ? `${fileCount} STL file${fileCount === 1 ? "" : "s"} attached — download them from Messages & requests in the dashboard.`
+            : null,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+      },
       siteUrl: new URL(request.url).origin,
     });
     emailed = await sendEmail({

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { layoutComponents, primarySideFace, rotateFace, worldBox, type LayoutResult } from "./layout";
+import { MIN_STANDOFF, layoutComponents, mountLift, primarySideFace, rotateFace, worldBox, type LayoutResult } from "./layout";
+import { getPart } from "./library";
 import type { LibraryPart } from "./schema";
 import { P, items, typical } from "./enclosure/test-fixtures";
 
@@ -112,5 +113,33 @@ describe("layoutComponents", () => {
 
   it("handles an empty list", () => {
     expect(layoutComponents([]).layout).toEqual([]);
+  });
+});
+
+describe("mount-hole lift (P5-14)", () => {
+  const real = (id: string) => {
+    const p = getPart(id);
+    if (!p) throw new Error(id);
+    return p;
+  };
+  it("lifts parts with mount holes by their standoff height (min 3 mm), others stay on the floor", () => {
+    for (const id of ["arduino_uno", "pir_hcsr501", "mpu6050", "relay_module", "esp32_devkit"]) {
+      const part = real(id);
+      const r = layoutComponents([{ instanceId: "x1", part }]);
+      expect(r.layout[0].pos[2], id).toBeCloseTo(mountLift(part), 6);
+      if (part.mount?.holes.length) expect(r.layout[0].pos[2], id).toBeGreaterThanOrEqual(Math.max(MIN_STANDOFF, part.mount.standoffHeight));
+      else expect(r.layout[0].pos[2], id).toBe(0);
+    }
+  });
+  it("a board over a battery takes the higher of the two lifts", () => {
+    const uno = real("arduino_uno");
+    const r = layoutComponents([
+      { instanceId: "u1", part: uno },
+      { instanceId: "b1", part: real("lipo_1000") },
+    ]);
+    const z = r.layout.find((i) => i.instanceId === "u1")!.pos[2];
+    expect(z).toBeCloseTo(Math.max(real("lipo_1000").dims.z + 2, mountLift(uno)), 6);
+    const a = layoutComponents([{ instanceId: "u1", part: uno }, { instanceId: "b1", part: real("lipo_1000") }]);
+    expect(layoutComponents([{ instanceId: "b1", part: real("lipo_1000") }, { instanceId: "u1", part: uno }])).toEqual(a);
   });
 });

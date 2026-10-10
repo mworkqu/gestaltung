@@ -43,6 +43,63 @@ export function exportObjectsSTL(objects: THREE.Object3D[], opts: { binary?: boo
   }));
 }
 
+/**
+ * A part ready for the slicer: its own mesh only (no children), turned as it
+ * sits in the product but moved so it rests on z = 0 at the origin. Where the
+ * viewer happens to have it (exploded or not) does not matter.
+ */
+function onBed(object: THREE.Object3D): THREE.Mesh | null {
+  if (!(object instanceof THREE.Mesh)) return null;
+  const geo = (object.geometry as THREE.BufferGeometry).clone();
+  geo.applyQuaternion(object.quaternion);
+  geo.computeBoundingBox();
+  const b = geo.boundingBox!;
+  geo.translate(-(b.min.x + b.max.x) / 2, -(b.min.y + b.max.y) / 2, -b.min.z);
+  geo.computeBoundingBox();
+  return new THREE.Mesh(geo);
+}
+
+/** One printable part as a binary STL, resting on the bed (mm). */
+export function printableSTL(object: THREE.Object3D): ArrayBuffer {
+  const m = onBed(object);
+  if (!m) return exportSTL(object, true, { children: false }) as ArrayBuffer;
+  const out = exportSTL(m, true) as ArrayBuffer;
+  m.geometry.dispose();
+  return out;
+}
+
+/**
+ * Every printable part laid out side by side on one bed (rows up to `bedWidth`
+ * mm, `gap` mm apart) as ONE binary STL — open it in a slicer and print.
+ */
+export function plateSTL(objects: THREE.Object3D[], opts: { bedWidth?: number; gap?: number } = {}): ArrayBuffer {
+  const bedWidth = opts.bedWidth ?? 240;
+  const gap = opts.gap ?? 6;
+  const group = new THREE.Group();
+  let x = 0;
+  let y = 0;
+  let rowDepth = 0;
+  for (const o of objects) {
+    const m = onBed(o);
+    if (!m) continue;
+    const b = m.geometry.boundingBox!;
+    const w = b.max.x - b.min.x;
+    const d = b.max.y - b.min.y;
+    if (x > 0 && x + w > bedWidth) {
+      x = 0;
+      y += rowDepth + gap;
+      rowDepth = 0;
+    }
+    m.position.set(x + w / 2, y + d / 2, 0);
+    group.add(m);
+    x += w + gap;
+    rowDepth = Math.max(rowDepth, d);
+  }
+  const out = exportSTL(group, true) as ArrayBuffer;
+  for (const c of group.children) (c as THREE.Mesh).geometry.dispose();
+  return out;
+}
+
 /** Save data as a file in the browser (no-op outside a browser). */
 export function downloadBlob(name: string, data: BlobPart, mime = "application/octet-stream"): void {
   if (typeof window === "undefined" || typeof document === "undefined") return;

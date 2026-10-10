@@ -19,7 +19,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { chatStorageKey, parseHandoff } from "@/lib/projects/create-from-chat";
 import { getPart } from "@/lib/studio/library";
-import { emptyStudioDoc, type EnclosureSpec, type ProductSpec, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
+import { emptyStudioDoc, type EnclosureSpec, type MechPart, type ProductSpec, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { liveStudioApi, type Locale, type StudioApi, type StudioProject } from "@/lib/studio/client/api";
 import {
@@ -39,6 +39,7 @@ import { IdeaStep } from "./steps/IdeaStep";
 import { PartsStep } from "./steps/PartsStep";
 import { WiringStep } from "./steps/WiringStep";
 import { EnclosureStep } from "./steps/EnclosureStep";
+import { PrintStep } from "./steps/PrintStep";
 import { CodeStep } from "./steps/CodeStep";
 import { MakeStep } from "./steps/MakeStep";
 
@@ -252,6 +253,7 @@ export function StudioShell({
             enclosureVersions: [],
             layout: [],
             mech: [],
+            firmware: undefined,
           };
       commit(nextDoc);
       void api.rename(spec.name);
@@ -267,7 +269,7 @@ export function StudioShell({
       commit(
         edited
           ? // A changed list: the old circuit and layout no longer apply.
-            { ...base, components, netlist: { nets: [] }, checks: [], layout: [], mech: [] }
+            { ...base, components, netlist: { nets: [] }, checks: [], layout: [], mech: [], firmware: undefined }
           : { ...base, components },
         edited ? undefined : serverVersion,
       );
@@ -279,7 +281,15 @@ export function StudioShell({
     (w: { components: StudioComponent[]; netlist: StudioDoc["netlist"]; checks: StudioDoc["checks"] }, serverVersion: number | null) => {
       const base = latest.current;
       if (!base) return;
-      commit({ ...base, components: w.components, netlist: w.netlist, checks: w.checks }, serverVersion);
+      // A different circuit: the old starter code no longer matches its pins.
+      const same = !base.firmware || JSON.stringify(base.netlist) === JSON.stringify(w.netlist);
+      if (same) {
+        commit({ ...base, components: w.components, netlist: w.netlist, checks: w.checks }, serverVersion);
+        return;
+      }
+      // The route saved the circuit; dropping the code is ours to save on top of it.
+      if (typeof serverVersion === "number") version.current = serverVersion;
+      commit({ ...base, components: w.components, netlist: w.netlist, checks: w.checks, firmware: undefined });
     },
     [commit],
   );
@@ -289,12 +299,37 @@ export function StudioShell({
       const base = latest.current;
       if (!base) return;
       const versions = opts.fresh ? [...(base.enclosureVersions ?? []), enclosure].slice(-3) : base.enclosureVersions;
-      const nextDoc: StudioDoc = { ...base, enclosure, enclosureVersions: versions, layout: opts.layout ?? base.layout };
+      // A new look changes the case's size: its printed parts are worked out again.
+      const nextDoc: StudioDoc = {
+        ...base,
+        enclosure,
+        enclosureVersions: versions,
+        layout: opts.layout ?? base.layout,
+        ...(opts.fresh ? { mech: [] } : {}),
+      };
       if (opts.fresh && typeof opts.serverVersion === "number") {
         // The route saved the enclosure; the layout is ours to add.
         version.current = opts.serverVersion;
       }
       commit(nextDoc);
+    },
+    [commit],
+  );
+
+  const onMech = useCallback(
+    (mech: MechPart[], serverVersion: number | null) => {
+      const base = latest.current;
+      if (!base) return;
+      commit({ ...base, mech }, serverVersion);
+    },
+    [commit],
+  );
+
+  const onFirmware = useCallback(
+    (firmware: { board: string; code: string }, serverVersion: number | null) => {
+      const base = latest.current;
+      if (!base) return;
+      commit({ ...base, firmware }, serverVersion);
     },
     [commit],
   );
@@ -375,7 +410,19 @@ export function StudioShell({
         {step === "enclosure" && doc && (
           <EnclosureStep ctx={ctx} doc={doc} beforeServer={flushBeforeServer} onEnclosure={onEnclosure} onNext={next} />
         )}
-        {step === "code" && doc && <CodeStep ctx={ctx} doc={doc} onNext={next} />}
+        {step === "print" && doc && (
+          <PrintStep ctx={ctx} doc={doc} beforeServer={flushBeforeServer} onMech={onMech} onNext={next} />
+        )}
+        {step === "code" && doc && (
+          <CodeStep
+            ctx={ctx}
+            doc={doc}
+            beforeServer={flushBeforeServer}
+            onFirmware={onFirmware}
+            onNext={next}
+            onWiring={() => go(FLOW.indexOf("wiring"))}
+          />
+        )}
         {step === "make" && doc && <MakeStep ctx={ctx} doc={doc} products={products} />}
       </div>
     </div>

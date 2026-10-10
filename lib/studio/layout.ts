@@ -39,7 +39,7 @@ export type LayoutResult = {
   height: number;
   /** Top of the tallest part that is NOT a poke-through sensor (= height when there is none). */
   bodyHeight?: number;
-  /** Height of the tallest poke-through sensor (0 when there is none). */
+  /** Height of the tallest poke-through sensor incl. its standoff lift (0 when there is none). */
   pokeHeight?: number;
 };
 
@@ -47,6 +47,14 @@ export type LayoutResult = {
 const TARGET_RATIO = 1.4;
 /** Gap between a battery and the board stacked on it. */
 const STACK_GAP = 2;
+/** Shortest printable standoff a board with mount holes stands on (mm). */
+export const MIN_STANDOFF = 3;
+
+/** How far a part stands off the floor on its own standoffs (0 without mount holes). */
+export function mountLift(part: LibraryPart): number {
+  if (!part.mount || part.mount.holes.length === 0) return 0;
+  return Math.max(MIN_STANDOFF, part.mount.standoffHeight);
+}
 
 const SIDE_ORDER: Face[] = ["+x", "+y", "-x", "-y"]; // counter-clockwise
 
@@ -115,7 +123,8 @@ export function pokeStats(layout: LayoutItem[], parts: Map<string, LibraryPart>)
   for (const it of layout) {
     const part = parts.get(it.instanceId);
     if (!part) continue;
-    if (isPokeSensor(part)) poke = Math.max(poke, part.dims.z);
+    // A dome on its own standoffs: the case must leave room for the lift too.
+    if (isPokeSensor(part)) poke = Math.max(poke, mountLift(part) + part.dims.z);
     else body = Math.max(body, it.pos[2] + part.dims.z);
   }
   return { bodyHeight: body, pokeHeight: poke };
@@ -176,7 +185,7 @@ function singleBlock(it: LayoutInput): Block {
   const [w, d] = rotatedSize(it.part, rotZ);
   return {
     key: it.instanceId,
-    members: [{ instanceId: it.instanceId, part: it.part, rotZ, cx: w / 2, cy: d / 2, z: 0 }],
+    members: [{ instanceId: it.instanceId, part: it.part, rotZ, cx: w / 2, cy: d / 2, z: mountLift(it.part) }],
     w,
     d,
     clearance: it.part.clearance,
@@ -211,7 +220,7 @@ function makeBlocks(items: LayoutInput[]): Block[] {
     if (stacked && it === board) {
       const bat = stacked.battery;
       const lift = bat.part.dims.z + STACK_GAP;
-      b.members[0].z = lift;
+      b.members[0].z = Math.max(lift, mountLift(board.part));
       b.members.unshift({
         instanceId: bat.instanceId,
         part: bat.part,
@@ -378,7 +387,7 @@ export function layoutComponents(items: LayoutInput[], opts: LayoutOptions = {})
   const layout: LayoutItem[] = [];
   for (const p of frame.placed) {
     for (const m of p.block.members) {
-      const z = p.block.raise ? Math.max(0, top - m.part.dims.z) : m.z;
+      const z = p.block.raise ? Math.max(m.z, top - m.part.dims.z) : m.z;
       layout.push({
         instanceId: m.instanceId,
         pos: [round(p.x + m.cx - frame.W / 2), round(p.y + m.cy - frame.D / 2), round(z)],
