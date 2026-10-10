@@ -10,7 +10,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, Code2, Copy, Loader2, RefreshCw } from "lucide-react";
+import { Check, Code2, Copy, RefreshCw } from "lucide-react";
 
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
@@ -163,12 +163,29 @@ export function CodeStep({
       ) : state === "failed" ? (
         <Problem>{t("codeFailed")}</Problem>
       ) : (
-        <div className="space-y-2" role="status" aria-busy="true">
-          <p className="flex items-center gap-2 text-sm font-medium" style={{ color: accent.ink }}>
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        <div className="space-y-3" role="status" aria-busy="true" data-testid="studio-code-skeleton">
+          <p className="text-sm font-medium" style={{ color: accent.ink }}>
             {t("codeWriting")}
           </p>
-          <Bar className="h-40 w-full rounded-2xl" />
+          <div className="space-y-2" aria-hidden>
+            <Bar className="h-3.5 w-24" />
+            {[0, 1, 2].map((i) => (
+              <Bar key={i} className={i === 1 ? "h-3 w-1/2" : "h-3 w-2/3"} />
+            ))}
+          </div>
+          <div aria-hidden dir="ltr" className="space-y-2 rounded-2xl bg-[#1c2434] p-4">
+            {[70, 45, 0, 30, 55, 62, 40, 0, 35, 66, 50, 20].map((w, i) =>
+              w === 0 ? (
+                <span key={i} className="block h-2" />
+              ) : (
+                <span
+                  key={i}
+                  className="block h-2.5 rounded-full bg-white/10 motion-safe:animate-pulse"
+                  style={{ width: `${w}%`, marginInlineStart: i % 4 === 1 || i % 4 === 2 ? "1.25rem" : undefined }}
+                />
+              ),
+            )}
+          </div>
         </div>
       )}
     </StepFrame>

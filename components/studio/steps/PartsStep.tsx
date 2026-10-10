@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { StudioViewer } from "@/components/studio/viewer/ViewerLazy";
+import { StudioViewer, ViewerSkeleton } from "@/components/studio/viewer/ViewerLazy";
 import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import type { StoreCardPart } from "@/lib/store/catalog";
@@ -195,7 +195,7 @@ export function PartsStep({
             data-testid="studio-parts-viewer"
           >
             {loading ? (
-              <div className="h-full w-full motion-safe:animate-pulse" style={{ background: "linear-gradient(180deg,#f4f7fb,#e6ebf2)" }} />
+              <ViewerSkeleton plate />
             ) : (
               <StudioViewer
                 components={viewerComponents}

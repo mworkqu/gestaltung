@@ -2,7 +2,7 @@
 
 import * as THREE from "three";
 import type { Colour, Finish } from "@/lib/studio/schema";
-import { COLOUR_HEX, FINISH_PBR } from "@/lib/studio/palette";
+import { COLOUR_HEX, FINISH_PBR, LOOK_HEX } from "@/lib/studio/palette";
 
 /** userData key marking a viewer object (component / enclosure / extra). */
 export type StudioObjectData = {
@@ -16,7 +16,11 @@ export function studioData(o: THREE.Object3D): StudioObjectData | undefined {
   return (o.userData as { studio?: StudioObjectData }).studio;
 }
 
-/** Procedural wood grain (rings around the part's local X axis), no textures. */
+/**
+ * Procedural wood (no textures): growth rings around the part's local X axis with
+ * a narrow, warmer latewood band, fine fibre streaks along X, and slightly rougher
+ * latewood so the grain also shows in the highlights.
+ */
 function addWoodGrain(m: THREE.MeshPhysicalMaterial) {
   m.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
@@ -28,14 +32,51 @@ function addWoodGrain(m: THREE.MeshPhysicalMaterial) {
         "#include <color_fragment>",
         [
           "#include <color_fragment>",
-          "float gr = length(vGrainPos.yz * vec2(1.0, 0.45)) + sin(vGrainPos.x * 0.045) * 2.2 + sin(vGrainPos.x * 0.31 + vGrainPos.y * 0.07) * 0.35;",
-          "float gg = fract(gr * 0.21);",
-          "float ring = smoothstep(0.0, 0.55, gg) * smoothstep(1.0, 0.55, gg);",
-          "diffuseColor.rgb *= mix(0.8, 1.07, ring);",
+          "float gWarp = sin(vGrainPos.x * 0.045) * 2.2 + sin(vGrainPos.x * 0.013 + vGrainPos.z * 0.05) * 1.6 + sin(vGrainPos.y * 0.21 + vGrainPos.x * 0.11) * 0.6;",
+          "float gR = length(vGrainPos.yz * vec2(1.0, 0.45)) + gWarp + sin(vGrainPos.x * 0.31 + vGrainPos.y * 0.07) * 0.35;",
+          "float gG = fract(gR * 0.21);",
+          "float gLate = smoothstep(0.3, 0.68, gG) * smoothstep(1.0, 0.72, gG);",
+          "float gFibre = sin(vGrainPos.y * 3.7 + sin(vGrainPos.x * 0.9) * 0.6) * sin(vGrainPos.z * 2.9 + vGrainPos.x * 0.05);",
+          "diffuseColor.rgb *= 1.04 - gLate * 0.16 + gFibre * 0.035;",
+          "diffuseColor.rgb *= mix(vec3(1.0), vec3(1.02, 0.97, 0.9), gLate);",
         ].join("\n"),
+      )
+      .replace(
+        "#include <roughnessmap_fragment>",
+        "#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor + gLate * 0.14 - 0.04, 0.05, 1.0);",
       );
   };
-  m.customProgramCacheKey = () => "studio-wood-grain";
+  m.customProgramCacheKey = () => "studio-wood-grain-3";
+}
+
+/**
+ * Brushed aluminium without textures: fine streaks along the part's local X axis
+ * vary the roughness by ±amount (and the colour a hair), which reads like the
+ * anisotropic sheen of brushed, anodized metal.
+ */
+function addBrushed(m: THREE.MeshPhysicalMaterial, amount: number) {
+  const a = amount.toFixed(3);
+  m.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vBrushPos;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBrushPos = position;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nvarying vec3 vBrushPos;")
+      .replace(
+        "#include <color_fragment>",
+        [
+          "#include <color_fragment>",
+          "float bS = sin(vBrushPos.y * 4.0 + sin(vBrushPos.x * 0.07) * 1.5) * 0.5",
+          "  + sin(vBrushPos.y * 11.0 + vBrushPos.z * 9.0) * 0.3 + sin(vBrushPos.z * 6.5 + vBrushPos.y * 1.3) * 0.2;",
+          "diffuseColor.rgb *= 1.0 + bS * 0.015;",
+        ].join("\n"),
+      )
+      .replace(
+        "#include <roughnessmap_fragment>",
+        `#include <roughnessmap_fragment>\nroughnessFactor = clamp(roughnessFactor * (1.0 + bS * ${a}), 0.05, 1.0);`,
+      );
+  };
+  m.customProgramCacheKey = () => `studio-brushed-${a}`;
 }
 
 /** Enclosure material for a finish + colour; `tint` (optional accent) is mixed in at `tintAmount`. */
@@ -51,8 +92,33 @@ export function makeEnclosureMaterial(finish: Finish, colour: Colour, tint?: Col
     clearcoatRoughness: pbr.clearcoatRoughness ?? 0,
     side: THREE.FrontSide,
   });
+  if (pbr.sheen) {
+    m.sheen = pbr.sheen;
+    m.sheenRoughness = pbr.sheenRoughness ?? 0.8;
+    m.sheenColor = c.clone().lerp(new THREE.Color("#ffffff"), 0.25);
+  }
   if (finish === "wood_look") addWoodGrain(m);
+  else if (pbr.brushed) addBrushed(m, pbr.brushed);
   return m;
+}
+
+/** Bare PCB colours: their glossy solder mask gets a little less of the room reflection. */
+const PCB_HEX = new Set((["pcb_green", "pcb_black", "pcb_blue"] as const).map((k) => new THREE.Color(LOOK_HEX[k]).getHex()));
+
+/**
+ * Give PCB-coloured materials under root their own (dimmer) environment: with an
+ * explicit envMap, three uses material.envMapIntensity instead of scene.environmentIntensity.
+ */
+export function dimPcbEnvironment(root: THREE.Object3D, env: THREE.Texture | null, intensity: number): void {
+  forEachMaterial(root, (mat) => {
+    const m = mat as THREE.MeshStandardMaterial;
+    if (!m.isMeshStandardMaterial || !PCB_HEX.has(m.color.getHex())) return;
+    if (m.envMap !== env) {
+      m.envMap = env;
+      m.needsUpdate = true;
+    }
+    m.envMapIntensity = intensity;
+  });
 }
 
 /** Clone every material of a built model (models share cached materials we must not mutate). */

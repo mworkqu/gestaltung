@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
@@ -22,10 +22,11 @@ const IDEA: Record<(typeof LOCALES)[number], string> = {
 
 const SHOTS = path.resolve(__dirname, "..", "test-results", "studio-phase1");
 const SHOTS2 = path.resolve(__dirname, "..", "test-results", "studio-phase2");
+const SHOTS3 = path.resolve(__dirname, "..", "test-results", "studio-phase3");
 
 for (const locale of LOCALES) {
   test(`design studio: idea to enclosure [${locale}]`, async ({ page }, info) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     const shoot = async (name: string) => {
       // Phone pictures for the owner: EN in the folder, AR in ar/ (RTL check).
       if (info.project.name !== "mobile-375") return;
@@ -38,6 +39,14 @@ for (const locale of LOCALES) {
       if (info.project.name !== "mobile-375") return;
       const dir = locale === "en" ? SHOTS2 : path.join(SHOTS2, locale);
       mkdirSync(dir, { recursive: true });
+      await page.screenshot({ path: path.join(dir, `${name}.png`) });
+    };
+    // Phase 3 final set (P5-15a): 375 × 812, EN in the folder, AR in ar/.
+    const shoot3 = async (name: string) => {
+      if (info.project.name !== "mobile-375") return;
+      const dir = locale === "en" ? SHOTS3 : path.join(SHOTS3, locale);
+      mkdirSync(dir, { recursive: true });
+      await page.waitForTimeout(400); // the step card's slide-in (340 ms) has finished
       await page.screenshot({ path: path.join(dir, `${name}.png`) });
     };
     let taps = 0;
@@ -54,8 +63,15 @@ for (const locale of LOCALES) {
       } catch {
         /* storage blocked */
       }
+      // "Share picture" must take the download path (no OS share sheet in a test).
+      try {
+        Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+      } catch {
+        /* read-only: the download path is still the fallback */
+      }
     });
-    const res = await page.goto(`/${locale}/e2e-fixtures/studio`);
+    // ?delay= slows the mocked calls a little, so the loading skeletons can be seen.
+    const res = await page.goto(`/${locale}/e2e-fixtures/studio?delay=1500`);
     expect(res?.status(), "start the server with E2E_FIXTURES=1 (playwright.config.ts webServer.env)").toBe(200);
     await expectLocale(page, locale);
 
@@ -80,6 +96,7 @@ for (const locale of LOCALES) {
     const summary = page.getByTestId("studio-idea-summary");
     await expect(summary).toBeVisible();
     await shoot("1-idea-summary");
+    await shoot3("1-idea");
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "looksRight") }));
 
     // ── Parts: picked automatically, floating on the plate in 3D ─────────
@@ -88,16 +105,20 @@ for (const locale of LOCALES) {
     await expectCanvas(page.getByTestId("studio-parts-viewer"));
     await scrollUnderBars(page, page.getByTestId("studio-parts-viewer"));
     await shoot("2-parts");
+    await shoot3("2-parts");
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }));
 
     // ── Wiring: one credit, then our schematic ───────────────────────────
     await expect(shell).toHaveAttribute("data-step", "wiring");
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "wiringDrawCredit") }));
+    // A skeleton in the shape of the diagram while the (mocked) circuit is drawn.
+    await expect(page.getByTestId("studio-wiring-skeleton")).toBeVisible();
     const schematic = page.getByTestId("studio-schematic");
     await expect(schematic.locator("svg").first()).toBeVisible();
     await expect(schematic).toHaveAttribute("dir", "ltr");
     await scrollUnderBars(page, page.getByText(msg(locale, "Studio", "headline_wiring")));
     await shoot("3-wiring");
+    await shoot3("3-wiring");
     // Phone: the diagram renders at a legible scale (>= 720 px wide, sideways scroll), not squeezed to the column.
     const frameBox = await schematic.evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }));
     expect(frameBox.scroll, "schematic is drawn at a readable width").toBeGreaterThanOrEqual(Math.min(720, frameBox.client + 1));
@@ -108,12 +129,14 @@ for (const locale of LOCALES) {
     // ── Enclosure: draw it, the case renders in 3D ───────────────────────
     await expect(shell).toHaveAttribute("data-step", "enclosure");
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "drawItCredit") }));
+    await expect(page.getByTestId("studio-enclosure-skeleton")).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: msg(locale, "Studio", "colour") })).toBeVisible();
     await expectCanvas(page.getByTestId("studio-enclosure-viewer"));
     // Let the turntable settle, and bring the case under the sticky bars.
     await page.waitForTimeout(800);
     await scrollUnderBars(page, page.getByTestId("studio-enclosure-viewer"));
     await shoot("4-enclosure");
+    await shoot3("4-enclosure");
     // The colour chips (last content) scroll fully above the sticky button.
     const chips = page.getByRole("radiogroup", { name: msg(locale, "Studio", "colour") });
     await scrollToBottom(page);
@@ -129,6 +152,22 @@ for (const locale of LOCALES) {
     await expect(codeDot).not.toContainText(msg(locale, "Studio", "stepDoneSr"));
 
     expect(taps, "taps from the idea to the enclosure").toBeLessThanOrEqual(6);
+
+    // Share picture: a 1080 × 1080 PNG (download path here), plus a WhatsApp text link.
+    const wa = page.getByTestId("studio-share-whatsapp");
+    await expect(wa).toHaveAttribute("href", /^https:\/\/wa\.me\/\?text=/);
+    const shareBtn = page.getByTestId("studio-share-picture");
+    await expect(shareBtn).toHaveText(msg(locale, "Studio", "sharePicture"));
+    const [download] = await Promise.all([page.waitForEvent("download"), shareBtn.click()]);
+    expect(download.suggestedFilename()).toMatch(/\.png$/);
+    const png = readFileSync(await download.path());
+    expect(png.subarray(1, 4).toString("ascii")).toBe("PNG");
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)], "share picture is 1080 × 1080").toEqual([1080, 1080]);
+    if (info.project.name === "mobile-375") {
+      const dir = locale === "en" ? SHOTS3 : path.join(SHOTS3, locale);
+      mkdirSync(dir, { recursive: true });
+      await download.saveAs(path.join(dir, "share-picture.png"));
+    }
     await expect(progress.locator('[aria-current="step"]')).toContainText(msg(locale, "Studio", "step_enclosure"));
     await expectNoHorizontalOverflow(page);
 
@@ -147,6 +186,7 @@ for (const locale of LOCALES) {
     await page.waitForTimeout(600);
     await scrollUnderBars(page, page.getByTestId("studio-print-viewer"));
     await shoot2("5-print-parts");
+    await shoot3("5-print");
     await slider.fill("1");
     await expect(slider).toHaveValue("1");
     await page.waitForTimeout(1200); // the viewer eases the parts apart (650 ms, wall-clock)
@@ -177,6 +217,7 @@ for (const locale of LOCALES) {
     expect(copiedText).toContain("void setup()");
     await scrollUnderBars(page, page.getByTestId("studio-code-board"));
     await shoot2("6-code");
+    await shoot3("6-code");
     await expectNoHorizontalOverflow(page);
 
     // ── Make ───────────────────────────────────────────────────────────
@@ -186,6 +227,7 @@ for (const locale of LOCALES) {
     await page.waitForTimeout(800); // the step change scrolls smoothly to the top
     await scrollUnderBars(page, page.getByText(msg(locale, "Studio", "headline_make")));
     await shoot2("7-make");
+    await expect(page.getByTestId("studio-share-picture")).toBeVisible();
   });
 }
 

@@ -3678,7 +3678,14 @@
     "requestReceived": "Request received",
     "requestReceivedText": "We'll WhatsApp you within one working day.",
     "requestFailed": "We couldn't send your request. Try again.",
-    "defaultContactName": "Design Studio visitor"
+    "defaultContactName": "Design Studio visitor",
+    "sharePicture": "Share picture",
+    "shareMaking": "Making the picture…",
+    "shareWhatsApp": "Send on WhatsApp",
+    "shareText": "Look what I designed: {name} — {link}",
+    "shareSaved": "Picture saved to your downloads.",
+    "shareFailed": "We couldn't make the picture. Please try again.",
+    "viewerMake": "3D view of your product"
   },
   "StudioLibrary": {
     "pageTitle": "Studio parts",

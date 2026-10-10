@@ -20,6 +20,11 @@ export type ViewerApi = {
   getObjects(): THREE.Object3D[];
   /** Renders one frame and returns the canvas as a PNG (transparent background). */
   toPNG(): Promise<Blob>;
+  /**
+   * Share picture: one square frame (default 1080 × 1080) on an opaque branded background
+   * (soft gradient, product name + small "Gestaltung360" wordmark in the bottom start corner).
+   */
+  toSharePNG(opts: { title: string; rtl?: boolean; size?: number; accent?: string }): Promise<Blob>;
 };
 
 export type ViewerProps = {

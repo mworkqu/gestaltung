@@ -38,7 +38,8 @@ import { BASE_DROP_MM, explodeFrame, explodeOffset, type ExplodeFrame, type Vec3
 import type { LayoutItem, LibraryPart } from "@/lib/studio/schema";
 import { ViewerContext, type ViewerCtx } from "./context";
 import { useDocumentHidden, usePrefersReducedMotion } from "./hooks";
-import { studioData } from "./materials";
+import { dimPcbEnvironment, studioData } from "./materials";
+import { canvasToPNG, composeShareImage, SHARE_SIZE } from "./share-image";
 import ComponentMesh from "./ComponentMesh";
 import EnclosureMesh from "./EnclosureMesh";
 import MechPartMesh from "./MechPartMesh";
@@ -60,6 +61,14 @@ const CONTENT_ROT: [number, number, number] = [-Math.PI / 2, 0, 0];
 /** Plate mode: share of the viewer's width / height the plate fills. */
 const PLATE_FILL_X = 0.8;
 const PLATE_FILL_Y = 0.88;
+
+// Look: ACES filmic tone mapping with a slightly lowered exposure so chalk / mist keep
+// their texture in the key light and graphite still separates from its shadow side.
+const EXPOSURE = 0.92;
+/** Room reflection strength for everything (scene.environmentIntensity)... */
+const ENV_INTENSITY = 0.6;
+/** ...and a little less on bare PCBs (glossy solder mask looked chromed). */
+const PCB_ENV_INTENSITY = 0.38;
 
 export default function Viewer(props: ViewerProps) {
   const reducedMotion = usePrefersReducedMotion();
@@ -105,6 +114,10 @@ export default function Viewer(props: ViewerProps) {
         shadows
         gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         camera={{ fov: 35, near: 1, far: 20000, position: [260, 220, 300] }}
+        onCreated={({ gl }) => {
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = EXPOSURE;
+        }}
         onPointerMissed={(e) => {
           const d = down.current;
           if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;
@@ -233,15 +246,18 @@ function Scene(p: SceneProps) {
   const invalidate = useThree((s) => s.invalidate);
 
   // --- environment (RoomEnvironment → PMREM, no network) -------------------
+  const [envTex, setEnvTex] = useState<THREE.Texture | null>(null);
   useEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
     const room = new RoomEnvironment();
     const rt = pmrem.fromScene(room, 0.04);
     room.dispose();
     scene.environment = rt.texture;
-    scene.environmentIntensity = 0.55;
+    scene.environmentIntensity = ENV_INTENSITY;
+    setEnvTex(rt.texture);
     invalidate();
     return () => {
+      setEnvTex(null);
       if (scene.environment === rt.texture) scene.environment = null;
       rt.dispose();
       pmrem.dispose();
@@ -370,6 +386,16 @@ function Scene(p: SceneProps) {
   const contentKey = `${compKey}#${layoutKey}#${encShapeKey}#${extrasKey}`;
   const explodeTarget = plate ? 0 : Math.min(1, Math.max(0, p.explode ?? 0));
 
+  // Bare PCBs get a dimmer copy of the room reflection (after every content change).
+  useEffect(() => {
+    const g = contentRef.current;
+    if (!g || !envTex) return;
+    g.traverse((o) => {
+      if (studioData(o)?.kind === "component") dimPcbEnvironment(o, envTex, PCB_ENV_INTENSITY);
+    });
+    invalidate();
+  }, [envTex, contentKey, invalidate]);
+
   // --- api -------------------------------------------------------------------
   const { onReady } = p;
   useEffect(() => {
@@ -391,9 +417,34 @@ function Scene(p: SceneProps) {
           }, "image/png");
         });
       },
+      toSharePNG(opts) {
+        // Render one square frame at the share size, copy it onto the branded 2D canvas,
+        // then put the renderer back exactly as it was (all before the browser paints).
+        const size = opts.size ?? SHARE_SIZE;
+        const prevSize = gl.getSize(new THREE.Vector2());
+        const prevDpr = gl.getPixelRatio();
+        const prevAspect = camera.aspect;
+        let out: HTMLCanvasElement;
+        try {
+          gl.setPixelRatio(1);
+          gl.setSize(size, size, false);
+          camera.aspect = 1;
+          camera.updateProjectionMatrix();
+          gl.render(scene, camera);
+          out = composeShareImage(gl.domElement, { ...opts, size });
+        } finally {
+          gl.setPixelRatio(prevDpr);
+          gl.setSize(prevSize.x, prevSize.y, false);
+          camera.aspect = prevAspect;
+          camera.updateProjectionMatrix();
+          gl.render(scene, camera);
+          invalidate();
+        }
+        return canvasToPNG(out);
+      },
     };
     onReady(api);
-  }, [onReady, gl, scene, camera]);
+  }, [onReady, gl, scene, camera, invalidate]);
 
   // --- turntable ---------------------------------------------------------------
   const spin = (p.autoRotate ?? true) && !reducedMotion && !hidden;
@@ -425,15 +476,29 @@ function Scene(p: SceneProps) {
     <ViewerContext.Provider value={ctx}>
       <Lights lights={lights} />
       <group ref={turntableRef} position={tPos}>
+        {/* Two baked contact shadows (frames=1, re-baked only when the content changes):
+            a tight, darker one for the "ambient occlusion" where the product meets the floor,
+            and a wide, soft one for the overall grounding. */}
         <ContactShadows
-          key={shadowKey}
+          key={`near#${shadowKey}`}
+          frames={1}
+          position={[0, floorY + 0.05, 0]}
+          scale={Math.max(80, radius * 3)}
+          far={Math.max(4, radius * 0.18)}
+          blur={1.1}
+          opacity={0.42}
+          resolution={512}
+          color="#141b28"
+        />
+        <ContactShadows
+          key={`far#${shadowKey}`}
           frames={1}
           position={[0, floorY, 0]}
-          scale={Math.max(80, radius * 3)}
-          far={Math.max(20, radius * 1.5)}
-          blur={2.4}
-          opacity={0.45}
-          resolution={512}
+          scale={Math.max(80, radius * 3.2)}
+          far={Math.max(20, radius * 1.6)}
+          blur={3}
+          opacity={0.3}
+          resolution={256}
           color="#1c2434"
         />
         <group position={oPos}>
@@ -514,10 +579,11 @@ function Lights({ lights }: { lights: MutableRefObject<LightRefs> }) {
   }, [lights]);
   return (
     <>
-      <hemisphereLight args={["#ffffff", "#c9d3df", 0.35]} />
-      <directionalLight ref={key} castShadow intensity={1.6} color="#ffffff" />
-      <directionalLight ref={fill} intensity={0.45} color="#eef2f7" />
-      <directionalLight ref={rim} intensity={0.7} color="#ffffff" />
+      {/* Light sky / cool floor bounce: lifts the shadow sides without flattening the form. */}
+      <hemisphereLight args={["#fbfcff", "#b9c4d3", 0.55]} />
+      <directionalLight ref={key} castShadow intensity={1.75} color="#fffaf2" />
+      <directionalLight ref={fill} intensity={0.4} color="#e8eef8" />
+      <directionalLight ref={rim} intensity={0.85} color="#ffffff" />
     </>
   );
 }

@@ -13,7 +13,7 @@
 //    done steps are tappable in the progress line, future ones are not.
 //  * ?step= deep-links to any reachable step; the URL follows the current step.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
@@ -393,7 +393,7 @@ function StudioShellInner({
   return (
     <div className="space-y-5" data-testid="studio-shell" data-step={step}>
       <ProgressLine current={current} furthest={furthest} done={(s) => stepDone(s, doc)} onGo={go} />
-      <div key={step} className="motion-safe:animate-rise">
+      <StepSlide index={current}>
         {step === "idea" && (
           <IdeaStep
             ctx={ctx}
@@ -437,7 +437,34 @@ function StudioShellInner({
           />
         )}
         {step === "make" && doc && <MakeStep ctx={ctx} doc={doc} products={products} />}
-      </div>
+      </StepSlide>
     </div>
   );
+}
+
+/**
+ * Step change: the new card slides in from the side it comes from (forwards = from the
+ * reading end, back = from the start; mirrored in Arabic) while fading in. Web
+ * Animations only (nothing left behind on the element), skipped with reduced motion.
+ */
+function StepSlide({ index, children }: { index: number; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const prev = useRef(index);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const from = prev.current;
+    prev.current = index;
+    if (!el || from === index || typeof el.animate !== "function") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const rtl = getComputedStyle(el).direction === "rtl";
+    const dx = (index > from ? 1 : -1) * (rtl ? -1 : 1) * 28;
+    el.animate(
+      [
+        { opacity: 0, transform: `translateX(${dx}px)` },
+        { opacity: 1, transform: "translateX(0)" },
+      ],
+      { duration: 340, easing: "cubic-bezier(0.32, 0.72, 0, 1)" },
+    );
+  }, [index]);
+  return <div ref={ref}>{children}</div>;
 }

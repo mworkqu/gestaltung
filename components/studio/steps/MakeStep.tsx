@@ -7,12 +7,14 @@
 //    with the design name, a link to the project and the part names. The
 //    WhatsApp number is asked only when the profile has none (PhonePrompt).
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { CheckCircle2, Factory, Loader2, ShoppingCart } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
 import { PhonePrompt } from "@/components/projects/phone-prompt";
+import { StudioViewer, type ViewerApi } from "@/components/studio/viewer/ViewerLazy";
+import { layoutComponents } from "@/lib/studio/layout";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { StudioDoc } from "@/lib/studio/schema";
@@ -21,6 +23,7 @@ import type { Profile } from "@/lib/studio/client/api";
 import type { StudioCtx } from "../StudioShell";
 import { Problem, StepFrame } from "../ui";
 import { storeLines, useAddAllToCart } from "../use-studio-cart";
+import { ShareActions } from "./share";
 
 const accent = STEP_ACCENT.make;
 
@@ -75,6 +78,31 @@ export function MakeStep({ ctx, doc, products }: { ctx: StudioCtx; doc: StudioDo
   const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
   const [quote, setQuote] = useState<"idle" | "checking" | "phone" | "sending" | "sent" | "failed">("idle");
   const [profile, setProfile] = useState<Profile | null>(null);
+  const viewer = useRef<ViewerApi | null>(null);
+
+  // The finished product (same layout as the Enclosure step, so the case fits identically).
+  const placed = useMemo(
+    () =>
+      doc.components.flatMap((c) => {
+        const part = getPart(c.partId);
+        return part ? [{ c, part }] : [];
+      }),
+    [doc.components, getPart],
+  );
+  const layout = useMemo(
+    () =>
+      doc.enclosure
+        ? layoutComponents(
+            placed.map(({ c, part }) => ({ instanceId: c.instanceId, part })),
+            { clearance: doc.enclosure.clearance, sizeHint: doc.spec.sizeHint },
+          ).layout
+        : undefined,
+    [placed, doc.enclosure, doc.spec.sizeHint],
+  );
+  const viewerComponents = useMemo(
+    () => placed.map(({ c }) => ({ instanceId: c.instanceId, partId: c.partId, label: c.label })),
+    [placed],
+  );
 
   async function orderParts() {
     const { lines } = storeLines(doc.components, products, getPart);
@@ -141,6 +169,29 @@ export function MakeStep({ ctx, doc, products }: { ctx: StudioCtx; doc: StudioDo
           onClick={() => void orderParts()}
         />
       </div>
+      {placed.length > 0 && (
+        <div className="space-y-2">
+          <div
+            className="relative h-[260px] overflow-hidden rounded-[24px] shadow-neu-inset sm:h-[340px]"
+            data-testid="studio-make-viewer"
+          >
+            <StudioViewer
+              components={viewerComponents}
+              layout={layout}
+              enclosure={doc.enclosure}
+              accent={accent.base}
+              autoRotate
+              ariaLabel={t("viewerMake")}
+              onReady={(api) => {
+                viewer.current = api;
+              }}
+            />
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-3 sm:justify-start">
+            <ShareActions ctx={ctx} viewer={viewer} accent={accent.base} />
+          </div>
+        </div>
+      )}
       {quote === "phone" && profile?.userId && (
         <PhonePrompt
           userId={profile.userId}

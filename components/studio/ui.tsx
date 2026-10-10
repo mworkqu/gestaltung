@@ -156,6 +156,6 @@ export function Sheet({
 }
 
 /** Grey bars in the shape of what is loading (never a bare spinner). */
-export function Bar({ className }: { className?: string }) {
-  return <span aria-hidden className={cn("block rounded-full bg-[#dfe5ee] motion-safe:animate-pulse", className)} />;
+export function Bar({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return <span aria-hidden style={style} className={cn("block rounded-full bg-[#dfe5ee] motion-safe:animate-pulse", className)} />;
 }

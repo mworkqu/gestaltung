@@ -41,20 +41,8 @@ export function ProgressLine({
           const lit = isCurrent || isDone || reachable;
           return (
             <li key={step} className="relative flex min-w-0 flex-1 justify-center">
-              {i > 0 && (
-                <span
-                  aria-hidden
-                  className="absolute start-0 top-[1.375rem] h-0.5 w-1/2 -translate-y-1/2 rounded-full"
-                  style={{ background: i <= furthest ? STEP_ACCENT[FLOW[i - 1]].base : "#d3dbe6", opacity: i <= furthest ? 0.45 : 1 }}
-                />
-              )}
-              {i < FLOW.length - 1 && (
-                <span
-                  aria-hidden
-                  className="absolute end-0 top-[1.375rem] h-0.5 w-1/2 -translate-y-1/2 rounded-full"
-                  style={{ background: i < furthest ? accent.base : "#d3dbe6", opacity: i < furthest ? 0.45 : 1 }}
-                />
-              )}
+              {i > 0 && <Segment side="start" lit={i <= furthest} colour={STEP_ACCENT[FLOW[i - 1]].base} />}
+              {i < FLOW.length - 1 && <Segment side="end" lit={i < furthest} colour={accent.base} />}
               <button
                 type="button"
                 onClick={() => onGo(i)}
@@ -90,6 +78,33 @@ export function ProgressLine({
         })}
       </ol>
     </nav>
+  );
+}
+
+/**
+ * Half of the line between two dots: a grey track with an accent fill that grows in the
+ * reading direction when the step is reached (the end half first, then the next dot's
+ * start half). No transition with reduced motion.
+ */
+function Segment({ side, lit, colour }: { side: "start" | "end"; lit: boolean; colour: string }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "absolute top-[1.375rem] h-0.5 w-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-[#d3dbe6]",
+        side === "start" ? "start-0" : "end-0",
+      )}
+    >
+      <span
+        className="block h-full w-full origin-left transition-transform duration-300 ease-out motion-reduce:transition-none rtl:origin-right"
+        style={{
+          background: colour,
+          opacity: 0.55,
+          transform: `scaleX(${lit ? 1 : 0})`,
+          transitionDelay: lit && side === "start" ? "250ms" : "0ms",
+        }}
+      />
+    </span>
   );
 }
 

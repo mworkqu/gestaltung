@@ -4,17 +4,20 @@
 
 import type { Colour, Finish, Look } from "./schema";
 
+// Tuned 2026-10-11 under the studio lighting (ACES, exposure 0.92): coral, sage, sun and
+// clay were a touch deeper so they don't wash out to pastel; chalk stays below clipping
+// and graphite keeps detail in its shadow side.
 export const COLOUR_HEX: Record<Colour, string> = {
   chalk: "#f2f0eb",
   graphite: "#3a3f47",
   sand: "#d9c7a7",
-  sage: "#9fb49a",
-  coral: "#e9806e",
+  sage: "#93ab8d",
+  coral: "#e46a55",
   ocean: "#3f7fa6",
-  sun: "#f1c04f",
+  sun: "#efb935",
   cobalt: "#0e59c5",
   mist: "#c9d3df",
-  clay: "#b9785a",
+  clay: "#b06a4c",
 };
 
 export const STEP_IDS = ["idea", "parts", "wiring", "enclosure", "print", "code", "make"] as const;
@@ -31,13 +34,25 @@ export const STEP_ACCENT: Record<StepId, { base: string; ink: string; soft: stri
   make: { base: "#0e59c5", ink: "#0c4eb0", soft: "#dbeafe" },
 };
 
-/** PBR settings per finish (viewer). */
-export const FINISH_PBR: Record<Finish, { roughness: number; metalness: number; clearcoat?: number; clearcoatRoughness?: number }> = {
+/** PBR settings per finish (viewer). Base roughness/metalness are the owner's values (P5-13 brief); clearcoat/sheen/brushed are the Phase 3 polish. */
+export type FinishPbr = {
+  roughness: number;
+  metalness: number;
+  clearcoat?: number;
+  clearcoatRoughness?: number;
+  /** Soft velvet rim (soft_touch). */
+  sheen?: number;
+  sheenRoughness?: number;
+  /** Fine brushed streaks: ± share of roughness varied along one axis (anodized). */
+  brushed?: number;
+};
+
+export const FINISH_PBR: Record<Finish, FinishPbr> = {
   matte_plastic: { roughness: 0.7, metalness: 0 },
-  glossy_plastic: { roughness: 0.15, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08 },
-  soft_touch: { roughness: 0.9, metalness: 0 },
-  anodized_aluminium: { roughness: 0.35, metalness: 0.6 },
-  wood_look: { roughness: 0.6, metalness: 0 },
+  glossy_plastic: { roughness: 0.15, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06 },
+  soft_touch: { roughness: 0.9, metalness: 0, sheen: 0.3, sheenRoughness: 0.8 },
+  anodized_aluminium: { roughness: 0.35, metalness: 0.6, brushed: 0.25 },
+  wood_look: { roughness: 0.58, metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.45 },
 };
 
 /** Base colours for component bodies. */

@@ -20,9 +20,8 @@ import { STEP_ACCENT } from "@/lib/studio/palette";
 import { renderSchematicSVG, summaryLine } from "@/lib/studio/schematic";
 import type { StudioDoc } from "@/lib/studio/schema";
 import { fileSlug } from "@/lib/studio/client/steps";
-import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
-import { linkCls, MainButton, Problem, StepFrame } from "../ui";
+import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { accessReason, problemKey } from "./problem";
 
 const accent = STEP_ACCENT.wiring;
@@ -133,15 +132,17 @@ export function WiringStep({
     >
       {doc.components.length === 0 && <p className="text-sm text-mutedtext">{t("wiringNeedParts")}</p>}
 
-      {!drawn && doc.components.length > 0 && (
+      {!drawn && doc.components.length > 0 && !busy && (
         <div
           aria-hidden
-          className={cn("relative h-48 overflow-hidden rounded-[24px] shadow-neu-inset sm:h-64", busy && "motion-safe:animate-pulse")}
+          className="relative h-48 overflow-hidden rounded-[24px] shadow-neu-inset sm:h-64"
           style={{ background: `radial-gradient(circle at 30% 20%, ${accent.soft}, #eef2f7 70%)` }}
         >
           <WirePreview />
         </div>
       )}
+
+      {!drawn && busy && <WiringSkeleton label={t("wiringDrawing")} />}
 
       {drawn && svg && (
         <div className="space-y-3 motion-safe:animate-rise">
@@ -256,5 +257,42 @@ function WirePreview() {
         <circle key={i} cx="40" cy={30 + i * 30} r="6" fill={STEP_ACCENT.wiring.base} opacity="0.5" />
       ))}
     </svg>
+  );
+}
+
+/** While the circuit is drawn: the summary line, the diagram frame and the check lines, as grey shapes. */
+function WiringSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-3" role="status" aria-busy="true" data-testid="studio-wiring-skeleton">
+      <span className="sr-only">{label}</span>
+      <Bar className="h-4 w-3/4" />
+      <div className="flex justify-end gap-1.5" aria-hidden>
+        {[0, 1, 2].map((i) => (
+          <Bar key={i} className="h-11 w-11" />
+        ))}
+      </div>
+      <div aria-hidden className="relative h-56 overflow-hidden rounded-[20px] bg-white shadow-neu-inset sm:h-72" dir="ltr">
+        <svg viewBox="0 0 400 200" className="h-full w-full motion-safe:animate-pulse" preserveAspectRatio="xMidYMid meet">
+          <rect x="155" y="55" width="90" height="90" rx="10" fill="#e6ebf2" />
+          {[0, 1, 2].map((i) => (
+            <g key={i}>
+              <rect x="30" y={35 + i * 50} width="64" height="34" rx="8" fill="#eef2f7" />
+              <path d={`M94 ${52 + i * 50} H155`} stroke="#dfe5ee" strokeWidth="3" strokeLinecap="round" />
+              <rect x="306" y={35 + i * 50} width="64" height="34" rx="8" fill="#eef2f7" />
+              <path d={`M245 ${52 + i * 50} H306`} stroke="#dfe5ee" strokeWidth="3" strokeLinecap="round" />
+            </g>
+          ))}
+        </svg>
+      </div>
+      <div className="space-y-2">
+        <Bar className="h-3.5 w-28" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Bar className="h-4 w-4 shrink-0" />
+            <Bar className={i === 1 ? "h-3.5 w-2/3" : "h-3.5 w-4/5"} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

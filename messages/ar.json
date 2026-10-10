@@ -3678,7 +3678,14 @@
     "requestReceived": "وصلنا طلبك",
     "requestReceivedText": "سنراسلك على واتساب خلال يوم عمل واحد.",
     "requestFailed": "تعذّر إرسال طلبك. حاول مرة أخرى.",
-    "defaultContactName": "زائر استوديو التصميم"
+    "defaultContactName": "زائر استوديو التصميم",
+    "sharePicture": "شارك الصورة",
+    "shareMaking": "نجهّز الصورة…",
+    "shareWhatsApp": "أرسل على واتساب",
+    "shareText": "انظر ما صمّمته: {name} — {link}",
+    "shareSaved": "حُفظت الصورة في التنزيلات.",
+    "shareFailed": "تعذّر تجهيز الصورة. حاول مرة أخرى.",
+    "viewerMake": "عرض ثلاثي الأبعاد لمنتجك"
   },
   "StudioLibrary": {
     "pageTitle": "قطع الاستوديو",

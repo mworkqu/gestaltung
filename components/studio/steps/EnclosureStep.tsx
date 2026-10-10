@@ -24,7 +24,8 @@ import { COLOURS, FINISHES, type EnclosureSpec, type StudioDoc } from "@/lib/stu
 import { fileSlug, looksLeftFromVersions } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
-import { linkCls, MainButton, Problem, StepFrame } from "../ui";
+import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
+import { ShareActions } from "./share";
 import { accessReason, problemKey } from "./problem";
 
 const accent = STEP_ACCENT.enclosure;
@@ -161,6 +162,7 @@ export function EnclosureStep({
               <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               {t("downloadStl")}
             </button>
+            <ShareActions ctx={ctx} viewer={viewer} accent={accent.base} disabled={busy} />
           </>
         ) : null
       }
@@ -204,8 +206,10 @@ export function EnclosureStep({
         </p>
       )}
 
+      {!enclosure && busy && <EnclosureSkeleton label={t("drawingIt")} />}
+
       {enclosure && (
-        <div className="space-y-4">
+        <div className="space-y-4 motion-safe:animate-rise">
           <fieldset className="space-y-2">
             <legend className="text-sm font-bold text-heading">{t("colour")}</legend>
             <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label={t("colour")}>
@@ -259,5 +263,30 @@ export function EnclosureStep({
       {problem && <Problem>{problem}</Problem>}
       {blocked && <AccessNote reason={blocked} step="cad" projectName={ctx.projectName} />}
     </StepFrame>
+  );
+}
+
+/** While the first look is drawn: the colour + finish rows that will appear, as grey shapes. */
+function EnclosureSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-4" role="status" aria-busy="true" data-testid="studio-enclosure-skeleton">
+      <span className="sr-only">{label}</span>
+      <div className="space-y-2">
+        <Bar className="h-3.5 w-16" />
+        <div className="flex flex-wrap gap-2.5">
+          {Array.from({ length: 10 }, (_, i) => (
+            <Bar key={i} className="h-11 w-11" />
+          ))}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Bar className="h-3.5 w-14" />
+        <div className="flex flex-wrap gap-2">
+          {[24, 28, 20, 32, 22].map((w, i) => (
+            <Bar key={i} className="h-11" style={{ width: `${w * 4}px` }} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
