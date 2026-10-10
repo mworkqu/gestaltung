@@ -24,6 +24,15 @@ A running list. Add a row whenever test or demo data is written to production. N
 | 8 | inquiries | `2f1e6ed7-e202-4e81-b7c4-3cf6b157dcf1` | "TEST LEAD (please ignore)" |
 | 9 | inquiries | `e4a966e9-21b9-46c0-b544-a9850c67eb9b` | "TEST contact (please ignore)" |
 | 10 | inquiries | `5f90cd3f-7bab-46ba-b5d6-c822f531868d` | "TEST callback (please ignore)" |
+| 11 | part_orders | `3cbf6a8c-232f-4eb2-a719-36b5754e96a1` | "TEST — Claude — please delete" QAR 66, cash on delivery, guest (2026-10-10, click-through step 9) |
+| 12 | projects | `055c5073-0f0e-477b-b880-e201c6c98791` | "Automatic smart desk lamp" — brief starts "TEST:" (owner account, 2026-10-10, click-through step 6; AI renamed it, so the name has no TEST) |
+| 13 | inquiries | lead "TEST — Claude — please delete" (File quote, 10 Oct 2026 13:21) | Click-through step 7; id to be read by the dry-run SELECT |
+| 14 | projects | `fbefc059-591e-4a06-887a-8c8557d0856a` | Project created by the step-7 quote (owns TEST-cube.stl in cad-files; delete the file with it) |
+| 15 | projects | `47d7814d-30f0-43cc-8fa0-370860819c06` | "TEST drawing — please delete" (click-through step 8) |
+| 16 | inquiries | lead "TEST drawing — please delete" (Drawing, 10 Oct 2026 13:26) | Click-through step 8; id to be read by the dry-run SELECT |
+| 17 | part_orders | order #75c58b7b… | Cancelled QAR 75 (2026-09-20) — owner: no real orders exist yet, all are tests |
+| 18 | part_orders | order #1b0dca20… | Cancelled QAR 425 (2026-07-05) — test |
+| 19 | part_orders | order #f28dcf37… | Cancelled QAR 5 (2026-06-22) — test |
 
 Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test = true. The test email in the info@ mailbox is deleted by hand.
 
