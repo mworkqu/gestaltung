@@ -63,7 +63,7 @@ export type ReadinessInput = {
     lineIds?: string[];
   } | null;
   /** Bill of materials with its live store matches; absent until matched. */
-  bom?: { lines: { id: string; function: string; kind: BomKind }[]; matches: Map<string, { status: LineStatus }> } | null;
+  bom?: { lines: { id: string; function: string; kind: BomKind }[]; matches: Map<string, { status: LineStatus; candidates?: { strength: string }[] }> } | null;
 };
 
 export type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -215,10 +215,14 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
     }
   }
 
-  // Bill of materials: a line with several store candidates waits on the
-  // client's pick. Matched, owned and not-stocked lines need nothing from them.
+  // Bill of materials: a line with several confident store candidates waits on
+  // the client's pick. Matched, owned and not-stocked lines need nothing from
+  // them, and neither does a line with only weak candidates: we pick that part
+  // for the client (P5-01, "We'll pick this part for you").
   for (const l of p.bom?.lines ?? []) {
-    if (p.bom!.matches.get(l.id)?.status !== "choose") continue;
+    const m = p.bom!.matches.get(l.id);
+    if (m?.status !== "choose") continue;
+    if (m.candidates && !m.candidates.some((c) => c.strength === "strong")) continue;
     const fn = humanName(l.function, l.id);
     add(
       { id: `bom:${l.id}`, group: "bom", label: fn, satisfied: false, focus: `bom-${l.id}`, bomKind: l.kind },

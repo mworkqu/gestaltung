@@ -1,26 +1,35 @@
 // The deterministic BOM matcher. Pure — the same catalogue and the same line
 // always give the same answer, and every candidate carries the reasons.
 //
-// Attributes first (lib/store/attributes). When the line names a class and a
-// product carries the same class, every attribute the line asks for is
-// compared: a contradiction excludes the product; all known and agreeing is a
-// STRONG match; some unknown on the product is a WEAK match ("no power rating
-// on product"). A product of another class is excluded.
+// Attributes first (lib/store/attributes). Since P5-01 both sides are typed
+// even when nobody filled the attributes in: a product's class and values are
+// read from its name (lib/store/derive-attributes effectiveAttributes; the
+// owner's own attributes always win) and a line's from its function + spec
+// (lineAttributes; a resistor value goes to the nearest E12 value). When both
+// carry the same class every attribute the line asks for is compared: a
+// contradiction excludes the product; so does a CORE field (sensor kind,
+// module type …) the product does not state — a PIR line only takes PIR
+// sensors. All known and agreeing is a STRONG match; some unknown is WEAK. A
+// product of another class is excluded (a limit switch is no motion sensor).
 //
-// Text second, only for products with no class, or lines with none. It needs
-// most of the line's function words in the product (not one stray word), a
-// voltage or M-size must not contradict, and a text match is always WEAK.
+// Text second, only for products whose name names no class, and never for a
+// line that states a core type. It needs most of the line's function words in
+// the product NAME, a voltage or M-size must not contradict, and a text match
+// is always WEAK.
 //
-// A line resolves to a product on its own only when exactly one distinct
-// STRONG match exists. Weak matches are shown and labelled, never picked for
-// the client. Duplicate listings of the same product collapse to one.
+// A line resolves to a product on its own only when the best candidate is
+// STRONG and not doubtful (several strong: the best ranked; alternatives stay
+// one click away). Weak matches are never pre-selected: the client reads
+// "We'll pick this part for you", super_admin sees the chooser. Duplicate
+// listings of the same product collapse to one.
 //
 // Every product field comes from public.parts. Nothing is invented here.
 
 import type { BomKind, BomLine } from "./analysis";
 import { buyable, orderQty, packOf, type Candidate, type LineMatch, type ProjectLine, type ScoredCandidate, type Strength } from "./bom";
-import { compareField, fieldsOf, isAttrClass, type Attributes } from "@/lib/store/attributes";
-import { guardAccessory, guardText } from "./bom-intent";
+import { compareField, fieldsOf, hasValue, isAttrClass, type AttrClass, type Attributes } from "@/lib/store/attributes";
+import { CORE_KEYS, effectiveAttributes, lineAttributes } from "@/lib/store/derive-attributes";
+import { guardAccessory, guardText, headOf } from "./bom-intent";
 
 export type InventoryRow = {
   productId: string | null;
@@ -134,29 +143,59 @@ function valueContradicts(line: BomLine, text: string): boolean {
   return found.length > 0 && !found.some((v) => Math.abs(v - target) <= target * 0.01);
 }
 
-/** Attribute comparison of one product against a line that names a class. */
-function scoreAttributes(line: BomLine, p: Candidate): Scored | null {
-  const attrs = (p.attributes ?? {}) as Attributes;
-  if (!isAttrClass(line.class)) return null;
-  const wanted = (line.attributes ?? {}) as Record<string, unknown>;
+/**
+ * Attribute comparison of one product against what a line asks (`wanted`, from
+ * lineAttributes). A contradiction excludes; so does a CORE field (what the
+ * part IS: sensor kind, module type …) the product does not state. A min field
+ * met exactly ranks above one met with room to spare (1 channel over 2).
+ */
+function scoreAttributes(cls: AttrClass, wanted: Attributes, attrs: Attributes, p: Candidate): Scored | null {
   const why: string[] = [];
+  const core = CORE_KEYS[cls] ?? [];
   let known = 0;
   let unknown = 0;
-  for (const f of fieldsOf(line.class)) {
-    if (!(f.key in wanted) || wanted[f.key] === null || wanted[f.key] === "") continue;
-    const v = compareField(f, wanted[f.key], attrs);
+  let exact = 0;
+  for (const f of fieldsOf(cls)) {
+    const want = wanted[f.key];
+    if (want === undefined || want === null || want === "") continue;
+    // A set ("M-M/M-F/F-F" jumpers) is never one product: one of its members is a weak match.
+    if (f.key === "size" && typeof want === "string" && want.includes("/")) {
+      const have = attrs.size;
+      if (hasValue(have) && !want.toLowerCase().split("/").includes(String(have).toLowerCase()) && String(have).toLowerCase() !== want.toLowerCase())
+        return null;
+      unknown += 1;
+      why.push(`size: part of the set ${want}`);
+      continue;
+    }
+    const v = compareField(f, want, attrs);
     if (!v.ok) return null;
+    if (!v.known && core.includes(f.key)) return null;
     why.push(v.why);
-    if (v.known) known += 1;
-    else unknown += 1;
+    if (v.known) {
+      known += 1;
+      if (f.compare === "min" && Math.abs(Number(attrs[f.key]) - Number(want)) < 1e-9) exact += 1;
+    } else unknown += 1;
   }
   return {
     p,
     strength: unknown === 0 ? "strong" : "weak",
-    score: 100 + known * 10 - unknown,
+    score: 100 + known * 10 + exact * 2 - unknown,
     compared: known + unknown,
-    why: [`class ${line.class}`, ...why],
+    why: [`class ${cls}`, ...why],
   };
+}
+
+// How well a product's head fits the line's own words, for ranking equals: +1
+// per function word in the head ("ESP32 expansion shield" prefers the shield),
+// −0.5 per head word the line never mentions ("Solid State", "Light Controlled").
+const NOISE = new Set("module modules board sensor sensors kit pack pcs pieces piece mini small".split(" "));
+function nameFit(line: Pick<BomLine, "function" | "spec">, p: Candidate): number {
+  const said = new Set(tokens(`${line.function} ${line.spec}`));
+  const fn = new Set(tokens(line.function).filter((w) => !GENERIC.has(w)));
+  const head = tokens(headOf(p.name ?? ""));
+  const hits = head.filter((w) => fn.has(w)).length;
+  const extra = head.filter((w) => !/\d/.test(w) && !NOISE.has(w) && !said.has(w)).length;
+  return hits - extra * 0.5;
 }
 
 // What each class is called in a shop. A typed line may match an untyped
@@ -242,40 +281,69 @@ export function matchLine(
   inventory: InventoryRow[],
   inventoryNames: Map<string, string>
 ): LineMatch {
+  // What the line asks for: its attributes, completed by its own words (P5-01).
+  const wanted = lineAttributes(line);
+  const lineClass = isAttrClass(wanted.class) ? wanted.class : null;
+  const typedLine: BomLine = lineClass ? { ...line, class: lineClass, attributes: wanted } : line;
+  // A line that says what the part IS (a PIR sensor, a relay module) only takes
+  // products that say the same; a product of unknown type is never a stand-in.
+  const needsType = !!lineClass && (CORE_KEYS[lineClass] ?? []).some((k) => hasValue(wanted[k]));
+
   const scored: Scored[] = [];
   for (const p of catalogue) {
-    const cls = (p.attributes as Attributes | null | undefined)?.class;
-    if (isAttrClass(line.class) && isAttrClass(cls)) {
+    const eff = effectiveAttributes(p);
+    let attrs = eff.attributes;
+    // A USB cable is a USB cable whether the line files it under power or consumables.
+    if (lineClass === "consumable" && attrs.class === "power" && attrs.power_type === "usb_cable")
+      attrs = { class: "consumable", consumable_type: "usb_cable" };
+    if (lineClass === "power" && attrs.class === "consumable" && attrs.consumable_type === "usb_cable")
+      attrs = { class: "power", power_type: "usb_cable" };
+    const cls = attrs.class;
+    if (lineClass && isAttrClass(cls)) {
       // Both sides typed: attributes decide, text is not consulted.
-      if (cls !== line.class) continue;
-      const s = scoreAttributes(line, p);
+      if (cls !== lineClass) continue;
+      const s = scoreAttributes(lineClass, wanted, attrs, p);
       if (!s) continue;
       // A product named "Expansion Shield" is not the board the line asks for,
       // whatever class it carries.
-      const acc = guardAccessory(line, p);
+      const acc = guardAccessory(typedLine, p);
       if (!acc.ok) continue;
-      if (s.compared === 0) {
-        // The line asked for no attribute, so "same class" proves nothing: the
-        // product's name has to fit what the line asks for, and it is only weak.
-        const g = guardText(line, p);
+      if (s.compared === 0 || eff.derived) {
+        // A class read from the name (or a line that asks for no attribute) is
+        // checked against the line's core noun too (bom-intent.ts).
+        const g = guardText(typedLine, p);
         if (!g.ok) continue;
-        scored.push({ ...s, strength: "weak", score: s.score + g.bonus, doubt: acc.doubt || g.doubt || undefined, why: [...s.why, "line names no attribute", ...g.why] });
+        const weakOnly = s.compared === 0;
+        // "Same class" alone proves nothing (silicone tubing is no breadboard):
+        // a line that asks for no attribute needs its own words in the name.
+        if (weakOnly && scoreText(line, p.name ?? "").score === 0) continue;
+        scored.push({
+          ...s,
+          strength: weakOnly ? "weak" : s.strength,
+          score: s.score + g.bonus + nameFit(line, p),
+          doubt: acc.doubt || g.doubt || undefined,
+          why: [...s.why, ...(weakOnly ? ["line names no attribute"] : []), ...(eff.derived ? ["read from the name"] : []), ...g.why],
+        });
         continue;
       }
       scored.push(acc.doubt ? { ...s, doubt: true, why: [...s.why, ...acc.why] } : s);
       continue;
     }
+    if (needsType) continue;
     // Untyped product (or untyped line): text, and never better than weak.
     const k = productKind(p);
     if (k && k !== line.kind) continue;
     const text = productText(p);
-    if (valueContradicts(line, text)) continue;
+    if (valueContradicts(typedLine, text)) continue;
     const t = scoreText(line, text);
-    const byClass = classWordsFor(line)?.test(text) ?? false;
+    const byClass = classWordsFor(typedLine)?.test(text) ?? false;
+    // A typed line needs the evidence in the product's NAME, not only in its
+    // description (a soldering board "for resistors" is no resistor).
+    if (lineClass && !(classWordsFor(typedLine)?.test(p.name) || scoreText(line, p.name).score > 0)) continue;
     if (t.score > 0 || byClass) {
       // Words are not enough: accessories, the core noun and fastener type/size
       // are checked against the product's name (lib/prototyping/bom-intent.ts).
-      const g = guardText(line, p);
+      const g = guardText(typedLine, p);
       if (!g.ok) continue;
       const doubtful = g.doubt || describedOnly(line, p);
       scored.push({
@@ -285,7 +353,7 @@ export function matchLine(
         ...(doubtful ? { doubt: true } : {}),
         why: [
           isAttrClass(cls) ? "line has no attributes" : "product has no attributes",
-          ...(t.why.length ? t.why : [`a ${line.class} by its name`]),
+          ...(t.why.length ? t.why : [`a ${lineClass ?? "part"} by its name`]),
           ...g.why,
           ...(!g.doubt && doubtful ? ["only its description mentions it"] : []),
         ],
@@ -293,6 +361,8 @@ export function matchLine(
     }
   }
 
+  // Price of what the client would actually pay: whole packs for the line's quantity.
+  const cost = (p: Candidate) => Number(p.unit_price) * orderQty(line.quantity, p);
   const ranked = dedupe(scored).sort(
     (a, b) =>
       Number(b.strength === "strong") - Number(a.strength === "strong") ||
@@ -300,23 +370,23 @@ export function matchLine(
       b.score - a.score ||
       leadRank(a.p) - leadRank(b.p) ||
       (STOCK_ORDER[a.p.stock_status] ?? 3) - (STOCK_ORDER[b.p.stock_status] ?? 3) ||
-      Number(a.p.unit_price) - Number(b.p.unit_price)
+      cost(a.p) - cost(b.p)
   );
   const candidates: ScoredCandidate[] = ranked
     .slice(0, MAX_CANDIDATES)
     .map((s) => ({ ...s.p, strength: s.strength, why: s.why, ...(s.doubt ? { doubt: true } : {}) }));
 
   const strong = candidates.filter((c) => c.strength === "strong");
-  // The client's own pick wins while it is still a candidate; then a single
-  // strong match; otherwise our best candidate is picked for them (owner,
-  // 2026-09-29: "choose the best option and change on request") and marked
-  // `auto` so the table says so and offers the alternatives.
+  // The client's own pick wins while it is still a candidate. Otherwise only a
+  // CONFIDENT match is picked for them: the best candidate when it is strong and
+  // not doubtful (owner, 2026-10-10: never pre-select a weak match). With
+  // nothing confident the line is "choose": the client reads "We'll pick this
+  // part for you", an engineer picks from the candidates.
   const chosen = line.choice ? candidates.find((c) => c.id === line.choice) ?? null : null;
-  const decided = chosen ?? (strong.length === 1 ? strong[0] : null);
-  // A doubtful best candidate (a kit, a USB cable of unstated connector) is never
-  // picked for the client: the line is "choose" and the suggestion is offered.
-  const auto = !decided && candidates.length > 0 && !candidates[0].doubt;
-  const product = decided ?? (auto ? candidates[0] : null);
+  const top = candidates[0];
+  const confident = top && top.strength === "strong" && !top.doubt ? top : null;
+  const product = chosen ?? confident;
+  const auto = !chosen && !!confident && strong.length > 1;
 
   const ownedProduct = inventory.find(
     (i) =>
@@ -327,8 +397,8 @@ export function matchLine(
   const ownedCustom = inventory.find((i) => {
     if (!i.customName || i.quantity <= 0) return false;
     const a = (i.attributes ?? {}) as Attributes;
-    if (isAttrClass(line.class) && a.class === line.class) {
-      const s = scoreAttributes(line, { attributes: a } as Candidate);
+    if (lineClass && a.class === lineClass) {
+      const s = scoreAttributes(lineClass, wanted, a, { attributes: a } as Candidate);
       return s?.strength === "strong";
     }
     return scoreText(line, i.customName).score >= 4;

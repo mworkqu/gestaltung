@@ -311,7 +311,8 @@ export const unstockedLines = <L extends ProjectLine>(lines: L[], matches: Map<s
  * The project cost summary. ONE money figure: what the client would pay now
  * for the lines still to buy (whole packs) — exactly the buyable() lines the
  * kit adds, so an out-of-stock product never counts. Counts are never blended with it:
- * not stocked, fabrication (priced by quote), to choose, have, bought.
+ * not stocked, fabrication (priced by quote), to choose, we pick (only weak
+ * candidates: our engineer picks), have, bought.
  * `ordered` is what the bought lines cost at the store's unit price — shown
  * per group, never added to the money figure — and `orderedPriced` how many
  * bought lines had a known price.
@@ -322,6 +323,7 @@ export function bomCost(lines: ProjectLine[], matches: Map<string, LineMatch>) {
   let notStocked = 0;
   let fabrication = 0;
   let toChoose = 0;
+  let wePick = 0;
   let have = 0;
   let bought = 0;
   let ordered = 0;
@@ -345,6 +347,8 @@ export function bomCost(lines: ProjectLine[], matches: Map<string, LineMatch>) {
     if (!m) continue;
     if (m.have) have += 1;
     else if (m.status === "not_stocked") notStocked += 1;
+    // Only weak candidates: we pick the part for the client, nothing to choose.
+    else if (m.status === "choose" && !m.candidates.some((c) => c.strength === "strong")) wePick += 1;
     else if (m.status === "choose") toChoose += 1;
     else {
       const p = buyable(l, m);
@@ -360,6 +364,7 @@ export function bomCost(lines: ProjectLine[], matches: Map<string, LineMatch>) {
     notStocked,
     fabrication,
     toChoose,
+    wePick,
     have,
     bought,
     ordered: Math.round(ordered * 100) / 100,

@@ -10,10 +10,11 @@
 // subtotal. States:
 //   matched      one clear, attribute-checked product; price, stock, add to cart
 //   choose       several candidates: the client picks, and the pick is saved
-//                on the line. Only weak (text / incomplete) matches: "No
-//                confident match" and "Suggested: … — confirm?"; a weak product
-//                is never shown as the line's product until the client picks it
-//   not stocked  no product, never a made-up item. All of a table's
+//                on the line. Only weak (text / incomplete) matches: the client
+//                reads "We'll pick this part for you" (no guess, no picker);
+//                super_admin sees "No confident match", "Suggested: … —
+//                confirm?" and the chooser (P5-01)
+//   not stocked  no product, never a made-up item: "We'll source this". All of a table's
 //                not-stocked lines go in ONE quote request (QuoteRequest)
 //   have         already in the client's inventory; left out of every total
 //   fabrication  made to order; priced by quote
@@ -130,6 +131,7 @@ export function CostSummary({
   const counts = [
     t("costCounts", { notStocked: c.notStocked, fabrication: c.fabrication, ordered: c.bought }),
     c.toChoose ? t("costToChoose", { count: c.toChoose }) : null,
+    c.wePick ? t("costWePick", { count: c.wePick }) : null,
     c.have ? t("costHave", { count: c.have }) : null,
   ]
     .filter(Boolean)
@@ -751,6 +753,9 @@ function Row({
           <span className="text-[12px] text-mutedtext">{t("bomMadeToOrder")}</span>
         ) : loading && !m ? (
           <span className="block h-3 w-32 animate-pulse rounded bg-borderstrong/40" />
+        ) : suggestion && !admin ? (
+          // Only weak candidates: the client never sees a guess, we pick the part (P5-01).
+          <span className="text-[12px] font-medium text-heading">{t("bomWePick")}</span>
         ) : suggestion ? (
           <div className="space-y-1">
             <span className="block text-[12px] font-medium text-inventory">{t("noConfidentMatch")}</span>
@@ -796,14 +801,14 @@ function Row({
               </span>
             </Link>
             {/* Our pick, with the other models one click away (owner, 2026-09-29). */}
-            {m && !m.have && !l.fulfilled && (m.auto || m.candidates.length > 1) && (
+            {/* The other confident models, one click away (owner, 2026-09-29); never a weak guess for the client. */}
+            {m && !m.have && !l.fulfilled && m.candidates.length > 1 && (
               <div className="space-y-0.5 text-[11px]">
-                {m.auto && <span className="font-semibold text-cobalt">{t("bomOurPick")}</span>}
-                {m.candidates.filter((c) => c.id !== p.id).length > 0 && (
+                {m.candidates.filter((c) => c.id !== p.id && (admin || c.strength === "strong")).length > 0 && (
                   <span className="block text-mutedtext">
                     {t("bomAlternatives")}{" "}
                     {m.candidates
-                      .filter((c) => c.id !== p.id)
+                      .filter((c) => c.id !== p.id && (admin || c.strength === "strong"))
                       .map((c, i) => (
                         <span key={c.id}>
                           {i > 0 && " · "}
@@ -831,7 +836,8 @@ function Row({
         ) : m?.have ? (
           <span className="text-[12px] text-heading">{m.have.name}</span>
         ) : m ? (
-          <span className="text-[12px] text-mutedtext">{t("bomNoMatch")}</span>
+          // Not in the store: never silently lost, we source it (P5-01).
+          <span className="text-[12px] font-medium text-heading">{t("bomWeSource")}</span>
         ) : null}
         {buying && pack > 1 && (
           <span className="mt-1 block text-[10.5px] leading-snug text-inventory">
@@ -864,8 +870,12 @@ function Row({
           ) : m?.status === "matched" ? (
             <Tag variant="buy">{l.choice ? t("bomChosen") : t("bomMatched")}</Tag>
           ) : m?.status === "choose" ? (
-            <Tag variant="neutral">{m.candidates.every((c) => c.strength === "weak") ? t("bomWeakOnly") : t("bomChoose")}</Tag>
-          ) : m?.status === "not_stocked" ? (
+            m.candidates.every((c) => c.strength === "weak") ? (
+              admin ? <Tag variant="neutral">{t("bomWeakOnly")}</Tag> : null
+            ) : (
+              <Tag variant="neutral">{t("bomChoose")}</Tag>
+            )
+          ) : m?.status === "not_stocked" && admin ? (
             <Tag variant="neutral">{t("bomNotStocked")}</Tag>
           ) : null}
           {p && !m?.have && !l.fulfilled && <LeadTimeBadge leadClass={p.lead_time_class} />}

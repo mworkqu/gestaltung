@@ -93,11 +93,13 @@ const MODULE_NAME: Record<string, RegExp> = {
   regulator: /\b(regulator|buck|boost|lm2596|ams1117)\b/i,
   rtc: /\b(rtc|ds3231|ds1307|real time clock)\b/i,
   amplifier: /\b(amplifier|pam8403|lm386)\b/i,
+  level_shifter: /\b(level (?:shifter|converter|translator)|logic level)\b/i,
 };
 const MODULE_IN_TEXT: [string, RegExp][] = [
   ["relay", /\brelay\b/],
   ["motor_driver", /\b(motor driver|h-?bridge)\b/],
   ["display", /\b(display|lcd|oled)\b/],
+  ["level_shifter", /\b(level (?:shifter|converter|translator)|logic level)\b/],
 ];
 
 const FASTENER_NAME: Record<string, RegExp> = {
@@ -215,7 +217,12 @@ function intentOf(line: BomLine): Intent {
     wantsUsbCable,
     wantsPowerAdapter,
     wantsBattery,
-    allows: wantsPowerAdapter ? /^(adapter|adaptor|charger)s?$/i : null,
+    // A level shifter is sold as a "logic level converter".
+    allows: wantsPowerAdapter
+      ? /^(adapter|adaptor|charger)s?$/i
+      : moduleType === "level_shifter"
+        ? /^(converter|translator)s?$/i
+        : null,
   };
 }
 

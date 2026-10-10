@@ -43,6 +43,8 @@ const flyback: ProjectLine = {
 const match = (line: ProjectLine, catalogue: Candidate[]) => matchLine(line, catalogue, [], new Map());
 
 describe("matchLine — diodes (audit #2)", () => {
+  // A diode whose name states no type: a weak candidate, never picked for the client.
+  const untypedDiode = part({ name: "Diode, general purpose", unit_price: 30, pack_size: 100 });
   const untyped4148 = part({ name: "Diode 1N4148", unit_price: 30, pack_size: 100 });
   const rectifier4007 = part({
     name: "Diode 1N4007",
@@ -53,13 +55,18 @@ describe("matchLine — diodes (audit #2)", () => {
     attributes: { class: "diode", diode_type: "signal", current_a: 0.2, voltage_v: 100 },
   });
 
-  it("an untyped 1N4148 is weak, and is picked as our best match (auto) until the client changes it", () => {
+  it("a diode of unstated type is weak and never pre-selected: the line waits (We'll pick this part for you)", () => {
+    const m = match(flyback, [untypedDiode]);
+    expect(m.candidates.map((c) => [c.id, c.strength])).toEqual([[untypedDiode.id, "weak"]]);
+    expect(m.product).toBeNull();
+    expect(m.status).toBe("choose");
+    expect(weakSuggestion(m)?.id).toBe(untypedDiode.id);
+  });
+
+  it("an untyped 1N4148 is read as a signal diode from its name and is no flyback rectifier", () => {
     const m = match(flyback, [untyped4148]);
-    expect(m.candidates.map((c) => [c.id, c.strength])).toEqual([[untyped4148.id, "weak"]]);
-    expect(m.product?.id).toBe(untyped4148.id);
-    expect(m.auto).toBe(true);
-    expect(m.status).toBe("matched");
-    expect(weakSuggestion(m)).toBeNull();
+    expect(m.candidates).toEqual([]);
+    expect(m.status).toBe("not_stocked");
   });
 
   it("a typed rectifier 1N4007, 1 A 1000 V, is a strong match and resolves the line", () => {
@@ -86,12 +93,13 @@ describe("matchLine — diodes (audit #2)", () => {
     const bare = part({ attributes: { class: "diode", diode_type: "rectifier" } });
     const m = match(flyback, [bare]);
     expect(m.candidates[0]?.strength).toBe("weak");
-    expect(m.auto).toBe(true);
+    expect(m.product).toBeNull();
+    expect(m.status).toBe("choose");
   });
 
   it("the client's explicit pick of the suggestion resolves the line", () => {
-    const m = match({ ...flyback, choice: untyped4148.id }, [untyped4148]);
-    expect(m.product?.id).toBe(untyped4148.id);
+    const m = match({ ...flyback, choice: untypedDiode.id }, [untypedDiode]);
+    expect(m.product?.id).toBe(untypedDiode.id);
     expect(m.auto).toBeUndefined();
     expect(m.status).toBe("matched");
     expect(weakSuggestion(m)).toBeNull();
@@ -183,7 +191,7 @@ describe("matchLine — the device, not its accessory (demo project)", () => {
       it(`${kind} line: our pick is a plain ESP32 development board`, () => {
         const m = match(l, catalogue);
         expect(m.product?.name).toBe("NodeMCU ESP32 Development Board – Wi-Fi & Bluetooth Enabled");
-        expect(m.auto).toBe(true);
+        expect(m.product?.strength).toBe("strong");
       });
     }
 
@@ -233,7 +241,6 @@ describe("matchLine — the device, not its accessory (demo project)", () => {
         const m = match(l, catalogue);
         expect(m.product?.name).toMatch(/Power Adapter/);
         expect(m.product?.name).not.toMatch(/12V/);
-        expect(m.auto).toBe(true);
       });
     }
 
@@ -271,13 +278,13 @@ describe("matchLine — the device, not its accessory (demo project)", () => {
       expect(m.status).toBe("choose");
       expect(m.product).toBeNull();
       expect(m.auto).toBeUndefined();
-      expect(weakSuggestion(m)?.name).toMatch(/Cable/);
+      expect(m.candidates.length).toBeGreaterThan(0);
+      for (const c of m.candidates) expect(c.doubt).toBe(true);
     });
 
     it("naming the connector lets us pick it", () => {
       const m = match(line({ function: "Micro USB cable", spec: "", kind: "consumable" }), catalogue);
       expect(m.product?.name).toBe("USB 2.0 Type-A to Micro USB Cable – 1 m");
-      expect(m.auto).toBe(true);
     });
   });
 
@@ -309,10 +316,12 @@ describe("matchLine — the device, not its accessory (demo project)", () => {
         for (const n of names(m)) expect(n).not.toMatch(/spacer|standoff|nut|leveling/i);
       });
 
-      it(`${kind} line: our pick is the single M3 screw, not the QAR 59 spacer kit`, () => {
+      it(`${kind} line: the best candidate is the single M3 screw, not the QAR 59 spacer kit`, () => {
         const m = match(l, catalogue);
-        expect(m.product?.name).toBe("M3 Stainless Steel Phillips Flat Head Screws – 5 Pcs");
-        expect(m.auto).toBe(true);
+        expect(m.candidates[0]?.name).toBe("M3 Stainless Steel Phillips Flat Head Screws – 5 Pcs");
+        // The typed line also asks for 8 mm, which the name does not state: weak, so not pre-selected.
+        if (kind === "typed") expect(m.product).toBeNull();
+        else expect(m.product?.name).toBe("M3 Stainless Steel Phillips Flat Head Screws – 5 Pcs");
       });
 
       it(`${kind} line: the wrong size is not a candidate`, () => {
@@ -383,11 +392,18 @@ describe("matchLine — the device, not its accessory (demo project)", () => {
       expect(m.status).toBe("not_stocked");
     });
 
-    it("a relay module typed as a module, for a line naming no attribute, is only a weak, our-pick match", () => {
+    it("a relay line whose words say relay matches a relay-typed module strongly", () => {
       const relay = live("1 Channel Relay Module", "Modules", "Modules", 13, { attributes: { class: "module", module_type: "relay" } });
       const m = match(line({ function: "relay module", spec: "", class: "module", attributes: {} }), [relay]);
-      expect(m.candidates[0]?.strength).toBe("weak");
+      expect(m.candidates[0]?.strength).toBe("strong");
       expect(m.product?.id).toBe(relay.id);
+    });
+
+    it("a module line that names no type at all is only a weak match, never pre-selected", () => {
+      const relay = live("1 Channel Relay Module", "Modules", "Modules", 13, { attributes: { class: "module", module_type: "relay" } });
+      const m = match(line({ function: "module", spec: "", class: "module", attributes: {} }), [relay]);
+      expect(m.candidates.every((c) => c.strength === "weak")).toBe(true);
+      expect(m.product).toBeNull();
     });
   });
 
@@ -416,5 +432,140 @@ describe("matchLine — the device, not its accessory (demo project)", () => {
     ];
     const m = match(line({ function: "breadboard", spec: "", kind: "consumable" }), catalogue);
     expect(m.product?.name).toBe("Full-Size Solderless Breadboard – 830 Tie Points");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// P5-01 (2026-10-10): wrong matches on the owner's projects (smart desk lamp,
+// plant monitor). Products are live names with no stored attributes: the type
+// and values are read from the name (lib/store/derive-attributes.ts).
+// ---------------------------------------------------------------------------
+
+describe("matchLine — the right product type (P5-01)", () => {
+  // The owner's resistor rows carry class + tolerance (as on live); value, power
+  // and package come from the name.
+  const TOL5 = { class: "resistor", tolerance_pct: 5 };
+  const SENSORS = "Sensors";
+  const catalogue = [
+    live("Limit Switch Module – Mechanical Collision Detection Sensor", "Sensors", SENSORS, 4),
+    live("SW-520D Tilt Sensor Module Digital Output", "Sensors", SENSORS, 3),
+    live("IR Obstacle Avoidance Sensor - 2 to 30 cm Adjustable Detection", "Sensors", SENSORS, 5),
+    live("HC-SR501 PIR Motion Sensor - Digital Output", "Sensors", SENSORS, 12),
+    live("AM312 Mini PIR Motion Sensor - Digital Output", "Sensors", SENSORS, 10),
+    live("IR Line Tracking Sensor Module – Adjustable Sensitivity", "Sensors", SENSORS, 4),
+    live("Pololu QTR-1A Reflectance Sensor – Analog IR Line Sensor (2 Pack)", "Sensors", SENSORS, 20),
+    live("UV Light Sensor Module – GUVA-S12SD, Analog Output", "Sensors", SENSORS, 25),
+    live("Photoresistor Light Sensor Module – LM393 Comparator, Analog Output", "Sensors", SENSORS, 6),
+    live("Photocell LDR Light Sensor – 4 Pieces Pack", "Sensors", SENSORS, 3),
+    live("12V Pre-Wired LED – 3mm/5mm with Built-in Resistor", "Components", "Modules", 1),
+    live("NE555P Precision Timer IC – DIP-8, 2 Pieces", "Chips & ICs", "Chips and ICs", 2),
+    live("Resistor 220 Ω 1/4 W, through-hole (pack of 10)", "Components", "Chips and ICs", 2, { pack_size: 10, attributes: TOL5 }),
+    live("Resistor 4.7 kΩ 1/4 W, through-hole (pack of 10)", "Components", "Chips and ICs", 2, { pack_size: 10, attributes: TOL5 }),
+    live("Resistor 10 kΩ 1/4 W, through-hole (pack of 10)", "Components", "Chips and ICs", 2, { pack_size: 10, attributes: TOL5 }),
+    live("USB Logic Analyzer 8-Channel Module", "Modules", "Modules", 45),
+    live("7404 Hex Inverter Logic IC – DIP-14", "Chips & ICs", "Chips and ICs", 2),
+  ];
+  const pir = line({
+    id: "e_item_2",
+    function: "motion sensor",
+    spec: "PIR, digital output, 5V",
+    class: "sensor",
+    attributes: { class: "sensor", measures: "motion", voltage_v: 5 },
+  });
+  const light = line({
+    id: "e_item_3",
+    function: "light sensor",
+    spec: "phototransistor, analog output, 3.3V-5V",
+    class: "sensor",
+    attributes: { class: "sensor", measures: "light", voltage_v: 5 },
+  });
+  const resistor = (ohm: number) =>
+    line({
+      id: `rule_res_${ohm}`,
+      function: "Resistor",
+      spec: `${ohm} Ω, 1/4 W, ±5%, through-hole`,
+      class: "resistor",
+      attributes: { class: "resistor", package: "through_hole", power_w: 0.25, tolerance_pct: 5, resistance_ohm: ohm },
+    });
+  const shifter = line({
+    id: "rule_level_shifter",
+    function: "Logic level shifter",
+    spec: "bidirectional, 3.3 V ↔ 5 V, 4 channels",
+    class: "module",
+    attributes: { class: "module", channels: 4, module_type: "level_shifter" },
+  });
+
+  it("PIR motion sensor: a PIR sensor, never the limit switch, tilt or obstacle sensor", () => {
+    const m = match(pir, catalogue);
+    expect(names(m).length).toBeGreaterThan(0);
+    for (const n of names(m)) expect(n).toMatch(/PIR/);
+    expect(m.product?.name).toMatch(/PIR Motion Sensor/);
+    expect(m.product?.strength).toBe("strong");
+    expect(m.status).toBe("matched");
+  });
+
+  it("PIR line with no PIR in the store: nothing stands in (We'll source this)", () => {
+    const m = match(pir, catalogue.filter((p) => !/PIR/.test(p.name)));
+    expect(m.candidates).toEqual([]);
+    expect(m.status).toBe("not_stocked");
+  });
+
+  it("light sensor: a photoresistor / LDR, never the IR line tracking or UV sensor", () => {
+    const m = match(light, catalogue);
+    expect(names(m).length).toBeGreaterThan(0);
+    for (const n of names(m)) expect(n).toMatch(/Photoresistor|LDR/);
+    expect(m.product?.name).toMatch(/Photoresistor|LDR/);
+  });
+
+  it("Resistor 120 Ω never matches the 12V pre-wired LED (or a timer IC)", () => {
+    const m = match(resistor(120), catalogue);
+    for (const n of names(m)) expect(n).not.toMatch(/LED|Timer|NE555/);
+    expect(m.product).toBeNull();
+  });
+
+  it("a resistor line takes the nearest standard E12 value in the right pack", () => {
+    // 4.6 kΩ is not a standard value; the nearest E12 value is 4.7 kΩ.
+    const m = match(resistor(4600), catalogue);
+    expect(m.product?.name).toBe("Resistor 4.7 kΩ 1/4 W, through-hole (pack of 10)");
+    expect(m.product?.strength).toBe("strong");
+    expect(m.product?.pack_size).toBe(10);
+    // 9.6 kΩ → 10 kΩ; never the 4.7 kΩ or 220 Ω packs.
+    const ten = match(resistor(9600), catalogue);
+    expect(ten.product?.name).toBe("Resistor 10 kΩ 1/4 W, through-hole (pack of 10)");
+    expect(names(ten)).not.toContain("Resistor 220 Ω 1/4 W, through-hole (pack of 10)");
+  });
+
+  it("a cheaper pack that covers the need ranks before a bigger one", () => {
+    const small = live("Resistor 10 kΩ 1/4 W, through-hole (pack of 10)", "Components", "Chips and ICs", 2, { pack_size: 10, sku: "R10-10", attributes: TOL5 });
+    const big = live("Resistor 10 kΩ 1/4 W, through-hole (pack of 100)", "Components", "Chips and ICs", 12, { pack_size: 100, sku: "R10-100", attributes: TOL5 });
+    const m = match(resistor(10000), [big, small]);
+    expect(m.product?.sku).toBe("R10-10");
+  });
+
+  it("logic level shifter with none in the store: not stocked (We'll source this), never a logic analyzer or IC", () => {
+    const m = match(shifter, catalogue);
+    expect(m.candidates).toEqual([]);
+    expect(m.status).toBe("not_stocked");
+    expect(m.product).toBeNull();
+  });
+
+  it("logic level shifter: the store's Logic Level Converter is a candidate (converter is not an accessory here)", () => {
+    const conv = live("Logic Level Converter - Bi-Directional", "Modules", "Modules", 9);
+    const m = match(shifter, [...catalogue, conv]);
+    expect(names(m)).toEqual(["Logic Level Converter - Bi-Directional"]);
+    // Its channel count is not in its name: no confident match until the owner fills it in.
+    expect(m.product).toBeNull();
+    expect(m.status).toBe("choose");
+    const typed = { ...conv, attributes: { class: "module", module_type: "level_shifter", channels: 4 } };
+    expect(match(shifter, [typed]).product?.id).toBe(conv.id);
+  });
+
+  it("only weak candidates: nothing is pre-selected", () => {
+    const m = match(resistor(120), [live("1/4W Through-Hole Resistor – 20 Pieces", "Components", "Chips and ICs", 1)]);
+    expect(m.candidates[0]?.strength).toBe("weak");
+    expect(m.product).toBeNull();
+    expect(m.auto).toBeUndefined();
+    expect(m.status).toBe("choose");
+    expect(weakSuggestion(m)?.name).toMatch(/Resistor/);
   });
 });

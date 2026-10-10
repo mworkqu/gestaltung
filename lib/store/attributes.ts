@@ -66,6 +66,9 @@ export const CLASSES = {
     fields: [
       { key: "measures", type: "enum", compare: "eq", required: true, options: ["temperature", "humidity", "soil_moisture", "distance", "light", "motion", "gas", "pressure", "sound", "current", "voltage", "acceleration", "water_level", "flow", "color", "gps", "touch", "other"] },
       { key: "interface", type: "enum", compare: "eq", required: true, options: ["analog", "digital", "i2c", "spi", "uart", "onewire"] },
+      // What the sensor IS, finer than what it measures: a PIR line only takes a
+      // PIR sensor, a light line takes a photocell / photoresistor (lib/store/derive-attributes).
+      { key: "sensor_type", type: "enum", compare: "eq", options: ["pir", "radar", "photo", "ambient_light", "uv", "ir_reflective", "ultrasonic", "tof", "capacitive", "resistive", "temp_humidity", "thermistor", "thermocouple", "hall", "tilt", "flame", "other"] },
       { key: "supply_v", type: "number", compare: "within", unit: "V", range: ["supply_min_v", "supply_max_v"] },
       { key: "supply_min_v", type: "number", compare: "eq", unit: "V" },
       { key: "supply_max_v", type: "number", compare: "eq", unit: "V" },

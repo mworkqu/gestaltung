@@ -10,11 +10,13 @@ import { Check, Loader2, Save } from "lucide-react";
 
 import {
   bulkSetAttributes,
+  fillAttributesFromNames,
   saveKitDiscount,
   savePartAttributes,
 } from "@/app/[locale]/dashboard/store/attributes/actions";
 import {
   ATTR_CLASSES,
+  cleanAttributes,
   fieldsOf,
   formatValue,
   isAttrClass,
@@ -22,7 +24,15 @@ import {
   type Attributes,
   type Field,
 } from "@/lib/store/attributes";
+import { deriveAttributes } from "@/lib/store/derive-attributes";
 import { cn } from "@/lib/utils";
+
+/** What the name says (P5-01), for a product the owner has not typed yet. */
+function suggestionFor(p: EditablePart) {
+  if (isAttrClass(p.attributes?.class)) return null;
+  const d = deriveAttributes(p);
+  return isAttrClass(d.attributes.class) ? d : null;
+}
 
 export type EditablePart = {
   id: string;
@@ -77,6 +87,7 @@ function PartRow({
   const [pack, setPack] = useState(p.pack_size ?? 1);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const cls = isAttrClass(attrs.class) ? attrs.class : null;
+  const suggestion = useMemo(() => suggestionFor(p), [p]);
 
   async function save() {
     setState("saving");
@@ -111,6 +122,27 @@ function PartRow({
             </option>
           ))}
         </select>
+        {suggestion && !cls && (
+          <p className="mt-1 text-[10.5px] leading-snug text-mutedtext">
+            {t("fromName")}{" "}
+            <span dir="ltr" className="font-mono text-heading">
+              {Object.entries(suggestion.attributes)
+                .map(([k, v]) => (k === "class" ? String(v) : `${k.replace(/_/g, " ")} ${Array.isArray(v) ? v.join("/") : v}`))
+                .join(" · ")}
+              {suggestion.packSize ? ` · pack ${suggestion.packSize}` : ""}
+            </span>{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setAttrs(cleanAttributes(suggestion.attributes));
+                if (suggestion.packSize && pack <= 1) setPack(suggestion.packSize);
+              }}
+              className="font-semibold text-cobalt hover:text-cobalt-hover max-md:tap-hit"
+            >
+              {t("useSuggestion")}
+            </button>
+          </p>
+        )}
       </td>
       <td className="px-2 py-2">
         {cls ? (
@@ -173,6 +205,16 @@ export function AttributesEditor({
   const [kit, setKit] = useState(String(kitDiscountPct));
   const [kitState, setKitState] = useState<"idle" | "saved" | "error">("idle");
 
+  const fillable = useMemo(() => parts.filter((p) => suggestionFor(p)).length, [parts]);
+  const [fillMsg, setFillMsg] = useState<string | null>(null);
+
+  function fillFromNames() {
+    start(async () => {
+      const r = await fillAttributesFromNames(locale);
+      setFillMsg("error" in r ? t("saveFailed") : t("fillDone", { count: r.count ?? 0 }));
+    });
+  }
+
   const shown = parts.filter(
     (p) => (!category || p.category === category) && (!onlyIncomplete || !isComplete(p.attributes))
   );
@@ -216,6 +258,22 @@ export function AttributesEditor({
         <p className="max-w-[48ch] text-[11.5px] text-mutedtext">{t("kitDiscountNote")}</p>
         {kitState === "error" && <p className="text-[11px] text-destructive">{t("saveFailed")}</p>}
       </section>
+
+      {fillable > 0 && (
+        <section className="neu flex flex-wrap items-center gap-3 p-5">
+          <button
+            type="button"
+            onClick={fillFromNames}
+            disabled={pending}
+            className="inline-flex items-center gap-1 rounded-lg bg-cobalt px-3 py-1.5 text-xs font-semibold text-white hover:bg-cobalt-hover disabled:opacity-60 max-md:min-h-11"
+          >
+            {pending && <Loader2 className="h-3 w-3 animate-spin" />}
+            {t("fillFromNames", { count: String(fillable) })}
+          </button>
+          <p className="max-w-[70ch] text-[11.5px] text-mutedtext">{t("fillFromNamesNote")}</p>
+          {fillMsg && <span className="text-[11.5px] text-heading">{fillMsg}</span>}
+        </section>
+      )}
 
       <section className="neu space-y-3 p-5">
         <div className="flex flex-wrap items-end gap-3">

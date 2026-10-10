@@ -222,6 +222,16 @@ describe("bomCost (audit #26, #27)", () => {
     expect(lines.filter((l) => buyable(l, m.get(l.id)))).toHaveLength(0);
   });
 
+  it("a choose line with only weak candidates is ours to pick, not the client's (P5-01)", () => {
+    const weak = { ...product("x", 1), strength: "weak" } as ScoredCandidate;
+    const strong = { ...product("y", 1), strength: "strong" } as ScoredCandidate;
+    const m = new Map(matches)
+      .set("b", { ...match("b", "choose"), candidates: [weak] })
+      .set("c", { ...match("c", "choose"), candidates: [strong, weak] });
+    const c = bomCost(lines, m);
+    expect([c.wePick, c.toChoose]).toEqual([1, 1]);
+  });
+
   it("prices the ordered lines at the store's unit price, apart from the money figure", () => {
     const c = bomCost([lines[0]], matches);
     expect(c.availableNow).toBe(0);
