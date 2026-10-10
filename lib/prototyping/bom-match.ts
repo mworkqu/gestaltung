@@ -30,6 +30,7 @@ import { buyable, orderQty, packOf, type Candidate, type LineMatch, type Project
 import { compareField, fieldsOf, hasValue, isAttrClass, type AttrClass, type Attributes } from "@/lib/store/attributes";
 import { CORE_KEYS, effectiveAttributes, lineAttributes } from "@/lib/store/derive-attributes";
 import { guardAccessory, guardText, headOf } from "./bom-intent";
+import type { PackProduct } from "@/lib/store/pack";
 
 export type InventoryRow = {
   productId: string | null;
@@ -424,7 +425,7 @@ export function weakSuggestion(m: LineMatch | undefined): ScoredCandidate | null
 }
 
 /** Whole packs bring more pieces than the line needs ("need 1, sold in 100"). */
-export const packExceedsNeed = (needed: number, p: Pick<Candidate, "pack_size" | "min_order_qty">) =>
+export const packExceedsNeed = (needed: number, p: PackProduct) =>
   packOf(p) > 1 && orderQty(needed, p) * packOf(p) > needed;
 
 /**

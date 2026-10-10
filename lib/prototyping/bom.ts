@@ -22,6 +22,7 @@
 import type { Part } from "@/lib/supabase/types";
 import { BOM_GROUPS, type BomGroup } from "@/lib/store/attributes";
 import type { BomKind, BomLine } from "./analysis";
+import { packSizeOf, packsFor, type PackProduct } from "@/lib/store/pack";
 
 export type { BomKind, BomLine };
 
@@ -285,15 +286,14 @@ export const mergeBom = (prev: ProjectBom | null | undefined, next: BomLine[]) =
 export const bomNode = (kind: BomKind) =>
   kind === "electronics" ? "electronics.components" : kind === "mechanical" ? "mechanical.parts" : "bom";
 
-/** Units per sold unit ("sold in packs of 10"). */
-export const packOf = (p: Pick<Candidate, "pack_size"> | null | undefined) => Math.max(1, Number(p?.pack_size) || 1);
+/** Pieces per sold unit ("sold in packs of 10"): the stored pack size, else the one the name states (lib/store/pack). */
+export const packOf = (p: PackProduct | null | undefined) => packSizeOf(p);
 
 /**
  * How many sold units to put in the cart for `needed` pieces: whole packs,
- * never below the product's minimum order.
+ * never below the product's minimum order (4 screws, pack of 5 → 1).
  */
-export const orderQty = (needed: number, p: Pick<Candidate, "pack_size" | "min_order_qty">) =>
-  Math.max(Math.ceil(needed / packOf(p)), p.min_order_qty || 1);
+export const orderQty = (needed: number, p: PackProduct) => packsFor(needed, p);
 
 /** A line the client can still buy: resolved to a product, not owned, not bought, in stock. */
 export function buyable(l: ProjectLine, m: LineMatch | undefined): ScoredCandidate | null {

@@ -138,6 +138,8 @@ export type CartItem = {
   minOrderQty: number;
   /** 0028; null = available on request (orderable, date to be confirmed — 0032). */
   leadTimeClass?: "in_stock" | "3_5_days" | "1_2_weeks" | "2_4_weeks" | null;
+  /** Pieces in one listing (lib/store/pack): "1 pack of 5". Absent on old snapshots = 1. */
+  packSize?: number;
   quantity: number;
 };
 

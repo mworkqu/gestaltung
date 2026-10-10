@@ -5,6 +5,7 @@
 import type { CartItem, Part } from "@/lib/supabase/types";
 import { CART_KEY } from "@/lib/parts/constants";
 import type { LeadTimeClass } from "@/lib/store/sourcing";
+import { packSizeOf } from "@/lib/store/pack";
 
 // A minimal shape (Part or a cart-stored snapshot) that addToCart accepts.
 // stock_status is admin-only and deliberately not carried into the cart
@@ -18,6 +19,7 @@ type PartLike = {
   image_url: string | null;
   min_order_qty: number;
   lead_time_class?: LeadTimeClass | null;
+  pack_size?: number | null;
 };
 
 export function toCartItem(part: PartLike, quantity: number): CartItem {
@@ -30,6 +32,7 @@ export function toCartItem(part: PartLike, quantity: number): CartItem {
     imageUrl: part.image_url,
     minOrderQty: part.min_order_qty,
     leadTimeClass: part.lead_time_class ?? null,
+    packSize: packSizeOf(part),
     quantity,
   };
 }

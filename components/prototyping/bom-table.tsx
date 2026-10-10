@@ -57,7 +57,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tag } from "@/components/ui/tag";
 import { Card, PrimaryButton, SoftButton, selectClass } from "@/components/prototyping/ui";
 import { createClient } from "@/lib/supabase/client";
-import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
+import { getCurrentUser } from "@/lib/supabase/guest";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
 import {
@@ -74,6 +74,8 @@ import {
 } from "@/lib/prototyping/bom";
 import { packLineCount, weakSuggestion } from "@/lib/prototyping/bom-match";
 import { costOfLines, type CostState } from "@/lib/prototyping/bom-cost";
+import { cartLineIds, kitPlan } from "@/lib/prototyping/kit-plan";
+import { arabicCountForm } from "@/lib/text/count";
 import { fulfilledLabel, fulfilledOrderIds } from "@/lib/prototyping/fulfilled";
 import type { BomGroup } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
@@ -393,7 +395,7 @@ export function BomTable({
   const t = useTranslations("Prototyping");
   const tU = useTranslations("Upsell");
   const locale = useLocale();
-  const { addItem, kitDiscountPct } = useCart();
+  const { addItem, addKit, kitDiscountPct, items: cartItems } = useCart();
   const admin = useIsSuperAdmin();
   // One line per item, whichever view renders this table (audit #29).
   const lines = dedupeLines(given, { keep: inCircuit });
@@ -429,8 +431,12 @@ export function BomTable({
     };
   }, [orderIdsKey]);
 
-  const toBuy = lines.filter((l) => buyable(l, matches.get(l.id)));
   const unstocked = unstockedLines(lines, matches);
+  // Lines this project's cart already holds (kit or loose): "In your cart", never added twice.
+  const inCart = cartLineIds(cartItems, projectId);
+  // The ONE plan: the button's count and total are computed from the rows it writes (P5-02).
+  const plan = kitPlan(lines, matches, { inCart, discountPct: kitDiscountPct });
+  const pricesReady = (costState ?? "ready") === "ready";
 
   async function add(l: ProjectLine) {
     const p = buyable(l, matches.get(l.id));
@@ -442,36 +448,23 @@ export function BomTable({
   }
 
   /**
-   * The ONE buy action (audit #28): the whole buyable BOM as a project kit —
-   * one cart entry, the kit discount, fulfilment tracked per line.
+   * The ONE buy action (audit #28): every line we sell, as a project kit — one
+   * cart entry, the kit discount, fulfilment tracked per line. One write, all
+   * or nothing (cart-provider addKit), so a kit is never half added (P5-02).
    */
   async function buyKit() {
+    if (!plan.rows.length) return;
     setAdding("kit");
     setKitFailed(false);
-    try {
-      await ensureSession();
-      const { data, error } = await createClient()
-        .from("project_kits")
-        .insert({ project_id: projectId })
-        .select("id")
-        .single();
-      if (error || !data) throw error ?? new Error("no kit");
-      let goods = 0;
-      for (const l of toBuy) {
-        const p = buyable(l, matches.get(l.id))!;
-        const qty = orderQty(l.quantity, p);
-        const ok = await addItem(p, qty, projectId, { bomLines: [l.id], kitId: data.id as string });
-        if (!ok) throw new Error("kit line not saved");
-        goods += Number(p.unit_price) * qty;
-      }
+    const kitId = await addKit(
+      projectId,
+      plan.rows.map((r) => ({ part: r.product, quantity: r.quantity, bomLines: r.bomLines }))
+    );
+    if (kitId) {
       setKitDone(true);
-      // Kit attach rate (P3-06): the kit's goods after the kit discount, as the cart prices it.
-      const total = Math.round(goods * (1 - kitDiscountPct / 100) * 100) / 100;
-      track("kit_added", { lines: toBuy.length, total_qar: total });
-    } catch (err) {
-      console.error("bom: kit not added", err);
-      setKitFailed(true);
-    }
+      // Kit attach rate (P3-06): the kit as the cart prices it.
+      track("kit_added", { lines: plan.add.length, total_qar: plan.total });
+    } else setKitFailed(true);
     setAdding(null);
   }
 
@@ -496,7 +489,7 @@ export function BomTable({
       {showTotal && lines.length > 0 && <CostSummary lines={lines} matches={matches} state={costState} />}
 
       {/* The ONE kit button (audit #28), prominent at the top since P3-06. */}
-      {showTotal && lines.length > 0 && (toBuy.length > 0 || kitDone || adding === "kit") && (
+      {showTotal && lines.length > 0 && pricesReady && (plan.add.length > 0 || plan.inCart.length > 0 || kitDone || adding === "kit") && (
         <div className="space-y-2 rounded-xl bg-panel/60 p-3 shadow-neu-inset sm:p-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1 space-y-0.5">
@@ -506,19 +499,39 @@ export function BomTable({
               </p>
               <p className="text-[11.5px] text-mutedtext">{tU("kitText")}</p>
             </div>
-            {kitDone ? (
+            {kitDone || plan.add.length === 0 ? (
               <Link href="/store/cart" className="inline-flex items-center gap-1 text-xs font-semibold text-buy max-md:min-h-11">
                 <PackageCheck className="h-3.5 w-3.5" />
-                {t("kitAdded")}
+                {kitDone ? t("kitAdded") : t("kitAllInCart")}
               </Link>
             ) : (
-              <PrimaryButton onClick={buyKit} disabled={!toBuy.length || adding !== null} title={t("kitHint")}>
+              <PrimaryButton onClick={buyKit} disabled={adding !== null} title={t("kitHint")} className="justify-center max-md:w-full">
                 {adding === "kit" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}
-                {t("addKit", { count: toBuy.length })}
-                {kitDiscountPct > 0 && ` ${t("kitDiscountNote", { pct: kitDiscountPct })}`}
+                {t("addKitPlan", {
+                  n: plan.add.length,
+                  count: String(plan.add.length),
+                  form: arabicCountForm(plan.add.length),
+                  total: formatPrice(plan.total, locale),
+                })}
               </PrimaryButton>
             )}
           </div>
+          {!kitDone && plan.add.length > 0 && kitDiscountPct > 0 && (
+            <p className="text-end text-[11px] text-buy">{t("kitDiscountIncluded", { pct: String(kitDiscountPct) })}</p>
+          )}
+          {!kitDone && plan.add.length > 0 && plan.inCart.length > 0 && (
+            <p className="text-[11.5px] text-mutedtext">
+              {t("kitAlreadyInCart", { n: plan.inCart.length, count: String(plan.inCart.length), form: arabicCountForm(plan.inCart.length) })}
+            </p>
+          )}
+          {plan.sourced.length > 0 && (
+            <p className="text-[11.5px] text-mutedtext">
+              <span className="font-semibold text-heading">
+                {t("kitWeSource", { n: plan.sourced.length, count: String(plan.sourced.length), form: arabicCountForm(plan.sourced.length) })}
+              </span>{" "}
+              {[...new Set(plan.sourced.map((x) => x.name))].join(" · ")}
+            </p>
+          )}
           {kitFailed && <p className="text-end text-[11.5px] text-destructive">{t("kitFailed")}</p>}
         </div>
       )}
@@ -581,6 +594,7 @@ export function BomTable({
                             adding={adding}
                             added={added.has(l.id)}
                             orderStatuses={orderStatuses}
+                            inCart={inCart.has(l.id)}
                             admin={admin}
                             onAdd={() => add(l)}
                             onChoose={onChoose}
@@ -626,6 +640,7 @@ function Row({
   adding,
   added,
   orderStatuses,
+  inCart,
   admin,
   onAdd,
   onChoose,
@@ -638,6 +653,8 @@ function Row({
   adding: string | null;
   added: boolean;
   orderStatuses: Map<string, string> | null;
+  /** A cart line of this project holds this BOM line. */
+  inCart: boolean;
   /** super_admin: show the matcher's reasons. */
   admin: boolean;
   onAdd: () => void;
@@ -841,7 +858,13 @@ function Row({
         ) : null}
         {buying && pack > 1 && (
           <span className="mt-1 block text-[10.5px] leading-snug text-inventory">
-            {t("packLine", { need: l.quantity, pack, price: formatPrice(Number(buying.unit_price), locale) })}
+            {t("packNeed", {
+              need: String(l.quantity),
+              n: packs ?? 1,
+              count: String(packs ?? 1),
+              form: arabicCountForm(packs ?? 1),
+              pack: String(pack),
+            })}
           </span>
         )}
       </td>
@@ -863,6 +886,11 @@ function Row({
                   ? t("bomDelivered")
                   : t("bomBought")}
             </Tag>
+          ) : inCart ? (
+            <Tag variant="buy">
+              <ShoppingCart className="h-3 w-3" />
+              {t("bomInCart")}
+            </Tag>
           ) : groupOf(l) === "fabrication" ? (
             <Tag variant="neutral">{t("bomFabrication")}</Tag>
           ) : m?.status === "have" ? (
@@ -879,7 +907,7 @@ function Row({
             <Tag variant="neutral">{t("bomNotStocked")}</Tag>
           ) : null}
           {p && !m?.have && !l.fulfilled && <LeadTimeBadge leadClass={p.lead_time_class} />}
-          {canBuy ? (
+          {canBuy && !inCart ? (
             <SoftButton onClick={onAdd} disabled={adding !== null} className="bg-surface">
               {adding === l.id ? (
                 <Loader2 className="h-3 w-3 animate-spin" />

@@ -15,6 +15,7 @@ import { track } from "@/lib/analytics";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { loadSupabase } from "@/lib/supabase/lazy";
 import { trackDemand } from "@/lib/store/demand-client";
+import { kitDiscountQar } from "@/lib/prototyping/kit-plan";
 
 // ── The cart ────────────────────────────────────────────────────────────────
 //
@@ -43,6 +44,9 @@ import { trackDemand } from "@/lib/store/demand-client";
 
 type AddOptions = { bomLines?: string[]; kitId?: string | null };
 
+/** One cart row of a project kit: a product, its packs and the BOM lines it covers (lib/prototyping/kit-plan). */
+export type KitRowInput = { part: Pick<Part, "id" | "min_order_qty"> & { sku?: string }; quantity: number; bomLines: string[] };
+
 /** "load": the cart could not be read; "save": a change was not saved. */
 export type CartError = "load" | "save";
 
@@ -54,6 +58,12 @@ type CartContextValue = {
   updateQty: (rowId: string, qty: number) => Promise<boolean>;
   removeItem: (rowId: string) => Promise<boolean>;
   removeKit: (kitId: string) => Promise<boolean>;
+  /**
+   * A whole project kit in ONE write: the kit row, then every line in a single
+   * insert. All or nothing — a failed insert removes the kit again, so the cart
+   * never holds half a kit (P5-02). Resolves the kit id, or null on failure.
+   */
+  addKit: (projectId: string, rows: KitRowInput[]) => Promise<string | null>;
   clearCart: () => Promise<boolean>;
   itemCount: number;
   /** Before any kit discount. */
@@ -299,6 +309,49 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [reload, failed]
   );
 
+  const addKit = useCallback(
+    async (projectId: string, rows: KitRowInput[]) => {
+      if (!rows.length) return null;
+      let user: Awaited<ReturnType<typeof ensureSession>>;
+      try {
+        user = await ensureSession();
+      } catch (e) {
+        await failed("kit (session)", e);
+        return null;
+      }
+      const supabase = await loadSupabase();
+      const kit = await supabase.from("project_kits").insert({ project_id: projectId }).select("id").single();
+      if (kit.error || !kit.data) {
+        await failed("kit", kit.error);
+        return null;
+      }
+      const kitId = kit.data.id as string;
+      const { error: linesError } = await supabase.from("cart_items").insert(
+        rows.map((r) => ({
+          user_id: user.id,
+          product_id: r.part.id,
+          project_id: projectId,
+          quantity: Math.max(r.part.min_order_qty || 1, Math.trunc(r.quantity) || 1),
+          bom_lines: r.bomLines,
+          kit_id: kitId,
+        }))
+      );
+      if (linesError) {
+        // One statement: nothing was inserted. Take the empty kit away again.
+        await supabase.from("project_kits").delete().eq("id", kitId);
+        await failed("kit lines", linesError);
+        return null;
+      }
+      for (const r of rows) {
+        trackDemand("add_to_cart", { partId: r.part.id });
+        track("add_to_cart", { sku: r.part.sku ?? r.part.id, qty: r.quantity });
+      }
+      await reload();
+      return kitId;
+    },
+    [reload, failed]
+  );
+
   const clearCart = useCallback(async () => {
     const supabase = await loadSupabase();
     const user = await getCurrentUser();
@@ -313,13 +366,14 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<CartContextValue>(() => {
     const subtotal = cartTotal(items);
     const kitSum = cartTotal(items.filter((i) => i.kitId));
-    const discount = Math.round(((kitSum * kitDiscountPct) / 100) * 100) / 100;
+    const discount = kitDiscountQar(kitSum, kitDiscountPct);
     return {
       items,
       addItem,
       updateQty,
       removeItem,
       removeKit,
+      addKit,
       clearCart,
       itemCount: cartItemCount(items),
       subtotalQar: subtotal,
@@ -331,7 +385,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       retry: reload,
       reload,
     };
-  }, [items, addItem, updateQty, removeItem, removeKit, clearCart, kitDiscountPct, ready, error, reload]);
+  }, [items, addItem, updateQty, removeItem, removeKit, addKit, clearCart, kitDiscountPct, ready, error, reload]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

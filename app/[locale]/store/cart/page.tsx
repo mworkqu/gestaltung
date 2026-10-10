@@ -15,6 +15,8 @@ import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
 import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
+import { kitDiscountQar as kitDiscountOf } from "@/lib/prototyping/kit-plan";
+import { arabicCountForm } from "@/lib/text/count";
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
@@ -87,7 +89,7 @@ export default function CartPage() {
         <ul className="min-w-0 space-y-3">
           {[...kits.entries()].map(([kitId, lines]) => {
             const sum = lines.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-            const price = sum - Math.round(((sum * kitDiscountPct) / 100) * 100) / 100;
+            const price = sum - kitDiscountOf(sum, kitDiscountPct);
             return (
               <li key={kitId} className="neu min-w-0 space-y-3 p-3 sm:p-4">
                 <div className="flex flex-wrap items-center gap-3">
@@ -126,7 +128,8 @@ export default function CartPage() {
                         {toConfirm(i) && <span className="ms-1 text-[10.5px] text-mutedtext">{tD("dateTbc")}</span>}
                       </span>
                       <span className="shrink-0 tabular-nums text-mutedtext">
-                        × {i.quantity} · {formatPrice(i.unitPrice * i.quantity, locale)}
+                        {(i.packSize ?? 1) > 1 ? t("cartPacks", { n: i.quantity, count: String(i.quantity), form: arabicCountForm(i.quantity), size: String(i.packSize ?? 1) }) : `× ${i.quantity}`} ·{" "}
+                        {formatPrice(i.unitPrice * i.quantity, locale)}
                       </span>
                     </li>
                   ))}
@@ -176,7 +179,12 @@ export default function CartPage() {
                   {item.projectName && (
                     <p className="text-[11px] text-mutedtext">{t("forProject", { project: item.projectName })}</p>
                   )}
-                  <p className="mt-1 text-sm font-medium text-body">{formatPrice(item.unitPrice, locale)}</p>
+                  <p className="mt-1 text-sm font-medium text-body">
+                    {formatPrice(item.unitPrice, locale)}
+                    {(item.packSize ?? 1) > 1 && (
+                      <span className="ms-1 text-[11px] font-normal text-mutedtext">{t("cartPerPack", { size: String(item.packSize ?? 1) })}</span>
+                    )}
+                  </p>
                 </div>
 
                 <div className="flex flex-col items-end gap-2 max-sm:w-full max-sm:flex-row max-sm:items-center max-sm:justify-between">
