@@ -49,6 +49,8 @@ export type PricingPlans = {
 export type ServicePrices = {
   currency: "QAR";
   enclosure_from: number;
+  /** EDM work, "from" price on /design/quote. Added after 0051 (see 0062). */
+  edm_from: number;
   drawing_simple: number;
   drawing_assembly: number;
   drawing_complex_from: number;
@@ -103,6 +105,7 @@ export const DEFAULT_PRICING_PLANS: PricingPlans = {
 export const DEFAULT_SERVICE_PRICES: ServicePrices = {
   currency: "QAR",
   enclosure_from: 800,
+  edm_from: 350,
   drawing_simple: 200,
   drawing_assembly: 450,
   drawing_complex_from: 800,

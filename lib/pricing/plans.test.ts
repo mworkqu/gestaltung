@@ -99,7 +99,21 @@ describe("migration 0051 seeds the same defaults", () => {
   };
 
   it("pricing_plans", () => expect(seeded("pricing_plans")).toEqual(DEFAULT_PRICING_PLANS));
-  it("service_prices", () => expect(seeded("service_prices")).toEqual(DEFAULT_SERVICE_PRICES));
+  it("service_prices (edm_from came later, 0062)", () => {
+    const original: Record<string, unknown> = { ...DEFAULT_SERVICE_PRICES };
+    delete original.edm_from;
+    expect(seeded("service_prices")).toEqual(original);
+  });
+  it("0062 adds edm_from without touching other owner edits", () => {
+    const add = fs.readFileSync(path.join(process.cwd(), "supabase", "migrations", "0062_edm_price_drawing_uploads.sql"), "utf8");
+    expect(add).toContain(`"edm_from": ${DEFAULT_SERVICE_PRICES.edm_from}`);
+    expect(add).toMatch(/not \(value \? 'edm_from'\)/i);
+  });
+  it("a stored row without edm_from still parses, with the default", () => {
+    const old: Record<string, unknown> = { ...DEFAULT_SERVICE_PRICES };
+    delete old.edm_from;
+    expect(parseServicePrices(old)).toEqual(DEFAULT_SERVICE_PRICES);
+  });
   it("never overwrites an owner edit", () => {
     expect(sql).toMatch(/on conflict \(key\) do nothing/i);
     expect(sql).not.toMatch(/do update/i);

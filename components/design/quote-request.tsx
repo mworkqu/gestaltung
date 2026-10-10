@@ -21,14 +21,8 @@ import {
 } from "@/lib/design/constants";
 import { cn } from "@/lib/utils";
 import { isValidPhone } from "@/lib/phone";
+import { DEFAULT_QUOTE_METHOD, QUOTE_METHODS } from "@/lib/design/quote-method";
 
-const TECHNIQUES = [
-  "3d_printing",
-  "cnc_machining",
-  "laser_cutting",
-  "edm",
-  "not_sure",
-] as const;
 
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -46,7 +40,14 @@ type Done = "sent" | "sent_large" | "sent_nofile" | null;
 // token goes to ensureSession() (anonymous sign-in for the project). If that
 // still fails the request falls back to the plain quote upload, as before — the
 // lead is never lost. Switch off = no widget, exactly as before.
-export function QuoteRequest({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
+export function QuoteRequest({
+  turnstileEnabled = false,
+  edmFrom,
+}: {
+  turnstileEnabled?: boolean;
+  /** service_prices.edm_from, already formatted (the price is data, never typed here). */
+  edmFrom: string;
+}) {
   const t = useTranslations("DesignQuote");
   const tPhone = useTranslations("Phone");
   const locale = useLocale();
@@ -54,20 +55,18 @@ export function QuoteRequest({ turnstileEnabled = false }: { turnstileEnabled?: 
   const inputRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
-  const techniqueRef = useRef<HTMLSelectElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
-  const [technique, setTechnique] = useState("");
+  const [technique, setTechnique] = useState<string>(DEFAULT_QUOTE_METHOD);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   // Field-level errors, shown under the field they belong to. A failed check
   // never clears what was typed.
   const [fileError, setFileError] = useState<string | null>(null);
   const [contactError, setContactError] = useState<string | null>(null);
-  const [techniqueError, setTechniqueError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<Done>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -122,17 +121,11 @@ export function QuoteRequest({ turnstileEnabled = false }: { turnstileEnabled?: 
     e.preventDefault();
     setError(null);
 
-    // The file is optional (see the label); contact and method are required.
+    // The file and the method are optional; only a way to reach you is required.
     const cErr = contactProblem(email, phone);
-    const tErr = technique ? null : t("errorTechnique");
     setContactError(cErr);
-    setTechniqueError(tErr);
     if (cErr) {
       (!email.trim() && phone.trim() ? phoneRef : emailRef).current?.focus();
-      return;
-    }
-    if (tErr) {
-      techniqueRef.current?.focus();
       return;
     }
 
@@ -253,7 +246,7 @@ export function QuoteRequest({ turnstileEnabled = false }: { turnstileEnabled?: 
               setEmail("");
               setPhone("");
               setName("");
-              setTechnique("");
+              setTechnique(DEFAULT_QUOTE_METHOD);
               setMessage("");
               setDone(null);
             }}
@@ -393,39 +386,23 @@ export function QuoteRequest({ turnstileEnabled = false }: { turnstileEnabled?: 
           />
         </div>
 
-        {/* Technique */}
+        {/* Method (optional, defaults to "not sure") */}
         <div className="space-y-2">
           <label htmlFor="q-technique" className={mono("block text-[10px] text-mutedtext")}>
-            {t("techniqueLabel")} <span aria-hidden className="text-destructive">*</span>
+            {t("techniqueLabel")} <span className="lowercase text-faint">({t("techniqueOptional")})</span>
           </label>
           <select
             id="q-technique"
-            ref={techniqueRef}
             value={technique}
-            onChange={(e) => {
-              setTechnique(e.target.value);
-              setTechniqueError(null);
-            }}
-            onBlur={() => setTechniqueError(technique ? null : t("errorTechnique"))}
-            aria-required
-            aria-invalid={techniqueError ? true : undefined}
-            aria-describedby={techniqueError ? "q-technique-msg" : undefined}
-            className={cn(fieldClass, isRtl && "text-right")}
+            onChange={(e) => setTechnique(e.target.value)}
+            className={cn(fieldClass, "min-h-11", isRtl && "text-right")}
           >
-            <option value="" disabled>
-              {t("techniquePlaceholder")}
-            </option>
-            {TECHNIQUES.map((m) => (
+            {QUOTE_METHODS.map((m) => (
               <option key={m} value={m}>
-                {t(`technique_${m}`)}
+                {m === "edm" ? t("technique_edm_from", { price: edmFrom }) : t(`technique_${m}`)}
               </option>
             ))}
           </select>
-          {techniqueError && (
-            <p id="q-technique-msg" role="alert" className="text-sm font-medium text-destructive">
-              {techniqueError}
-            </p>
-          )}
         </div>
       </div>
 

@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { QuoteRequest } from "@/components/design/quote-request";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+import { getServicePrices } from "@/lib/store/public-catalog";
+import { formatQar } from "@/lib/pricing/plans";
 
 // Public quote-request page. The homepage dropzone hands off a CAD file here;
 // this page collects the visitor's email/phone + preferred method and submits a
@@ -31,7 +33,7 @@ export default async function DesignQuotePage({
 
   const t = await getTranslations("DesignQuote");
   // Cached public read (tag "store-settings"): the page stays static / ISR.
-  const turnstileEnabled = await turnstileEnabledForPages();
+  const [turnstileEnabled, prices] = await Promise.all([turnstileEnabledForPages(), getServicePrices()]);
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -52,7 +54,7 @@ export default async function DesignQuotePage({
           {t("subheading")}
         </p>
 
-        <QuoteRequest turnstileEnabled={turnstileEnabled} />
+        <QuoteRequest turnstileEnabled={turnstileEnabled} edmFrom={formatQar(prices.edm_from)} />
       </div>
     </div>
     </MessagesScope>

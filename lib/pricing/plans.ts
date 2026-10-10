@@ -46,6 +46,8 @@ const pricingPlansSchema = z.object({
 const servicePricesSchema = z.object({
   currency: z.literal("QAR"),
   enclosure_from: money,
+  // Optional in storage (rows seeded by 0051 have none): falls back to the default.
+  edm_from: money.default(DEFAULT_SERVICE_PRICES.edm_from),
   drawing_simple: money,
   drawing_assembly: money,
   drawing_complex_from: money,
