@@ -12,10 +12,11 @@
 // viewer and exports stay identical. The formats must not change: if a field is
 // needed, add it to schema.ts for both backends.
 
-import type * as THREE from "three";
+import * as THREE from "three";
 import type { EnclosureSpec, LibraryPart, MechPart } from "./schema";
 import type { LayoutResult } from "./layout";
 import { buildEnclosure, type EnclosureMeta } from "./enclosure/build";
+import { buildMechGeometry } from "./mech/templates";
 
 export type CadEnclosure = { base: THREE.Mesh; lid: THREE.Mesh; meta: EnclosureMeta };
 
@@ -32,9 +33,14 @@ export class BrowserCadBackend implements CadBackend {
     return buildEnclosure(enc, layout, parts);
   }
 
+  /** One printable part in its own local coords (placement: lib/studio/mech/build.ts). */
   async buildMechPart(part: MechPart): Promise<THREE.Object3D> {
-    // Phase 2: lib/studio/mech/* will build printable mechanical parts.
-    throw new Error(`phase 2: mechanical part "${part.template}" is not built yet`);
+    const mesh = new THREE.Mesh(
+      buildMechGeometry(part),
+      new THREE.MeshStandardMaterial({ color: 0xf2f0eb, roughness: 0.7, metalness: 0 }),
+    );
+    mesh.name = part.id;
+    return mesh;
   }
 }
 

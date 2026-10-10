@@ -44,6 +44,11 @@ export function cylX(name: string, r: number, len: number, xc: number, y: number
   return mesh(name, g, m, xc, y, zc);
 }
 
+/** Cylinder with its axis along Y, centred on (x, yc, zc). */
+export function cylY(name: string, r: number, len: number, x: number, yc: number, zc: number, m: M, seg = 16): THREE.Mesh {
+  return mesh(name, new THREE.CylinderGeometry(r, r, len, seg), m, x, yc, zc);
+}
+
 /** Upper hemisphere (dome) of radius r, flattened to height h, base on zBottom. */
 export function dome(
   name: string, r: number, h: number, x: number, y: number, zBottom: number, m: M, wSeg = 20, hSeg = 8,

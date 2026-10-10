@@ -14,6 +14,18 @@ import { oledDisplay } from "./oledDisplay";
 import { pushButton } from "./pushButton";
 import { led } from "./led";
 import { resistor } from "./resistor";
+import { moduleBoard } from "./moduleBoard";
+import { aaHolder } from "./aaHolder";
+import { lipoPouch } from "./lipoPouch";
+import { ultrasonicSensor } from "./ultrasonicSensor";
+import { ledRing } from "./ledRing";
+import { buzzer } from "./buzzer";
+import { speakerAmp } from "./speakerAmp";
+import { servo } from "./servo";
+import { n20Motor } from "./n20Motor";
+import { slideSwitch } from "./slideSwitch";
+import { ds18b20Probe } from "./ds18b20Probe";
+import { lcdModule } from "./lcdModule";
 
 export const BUILDERS: Record<string, ModelBuilder> = {
   devBoard,
@@ -25,6 +37,18 @@ export const BUILDERS: Record<string, ModelBuilder> = {
   pushButton,
   led,
   resistor,
+  moduleBoard,
+  aaHolder,
+  lipoPouch,
+  ultrasonicSensor,
+  ledRing,
+  buzzer,
+  speakerAmp,
+  servo,
+  n20Motor,
+  slideSwitch,
+  ds18b20Probe,
+  lcdModule,
 };
 
 /** Grey rounded box of the part's dims (STL parts: the viewer swaps in the real mesh). */

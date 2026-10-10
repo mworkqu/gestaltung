@@ -91,7 +91,8 @@ describe("buildEnclosure", () => {
     expect(be.id).toBe("browser");
     const { base } = await be.buildEnclosure(spec(), lr, parts);
     expect(base.name).toBe("enclosure_base");
-    await expect(be.buildMechPart({ id: "s", template: "standoff", params: {}, printable: { material: "PLA", estGrams: 1 } })).rejects.toThrow(/phase 2/);
+    const mech = await be.buildMechPart({ id: "s", template: "standoff", params: {}, printable: { material: "PLA", estGrams: 1 } });
+    expect(mech.name).toBe("s");
   });
 });
 

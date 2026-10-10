@@ -1,11 +1,17 @@
-// 0.96" I2C OLED: blue board, black glass, cyan active area, 4-pin header at -y.
+// I2C OLED module (0.96" or 1.3"): blue board, black glass, cyan active area, 4-pin header at -y.
+//
+// params (all optional; defaults are the 0.96" module):
+//   glassW / glassH   glass panel size          (dx - 1.6, 19.6)
+//   glassY            glass centre y            (3)
+//   activeW / activeH lit pixel area            (21.7, 10.9)
+//   activeDY          active-area centre above the glass centre (1.2)
 
 import * as THREE from "three";
 import type { ModelBuilder } from "./types";
 import { mat, GOLD, METAL, BLACK } from "./materials";
-import { box, rbox, cylZ, finish } from "./shapes";
+import { box, rbox, cylZ, finish, num } from "./shapes";
 
-export const oledDisplay: ModelBuilder = ({ part }) => {
+export const oledDisplay: ModelBuilder = ({ part, params }) => {
   const { x: dx, y: dy, z: dz } = part.dims;
   const g = new THREE.Group();
   const t = 1.2;
@@ -17,13 +23,15 @@ export const oledDisplay: ModelBuilder = ({ part }) => {
   }
 
   // Glass panel and active pixel area.
-  const yGlass = 3;
-  g.add(box("glass", dx - 1.6, 19.6, 1.4, 0, yGlass, t, mat("#0a0b0d", { roughness: 0.12, metalness: 0.2 })));
-  g.add(box("active_area", 21.7, 10.9, 0.06, 0, yGlass + 1.2, t + 1.4, mat("#0b2e3a", {
+  const glassW = num(params.glassW, dx - 1.6);
+  const glassH = num(params.glassH, 19.6);
+  const yGlass = num(params.glassY, 3);
+  g.add(box("glass", glassW, glassH, 1.4, 0, yGlass, t, mat("#0a0b0d", { roughness: 0.12, metalness: 0.2 })));
+  g.add(box("active_area", num(params.activeW, 21.7), num(params.activeH, 10.9), 0.06, 0, yGlass + num(params.activeDY, 1.2), t + 1.4, mat("#0b2e3a", {
     roughness: 0.25, emissive: "#2ab4d6", emissiveIntensity: 0.55,
   })));
   // Flex-cable fold and driver chip sliver below the glass.
-  g.add(box("flex_cable", dx - 6, 3, 0.35, 0, yGlass - 9.9 - 1.1, t, mat("#b8742a", { roughness: 0.6 })));
+  g.add(box("flex_cable", dx - 6, 3, 0.35, 0, yGlass - glassH / 2 - 0.1 - 1.1, t, mat("#b8742a", { roughness: 0.6 })));
 
   // 4-pin header (GND VCC SCL SDA).
   const hy = -dy / 2 + 1.7;
