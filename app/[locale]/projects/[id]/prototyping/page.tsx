@@ -1,4 +1,6 @@
+import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { getSessionContext } from "@/lib/auth/get-session";
 import { pageMetadata } from "@/lib/seo";
 
 import { PrototypingWorkspace } from "@/components/prototyping/workspace";
@@ -40,6 +42,12 @@ export default async function PrototypingPage({
   // chat opens with the first turn, and the project gets a name from its brief.
   const startChat = (await searchParams).start === "chat";
   setRequestLocale(locale);
+  // P5-13: this workspace is the Engineer view now. Everyone except a
+  // super_admin (checked on the server) goes to the Design Studio.
+  const session = await getSessionContext().catch(() => null);
+  if (session?.profile.role !== "super_admin") {
+    redirect(`/${locale}/projects/${id}/studio${startChat ? "?start=chat" : ""}`);
+  }
   // Only the provider's public name crosses to the client — never its key.
   const { destination } = await providerStatus();
   // P2-08: guests need a Turnstile token for /api/analyse while the switch is on.

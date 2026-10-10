@@ -7,7 +7,8 @@ export type LeadKind = (typeof LEAD_KINDS)[number];
 
 export function leadKind(message: string | null | undefined): LeadKind {
   const m = (message ?? "").toLowerCase();
-  if (m.startsWith("custom manufacturing quote request") || m.startsWith("cad file attached")) return "quote";
+  if (m.startsWith("custom manufacturing quote request") || m.startsWith("cad file attached") || m.startsWith("design studio:"))
+    return "quote";
   if (m.startsWith("drawing request") || m.startsWith("help me draw it")) return "drawing";
   if (m.startsWith("quote request for") || m.startsWith("bill of materials")) return "bom";
   if (m.startsWith("store landing") || m.includes("requested a callback")) return "callback";

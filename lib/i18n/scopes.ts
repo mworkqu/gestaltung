@@ -59,6 +59,23 @@ export const MESSAGE_SCOPES = {
   // the Orders namespace is read on the server.
   orders: ["PayMethods"],
   project: ["PartsDashboard", "ProjectCad", "Projects", "Prototyping", "Search", "Turnstile"],
+  // Design Studio (P5-13): the flow + what its reused client pieces read
+  // (AccessNote, the consent line, PhonePrompt, the guest check dialog).
+  studio: [
+    "Studio",
+    "Credits",
+    "Prototyping.aiConsentLabel",
+    "Prototyping.aiConsentHint",
+    "Prototyping.chatThinking",
+    "Prototyping.chatFailed",
+    "Prototyping.chatPlaceholder",
+    "Prototyping.chatSend",
+    "Prototyping.readAloud",
+    "Prototyping.readAloudStop",
+    "Projects",
+    "Parts",
+    "Turnstile",
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 export type MessageScope = keyof typeof MESSAGE_SCOPES | "all";

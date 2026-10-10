@@ -43,6 +43,13 @@ const SOURCES: Record<
     subject: (n) => `New drawing request — ${n}`,
     fallbackMessage: "Help me draw it — new drawing project.",
   },
+  // Design Studio "Get it made" (P5-13): the design name, the project link and
+  // the part names. The visitor may have no name on file: a neutral one is used.
+  studio_quote: {
+    label: "Design Studio request",
+    subject: (n) => `Design Studio — get it made — ${n}`,
+    fallbackMessage: "Design Studio — get it made.",
+  },
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -110,8 +117,10 @@ export async function POST(request: Request) {
     source?: string;
     // contact_form only: "school" | "institution" from /contact?kind=....
     kind?: string;
-    // bom_quote only.
+    // bom_quote / studio_quote only.
     items?: unknown;
+    // studio_quote only: the design (product) name from the Studio.
+    designName?: string;
     note?: string;
     projectId?: string;
     // P2-08: the Turnstile token from the contact / callback forms.
@@ -126,19 +135,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "captcha_failed" }, { status: 403 });
   }
 
-  const name = String(body.name ?? "").trim().slice(0, 120);
+  const isStudio = body.source === "studio_quote";
+  const name = String(body.name ?? "").trim().slice(0, 120) || (isStudio ? "Design Studio visitor" : "");
   const phone = normalizePhone(String(body.phone ?? "")).slice(0, 40);
   const email = String(body.email ?? "").trim().slice(0, 160) || null;
   const locale = body.locale === "ar" ? "ar" : "en";
   const src = SOURCES[body.source ?? ""] ?? SOURCES.store_callback;
   const isQuote = body.source === "bom_quote";
-  const items = isQuote ? quoteItems(body.items) : [];
+  const items = isQuote || isStudio ? quoteItems(body.items) : [];
   const contactKind =
     body.source === "contact_form" && typeof body.kind === "string" && Object.hasOwn(CONTACT_KINDS, body.kind)
       ? CONTACT_KINDS[body.kind]
       : null;
 
-  if (!name || !phone || (isQuote && !items.length)) {
+  if (!name || !phone || ((isQuote || isStudio) && !items.length)) {
     return NextResponse.json({ error: "missing_fields" }, { status: 422 });
   }
 
@@ -168,6 +178,31 @@ export async function POST(request: Request) {
       projectId ? `Project: ${projectName ?? "(name not readable)"} — ${link}` : null,
       items.map((i) => `- ${i.function}${i.spec ? ` — ${i.spec}` : ""} × ${i.quantity}`).join("\n"),
       note ? `Note:\n${note}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 4000);
+  }
+
+  if (isStudio) {
+    // "Design Studio: <name> — <project link>", then the parts (quantity is always 1).
+    const projectId = typeof body.projectId === "string" && UUID.test(body.projectId) ? body.projectId : null;
+    let projectName: string | null = null;
+    if (projectId) {
+      try {
+        const supabase = await createClient();
+        const { data } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle();
+        projectName = (data?.name as string | undefined) ?? null;
+      } catch (err) {
+        console.error("store-lead: project name lookup failed", err);
+      }
+    }
+    const design = String(body.designName ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || projectName || "Untitled design";
+    const link = projectId ? `${new URL(request.url).origin}/${locale}/projects/${projectId}/studio` : null;
+    message = [
+      `Design Studio: ${design}${link ? ` — ${link}` : ""}`,
+      projectId ? `Project: ${projectName ?? design}${link ? ` — ${link}` : ""}` : null,
+      items.map((i) => `- ${i.function}`).join("\n"),
     ]
       .filter(Boolean)
       .join("\n\n")

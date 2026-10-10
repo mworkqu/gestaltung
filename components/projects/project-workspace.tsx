@@ -405,7 +405,8 @@ function PrototypingCard({ projectId }: { projectId: string }) {
           <p className="mt-1 text-sm text-mutedtext">{t("openIntro")}</p>
         </div>
         <Button asChild>
-          <Link href={`/projects/${projectId}/prototyping`}>{t("open")}</Link>
+          {/* P5-13: the Design Studio; the old workspace is the super_admin Engineer view (link inside the Studio). */}
+          <Link href={`/projects/${projectId}/studio`}>{t("open")}</Link>
         </Button>
       </div>
     </section>

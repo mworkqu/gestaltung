@@ -7,9 +7,9 @@
 //   2. one projects insert: name "New project", brief = the message, and the
 //      AI consent in spec.aiConsent (so the provider never gets text before a
 //      consent record exists);
-//   3. the first /api/brief-chat turn;
-//   4. the turn (or its failure) goes to sessionStorage and the workspace
-//      opens with ?start=chat, where BriefChat picks it up and carries on.
+//   3. (P5-13) no AI call here: the Design Studio asks the first question;
+//   4. the first message goes to sessionStorage and the Design Studio
+//      opens with ?start=chat, where its idea chat picks it up and carries on.
 // The 3-active-projects cap (0042) stops at step 2 with a link to archive one.
 //
 // Turnstile (P2-08): with the switch on and no session yet, the widget shows
@@ -18,7 +18,7 @@
 // dialog. Switch off = no widget, ensureSession() exactly as before.
 
 import { useEffect, useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 import { Link, useRouter } from "@/i18n/navigation";
 import { ChatConsent, ChatInput, ChatMessages } from "@/components/prototyping/chat-thread";
@@ -27,7 +27,6 @@ import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import {
-  buildFirstTurn,
   buildHandoff,
   chatStorageKey,
   isProjectLimitError,
@@ -37,7 +36,6 @@ import {
 
 export function NewProjectChat({ destination, turnstileEnabled = false }: { destination: string; turnstileEnabled?: boolean }) {
   const t = useTranslations("Projects");
-  const locale = useLocale();
   const router = useRouter();
 
   const [input, setInput] = useState("");
@@ -92,38 +90,20 @@ export function NewProjectChat({ destination, turnstileEnabled = false }: { dest
       return;
     }
 
-    let reply: string | null = null;
-    let addition: string | null = null;
-    let done = false;
-    let errorCode: string | null = null;
-    try {
-      const res = await fetch("/api/brief-chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId, locale, brief: "", messages: buildFirstTurn(text) }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { reply?: string; done?: boolean; addition?: string; error?: string };
-      if (!res.ok || !data.reply) errorCode = data.error ?? "failed";
-      else {
-        reply = data.reply;
-        done = Boolean(data.done);
-        addition = data.done && data.addition ? data.addition : null;
-      }
-    } catch {
-      errorCode = "failed";
-    }
-
+    // P5-13: the Design Studio's idea chat takes the first message from here
+    // and asks the first question itself (/api/studio/spec), so no AI call is
+    // made on this page any more.
     try {
       sessionStorage.setItem(
         chatStorageKey(projectId),
-        JSON.stringify(buildHandoff({ text, reply, addition, done, error: errorCode }))
+        JSON.stringify(buildHandoff({ text, reply: null, addition: null, done: false, error: null }))
       );
     } catch {
-      // Storage blocked: the workspace opens on the brief without the chat.
+      // Storage blocked: the Studio opens with the brief in the input instead.
     }
     // refresh() so the server sees the session cookie the anonymous sign-in
-    // just wrote, before the workspace renders.
-    router.replace(`/projects/${projectId}/prototyping?start=chat`);
+    // just wrote, before the Studio renders.
+    router.replace(`/projects/${projectId}/studio?start=chat`);
     router.refresh();
   }
 
