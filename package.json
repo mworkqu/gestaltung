@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.1",
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.1",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
     "class-variance-authority": "^0.7.1",
@@ -30,6 +32,8 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.180.0",
+    "three-bvh-csg": "0.0.18",
+    "three-mesh-bvh": "0.9.16",
     "zod": "^4.6.5"
   },
   "devDependencies": {
