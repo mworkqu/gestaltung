@@ -274,14 +274,14 @@ export function renderSchematicSVG(
     }
     const colSide: "L" | "R" = l > r ? "L" : r > l ? "R" : DEFAULT_LEFT.has(e.p.category) ? "L" : "R";
     const name = plainName(e.p, locale);
-    const labW = (ps: Pin[]) => Math.max(0, ...ps.map((p) => textW(pinText(p), 9, true)));
-    const w = Math.ceil(Math.max(BOX_MIN_W, textW(name, 12) + 28, textW(KIND_TEXT[e.p.category][locale], 9) + 28, labW(inner) + labW(outer) + 34));
+    const labW = (ps: Pin[]) => Math.max(0, ...ps.map((p) => textW(pinText(p), 11, true)));
+    const w = Math.ceil(Math.max(BOX_MIN_W, textW(name, 14) + 28, textW(KIND_TEXT[e.p.category][locale], 11) + 28, labW(inner) + labW(outer) + 34));
     const rows = Math.max(inner.length, outer.length, 1);
     items.push({ kind: "box", e, inner, outer, w, h: HEAD + rows * ROW + 6, col: colSide, x: 0, y: 0 });
   }
   for (const ch of chains) {
-    const slots = ch.els.map((el) => Math.ceil(Math.max(60, textW(plainName(el.e.p, locale), 9) + 10)));
-    const endW = ch.end.type === "label" && ch.end.net ? textW(ch.end.net, 9, true) + 26 : ch.end.type === "power" ? textW(ch.end.net ?? "", 9, true) + 22 : 24;
+    const slots = ch.els.map((el) => Math.ceil(Math.max(60, textW(plainName(el.e.p, locale), 11) + 10)));
+    const endW = ch.end.type === "label" && ch.end.net ? textW(ch.end.net, 11, true) + 26 : ch.end.type === "power" ? textW(ch.end.net ?? "", 11, true) + 22 : 24;
     const w = STUB + slots.reduce((s, x) => s + x, 0) + endW;
     const last = ch.els[ch.els.length - 1].e.p;
     const colSide = sideOfMcuPin.get(ch.mcuPin) ?? (DEFAULT_LEFT.has(last.category) ? "L" : "R");
@@ -379,7 +379,7 @@ export function renderSchematicSVG(
       if (it.kind !== "box") continue;
       for (const p of it.outer) {
         const net = netOf.get(`${it.e.c.instanceId}.${p.id}`)?.name;
-        const sym = !net ? 14 : net === "GND" ? 20 : textW(net, 9, true) + 18;
+        const sym = !net ? 14 : net === "GND" ? 20 : textW(net, 11, true) + 18;
         w = Math.max(w, STUB + sym + 6);
       }
     }
@@ -390,7 +390,7 @@ export function renderSchematicSVG(
     nets.filter((n) => kindOf.get(n.name) === "signal" && n.pins.some((r) => sideOfMcuPin.get(r) === side || itemSideOf.get(r) === side));
   const channelW = (side: "L" | "R") => {
     const ns = sideNets(side);
-    const flag = Math.max(0, ...ns.map((n) => textW(n.name, 9, true) + 18));
+    const flag = Math.max(0, ...ns.map((n) => textW(n.name, 11, true) + 18));
     return Math.ceil(Math.max(64, 32 + ns.length * TRACK, 2 * (flag + STUB) + 16));
   };
   const roomL = left.length ? roomFor(left) : 0;
@@ -401,11 +401,11 @@ export function renderSchematicSVG(
   const chR = mcu && right.length ? channelW("R") : right.length ? 40 : 0;
 
   const sideLab = (side: "L" | "R") =>
-    Math.max(0, ...[...sideOfMcuPin].filter(([, s]) => s === side).map(([r]) => textW(pinText(pinOf(r)!.pin), 9, true)));
-  const topLab = Math.max(0, ...topPins.map((p) => textW(pinText(p), 9, true)), ...bottomPins.map((p) => textW(pinText(p), 9, true)));
+    Math.max(0, ...[...sideOfMcuPin].filter(([, s]) => s === side).map(([r]) => textW(pinText(pinOf(r)!.pin), 11, true)));
+  const topLab = Math.max(0, ...topPins.map((p) => textW(pinText(p), 11, true)), ...bottomPins.map((p) => textW(pinText(p), 11, true)));
   const pitch = Math.max(48, topLab + 14);
   const mcuW = mcu
-    ? Math.ceil(Math.max(170, textW(mcuName, 13) + 36, sideLab("L") + sideLab("R") + 48, topPins.length * pitch + 24, bottomPins.length * pitch + 24))
+    ? Math.ceil(Math.max(170, textW(mcuName, 15) + 36, sideLab("L") + sideLab("R") + 48, topPins.length * pitch + 24, bottomPins.length * pitch + 24))
     : 0;
 
   const xLeftCol = PAD + roomL; // left edge of the widest left box
@@ -475,21 +475,21 @@ export function renderSchematicSVG(
   const powerSym = (x: number, y: number, dir: Dir, net: string, c: string) => {
     const t = esc(net);
     if (dir === "U")
-      return `<path d="M${f(x - 9)} ${f(y)}H${f(x + 9)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><text x="${f(x)}" y="${f(y - 5)}" text-anchor="middle" font-family="${MONO}" font-size="9" font-weight="700" fill="${c}">${t}</text>`;
+      return `<path d="M${f(x - 9)} ${f(y)}H${f(x + 9)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><text x="${f(x)}" y="${f(y - 5)}" text-anchor="middle" font-family="${MONO}" font-size="11" font-weight="700" fill="${c}">${t}</text>`;
     if (dir === "D")
-      return `<path d="M${f(x - 9)} ${f(y)}H${f(x + 9)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><text x="${f(x)}" y="${f(y + 12)}" text-anchor="middle" font-family="${MONO}" font-size="9" font-weight="700" fill="${c}">${t}</text>`;
+      return `<path d="M${f(x - 9)} ${f(y)}H${f(x + 9)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><text x="${f(x)}" y="${f(y + 12)}" text-anchor="middle" font-family="${MONO}" font-size="11" font-weight="700" fill="${c}">${t}</text>`;
     const bx = x;
     const tx = dir === "L" ? bx - 5 : bx + 5;
-    return `<path d="M${f(bx)} ${f(y - 7)}V${f(y + 7)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><text x="${f(tx)}" y="${f(y + 3)}" text-anchor="${dir === "L" ? "end" : "start"}" font-family="${MONO}" font-size="9" font-weight="700" fill="${c}">${t}</text>`;
+    return `<path d="M${f(bx)} ${f(y - 7)}V${f(y + 7)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><text x="${f(tx)}" y="${f(y + 3)}" text-anchor="${dir === "L" ? "end" : "start"}" font-family="${MONO}" font-size="11" font-weight="700" fill="${c}">${t}</text>`;
   };
   const flag = (x: number, y: number, dir: Dir, net: string) => {
     const c = col(net);
-    const w = textW(net, 9, true) + 12;
+    const w = textW(net, 11, true) + 12;
     const s = dir === "L" ? -1 : 1;
     const x0 = x, x1 = x + s * 6, x2 = x1 + s * w;
     const pts = [[x0, y], [x1, y - 7], [x2, y - 7], [x2, y + 7], [x1, y + 7]].map(([a, b]) => `${f(a)},${f(b)}`).join(" ");
     segs.push({ x1: Math.min(x0, x2), y1: y, x2: Math.max(x0, x2), y2: y, net });
-    return `<g data-net="${esc(net)}"><polygon points="${pts}" fill="${PAPER}" stroke="${c}" stroke-width="1.4"/><text x="${f((x1 + x2) / 2)}" y="${f(y + 3)}" text-anchor="middle" font-family="${MONO}" font-size="9" font-weight="600" fill="${c}">${esc(net)}</text></g>`;
+    return `<g data-net="${esc(net)}"><polygon points="${pts}" fill="${PAPER}" stroke="${c}" stroke-width="1.4"/><text x="${f((x1 + x2) / 2)}" y="${f(y + 3)}" text-anchor="middle" font-family="${MONO}" font-size="11" font-weight="600" fill="${c}">${esc(net)}</text></g>`;
   };
   const nc = (x: number, y: number) =>
     `<path d="M${f(x - 3)} ${f(y - 3)}L${f(x + 3)} ${f(y + 3)}M${f(x + 3)} ${f(y - 3)}L${f(x - 3)} ${f(y + 3)}" stroke="${MUTED}" stroke-width="1.4"/>`;
@@ -592,7 +592,7 @@ export function renderSchematicSVG(
       // The net name rides on the wire next to the part.
       const lp = pts.find((p) => !sideOfMcuPin.has(p.ref)) ?? pts[0];
       const lx = side === "L" ? lp.x + 4 : lp.x - 4;
-      g += `<text x="${f(lx)}" y="${f(lp.y - 4)}" text-anchor="${side === "L" ? "start" : "end"}" font-family="${MONO}" font-size="8" fill="${c}">${esc(n.name)}</text></g>`;
+      g += `<text x="${f(lx)}" y="${f(lp.y - 4)}" text-anchor="${side === "L" ? "start" : "end"}" font-family="${MONO}" font-size="10" fill="${c}">${esc(n.name)}</text></g>`;
       wires.push(g);
     }
   }
@@ -604,8 +604,8 @@ export function renderSchematicSVG(
     const { e } = it;
     const inst = e.c.instanceId;
     let g = `<g data-part="${esc(inst)}"><rect x="${f(it.x)}" y="${f(it.y)}" width="${f(it.w)}" height="${f(it.h)}" rx="10" fill="${PAPER}" stroke="${LINE}" stroke-width="1.4"/>`;
-    g += `<text x="${f(it.x + it.w / 2)}" y="${f(it.y + 18)}" text-anchor="middle" font-size="12" font-weight="600" fill="${INK}"${rtl}>${esc(plainName(e.p, locale))}</text>`;
-    g += `<text x="${f(it.x + it.w / 2)}" y="${f(it.y + 31)}" text-anchor="middle" font-size="9" fill="${MUTED}"${rtl}>${kindText(e.p)}</text>`;
+    g += `<text x="${f(it.x + it.w / 2)}" y="${f(it.y + 18)}" text-anchor="middle" font-size="14" font-weight="600" fill="${INK}"${rtl}>${esc(plainName(e.p, locale))}</text>`;
+    g += `<text x="${f(it.x + it.w / 2)}" y="${f(it.y + 31)}" text-anchor="middle" font-size="11" fill="${MUTED}"${rtl}>${kindText(e.p)}</text>`;
     const innerX = it.col === "L" ? it.x + it.w : it.x;
     const outerX = it.col === "L" ? it.x : it.x + it.w;
     const pinRow = (p: Pin, i: number, x: number, outward: number, anchorInside: "start" | "end") => {
@@ -613,7 +613,7 @@ export function renderSchematicSVG(
       const net = netOf.get(`${inst}.${p.id}`)?.name;
       const c = col(net);
       const tx = anchorInside === "end" ? x - 6 : x + 6;
-      return `<path d="M${f(x)} ${f(y)}H${f(x + outward * STUB)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(x)}" cy="${f(y)}" r="2" fill="${c}"/><text x="${f(tx)}" y="${f(y + 3)}" text-anchor="${anchorInside}" font-family="${MONO}" font-size="9" fill="${INK}">${esc(pinText(p))}</text>`;
+      return `<path d="M${f(x)} ${f(y)}H${f(x + outward * STUB)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(x)}" cy="${f(y)}" r="2" fill="${c}"/><text x="${f(tx)}" y="${f(y + 3)}" text-anchor="${anchorInside}" font-family="${MONO}" font-size="11" fill="${INK}">${esc(pinText(p))}</text>`;
     };
     it.inner.forEach((p, i) => (g += pinRow(p, i, innerX, it.col === "L" ? 1 : -1, it.col === "L" ? "end" : "start")));
     it.outer.forEach((p, i) => (g += pinRow(p, i, outerX, it.col === "L" ? -1 : 1, it.col === "L" ? "start" : "end")));
@@ -661,7 +661,7 @@ export function renderSchematicSVG(
       }
       const name = plainName(el.e.p, locale);
       const ty = i % 2 === 0 ? cy - 13 : cy + 20;
-      g += `<text x="${f(cx)}" y="${f(ty)}" text-anchor="middle" font-size="9" fill="${MUTED}"${rtl} data-part="${esc(el.e.c.instanceId)}">${esc(name)}</text>`;
+      g += `<text x="${f(cx)}" y="${f(ty)}" text-anchor="middle" font-size="11" fill="${MUTED}"${rtl} data-part="${esc(el.e.c.instanceId)}">${esc(name)}</text>`;
       net = el.outNet;
       g += wire(cx + s * half, x + s * slot, net);
       x += s * slot;
@@ -680,8 +680,8 @@ export function renderSchematicSVG(
   // ── The board ──
   if (mcu) {
     let g = `<g data-part="${esc(mcu.c.instanceId)}"><rect x="${f(mcuX)}" y="${f(mcuTop)}" width="${f(mcuW)}" height="${f(mcuH)}" rx="12" fill="${BOARD_FILL}" stroke="${INK}" stroke-width="1.6"/>`;
-    g += `<text x="${f(mcuX + mcuW / 2)}" y="${f(mcuTop + 38)}" text-anchor="middle" font-size="13" font-weight="700" fill="${INK}"${rtl}>${esc(mcuName)}</text>`;
-    g += `<text x="${f(mcuX + mcuW / 2)}" y="${f(mcuTop + 51)}" text-anchor="middle" font-size="9" fill="${MUTED}"${rtl}>${kindText(mcu.p)}</text>`;
+    g += `<text x="${f(mcuX + mcuW / 2)}" y="${f(mcuTop + 38)}" text-anchor="middle" font-size="15" font-weight="700" fill="${INK}"${rtl}>${esc(mcuName)}</text>`;
+    g += `<text x="${f(mcuX + mcuW / 2)}" y="${f(mcuTop + 51)}" text-anchor="middle" font-size="11" fill="${MUTED}"${rtl}>${kindText(mcu.p)}</text>`;
     for (const [r, side] of sideOfMcuPin) {
       const e = ends.get(r)!;
       const p = pinOf(r)!.pin;
@@ -689,7 +689,7 @@ export function renderSchematicSVG(
       const c = col(net);
       const edge = side === "L" ? mcuX : mcuX + mcuW;
       g += `<path d="M${f(edge)} ${f(e.y)}H${f(e.x)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(edge)}" cy="${f(e.y)}" r="2" fill="${c}"/>`;
-      g += `<text x="${f(side === "L" ? edge + 6 : edge - 6)}" y="${f(e.y + 3)}" text-anchor="${side === "L" ? "start" : "end"}" font-family="${MONO}" font-size="9" fill="${INK}">${esc(pinText(p))}</text>`;
+      g += `<text x="${f(side === "L" ? edge + 6 : edge - 6)}" y="${f(e.y + 3)}" text-anchor="${side === "L" ? "start" : "end"}" font-family="${MONO}" font-size="11" fill="${INK}">${esc(pinText(p))}</text>`;
     }
     for (const p of [...topPins, ...bottomPins]) {
       const r = `${mcuInst}.${p.id}`;
@@ -698,13 +698,13 @@ export function renderSchematicSVG(
       const c = col(net);
       const edge = e.dir === "U" ? mcuTop : mcuTop + mcuH;
       g += `<path d="M${f(e.x)} ${f(edge)}V${f(e.y)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(e.x)}" cy="${f(edge)}" r="2" fill="${c}"/>`;
-      g += `<text x="${f(e.x)}" y="${f(e.dir === "U" ? edge + 13 : edge - 6)}" text-anchor="middle" font-family="${MONO}" font-size="9" fill="${INK}">${esc(pinText(p))}</text>`;
+      g += `<text x="${f(e.x)}" y="${f(e.dir === "U" ? edge + 13 : edge - 6)}" text-anchor="middle" font-family="${MONO}" font-size="11" fill="${INK}">${esc(pinText(p))}</text>`;
     }
     out.push(g + "</g>");
   }
 
   const title = opts.title
-    ? `<text x="${locale === "ar" ? width - PAD : PAD}" y="${PAD + 14}" font-size="15" font-weight="700" fill="${INK}"${rtl}>${esc(opts.title)}</text>`
+    ? `<text x="${locale === "ar" ? width - PAD : PAD}" y="${PAD + 14}" font-size="17" font-weight="700" fill="${INK}"${rtl}>${esc(opts.title)}</text>`
     : "";
   const aria = esc(opts.title ?? (locale === "ar" ? "مخطط التوصيل" : "Wiring diagram"));
   // Nets with nothing to draw still get a hook so the UI can find every net.

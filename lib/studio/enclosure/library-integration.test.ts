@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { LIBRARY } from "../library";
-import { layoutComponents, worldBox } from "../layout";
+import { isPokeSensor, layoutComponents, worldBox } from "../layout";
 import type { EnclosureTemplate } from "../schema";
 import { buildEnclosure } from "./build";
 import { insideSection, topAt } from "./templates";
@@ -28,6 +28,8 @@ describe("real library", () => {
       expect(meta.cutouts.length).toBe(list.filter((i) => placed.has(i.instanceId)).reduce((n, i) => n + i.part.ports.length, 0));
       const d = meta.dims;
       for (const it of lr.layout) {
+        // Poke-through domes (the PIR) leave the cavity through the lid on purpose.
+        if (isPokeSensor(parts.get(it.instanceId)!)) continue;
         const b = worldBox(it, parts.get(it.instanceId)!);
         for (const x of [b.min[0] - d.clearance, b.max[0] + d.clearance]) {
           for (const y of [b.min[1] - d.clearance, b.max[1] + d.clearance]) {

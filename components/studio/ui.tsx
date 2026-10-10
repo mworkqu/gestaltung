@@ -71,9 +71,15 @@ export function StepFrame({
       </header>
       {children}
       {(footer || secondary) && (
-        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-col-reverse items-stretch gap-2 rounded-b-[28px] bg-gradient-to-t from-[#eef2f7] via-[#eef2f7] to-[#eef2f7]/0 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6 sm:static sm:mx-0 sm:mb-0 sm:flex-row sm:items-center sm:justify-between sm:bg-none sm:p-0 sm:pt-2">
-          <div className="flex flex-wrap items-center justify-center gap-x-3 sm:justify-start">{secondary}</div>
-          {footer}
+        // `contents` on phones: the secondary links scroll with the page and ONLY the main
+        // button (with a soft canvas fade behind it) sticks, so the bar never hides more than
+        // ~100 px. The section's own bottom padding is the spacer: the last content always
+        // scrolls fully above the bar (+ the safe-area inset).
+        <div className="contents sm:flex sm:items-center sm:justify-between sm:gap-2 sm:pt-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 sm:justify-start max-sm:mt-5 max-sm:empty:hidden">{secondary}</div>
+          <div className="sticky bottom-0 z-10 -mx-5 -mb-5 rounded-b-[28px] bg-gradient-to-t from-[#eef2f7] from-60% via-[#eef2f7]/90 to-[#eef2f7]/0 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-10 sm:static sm:m-0 sm:bg-none sm:p-0">
+            {footer}
+          </div>
         </div>
       )}
     </section>

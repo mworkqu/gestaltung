@@ -90,6 +90,11 @@ for (const locale of LOCALES) {
     await expect(schematic).toHaveAttribute("dir", "ltr");
     await scrollUnderBars(page, page.getByText(msg(locale, "Studio", "headline_wiring")));
     await shoot("3-wiring");
+    // Phone: the diagram renders at a legible scale (>= 720 px wide, sideways scroll), not squeezed to the column.
+    const frameBox = await schematic.evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }));
+    expect(frameBox.scroll, "schematic is drawn at a readable width").toBeGreaterThanOrEqual(Math.min(720, frameBox.client + 1));
+    await scrollToBottom(page);
+    await shoot("3b-wiring-bottom");
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }));
 
     // ── Enclosure: draw it, the case renders in 3D ───────────────────────
@@ -101,11 +106,41 @@ for (const locale of LOCALES) {
     await page.waitForTimeout(800);
     await scrollUnderBars(page, page.getByTestId("studio-enclosure-viewer"));
     await shoot("4-enclosure");
+    // The colour chips (last content) scroll fully above the sticky button.
+    const chips = page.getByRole("radiogroup", { name: msg(locale, "Studio", "colour") });
+    await scrollToBottom(page);
+    await shoot("4b-enclosure-bottom");
+    const chipsBox = await chips.boundingBox();
+    const barTop = await page.evaluate(() => {
+      const bar = Array.from(document.querySelectorAll("[data-step] .sticky")).at(-1);
+      return bar ? bar.getBoundingClientRect().top : window.innerHeight;
+    });
+    expect((chipsBox?.y ?? 0) + (chipsBox?.height ?? 0), "colour chips are not under the sticky bar").toBeLessThanOrEqual(barTop + 1);
+    // "Code" has no data of its own: not ticked before the visitor has been there.
+    const codeDot = progress.getByRole("button", { name: new RegExp(msg(locale, "Studio", "step_code")) });
+    await expect(codeDot).not.toContainText(msg(locale, "Studio", "stepDoneSr"));
 
     expect(taps, "taps from the idea to the enclosure").toBeLessThanOrEqual(6);
     await expect(progress.locator('[aria-current="step"]')).toContainText(msg(locale, "Studio", "step_enclosure"));
     await expectNoHorizontalOverflow(page);
+
+    // Walk on to Code: now it is current; Enclosure is ticked, Make is still open.
+    await tap(page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }));
+    await expect(shell).toHaveAttribute("data-step", "code");
+    await expect(progress.getByRole("button", { name: new RegExp(msg(locale, "Studio", "step_make")) })).not.toContainText(
+      msg(locale, "Studio", "stepDoneSr"),
+    );
   });
+}
+
+/** Scroll so the end of the step card sits at the bottom of the screen (the sticky bar is then at rest). */
+async function scrollToBottom(page: Page) {
+  await page.evaluate(() => {
+    const card = document.querySelector("section[data-step]");
+    if (!card) return;
+    window.scrollTo({ top: card.getBoundingClientRect().bottom + window.scrollY - window.innerHeight, behavior: "instant" as ScrollBehavior });
+  });
+  await page.waitForTimeout(150);
 }
 
 /** Scroll so the element sits just below the sticky header + progress line. */

@@ -40,6 +40,27 @@ function containsEverything(svg: string, components: StudioComponent[], nets: { 
 const ESP_SET = ["esp32_devkit", "pir_hcsr501", "oled_096_i2c", "button_6mm", "led_5mm"];
 
 describe("renderSchematicSVG", () => {
+  it("keeps every label legible: no text under 10 units, pin / part labels 11+, boxes still fit their labels", () => {
+    for (const locale of ["en", "ar"] as const) {
+      const { svg } = render(ESP_SET, DEFAULT_SPEC, getPart, locale, "Motion lamp");
+      const sizes = [...svg.matchAll(/font-size="(\d+(?:\.\d+)?)"/g)].map((m) => Number(m[1]));
+      expect(sizes.length).toBeGreaterThan(10);
+      expect(Math.min(...sizes)).toBeGreaterThanOrEqual(10);
+      // Pin names (the mono 11 labels) are the most numerous text.
+      expect(sizes.filter((v) => v >= 11).length).toBeGreaterThan(sizes.filter((v) => v < 11).length);
+      // A box is never narrower than its title text.
+      for (const m of svg.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="([\d.]+)" height="[\d.]+" rx="10"/g)) {
+        expect(Number(m[1])).toBeGreaterThanOrEqual(128);
+      }
+    }
+  });
+
+  it("is deterministic", () => {
+    const a = render(ESP_SET, DEFAULT_SPEC, getPart, "en", "Motion lamp").svg;
+    const b = render(ESP_SET, DEFAULT_SPEC, getPart, "en", "Motion lamp").svg;
+    expect(a).toBe(b);
+  });
+
   for (const locale of ["en", "ar"] as const) {
     it(`draws the ESP32 set (${locale}): well-formed, every part and net, labels for rails`, () => {
       const { w, svg } = render(ESP_SET, DEFAULT_SPEC, getPart, locale, "Motion lamp");

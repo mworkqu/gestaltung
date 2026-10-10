@@ -22,7 +22,17 @@ import { getPart } from "@/lib/studio/library";
 import { emptyStudioDoc, type EnclosureSpec, type ProductSpec, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { liveStudioApi, type Locale, type StudioApi, type StudioProject } from "@/lib/studio/client/api";
-import { FLOW, furthestStep, initialStep, sameSpec, stepDone, type FlowStep } from "@/lib/studio/client/steps";
+import {
+  FLOW,
+  PASS_ONLY,
+  furthestStep,
+  initialStep,
+  markPassed,
+  passedAnswers,
+  sameSpec,
+  stepDone,
+  type FlowStep,
+} from "@/lib/studio/client/steps";
 import { ProgressLine } from "./ProgressLine";
 import { Bar, MainButton } from "./ui";
 import { IdeaStep } from "./steps/IdeaStep";
@@ -71,6 +81,7 @@ export function StudioShell({
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
   const [doc, setDoc] = useState<StudioDoc | null>(null);
   const [current, setCurrent] = useState(0);
+  const currentRef = useRef(0);
   const [visited, setVisited] = useState(0);
   const [handoffIdea, setHandoffIdea] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
@@ -149,6 +160,7 @@ export function StudioShell({
       }
       const start = initialStep(r.doc, requestedStep);
       setCurrent(start);
+      currentRef.current = start;
       setVisited(start);
       setLoaded({ state: "ready", project: r.project });
     });
@@ -171,6 +183,14 @@ export function StudioShell({
   const go = useCallback(
     (i: number) => {
       const idx = Math.max(0, Math.min(FLOW.length - 1, i));
+      // Leaving Code / Make forwards is what makes them "done" (they have no data of their own).
+      const leaving = FLOW[currentRef.current];
+      const base = latest.current;
+      if (base && idx > currentRef.current && (PASS_ONLY as readonly string[]).includes(leaving)) {
+        const answers = markPassed(base.answers, leaving);
+        if (answers !== base.answers) commit({ ...base, answers });
+      }
+      currentRef.current = idx;
       void flush();
       setCurrent(idx);
       setVisited((v) => Math.max(v, idx));
@@ -184,7 +204,7 @@ export function StudioShell({
       }
       if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     },
-    [flush],
+    [flush, commit],
   );
   const next = useCallback(() => go(current + 1), [go, current]);
 
@@ -219,7 +239,7 @@ export function StudioShell({
       const base = prev ?? emptyStudioDoc(spec);
       const same = prev ? sameSpec(prev.spec, spec) : false;
       const nextDoc: StudioDoc = same
-        ? { ...base, answers }
+        ? { ...base, answers: { ...passedAnswers(base.answers), ...answers } }
         : {
             ...base,
             spec,

@@ -14,7 +14,27 @@ export function isFlowStep(v: unknown): v is FlowStep {
   return typeof v === "string" && (FLOW as readonly string[]).includes(v);
 }
 
-/** Whether a step's own result is in the doc. Code and Make have nothing to save yet. */
+/** Steps with no data of their own: done only once the visitor has passed them. */
+export const PASS_ONLY: readonly FlowStep[] = ["code", "make"];
+const PASSED_PREFIX = "passed:";
+
+/** Has the visitor already moved on from this step (stored in doc.answers, never a future step)? */
+export function hasPassed(step: FlowStep, doc: StudioDoc | null): boolean {
+  return Boolean(doc?.answers?.[`${PASSED_PREFIX}${step}`]);
+}
+
+/** The doc.answers entries for the steps passed so far (kept when the chat answers are rewritten). */
+export function passedAnswers(answers: Record<string, string> | undefined): Record<string, string> {
+  return Object.fromEntries(Object.entries(answers ?? {}).filter(([k]) => k.startsWith(PASSED_PREFIX)));
+}
+
+/** doc.answers with `step` marked passed (same object when it already was). */
+export function markPassed(answers: Record<string, string> | undefined, step: FlowStep): Record<string, string> {
+  if (answers?.[`${PASSED_PREFIX}${step}`]) return answers;
+  return { ...(answers ?? {}), [`${PASSED_PREFIX}${step}`]: "1" };
+}
+
+/** Whether a step's own result is in the doc. Code and Make have nothing of their own: they count once passed. */
 export function stepDone(step: FlowStep, doc: StudioDoc | null): boolean {
   if (!doc) return false;
   switch (step) {
@@ -27,9 +47,9 @@ export function stepDone(step: FlowStep, doc: StudioDoc | null): boolean {
     case "enclosure":
       return doc.enclosure !== null;
     case "code":
-      return Boolean(doc.firmware) || doc.enclosure !== null;
+      return hasPassed("code", doc);
     case "make":
-      return false;
+      return hasPassed("make", doc);
   }
 }
 

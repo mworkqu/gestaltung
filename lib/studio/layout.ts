@@ -15,6 +15,10 @@
 //    (board on standoffs = battery height + 2), else it is packed like any part;
 //  * parts with +z ports (screens, buttons, light pipes…) are raised so their top
 //    is level with the tallest stack — they sit right under the lid;
+//  * "poke-through" sensors (a round dome window: sensor_window on +z, square
+//    <= 30 mm, e.g. the PIR) do NOT count towards that stack. The layout leaves
+//    them level with it; the enclosure (enclosure/templates.ts settlePokes) then
+//    lifts them so the dome pokes POKE_OUT mm out through a round lid opening;
 //  * gaps are ≥ max(the two parts' clearance, opts.clearance);
 //  * helper parts (resistors…) are not placed physically unless they have ports.
 //
@@ -33,6 +37,10 @@ export type LayoutResult = {
   bbox: { min: Vec3; max: Vec3 };
   footprint: { w: number; d: number };
   height: number;
+  /** Top of the tallest part that is NOT a poke-through sensor (= height when there is none). */
+  bodyHeight?: number;
+  /** Height of the tallest poke-through sensor (0 when there is none). */
+  pokeHeight?: number;
 };
 
 /** Target footprint aspect (x : y). */
@@ -78,6 +86,39 @@ export function isBattery(part: LibraryPart): boolean {
 
 export function hasTopPort(part: LibraryPart): boolean {
   return part.ports.some((p) => p.face === "+z");
+}
+
+/** How far a poke-through dome rises above the lid's outer top surface (mm). */
+export const POKE_OUT = 3;
+/** Largest square sensor window (mm) that gets a round opening and pokes through. */
+export const POKE_MAX_WINDOW = 30;
+
+/** Is this port a square sensor window on +z small enough to be a dome (opened round)? */
+export function isRoundSensorPort(port: LibraryPart["ports"][number]): boolean {
+  return (
+    port.kind === "sensor_window" &&
+    port.face === "+z" &&
+    Math.abs(port.size.w - port.size.h) < 0.5 &&
+    Math.max(port.size.w, port.size.h) <= POKE_MAX_WINDOW
+  );
+}
+
+/** A sensor whose dome pokes through the lid (the PIR). */
+export function isPokeSensor(part: LibraryPart): boolean {
+  return part.ports.some(isRoundSensorPort);
+}
+
+/** bodyHeight / pokeHeight of a placed layout (see LayoutResult). */
+export function pokeStats(layout: LayoutItem[], parts: Map<string, LibraryPart>): { bodyHeight: number; pokeHeight: number } {
+  let body = 0;
+  let poke = 0;
+  for (const it of layout) {
+    const part = parts.get(it.instanceId);
+    if (!part) continue;
+    if (isPokeSensor(part)) poke = Math.max(poke, part.dims.z);
+    else body = Math.max(body, it.pos[2] + part.dims.z);
+  }
+  return { bodyHeight: body, pokeHeight: poke };
 }
 
 /** The side port that decides where the part goes (largest opening, then first). */
@@ -331,7 +372,9 @@ export function layoutComponents(items: LayoutInput[], opts: LayoutOptions = {})
 
   // Heights: tallest stack, then raise +z-port parts to it.
   let top = 0;
-  for (const p of frame.placed) for (const m of p.block.members) top = Math.max(top, m.z + m.part.dims.z);
+  for (const p of frame.placed) {
+    for (const m of p.block.members) if (!isPokeSensor(m.part)) top = Math.max(top, m.z + m.part.dims.z);
+  }
   const layout: LayoutItem[] = [];
   for (const p of frame.placed) {
     for (const m of p.block.members) {
@@ -360,6 +403,7 @@ export function layoutComponents(items: LayoutInput[], opts: LayoutOptions = {})
     bbox: { min, max },
     footprint: { w: max[0] - min[0], d: max[1] - min[1] },
     height: max[2],
+    ...pokeStats(layout, partOf),
   };
 }
 

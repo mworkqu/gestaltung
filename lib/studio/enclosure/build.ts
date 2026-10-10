@@ -18,13 +18,14 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { ADDITION, Brush, Evaluator, INTERSECTION, SUBTRACTION } from "three-bvh-csg";
-import type { EnclosureSpec, LibraryPart } from "../schema";
+import type { EnclosureSpec, LayoutItem, LibraryPart } from "../schema";
 import type { LayoutResult } from "../layout";
 import { cutoutsFor, ventCutouts, type Cutout } from "./cutouts";
 import {
   LIP,
   enclosureDims,
   exitDistance,
+  settlePokes,
   outlineAt,
   taperScale,
   taperSlope,
@@ -40,6 +41,8 @@ export type EnclosureMeta = {
   dims: EnclosureDims;
   cutouts: Cutout[];
   vents: Cutout[];
+  /** The layout the case was cut for: poke-through sensors lifted to the lid (render parts with THIS). */
+  layout: LayoutItem[];
   triangles: number;
   ms: number;
 };
@@ -364,7 +367,8 @@ function feet(d: EnclosureDims, kind: EnclosureSpec["feet"]): THREE.Mesh[] {
 export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, parts: Map<string, LibraryPart>): BuiltEnclosure {
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
   const d = enclosureDims(spec, layoutResult);
-  const cutouts = cutoutsFor(layoutResult.layout, parts, d);
+  const placed = settlePokes(layoutResult.layout, parts, d);
+  const cutouts = cutoutsFor(placed, parts, d);
   const vents = ventCutouts(spec, d, cutouts);
 
   const ev = new Evaluator();
@@ -412,6 +416,7 @@ export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, 
       dims: d,
       cutouts,
       vents,
+      layout: placed,
       triangles: triCount(base.geometry) + triCount(lid.geometry),
       ms: Math.round(t1 - t0),
     },

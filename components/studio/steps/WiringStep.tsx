@@ -7,7 +7,7 @@
 // generate ourselves (renderSchematicSVG escapes every text), shown in a
 // zoomable, left-to-right frame, plus the summary line and the plain checks.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2, Download, Loader2, Maximize2, Minus, Plus } from "lucide-react";
 
@@ -26,7 +26,9 @@ import { linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { accessReason, problemKey } from "./problem";
 
 const accent = STEP_ACCENT.wiring;
-const ZOOMS = [1, 1.5, 2, 3];
+const ZOOMS = [1, 1.25, 1.5, 2];
+/** The schematic is never drawn narrower than this (px): sideways scroll instead of tiny labels. */
+const MIN_RENDER_W = 720;
 
 export function WiringStep({
   ctx,
@@ -62,6 +64,7 @@ export function WiringStep({
       return "";
     }
   }, [drawn, doc.components, doc.netlist.nets, doc.spec.name, locale]);
+  const mcuId = useMemo(() => doc.components.find((c) => getPart(c.partId)?.category === "mcu")?.instanceId ?? null, [doc.components]);
   const summary = useMemo(() => {
     try {
       return summaryLine(doc.spec, doc.components, getPart, locale);
@@ -146,7 +149,7 @@ export function WiringStep({
               {summary}
             </p>
           )}
-          <SchematicFrame svg={svg} label={t("schematicLabel")} />
+          <SchematicFrame svg={svg} label={t("schematicLabel")} centreOn={mcuId} />
           {doc.checks.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-sm font-bold text-heading">{t("checksHeading")}</h2>
@@ -174,11 +177,35 @@ export function WiringStep({
   );
 }
 
-/** Zoom buttons + pinch/scroll; drawings always read left to right. */
-function SchematicFrame({ svg, label }: { svg: string; label: string }) {
+/**
+ * Zoom buttons + pinch/scroll; drawings always read left to right. The diagram
+ * renders at least 1 SVG unit = 1 px (and never under MIN_RENDER_W), so the pin
+ * labels stay legible on a phone; the frame scrolls sideways and starts centred
+ * on the main board.
+ */
+function SchematicFrame({ svg, label, centreOn }: { svg: string; label: string; centreOn: string | null }) {
   const t = useTranslations("Studio");
   const [z, setZ] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
+  const vbWidth = useMemo(() => {
+    const m = /viewBox="0 0 (\d+(?:\.\d+)?) /.exec(svg);
+    return m ? Number(m[1]) : 0;
+  }, [svg]);
+  const base = Math.max(MIN_RENDER_W, vbWidth);
   const btn = "grid h-11 w-11 place-items-center rounded-full bg-surface text-heading shadow-neu-sm disabled:opacity-40";
+
+  // Centre the main board in the visible window (on first show and after a zoom).
+  useEffect(() => {
+    const frame = box.current;
+    if (!frame) return;
+    const el = centreOn ? frame.querySelector<SVGGElement>(`[data-part="${CSS.escape(centreOn)}"]`) : null;
+    const target = el?.querySelector("rect") ?? el;
+    if (!target) return;
+    const r = target.getBoundingClientRect();
+    const c = frame.getBoundingClientRect();
+    frame.scrollLeft += r.left + r.width / 2 - (c.left + c.width / 2);
+  }, [svg, z, centreOn]);
+
   return (
     <div className="space-y-2" dir="ltr">
       <div className="flex items-center justify-end gap-1.5">
@@ -193,6 +220,7 @@ function SchematicFrame({ svg, label }: { svg: string; label: string }) {
         </button>
       </div>
       <div
+        ref={box}
         className="max-h-[70dvh] overflow-auto overscroll-contain rounded-[20px] bg-white shadow-neu-inset"
         style={{ touchAction: "pan-x pan-y pinch-zoom" }}
         data-testid="studio-schematic"
@@ -201,7 +229,7 @@ function SchematicFrame({ svg, label }: { svg: string; label: string }) {
         <div
           role="img"
           aria-label={label}
-          style={{ width: `${ZOOMS[z] * 100}%`, minWidth: z === 0 ? undefined : 560 }}
+          style={{ width: `max(100%, ${Math.round(base * ZOOMS[z])}px)` }}
           className="[&>svg]:block [&>svg]:h-auto [&>svg]:w-full"
           // Our own generated SVG (lib/studio/schematic.ts escapes all text).
           dangerouslySetInnerHTML={{ __html: svg }}

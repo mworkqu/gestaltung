@@ -8,6 +8,9 @@ import {
   fileSlug,
   firstOpenStep,
   furthestStep,
+  hasPassed,
+  markPassed,
+  passedAnswers,
   historyFrom,
   initialStep,
   looksLeftFromVersions,
@@ -35,6 +38,29 @@ describe("studio flow", () => {
     expect(stepDone("wiring", wired)).toBe(true);
     expect(stepDone("enclosure", { ...wired, enclosure: DEFAULT_ENCLOSURE })).toBe(true);
     expect(stepDone("make", { ...wired, enclosure: DEFAULT_ENCLOSURE })).toBe(false);
+  });
+
+  it("counts Code and Make as done only after they were passed", () => {
+    const wired: StudioDoc = {
+      ...withParts(),
+      netlist: { nets: [{ name: "GND", pins: ["a.1", "b.1"] }] },
+      checks: [{ id: "x", ok: true, plain: "ok" }],
+      enclosure: DEFAULT_ENCLOSURE,
+      firmware: { board: "esp32", code: "void setup(){}" },
+    };
+    // Everything before Code is done, but Code itself has not been visited yet.
+    expect(stepDone("enclosure", wired)).toBe(true);
+    expect(stepDone("code", wired)).toBe(false);
+    expect(firstOpenStep(wired)).toBe(FLOW.indexOf("code"));
+    const passed = { ...wired, answers: markPassed(wired.answers, "code") };
+    expect(hasPassed("code", passed)).toBe(true);
+    expect(stepDone("code", passed)).toBe(true);
+    expect(stepDone("make", passed)).toBe(false);
+    expect(firstOpenStep(passed)).toBe(FLOW.indexOf("make"));
+    expect(markPassed(passed.answers, "code")).toBe(passed.answers);
+    expect(passedAnswers({ idea: "x", "passed:code": "1" })).toEqual({ "passed:code": "1" });
+    // The idea chat history ignores the marker.
+    expect(historyFrom(passed.answers).messages).toEqual([]);
   });
 
   it("opens the first open step and honours a reachable ?step=", () => {

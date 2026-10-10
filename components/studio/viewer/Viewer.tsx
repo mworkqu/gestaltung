@@ -31,7 +31,7 @@ import { ContactShadows, OrbitControls } from "@react-three/drei";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { cn } from "@/lib/utils";
 import { getPart } from "@/lib/studio/library";
-import { worldBox, type LayoutResult } from "@/lib/studio/layout";
+import { pokeStats, worldBox, type LayoutResult } from "@/lib/studio/layout";
 import { buildEnclosure } from "@/lib/studio/enclosure/build";
 import { heightLayers, type Vec3 } from "@/lib/studio/explode";
 import type { LayoutItem, LibraryPart } from "@/lib/studio/schema";
@@ -56,6 +56,9 @@ const RESUME_MS = 4000;
 const PLATE_T = 4;
 const PLATE_LIFT = 3;
 const CONTENT_ROT: [number, number, number] = [-Math.PI / 2, 0, 0];
+/** Plate mode: share of the viewer's width / height the plate fills. */
+const PLATE_FILL_X = 0.8;
+const PLATE_FILL_Y = 0.88;
 
 export default function Viewer(props: ViewerProps) {
   const reducedMotion = usePrefersReducedMotion();
@@ -129,28 +132,71 @@ function footprint(part: LibraryPart | undefined, rotZ = 0): { w: number; d: num
   return { w: swap ? y : x, d: swap ? x : y, h: z };
 }
 
-/** Plate mode: neat centred grid, sorted by footprint (largest first). */
+/** Gap between parts on the plate, and the rim around them (mm). */
+const PLATE_GAP = 5;
+const PLATE_MARGIN = 12;
+
+/**
+ * Plate mode: a compact shelf packing (rows centred, small gaps, largest parts first). The shelf
+ * width is searched for the smallest circle around the cluster, so the plate hugs the parts
+ * (content radius + PLATE_MARGIN) and they read large when the camera fits the plate.
+ */
 function platePlacements(components: ViewerComponent[], parts: Map<string, LibraryPart>) {
   const n = components.length;
   if (n === 0) return { placements: [] as Placement[], radius: 60 };
-  const sizes = components.map((c) => footprint(parts.get(c.instanceId)));
-  const cell = Math.max(...sizes.map((s) => Math.max(s.w, s.d))) + 16;
-  const cols = Math.ceil(Math.sqrt(n));
-  const rows = Math.ceil(n / cols);
-  const placements: Placement[] = components.map((c, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const inRow = row === rows - 1 ? n - row * cols : cols;
-    const x = (col - (inRow - 1) / 2) * cell;
-    const y = ((rows - 1) / 2 - row) * cell;
-    return { c, pos: [x, y, PLATE_LIFT], rotZ: 0, bobPhase: i * 1.7 };
-  });
-  let radius = 40;
-  placements.forEach((p, i) => {
-    const s = sizes[i];
-    radius = Math.max(radius, Math.hypot(p.pos[0], p.pos[1]) + Math.hypot(s.w, s.d) / 2 + 12);
-  });
-  return { placements, radius };
+  const items = components
+    .map((c, i) => ({ c, i, ...footprint(parts.get(c.instanceId)) }))
+    .sort((a, b) => b.w * b.d - a.w * a.d || a.i - b.i);
+  const maxW = Math.max(...items.map((it) => it.w));
+  const sumW = items.reduce((t, it) => t + it.w, 0) + PLATE_GAP * (n - 1);
+
+  const pack = (target: number) => {
+    const rows: (typeof items)[] = [];
+    let cur: typeof items = [];
+    let curW = 0;
+    for (const it of items) {
+      const next = cur.length ? curW + PLATE_GAP + it.w : it.w;
+      if (cur.length && next > target + 1e-9) {
+        rows.push(cur);
+        cur = [it];
+        curW = it.w;
+      } else {
+        cur.push(it);
+        curW = next;
+      }
+    }
+    if (cur.length) rows.push(cur);
+    const rowW = rows.map((r) => r.reduce((t, it) => t + it.w, 0) + PLATE_GAP * (r.length - 1));
+    const rowD = rows.map((r) => Math.max(...r.map((it) => it.d)));
+    const totalD = rowD.reduce((t, d) => t + d, 0) + PLATE_GAP * (rows.length - 1);
+    const out: { it: (typeof items)[number]; x: number; y: number }[] = [];
+    let y = totalD / 2;
+    rows.forEach((r, ri) => {
+      let x = -rowW[ri] / 2;
+      for (const it of r) {
+        out.push({ it, x: x + it.w / 2, y: y - rowD[ri] / 2 });
+        x += it.w + PLATE_GAP;
+      }
+      y -= rowD[ri] + PLATE_GAP;
+    });
+    // Radius of the circle (about the origin) that holds every corner.
+    let radius = 0;
+    for (const o of out) radius = Math.max(radius, Math.hypot(Math.abs(o.x) + o.it.w / 2, Math.abs(o.y) + o.it.d / 2));
+    return { out, radius };
+  };
+
+  let best = pack(maxW);
+  for (let k = 1; k <= 24; k++) {
+    const cand = pack(maxW + ((sumW - maxW) * k) / 24);
+    if (cand.radius < best.radius - 1e-6) best = cand;
+  }
+  const placements: Placement[] = best.out.map(({ it, x, y }) => ({
+    c: it.c,
+    pos: [x, y, PLATE_LIFT],
+    rotZ: 0,
+    bobPhase: it.i * 1.7,
+  }));
+  return { placements, radius: Math.max(30, best.radius) + PLATE_MARGIN };
 }
 
 /** LayoutResult for the caller's layout (bbox from the same worldBox the layout engine uses). */
@@ -174,6 +220,7 @@ function layoutResultFrom(layout: LayoutItem[], parts: Map<string, LibraryPart>)
     bbox: { min, max },
     footprint: { w: max[0] - min[0], d: max[1] - min[1] },
     height: max[2] - Math.min(0, min[2]),
+    ...pokeStats(layout, parts),
   };
 }
 
@@ -215,13 +262,39 @@ function Scene(p: SceneProps) {
   const layoutKey = layout ? JSON.stringify(layout) : "";
   const plate = !layout;
 
+  // --- enclosure geometry (rebuilt only when the shape changes) -------------
+  const encShapeKey = enclosure
+    ? JSON.stringify({ ...enclosure, finish: undefined, colour: undefined, accentColour: undefined })
+    : "";
+  const enc = useMemo(() => {
+    if (!enclosure || !layout || parts.size === 0) return null;
+    try {
+      return buildEnclosure(enclosure, layoutResultFrom(layout, parts), parts);
+    } catch (err) {
+      console.warn("[studio viewer] enclosure build failed", err);
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [encShapeKey, layoutKey, parts]);
+
+  useEffect(() => {
+    return () => {
+      enc?.base.geometry.dispose();
+      enc?.lid.geometry.dispose();
+    };
+  }, [enc]);
+
+  // With a case, parts stand where the case was cut for (poke-through sensors lifted to the lid).
+  const shown = enc?.meta.layout ?? layout;
+  const shownKey = shown ? JSON.stringify(shown) : "";
+
   const { placements, plateRadius, centre, height } = useMemo(() => {
-    if (!layout) {
+    if (!shown) {
       const r = platePlacements(components, parts);
       const h = Math.max(10, ...r.placements.map((pl) => footprint(parts.get(pl.c.instanceId)).h + PLATE_LIFT));
       return { placements: r.placements, plateRadius: r.radius, centre: [0, 0, 0] as Vec3, height: h };
     }
-    const byId = new Map<string, LayoutItem>(layout.map((l) => [l.instanceId, l]));
+    const byId = new Map<string, LayoutItem>(shown.map((l) => [l.instanceId, l]));
     // Parts without a layout entry (helpers such as resistors) are not shown physically.
     const pls: Placement[] = components.flatMap((c) => {
       const l = byId.get(c.instanceId);
@@ -245,31 +318,9 @@ function Scene(p: SceneProps) {
       height: empty ? 20 : Math.max(10, maxZ - Math.min(0, minZ)),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compKey, layoutKey, parts]);
+  }, [compKey, shownKey, parts]);
 
   const layers = useMemo(() => heightLayers(placements.map((pl) => pl.pos[2])), [placements]);
-
-  // --- enclosure geometry (rebuilt only when the shape changes) -------------
-  const encShapeKey = enclosure
-    ? JSON.stringify({ ...enclosure, finish: undefined, colour: undefined, accentColour: undefined })
-    : "";
-  const enc = useMemo(() => {
-    if (!enclosure || !layout || parts.size === 0) return null;
-    try {
-      return buildEnclosure(enclosure, layoutResultFrom(layout, parts), parts);
-    } catch (err) {
-      console.warn("[studio viewer] enclosure build failed", err);
-      return null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [encShapeKey, layoutKey, parts]);
-
-  useEffect(() => {
-    return () => {
-      enc?.base.geometry.dispose();
-      enc?.lid.geometry.dispose();
-    };
-  }, [enc]);
 
   const H = enc?.meta.H ?? height;
 
@@ -412,7 +463,9 @@ function Scene(p: SceneProps) {
       <CameraRig
         contentRef={contentRef}
         lights={lights}
-        fitKey={`${contentKey}#${explodeTarget > 0.05 ? 1 : 0}`}
+        fitKey={`${contentKey}#${explodeTarget > 0.05 ? 1 : 0}#${Math.round(plateRadius)}`}
+        plateRadius={plate ? plateRadius : 0}
+        plateTop={height}
         grow={1 + 0.6 * explodeTarget}
         reducedMotion={reducedMotion}
         onRadius={setRadius}
@@ -485,6 +538,8 @@ function CameraRig({
   lights,
   fitKey,
   grow,
+  plateRadius,
+  plateTop,
   reducedMotion,
   onRadius,
 }: {
@@ -492,6 +547,10 @@ function CameraRig({
   lights: MutableRefObject<LightRefs>;
   fitKey: string;
   grow: number;
+  /** Plate mode: the plate's radius (mm), else 0. The camera frames the plate itself. */
+  plateRadius: number;
+  /** Plate mode: height of the tallest part above the plate (mm). */
+  plateTop: number;
   reducedMotion: boolean;
   onRadius(r: number): void;
 }) {
@@ -502,6 +561,8 @@ function CameraRig({
   const first = useRef(true);
   const growRef = useRef(grow);
   growRef.current = grow;
+  const plateRef = useRef({ radius: plateRadius, top: plateTop });
+  plateRef.current = { radius: plateRadius, top: plateTop };
 
   useEffect(() => {
     // Wait one frame so children have applied their rest poses.
@@ -519,10 +580,43 @@ function CameraRig({
       const fit = Math.min(fov, 2 * Math.atan(Math.tan(fov / 2) * aspect));
       const dist = (r / Math.sin(fit / 2)) * 1.08;
 
-      const dir = first.current
-        ? new THREE.Vector3(0.75, 0.62, 1).normalize()
-        : camera.position.clone().sub(c.target).normalize();
-      if (!Number.isFinite(dir.x) || dir.lengthSq() < 0.5) dir.set(0.75, 0.62, 1).normalize();
+      const plate = plateRef.current;
+      // Plate: a slightly raised 3/4 view (~37° up); everything else keeps the lower default.
+      const home = plate.radius > 0 ? new THREE.Vector3(0.5, 0.9, 1) : new THREE.Vector3(0.75, 0.62, 1);
+      const dir = first.current ? home.clone().normalize() : camera.position.clone().sub(c.target).normalize();
+      if (!Number.isFinite(dir.x) || dir.lengthSq() < 0.5) dir.copy(home).normalize();
+
+      let fitDist = dist;
+      if (plate.radius > 0) {
+        // Frame the plate's real outline (not its bounding sphere): it fills ~80 % of the width.
+        const pts: THREE.Vector3[] = [];
+        for (let k = 0; k < 48; k++) {
+          const a = (k / 48) * Math.PI * 2;
+          for (const [rr, z] of [[1, 0], [1, -PLATE_T], [0.7, plate.top]] as const) {
+            pts.push(g.localToWorld(new THREE.Vector3(Math.cos(a) * plate.radius * rr, Math.sin(a) * plate.radius * rr, z)));
+          }
+        }
+        const centre = sphere.center;
+        const pos0 = camera.position.clone();
+        const quat0 = camera.quaternion.clone();
+        for (let it = 0; it < 8; it++) {
+          camera.position.copy(centre).addScaledVector(dir, fitDist);
+          camera.lookAt(centre);
+          camera.updateMatrixWorld();
+          let mx = 0;
+          let my = 0;
+          for (const p of pts) {
+            const v = p.clone().project(camera);
+            mx = Math.max(mx, Math.abs(v.x));
+            my = Math.max(my, Math.abs(v.y));
+          }
+          const k = Math.max(mx / PLATE_FILL_X, my / PLATE_FILL_Y);
+          if (Math.abs(k - 1) < 0.01) break;
+          fitDist *= k;
+        }
+        camera.position.copy(pos0);
+        camera.quaternion.copy(quat0);
+      }
 
       camera.near = Math.max(0.5, r / 50);
       camera.far = r * 60;
@@ -530,7 +624,7 @@ function CameraRig({
       c.minDistance = r * 1.1;
       c.maxDistance = r * 6;
 
-      goal.current = { pos: sphere.center.clone().addScaledVector(dir, dist), target: sphere.center.clone() };
+      goal.current = { pos: sphere.center.clone().addScaledVector(dir, fitDist), target: sphere.center.clone() };
       if (first.current || reducedMotion) {
         camera.position.copy(goal.current.pos);
         c.target.copy(goal.current.target);

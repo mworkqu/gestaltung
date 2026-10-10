@@ -13,9 +13,11 @@ import {
   LIMITS,
   type EnclosureSpec,
   type EnclosureTemplate,
+  type LayoutItem,
+  type LibraryPart,
   type ProductSpec,
 } from "../schema";
-import type { LayoutResult, Vec3 } from "../layout";
+import { isPokeSensor, POKE_OUT, type LayoutResult, type Vec3 } from "../layout";
 
 /** Templates the browser builder can make right now. */
 export const BUILDABLE_TEMPLATES = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"] as const;
@@ -256,11 +258,12 @@ export function heightRuleOk(d: EnclosureDims): boolean {
 }
 
 /** Every corner of the layout box (+ clearance + lip allowance) sits inside the cavity. */
-export function contentFits(d: EnclosureDims, lr: Pick<LayoutResult, "bbox">, clearance = d.clearance): boolean {
+export function contentFits(d: EnclosureDims, lr: Pick<LayoutResult, "bbox" | "bodyHeight">, clearance = d.clearance): boolean {
   const m = clearance + LIP_ALLOWANCE;
   const { min, max } = lr.bbox;
   const z0 = d.floorZ + min[2];
-  const z1 = d.floorZ + max[2] + clearance;
+  // Poke-through domes are allowed to leave the cavity through the lid.
+  const z1 = d.floorZ + (lr.bodyHeight ?? max[2]) + clearance;
   for (const x of [min[0] - m, max[0] + m]) {
     for (const y of [min[1] - m, max[1] + m]) {
       if (!insideSection(d, x, y, d.wall)) return false;
@@ -281,8 +284,10 @@ export function enclosureDims(spec: EnclosureSpec, lr: LayoutResult): EnclosureD
   const need: Need = {
     iw: Math.max(fw + 2 * m, LIMITS.minFootprint - 2 * wall),
     id: Math.max(fd + 2 * m, LIMITS.minFootprint - 2 * wall),
-    ih: lr.height + (c + LID_SPACE) * HEADROOM_MULT[spec.proportions.heightBias],
+    ih: (lr.bodyHeight ?? lr.height) + (c + LID_SPACE) * HEADROOM_MULT[spec.proportions.heightBias],
   };
+  // A poke-through dome must still stand on the floor with its top POKE_OUT above the lid.
+  if (lr.pokeHeight) need.ih = Math.max(need.ih, lr.pokeHeight - POKE_OUT - wall);
   let d = shapeDims(tpl, spec, need);
   for (let i = 0; i < 200; i++) {
     if (!heightRuleOk(d)) {
@@ -300,6 +305,21 @@ export function enclosureDims(spec: EnclosureSpec, lr: LayoutResult): EnclosureD
     d = shapeDims(tpl, spec, need);
   }
   return d;
+}
+
+/**
+ * Lift every poke-through sensor (the PIR) so its dome top is POKE_OUT mm above the lid's
+ * OUTER top surface (so also above the inner one) at the sensor's position. Other parts keep
+ * their place. Pure: returns a new array, same order. cutouts.ts / the viewer use the result.
+ */
+export function settlePokes(layout: LayoutItem[], parts: Map<string, LibraryPart>, d: EnclosureDims): LayoutItem[] {
+  return layout.map((it) => {
+    const part = parts.get(it.instanceId);
+    if (!part || !isPokeSensor(part)) return it;
+    const y = it.pos[1] + d.contentOffset[1];
+    const z = Math.max(0, topAt(d, y) + POKE_OUT - d.contentOffset[2] - part.dims.z);
+    return { ...it, pos: [it.pos[0], it.pos[1], Math.round(z * 1000) / 1000] };
+  });
 }
 
 // ---------------------------------------------------------------------------

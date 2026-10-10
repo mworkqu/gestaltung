@@ -5,7 +5,7 @@
 // depth) that build.ts subtracts from the shell.
 
 import type { EnclosureSpec, LayoutItem, LibraryPart, PortKind, VentFace } from "../schema";
-import { rotateFace, rotateXY, type Vec3 } from "../layout";
+import { isRoundSensorPort, rotateFace, rotateXY, type Vec3 } from "../layout";
 import { exitDistance, topAt, type EnclosureDims } from "./templates";
 
 export type CutoutShape = "rrect" | "circle" | "hex" | "grille";
@@ -87,7 +87,8 @@ export function cutoutsFor(layout: LayoutItem[], parts: Map<string, LibraryPart>
       const [rx, ry] = rotateXY(local[0], local[1], item.rotZ);
       const p: Vec3 = [rx + item.pos[0] + ox, ry + item.pos[1] + oy, local[2] + item.pos[2] + oz];
       const face = rotateFace(port.face, item.rotZ) as VentFace;
-      const round = ROUND_KINDS.includes(port.kind);
+      // Round openings: light pipes, button caps and dome-shaped sensor windows (the PIR).
+      const round = ROUND_KINDS.includes(port.kind) || isRoundSensorPort(port);
       let w = port.size.w + PORT_TOLERANCE;
       let h = port.size.h + PORT_TOLERANCE;
       if (round) w = h = Math.max(w, h);
@@ -99,11 +100,14 @@ export function cutoutsFor(layout: LayoutItem[], parts: Map<string, LibraryPart>
         const vy = rotateXY(0, 1, item.rotZ);
         basis = { n: [0, 0, 1], u: [ux[0], ux[1], 0], v: [vy[0], vy[1], 0] };
       }
-      const t0 = 0.3;
+      let t0 = 0.3;
       let t1: number;
       if (face === "+z") {
         const reach = (Math.abs(basis.u[1]) * w + Math.abs(basis.v[1]) * h) / 2;
+        const lo = Math.min(topAt(dims, p[1] - reach), topAt(dims, p[1] + reach));
         t1 = Math.max(topAt(dims, p[1] - reach), topAt(dims, p[1] + reach)) - p[2] + 2;
+        // A dome that reaches the lid: start the cut below the lid's inner surface so it opens fully.
+        t0 = Math.min(t0, lo - dims.wall - 1 - p[2]);
       } else {
         t1 = exitDistance(dims, p[0], p[1], basis.n[0], basis.n[1]) + 2;
       }
