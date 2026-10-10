@@ -31,6 +31,7 @@ vi.mock("google-auth-library", () => ({
 import {
   buildOnce,
   buildWithRetry,
+  cloudAuthMode,
   cloudConfigured,
   cloudFailureCode,
   cloudUrl,
@@ -69,6 +70,9 @@ beforeEach(() => {
   calls.fetchAudiences.length = 0;
   vi.stubEnv("GCP_CAD_URL", `${URL_}/`);
   vi.stubEnv("GCP_CAD_SA_KEY", JSON.stringify(KEY));
+  vi.stubEnv("GCP_WIF_PROVIDER", "");
+  vi.stubEnv("GCP_CAD_SA_EMAIL", "");
+  vi.stubEnv("VERCEL_OIDC_TOKEN", "");
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -251,5 +255,127 @@ describe("nextCloudStep", () => {
     if (failedCheck.kind !== "result" || failedBuild.kind !== "result") throw new Error();
     expect(repairMessages(failedCheck.result)).toContain('Check "must_contain_box" failed: inside 50 mm < 69 mm');
     expect(repairMessages(failedBuild.result)).toContain("Build failed: boom");
+  });
+});
+
+// ── Keyless: Vercel OIDC → Google STS → IAM Credentials generateIdToken ──────
+const PROVIDER = "projects/1005108288584/locations/global/workloadIdentityPools/vercel/providers/vercel";
+const SA = "vercel-cad-caller@gestaltung-cad.iam.gserviceaccount.com";
+const VERCEL_JWT = "vercel.oidc.jwt";
+const STS = "https://sts.googleapis.com/v1/token";
+const IAM = `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(SA)}:generateIdToken`;
+
+const googleIdToken = (expSeconds = 3600) =>
+  `g.${Buffer.from(JSON.stringify({ aud: URL_, exp: Math.floor(Date.now() / 1000) + expSeconds })).toString("base64url")}.s`;
+
+/** Routes by URL: STS, IAM Credentials, then the worker. Records every call. */
+function googleFetch(over: { sts?: () => Response; iam?: () => Response; worker?: () => Response } = {}) {
+  const calls: { url: string; init: RequestInit }[] = [];
+  const impl = vi.fn(async (url: string, init: RequestInit) => {
+    calls.push({ url, init });
+    if (url === STS) return over.sts?.() ?? json({ access_token: "fed-access", token_type: "Bearer", expires_in: 3600 });
+    if (url === IAM) return over.iam?.() ?? json({ token: googleIdToken() });
+    return over.worker?.() ?? json(okBody);
+  });
+  return { impl: impl as unknown as typeof fetch, calls };
+}
+
+describe("keyless Google auth (Workload Identity Federation)", () => {
+  beforeEach(() => {
+    vi.stubEnv("GCP_WIF_PROVIDER", PROVIDER);
+    vi.stubEnv("GCP_CAD_SA_EMAIL", SA);
+    vi.stubEnv("VERCEL_OIDC_TOKEN", VERCEL_JWT);
+  });
+
+  it("selection: keyless wins over a key; key alone = key; neither = not configured", () => {
+    expect(cloudAuthMode()).toBe("keyless");
+    vi.stubEnv("GCP_WIF_PROVIDER", "");
+    expect(cloudAuthMode()).toBe("key");
+    vi.stubEnv("GCP_CAD_SA_KEY", "");
+    expect(cloudAuthMode()).toBeNull();
+    expect(cloudConfigured()).toBe(false);
+    vi.stubEnv("GCP_WIF_PROVIDER", PROVIDER);
+    expect(cloudConfigured()).toBe(true);
+  });
+
+  it("exchanges the Vercel token at STS, then asks IAM for an ID token with the service URL as audience", async () => {
+    const g = googleFetch();
+    const r = await buildOnce(req, { fetchImpl: g.impl });
+    expect(r.kind).toBe("result");
+    expect(g.calls.map((c) => c.url)).toEqual([STS, IAM, `${URL_}/build`]);
+
+    const [sts, iam, worker] = g.calls;
+    expect(sts.init.method).toBe("POST");
+    expect(JSON.parse(String(sts.init.body))).toEqual({
+      grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
+      audience: `//iam.googleapis.com/${PROVIDER}`,
+      scope: "https://www.googleapis.com/auth/cloud-platform",
+      requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+      subjectToken: VERCEL_JWT,
+      subjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
+    });
+    expect((sts.init.headers as Record<string, string>).authorization).toBeUndefined();
+
+    expect((iam.init.headers as Record<string, string>).authorization).toBe("Bearer fed-access");
+    expect(JSON.parse(String(iam.init.body))).toEqual({ audience: URL_, includeEmail: true });
+
+    expect((worker.init.headers as Record<string, string>).authorization).toMatch(/^Bearer g\./);
+    // The key path is never touched.
+    expect(calls.credentials).toHaveLength(0);
+  });
+
+  it("prefers the token passed from the request header over the env var", async () => {
+    const g = googleFetch();
+    await buildOnce(req, { fetchImpl: g.impl, oidcToken: "from-header" });
+    expect(JSON.parse(String(g.calls[0].init.body)).subjectToken).toBe("from-header");
+  });
+
+  it("caches the ID token until 5 minutes before it expires", async () => {
+    const g = googleFetch();
+    await idToken(URL_, { fetchImpl: g.impl });
+    await idToken(URL_, { fetchImpl: g.impl });
+    expect(g.calls.filter((c) => c.url === STS)).toHaveLength(1);
+
+    resetCloudAuth();
+    const short = googleFetch({ iam: () => json({ token: googleIdToken(4 * 60) }) });
+    await idToken(URL_, { fetchImpl: short.impl });
+    await idToken(URL_, { fetchImpl: short.impl });
+    expect(short.calls.filter((c) => c.url === STS)).toHaveLength(2);
+  });
+
+  it("STS failure → down (unreachable) → retried once → fallback to the browser path, no worker call, no token leaked", async () => {
+    const g = googleFetch({ sts: () => json({ error: "invalid_grant", error_description: "bad" }, 400) });
+    const r = await buildWithRetry(req, { fetchImpl: g.impl });
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+    expect(r.kind === "down" && r.detail).toContain("sts HTTP 400 invalid_grant");
+    expect(g.calls.filter((c) => c.url === STS)).toHaveLength(2);
+    expect(g.calls.some((c) => c.url.startsWith(URL_))).toBe(false);
+    expect(nextCloudStep(r)).toEqual({ action: "fallback" });
+    expect(JSON.stringify(r)).not.toContain(VERCEL_JWT);
+  });
+
+  it("generateIdToken refused (403) → down (unreachable)", async () => {
+    const g = googleFetch({ iam: () => json({ error: { code: 403, status: "PERMISSION_DENIED" } }, 403) });
+    const r = await buildOnce(req, { fetchImpl: g.impl });
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+    expect(r.kind === "down" && r.detail).toContain("generateIdToken HTTP 403 PERMISSION_DENIED");
+    expect(JSON.stringify(r)).not.toContain("fed-access");
+  });
+
+  it("no Vercel OIDC token anywhere → down without calling Google", async () => {
+    vi.stubEnv("VERCEL_OIDC_TOKEN", "");
+    const g = googleFetch();
+    const r = await buildOnce(req, { fetchImpl: g.impl });
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+    expect(g.calls).toHaveLength(0);
+  });
+
+  it("nothing configured → not_configured without a request", async () => {
+    vi.stubEnv("GCP_WIF_PROVIDER", "");
+    vi.stubEnv("GCP_CAD_SA_KEY", "");
+    const g = googleFetch();
+    const r = await buildOnce(req, { fetchImpl: g.impl });
+    expect(r).toMatchObject({ kind: "down", reason: "not_configured" });
+    expect(g.calls).toHaveLength(0);
   });
 });

@@ -1,19 +1,26 @@
 // The cloud CAD worker (Cloud Run, CadQuery) — server-only. NEVER import this
-// from a "use client" file: it reads the service-account key.
+// from a "use client" file: it handles Google credentials.
 //
 //   POST {GCP_CAD_URL}/build  {code, units:"mm", checks:{min_wall_mm, must_contain_box}}
 //     → {ok, step_b64, stl_b64, preview_svg, bbox, volume_mm3, checks, log, error?}
 //   GET  {GCP_CAD_URL}/health
 //
 // The service is IAM-protected: every request carries a Google ID token whose
-// audience is the service URL, minted from the service-account JSON in
-// GCP_CAD_SA_KEY (raw JSON or base64 of it). The auth client and the token are
-// cached per server instance (a token lives about an hour; renewed 5 min
-// early). The key and the token are never logged.
+// audience is the service URL. Two ways to mint it (cloudAuthMode):
+//   keyless (preferred) — GCP_WIF_PROVIDER + GCP_CAD_SA_EMAIL: the Vercel OIDC
+//     token is exchanged at Google STS (Workload Identity Federation) for a
+//     federated access token, which asks IAM Credentials for an ID token of the
+//     service account. No key file exists (the Google org blocks SA keys).
+//   key (legacy) — GCP_CAD_SA_KEY (raw JSON or base64 of it) via
+//     google-auth-library.
+// The ID token is cached per server instance until 5 min before it expires.
+// Keys and tokens are never logged; error messages carry the HTTP status and
+// Google's error code only.
 //
 // "Down" = the worker could not be reached, timed out (60 s), refused us
-// (401/403/5xx) or answered something that is not the contract. A build that
-// RAN and failed (ok:false, a check failed) is a result, not "down".
+// (401/403/5xx), we could not get a token, or it answered something that is
+// not the contract. A build that RAN and failed (ok:false, a check failed) is
+// a result, not "down".
 
 import { GoogleAuth } from "google-auth-library";
 import { z } from "zod";
@@ -23,7 +30,12 @@ import type { Box3, CadCheck } from "./engine";
 if (typeof window !== "undefined") throw new Error("lib/cad/cloud.ts is server-only");
 
 export const CLOUD_BUILD_TIMEOUT_MS = 60_000;
+export const GOOGLE_CALL_TIMEOUT_MS = 10_000;
 const TOKEN_EARLY_MS = 5 * 60_000;
+
+export const STS_URL = "https://sts.googleapis.com/v1/token";
+export const iamIdTokenUrl = (email: string) =>
+  `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(email)}:generateIdToken`;
 
 /** The service URL without a trailing slash (= the token audience), or null when not configured. */
 export function cloudUrl(): string | null {
@@ -38,8 +50,17 @@ export function cloudUrl(): string | null {
   }
 }
 
+export type CloudAuthMode = "keyless" | "key";
+
+/** keyless (WIF provider + SA email) wins over a key; null = no credentials configured. */
+export function cloudAuthMode(): CloudAuthMode | null {
+  if (process.env.GCP_WIF_PROVIDER?.trim() && process.env.GCP_CAD_SA_EMAIL?.trim()) return "keyless";
+  if (process.env.GCP_CAD_SA_KEY?.trim()) return "key";
+  return null;
+}
+
 export function cloudConfigured(): boolean {
-  return !!cloudUrl() && !!process.env.GCP_CAD_SA_KEY?.trim();
+  return !!cloudUrl() && !!cloudAuthMode();
 }
 
 /** The key as an object: raw JSON, or base64 of it (easier to paste into Vercel). */
@@ -56,7 +77,7 @@ function credentials(): Record<string, unknown> {
 
 type TokenSource = { fetchIdToken: (audience: string) => Promise<string> };
 let source: { audience: string; client: Promise<TokenSource> } | null = null;
-let cached: { audience: string; token: string; expires: number } | null = null;
+let cached: { key: string; token: string; expires: number } | null = null;
 
 /** Test hook: forget the cached client and token. */
 export function resetCloudAuth() {
@@ -74,9 +95,99 @@ function tokenExpiry(token: string): number {
   return Date.now() + 30 * 60_000;
 }
 
-/** A Google ID token for the worker (audience = the service URL). */
-export async function idToken(audience: string): Promise<string> {
-  if (cached && cached.audience === audience && cached.expires - TOKEN_EARLY_MS > Date.now()) return cached.token;
+type RequestContext = { get?: () => { headers?: Record<string, unknown> } | undefined };
+
+/**
+ * The Vercel OIDC token: one passed by the route (request header
+ * x-vercel-oidc-token), else the current request's header through Vercel's
+ * request context (what @vercel/functions getVercelOidcToken reads), else the
+ * env var (set at build time, and by `vercel env pull` for local runs).
+ */
+export function vercelOidcToken(passed?: string | null): string | null {
+  const direct = passed?.trim();
+  if (direct) return direct;
+  try {
+    const ctx = (globalThis as unknown as Record<symbol, RequestContext | undefined>)[
+      Symbol.for("@vercel/request-context")
+    ]?.get?.();
+    const header = ctx?.headers?.["x-vercel-oidc-token"];
+    if (typeof header === "string" && header.trim()) return header.trim();
+  } catch {
+    /* no request context (local / tests) */
+  }
+  return process.env.VERCEL_OIDC_TOKEN?.trim() || null;
+}
+
+/** Google's error code from a failed answer, never the body itself. */
+async function googleError(step: string, res: Response): Promise<Error> {
+  const body = (await res.json().catch(() => null)) as { error?: unknown } | null;
+  const err = body?.error;
+  const code =
+    typeof err === "string"
+      ? err
+      : err && typeof err === "object" && "status" in err
+        ? String((err as { status: unknown }).status)
+        : "";
+  return new Error(`google auth: ${step} HTTP ${res.status}${code ? ` ${code.slice(0, 60)}` : ""}`);
+}
+
+async function googlePost(
+  doFetch: typeof fetch,
+  step: string,
+  url: string,
+  body: unknown,
+  headers: Record<string, string> = {}
+): Promise<Record<string, unknown>> {
+  let res: Response;
+  try {
+    res = await doFetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(GOOGLE_CALL_TIMEOUT_MS),
+      cache: "no-store",
+    });
+  } catch (e) {
+    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+    throw new Error(`google auth: ${step} ${timedOut ? "timed out" : "unreachable"}`);
+  }
+  if (!res.ok) throw await googleError(step, res);
+  return ((await res.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+}
+
+type AuthOpts = { fetchImpl?: typeof fetch; oidcToken?: string | null };
+
+/** Keyless: Vercel OIDC → STS federated access token → IAM Credentials generateIdToken. */
+async function keylessIdToken(audience: string, opts: AuthOpts): Promise<string> {
+  const doFetch = opts.fetchImpl ?? fetch;
+  const provider = (process.env.GCP_WIF_PROVIDER ?? "").trim().replace(/^\/\/iam\.googleapis\.com\//, "");
+  const email = (process.env.GCP_CAD_SA_EMAIL ?? "").trim();
+  const subject = vercelOidcToken(opts.oidcToken);
+  if (!subject) throw new Error("google auth: no Vercel OIDC token");
+  const sts = await googlePost(doFetch, "sts", STS_URL, {
+    grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
+    audience: `//iam.googleapis.com/${provider}`,
+    scope: "https://www.googleapis.com/auth/cloud-platform",
+    requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+    subjectToken: subject,
+    subjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
+  });
+  const access = typeof sts.access_token === "string" ? sts.access_token : "";
+  if (!access) throw new Error("google auth: sts answered without an access token");
+  const id = await googlePost(
+    doFetch,
+    "generateIdToken",
+    iamIdTokenUrl(email),
+    { audience, includeEmail: true },
+    { authorization: `Bearer ${access}` }
+  );
+  const token = typeof id.token === "string" ? id.token : "";
+  if (!token) throw new Error("google auth: generateIdToken answered without a token");
+  return token;
+}
+
+/** Legacy: the service-account key via google-auth-library. */
+async function keyIdToken(audience: string): Promise<string> {
   if (!source || source.audience !== audience) {
     const auth = new GoogleAuth({ credentials: credentials() });
     const client = auth.getIdTokenClient(audience).then((c) => c.idTokenProvider as TokenSource);
@@ -85,8 +196,17 @@ export async function idToken(audience: string): Promise<string> {
       if (source?.client === client) source = null;
     });
   }
-  const token = await (await source.client).fetchIdToken(audience);
-  cached = { audience, token, expires: tokenExpiry(token) };
+  return (await source.client).fetchIdToken(audience);
+}
+
+/** A Google ID token for the worker (audience = the service URL). Throws when none can be had. */
+export async function idToken(audience: string, opts: AuthOpts = {}): Promise<string> {
+  const mode = cloudAuthMode();
+  if (!mode) throw new Error("google auth: not configured");
+  const key = `${mode}|${audience}`;
+  if (cached && cached.key === key && cached.expires - TOKEN_EARLY_MS > Date.now()) return cached.token;
+  const token = mode === "keyless" ? await keylessIdToken(audience, opts) : await keyIdToken(audience);
+  cached = { key, token, expires: tokenExpiry(token) };
   return token;
 }
 
@@ -147,18 +267,28 @@ export function workerHeaders(idTokenValue: string): Record<string, string> {
   return headers;
 }
 
+export type BuildOpts = {
+  timeoutMs?: number;
+  /** Used for the worker AND the keyless Google calls (tests route by URL). */
+  fetchImpl?: typeof fetch;
+  /** The request's x-vercel-oidc-token header, when the route has it. */
+  oidcToken?: string | null;
+};
+
 /** One call to /build. Never throws. */
-export async function buildOnce(
-  req: BuildRequest,
-  opts: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
-): Promise<BuildOutcome> {
+export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promise<BuildOutcome> {
   const url = cloudUrl();
-  if (!url || !process.env.GCP_CAD_SA_KEY?.trim()) return { kind: "down", reason: "not_configured", detail: "GCP_CAD_URL / GCP_CAD_SA_KEY missing" };
+  if (!url || !cloudAuthMode())
+    return {
+      kind: "down",
+      reason: "not_configured",
+      detail: "GCP_CAD_URL and GCP_WIF_PROVIDER + GCP_CAD_SA_EMAIL (or GCP_CAD_SA_KEY) missing",
+    };
   const doFetch = opts.fetchImpl ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? CLOUD_BUILD_TIMEOUT_MS);
   try {
-    const token = await idToken(url);
+    const token = await idToken(url, { fetchImpl: opts.fetchImpl, oidcToken: opts.oidcToken });
     const res = await doFetch(`${url}/build`, {
       method: "POST",
       headers: workerHeaders(token),
@@ -194,7 +324,8 @@ export async function buildOnce(
     };
   } catch (e) {
     if (controller.signal.aborted) return { kind: "down", reason: "timeout", detail: `no answer within ${Math.round((opts.timeoutMs ?? CLOUD_BUILD_TIMEOUT_MS) / 1000)} s` };
-    // The message of a fetch / auth error never contains the key or the token.
+    // A token failure counts as "worker unavailable" too (retry, then the browser
+    // path). The message of a fetch / auth error never contains a key or a token.
     return { kind: "down", reason: "unreachable", detail: e instanceof Error ? e.message.slice(0, 200) : "request failed" };
   } finally {
     clearTimeout(timer);
@@ -202,10 +333,7 @@ export async function buildOnce(
 }
 
 /** /build with one retry when the worker is down; "down" only after two misses in a row. */
-export async function buildWithRetry(
-  req: BuildRequest,
-  opts: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
-): Promise<BuildOutcome> {
+export async function buildWithRetry(req: BuildRequest, opts: BuildOpts = {}): Promise<BuildOutcome> {
   const first = await buildOnce(req, opts);
   if (first.kind === "result" || first.reason === "not_configured") return first;
   return buildOnce(req, opts);

@@ -51,6 +51,8 @@ type Ctx = {
   locale: "en" | "ar";
   minWallMm: number;
   boards: Footprint[];
+  /** The request's x-vercel-oidc-token header (keyless Google auth); optional. */
+  oidcToken?: string | null;
 };
 
 export type CloudReply =
@@ -221,7 +223,10 @@ export async function runCloudCad(ctx: Ctx): Promise<CloudReply> {
     return modelError(first.error);
   }
   const code1 = first.value.code;
-  const b1 = await buildWithRetry({ code: code1, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) });
+  const b1 = await buildWithRetry(
+    { code: code1, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) },
+    { oidcToken: ctx.oidcToken }
+  );
   if (b1.kind === "down") {
     // No code stored: our own outage never counts against the caller's cap.
     await fail(ctx.supabase, a.id, `cloud_down: ${b1.reason}`);
@@ -247,7 +252,10 @@ export async function runCloudCad(ctx: Ctx): Promise<CloudReply> {
     await fail(ctx.supabase, b.id, `${second.error}: repair not written`);
     return { kind: "error", error: cloudFailureCode(b1), status: 502 };
   }
-  let b2 = await buildWithRetry({ code: second.value.code, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) });
+  let b2 = await buildWithRetry(
+    { code: second.value.code, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) },
+    { oidcToken: ctx.oidcToken }
+  );
   if (b2.kind === "result" && !(await setCode(ctx, b.id, second.value.code, second.model))) {
     b2 = { kind: "result", result: { ...b2.result, ok: false, error: "not saved" } };
   }

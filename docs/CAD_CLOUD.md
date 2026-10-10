@@ -11,7 +11,9 @@ Workspace "3D model" card
 Next.js (Vercel)  ── lib/cad/engine.ts: which engine? (store_settings.cad_engine + role)
    │  cloud:
    │   1. Gemini writes CadQuery (lib/cad/prompt.ts, checked by lib/cad/validate.ts)
-   │   2. lib/cad/cloud.ts mints a Google ID token from GCP_CAD_SA_KEY
+   │   2. lib/cad/cloud.ts mints a Google ID token WITHOUT a key file:
+   │      Vercel OIDC token → Google STS (Workload Identity Federation)
+   │      → IAM Credentials generateIdToken as vercel-cad-caller
    │      and POSTs {code, checks} to GCP_CAD_URL/build (60 s)
    ▼
 Cloud Run "cad-worker" (services/cad-worker, private, IAM: run.invoker only)
@@ -29,7 +31,7 @@ then calls cad_deliver (the credit is spent only now).
   - the board fits inside (`must_contain_box`, from the project's largest known board, height 12 mm)
   - walls at least 1.2 mm (`min_wall_mm` in the setting)
 - **A failed check:** the worker's messages are fed into one automatic repair. If it still fails, nothing is delivered and nothing is charged.
-- **Worker down or timing out twice (or env missing):** the request falls back to the browser OpenSCAD path. An `ai_usage` row is logged with provider `cad-worker` and error code `fallback_browser:<reason>`, visible on Dashboard → AI usage.
+- **Worker down or timing out twice, no Google token (STS / IAM refused or timed out, 10 s each), or env missing:** the request falls back to the browser OpenSCAD path. An `ai_usage` row is logged with provider `cad-worker` and error code `fallback_browser:<reason>`, visible on Dashboard → AI usage.
 - **Credits are unchanged:**
   - 1 CAD credit covers up to 3 versions.
   - The credit is charged only when the first result is delivered.
@@ -76,25 +78,37 @@ gcloud config set project PROJECT
    gcloud iam service-accounts create cad-worker-runtime --display-name="CAD worker runtime (no roles)"
    gcloud run deploy cad-worker --image=me-central1-docker.pkg.dev/PROJECT/gestaltung/cad-worker:latest --region=me-central1 --no-allow-unauthenticated --service-account=cad-worker-runtime@PROJECT.iam.gserviceaccount.com --cpu=2 --memory=2Gi --concurrency=1 --timeout=60 --min-instances=0 --max-instances=2 --set-env-vars=CAD_WORKER_TOKEN=CHOOSE_A_LONG_RANDOM_STRING
    ```
-4. **The caller Vercel uses.** It gets the invoker role on this one service only.
+4. **The caller Vercel uses — keyless.** The Google organisation blocks service-account keys (`constraints/iam.disableServiceAccountKeyCreation`), so Vercel proves who it is with its own OIDC token and Google swaps it for a short-lived ID token (Workload Identity Federation). There is no key file anywhere.
    ```bash
    gcloud iam service-accounts create vercel-cad-caller --display-name="Vercel CAD caller"
-   gcloud run services add-iam-policy-binding cad-worker --region=me-central1 --member=serviceAccount:vercel-cad-caller@PROJECT.iam.gserviceaccount.com --role=roles/run.invoker
-   gcloud iam service-accounts keys create vercel-cad-caller.json --iam-account=vercel-cad-caller@PROJECT.iam.gserviceaccount.com
+   gcloud run services add-iam-policy-binding cad-worker --region=me-central1 --member=serviceAccount:vercel-cad-caller@gestaltung-cad.iam.gserviceaccount.com --role=roles/run.invoker
+   gcloud services enable iamcredentials.googleapis.com sts.googleapis.com --project=gestaltung-cad
+   gcloud iam workload-identity-pools create vercel --location=global --display-name="Vercel" --project=gestaltung-cad
+   gcloud iam workload-identity-pools providers create-oidc vercel --workload-identity-pool=vercel --location=global --issuer-uri=https://oidc.vercel.com/gestaltungco-7345s-projects --allowed-audiences=https://vercel.com/gestaltungco-7345s-projects --attribute-mapping="google.subject=assertion.sub,attribute.project=assertion.project,attribute.environment=assertion.environment" --attribute-condition="assertion.project=='gestaltung' && (assertion.environment=='production' || assertion.environment=='development')" --project=gestaltung-cad
+   gcloud iam service-accounts add-iam-policy-binding vercel-cad-caller@gestaltung-cad.iam.gserviceaccount.com --role=roles/iam.workloadIdentityUser --member="principalSet://iam.googleapis.com/projects/1005108288584/locations/global/workloadIdentityPools/vercel/attribute.project/gestaltung" --project=gestaltung-cad
+   gcloud iam service-accounts add-iam-policy-binding vercel-cad-caller@gestaltung-cad.iam.gserviceaccount.com --role=roles/iam.serviceAccountOpenIdTokenCreator --member="principalSet://iam.googleapis.com/projects/1005108288584/locations/global/workloadIdentityPools/vercel/attribute.project/gestaltung" --project=gestaltung-cad
    ```
-   Run this outside the repo folder (or move the file out at once) so the key can never be committed, and delete it after step 5.
-5. **Vercel env** (Production; add Preview too if you want). All three are server-only:
+   - The provider only accepts tokens of the Vercel project `gestaltung`, environments `production` and `development` (Preview is refused; add it to the condition if you want it).
+   - Vercel side: Team Settings → Security → "Secure backend access with OIDC federation" must be on, Team issuer mode (`https://oidc.vercel.com/gestaltungco-7345s-projects`). It already is.
+   - IAM changes can take a couple of minutes to work.
+5. **Vercel env** (Production; Development too for local runs). All server-only:
+
+   | Name | Value |
+   |---|---|
+   | `GCP_CAD_URL` | `https://cad-worker-1005108288584.me-central1.run.app` |
+   | `GCP_WIF_PROVIDER` | `projects/1005108288584/locations/global/workloadIdentityPools/vercel/providers/vercel` |
+   | `GCP_CAD_SA_EMAIL` | `vercel-cad-caller@gestaltung-cad.iam.gserviceaccount.com` |
+   | `CAD_WORKER_TOKEN` | the same string as in step 3 |
+
    ```bash
-   gcloud run services describe cad-worker --region=me-central1 --format="value(status.url)"
    vercel env add GCP_CAD_URL production
-   vercel env add GCP_CAD_SA_KEY production
+   vercel env add GCP_WIF_PROVIDER production
+   vercel env add GCP_CAD_SA_EMAIL production
    vercel env add CAD_WORKER_TOKEN production
    ```
-   - `GCP_CAD_URL`: paste the URL printed by the first command.
-   - `GCP_CAD_SA_KEY`: paste the whole JSON (or its base64).
-   - `CAD_WORKER_TOKEN`: the same string as in step 3.
+   Redeploy after adding them. The Vercel OIDC token itself needs no env: on Vercel it arrives with every request (header `x-vercel-oidc-token`); locally `vercel env pull` writes a `VERCEL_OIDC_TOKEN` (valid about 12 hours, pull again when it expires).
 
-   Redeploy after adding them.
+   *Legacy:* `GCP_CAD_SA_KEY` (a key JSON, raw or base64) still works when `GCP_WIF_PROVIDER` / `GCP_CAD_SA_EMAIL` are not set. Keyless always wins when both are set.
 6. **Budget alerts** (emails go to the billing account's admins):
    ```bash
    gcloud billing budgets create --billing-account=BILLING --display-name="CAD worker" --budget-amount=10USD --threshold-rule=percent=0.1 --threshold-rule=percent=0.5 --threshold-rule=percent=1.0
@@ -115,16 +129,7 @@ gcloud run deploy cad-worker --image=me-central1-docker.pkg.dev/PROJECT/gestaltu
 
 ## Rotate the caller key
 
-```bash
-gcloud iam service-accounts keys list --iam-account=vercel-cad-caller@PROJECT.iam.gserviceaccount.com
-gcloud iam service-accounts keys create new.json --iam-account=vercel-cad-caller@PROJECT.iam.gserviceaccount.com
-```
-1. Put `new.json` in Vercel's `GCP_CAD_SA_KEY` and redeploy.
-2. Delete the old key:
-   ```bash
-   gcloud iam service-accounts keys delete OLD_KEY_ID --iam-account=vercel-cad-caller@PROJECT.iam.gserviceaccount.com
-   ```
-3. Delete `new.json` from the disk.
+Nothing to rotate: the keyless setup has no key. Each ID token lives about an hour and is minted fresh from the Vercel OIDC token. To cut Vercel off, remove the two `principalSet` bindings from step 4 (or disable the `vercel` provider).
 
 ## Read the costs
 

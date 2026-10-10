@@ -112,6 +112,8 @@ export async function POST(request: Request) {
       locale,
       minWallMm: setting.minWallMm,
       boards: await loadProjectBoards(supabase, projectId),
+      // Keyless Google auth (Vercel OIDC → Workload Identity Federation).
+      oidcToken: request.headers.get("x-vercel-oidc-token"),
     });
     if (cloud.kind === "delivered") return Response.json(cloud.body);
     if (cloud.kind === "error") return Response.json({ error: cloud.error }, { status: cloud.status });
