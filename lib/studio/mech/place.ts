@@ -24,7 +24,7 @@ import { MECH_PARAMS, THROUGH_LID, type LayoutItem, type LibraryPart, type MechP
 import { rotateXY, type LayoutResult } from "../layout";
 import { BASE_DROP_MM, componentVector, explodeFrame, lidLiftMm, type Vec3 } from "../explode";
 import { openingSize } from "../enclosure/cutouts";
-import { topAt } from "../enclosure/templates";
+import { topAt, type DomeDims } from "../enclosure/templates";
 import { clampParams, type MechParams } from "./templates";
 
 /** The enclosure numbers placement needs (EnclosureDims satisfies it). */
@@ -36,8 +36,9 @@ export type MechDims = {
   floorZ: number;
   splitZ: number;
   contentOffset: Vec3;
-  /** soft_wedge: the top falls towards the front (topAt). */
+  /** soft_wedge: the top falls towards the front; dome_base: a domed top (topAt). */
   wedgeDeg?: number;
+  dome?: DomeDims;
 };
 
 export type MechPlacement = {
@@ -198,7 +199,7 @@ export function placeMechParts(
         const local = portXY(tt.part, port);
         const p = toWorld(ctx, tt.item, local.x, local.y, tt.part.dims.z);
         // Length from the part's real top (after settleLayout) to the lid's outer top here.
-        const gap = topAt(dims, p[1]) - p[2];
+        const gap = topAt(dims, p[1], p[0]) - p[2];
         const opening = openingSize(port).w;
         if (m.template === "button_extender") {
           const e = THROUGH_LID.extender;

@@ -9,7 +9,7 @@ import {
   COLOURS, DEFAULT_ENCLOSURE, ENCLOSURE_TEMPLATES, FEET, FINISHES, LIDS, clampEnclosure,
   type ClampLog, type EnclosureSpec, type EnclosureTemplate, type ProductSpec,
 } from "../schema";
-import { ENCLOSURE_SYSTEM, PHASE1_TEMPLATES, enclosurePrompt, enclosureSchema } from "./prompts";
+import { AI_TEMPLATES, ENCLOSURE_SYSTEM, enclosurePrompt, enclosureSchema } from "./prompts";
 import { isObj, type Outcome, type StudioCall } from "./types";
 
 export type Bbox = { w: number; d: number; h: number };
@@ -67,7 +67,7 @@ export async function runEnclosure(opts: {
   /** templateFor(spec) when lib/studio/enclosure/templates.ts provides it. */
   fallback?: EnclosureSpec;
 }): Promise<Outcome<EnclosureSpec>> {
-  const templates = (opts.templates ?? PHASE1_TEMPLATES).filter((t) => (ENCLOSURE_TEMPLATES as readonly string[]).includes(t));
+  const templates = (opts.templates ?? AI_TEMPLATES).filter((t) => (ENCLOSURE_TEMPLATES as readonly string[]).includes(t));
   const previous = opts.previous ?? [];
   const log: ClampLog = [];
   const r = await opts.call<EnclosureSpec>({

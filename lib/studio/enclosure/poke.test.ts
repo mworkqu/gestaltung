@@ -5,11 +5,10 @@ import { getPart } from "../library";
 import { isPokeSensor, layoutComponents, mountLift, POKE_OUT, worldBox } from "../layout";
 import { buildEnclosure } from "./build";
 import { cutoutBox } from "./cutouts";
-import { settlePokes } from "./templates";
-import { spec, items, P } from "./test-fixtures";
-import type { EnclosureTemplate } from "../schema";
+import { innerTopAt, settlePokes, topAt } from "./templates";
+import { ALL_TEMPLATES, spec, items, P } from "./test-fixtures";
 
-const TEMPLATES: EnclosureTemplate[] = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"];
+const TEMPLATES = ALL_TEMPLATES;
 
 function deskFriend() {
   return items(
@@ -51,8 +50,10 @@ describe("poke-through sensor (PIR)", () => {
       const dome = parts.get("pir")!;
       const apex = d.floorZ + pir.pos[2] + dome.dims.z; // enclosure space
       const y = pir.pos[1] + d.contentOffset[1];
-      const outerTop = d.wedgeDeg ? d.H + (Math.min(y, d.D / 2) - d.D / 2) * Math.tan((d.wedgeDeg * Math.PI) / 180) : d.H;
-      const innerTop = outerTop - d.wall;
+      const x = pir.pos[0] + d.contentOffset[0];
+      const outerTop = topAt(d, y, x);
+      if (!d.wedgeDeg && !d.dome) expect(outerTop).toBe(d.H);
+      const innerTop = innerTopAt(d, y, x);
       expect(apex).toBeGreaterThan(innerTop); // above the lid's inner top surface
       expect(apex - outerTop).toBeGreaterThanOrEqual(POKE_OUT - 0.01); // and out through the top
       expect(apex - outerTop).toBeLessThanOrEqual(4);

@@ -1,9 +1,9 @@
 import { canUse } from "@/lib/credits/server";
 import { studioLibrary } from "@/lib/studio/library/remote";
-import { templateFor } from "@/lib/studio/enclosure/templates";
-import { emptyStudioDoc, DEFAULT_ENCLOSURE, type EnclosureSpec } from "@/lib/studio/schema";
+import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
+import { emptyStudioDoc, type EnclosureSpec } from "@/lib/studio/schema";
 import { runEnclosure, safeBbox } from "@/lib/studio/ai/enclosure";
-import { PHASE1_TEMPLATES } from "@/lib/studio/ai/prompts";
+import { AI_TEMPLATES } from "@/lib/studio/ai/prompts";
 import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
 import {
   cadRpcError, callErrorStatus, creditDenied, EnclosureBody, rpcMissing, versionFromRegens,
@@ -82,11 +82,11 @@ export async function POST(request: Request) {
       return { name: c.label || part?.name.en || c.partId, category: part?.category ?? "unknown" };
     }),
     bbox,
-    templates: PHASE1_TEMPLATES,
+    templates: AI_TEMPLATES,
     // Only the last 3 looks matter for "a different one".
     previous: previous.slice(-3),
-    // Default look on model failure: the rule-picked template for this product.
-    fallback: { ...DEFAULT_ENCLOSURE, template: templateFor(body.spec) },
+    // Default look on model failure: the rule-picked template (+ its feet / vents) for this product.
+    fallback: defaultEnclosureFor(body.spec),
   });
   if (!r.ok) {
     await fail(r.error);

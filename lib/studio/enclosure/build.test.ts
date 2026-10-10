@@ -2,15 +2,14 @@ import * as THREE from "three";
 import { computeMeshVolume } from "three-bvh-csg";
 import { describe, expect, it } from "vitest";
 import { layoutComponents } from "../layout";
-import type { EnclosureTemplate } from "../schema";
 import { buildEnclosure } from "./build";
 import { cutoutsFor } from "./cutouts";
 import { enclosureDims } from "./templates";
 import { exportObjectsSTL, exportSTL, exportSVG } from "../export";
 import { getCadBackend } from "../cad-adapter";
-import { P, items, spec, typical } from "./test-fixtures";
+import { ALL_TEMPLATES, P, items, spec, typical } from "./test-fixtures";
 
-const TEMPLATES: EnclosureTemplate[] = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper", "wall_plate"];
+const TEMPLATES = ALL_TEMPLATES;
 
 function setup(list = typical()) {
   const lr = layoutComponents(list, { clearance: 2 });
@@ -41,7 +40,8 @@ describe("buildEnclosure", () => {
       expect(base.geometry.boundingBox!.max.z).toBeLessThanOrEqual(meta.splitZ + 1e-3);
       expect(computeMeshVolume(base)).toBeGreaterThan(0);
       expect(computeMeshVolume(lid)).toBeGreaterThan(0);
-      expect(base.children.length).toBe(4);
+      // Rubber feet as child meshes — a wall plate hangs on the wall, so none.
+      expect(base.children.length).toBe(template === "wall_plate" ? 0 : 4);
       expect(meta.triangles).toBeLessThan(60000);
       const nor = base.geometry.getAttribute("normal");
       expect(nor).toBeTruthy();
@@ -52,9 +52,11 @@ describe("buildEnclosure", () => {
   it("is fast enough for a typical box", () => {
     const { lr, parts } = setup();
     buildEnclosure(spec(), lr, parts); // warm-up
-    const t0 = performance.now();
+    // This process's CPU time (each test file runs in its own process), so parallel suites don't skew it.
+    const c0 = process.cpuUsage();
     const { meta } = buildEnclosure(spec({ vents: { pattern: "holes", face: "-z", count: 12 }, feet: "ring" }), lr, parts);
-    const ms = performance.now() - t0;
+    const c = process.cpuUsage(c0);
+    const ms = (c.user + c.system) / 1000;
     console.info(`[enclosure] rounded_box: ${ms.toFixed(0)} ms, ${meta.triangles} triangles, ${meta.cutouts.length} cutouts, ${meta.vents.length} vents`);
     expect(ms).toBeLessThan(1500);
   });

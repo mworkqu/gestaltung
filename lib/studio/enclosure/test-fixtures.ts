@@ -1,6 +1,9 @@
 // Small fake LibraryParts for layout / enclosure tests (independent of the real library).
 
-import { DEFAULT_ENCLOSURE, LibraryPartSchema, type EnclosureSpec, type LibraryPart, type Port } from "../schema";
+import { DEFAULT_ENCLOSURE, ENCLOSURE_TEMPLATES, LibraryPartSchema, type EnclosureSpec, type EnclosureTemplate, type LibraryPart, type Port } from "../schema";
+
+/** Every enclosure template (all eight are built since Phase 3). */
+export const ALL_TEMPLATES: readonly EnclosureTemplate[] = ENCLOSURE_TEMPLATES;
 
 type FakeOpts = {
   category?: LibraryPart["category"];

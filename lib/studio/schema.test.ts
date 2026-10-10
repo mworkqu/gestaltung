@@ -287,6 +287,16 @@ describe("clampEnclosure", () => {
     expect(clampEnclosure({ ...validEnclosure, vents: { pattern: "slots", face: "-z", count: NaN } }).vents.count).toBe(8);
   });
 
+  it("accepts grille / louvres; louvres only on a side face; a wall plate has no feet", () => {
+    expect(clampEnclosure({ ...validEnclosure, vents: { pattern: "grille", face: "+z", count: 9 } }).vents).toEqual({ pattern: "grille", face: "+z", count: 9 });
+    expect(clampEnclosure({ ...validEnclosure, vents: { pattern: "louvres", face: "-y", count: 4 } }).vents.face).toBe("-y");
+    const log: ClampLog = [];
+    expect(clampEnclosure({ ...validEnclosure, vents: { pattern: "Louvres", face: "+z", count: 4 } }, log).vents).toEqual({ pattern: "louvres", face: "+x", count: 4 });
+    expect(log.some((l) => l.path === "vents.face" && l.to === "+x")).toBe(true);
+    expect(clampEnclosure({ ...validEnclosure, template: "wall_plate", feet: "rubber_4" }).feet).toBe("none");
+    expect(clampEnclosure({ ...validEnclosure, template: "dome_base", feet: "ring" }).feet).toBe("ring");
+  });
+
   it("handles accentColour and label", () => {
     expect(clampEnclosure({ ...validEnclosure, colour: "sage", accentColour: "sage" }).accentColour).toBeUndefined();
     expect(clampEnclosure({ ...validEnclosure, accentColour: "magenta" }).accentColour).toBeUndefined();

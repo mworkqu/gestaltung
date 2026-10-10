@@ -7,13 +7,13 @@ import { getPart } from "../library";
 import { layoutComponents, worldBox } from "../layout";
 import { defaultMechParts, layoutBounds, mechSummary } from "../ai/mech-default";
 import { placeMechParts } from "../mech/place";
-import type { EnclosureTemplate, LibraryPart, StudioComponent } from "../schema";
+import type { LibraryPart, StudioComponent } from "../schema";
 import { cutoutBox, type Cutout } from "./cutouts";
 import { planEnclosure } from "./build";
 import { topAt } from "./templates";
-import { spec } from "./test-fixtures";
+import { ALL_TEMPLATES, spec } from "./test-fixtures";
 
-const TEMPLATES: EnclosureTemplate[] = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"];
+const TEMPLATES = ALL_TEMPLATES;
 /** Minimum lid material between two openings (mm). */
 const MIN_WEB = 3;
 
@@ -112,7 +112,7 @@ describe("lid openings (real library)", () => {
           expect(p[1]).toBeLessThan(r.y1);
           // Height: extender cap ~1 mm proud of the lid, light pipe flush (0–0.3 mm).
           const tip = p[2] + (m.template === "button_extender" ? 1 + places[i].params.length + 2.5 : places[i].params.length);
-          const proud = tip - topAt(dims, p[1]);
+          const proud = tip - topAt(dims, p[1], p[0]);
           if (m.template === "button_extender") {
             expect(proud).toBeGreaterThanOrEqual(0.5);
             expect(proud).toBeLessThanOrEqual(1.5);

@@ -42,14 +42,17 @@ export const PIN_ROLES = [
 ] as const;
 export const PIN_SIDES = ["left", "right", "top", "bottom"] as const;
 
-/** Phase 1 templates; Phase 3 adds lantern / dome_base / wall_plate. */
+/** All eight enclosure templates (lantern / dome_base / wall_plate since Phase 3). */
 export const ENCLOSURE_TEMPLATES = [
   "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper",
   "lantern", "dome_base", "wall_plate",
 ] as const;
 export const HEIGHT_BIASES = ["low", "mid", "tall"] as const;
 export const LIDS = ["snap", "screw_4", "slide", "twist"] as const;
-export const VENT_PATTERNS = ["none", "slots", "holes", "hex"] as const;
+/** grille = concentric arcs (speakers); louvres = angled slats on a SIDE face. */
+export const VENT_PATTERNS = ["none", "slots", "holes", "hex", "grille", "louvres"] as const;
+/** Faces where louvres make sense (side walls). */
+export const SIDE_VENT_FACES = ["+x", "-x", "+y", "-y"] as const;
 export const FEET = ["none", "rubber_4", "ring"] as const;
 export const FINISHES = [
   "matte_plastic", "glossy_plastic", "soft_touch", "anodized_aluminium", "wood_look",
@@ -287,8 +290,10 @@ function pickEnum<T extends string>(
   values: readonly T[], v: unknown, fallback: T, path: string, log: ClampLog,
 ): T {
   if (typeof v === "string") {
-    const norm = v.trim().toLowerCase().replace(/[\s-]+/g, "_");
-    const hit = values.find((x) => x === norm);
+    const lower = v.trim().toLowerCase();
+    const norm = lower.replace(/[\s-]+/g, "_");
+    // Exact (lower-cased) first: faces such as "-y" must not become "_y".
+    const hit = values.find((x) => x === lower) ?? values.find((x) => x === norm);
     if (hit) {
       if (hit !== v) log.push({ path, from: v, to: hit });
       return hit;
@@ -458,6 +463,17 @@ export function clampEnclosure(input: unknown, log: ClampLog = [], opts: ClampEn
   const ventCount = ventPattern === "none"
     ? 0
     : clampNum(v.count, LIMITS.ventCount.min, LIMITS.ventCount.max, 8, "vents.count", log, { int: true });
+  let ventFace = pickEnum(VENT_FACES, v.face, "-z", "vents.face", log);
+  if (ventPattern === "louvres" && !(SIDE_VENT_FACES as readonly string[]).includes(ventFace)) {
+    log.push({ path: "vents.face", from: ventFace, to: "+x" });
+    ventFace = "+x";
+  }
+  let feet = pickEnum(FEET, o.feet, d.feet, "feet", log);
+  if (template === "wall_plate" && feet !== "none") {
+    // A wall plate hangs on the wall: no feet.
+    log.push({ path: "feet", from: feet, to: "none" });
+    feet = "none";
+  }
   const out: EnclosureSpec = {
     template,
     proportions: {
@@ -469,8 +485,8 @@ export function clampEnclosure(input: unknown, log: ClampLog = [], opts: ClampEn
     wall,
     clearance: clampNum(o.clearance, LIMITS.clearance.min, LIMITS.clearance.max, d.clearance, "clearance", log),
     lid,
-    vents: { pattern: ventPattern, face: pickEnum(VENT_FACES, v.face, "-z", "vents.face", log), count: ventCount },
-    feet: pickEnum(FEET, o.feet, d.feet, "feet", log),
+    vents: { pattern: ventPattern, face: ventFace, count: ventCount },
+    feet,
     finish: pickEnum(FINISHES, o.finish, d.finish, "finish", log),
     colour: pickEnum(COLOURS, o.colour, d.colour, "colour", log),
   };

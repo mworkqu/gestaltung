@@ -15,10 +15,10 @@ import { contentOffsetOf, placePart } from "../placement";
 import type { EnclosureTemplate, LayoutItem, LibraryPart } from "../schema";
 import { planEnclosure } from "./build";
 import { portLocal, type Cutout } from "./cutouts";
-import { topAt } from "./templates";
-import { items, spec } from "./test-fixtures";
+import { innerTopAt } from "./templates";
+import { ALL_TEMPLATES, items, spec } from "./test-fixtures";
 
-const TEMPLATES: EnclosureTemplate[] = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"];
+const TEMPLATES = ALL_TEMPLATES;
 const ROTS: RotZ[] = [0, 90, 180, 270];
 const TOL = 1.5;
 /** A screen's glass may sit at most this far under the lid's inner surface. */
@@ -93,8 +93,10 @@ function check(template: EnclosureTemplate, rot: RotZ | null) {
         // Right under the window: below the lid's inner surface (its lowest point over the
         // board — a sloped lid), but not deep inside the case.
         const box = worldBox(item, part);
-        const oy = offset[1];
-        const lidInner = Math.min(topAt(plan.dims, box.min[1] + oy), topAt(plan.dims, box.max[1] + oy)) - plan.dims.wall;
+        const [ox, oy] = offset;
+        const lidInner = Math.min(
+          ...[box.min[0], box.max[0]].flatMap((x) => [box.min[1], box.max[1]].map((y) => innerTopAt(plan.dims, y + oy, x + ox))),
+        );
         expect(s.top, `${label}: screen under the lid`).toBeLessThanOrEqual(lidInner + 1e-6);
         // A part stacked over it (only when a test forces a rotation onto a packed layout) caps it instead.
         const above = plan.placed

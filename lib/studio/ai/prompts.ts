@@ -7,7 +7,7 @@
 
 import {
   COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
-  MECH_TEMPLATES, MATERIALS, OUTPUTS, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
+  MECH_TEMPLATES, MATERIALS, OUTPUTS, PHASE_TEMPLATES, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
   type EnclosureTemplate, type MechTemplate,
 } from "../schema";
 
@@ -18,10 +18,8 @@ export const LABEL_MAX = 30;
 export const REASON_MAX = 100;
 export const MAX_COMPONENTS = 12;
 
-/** Phase 1 enclosure templates the renderer can build. */
-export const PHASE1_TEMPLATES: readonly EnclosureTemplate[] = [
-  "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper",
-];
+/** Enclosure templates the AI may choose (= what the browser builder makes: all eight). */
+export const AI_TEMPLATES: readonly EnclosureTemplate[] = PHASE_TEMPLATES;
 
 const str = (description?: string) => ({ type: "STRING", ...(description ? { description } : {}) });
 const num = (description?: string) => ({ type: "NUMBER", ...(description ? { description } : {}) });
@@ -141,6 +139,15 @@ export function pickPrompt(opts: { spec: unknown; index: unknown[]; locale: "en"
 export const ENCLOSURE_SYSTEM =
   "Choose a friendly, ergonomic enclosure for this product from the allowed templates and options. " +
   "Prefer soft, rounded, consumer-product looks that suit the use (desk / handheld / wall / outdoor). " +
+  "When each template fits: rounded_box = general box on a desk or shelf; pill = wearable or pocket item; " +
+  "soft_wedge = desk device with a screen (tilted top); puck = small round palm-sized object; " +
+  "handheld_taper = held in the hand; lantern = tall light or speaker standing on a desk (light slots around " +
+  "its top band, up to 3 times as tall as wide); dome_base = round sensor, lamp or speaker on a desk (domed lid, " +
+  "ring feet); wall_plate = mounted on a wall (thin plate, keyholes on the back, no feet). " +
+  "Vents: slots, holes or hex for airflow; grille = concentric arcs over a speaker (usually the +z top); " +
+  "louvres = angled slats on a side face (+x/-x/+y/-y) for products near rain or dust. " +
+  "label = optional short product name raised on the lid, Latin letters, digits, space, - . & only, at most " +
+  `${LIMITS.label.max} characters; leave it out for an Arabic name. ` +
   "Return only EnclosureSpec JSON. Never write geometry or code.";
 
 export function enclosureSchema(templates: readonly EnclosureTemplate[]) {
@@ -164,7 +171,7 @@ export function enclosureSchema(templates: readonly EnclosureTemplate[]) {
       vents: {
         type: "OBJECT",
         properties: {
-          pattern: enumOf(VENT_PATTERNS),
+          pattern: enumOf(VENT_PATTERNS, "grille = speaker arcs; louvres only on a side face"),
           face: enumOf(VENT_FACES),
           count: { type: "INTEGER", description: `${LIMITS.ventCount.min}–${LIMITS.ventCount.max}` },
         },
@@ -174,7 +181,7 @@ export function enclosureSchema(templates: readonly EnclosureTemplate[]) {
       finish: enumOf(FINISHES),
       colour: enumOf(COLOURS),
       accentColour: enumOf(COLOURS),
-      label: str(`Optional text on the case, at most ${LIMITS.label.max} characters`),
+      label: str(`Optional product name raised on the lid: Latin letters, digits, space, - . & only, at most ${LIMITS.label.max} characters`),
     },
     required: ["template", "proportions", "cornerRadius", "edgeFillet", "wall", "clearance", "lid", "vents", "feet", "finish", "colour"],
   };

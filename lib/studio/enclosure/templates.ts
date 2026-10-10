@@ -6,7 +6,9 @@
 // Enclosure space (all mm, Z up): outer shell spans x ∈ [-W/2, W/2],
 // y ∈ [-D/2, D/2], z ∈ [0, H]; the floor top is at z = floorZ (= wall) and the
 // layout is placed with its z = 0 on that floor (contentOffset). For soft_wedge
-// H is the BACK height; the top falls towards the front (-y).
+// H is the BACK height; the top falls towards the front (-y). For dome_base the
+// outer top is a half-ellipsoid (topAt depends on x AND y): a cylinder up to
+// dome.z0, then a cap rising dome.rise to H.
 
 import {
   DEFAULT_ENCLOSURE,
@@ -21,26 +23,26 @@ import {
 } from "../schema";
 import { hasTopPort, isPokeSensor, mountLift, POKE_OUT, worldBox, type LayoutResult, type Vec3 } from "../layout";
 
-/** Templates the browser builder can make right now. */
-export const BUILDABLE_TEMPLATES = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"] as const;
+/** Templates the browser builder can make (all eight since Phase 3). */
+export const BUILDABLE_TEMPLATES = [
+  "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper", "lantern", "dome_base", "wall_plate",
+] as const;
 export type BuildableTemplate = (typeof BUILDABLE_TEMPLATES)[number];
-
-// TODO(Phase 3): lantern, dome_base, wall_plate. Add the template to
-// BUILDABLE_TEMPLATES, give it a ShapeKind / proportions branch in shapeDims()
-// (lantern is exempt from the height rule — see heightRuleOk) and a geometry
-// branch in build.ts. Until then resolveTemplate() falls back to rounded_box.
 
 export type ShapeKind = "rrect" | "stadium" | "circle";
 
+/** dome_base: outer top = z0 + rise·√(1 − (r/R)²), R = W/2 (tangent to the cylinder wall at r = R). */
+export type DomeDims = { z0: number; rise: number };
+
 export type EnclosureDims = {
-  /** Template actually built (after fallback). */
+  /** Template actually built. */
   template: BuildableTemplate;
   /** Template the spec asked for. */
   requested: EnclosureTemplate;
   shape: ShapeKind;
   W: number;
   D: number;
-  /** Max outer height (back height for soft_wedge). */
+  /** Max outer height (back height for soft_wedge, dome apex for dome_base). */
   H: number;
   innerW: number;
   innerD: number;
@@ -57,6 +59,8 @@ export type EnclosureDims = {
   frontH?: number;
   /** handheld_taper: narrows by `amount` towards the + end of `axis`. */
   taper?: { axis: "x" | "y"; amount: number };
+  /** dome_base: the domed lid. */
+  dome?: DomeDims;
   /** Where the layout's origin goes inside the enclosure. */
   contentOffset: Vec3;
 };
@@ -74,6 +78,16 @@ const WEDGE_DEG = { low: 12, mid: 15, tall: 18 } as const;
 const TAPER_AMOUNT = 0.2;
 /** Below this (front) height the lid is just the top plate. */
 const PLATE_LID_BELOW = 24;
+/** lantern: minimum height : side per heightBias, and its own height cap (exempt from the 2× rule). */
+const LANTERN_RATIO = { low: 1.3, mid: 1.8, tall: 2.5 } as const;
+export const LANTERN_MAX_RATIO = 3;
+/** lantern: the lid is the upper band (light slots + label) from this share of H. */
+export const LANTERN_SPLIT = 0.55;
+/** dome_base: dome rise as a share of the diameter. */
+const DOME_RISE = { low: 0.25, mid: 0.35, tall: 0.5 } as const;
+/** wall_plate: smallest footprint side and corner radius (two keyholes need room). */
+export const WALL_PLATE_MIN_SIDE = 40;
+export const WALL_PLATE_MIN_RADIUS = 6;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const r1 = (n: number) => Math.round(n * 100) / 100;
@@ -138,10 +152,38 @@ export function insideSection(d: EnclosureDims, x: number, y: number, inset: num
   return insideRounded(o.hw, o.hd, o.r, px, py);
 }
 
-/** Outer top surface height at y. */
-export function topAt(d: Pick<EnclosureDims, "H" | "D" | "wedgeDeg">, y: number): number {
+export type TopDims = Pick<EnclosureDims, "H" | "D" | "wedgeDeg"> & { W?: number; dome?: DomeDims };
+
+/** Outer top surface height at (x, y). x only matters for dome_base (defaults to the centre line). */
+export function topAt(d: TopDims, y: number, x = 0): number {
+  if (d.dome) {
+    const R = (d.W ?? d.D) / 2;
+    const q = 1 - (x * x + y * y) / (R * R);
+    return d.dome.z0 + d.dome.rise * Math.sqrt(Math.max(0, q));
+  }
   if (!d.wedgeDeg) return d.H;
   return d.H + (Math.min(y, d.D / 2) - d.D / 2) * Math.tan((d.wedgeDeg * Math.PI) / 180);
+}
+
+/**
+ * The lid's inner (cavity) ceiling at (x, y): topAt − wall; for the dome also never above the
+ * inner ellipsoid (semi-axes R − wall, rise − wall), so the dome shell stays ≥ wall thick.
+ * build.ts makes the cavity exactly this surface.
+ */
+export function innerTopAt(d: EnclosureDims, y: number, x = 0): number {
+  const flat = topAt(d, y, x) - d.wall;
+  if (!d.dome) return flat;
+  const Ri = d.W / 2 - d.wall;
+  const q = 1 - (x * x + y * y) / (Ri * Ri);
+  const ell = d.dome.z0 + Math.max(0, d.dome.rise - d.wall) * Math.sqrt(Math.max(0, q));
+  return Math.min(flat, ell);
+}
+
+/** Lowest / highest outer top over an axis-aligned XY rectangle (corners, plus the point nearest the dome's centre). */
+export function topRange(d: TopDims, x0: number, x1: number, y0: number, y1: number): { lo: number; hi: number } {
+  const vals = [topAt(d, y0, x0), topAt(d, y0, x1), topAt(d, y1, x0), topAt(d, y1, x1)];
+  if (d.dome) vals.push(topAt(d, clamp(0, y0, y1), clamp(0, x0, x1)));
+  return { lo: Math.min(...vals), hi: Math.max(...vals) };
 }
 
 /** Wedge vertex shift: z' = z + delta(y)·blend(z). */
@@ -157,7 +199,7 @@ export function wedgeShift(d: EnclosureDims): { zA: number; zB: number; slope: n
 export function pointInCavity(d: EnclosureDims, p: Vec3, margin = 0): boolean {
   const [x, y, z] = p;
   if (z < d.floorZ - 1e-6) return false;
-  if (z > topAt(d, y) - d.wall - margin + 1e-6) return false;
+  if (z > innerTopAt(d, y, x) - margin + 1e-6) return false;
   return insideSection(d, x, y, d.wall + margin);
 }
 
@@ -180,13 +222,16 @@ export function exitDistance(d: EnclosureDims, ox: number, oy: number, dx: numbe
 
 type Need = { iw: number; id: number; ih: number };
 
+/** Templates with a square / round footprint (widthToDepth is ignored). */
+const SQUARE_FOOTPRINT: readonly BuildableTemplate[] = ["puck", "dome_base", "lantern"];
+
 function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): EnclosureDims {
   const wall = clamp(spec.wall, LIMITS.wall.min, LIMITS.wall.max);
   const clearance = clamp(spec.clearance, LIMITS.clearance.min, LIMITS.clearance.max);
   const bias = spec.proportions.heightBias;
   let W = need.iw + 2 * wall;
   let D = need.id + 2 * wall;
-  if (tpl === "puck") {
+  if (SQUARE_FOOTPRINT.includes(tpl)) {
     W = D = Math.max(W, D);
   } else {
     const r = clamp(spec.proportions.widthToDepth, LIMITS.widthToDepth.min, LIMITS.widthToDepth.max);
@@ -194,12 +239,25 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     if (W / D < r) W = D * r;
     else D = Math.max(D, W / r);
   }
-  W = Math.max(W, LIMITS.minFootprint);
-  D = Math.max(D, LIMITS.minFootprint);
+  const minFoot = tpl === "wall_plate" ? WALL_PLATE_MIN_SIDE : LIMITS.minFootprint;
+  W = Math.max(W, minFoot);
+  D = Math.max(D, minFoot);
   const minSide = Math.min(W, D);
 
   let H = need.ih + 2 * wall;
-  H = Math.max(H, BIAS_RATIO[bias] * minSide, 2 * wall + LIP.height + 4);
+  // A wall plate stays as thin as its parts allow; a lantern is tall on purpose.
+  const ratio = tpl === "lantern" ? LANTERN_RATIO[bias] : tpl === "wall_plate" ? 0 : BIAS_RATIO[bias];
+  H = Math.max(H, ratio * minSide, 2 * wall + LIP.height + 4);
+
+  let dome: DomeDims | undefined;
+  if (tpl === "dome_base") {
+    // The parts fit under the shoulder (z0); the dome on top is the lid.
+    const z0 = Math.max(H - wall, 2 * wall + LIP.height + 6);
+    const rise = Math.max(wall + 6, DOME_RISE[bias] * W);
+    dome = { z0: r1(z0), rise: r1(rise) };
+    H = dome.z0 + dome.rise;
+  }
+
   let frontH: number | undefined;
   let wedgeDeg: number | undefined;
   if (tpl === "soft_wedge") {
@@ -208,11 +266,12 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     H = frontH + D * Math.tan((wedgeDeg * Math.PI) / 180);
   }
 
-  const shape: ShapeKind = tpl === "puck" ? "circle" : tpl === "pill" ? "stadium" : "rrect";
+  const shape: ShapeKind = tpl === "puck" || tpl === "dome_base" ? "circle" : tpl === "pill" ? "stadium" : "rrect";
+  const wantR = tpl === "wall_plate" ? Math.max(spec.cornerRadius, WALL_PLATE_MIN_RADIUS) : spec.cornerRadius;
   const cornerRadius =
-    shape === "circle" ? W / 2 : shape === "stadium" ? minSide / 2 : clamp(spec.cornerRadius, LIMITS.cornerRadius.min, 0.33 * minSide);
+    shape === "circle" ? W / 2 : shape === "stadium" ? minSide / 2 : clamp(wantR, LIMITS.cornerRadius.min, 0.33 * minSide);
   const edgeFillet = clamp(
-    Math.min(spec.edgeFillet, 0.9 * wall, cornerRadius - 0.5, H / 4),
+    Math.min(spec.edgeFillet, 0.9 * wall, cornerRadius - 0.5, (dome ? dome.z0 : H) / 4),
     LIMITS.edgeFillet.min,
     LIMITS.edgeFillet.max,
   );
@@ -221,7 +280,16 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
   const innerTopRef = href - wall;
   let splitZ: number;
   let lidStyle: "cap" | "plate";
-  if (href < PLATE_LID_BELOW) {
+  if (dome) {
+    // Just under the shoulder, so the lip flange sits in the cylindrical wall.
+    splitZ = dome.z0 - 4;
+    lidStyle = "cap";
+  } else if (tpl === "lantern") {
+    // The lid is the upper band: the light slots and the label live on it.
+    splitZ = Math.round(H * LANTERN_SPLIT * 10) / 10;
+    lidStyle = "cap";
+    if (splitZ + LIP.flange + 2.5 > innerTopRef) splitZ = innerTopRef - LIP.flange - 2.5;
+  } else if (href < PLATE_LID_BELOW) {
     splitZ = innerTopRef - 1.2;
     lidStyle = "plate";
   } else {
@@ -250,13 +318,19 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     lidStyle,
     ...(wedgeDeg !== undefined ? { wedgeDeg, frontH: r1(frontH!) } : {}),
     ...(tpl === "handheld_taper" ? { taper: { axis: W >= D ? ("x" as const) : ("y" as const), amount: TAPER_AMOUNT } } : {}),
+    ...(dome ? { dome } : {}),
     contentOffset: [0, 0, wall],
   };
 }
 
-/** Design rule: H ≤ 2 × the smaller footprint side (lantern will be exempt). */
-export function heightRuleOk(d: EnclosureDims): boolean {
-  return d.H <= LIMITS.maxHeightRatio * Math.min(d.W, d.D) + 1e-6;
+/** Height cap for a template: 2 × the smaller footprint side; a lantern may reach 3 ×. */
+export function maxHeightRatio(template: EnclosureTemplate | string): number {
+  return template === "lantern" ? LANTERN_MAX_RATIO : LIMITS.maxHeightRatio;
+}
+
+/** Design rule: H ≤ maxHeightRatio × the smaller footprint side. */
+export function heightRuleOk(d: Pick<EnclosureDims, "H" | "W" | "D" | "template">): boolean {
+  return d.H <= maxHeightRatio(d.template) * Math.min(d.W, d.D) + 1e-6;
 }
 
 /** Every corner of the layout box (+ clearance + lip allowance) sits inside the cavity. */
@@ -269,7 +343,7 @@ export function contentFits(d: EnclosureDims, lr: Pick<LayoutResult, "bbox" | "b
   for (const x of [min[0] - m, max[0] + m]) {
     for (const y of [min[1] - m, max[1] + m]) {
       if (!insideSection(d, x, y, d.wall)) return false;
-      if (z0 < d.floorZ - 1e-6 || z1 > topAt(d, y) - d.wall + 1e-6) return false;
+      if (z0 < d.floorZ - 1e-6 || z1 > innerTopAt(d, y, x) + 1e-6) return false;
     }
   }
   return true;
@@ -290,13 +364,14 @@ export function enclosureDims(spec: EnclosureSpec, lr: LayoutResult): EnclosureD
   };
   // A poke-through dome must still stand on the floor with its top POKE_OUT above the lid.
   if (lr.pokeHeight) need.ih = Math.max(need.ih, lr.pokeHeight - POKE_OUT - wall);
+  const square = SQUARE_FOOTPRINT.includes(tpl);
   let d = shapeDims(tpl, spec, need);
   for (let i = 0; i < 200; i++) {
     if (!heightRuleOk(d)) {
       // Too tall for its footprint → grow the footprint (never squash the content).
-      const target = d.H / LIMITS.maxHeightRatio - 2 * wall + 0.5;
-      if (d.W <= d.D || tpl === "puck") need.iw = Math.max(need.iw + 0.5, target);
-      if (d.D <= d.W || tpl === "puck") need.id = Math.max(need.id + 0.5, target);
+      const target = d.H / maxHeightRatio(tpl) - 2 * wall + 0.5;
+      if (d.W <= d.D || square) need.iw = Math.max(need.iw + 0.5, target);
+      if (d.D <= d.W || square) need.id = Math.max(need.id + 0.5, target);
     } else if (!contentFits(d, lr, c)) {
       const step = Math.max(1, 0.03 * Math.max(need.iw, need.id));
       need.iw += step;
@@ -318,9 +393,10 @@ export function settlePokes(layout: LayoutItem[], parts: Map<string, LibraryPart
   return layout.map((it) => {
     const part = parts.get(it.instanceId);
     if (!part || !isPokeSensor(part)) return it;
+    const x = it.pos[0] + d.contentOffset[0];
     const y = it.pos[1] + d.contentOffset[1];
     // Never below its own standoffs (mech/place.ts fills floor → board underside).
-    const z = Math.max(mountLift(part), topAt(d, y) + POKE_OUT - d.contentOffset[2] - part.dims.z);
+    const z = Math.max(mountLift(part), topAt(d, y, x) + POKE_OUT - d.contentOffset[2] - part.dims.z);
     return { ...it, pos: [it.pos[0], it.pos[1], Math.round(z * 1000) / 1000] };
   });
 }
@@ -344,19 +420,25 @@ export function lidGapFor(part: LibraryPart, wall: number): number {
  *  - every other part with a +z port (screen, button, light pipe, grille) is lifted so its
  *    top is LID_GAP under the lid's inner surface over its whole footprint (a button: room
  *    for its printed extender, lidGapFor). The layout only
- *    levels them with the tallest stack, which can be far below the lid (a tall or sloped
- *    case): a screen there is not seen through its own window. Never lowered, never pushed
- *    into a part stacked above it. Pure: new array, same order.
+ *    levels them with the tallest stack, which can be far below the lid (a tall, sloped or
+ *    domed case): a screen there is not seen through its own window. Never lowered, never
+ *    pushed into a part stacked above it. Pure: new array, same order.
  */
 export function settleLayout(layout: LayoutItem[], parts: Map<string, LibraryPart>, d: EnclosureDims): LayoutItem[] {
   const poked = settlePokes(layout, parts, d);
-  const [, oy, oz] = d.contentOffset;
+  const [ox, oy, oz] = d.contentOffset;
   return poked.map((it) => {
     const part = parts.get(it.instanceId);
     if (!part || isPokeSensor(part) || !hasTopPort(part)) return it;
     const box = worldBox(it, part);
-    // The lowest point of the lid over the part (the wedge slopes along y).
-    let ceiling = Math.min(topAt(d, box.min[1] + oy), topAt(d, box.max[1] + oy)) - d.wall - lidGapFor(part, d.wall) - oz;
+    // The lowest point of the lid's inner surface over the part (wedge: along y; dome: radial).
+    let ceiling =
+      Math.min(
+        innerTopAt(d, box.min[1] + oy, box.min[0] + ox),
+        innerTopAt(d, box.min[1] + oy, box.max[0] + ox),
+        innerTopAt(d, box.max[1] + oy, box.min[0] + ox),
+        innerTopAt(d, box.max[1] + oy, box.max[0] + ox),
+      ) - lidGapFor(part, d.wall) - oz;
     for (const other of poked) {
       if (other === it) continue;
       const op = parts.get(other.instanceId);
@@ -376,7 +458,17 @@ export function settleLayout(layout: LayoutItem[], parts: Map<string, LibraryPar
 
 export function templateFor(spec: ProductSpec): EnclosureTemplate {
   const text = `${spec.name} ${spec.oneLine} ${spec.features.join(" ")}`.toLowerCase();
-  const round = /\b(round|circular|puck|disc|disk|coaster)\b/.test(text);
+  const round = /\b(round|circular|puck|disc|disk|coaster|dome|domed)\b/.test(text);
+  const lampish = /\b(lamp|light|lights|nightlight|glow|lantern)\b/.test(text);
+  const sensorish = /\b(sensor|motion|presence|pir|detector|smoke|air|temperature|humidity)\b/.test(text);
+  const ring = /\b(ring|neopixel|ws2812|rgb)\b/.test(text);
+  const carried = spec.use === "handheld" || spec.use === "wearable";
+  if (spec.use === "wall") return "wall_plate";
+  // Tall light / speaker products standing on a desk.
+  const tallOutput = spec.outputs.includes("speaker") || (spec.outputs.includes("led") && (ring || lampish));
+  if (tallOutput && !carried && (spec.sizeHint === "desk" || spec.sizeHint === "large")) return "lantern";
+  // Round sensors / lamps / speakers on a desk.
+  if (round && !carried && (sensorish || lampish || spec.outputs.includes("speaker"))) return "dome_base";
   if (round && (spec.sizeHint === "pocket" || spec.sizeHint === "palm")) return "puck";
   if (spec.use === "desk" && spec.outputs.includes("screen")) return "soft_wedge";
   if (spec.use === "wearable") return "pill";
@@ -387,13 +479,20 @@ export function templateFor(spec: ProductSpec): EnclosureTemplate {
 /** A complete, valid EnclosureSpec for a product — used when the AI answer is unusable. */
 export function defaultEnclosureFor(spec: ProductSpec): EnclosureSpec {
   const template = templateFor(spec);
-  const heightBias = spec.use === "wall" || template === "puck" ? "low" : "mid";
-  const widthToDepth = template === "puck" ? 1 : template === "pill" || template === "handheld_taper" ? 2 : 1.4;
-  return {
+  const heightBias = spec.use === "wall" || template === "puck" || template === "wall_plate" ? "low" : "mid";
+  const square = template === "puck" || template === "dome_base" || template === "lantern";
+  const widthToDepth = square ? 1 : template === "pill" || template === "handheld_taper" ? 2 : 1.4;
+  const feet: EnclosureSpec["feet"] =
+    template === "wall_plate" ? "none" : template === "dome_base" ? "ring" : spec.use === "desk" ? "rubber_4" : "none";
+  const out: EnclosureSpec = {
     ...DEFAULT_ENCLOSURE,
     template,
     proportions: { widthToDepth, heightBias },
-    feet: spec.use === "desk" ? "rubber_4" : "none",
+    feet,
     ...(spec.environment === "outdoor" ? { wall: 2.4 } : {}),
   };
+  if (template === "wall_plate") out.cornerRadius = 8;
+  if (template === "lantern") out.vents = { pattern: "slots", face: "+x", count: 6 };
+  if (template === "dome_base" && spec.outputs.includes("speaker")) out.vents = { pattern: "grille", face: "+z", count: 9 };
+  return out;
 }

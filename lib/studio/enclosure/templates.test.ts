@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { layoutComponents, worldBox } from "../layout";
-import { DEFAULT_SPEC, LIMITS, type EnclosureTemplate, type LibraryPart } from "../schema";
-import { enclosureDims, heightRuleOk, insideSection, templateFor, topAt, defaultEnclosureFor, type EnclosureDims } from "./templates";
-import { P, items, spec, typical } from "./test-fixtures";
+import { DEFAULT_SPEC, LIMITS, type LibraryPart } from "../schema";
+import { enclosureDims, heightRuleOk, innerTopAt, insideSection, maxHeightRatio, templateFor, topAt, defaultEnclosureFor, type EnclosureDims } from "./templates";
+import { ALL_TEMPLATES, P, items, spec, typical } from "./test-fixtures";
 
-const TEMPLATES: EnclosureTemplate[] = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper", "lantern"];
+const TEMPLATES = ALL_TEMPLATES;
 
 function checkFits(d: EnclosureDims, list: { instanceId: string; part: LibraryPart }[]) {
   const r = layoutComponents(list, { clearance: d.clearance });
@@ -15,7 +15,8 @@ function checkFits(d: EnclosureDims, list: { instanceId: string; part: LibraryPa
     for (const x of [b.min[0] - c, b.max[0] + c]) {
       for (const y of [b.min[1] - c, b.max[1] + c]) {
         expect(insideSection(d, x, y, d.wall), `${d.template} ${it.instanceId} xy`).toBe(true);
-        expect(b.max[2] + d.floorZ + c, `${d.template} ${it.instanceId} z`).toBeLessThanOrEqual(topAt(d, y) - d.wall + 1e-6);
+        expect(b.max[2] + d.floorZ + c, `${d.template} ${it.instanceId} z`).toBeLessThanOrEqual(innerTopAt(d, y, x) + 1e-6);
+        expect(innerTopAt(d, y, x)).toBeLessThanOrEqual(topAt(d, y, x) - d.wall + 1e-6);
       }
     }
   }
@@ -24,6 +25,7 @@ function checkFits(d: EnclosureDims, list: { instanceId: string; part: LibraryPa
 function checkRules(d: EnclosureDims) {
   expect(Math.min(d.W, d.D)).toBeGreaterThanOrEqual(LIMITS.minFootprint);
   expect(heightRuleOk(d)).toBe(true);
+  expect(d.H).toBeLessThanOrEqual(maxHeightRatio(d.template) * Math.min(d.W, d.D) + 1e-6);
   expect(d.cornerRadius).toBeGreaterThanOrEqual(3);
   if (d.shape === "rrect") expect(d.cornerRadius).toBeLessThanOrEqual(0.33 * Math.min(d.W, d.D) + 1e-6);
   expect(d.edgeFillet).toBeGreaterThanOrEqual(1);
@@ -38,7 +40,23 @@ describe("enclosureDims", () => {
       const d = enclosureDims(spec({ template }), layoutComponents(list, { clearance: 2 }));
       checkRules(d);
       checkFits(d, list);
-      if (template === "lantern") expect(d.template).toBe("rounded_box");
+      expect(d.template).toBe(template); // no fallback any more
+      if (template === "lantern") {
+        expect(d.W).toBe(d.D);
+        expect(d.H).toBeGreaterThan(1.2 * d.W); // tall on purpose (exempt from the 2× rule, capped at 3×)
+        expect(d.lidStyle).toBe("cap");
+      }
+      if (template === "dome_base") {
+        expect(d.shape).toBe("circle");
+        expect(d.dome).toBeTruthy();
+        expect(topAt(d, 0, 0)).toBeCloseTo(d.H, 6);
+        expect(topAt(d, 0, d.W / 2)).toBeCloseTo(d.dome!.z0, 6);
+        expect(d.splitZ).toBeLessThan(d.dome!.z0);
+      }
+      if (template === "wall_plate") {
+        expect(d.cornerRadius).toBeGreaterThanOrEqual(6);
+        expect(d.H).toBeLessThan(Math.min(d.W, d.D));
+      }
       if (template === "puck") expect(d.W).toBe(d.D);
       if (template === "pill") expect(d.cornerRadius).toBeCloseTo(Math.min(d.W, d.D) / 2, 1);
       if (template === "soft_wedge") {
@@ -85,7 +103,13 @@ describe("templateFor", () => {
     expect(templateFor({ ...DEFAULT_SPEC, use: "desk", outputs: ["screen"] })).toBe("soft_wedge");
     expect(templateFor({ ...DEFAULT_SPEC, use: "handheld", sizeHint: "palm" })).toBe("handheld_taper");
     expect(templateFor({ ...DEFAULT_SPEC, use: "wearable" })).toBe("pill");
-    expect(templateFor({ ...DEFAULT_SPEC, use: "wall" })).toBe("rounded_box");
+    expect(templateFor({ ...DEFAULT_SPEC, use: "wall" })).toBe("wall_plate");
+    expect(templateFor({ ...DEFAULT_SPEC, use: "desk", outputs: ["speaker"], sizeHint: "desk" })).toBe("lantern");
+    expect(templateFor({ ...DEFAULT_SPEC, name: "Mood lamp", features: ["LED ring"], outputs: ["led"], sizeHint: "large" })).toBe("lantern");
+    expect(templateFor({ ...DEFAULT_SPEC, name: "Round motion sensor", sizeHint: "palm" })).toBe("dome_base");
+    expect(templateFor({ ...DEFAULT_SPEC, name: "Dome night light", outputs: ["led"], sizeHint: "palm" })).toBe("dome_base");
+    expect(defaultEnclosureFor({ ...DEFAULT_SPEC, use: "wall" }).feet).toBe("none");
+    expect(defaultEnclosureFor({ ...DEFAULT_SPEC, name: "Round motion sensor" }).feet).toBe("ring");
     expect(templateFor({ ...DEFAULT_SPEC, name: "Round timer", sizeHint: "palm" })).toBe("puck");
     expect(defaultEnclosureFor({ ...DEFAULT_SPEC, use: "wall" }).proportions.heightBias).toBe("low");
   });

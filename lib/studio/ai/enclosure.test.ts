@@ -48,10 +48,10 @@ describe("runEnclosure", () => {
   });
 
   it("template outside the allowed list → retry with the problem → valid", async () => {
-    const m = fakeModel([{ ...LOOK, template: "lantern" }, LOOK]);
+    const m = fakeModel([{ ...LOOK, template: "cube" }, LOOK]);
     const r = await runEnclosure({ call: m.call, ...base });
     expect(r.ok && r.value.template).toBe("pill");
-    expect(m.prompts[1]).toContain("template must be one of: rounded_box, pill, soft_wedge, puck, handheld_taper");
+    expect(m.prompts[1]).toContain("template must be one of: rounded_box, pill, soft_wedge, puck, handheld_taper, lantern, dome_base, wall_plate");
   });
 
   it("'Try another look': the same look again is rejected and the prompt asks for a different one", async () => {

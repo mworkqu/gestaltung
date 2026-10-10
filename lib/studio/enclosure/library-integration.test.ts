@@ -1,14 +1,13 @@
-// Layout + enclosure with the real component library (all parts, every Phase 1 template).
+// Layout + enclosure with the real component library (all parts, all eight templates).
 
 import { describe, expect, it } from "vitest";
 import { LIBRARY } from "../library";
 import { isPokeSensor, layoutComponents, worldBox } from "../layout";
-import type { EnclosureTemplate } from "../schema";
 import { buildEnclosure } from "./build";
-import { insideSection, topAt } from "./templates";
-import { spec } from "./test-fixtures";
+import { innerTopAt, insideSection } from "./templates";
+import { ALL_TEMPLATES, spec } from "./test-fixtures";
 
-const TEMPLATES: EnclosureTemplate[] = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"];
+const TEMPLATES = ALL_TEMPLATES;
 
 describe("real library", () => {
   const list = LIBRARY.map((part, i) => ({ instanceId: `${part.id}_${i}`, part }));
@@ -34,7 +33,7 @@ describe("real library", () => {
         for (const x of [b.min[0] - d.clearance, b.max[0] + d.clearance]) {
           for (const y of [b.min[1] - d.clearance, b.max[1] + d.clearance]) {
             expect(insideSection(d, x, y, d.wall)).toBe(true);
-            expect(b.max[2] + d.floorZ + d.clearance).toBeLessThanOrEqual(topAt(d, y) - d.wall + 1e-6);
+            expect(b.max[2] + d.floorZ + d.clearance).toBeLessThanOrEqual(innerTopAt(d, y, x) + 1e-6);
           }
         }
       }

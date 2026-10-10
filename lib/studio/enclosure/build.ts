@@ -13,17 +13,24 @@
 //  * split at splitZ into base and lid with one multi-operation evaluate;
 //  * the lid gets a lip ring (0.4 mm gap to the base wall, ~3 mm deep) joined
 //    by a flange hidden inside the lid wall;
-//  * feet are separate dark child meshes of the base (bought rubber pads).
+//  * feet are separate dark child meshes of the base (bought rubber pads; none on a wall plate);
+//  * dome_base: outer = cylinder + half-ellipsoid cap (one smooth sweep), cavity = the
+//    innerTopAt surface, so the dome shell is >= wall thick everywhere;
+//  * the raised label (label.ts) is unioned onto the outer solid first (one CSG step on
+//    disjoint capsules) and so ends up in the lid mesh.
 
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { ADDITION, Brush, Evaluator, INTERSECTION, SUBTRACTION } from "three-bvh-csg";
 import type { EnclosureSpec, LayoutItem, LibraryPart } from "../schema";
 import type { LayoutResult } from "../layout";
-import { cutoutsFor, ventCutouts, type Cutout } from "./cutouts";
+import { cutoutsFor, keyholeCutouts, ventCutouts, type Cutout } from "./cutouts";
+import { labelGeometry, planLabel, type LabelPlan } from "./label";
+import type { LabelSkipReason } from "./label-font";
 import {
   LIP,
   enclosureDims,
+  innerTopAt,
   exitDistance,
   settleLayout,
   outlineAt,
@@ -41,6 +48,12 @@ export type EnclosureMeta = {
   dims: EnclosureDims;
   cutouts: Cutout[];
   vents: Cutout[];
+  /** wall_plate: the two keyhole slots in the back. */
+  keyholes: Cutout[];
+  /** Where the raised label went (null when there is none or it was skipped). */
+  label: LabelPlan | null;
+  /** Why spec.label was not raised: Arabic ("script"), unsupported characters, too long, or no free space. */
+  labelSkipped?: LabelSkipReason | "space";
   /** The layout the case was cut for: poke-through sensors lifted to the lid (render parts with THIS). */
   layout: LayoutItem[];
   triangles: number;
@@ -55,6 +68,7 @@ type ProfilePt = { inset: number; z: number; nr: number; nz: number };
 
 const CORNER_SEGS = { rrect: 8, stadium: 10, circle: 16 } as const;
 const BEVEL_SEGS = 3;
+const DOME_SEGS = 14;
 
 // ---------------------------------------------------------------------------
 // Outlines + sweeps
@@ -235,13 +249,59 @@ function outlineFn(d: EnclosureDims, extraInset = 0): (inset: number) => Outline
   };
 }
 
+/** dome_base outer profile: bottom fillet, cylinder to z0, then the half-ellipsoid (smooth, one chain). */
+function domeOuterProfile(d: EnclosureDims): ProfilePt[] {
+  const dome = d.dome!;
+  const R = d.W / 2;
+  const f = d.edgeFillet;
+  const out: ProfilePt[] = [];
+  for (let i = 0; i <= BEVEL_SEGS; i++) {
+    const a = (i / BEVEL_SEGS) * (Math.PI / 2);
+    out.push({ inset: f * (1 - Math.sin(a)), z: f * (1 - Math.cos(a)), nr: Math.sin(a), nz: -Math.cos(a) });
+  }
+  const tMax = Math.acos(Math.min(0.999, 0.5 / R));
+  for (let k = 0; k <= DOME_SEGS; k++) {
+    const t = (k / DOME_SEGS) * tMax;
+    const nr = Math.cos(t) / R;
+    const nz = Math.sin(t) / dome.rise;
+    const l = Math.hypot(nr, nz);
+    out.push({ inset: R - R * Math.cos(t), z: dome.z0 + dome.rise * Math.sin(t), nr: nr / l, nz: nz / l });
+  }
+  return out;
+}
+
+/** dome_base cavity: cylinder (inset wall) up to the ceiling, then the innerTopAt surface. */
+function domeCavityChains(d: EnclosureDims): ProfilePt[][] {
+  const R = d.W / 2;
+  const Ri = R - d.wall;
+  const g = (rho: number) => innerTopAt(d, 0, rho);
+  const wallTop = g(Ri);
+  const side: ProfilePt[] = [
+    { inset: d.wall, z: d.floorZ, nr: 1, nz: 0 },
+    { inset: d.wall, z: wallTop, nr: 1, nz: 0 },
+  ];
+  const top: ProfilePt[] = [];
+  const tMax = Math.acos(Math.min(0.999, 0.5 / Ri));
+  for (let k = 0; k <= DOME_SEGS; k++) {
+    const rho = Ri * Math.cos((k / DOME_SEGS) * tMax);
+    const lo = Math.max(0, rho - 0.05);
+    const hi = Math.min(Ri, rho + 0.05);
+    const slope = (g(hi) - g(lo)) / (hi - lo);
+    const l = Math.hypot(slope, 1);
+    top.push({ inset: R - rho, z: g(rho), nr: -slope / l, nz: 1 / l });
+  }
+  return [side, top];
+}
+
 function outerSolid(d: EnclosureDims): THREE.BufferGeometry {
+  if (d.dome) return sweep(outlineFn(d), [domeOuterProfile(d)], { bottom: true, top: true });
   const g = sweep(outlineFn(d), [slabProfile(0, d.H, d.edgeFillet)], { bottom: true, top: true });
   deform(g, d, 0);
   return g;
 }
 
 function cavitySolid(d: EnclosureDims): THREE.BufferGeometry {
+  if (d.dome) return sweep(outlineFn(d), domeCavityChains(d), { bottom: true, top: true });
   const g = sweep(outlineFn(d, d.wall), [slabProfile(d.floorZ, d.H - d.wall, 0)], { bottom: true, top: true });
   deform(g, d, d.wall);
   return g;
@@ -272,13 +332,67 @@ function lipSolid(d: EnclosureDims): THREE.BufferGeometry {
   return g;
 }
 
+/** A flat 2D shape extruded +-depth/2 along local z (position + normal only). */
+function extrudeShape(shape: THREE.Shape, depth: number): THREE.BufferGeometry {
+  const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 6 });
+  g.translate(0, 0, -depth / 2);
+  g.deleteAttribute("uv");
+  g.clearGroups();
+  // Indexed like every other cutter, so all of them merge into one brush.
+  return mergeVertices(g);
+}
+
+/** One arc slot with round ends (grille vents). */
+function arcShape(a: NonNullable<Cutout["arc"]>): THREE.Shape {
+  const hw = a.width / 2;
+  const s = new THREE.Shape();
+  const end = (t: number): [number, number] => [a.cu + a.r * Math.cos(t), a.cv + a.r * Math.sin(t)];
+  s.absarc(a.cu, a.cv, a.r + hw, a.a0, a.a1, false);
+  const e1 = end(a.a1);
+  s.absarc(e1[0], e1[1], hw, a.a1, a.a1 + Math.PI, false);
+  s.absarc(a.cu, a.cv, a.r - hw, a.a1, a.a0, true);
+  const e0 = end(a.a0);
+  s.absarc(e0[0], e0[1], hw, a.a0 + Math.PI, a.a0 + 2 * Math.PI, false);
+  return s;
+}
+
+/** Keyhole: head circle at (0, headV), slot of slotW running along -v to slotL past the head centre. */
+function keyholeShape(k: NonNullable<Cutout["keyhole"]>): THREE.Shape {
+  const R = k.headD / 2;
+  const sw = k.slotW / 2;
+  const yc = Math.sqrt(R * R - sw * sw);
+  const t = Math.atan2(yc, sw);
+  const s = new THREE.Shape();
+  // Head: from (sw, headV - yc) counter-clockwise over the top to (-sw, headV - yc); the slot leaves downwards in v.
+  s.absarc(0, k.headV, R, -t, Math.PI + t, false);
+  s.lineTo(-sw, k.headV - k.slotL);
+  s.absarc(0, k.headV - k.slotL, sw, Math.PI, 2 * Math.PI, false);
+  s.lineTo(sw, k.headV - yc);
+  return s;
+}
+
 /** Cutting prism for one cut-out, positioned in enclosure space. */
 function cutGeometry(c: Cutout): THREE.BufferGeometry {
   const half = c.depth / 2;
   const prism = (o: Outline) =>
     sweep(() => o, [[{ inset: 0, z: -half, nr: 1, nz: 0 }, { inset: 0, z: half, nr: 1, nz: 0 }]], { bottom: true, top: true });
   let g: THREE.BufferGeometry;
-  if (c.shape === "grille" && c.holes?.length) {
+  if (c.shape === "arc" && c.arc) {
+    g = extrudeShape(arcShape(c.arc), c.depth);
+  } else if (c.shape === "keyhole" && c.keyhole) {
+    g = extrudeShape(keyholeShape(c.keyhole), c.depth);
+  } else if (c.bevel && c.outerAt !== undefined) {
+    // Louvre: straight slot, widening at 45 deg from just inside the outer surface (chamfered edge).
+    const zs = Math.max(-half + 0.1, c.outerAt - c.bevel);
+    const grow = half - zs;
+    const r0 = Math.min(c.radius, c.w / 2, c.h / 2);
+    const o = (inset: number) => roundedOutline(c.w / 2 - inset, c.h / 2 - inset, Math.max(0.2, r0 - inset), 3);
+    const k = Math.SQRT1_2;
+    g = sweep(o, [
+      [{ inset: 0, z: -half, nr: 1, nz: 0 }, { inset: 0, z: zs, nr: 1, nz: 0 }],
+      [{ inset: 0, z: zs, nr: k, nz: -k }, { inset: -grow, z: half, nr: k, nz: -k }],
+    ], { bottom: true, top: true });
+  } else if (c.shape === "grille" && c.holes?.length) {
     const parts = c.holes.map((hole) => {
       const p = prism(roundedOutline(hole.d / 2, hole.d / 2, hole.d / 2, 3));
       p.translate(hole.u, hole.v, 0);
@@ -295,10 +409,11 @@ function cutGeometry(c: Cutout): THREE.BufferGeometry {
   const m = new THREE.Matrix4().makeBasis(
     new THREE.Vector3(...c.u),
     new THREE.Vector3(...c.v),
-    new THREE.Vector3(...c.normal),
+    new THREE.Vector3(...(c.axis ?? c.normal)),
   );
   m.setPosition(...c.center);
   g.applyMatrix4(m);
+  // Every cutter is indexed (extrusions via mergeVertices) so they merge into one brush.
   return g;
 }
 
@@ -369,20 +484,26 @@ export function planEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, p
   const dims = enclosureDims(spec, layoutResult);
   const placed = settleLayout(layoutResult.layout, parts, dims);
   const cutouts = cutoutsFor(placed, parts, dims);
-  const vents = ventCutouts(spec, dims, cutouts);
-  return { dims, placed, cutouts, vents };
+  const keyholes = keyholeCutouts(dims);
+  const label = planLabel(spec.label, dims, [...cutouts, ...keyholes]);
+  const vents = ventCutouts(spec, dims, [...cutouts, ...keyholes], label.plan ? [label.plan.box] : []);
+  return { dims, placed, cutouts, keyholes, label, vents };
 }
 
 export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, parts: Map<string, LibraryPart>): BuiltEnclosure {
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-  const { dims: d, placed, cutouts, vents } = planEnclosure(spec, layoutResult, parts);
+  const { dims: d, placed, cutouts, keyholes, label, vents } = planEnclosure(spec, layoutResult, parts);
 
   const ev = new Evaluator();
   ev.attributes = ["position", "normal"];
   ev.useGroups = false;
 
-  let shell = ev.evaluate(brush(outerSolid(d)), brush(cavitySolid(d)), SUBTRACTION);
-  const cutGeos = [...cutouts, ...vents].map(cutGeometry);
+  // The raised label goes onto the plain outer solid first (cheapest union; it sits above
+  // splitZ and ≥ 3 mm from every opening, so it ends up in the lid untouched by the cuts).
+  let outer = brush(outerSolid(d));
+  if (label.plan) outer = ev.evaluate(outer, brush(labelGeometry(label.plan, d)), ADDITION);
+  let shell = ev.evaluate(outer, brush(cavitySolid(d)), SUBTRACTION);
+  const cutGeos = [...cutouts, ...keyholes, ...vents].map(cutGeometry);
   const cutBrush = cutGeos.length ? brush(mergeGeometries(cutGeos)!) : null;
   if (cutBrush) shell = ev.evaluate(shell, cutBrush, SUBTRACTION);
 
@@ -406,7 +527,7 @@ export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, 
   const material = () => new THREE.MeshStandardMaterial({ color: 0xf2f0eb, roughness: 0.7, metalness: 0 });
   const base = new THREE.Mesh(finish(baseBrush.geometry), material());
   base.name = "enclosure_base";
-  for (const f of feet(d, spec.feet)) base.add(f);
+  for (const f of feet(d, d.template === "wall_plate" ? "none" : spec.feet)) base.add(f);
   const lid = new THREE.Mesh(finish(lidBrush.geometry), material());
   lid.name = "enclosure_lid";
 
@@ -422,6 +543,9 @@ export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, 
       dims: d,
       cutouts,
       vents,
+      keyholes,
+      label: label.plan,
+      ...(label.skipped ? { labelSkipped: label.skipped } : {}),
       layout: placed,
       triangles: triCount(base.geometry) + triCount(lid.geometry),
       ms: Math.round(t1 - t0),
