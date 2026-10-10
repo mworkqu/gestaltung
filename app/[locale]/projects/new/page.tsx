@@ -10,6 +10,8 @@ import { DescribeIdea } from "@/components/projects/describe-idea";
 import { providerStatus } from "@/lib/prototyping/providers";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+import { getServicePrices } from "@/lib/store/public-catalog";
+import { drawingTiers } from "@/lib/pricing/service-tiers";
 
 export async function generateMetadata({
   params,
@@ -58,6 +60,7 @@ export default async function NewProjectPage({
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   const turnstileEnabled = await turnstileEnabledForPages();
+  const tiers = forDrawing ? drawingTiers(await getServicePrices()) : [];
   const explain = forDrawing ? ["explainWhy"] : ["explainNext", "explainFree", "explainWhy"];
 
   return (
@@ -89,7 +92,7 @@ export default async function NewProjectPage({
         ))}
       </ul>
 
-      <NewProjectForm forDrawing={forDrawing} turnstileEnabled={turnstileEnabled} />
+      <NewProjectForm forDrawing={forDrawing} turnstileEnabled={turnstileEnabled} tiers={tiers} />
       <TurnstileChallenge enabled={turnstileEnabled} />
     </div>
     </MessagesScope>

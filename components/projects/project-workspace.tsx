@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  FileText,
   ImagePlus,
   Loader2,
   Sparkles,
@@ -38,6 +39,8 @@ import {
 } from "@/lib/projects/item-status";
 import { activeLines, type LineMatch, type ProjectBom } from "@/lib/prototyping/bom";
 import { costState, toBuyNow } from "@/lib/prototyping/bom-cost";
+import { projectUsesAi } from "@/lib/projects/uses-ai";
+import { isPdfPath } from "@/lib/projects/drawing-attachment";
 import { ProjectCadCard } from "@/components/projects/project-cad-card";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -249,7 +252,10 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         guestPhone={guestPhone}
         onRenamed={(name) => setProject((p) => (p ? { ...p, name } : p))}
       />
-      <PrototypingCard projectId={projectId} bom={project.bom?.lines ? project.bom : null} />
+      {/* Drawing-only / quote projects never used the AI: no prototyping block. */}
+      {projectUsesAi(project) && (
+        <PrototypingCard projectId={projectId} bom={project.bom?.lines ? project.bom : null} />
+      )}
       <BriefCard project={project} />
       <BlocksCard
         projectId={projectId}
@@ -644,6 +650,16 @@ function BlocksCard({
                       placeholder={t("blockPlaceholder")}
                       className="w-full resize-y rounded-lg bg-transparent text-sm leading-relaxed text-heading outline-none placeholder:text-faint"
                     />
+                  ) : block.storage_path && imageUrls[block.storage_path] && isPdfPath(block.storage_path) ? (
+                    <a
+                      href={imageUrls[block.storage_path]}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-cobalt hover:underline"
+                    >
+                      <FileText className="h-4 w-4" aria-hidden />
+                      {t("attachedPdf")}
+                    </a>
                   ) : block.storage_path && imageUrls[block.storage_path] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -1002,26 +1018,18 @@ function DangerZoneCard({
   }
 
   return (
-    <section
-      aria-labelledby="project-danger-zone"
-      className="neu space-y-4 border border-destructive/20 p-6 sm:p-8"
-    >
-      <div>
-        <h2 id="project-danger-zone" className="text-sm font-semibold text-destructive">
-          {t("dangerZone")}
-        </h2>
-        <p className="mt-1 text-sm text-mutedtext">{t("deleteHint")}</p>
-      </div>
-
+    <section className="space-y-3 pt-2">
       {!confirming && (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          disabled={deleting}
-          className="rounded-lg bg-surface px-3.5 py-2 text-xs font-semibold text-destructive shadow-neu-sm transition-colors disabled:opacity-60"
-        >
-          {t("deleteProject")}
-        </button>
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            disabled={deleting}
+            className="inline-flex min-h-11 items-center px-3 text-xs text-mutedtext underline-offset-2 transition-colors hover:text-destructive hover:underline disabled:opacity-60"
+          >
+            {t("deleteProject")}
+          </button>
+        </div>
       )}
 
       {confirming && (
@@ -1037,7 +1045,7 @@ function DangerZoneCard({
                 type="button"
                 onClick={() => remove(true)}
                 disabled={deleting}
-                className="rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover disabled:opacity-60"
+                className="rounded-lg bg-cobalt px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-cobalt-hover disabled:opacity-60 max-md:min-h-11"
               >
                 {t("returnParts")}
               </button>
@@ -1046,7 +1054,7 @@ function DangerZoneCard({
               type="button"
               onClick={() => remove(false)}
               disabled={deleting}
-              className="rounded-lg bg-surface px-3.5 py-2 text-xs font-semibold text-destructive shadow-neu-sm transition-colors disabled:opacity-60"
+              className="rounded-lg bg-surface px-3.5 py-2 text-xs font-semibold text-destructive shadow-neu-sm transition-colors disabled:opacity-60 max-md:min-h-11"
             >
               {reclaimable > 0 ? t("discardParts") : t("deleteProject")}
             </button>
@@ -1054,7 +1062,7 @@ function DangerZoneCard({
               type="button"
               onClick={() => setConfirming(false)}
               disabled={deleting}
-              className="rounded-lg px-3.5 py-2 text-xs font-semibold text-mutedtext transition-colors hover:text-heading"
+              className="rounded-lg px-3.5 py-2 text-xs font-semibold text-mutedtext transition-colors hover:text-heading max-md:min-h-11"
             >
               {t("keepProject")}
             </button>

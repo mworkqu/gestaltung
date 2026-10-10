@@ -23,3 +23,9 @@ export const PROJECT_IMAGE_BUCKET = "project-images";
 
 export const MAX_PROJECT_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB, matches the bucket
 export const PROJECT_IMAGE_ACCEPT = "image/png,image/jpeg,image/webp,image/gif";
+
+// Drawing request (/projects/new?for=drawing): one photo, sketch or PDF stored
+// in the same private bucket as project images (PROJECT_IMAGE_BUCKET, same
+// <user_id>/<project_id>/ path and RLS). 20 MB needs migration 0062.
+export const MAX_DRAWING_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+export const DRAWING_ATTACHMENT_ACCEPT = "image/*,.pdf,application/pdf";
