@@ -5,7 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
-import { AdminOverview } from "@/components/dashboard/admin-overview";
+import { AdminHome } from "@/components/dashboard/admin-home";
 import { cn } from "@/lib/utils";
 
 // Auth state is per-request (read from cookies); never statically cache it.
@@ -26,9 +26,9 @@ export default async function DashboardPage({
     redirect(`/${locale}/sign-in`);
   }
 
-  // super_admin gets the global command center; everyone else the account view.
+  // super_admin gets four tiles (Reply / Confirm / Buy / Fix) and a More menu; everyone else the account view.
   if (session.profile.role === "super_admin") {
-    return <AdminOverview locale={locale} />;
+    return <AdminHome locale={locale} />;
   }
 
   const t = await getTranslations("Dashboard");

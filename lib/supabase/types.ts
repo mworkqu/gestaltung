@@ -77,6 +77,8 @@ export type Part = {
   // `category` stays the supplier/source category. Absent before 0048.
   store_category?: string | null;
   store_category_review?: boolean;
+  // 0069. True while we hold the product ourselves in Lusail (the count stays admin-only).
+  in_own_stock?: boolean;
   created_at: string;
   updated_at: string;
 };

@@ -4,6 +4,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
 import { guestRedirect } from "@/lib/auth/guest-redirect";
 import { DashboardNav, type NavGroup } from "@/components/dashboard/dashboard-nav";
+import { adminNavGroups } from "@/components/dashboard/admin-nav-groups";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { metaFor } from "@/lib/meta";
 import { MessagesScope } from "@/components/i18n/messages-scope";
@@ -38,49 +39,7 @@ export default async function DashboardLayout({
   const isClient = session.profile.role === "client";
   const isSuperAdmin = session.profile.role === "super_admin";
   const groups: NavGroup[] = isSuperAdmin
-    ? [
-        { items: [{ href: "/dashboard", label: t("overview") }] },
-        {
-          label: t("group_customers"),
-          items: [
-            { href: "/dashboard/leads", label: t("leads") },
-            { href: "/dashboard/store/orders", label: t("partsOrders") },
-            { href: "/dashboard/projects", label: t("projects") },
-            { href: "/dashboard/credits", label: t("aiCredits") },
-            { href: "/dashboard/reviews", label: t("reviews") },
-          ],
-        },
-        {
-          label: t("group_store"),
-          items: [
-            { href: "/dashboard/store/overview", label: t("overviewStore") },
-            { href: "/dashboard/store", label: t("partsCatalog") },
-            { href: "/dashboard/store/quick", label: t("quickAdd") },
-            { href: "/dashboard/store/attributes", label: t("storeAttributes") },
-            { href: "/dashboard/store/restock", label: t("restock") },
-            { href: "/dashboard/store/gaps", label: t("sourcingGaps") },
-            { href: "/dashboard/store/occasions", label: t("occasions") },
-            { href: "/dashboard/store/discounts", label: t("discounts") },
-            { href: "/dashboard/store/youtube", label: t("youtube") },
-          ],
-        },
-        {
-          label: t("group_suppliers"),
-          items: [
-            { href: "/dashboard/store/suppliers", label: t("suppliers") },
-            { href: "/dashboard/store/suppliers/lookup", label: t("findParts") },
-            { href: "/dashboard/store/suppliers/voltaat", label: t("voltaatSync") },
-          ],
-        },
-        {
-          label: t("group_settings"),
-          items: [
-            { href: "/dashboard/usage", label: t("aiUsage") },
-            { href: "/dashboard/notifications", label: t("notifications") },
-            { href: "/inventory", label: t("inventory") },
-          ],
-        },
-      ]
+    ? adminNavGroups(t)
     : [
         {
           items: [

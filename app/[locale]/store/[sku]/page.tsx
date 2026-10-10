@@ -236,6 +236,11 @@ export default async function PartDetailPage({
                 <LeadTimeBadge leadClass={null} />
               </div>
             )}
+            {part.in_own_stock === true && (
+              <p className="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                {t("inStockLusail")}
+              </p>
+            )}
             <h1 className="break-words text-2xl font-extrabold tracking-tight text-heading sm:text-3xl">
               <IsolatedTitle text={name} locale={locale} />
             </h1>
