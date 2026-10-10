@@ -80,6 +80,7 @@ const isAnalog = (p: LibraryPart) => tagged(p, ["analog", "analogue"]);
 /** Helper part ids we add when the library has them (skipped silently otherwise). */
 export const LEVEL_SHIFTER_IDS = ["level_shifter_4ch", "level_shifter"] as const;
 export const DRIVER_IDS = ["mosfet_driver", "mosfet_module", "motor_driver", "relay_module"] as const;
+export const BOOSTER_IDS = ["boost_5v"] as const;
 
 // ── Entries ─────────────────────────────────────────────────────────────────
 
@@ -311,7 +312,7 @@ function shiftKeys(entries: Entry[], plan: PowerPlan, mcu: Entry | undefined): s
 // ── resolveRequired ─────────────────────────────────────────────────────────
 
 export type AddedComponent = { instanceId: string; partId: string; reasonKey: AddedReason };
-export type AddedReason = "resistor" | "level_shifter" | "driver" | "required";
+export type AddedReason = "resistor" | "level_shifter" | "driver" | "booster" | "required";
 
 /** Why an added part is there, in plain words (also used for StudioComponent.reason). */
 export const ADDED_REASON: Record<AddedReason, Record<Locale, string>> = {
@@ -321,6 +322,10 @@ export const ADDED_REASON: Record<AddedReason, Record<Locale, string>> = {
     ar: "يتيح لقطعة تعمل بـ 5 فولت أن تتواصل مع اللوحة بأمان.",
   },
   driver: { en: "Lets the board switch the motor safely.", ar: "يتيح للوحة تشغيل المحرّك بأمان." },
+  booster: {
+    en: "Raises the battery to 5 V so every part gets enough power.",
+    ar: "يرفع جهد البطارية إلى 5 فولت لتحصل كل قطعة على طاقة كافية.",
+  },
   required: { en: "Another part needs it to work safely.", ar: "تحتاجها قطعة أخرى لتعمل بأمان." },
 };
 
@@ -359,6 +364,18 @@ export function resolveRequired(
   const drivers = ents().filter((e) => isDriver(e.p)).length;
   const driver = firstFound(DRIVER_IDS);
   if (driver) for (let i = drivers; i < loads; i++) add(driver, "driver");
+
+  // 1b. A 5 V booster when a battery can't reach what a part needs and no converter is there.
+  const booster = firstFound(BOOSTER_IDS);
+  if (booster) {
+    const e = ents();
+    const batteries = e.filter((x) => isBattery(x.p));
+    if (batteries.length > 0 && !e.some((x) => isConverter(x.p))) {
+      const batteryMax = Math.max(...batteries.map((x) => x.p.power.vMax));
+      const starved = e.some((x) => !isPowerSource(x.p) && !symbolKind(x.p) && x.p.power.vMin > batteryMax);
+      if (starved) add(booster, "booster");
+    }
+  }
 
   // 2. `requires`, one per instance of the requiring part; repeat for what the added parts require.
   for (let round = 0; round < 3; round++) {

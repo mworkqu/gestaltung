@@ -62,13 +62,13 @@ describe("studioChecks (real library)", () => {
     expect(w.checks[0]).toEqual({ id: "ok_battery_usb", ok: true, plain: "Everything runs from the battery, and it charges over USB." });
   });
 
-  it("asks for a charger, and flags a 5 V part the battery can't feed", () => {
+  it("asks for a charger, and adds a 5 V booster for a part the battery can't feed", () => {
     const spec: ProductSpec = { ...DEFAULT_SPEC, power: "battery" };
     const w = buildWiring(comps("esp32_devkit", "cell_18650", "pir_hcsr501"), spec, getPart, "en");
     const ids = w.checks.filter((c) => !c.ok).map((c) => c.id);
     expect(ids).toContain("no_charger");
-    expect(ids).toContain("voltage:pir_hcsr501_1");
-    expect(w.checks.find((c) => c.id === "voltage:pir_hcsr501_1")?.plain).toBe("Motion sensor needs a voltage the board can't give.");
+    expect(ids).not.toContain("voltage:pir_hcsr501_1");
+    expect(w.components.some((c) => c.partId === "boost_5v" && c.auto)).toBe(true);
     expectPlain(w.checks, w.components, "en");
   });
 
@@ -79,9 +79,10 @@ describe("studioChecks (real library)", () => {
     expect(unwanted.checks.some((c) => c.id === "battery_unwanted")).toBe(true);
   });
 
-  it("says the battery can't run an Uno directly", () => {
+  it("powers an Uno from one cell through the 5 V booster", () => {
     const w = buildWiring(comps("arduino_uno", "cell_18650", "tp4056_usbc"), { ...DEFAULT_SPEC, power: "battery_usb" }, getPart, "en");
-    expect(w.checks.some((c) => c.id === "supply_range")).toBe(true);
+    expect(w.components.some((c) => c.partId === "boost_5v")).toBe(true);
+    expect(w.checks.some((c) => c.id === "supply_range")).toBe(false);
   });
 });
 
