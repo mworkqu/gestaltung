@@ -55,3 +55,6 @@ _archive/
 # playwright (P3-10)
 test-results/
 playwright-report/
+
+# owner working notes (not part of the site)
+Claude outputs/
