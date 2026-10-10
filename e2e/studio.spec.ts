@@ -149,7 +149,7 @@ for (const locale of LOCALES) {
     await shoot2("5-print-parts");
     await slider.fill("1");
     await expect(slider).toHaveValue("1");
-    await page.waitForTimeout(1200); // the viewer eases the parts apart
+    await page.waitForTimeout(1200); // the viewer eases the parts apart (650 ms, wall-clock)
     await shoot2("5b-exploded");
     await scrollToBottom(page);
     await shoot2("5c-print-list");

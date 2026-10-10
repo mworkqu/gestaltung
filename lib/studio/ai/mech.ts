@@ -18,6 +18,14 @@ export function validateMech(raw: unknown, opts: { summary: MechSummary; log: Cl
       errors.push(`parts[${i}].template must be one of: ${MECH_TEMPLATES.join(", ")}`);
     else if (typeof p.forInstance === "string" && p.forInstance && !instances.has(p.forInstance))
       errors.push(`parts[${i}].forInstance "${p.forInstance}" is not a component instanceId`);
+    else if (isObj(p) && typeof p.template === "string") {
+      // A button extender / light pipe only goes through the lid over a matching top opening.
+      const tpl = p.template.trim().toLowerCase();
+      const need = tpl === "button_extender" ? "button_cap" : tpl === "light_pipe" ? "led_light_pipe" : null;
+      const target = opts.summary.components.find((c) => c.instanceId === p.forInstance);
+      if (need && !(target?.topPorts ?? []).includes(need))
+        errors.push(`parts[${i}] ${tpl} needs forInstance = a component with a top "${need}" port`);
+    }
   });
   if (errors.length) return { value: null, errors: errors.slice(0, 6) };
   const value = clampMechParts(list, opts.log);

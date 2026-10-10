@@ -11,6 +11,8 @@
 import {
   DEFAULT_ENCLOSURE,
   LIMITS,
+  MECH_PARAMS,
+  THROUGH_LID,
   type EnclosureSpec,
   type EnclosureTemplate,
   type LayoutItem,
@@ -137,7 +139,7 @@ export function insideSection(d: EnclosureDims, x: number, y: number, inset: num
 }
 
 /** Outer top surface height at y. */
-export function topAt(d: EnclosureDims, y: number): number {
+export function topAt(d: Pick<EnclosureDims, "H" | "D" | "wedgeDeg">, y: number): number {
   if (!d.wedgeDeg) return d.H;
   return d.H + (Math.min(y, d.D / 2) - d.D / 2) * Math.tan((d.wedgeDeg * Math.PI) / 180);
 }
@@ -327,10 +329,21 @@ export function settlePokes(layout: LayoutItem[], parts: Map<string, LibraryPart
 export const LID_GAP = 0.5;
 
 /**
+ * Gap under the lid's inner surface for a top-port part. A button (top button cap) leaves
+ * room for the shortest printed extender: flange + shaft + cap, minus what pokes out.
+ */
+export function lidGapFor(part: LibraryPart, wall: number): number {
+  if (!part.ports.some((p) => p.face === "+z" && p.kind === "button_cap")) return LID_GAP;
+  const e = THROUGH_LID.extender;
+  return Math.max(LID_GAP, e.flange + MECH_PARAMS.button_extender.length[0] + e.capT - e.proud - wall);
+}
+
+/**
  * Where the parts stand in THIS case (what cutoutsFor cuts for and the viewer draws):
  *  - poke-through sensors (the PIR) are lifted so the dome pokes out (settlePokes);
  *  - every other part with a +z port (screen, button, light pipe, grille) is lifted so its
- *    top is LID_GAP under the lid's inner surface over its whole footprint. The layout only
+ *    top is LID_GAP under the lid's inner surface over its whole footprint (a button: room
+ *    for its printed extender, lidGapFor). The layout only
  *    levels them with the tallest stack, which can be far below the lid (a tall or sloped
  *    case): a screen there is not seen through its own window. Never lowered, never pushed
  *    into a part stacked above it. Pure: new array, same order.
@@ -343,7 +356,7 @@ export function settleLayout(layout: LayoutItem[], parts: Map<string, LibraryPar
     if (!part || isPokeSensor(part) || !hasTopPort(part)) return it;
     const box = worldBox(it, part);
     // The lowest point of the lid over the part (the wedge slopes along y).
-    let ceiling = Math.min(topAt(d, box.min[1] + oy), topAt(d, box.max[1] + oy)) - d.wall - LID_GAP - oz;
+    let ceiling = Math.min(topAt(d, box.min[1] + oy), topAt(d, box.max[1] + oy)) - d.wall - lidGapFor(part, d.wall) - oz;
     for (const other of poked) {
       if (other === it) continue;
       const op = parts.get(other.instanceId);

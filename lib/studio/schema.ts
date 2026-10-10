@@ -485,6 +485,19 @@ export function clampEnclosure(input: unknown, log: ClampLog = [], opts: ClampEn
   return out;
 }
 
+/**
+ * Through-lid printed parts (mm). Button extender profile, bottom → top: a flange
+ * (FLANGE) on the button, a shaft of `length`, then the cap (CAP_T) in the lid
+ * opening, its top PROUD above the lid's outer surface. A light pipe ends PROUD
+ * above the lid (flush). mech/place.ts fits `length` to the real gap.
+ */
+export const THROUGH_LID = {
+  extender: { flange: 1, capT: 2.5, proud: 1, minOpening: 8 },
+  lightPipe: { proud: 0.15 },
+  /** Radial play of a cap / pipe in its lid opening. */
+  play: 0.3,
+} as const;
+
 /** Per-template parameter ranges for printable parts: [min, max, default]. */
 export const MECH_PARAMS: Record<MechTemplate, Record<string, [number, number, number]>> = {
   standoff: { height: [2, 25, 6], outerD: [4, 10, 6], holeD: [1.6, 3.4, 2.5] },

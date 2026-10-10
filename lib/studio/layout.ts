@@ -25,7 +25,7 @@
 // Determinism: input order does not matter (parts are sorted by footprint area
 // desc, then instanceId), and every decision is a pure function of the input.
 
-import { LIMITS, type Face, type LayoutItem, type LibraryPart, type SizeHint } from "./schema";
+import { LIMITS, THROUGH_LID, type Face, type LayoutItem, type LibraryPart, type Port, type PortKind, type SizeHint } from "./schema";
 
 export type Vec3 = [number, number, number];
 export type RotZ = 0 | 90 | 180 | 270;
@@ -111,6 +111,45 @@ export function isRoundSensorPort(port: LibraryPart["ports"][number]): boolean {
   );
 }
 
+/** Fit tolerance added to every port opening (mm). */
+export const PORT_TOLERANCE = 0.6;
+const ROUND_KINDS: PortKind[] = ["led_light_pipe", "button_cap"];
+
+/**
+ * Size of the opening cut for a port (mm). Round for light pipes, button caps and dome
+ * windows. A button cap on top gets at least room for the printed extender's cap
+ * (THROUGH_LID.extender.minOpening + tolerance), which mech/place.ts fits to this size.
+ */
+export function openingSize(port: Port): { w: number; h: number; round: boolean } {
+  const round = ROUND_KINDS.includes(port.kind) || isRoundSensorPort(port);
+  let w = port.size.w + PORT_TOLERANCE;
+  let h = port.size.h + PORT_TOLERANCE;
+  if (round) w = h = Math.max(w, h);
+  if (port.kind === "button_cap" && port.face === "+z") w = h = Math.max(w, THROUGH_LID.extender.minOpening + PORT_TOLERANCE);
+  return { w, h, round };
+}
+
+/** Lid material kept between two top openings (mm). */
+export const MIN_OPENING_WEB = 3;
+
+/**
+ * How far this part's top openings reach past its own footprint (mm, ≥ 0), or null when it
+ * has no top opening. Rotation-free: the max over both axes.
+ */
+export function topOverhang(part: LibraryPart): number | null {
+  let over: number | null = null;
+  for (const p of part.ports) {
+    if (p.face !== "+z") continue;
+    const { w, h } = openingSize(p);
+    const cx = -part.dims.x / 2 + p.at.u * part.dims.x;
+    const cy = -part.dims.y / 2 + p.at.v * part.dims.y;
+    const ox = Math.max(0, Math.abs(cx) + w / 2 - part.dims.x / 2);
+    const oy = Math.max(0, Math.abs(cy) + h / 2 - part.dims.y / 2);
+    over = Math.max(over ?? 0, ox, oy);
+  }
+  return over;
+}
+
 /** A sensor whose dome pokes through the lid (the PIR). */
 export function isPokeSensor(part: LibraryPart): boolean {
   return part.ports.some(isRoundSensorPort);
@@ -164,6 +203,8 @@ type Block = {
   face: Face | null;
   /** Raise to the tallest stack (single part with a +z port). */
   raise: boolean;
+  /** Top openings' reach past the block (null = no top opening): see pairGap. */
+  topOver: number | null;
 };
 
 type Placed = { block: Block; x: number; y: number };
@@ -191,6 +232,7 @@ function singleBlock(it: LayoutInput): Block {
     clearance: it.part.clearance,
     face,
     raise: hasTopPort(it.part),
+    topOver: topOverhang(it.part),
   };
 }
 
@@ -241,9 +283,22 @@ function makeBlocks(items: LayoutInput[]): Block[] {
 // Packing
 // ---------------------------------------------------------------------------
 
-type Group = { placed: Placed[]; w: number; d: number; clearance: number };
+type Group = { placed: Placed[]; w: number; d: number; clearance: number; topOver: number | null };
 
-const emptyGroup = (): Group => ({ placed: [], w: 0, d: 0, clearance: 0 });
+const emptyGroup = (): Group => ({ placed: [], w: 0, d: 0, clearance: 0, topOver: null });
+
+type Spaced = { clearance: number; topOver: number | null };
+const maxOver = (a: number | null, b: number | null) => (a === null ? b : b === null ? a : Math.max(a, b));
+
+/**
+ * Gap between two neighbours: their clearance, and when BOTH have top openings enough room
+ * that the openings keep MIN_OPENING_WEB of lid between them (each opening may reach past
+ * its part by topOver).
+ */
+function pairGap(a: Spaced, b: Spaced, minC: number): number {
+  const web = a.topOver !== null && b.topOver !== null ? MIN_OPENING_WEB + a.topOver + b.topOver : 0;
+  return Math.max(minC, a.clearance, b.clearance, web);
+}
 
 /** Lay blocks in a line along x (row) or y (column). */
 function line(blocks: Block[], axis: "x" | "y", minC: number): Group {
@@ -251,10 +306,11 @@ function line(blocks: Block[], axis: "x" | "y", minC: number): Group {
   let cursor = 0;
   let prev: Block | null = null;
   for (const b of blocks) {
-    if (prev) cursor += Math.max(minC, prev.clearance, b.clearance);
+    if (prev) cursor += pairGap(prev, b, minC);
     g.placed.push(axis === "x" ? { block: b, x: cursor, y: 0 } : { block: b, x: 0, y: cursor });
     cursor += axis === "x" ? b.w : b.d;
     g.clearance = Math.max(g.clearance, b.clearance);
+    g.topOver = maxOver(g.topOver, b.topOver);
     prev = b;
   }
   if (axis === "x") {
@@ -274,7 +330,7 @@ function shelves(blocks: Block[], maxW: number, minC: number): Group {
   let curW = 0;
   for (const b of blocks) {
     const prev = cur[cur.length - 1];
-    const next = prev ? curW + Math.max(minC, prev.clearance, b.clearance) + b.w : b.w;
+    const next = prev ? curW + pairGap(prev, b, minC) + b.w : b.w;
     if (prev && next > maxW + 1e-9) {
       rows.push(cur);
       cur = [b];
@@ -290,18 +346,19 @@ function shelves(blocks: Block[], maxW: number, minC: number): Group {
   let prevRow: Group | null = null;
   for (const r of rows) {
     const row = line(r, "x", minC);
-    if (prevRow) y += Math.max(minC, prevRow.clearance, row.clearance);
+    if (prevRow) y += pairGap(prevRow, row, minC);
     for (const p of row.placed) g.placed.push({ block: p.block, x: p.x, y });
     g.w = Math.max(g.w, row.w);
     y += row.d;
     g.clearance = Math.max(g.clearance, row.clearance);
+    g.topOver = maxOver(g.topOver, row.topOver);
     prevRow = row;
   }
   g.d = y;
   return g;
 }
 
-const gapBetween = (a: Group, b: Group, minC: number) => Math.max(minC, a.clearance, b.clearance);
+const gapBetween = (a: Group, b: Group, minC: number) => pairGap(a, b, minC);
 
 type Frame = { placed: Placed[]; W: number; D: number };
 
@@ -317,7 +374,17 @@ function assemble(groups: { L: Group; R: Group; F: Group; B: Group; C: Group }, 
   });
   const Mh = Math.max(0, ...mids.map((g) => g.d));
   const W = Math.max(Mw, F.w, B.w);
-  const bands = [F, { ...emptyGroup(), placed: mids.flatMap((g) => g.placed), d: Mh, clearance: Math.max(0, ...mids.map((g) => g.clearance)) }, B].filter(has);
+  const bands = [
+    F,
+    {
+      ...emptyGroup(),
+      placed: mids.flatMap((g) => g.placed),
+      d: Mh,
+      clearance: Math.max(0, ...mids.map((g) => g.clearance)),
+      topOver: mids.reduce<number | null>((o, g) => maxOver(o, g.topOver), null),
+    },
+    B,
+  ].filter(has);
   const out: Placed[] = [];
   let y = 0;
   let prevBand: Group | null = null;

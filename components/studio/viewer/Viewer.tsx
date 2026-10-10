@@ -34,7 +34,7 @@ import { getPart } from "@/lib/studio/library";
 import { pokeStats, worldBox, type LayoutResult } from "@/lib/studio/layout";
 import { contentOffsetOf, placePart } from "@/lib/studio/placement";
 import { buildEnclosure } from "@/lib/studio/enclosure/build";
-import { heightLayers, type Vec3 } from "@/lib/studio/explode";
+import { BASE_DROP_MM, explodeFrame, explodeOffset, type ExplodeFrame, type Vec3 } from "@/lib/studio/explode";
 import type { LayoutItem, LibraryPart } from "@/lib/studio/schema";
 import { ViewerContext, type ViewerCtx } from "./context";
 import { useDocumentHidden, usePrefersReducedMotion } from "./hooks";
@@ -323,9 +323,20 @@ function Scene(p: SceneProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compKey, shownKey, parts, enc]);
 
-  const layers = useMemo(() => heightLayers(placements.map((pl) => pl.pos[2])), [placements]);
-
   const H = enc?.meta.H ?? height;
+  // One explode frame for the whole scene (mech/place.ts derives the printed parts' vectors from the same maths).
+  const { frame: exFrame, layers } = useMemo(
+    () =>
+      explodeFrame(
+        placements.map((pl) => {
+          const f = footprint(parts.get(pl.c.instanceId), pl.rotZ);
+          return { pos: pl.pos, w: f.w, d: f.d, h: f.h };
+        }),
+        H,
+        enc?.meta.splitZ,
+      ),
+    [placements, parts, H, enc],
+  );
 
   // --- refs, dirty flag, context ---------------------------------------------
   const contentRef = useRef<THREE.Group>(null);
@@ -403,7 +414,8 @@ function Scene(p: SceneProps) {
   // Z-up centre → world Y-up position of the turntable axis.
   const tPos = useMemo<[number, number, number]>(() => [centre[0], 0, -centre[1]], [centre]);
   const oPos = useMemo<[number, number, number]>(() => [-centre[0], 0, centre[1]], [centre]);
-  const floorY = plate ? -PLATE_T - 0.2 : -0.2;
+  // The base drops a little when exploded; the shadow plane follows it.
+  const floorY = plate ? -PLATE_T - 0.2 : -0.2 - BASE_DROP_MM * explodeTarget;
 
   const [radius, setRadius] = useState(100);
   const lights = useRef<LightRefs>({ key: null, fill: null, rim: null });
@@ -454,8 +466,7 @@ function Scene(p: SceneProps) {
             <ExplodeController
               root={contentRef}
               target={explodeTarget}
-              centre={centre}
-              H={H}
+              frame={exFrame}
               reducedMotion={reducedMotion}
               dirty={dirty}
               onSettled={onSettled}
@@ -466,10 +477,11 @@ function Scene(p: SceneProps) {
       <CameraRig
         contentRef={contentRef}
         lights={lights}
-        fitKey={`${contentKey}#${explodeTarget > 0.05 ? 1 : 0}#${Math.round(plateRadius)}`}
+        fitKey={`${contentKey}#${Math.round(explodeTarget * 10)}#${Math.round(plateRadius)}`}
         plateRadius={plate ? plateRadius : 0}
         plateTop={height}
-        grow={1 + 0.6 * explodeTarget}
+        explodeAt={explodeTarget}
+        frame={exFrame}
         reducedMotion={reducedMotion}
         onRadius={setRadius}
       />
@@ -536,11 +548,33 @@ function placeLights(L: LightRefs, centre: THREE.Vector3, r: number) {
 
 // --- camera auto-fit -----------------------------------------------------------------
 
+/**
+ * World bounds of the content with every studio object at its pose for explode amount `t`
+ * (the slider's goal), so the camera frames the exploded view before the parts get there.
+ * Positions are restored afterwards (the explode controller owns them).
+ */
+function boundsAt(g: THREE.Group, frame: ExplodeFrame, t: number): THREE.Box3 {
+  const saved: [THREE.Object3D, THREE.Vector3][] = [];
+  g.traverse((o) => {
+    const s = studioData(o);
+    if (!s) return;
+    saved.push([o, o.position.clone()]);
+    const off = explodeOffset(s.kind, s.rest, frame, s.layer ?? 0, t, s.vector);
+    o.position.set(s.rest[0] + off[0], s.rest[1] + off[1], s.rest[2] + off[2]);
+  });
+  g.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(g);
+  for (const [o, p] of saved) o.position.copy(p);
+  g.updateWorldMatrix(true, true);
+  return box;
+}
+
 function CameraRig({
   contentRef,
   lights,
   fitKey,
-  grow,
+  explodeAt,
+  frame,
   plateRadius,
   plateTop,
   reducedMotion,
@@ -549,7 +583,9 @@ function CameraRig({
   contentRef: RefObject<THREE.Group | null>;
   lights: MutableRefObject<LightRefs>;
   fitKey: string;
-  grow: number;
+  /** Explode amount the camera frames (the slider's target, not the animated value). */
+  explodeAt: number;
+  frame: ExplodeFrame;
   /** Plate mode: the plate's radius (mm), else 0. The camera frames the plate itself. */
   plateRadius: number;
   /** Plate mode: height of the tallest part above the plate (mm). */
@@ -562,8 +598,8 @@ function CameraRig({
   const controls = useRef<OrbitControlsImpl>(null);
   const goal = useRef<{ pos: THREE.Vector3; target: THREE.Vector3 } | null>(null);
   const first = useRef(true);
-  const growRef = useRef(grow);
-  growRef.current = grow;
+  const exRef = useRef({ at: explodeAt, frame });
+  exRef.current = { at: explodeAt, frame };
   const plateRef = useRef({ radius: plateRadius, top: plateTop });
   plateRef.current = { radius: plateRadius, top: plateTop };
 
@@ -573,11 +609,10 @@ function CameraRig({
       const g = contentRef.current;
       const c = controls.current;
       if (!g || !c) return;
-      g.updateWorldMatrix(true, true);
-      const box = new THREE.Box3().setFromObject(g);
+      const box = boundsAt(g, exRef.current.frame, exRef.current.at);
       if (box.isEmpty()) box.set(new THREE.Vector3(-40, -10, -40), new THREE.Vector3(40, 30, 40));
       const sphere = box.getBoundingSphere(new THREE.Sphere());
-      const r = Math.max(15, sphere.radius) * growRef.current;
+      const r = Math.max(15, sphere.radius);
       const fov = THREE.MathUtils.degToRad(camera.fov);
       const aspect = Math.max(0.5, camera.aspect || 1);
       const fit = Math.min(fov, 2 * Math.atan(Math.tan(fov / 2) * aspect));
@@ -648,7 +683,7 @@ function CameraRig({
     const g = goal.current;
     const c = controls.current;
     if (!g || !c) return;
-    const k = 1 - Math.exp(-6 * Math.min(dt, 0.1));
+    const k = 1 - Math.exp(-6 * Math.min(dt, 0.25)); // slow frames still converge
     camera.position.lerp(g.pos, k);
     c.target.lerp(g.target, k);
     c.update();

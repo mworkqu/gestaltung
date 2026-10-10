@@ -5,7 +5,7 @@
 // depth) that build.ts subtracts from the shell.
 
 import type { EnclosureSpec, LayoutItem, LibraryPart, PortKind, VentFace } from "../schema";
-import { isRoundSensorPort, rotateFace, rotateXY, type Vec3 } from "../layout";
+import { openingSize, rotateFace, rotateXY, type Vec3 } from "../layout";
 import { exitDistance, topAt, type EnclosureDims } from "./templates";
 
 export type CutoutShape = "rrect" | "circle" | "hex" | "grille";
@@ -32,8 +32,7 @@ export type Cutout = {
   holes?: { u: number; v: number; d: number }[];
 };
 
-/** Fit tolerance added to every port opening (mm). */
-export const PORT_TOLERANCE = 0.6;
+export { PORT_TOLERANCE, openingSize } from "../layout";
 
 type Basis = { n: Vec3; u: Vec3; v: Vec3 };
 const BASIS: Record<VentFace, Basis> = {
@@ -45,7 +44,6 @@ const BASIS: Record<VentFace, Basis> = {
   "-z": { n: [0, 0, -1], u: [1, 0, 0], v: [0, -1, 0] },
 };
 
-const ROUND_KINDS: PortKind[] = ["led_light_pipe", "button_cap"];
 const add = (a: Vec3, b: Vec3, s = 1): Vec3 => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
 
 /** Port point on the part face, part-local (part spans ±dx/2, ±dy/2, 0..dz). */
@@ -88,10 +86,7 @@ export function cutoutsFor(layout: LayoutItem[], parts: Map<string, LibraryPart>
       const p: Vec3 = [rx + item.pos[0] + ox, ry + item.pos[1] + oy, local[2] + item.pos[2] + oz];
       const face = rotateFace(port.face, item.rotZ) as VentFace;
       // Round openings: light pipes, button caps and dome-shaped sensor windows (the PIR).
-      const round = ROUND_KINDS.includes(port.kind) || isRoundSensorPort(port);
-      let w = port.size.w + PORT_TOLERANCE;
-      let h = port.size.h + PORT_TOLERANCE;
-      if (round) w = h = Math.max(w, h);
+      const { w, h, round } = openingSize(port);
       const radius = round ? w / 2 : Math.min(1.5, h / 2, w / 2);
       let basis = BASIS[face];
       if (face === "+z") {

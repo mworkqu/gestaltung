@@ -8,6 +8,7 @@ import { getPart } from "@/lib/studio/library";
 import type { RotZ } from "@/lib/studio/layout";
 import { placePart } from "@/lib/studio/placement";
 import { useViewerCtx } from "./context";
+import { useStlPart } from "./StlModel";
 import { cloneMaterials, disposeObject, forEachMaterial, type StudioObjectData } from "./materials";
 
 type Props = {
@@ -64,6 +65,11 @@ export default function ComponentMesh({ instanceId, partId, rest, rotZ, layer, b
     };
   }, [model]);
 
+  // An owner-uploaded STL replaces the box placeholder once it has loaded.
+  const part = getPart(partId);
+  const stl = useStlPart(part?.model.kind === "stl" ? part.model.url : null, part?.dims, part?.look.body);
+  const shown = stl ?? model;
+
   // Rest pose + explode metadata; the explode controller adds its offset on top.
   const [rx, ry, rz] = rest;
   useLayoutEffect(() => {
@@ -82,7 +88,7 @@ export default function ComponentMesh({ instanceId, partId, rest, rotZ, layer, b
   // Selection highlight: emissive tint in the accent colour.
   const isSelected = selected === instanceId;
   useEffect(() => {
-    forEachMaterial(model, (m) => {
+    forEachMaterial(shown, (m) => {
       const sm = m as THREE.MeshStandardMaterial;
       if (!sm.emissive) return;
       const ud = sm.userData as { emissiveBackup?: EmissiveBackup };
@@ -96,7 +102,7 @@ export default function ComponentMesh({ instanceId, partId, rest, rotZ, layer, b
       }
     });
     invalidate();
-  }, [model, isSelected, accent, invalidate]);
+  }, [shown, isSelected, accent, invalidate]);
 
   const bobbing = bobPhase !== undefined && !reducedMotion;
   useEffect(() => {
@@ -132,7 +138,7 @@ export default function ComponentMesh({ instanceId, partId, rest, rotZ, layer, b
       }}
     >
       <group ref={inner}>
-        <primitive object={model} />
+        <primitive object={shown} />
       </group>
     </group>
   );

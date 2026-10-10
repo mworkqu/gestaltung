@@ -38,6 +38,7 @@ describe("real library", () => {
           }
         }
       }
-    });
+      // CSG of the whole library: ~1 s alone, slower when the full suite runs in parallel.
+    }, 30_000);
   }
 });

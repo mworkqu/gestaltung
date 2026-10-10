@@ -2,7 +2,8 @@
 // and the reference the model's answer is compared with. Pure.
 //
 // Rules: one standoff per mounting hole of every placed part that has a mount;
-// a battery_clip per cell; a button_extender per button; a light_pipe per LED;
+// a battery_clip per cell; a button_extender per +z button cap; a light_pipe per
+// +z LED port (lengths are only a start: mech/place.ts fits them to the lid);
 // plus the lid and the base sized to the enclosure.
 
 import {
@@ -20,6 +21,8 @@ export type MechSummaryItem = {
   mountHoles: { x: number; y: number; d: number }[];
   standoffHeight: number | null;
   ports: string[];
+  /** Kinds of the ports that open through the lid (+z) — the only ones a button extender / light pipe serves. */
+  topPorts: string[];
   tags: string[];
 };
 
@@ -76,6 +79,7 @@ export function mechSummary(opts: {
       mountHoles: part?.mount?.holes ?? [],
       standoffHeight: part?.mount ? part.mount.standoffHeight : null,
       ports: part?.ports.map((p) => p.kind) ?? [],
+      topPorts: part?.ports.filter((p) => p.face === "+z").map((p) => p.kind) ?? [],
       tags: part?.tags ?? [],
     });
   }
@@ -86,8 +90,10 @@ const has = (item: MechSummaryItem, ...words: string[]) =>
   words.some((w) => item.partId.includes(w) || item.tags.some((t) => t.toLowerCase().includes(w)));
 
 const isCell = (i: MechSummaryItem) => i.category === "power" && (has(i, "cell", "18650", "battery") && !has(i, "charger", "tp4056"));
-const isButton = (i: MechSummaryItem) => i.category === "input" && (has(i, "button", "switch") || i.ports.includes("button_cap"));
-const isLed = (i: MechSummaryItem) => has(i, "led") || i.ports.includes("led_light_pipe");
+// Through-lid parts follow the part's own +z port, never its name: "oled" contains "led"
+// (a light pipe used to land in the screen window) and a slide switch's lever is on a side.
+const isButton = (i: MechSummaryItem) => (i.topPorts ?? []).includes("button_cap");
+const isLed = (i: MechSummaryItem) => (i.topPorts ?? []).includes("led_light_pipe");
 
 export function defaultMechParts(summary: MechSummary, log: ClampLog = []): MechPart[] {
   const raw: Record<string, unknown>[] = [];

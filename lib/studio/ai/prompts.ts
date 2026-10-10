@@ -209,6 +209,7 @@ export function enclosurePrompt(opts: {
 export const MECH_SYSTEM =
   "List the printable parts that hold these components inside this enclosure: " +
   "standoffs for mounting holes, cradles, clips, extenders. " +
+  "A button_extender only for a component whose topPorts has button_cap, a light_pipe only for one whose topPorts has led_light_pipe. " +
   "Return MechPart[] using only the templates and parameter ranges given. Never write geometry or code.";
 
 const MECH_PARAM_NAMES = [...new Set(Object.values(MECH_PARAMS).flatMap((r) => Object.keys(r)))];

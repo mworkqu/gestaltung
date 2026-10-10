@@ -13,7 +13,7 @@
 
 import * as THREE from "three";
 import { mergeGeometries, toCreasedNormals } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { MECH_PARAMS, clampMechPart, type MechPart, type MechTemplate } from "../schema";
+import { MECH_PARAMS, THROUGH_LID, clampMechPart, type MechPart, type MechTemplate } from "../schema";
 
 export type MechParams = Record<string, number>;
 type P2 = [number, number];
@@ -294,10 +294,11 @@ function buttonExtender(p: MechParams): THREE.BufferGeometry {
   const rs = Math.max(1.2, Math.min(p.capD * 0.3, rc - 1));
   const rf = rc + 1;
   const L = p.length;
-  const capT = 2.5;
+  const capT = THROUGH_LID.extender.capT;
   const f = Math.min(1, rc / 3, capT / 2);
+  const FL = THROUGH_LID.extender.flange;
   const g = revolve([
-    [0, 0], [rf, 0], [rf, 1], [rs, 1], [rs, 1 + L], [rc, 1 + L], ...fillet(rc, 1 + L + capT, f), [0, 1 + L + capT],
+    [0, 0], [rf, 0], [rf, FL], [rs, FL], [rs, FL + L], [rc, FL + L], ...fillet(rc, FL + L + capT, f), [0, FL + L + capT],
   ], 32);
   g.computeBoundingBox();
   return g;

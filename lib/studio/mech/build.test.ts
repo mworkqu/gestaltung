@@ -7,7 +7,7 @@ import { buildEnclosure } from "../enclosure/build";
 import { pointInCavity } from "../enclosure/templates";
 import { spec } from "../enclosure/test-fixtures";
 import { defaultMechParts, mechSummary } from "../ai/mech-default";
-import { explodeOffset } from "../explode";
+import { explodeOffset, type ExplodeFrame } from "../explode";
 import { exportSTL, plateSTL, printableSTL } from "../export";
 import { getCadBackend } from "../cad-adapter";
 import { buildMechParts, defaultMaterial } from "./build";
@@ -74,20 +74,24 @@ describe("placeMechParts", () => {
 
   it("gives every part a non-zero, reversible explode vector", () => {
     const { lr, parts, enc } = scene();
+    const FRAME: ExplodeFrame = { centre: [0, 0, 0], H: enc.meta.H, tallest: 10, layers: 1, span: 50 };
     const placed = placeMechParts(all(), lr, parts, enc.meta.dims);
     for (const p of placed) {
       expect(Math.hypot(...p.explode)).toBeGreaterThan(1);
-      const full = explodeOffset("extra", p.position, [0, 0, 0], enc.meta.H, 0, 1, p.explode);
+      const full = explodeOffset("extra", p.position, FRAME, 0, 1, p.explode);
       full.forEach((v, i) => expect(v).toBeCloseTo(p.explode[i], 6));
-      expect(explodeOffset("extra", p.position, [0, 0, 0], enc.meta.H, 0, 0, p.explode)).toEqual([0, 0, 0]);
-      const half = explodeOffset("extra", p.position, [0, 0, 0], enc.meta.H, 0, 0.5, p.explode);
+      expect(explodeOffset("extra", p.position, FRAME, 0, 0, p.explode)).toEqual([0, 0, 0]);
+      const half = explodeOffset("extra", p.position, FRAME, 0, 0.5, p.explode);
       expect(Math.hypot(...half)).toBeLessThan(Math.hypot(...p.explode));
     }
     const by = (t: string) => placed[all().findIndex((m) => m.template === t)];
     expect(by("lid").explode[2]).toBeGreaterThan(0);
     expect(by("base").explode[2]).toBeLessThan(0);
-    expect(by("button_extender").explode[2]).toBeGreaterThan(by("lid").explode[2]);
-    expect(by("standoff").explode[2]).toBeLessThan(0);
+    // Through-lid parts float between their part and the raised lid; standoffs under their part.
+    expect(by("button_extender").explode[2]).toBeGreaterThan(0);
+    expect(by("button_extender").explode[2]).toBeLessThan(by("lid").explode[2]);
+    expect(by("standoff").explode[2]).toBeGreaterThan(0);
+    expect(by("standoff").explode[2]).toBeLessThan(by("button_extender").explode[2]);
     expect(by("wall_bracket").explode[1]).toBeLessThan(0);
     expect(by("wall_bracket").position[1]).toBeLessThan(-enc.meta.D / 2);
   });
