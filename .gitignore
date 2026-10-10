@@ -58,3 +58,8 @@ playwright-report/
 
 # owner working notes (not part of the site)
 Claude outputs/
+
+# python service caches (services/cad-worker)
+services/**/__pycache__/
+services/**/.pytest_cache/
+services/**/.venv/

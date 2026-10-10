@@ -1,0 +1,2 @@
+# Python services deploy separately (Cloud Run); keep them out of the Vercel upload.
+services/

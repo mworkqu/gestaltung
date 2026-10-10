@@ -1,0 +1,38 @@
+# Builds the CAD worker image. The Dockerfile's test stage runs the whole pytest
+# suite inside the image (cadquery tests included); the runtime stage depends on
+# it, so a failing test fails the build and nothing is pushed.
+#
+# From the repo root (do not run from Claude):
+#   gcloud builds submit services/cad-worker \
+#     --config services/cad-worker/cloudbuild.yaml \
+#     --substitutions=_REGION=me-central1,_REPO=gestaltung
+# Needs an Artifact Registry Docker repo named ${_REPO} in ${_REGION}.
+
+substitutions:
+  _REGION: me-central1
+  _REPO: gestaltung
+  _IMAGE: cad-worker
+  _TAG: latest
+
+steps:
+  - id: build-and-test
+    name: gcr.io/cloud-builders/docker
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - --progress=plain
+      - --target=runtime
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:${_TAG}
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$BUILD_ID
+      - .
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:${_TAG}
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_IMAGE}:$BUILD_ID
+
+timeout: 1800s
+options:
+  logging: CLOUD_LOGGING_ONLY

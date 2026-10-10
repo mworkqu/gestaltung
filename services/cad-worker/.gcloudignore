@@ -1,0 +1,8 @@
+# Uploaded by `gcloud builds submit services/cad-worker` (the Dockerfile and its context only).
+.gcloudignore
+.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.venv
+venv

@@ -25,6 +25,8 @@ const config = [
       "_archive/**",
       // Claude Code tooling, not project source.
       ".claude/**",
+      // Python services (CadQuery worker): not part of the Next.js app.
+      "services/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
