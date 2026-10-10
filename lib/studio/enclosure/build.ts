@@ -25,7 +25,7 @@ import {
   LIP,
   enclosureDims,
   exitDistance,
-  settlePokes,
+  settleLayout,
   outlineAt,
   taperScale,
   taperSlope,
@@ -364,12 +364,18 @@ function feet(d: EnclosureDims, kind: EnclosureSpec["feet"]): THREE.Mesh[] {
 // Public
 // ---------------------------------------------------------------------------
 
+/** The pure part of buildEnclosure: dims, where the parts stand in the case, and the openings. */
+export function planEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, parts: Map<string, LibraryPart>) {
+  const dims = enclosureDims(spec, layoutResult);
+  const placed = settleLayout(layoutResult.layout, parts, dims);
+  const cutouts = cutoutsFor(placed, parts, dims);
+  const vents = ventCutouts(spec, dims, cutouts);
+  return { dims, placed, cutouts, vents };
+}
+
 export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, parts: Map<string, LibraryPart>): BuiltEnclosure {
   const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
-  const d = enclosureDims(spec, layoutResult);
-  const placed = settlePokes(layoutResult.layout, parts, d);
-  const cutouts = cutoutsFor(placed, parts, d);
-  const vents = ventCutouts(spec, d, cutouts);
+  const { dims: d, placed, cutouts, vents } = planEnclosure(spec, layoutResult, parts);
 
   const ev = new Evaluator();
   ev.attributes = ["position", "normal"];

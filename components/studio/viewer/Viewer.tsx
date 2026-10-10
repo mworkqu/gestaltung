@@ -32,6 +32,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { cn } from "@/lib/utils";
 import { getPart } from "@/lib/studio/library";
 import { pokeStats, worldBox, type LayoutResult } from "@/lib/studio/layout";
+import { contentOffsetOf, placePart } from "@/lib/studio/placement";
 import { buildEnclosure } from "@/lib/studio/enclosure/build";
 import { heightLayers, type Vec3 } from "@/lib/studio/explode";
 import type { LayoutItem, LibraryPart } from "@/lib/studio/schema";
@@ -295,10 +296,12 @@ function Scene(p: SceneProps) {
       return { placements: r.placements, plateRadius: r.radius, centre: [0, 0, 0] as Vec3, height: h };
     }
     const byId = new Map<string, LayoutItem>(shown.map((l) => [l.instanceId, l]));
+    // Same frame as the shell and its cut-outs: layout z = 0 is the case floor (contentOffset).
+    const offset = contentOffsetOf(enc?.meta.dims);
     // Parts without a layout entry (helpers such as resistors) are not shown physically.
     const pls: Placement[] = components.flatMap((c) => {
       const l = byId.get(c.instanceId);
-      return l ? [{ c, pos: [l.pos[0], l.pos[1], l.pos[2]] as [number, number, number], rotZ: l.rotZ }] : [];
+      return l ? [{ c, pos: placePart(l, offset).position, rotZ: l.rotZ }] : [];
     });
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (const pl of pls) {
@@ -318,7 +321,7 @@ function Scene(p: SceneProps) {
       height: empty ? 20 : Math.max(10, maxZ - Math.min(0, minZ)),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compKey, shownKey, parts]);
+  }, [compKey, shownKey, parts, enc]);
 
   const layers = useMemo(() => heightLayers(placements.map((pl) => pl.pos[2])), [placements]);
 

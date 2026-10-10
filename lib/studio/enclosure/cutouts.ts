@@ -49,7 +49,7 @@ const ROUND_KINDS: PortKind[] = ["led_light_pipe", "button_cap"];
 const add = (a: Vec3, b: Vec3, s = 1): Vec3 => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s];
 
 /** Port point on the part face, part-local (part spans ±dx/2, ±dy/2, 0..dz). */
-function portLocal(part: LibraryPart, face: string, u: number, v: number): Vec3 {
+export function portLocal(part: LibraryPart, face: string, u: number, v: number): Vec3 {
   const { x: dx, y: dy, z: dz } = part.dims;
   switch (face) {
     case "+x": return [dx / 2, -dy / 2 + u * dy, v * dz];

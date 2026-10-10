@@ -5,6 +5,8 @@ import * as THREE from "three";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { buildPartModel } from "@/lib/studio/models";
 import { getPart } from "@/lib/studio/library";
+import type { RotZ } from "@/lib/studio/layout";
+import { placePart } from "@/lib/studio/placement";
 import { useViewerCtx } from "./context";
 import { cloneMaterials, disposeObject, forEachMaterial, type StudioObjectData } from "./materials";
 
@@ -68,8 +70,10 @@ export default function ComponentMesh({ instanceId, partId, rest, rotZ, layer, b
     const g = outer.current;
     if (!g) return;
     g.name = instanceId;
+    // rest is already placePart(...).position (Viewer); rotation from the same helper.
+    const { rotationZ } = placePart({ pos: [rx, ry, rz], rotZ: rotZ as RotZ });
     g.position.set(rx, ry, rz);
-    g.rotation.set(0, 0, THREE.MathUtils.degToRad(rotZ));
+    g.rotation.set(0, 0, rotationZ);
     const data: StudioObjectData = { kind: "component", rest: [rx, ry, rz], layer };
     g.userData.studio = data;
     markDirty();

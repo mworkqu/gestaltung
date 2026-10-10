@@ -17,7 +17,7 @@ import {
   type LibraryPart,
   type ProductSpec,
 } from "../schema";
-import { isPokeSensor, POKE_OUT, type LayoutResult, type Vec3 } from "../layout";
+import { hasTopPort, isPokeSensor, POKE_OUT, worldBox, type LayoutResult, type Vec3 } from "../layout";
 
 /** Templates the browser builder can make right now. */
 export const BUILDABLE_TEMPLATES = ["rounded_box", "pill", "soft_wedge", "puck", "handheld_taper"] as const;
@@ -319,6 +319,40 @@ export function settlePokes(layout: LayoutItem[], parts: Map<string, LibraryPart
     const y = it.pos[1] + d.contentOffset[1];
     const z = Math.max(0, topAt(d, y) + POKE_OUT - d.contentOffset[2] - part.dims.z);
     return { ...it, pos: [it.pos[0], it.pos[1], Math.round(z * 1000) / 1000] };
+  });
+}
+
+/** Air gap between a top-port part (screen, button, light pipe) and the lid's inner surface (mm). */
+export const LID_GAP = 0.5;
+
+/**
+ * Where the parts stand in THIS case (what cutoutsFor cuts for and the viewer draws):
+ *  - poke-through sensors (the PIR) are lifted so the dome pokes out (settlePokes);
+ *  - every other part with a +z port (screen, button, light pipe, grille) is lifted so its
+ *    top is LID_GAP under the lid's inner surface over its whole footprint. The layout only
+ *    levels them with the tallest stack, which can be far below the lid (a tall or sloped
+ *    case): a screen there is not seen through its own window. Never lowered, never pushed
+ *    into a part stacked above it. Pure: new array, same order.
+ */
+export function settleLayout(layout: LayoutItem[], parts: Map<string, LibraryPart>, d: EnclosureDims): LayoutItem[] {
+  const poked = settlePokes(layout, parts, d);
+  const [, oy, oz] = d.contentOffset;
+  return poked.map((it) => {
+    const part = parts.get(it.instanceId);
+    if (!part || isPokeSensor(part) || !hasTopPort(part)) return it;
+    const box = worldBox(it, part);
+    // The lowest point of the lid over the part (the wedge slopes along y).
+    let ceiling = Math.min(topAt(d, box.min[1] + oy), topAt(d, box.max[1] + oy)) - d.wall - LID_GAP - oz;
+    for (const other of poked) {
+      if (other === it) continue;
+      const op = parts.get(other.instanceId);
+      if (!op) continue;
+      const ob = worldBox(other, op);
+      const overlapXY = ob.min[0] < box.max[0] && box.min[0] < ob.max[0] && ob.min[1] < box.max[1] && box.min[1] < ob.max[1];
+      if (overlapXY && ob.min[2] >= box.max[2] - 1e-6) ceiling = Math.min(ceiling, ob.min[2]);
+    }
+    const z = Math.round((ceiling - part.dims.z) * 1000) / 1000;
+    return z > it.pos[2] ? { ...it, pos: [it.pos[0], it.pos[1], z] } : it;
   });
 }
 
