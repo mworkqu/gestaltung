@@ -1,3 +1,4 @@
+import { formatPhoneDisplay } from "@/lib/phone";
 import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
@@ -122,7 +123,7 @@ export default async function DashboardPage({
 
   const rows: { label: string; value: string }[] = [
     { label: t("emailLabel"), value: email },
-    { label: t("phoneLabel"), value: profile.phone || t("noPhone") },
+    { label: t("phoneLabel"), value: formatPhoneDisplay(profile.phone) || t("noPhone") },
     { label: t("roleLabel"), value: roleLabel },
     { label: t("tenantLabel"), value: tenantText },
   ];

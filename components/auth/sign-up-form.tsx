@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isGuest } from "@/lib/supabase/guest";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
+import { normalizePhone } from "@/lib/phone";
 import { PhoneInput } from "@/components/phone-input";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,7 @@ export function SignUpForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
 
     const data = new FormData(e.currentTarget);
     const fullName = String(data.get("fullName"));
-    const phone = String(data.get("phone")).trim();
+    const phone = normalizePhone(String(data.get("phone")));
     const email = String(data.get("email"));
     const password = String(data.get("password"));
 

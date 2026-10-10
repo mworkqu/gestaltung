@@ -11,7 +11,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { escapeHtml, OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { renderOwnerEmail } from "@/lib/email/lead-email";
+import { dataTable } from "@/lib/email/brand-layout";
 import {
   BlockedError,
   planChanges,
@@ -161,7 +163,10 @@ async function alert(text: string) {
   await sendEmail({
     to: [OWNER_EMAIL],
     subject: "Voltaat price sync stopped",
-    html: `<p>${escapeHtml(text)}</p><p>See Dashboard → Suppliers → Voltaat sync. You can switch the sync off there.</p>`,
+    ...renderOwnerEmail({
+      title: "Voltaat price sync stopped",
+      paragraphs: [text, "See Dashboard → Suppliers → Voltaat sync. You can switch the sync off there."],
+    }),
   });
 }
 
@@ -170,23 +175,34 @@ async function report(
   missing: { partName: string; reason: string }[]
 ) {
   const q = (n: number | null) => (n === null ? "—" : `QAR ${n.toFixed(2)}`);
-  const rows = changes
-    .map((c) => {
+  const table = dataTable(
+    ["Product", "Voltaat price", "Availability", "Our price now"],
+    changes.map((c) => {
       const pct = c.oldRetail ? ((c.newRetail - c.oldRetail) / c.oldRetail) * 100 : null;
-      return `<tr><td>${escapeHtml(c.partName)}</td><td>${q(c.oldRetail)} → <b>${q(c.newRetail)}</b>${
-        pct === null ? "" : ` (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)`
-      }</td><td>${c.oldAvailability === c.newAvailability ? "" : `${c.oldAvailability} → ${c.newAvailability}`}</td><td>${q(c.newOurPrice)}</td></tr>`;
+      return [
+        c.partName,
+        `${q(c.oldRetail)} → ${q(c.newRetail)}${pct === null ? "" : ` (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)`}`,
+        c.oldAvailability === c.newAvailability ? "" : `${c.oldAvailability} → ${c.newAvailability}`,
+        q(c.newOurPrice),
+      ];
     })
-    .join("");
+  );
   const miss = missing.length
-    ? `<p>${missing.length} mapped product(s) couldn't be followed: ${missing
+    ? `${missing.length} mapped product(s) couldn't be followed: ${missing
         .slice(0, 20)
-        .map((m) => `${escapeHtml(m.partName)} (${m.reason.replace(/_/g, " ")})`)
-        .join(", ")}</p>`
+        .map((m) => `${m.partName} (${m.reason.replace(/_/g, " ")})`)
+        .join(", ")}`
     : "";
+  const mail = renderOwnerEmail({
+    title: `Voltaat prices: ${changes.length} change(s) today`,
+    bodyHtml: table.html,
+    bodyText: table.text,
+    paragraphs: miss ? [miss] : [],
+  });
   await sendEmail({
     to: [OWNER_EMAIL],
     subject: `Voltaat prices: ${changes.length} change(s) today`,
-    html: `<table cellpadding="4" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px"><tr><th align="left">Product</th><th align="left">Voltaat price</th><th align="left">Availability</th><th align="left">Our price now</th></tr>${rows}</table>${miss}`,
+    html: mail.html,
+    text: mail.text,
   });
 }

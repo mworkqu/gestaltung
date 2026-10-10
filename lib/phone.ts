@@ -71,3 +71,17 @@ export function isValidPhone(raw: string): boolean {
   if (/^\+974\d{8}$/.test(n)) return true;
   return /^\+\d{8,15}$/.test(n) && !n.startsWith("+974");
 }
+
+/**
+ * How a phone number is SHOWN to people (admin cards, emails): Qatar numbers
+ * as `+974 XXXX XXXX`. Stored values stay bare E.164 (`+97466567410`) because
+ * wa.me and tel: need that; this is display only. A number we can't read as a
+ * Qatar number is returned as typed (foreign E.164 keeps its `+digits`).
+ * Never throws; null / undefined → "".
+ */
+export function formatPhoneDisplay(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").trim();
+  if (!trimmed) return "";
+  const m = /^\+974(\d{4})(\d{4})$/.exec(normalizePhone(trimmed));
+  return m ? `+974 ${m[1]} ${m[2]}` : trimmed;
+}

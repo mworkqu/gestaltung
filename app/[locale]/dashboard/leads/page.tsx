@@ -11,7 +11,8 @@ import type { Inquiry, InquiryStatus } from "@/lib/supabase/types";
 import { setLeadStatus } from "./actions";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
-import { toWhatsAppDigits } from "@/lib/phone";
+import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
+import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { cn } from "@/lib/utils";
 
 // Every enquiry the site captures — homepage callbacks and CAD quote requests
@@ -39,24 +40,6 @@ const ACTION_LABEL: Record<InquiryStatus, "markNew" | "markContacted" | "markClo
   contacted: "markContacted",
   closed: "markClosed",
 };
-
-/** URLs in a message become links (quote requests carry download links). */
-function Linkified({ text }: { text: string }) {
-  const parts = text.split(/(https?:\/\/[^\s)]+)/g);
-  return (
-    <>
-      {parts.map((p, i) =>
-        /^https?:\/\//.test(p) ? (
-          <a key={i} href={p} target="_blank" rel="noopener noreferrer" className="break-all text-cobalt hover:underline" dir="ltr">
-            {p}
-          </a>
-        ) : (
-          <span key={i}>{p}</span>
-        )
-      )}
-    </>
-  );
-}
 
 export default async function LeadsPage({
   params,
@@ -112,6 +95,19 @@ export default async function LeadsPage({
       list.push({ name: f.file_name as string, url: signed.signedUrl });
       filesByProject.set(f.project_id as string, list);
     }
+  }
+  // Lead files that live in storage: a fresh 1-hour link per lead (the link in
+  // the email expires after 7 days). Falls back to the emailed link.
+  const parsedById = new Map(leads.map((l) => [l.id, parseLeadMessage(l.message)] as const));
+  const downloadById = new Map<string, string>();
+  const svc2 = createServiceClient();
+  for (const l of leads) {
+    const p = parsedById.get(l.id)!;
+    if (svc2 && p.storage) {
+      const { data: signed } = await svc2.storage.from(p.storage.bucket).createSignedUrl(p.storage.path, 3600);
+      if (signed?.signedUrl) downloadById.set(l.id, signed.signedUrl);
+    }
+    if (!downloadById.has(l.id) && p.downloadUrl) downloadById.set(l.id, p.downloadUrl);
   }
   const filterHref = (patch: { status?: string; kind?: string | null }) => {
     const q: Record<string, string> = {};
@@ -175,7 +171,26 @@ export default async function LeadsPage({
             const waDigits = toWhatsAppDigits(lead.phone);
             const kind = leadKind(lead.message);
             const projectId = leadProjectId(lead.message);
-            const files = projectId ? filesByProject.get(projectId) ?? [] : [];
+            const parsed = parsedById.get(lead.id)!;
+            const leadDownload = downloadById.get(lead.id) ?? null;
+            const projectFiles = projectId ? filesByProject.get(projectId) ?? [] : [];
+            // The lead's own file first; project files only when it has none of its own.
+            const files = leadDownload ? [] : projectFiles;
+            const rows: { label: string; value: string; ltr?: boolean }[] = [
+              ...(parsed.method ? [{ label: t("labelMethod"), value: parsed.method }] : []),
+              ...(parsed.fileName
+                ? [
+                    {
+                      label: t("labelFile"),
+                      value: [parsed.fileName, parsed.fileSize && `(${parsed.fileSize})`, parsed.uploadFailed && `— ${t("uploadFailed")}`]
+                        .filter(Boolean)
+                        .join(" "),
+                      ltr: !parsed.uploadFailed,
+                    },
+                  ]
+                : []),
+              ...(parsed.projectName ? [{ label: t("labelProject"), value: parsed.projectName }] : []),
+            ];
 
             return (
               <li key={lead.id} className="neu p-5">
@@ -210,7 +225,7 @@ export default async function LeadsPage({
                       className="inline-flex items-center gap-2 rounded-full border border-azure/40 bg-azure/10 px-4 py-2 text-sm font-medium text-azure transition hover:bg-azure/20"
                     >
                       <MessageCircle className="h-4 w-4" aria-hidden />
-                      <span dir="ltr">{lead.phone}</span>
+                      <span dir="ltr">{formatPhoneDisplay(lead.phone)}</span>
                     </a>
                   ) : (
                     <span
@@ -218,7 +233,7 @@ export default async function LeadsPage({
                       title={t("whatsappUnavailable")}
                     >
                       <MessageCircle className="h-4 w-4" aria-hidden />
-                      <span dir="ltr">{lead.phone}</span>
+                      <span dir="ltr">{formatPhoneDisplay(lead.phone)}</span>
                     </span>
                   )}
 
@@ -240,13 +255,41 @@ export default async function LeadsPage({
                 </div>
 
                 <div className="mt-4 border-t border-borderstrong/60 pt-4">
-                  <p className={mono("text-[10px] text-faint")}>{t("colMessage")}</p>
-                  {/* Quote enquiries arrive as multi-line text (method, file, notes). */}
-                  <p className="mt-2 whitespace-pre-line break-words text-sm text-body">
-                    <Linkified text={lead.message ?? ""} />
-                  </p>
-                  {(files.length > 0 || projectId) && (
+                  {rows.length > 0 && (
+                    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 rounded-xl bg-panel p-3 text-sm shadow-neu-inset">
+                      {rows.map((row) => (
+                        <div key={row.label} className="contents">
+                          <dt className="text-xs text-mutedtext">{row.label}</dt>
+                          <dd className="min-w-0 break-words font-semibold text-heading" dir={row.ltr ? "ltr" : undefined}>
+                            {row.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {(parsed.body || parsed.notes) && (
+                    <>
+                      <p className={mono("mt-3 text-[10px] text-faint")}>{parsed.notes && !parsed.body ? t("labelNotes") : t("colMessage")}</p>
+                      <p className="mt-2 whitespace-pre-line break-words text-sm text-body">
+                        {[parsed.body, parsed.notes && parsed.body ? `${t("labelNotes")}: ${parsed.notes}` : parsed.notes]
+                          .filter(Boolean)
+                          .join("\n\n")}
+                      </p>
+                    </>
+                  )}
+                  {(leadDownload || files.length > 0 || projectId) && (
                     <div className="mt-3 flex flex-wrap gap-2">
+                      {leadDownload && (
+                        <a
+                          href={leadDownload}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-full bg-cobalt px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          {t("downloadFile")}
+                        </a>
+                      )}
                       {files.map((f) => (
                         <a
                           key={f.url}

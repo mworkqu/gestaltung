@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { escapeHtml, OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { leadsDashboardUrl, renderOwnerEmail } from "@/lib/email/lead-email";
 
 // Demand signals (Task 18b): view, add_to_cart, request, zero_search.
 // Written through public.record_demand() (SECURITY DEFINER; stamps the
@@ -37,14 +38,23 @@ export async function POST(request: Request) {
       p_source_page: str("sourcePage", 300),
       p_search_term: item,
     });
-    const e = (s: string | null) => escapeHtml(s ?? "");
+    const mail = renderOwnerEmail({
+      title: "Item request: not in the store",
+      facts: [
+        { label: "Item", value: item },
+        { label: "Email", value: email, href: `mailto:${email}`, ltr: true },
+        { label: "Quantity", value: String(qty) },
+        ...(str("sourcePage", 300) ? [{ label: "Page", value: str("sourcePage", 300) ?? "", ltr: true }] : []),
+      ],
+      quote: str("note", 1000) ? { label: "Note", text: str("note", 1000) ?? "" } : undefined,
+      buttons: [{ label: "Open in dashboard", url: leadsDashboardUrl() }],
+    });
     const emailed = await sendEmail({
       to: [OWNER_EMAIL],
       replyTo: email,
       subject: `Item request (not in the store): ${item}`,
-      html: `<p><b>${e(item)}</b> — not in the store</p>
-<p>Email: ${e(email)}<br/>Quantity: ${qty}<br/>Page: ${e(str("sourcePage", 300))}</p>
-<p>${e(str("note", 1000))}</p>`,
+      html: mail.html,
+      text: mail.text,
     });
     if (!emailed && recErr) return Response.json({ error: "failed" }, { status: 500 });
     return Response.json({ ok: true, emailed });
@@ -65,14 +75,24 @@ export async function POST(request: Request) {
 
   if (kind === "request" && partId) {
     const { data: part } = await supabase.from("parts").select("sku, name").eq("id", partId).maybeSingle();
-    const e = (s: string | null) => escapeHtml(s ?? "");
+    const reqEmail = str("email", 200);
+    const mail = renderOwnerEmail({
+      title: "Item request",
+      facts: [
+        { label: "Item", value: [part?.name, part?.sku && `(${part.sku})`].filter(Boolean).join(" ") },
+        ...(reqEmail ? [{ label: "Email", value: reqEmail, href: `mailto:${reqEmail}`, ltr: true }] : []),
+        { label: "Quantity", value: String(qty) },
+        ...(str("sourcePage", 300) ? [{ label: "Page", value: str("sourcePage", 300) ?? "", ltr: true }] : []),
+      ],
+      quote: str("note", 1000) ? { label: "Note", text: str("note", 1000) ?? "" } : undefined,
+      buttons: [{ label: "Open in dashboard", url: leadsDashboardUrl() }],
+    });
     await sendEmail({
       to: [OWNER_EMAIL],
-      replyTo: str("email", 200) ?? undefined,
+      replyTo: reqEmail ?? undefined,
       subject: `Item request: ${part?.name ?? partId}`,
-      html: `<p><b>${e(part?.name ?? "")}</b> (${e(part?.sku ?? "")})</p>
-<p>Email: ${e(str("email", 200))}<br/>Quantity: ${qty}<br/>Page: ${e(str("sourcePage", 300))}</p>
-<p>${e(str("note", 1000))}</p>`,
+      html: mail.html,
+      text: mail.text,
     });
   }
 

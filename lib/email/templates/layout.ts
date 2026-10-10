@@ -3,7 +3,8 @@
 // one HTML/text shell every kind goes through. Pure — no I/O, safe in tests.
 
 import { escapeHtml } from "@/lib/email";
-import { COMPANY, COMPANY_WHATSAPP } from "@/lib/company";
+import { BRAND, renderBrandedEmail } from "@/lib/email/brand-layout";
+import { COMPANY } from "@/lib/company";
 import { CAD_GENERATIONS, CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
 
 export type NotificationLocale = "en" | "ar";
@@ -164,79 +165,51 @@ export type EmailDoc = {
 export function buildEmail(doc: EmailDoc): Rendered {
   const { locale, links } = doc;
   const c = COPY[locale];
-  const ar = locale === "ar";
   const howTo = doc.howTo !== false;
   const learnUrl = creditsPageUrl(links, locale);
   const unsub = links.unsubscribeUrl.trim();
   const reason = doc.orderEmail ? c.orderReason : c.reason;
   const rating = doc.rating?.options.length ? doc.rating : null;
-
-  // ── plain text
-  const text = [
-    c.brandStrip,
-    "",
-    doc.headline,
-    "",
-    ...doc.paragraphs.flatMap((p) => [p, ""]),
-    ...(doc.facts?.length ? [...doc.facts.map((f) => `${f.label}: ${f.value}`), ""] : []),
-    `${doc.cta.label}: ${doc.cta.url}`,
-    "",
-    ...(rating ? [rating.question, ...rating.options.map((o) => `${o.label}: ${o.url}`), ""] : []),
-    ...(howTo ? [c.howTitle, ...c.how.flatMap((p) => ["", p]), "", `${c.howLink}: ${learnUrl}`, ""] : []),
-    `${c.help}: ${COMPANY_WHATSAPP.display} ${links.whatsappUrl}`,
-    "",
-    "--",
-    reason,
-    ...(unsub ? [`${c.unsubscribe}: ${unsub}`] : []),
-  ].join("\n");
-
-  // ── html (inline styles only)
   const e = escapeHtml;
-  const para = (s: string) => `<p style="margin:0 0 14px">${e(s)}</p>`;
-  const facts = doc.facts?.length
-    ? `<table role="presentation" style="border-collapse:collapse;margin:0 0 14px">${doc.facts
-        .map(
-          (f) =>
-            `<tr><td style="padding:2px ${ar ? "0 2px 14px" : "14px 2px 0"};color:#475569">${e(f.label)}</td><td style="padding:2px 0;font-weight:bold">${e(f.value)}</td></tr>`
-        )
-        .join("")}</table>`
-    : "";
+
+  // Sections the shared shell has no slot for: the one-tap rating row and the
+  // "how to use your credits" box. Plain-text twins carry their links.
   const ratingHtml = rating
     ? [
-        `<p style="margin:18px 0 8px;font-weight:bold;color:#0f172a">${e(rating.question)}</p>`,
+        `<p style="margin:18px 0 8px;font-weight:bold;color:${BRAND.ink}">${e(rating.question)}</p>`,
         `<table role="presentation" style="border-collapse:separate;border-spacing:6px 0;margin:0 0 6px"><tr>`,
         ...rating.options.map(
           (o) =>
-            `<td><a href="${e(o.url)}" style="display:inline-block;min-width:40px;padding:10px 0;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;color:#0f172a;text-align:center;text-decoration:none;font-weight:bold;font-size:16px">${e(o.label)}</a></td>`
+            `<td><a href="${e(o.url)}" style="display:inline-block;min-width:40px;padding:10px 0;border-radius:10px;border:1px solid ${BRAND.border};background:${BRAND.white};color:${BRAND.ink};text-align:center;text-decoration:none;font-weight:bold;font-size:16px">${e(o.label)}</a></td>`
         ),
         `</tr></table>`,
       ].join("")
     : "";
   const how = howTo
     ? [
-        `<div style="margin:20px 0 0;padding:14px 16px;border-radius:10px;background:#f1f5f9">`,
-        `<p style="margin:0 0 8px;font-weight:bold;color:#0f172a">${e(c.howTitle)}</p>`,
-        ...c.how.map((p) => `<p style="margin:0 0 10px;font-size:14px;color:#334155">${e(p)}</p>`),
-        `<p style="margin:0;font-size:14px"><a href="${e(learnUrl)}" style="color:#1d4ed8">${e(c.howLink)}</a></p>`,
+        `<div style="margin:20px 0 0;padding:14px 16px;border-radius:12px;background:${BRAND.recessed};border:1px solid ${BRAND.border}">`,
+        `<p style="margin:0 0 8px;font-weight:bold;color:${BRAND.ink}">${e(c.howTitle)}</p>`,
+        ...c.how.map((p) => `<p style="margin:0 0 10px;font-size:14px;line-height:1.6;color:${BRAND.body}">${e(p)}</p>`),
+        `<p style="margin:0;font-size:14px"><a href="${e(learnUrl)}" style="color:${BRAND.cobalt}">${e(c.howLink)}</a></p>`,
         `</div>`,
       ].join("")
     : "";
+  const afterText = [
+    ...(rating ? [rating.question, ...rating.options.map((o) => `${o.label}: ${o.url}`)] : []),
+    ...(howTo ? [...(rating ? [""] : []), c.howTitle, ...c.how.flatMap((p) => ["", p]), "", `${c.howLink}: ${learnUrl}`] : []),
+  ].join("\n");
 
-  const html = [
-    `<div dir="${ar ? "rtl" : "ltr"}" lang="${locale}" style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#0f172a;text-align:${ar ? "right" : "left"};max-width:560px;margin:0 auto;padding:16px">`,
-    `<p style="margin:0 0 20px;padding:8px 12px;border-radius:8px;background:#0f172a;color:#ffffff;font-size:12px;letter-spacing:0.02em">${e(c.brandStrip)}</p>`,
-    `<h1 style="margin:0 0 14px;font-size:20px;line-height:1.35;color:#0f172a">${e(doc.headline)}</h1>`,
-    ...doc.paragraphs.map(para),
-    facts,
-    `<p style="margin:18px 0"><a href="${e(doc.cta.url)}" style="display:inline-block;padding:11px 20px;border-radius:10px;background:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:bold">${e(doc.cta.label)}</a></p>`,
-    ratingHtml,
-    how,
-    `<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0 14px"/>`,
-    `<p style="margin:0 0 8px;font-size:12px;color:#64748b">${e(c.help)}: <a href="${e(links.whatsappUrl)}" dir="ltr" style="color:#1d4ed8">${e(COMPANY_WHATSAPP.display)}</a></p>`,
-    `<p style="margin:0 0 4px;font-size:12px;color:#64748b">${e(reason)}</p>`,
-    unsub ? `<p style="margin:0;font-size:12px"><a href="${e(unsub)}" style="color:#64748b">${e(c.unsubscribe)}</a></p>` : "",
-    `</div>`,
-  ].join("");
-
+  const { html, text } = renderBrandedEmail({
+    locale,
+    title: doc.headline,
+    preheader: doc.paragraphs[0],
+    paragraphs: doc.paragraphs,
+    facts: doc.facts?.map((f) => ({ label: f.label, value: f.value, ltr: false })),
+    buttons: [{ label: doc.cta.label, url: doc.cta.url }],
+    afterHtml: ratingHtml + how,
+    afterText,
+    footer: { reason, unsubscribe: unsub ? { label: c.unsubscribe, url: unsub } : undefined },
+    siteUrl: links.siteUrl,
+  });
   return { subject: doc.subject, text, html };
 }

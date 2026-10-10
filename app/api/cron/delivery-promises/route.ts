@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { renderOwnerEmail } from "@/lib/email/lead-email";
 import { dateChangeEmail, type OrderForEmail } from "@/lib/store/order-email";
 import { reviewPromise } from "@/lib/store/delivery";
 import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
@@ -105,7 +106,10 @@ export async function GET(request: Request) {
     await sendEmail({
       to: [OWNER_EMAIL],
       subject: `Delivery dates: ${report.length} order(s) affected by lead-time changes`,
-      html: `<ul>${report.map((r) => `<li>${r.replace(/</g, "&lt;")}</li>`).join("")}</ul>`,
+      ...renderOwnerEmail({
+        title: "Delivery dates affected by lead-time changes",
+        paragraphs: report,
+      }),
     });
   }
   return Response.json({ checked: orders?.length ?? 0, affected: report });

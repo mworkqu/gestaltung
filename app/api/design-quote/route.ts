@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { normalizePhone } from "@/lib/phone";
+import { formatFileSize } from "@/lib/format-bytes";
+import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { renderLeadEmail } from "@/lib/email/lead-email";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CAD_BUCKET, QUOTE_BUCKET } from "@/lib/design/constants";
@@ -9,14 +12,9 @@ import { CAD_BUCKET, QUOTE_BUCKET } from "@/lib/design/constants";
 // homepage dropzone → /design/quote uploads the CAD file straight to Storage,
 // then posts the visitor's contact details, chosen method, and the storage
 // path here as JSON. Like /api/store-lead it is best-effort: it (1) saves the
-// lead to the inquiries table and (2) emails the owner via Resend, including a
-// short-lived signed download link for the uploaded file. We succeed if either
-// lands so a missing key never loses a lead.
-
-const LEAD_EMAIL = process.env.STORE_LEAD_EMAIL || "info@gestaltung360.com";
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM =
-  process.env.RESEND_FROM || "Gestaltung <onboarding@resend.dev>";
+// lead to the inquiries table and (2) emails the owner (branded lead alert,
+// lib/email/lead-email.ts) with a short-lived signed download link for the
+// uploaded file. We succeed if either lands so a missing key never loses a lead.
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 7; // 7 days
 
@@ -66,9 +64,22 @@ export async function POST(request: Request) {
   const projectId =
     typeof body.project_id === "string" && /^[0-9a-f-]{36}$/i.test(body.project_id) ? body.project_id : null;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gestaltung360.com";
-  const projectLine = projectId
-    ? `Project: ${projectId} (export: ${siteUrl}/api/admin/projects/${projectId}/export)\n`
-    : "";
+
+  // The id lives in the stored message (the admin card finds the project from
+  // it); the card and the email show the project name, never the id.
+  let projectName: string | null = null;
+  if (projectId) {
+    try {
+      const svc = createServiceClient();
+      if (svc) {
+        const { data } = await svc.from("projects").select("name").eq("id", projectId).maybeSingle();
+        projectName = (data?.name as string | undefined) ?? null;
+      }
+    } catch {
+      projectName = null;
+    }
+  }
+  const projectLine = projectId ? `Project: ${projectName ?? ""} — ${siteUrl}/${locale}/projects/${projectId}\n` : "";
 
   if (!email && !phone) {
     return NextResponse.json({ error: "missing_contact" }, { status: 422 });
@@ -96,12 +107,14 @@ export async function POST(request: Request) {
     }
   }
 
+  // The stored message is what the admin card (lib/admin/lead-parse.ts) reads.
+  // "Storage:" lets the dashboard mint a fresh download link after the 7-day one
+  // in the email has expired. Sizes are real KB/MB, never "0.00 MB".
+  const sizeLabel = formatFileSize(fileSize);
   const fileLine = fileName
-    ? `File: ${fileName}${fileSize ? ` (${(fileSize / 1024 / 1024).toFixed(2)} MB)` : ""}${
+    ? `File: ${fileName}${sizeLabel ? ` (${sizeLabel})` : ""}${
         storagePath
-          ? downloadUrl
-            ? `\nDownload (valid 7 days): ${downloadUrl}`
-            : `\nStored at: ${storagePath}`
+          ? `\nStorage: ${bucket}/${storagePath}${downloadUrl ? `\nDownload (valid 7 days): ${downloadUrl}` : ""}`
           : " — upload failed, awaiting the file from the customer"
       }`
     : "File: none provided";
@@ -140,36 +153,31 @@ export async function POST(request: Request) {
     }
   }
 
-  // 2) Email the owner with the details + signed download link.
-  if (RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: RESEND_FROM,
-          to: [LEAD_EMAIL],
-          reply_to: email || LEAD_EMAIL,
-          subject: `New quote request — ${name} (${methodLabel})`,
-          text:
-            `New custom-manufacturing quote request from the Gestaltung website.\n\n` +
-            `Name: ${name}\n` +
-            `Email: ${email ?? "—"}\n` +
-            `Phone / WhatsApp: ${phone || "—"}\n` +
-            `Method: ${methodLabel}\n` +
-            `${fileLine}\n` +
-            projectLine +
-            `Language: ${locale}\n` +
-            (notes ? `\nNotes:\n${notes}\n` : ""),
-        }),
-      });
-      emailed = res.ok;
-    } catch {
-      emailed = false;
-    }
+  // 2) Email the owner: the branded lead alert with a Download button. The
+  // plain-text part carries the same fields with the link spelled out.
+  try {
+    const mail = renderLeadEmail({
+      title: "New quote request",
+      name,
+      phone,
+      email,
+      method: methodLabel,
+      file: fileName ? { name: fileName, sizeBytes: fileSize || undefined, failed: !storagePath } : null,
+      downloadUrl,
+      projectName,
+      language: locale,
+      notes: notes ? { label: "Notes", text: notes } : null,
+      siteUrl,
+    });
+    emailed = await sendEmail({
+      to: [OWNER_EMAIL],
+      replyTo: email || OWNER_EMAIL,
+      subject: `New quote request — ${name} (${methodLabel})`,
+      html: mail.html,
+      text: mail.text,
+    });
+  } catch {
+    emailed = false;
   }
 
   if (!saved && !emailed) {

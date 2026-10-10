@@ -1,3 +1,4 @@
+import { formatPhoneDisplay } from "@/lib/phone";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ClipboardList, ArrowLeft } from "lucide-react";
 
@@ -126,7 +127,7 @@ export default async function PartsOrdersPage({
                       {o.customer_name}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-mutedtext" dir="ltr">
-                      {o.customer_phone}
+                      {formatPhoneDisplay(o.customer_phone)}
                     </td>
                     <td className="px-4 py-3 text-body">{areaLabel(o.delivery_area)}</td>
                     <td className="px-4 py-3 text-end tabular-nums text-body">

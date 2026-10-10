@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { isAuthorizedCron } from "@/lib/notifications/links";
-import { escapeHtml, OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { renderOwnerEmail } from "@/lib/email/lead-email";
 import {
   CLEANUP_KEY,
   parseCleanupResult,
@@ -69,8 +70,10 @@ export async function GET(request: Request) {
     emailed = await sendEmail({
       to: [OWNER_EMAIL],
       subject: `Guest cleanup: ${result.deleted} account${result.deleted === 1 ? "" : "s"} deleted`,
-      text: `${line}\n\nRun log: Dashboard → AI usage & pricing → Guest account cleanup.\n`,
-      html: `<p>${escapeHtml(line)}</p><p>Run log: Dashboard → AI usage &amp; pricing → Guest account cleanup.</p>`,
+      ...renderOwnerEmail({
+        title: "Guest account cleanup",
+        paragraphs: [line, "Run log: Dashboard → AI usage & pricing → Guest account cleanup."],
+      }),
     });
   }
 

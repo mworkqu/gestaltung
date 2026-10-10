@@ -9,7 +9,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { escapeHtml, OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { renderOwnerEmail } from "@/lib/email/lead-email";
+import { dataTable } from "@/lib/email/brand-layout";
 import { digikeyConfigured, digikeyPart } from "@/lib/sourcing/adapters/digikey";
 import { mouserConfigured, mouserPart } from "@/lib/sourcing/adapters/mouser";
 import type { SupplierProduct } from "@/lib/sourcing/types";
@@ -146,24 +148,38 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       await sendEmail({
         to: [OWNER_EMAIL],
         subject: `${code === "mouser" ? "Mouser" : "DigiKey"} refresh stopped`,
-        html: `<p>The daily refresh stopped (${escapeHtml(error ?? "")}) after ${requests} lookups and didn't retry. Offers not reached keep their last numbers and go first tomorrow.</p>`,
+        ...renderOwnerEmail({
+          title: `${code === "mouser" ? "Mouser" : "DigiKey"} refresh stopped`,
+          paragraphs: [
+            `The daily refresh stopped (${error ?? ""}) after ${requests} lookups and didn't retry. Offers not reached keep their last numbers and go first tomorrow.`,
+          ],
+        }),
       });
     }
   }
 
   if (allChanges.length) {
-    const rows = allChanges
-      .map(
-        (c) =>
-          `<tr><td>${c.supplier === "mouser" ? "Mouser" : "DigiKey"}</td><td>${escapeHtml(c.partName)}</td><td>${escapeHtml(c.sku)}</td><td>${escapeHtml(
-            c.field.replace(/_/g, " ")
-          )}</td><td>${escapeHtml(String(c.from ?? "—"))} → <b>${escapeHtml(String(c.to ?? "—"))}</b></td></tr>`
-      )
-      .join("");
+    const table = dataTable(
+      ["Supplier", "Product", "Their SKU", "What", "Change"],
+      allChanges.map((c) => [
+        c.supplier === "mouser" ? "Mouser" : "DigiKey",
+        c.partName,
+        c.sku,
+        c.field.replace(/_/g, " "),
+        `${String(c.from ?? "—")} → ${String(c.to ?? "—")}`,
+      ])
+    );
+    const mail = renderOwnerEmail({
+      title: `Mouser/DigiKey refresh: ${allChanges.length} change(s)`,
+      bodyHtml: table.html,
+      bodyText: table.text,
+      paragraphs: ["Applied automatically. Products below your margin floor show a red ⚠ in Dashboard → Store."],
+    });
     await sendEmail({
       to: [OWNER_EMAIL],
       subject: `Mouser/DigiKey refresh: ${allChanges.length} change(s)`,
-      html: `<table cellpadding="4" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px"><tr><th align="left">Supplier</th><th align="left">Product</th><th align="left">Their SKU</th><th align="left">What</th><th align="left">Change</th></tr>${rows}</table><p>Applied automatically. Products below your margin floor show a red ⚠ in Dashboard → Store.</p>`,
+      html: mail.html,
+      text: mail.text,
     });
   }
   return summary;

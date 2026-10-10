@@ -4,6 +4,8 @@
 // doesn't know the customer's language.
 
 import { escapeHtml } from "@/lib/email";
+import { renderBrandedEmail } from "@/lib/email/brand-layout";
+import { htmlToText } from "@/lib/email/html-to-text";
 import { formatDeliveryDate } from "@/lib/store/delivery";
 import { COMPANY, PAYMENT_DETAILS } from "@/lib/company";
 import { splitBidiRuns } from "@/lib/text/bidi";
@@ -72,6 +74,12 @@ const qar = (n: number) => `QAR ${Number(n).toFixed(2)}`;
 const qarAr = (n: number) => `<bdi dir="rtl">${Number(n).toFixed(2)} ر.ق</bdi>`;
 const BANK_AR = `مصرف قطر الإسلامي الدولي (<bdi dir="ltr">QIIB</bdi>)`;
 const e = escapeHtml;
+/** The body goes inside the shared branded shell (logo, cobalt, RTL, text part). */
+function shell(locale: "en" | "ar", title: string, body: string) {
+  const { html, text } = renderBrandedEmail({ locale, title, bodyHtml: body, bodyText: htmlToText(body) });
+  return { html, text };
+}
+
 /** Escaped text for the Arabic half: Latin / digit runs (part numbers, names) are isolated left-to-right. */
 const bidiHtml = (text: string) =>
   splitBidiRuns(text)
@@ -175,19 +183,20 @@ ${Number(o.handling_fee_qar) > 0 ? `<tr><td>رسوم التجهيز</td><td></td
 ${paymentBlock(o, "ar")}
 <p>${o.promised_date ? "إذا تغيّر هذا الموعد فسنراسلك قبله، لا بعده. " : ""}سنؤكد الدفع والتوصيل عبر واتساب.</p>
 </div>`;
-  const html = `
-<div style="font-family:Arial,sans-serif;font-size:14px;color:#111">
+  const inner = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#475569">
 ${locale === "ar" ? `${arBlock}
 <hr/>
 ${enBlock}` : `${enBlock}
 <hr/>
 ${arBlock}`}
 </div>`;
+  const { html, text } = shell(locale, locale === "ar" ? `طلبك ${ref}` : `Order ${ref}`, inner);
   const when = o.promised_date ? `arrives by ${formatDeliveryDate(o.promised_date, "en")}` : "delivery date to be confirmed";
   const whenAr = o.promised_date ? `يصل بحلول ${formatDeliveryDate(o.promised_date, "ar")}` : "الموعد يُؤكَّد لاحقاً";
   return {
     subject: locale === "ar" ? `طلبك ${ref} — ${whenAr} | Order ${ref}` : `Order ${ref} — ${when} | طلبك ${ref}`,
     html,
+    text,
   };
 }
 
@@ -214,8 +223,11 @@ export function dateChangeEmail(
     : later
       ? `تغيّرت مدة توريد ${listAr}. كان موعد طلبك ${formatDeliveryDate(oldDate, "ar")}؛ والموعد الجديد <b>${formatDeliveryDate(newDate, "ar")}</b>. راسلنا إن أردت إلغاء الطلب أو تعديله.`
       : `تغيّرت مدة توريد ${listAr}. موعد التوصيل <b>${formatDeliveryDate(oldDate, "ar")}</b> ما زال قائماً.`;
+  const inner = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#475569"><p>Hi ${e(o.customer_name)},</p><p>${en}</p>${note("en")}<hr/><div dir="rtl"><p>${ar}</p>${note("ar")}</div></div>`;
+  const { html, text } = shell("en", `Order ${ref}`, inner);
   return {
     subject: later ? `Order ${ref}: new delivery date | موعد جديد لطلبك` : `Order ${ref}: delivery date unchanged | موعد طلبك`,
-    html: `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111"><p>Hi ${e(o.customer_name)},</p><p>${en}</p>${note("en")}<hr/><div dir="rtl"><p>${ar}</p>${note("ar")}</div></div>`,
+    html,
+    text,
   };
 }

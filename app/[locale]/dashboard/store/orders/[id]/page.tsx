@@ -1,3 +1,4 @@
+import { formatPhoneDisplay } from "@/lib/phone";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowLeft } from "lucide-react";
@@ -206,7 +207,7 @@ export default async function OrderDetailPage({
             {field(
               t("colPhone"),
               <span dir="ltr" className="font-mono text-xs">
-                {order.customer_phone}
+                {formatPhoneDisplay(order.customer_phone)}
               </span>
             )}
             {order.customer_email &&

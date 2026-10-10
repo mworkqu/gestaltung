@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { normalizePhone } from "@/lib/phone";
+import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { renderLeadEmail } from "@/lib/email/lead-email";
+import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { createClient } from "@/lib/supabase/server";
 import { readTurnstileToken } from "@/lib/turnstile";
 import { checkTurnstile, turnstileEnforced } from "@/lib/turnstile-server";
@@ -14,11 +17,6 @@ import { checkTurnstile, turnstileEnforced } from "@/lib/turnstile-server";
 // info@gestaltung360.com. Both are best-effort — we succeed if either lands, so
 // a missing email key never loses a lead. Email goes out via Resend's REST API
 // (free tier, no SDK).
-
-const LEAD_EMAIL = process.env.STORE_LEAD_EMAIL || "info@gestaltung360.com";
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM =
-  process.env.RESEND_FROM || "Gestaltung <onboarding@resend.dev>";
 
 // Per-case labelling. Add a new case here + post its `source` from the form.
 const SOURCES: Record<
@@ -195,33 +193,30 @@ export async function POST(request: Request) {
     }
   }
 
-  // 2) Email the owner (skipped gracefully if the key isn't configured yet).
-  if (RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: RESEND_FROM,
-          to: [LEAD_EMAIL],
-          reply_to: email || LEAD_EMAIL,
-          subject: src.subject(name, { count: items.length }) + (contactKind?.subject ?? ""),
-          text:
-            `New ${src.label.toLowerCase()} from the Gestaltung website.\n\n` +
-            `Name: ${name}\n` +
-            `Phone / WhatsApp: ${phone}\n` +
-            `Email: ${email ?? "—"}\n` +
-            `Language: ${locale}\n\n` +
-            `Message:\n${message}\n`,
-        }),
-      });
-      emailed = res.ok;
-    } catch {
-      emailed = false;
-    }
+  // 2) Email the owner: the branded lead alert (lib/email/lead-email.ts). The
+  // project id and links stay out of the visible text; the card shows the name.
+  try {
+    const parsed = parseLeadMessage(message);
+    const mail = renderLeadEmail({
+      title: `New ${src.label.toLowerCase()}`,
+      name,
+      phone,
+      email,
+      type: contactKind?.tag ?? null,
+      projectName: parsed.projectName,
+      language: locale,
+      notes: { label: "Message", text: [parsed.body, parsed.notes].filter(Boolean).join("\n\n") },
+      siteUrl: new URL(request.url).origin,
+    });
+    emailed = await sendEmail({
+      to: [OWNER_EMAIL],
+      replyTo: email || OWNER_EMAIL,
+      subject: src.subject(name, { count: items.length }) + (contactKind?.subject ?? ""),
+      html: mail.html,
+      text: mail.text,
+    });
+  } catch {
+    emailed = false;
   }
 
   if (!saved && !emailed) {

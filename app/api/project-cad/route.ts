@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { formatFileSize } from "@/lib/format-bytes";
+import { OWNER_EMAIL, sendEmail } from "@/lib/email";
+import { renderLeadEmail } from "@/lib/email/lead-email";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CAD_BUCKET } from "@/lib/design/constants";
@@ -13,11 +16,6 @@ import { CAD_BUCKET } from "@/lib/design/constants";
 // Best-effort, like /api/store-lead and /api/design-quote: it reports success
 // if EITHER the row saved or the email sent, so a missing key never loses a
 // request.
-
-const LEAD_EMAIL = process.env.STORE_LEAD_EMAIL || "info@gestaltung360.com";
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM =
-  process.env.RESEND_FROM || "Gestaltung <onboarding@resend.dev>";
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 7; // 7 days
 
@@ -86,16 +84,17 @@ export async function POST(request: Request) {
   }
 
   const isGuest = user.is_anonymous === true;
-  const sizeLabel = fileSize ? ` (${(fileSize / 1024 / 1024).toFixed(2)} MB)` : "";
+  const sizeLabel = formatFileSize(fileSize);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gestaltung360.com";
 
+  // Stored message (read by lib/admin/lead-parse.ts): the project is a link so
+  // the dashboard can find it; Storage lets it mint a fresh download link.
   const message =
     `CAD file attached to a project — quote by hand.\n` +
-    `Project: ${project.name}\n` +
-    `Project ID: ${project.id}\n` +
-    `File: ${fileName}${sizeLabel}\n` +
-    (downloadUrl
-      ? `Download (valid 7 days): ${downloadUrl}\n`
-      : `Stored at: ${storagePath}\n`) +
+    `Project: ${project.name} — ${siteUrl}/${locale}/projects/${project.id}\n` +
+    `File: ${fileName}${sizeLabel ? ` (${sizeLabel})` : ""}\n` +
+    `Storage: ${CAD_BUCKET}/${storagePath}\n` +
+    (downloadUrl ? `Download (valid 7 days): ${downloadUrl}\n` : "") +
     `Customer: ${user.email ?? (isGuest ? "guest — no account yet" : "—")}\n`;
 
   let saved = false;
@@ -115,25 +114,25 @@ export async function POST(request: Request) {
     saved = false;
   }
 
-  if (RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: RESEND_FROM,
-          to: LEAD_EMAIL,
-          subject: `CAD file on project "${project.name}"`,
-          text: message,
-        }),
-      });
-      emailed = res.ok;
-    } catch {
-      emailed = false;
-    }
+  try {
+    const mail = renderLeadEmail({
+      title: "CAD file added to a project",
+      name: user.email ?? "Project owner",
+      email: user.email ?? null,
+      file: { name: fileName, sizeBytes: fileSize || undefined },
+      downloadUrl,
+      projectName: project.name as string,
+      language: locale,
+      siteUrl,
+    });
+    emailed = await sendEmail({
+      to: [OWNER_EMAIL],
+      subject: `CAD file on project "${project.name}"`,
+      html: mail.html,
+      text: mail.text,
+    });
+  } catch {
+    emailed = false;
   }
 
   if (!saved && !emailed) {

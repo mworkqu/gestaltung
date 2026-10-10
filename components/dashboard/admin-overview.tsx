@@ -1,3 +1,4 @@
+import { stripLinksAndIds } from "@/lib/admin/lead-parse";
 import { getTranslations } from "next-intl/server";
 import {
   ArrowRight,
@@ -266,7 +267,7 @@ export async function AdminOverview({ locale }: { locale: string }) {
                     <span className="truncate text-sm font-medium text-heading">{l.name}</span>
                     <span className="shrink-0 text-[11px] text-mutedtext">{when(l.created_at as string)}</span>
                   </div>
-                  <p className="truncate text-xs text-mutedtext">{String(l.message ?? "").split("\n")[0]}</p>
+                  <p className="truncate text-xs text-mutedtext">{stripLinksAndIds(String(l.message ?? "").split("\n")[0])}</p>
                   {l.status === "new" && <span className="text-[10px] font-semibold text-amber-700">{t("statusNew")}</span>}
                 </li>
               ))}

@@ -6,7 +6,7 @@ import { projectStatus } from "@/lib/admin/project-export";
 import { ProjectExportButtons } from "@/components/admin/project-export-buttons";
 import { TestBadge, TestDataToggle, showsTestData } from "@/components/admin/test-data-toggle";
 import { cn } from "@/lib/utils";
-import { toWhatsAppDigits } from "@/lib/phone";
+import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
 
 // Every project on the platform, for diagnostics. super_admin only (layout +
 // RLS). Owner, created, status and last activity per project; filter by
@@ -205,11 +205,11 @@ export default async function AdminProjectsPage({
                         className="block text-[11.5px] font-medium text-cobalt hover:underline"
                         dir="ltr"
                       >
-                        {ownerPhone(p.user_id)}
+                        {formatPhoneDisplay(ownerPhone(p.user_id))}
                       </a>
                     ) : (
                       <span className="block text-[11.5px] text-mutedtext" dir="ltr">
-                        {ownerPhone(p.user_id)}
+                        {formatPhoneDisplay(ownerPhone(p.user_id))}
                       </span>
                     ))}
                   <span className="block font-mono text-[10px] text-faint">{p.user_id.slice(0, 8)}</span>
