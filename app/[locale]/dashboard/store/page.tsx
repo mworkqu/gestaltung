@@ -11,6 +11,9 @@ import { categoryLabel } from "@/lib/store/category-label";
 import { StockBadge } from "@/components/parts/stock-badge";
 import { PublishedToggle } from "@/components/parts/published-toggle";
 import { DeletePartButton } from "@/components/parts/delete-part-button";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+import { ListSearch } from "@/components/dashboard/list-search";
+import { matchesQuery, paginate, parsePage } from "@/lib/admin/pagination";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -26,10 +29,13 @@ export default async function PartsCatalogManager({
     published?: string;
     merged?: string;
     review?: string;
+    q?: string;
+    page?: string;
   }>;
 }) {
   const { locale } = await params;
-  const { category, stock, published, merged, review } = await searchParams;
+  const sp = await searchParams;
+  const { category, stock, published, merged, review, q } = sp;
   const showMerged = merged === "1";
   const reviewOnly = review === "1";
   setRequestLocale(locale);
@@ -61,8 +67,11 @@ export default async function PartsCatalogManager({
       (!category || p.category === category || p.store_category === category) &&
       (!stock || p.stock_status === stock) &&
       (!published ||
-        (published === "published" ? p.is_published : !p.is_published))
+        (published === "published" ? p.is_published : !p.is_published)) &&
+      matchesQuery(q, [p.name, p.name_ar, p.sku])
   );
+  // D2: 100 rows per page; ?page= sits next to the search and filters in the URL.
+  const paged = paginate(parts, parsePage(sp.page));
 
   return (
     <div>
@@ -157,7 +166,16 @@ export default async function PartsCatalogManager({
       )}
 
       {!error && all.length > 0 && (
-        <div className="neu mt-8 overflow-x-auto p-2">
+        <ListSearch
+          className="mt-8"
+          q={q}
+          placeholder="listSearchProducts"
+          keep={{ category, stock, published, merged, review }}
+        />
+      )}
+
+      {!error && all.length > 0 && (
+        <div className="neu mt-4 overflow-x-auto p-2">
           <table className="w-full min-w-[920px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-borderstrong/60">
@@ -179,7 +197,7 @@ export default async function PartsCatalogManager({
               </tr>
             </thead>
             <tbody>
-              {parts.map((p) => (
+              {paged.items.map((p) => (
                 <tr
                   key={p.id}
                   className="border-b border-borderstrong/40 last:border-0 hover:bg-panel/50"
@@ -253,6 +271,8 @@ export default async function PartsCatalogManager({
           </table>
         </div>
       )}
+
+      {!error && <ListPagination className="mt-4" pathname="/dashboard/store" params={sp} paged={paged} />}
     </div>
   );
 }
