@@ -4338,9 +4338,9 @@
     "views": {
       "tabsLabel": "طرق عرض توصيلاتك",
       "tabWiring": "التوصيل",
-      "tab3d": "ثلاثي الأبعاد",
+      "tab3d": "3D",
       "tabSchematic": "المخطط",
-      "tabPins": "قائمة الأطراف",
+      "tabPins": "الأطراف",
       "wireLabel": "{from} ← {to} ({colour})",
       "clearSelection": "إلغاء",
       "showInCode": "اعرضه في الكود",

@@ -25,6 +25,9 @@ const WireSnippet = dynamic(() => import("./WireSnippet"), {
 type Open = { line: number; id: string; top?: number; bottom?: number; left: number; width: number; via: "hover" | "click" };
 
 const PREVIEW_W = 320;
+const PREVIEW_H = 270;
+/** Fallback height of the sticky bar when it cannot be measured. */
+const BAR_RESERVE = 96;
 
 /** The browser fakes a pointer move when the page scrolls under a resting cursor; only real moves open a preview. */
 const still = (e: React.PointerEvent) => e.movementX === 0 && e.movementY === 0;
@@ -75,9 +78,20 @@ export function CodeLines({
     const width = Math.min(PREVIEW_W, vw - 24);
     const left = Math.max(12, Math.min(r.left + 24, vw - width - 12));
     const below = r.bottom + 6;
-    // Below the line when it fits (~270 px), else above it (anchored by its bottom edge).
-    const above = below + 270 > window.innerHeight && r.top > 270;
-    setOpen(above ? { line, id, bottom: window.innerHeight - r.top + 6, left, width, via } : { line, id, top: below, left, width, via });
+    // The sticky "Get it made" bar sits over the bottom of the screen: never place the preview under it.
+    const bar = document.querySelector<HTMLElement>('[data-testid="studio-get-it-made-bar"]');
+    const barTop = bar ? bar.getBoundingClientRect().top : window.innerHeight - BAR_RESERVE;
+    const limit = Math.min(window.innerHeight - 12, barTop - 8);
+    // Below the line when it fits (~270 px), else above it (anchored by its bottom edge), else pinned just above the bar.
+    const fitsBelow = below + PREVIEW_H <= limit;
+    const fitsAbove = r.top - 6 - PREVIEW_H >= 12;
+    setOpen(
+      fitsBelow
+        ? { line, id, top: below, left, width, via }
+        : fitsAbove
+          ? { line, id, bottom: window.innerHeight - r.top + 6, left, width, via }
+          : { line, id, top: Math.max(12, limit - PREVIEW_H), left, width, via },
+    );
   }, []);
 
   // Keep the preview next to its line when the page or the code scrolls; close when it scrolls away.
@@ -129,7 +143,7 @@ export function CodeLines({
         data-testid="studio-code"
         aria-label={label}
         tabIndex={0}
-        className="max-h-[420px] overflow-auto rounded-2xl bg-[#1c2434] py-4 text-start font-mono text-xs leading-relaxed text-[#e7ecf3]"
+        className="mb-24 max-h-[420px] overflow-auto rounded-2xl bg-[#1c2434] py-4 text-start font-mono text-xs leading-relaxed text-[#e7ecf3]"
       >
         <code className="block min-w-max">
           {lines.map((text, i) => {

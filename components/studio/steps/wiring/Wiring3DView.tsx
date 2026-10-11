@@ -716,13 +716,14 @@ function CameraRig({ layout, apart, reducedMotion }: { layout: MatLayout; apart:
       camera.near = Math.max(0.5, r / 50);
       camera.far = r * 60;
       camera.updateProjectionMatrix();
-      // Keep the user's angle after the first fit; fit the mat's real corners (~88 % × 80 % of the view).
+      // Keep the user's angle after the first fit; fit the parts' corners (~94 % × 88 % of the view).
       // A wide mat in a tall (phone) view is seen from its side, so its long edge runs up the screen.
       const portrait = (camera.aspect || 1) < 0.8 && maxX - minX > (maxY - minY) * 1.2;
       const home = portrait ? HOME_DIR_PORTRAIT : HOME_DIR;
       const dir = first.current ? home.clone() : camera.position.clone().sub(c.target).normalize();
       if (!Number.isFinite(dir.x) || dir.lengthSq() < 0.5) dir.copy(home);
-      const m = MAT_MARGIN * 0.6;
+      // Fit the parts (not the whole mat): the mat runs on past the frame edge.
+      const m = 4;
       const pts: THREE.Vector3[] = [];
       for (const x of [minX - m, maxX + m]) for (const y of [minY - m, maxY + m]) for (const z of [0, top]) pts.push(new THREE.Vector3(x, z, -y));
       const pos0 = camera.position.clone();
@@ -739,7 +740,7 @@ function CameraRig({ layout, apart, reducedMotion }: { layout: MatLayout; apart:
           mx = Math.max(mx, Math.abs(v.x));
           my = Math.max(my, Math.abs(v.y));
         }
-        const k = Math.max(mx / 0.88, my / 0.8);
+        const k = Math.max(mx / 0.94, my / 0.88);
         if (!Number.isFinite(k) || Math.abs(k - 1) < 0.01) break;
         dist *= k;
       }

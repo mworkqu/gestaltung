@@ -137,7 +137,7 @@ function Tabs() {
             tabIndex={on ? 0 : -1}
             onClick={() => setTab(id)}
             data-testid={`studio-wiring-tab-${id}`}
-            className="min-h-11 truncate rounded-full px-2 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="min-h-11 rounded-full px-1 text-center text-xs font-semibold leading-tight sm:px-2 sm:text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
             style={on ? { background: accent.base, color: "#1c2434" } : { color: "#475569" }}
           >
             {t(TAB_KEY[id])}

@@ -7,7 +7,8 @@
 // generate ourselves (renderSchematicSVG escapes every text), shown in a
 // zoomable, left-to-right frame, plus the summary line and the plain checks.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 
@@ -17,15 +18,30 @@ import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { downloadBlob, exportSVG } from "@/lib/studio/download";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
-import { renderSchematicSVG, summaryLine } from "@/lib/studio/schematic";
+type Schematic = typeof import("@/lib/studio/schematic");
 import type { StudioDoc } from "@/lib/studio/schema";
 import { fileSlug } from "@/lib/studio/client/steps";
 import type { StudioCtx } from "../StudioShell";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { accessReason, problemKey } from "./problem";
-import { WiringViews } from "./wiring/WiringViews";
 
 const accent = STEP_ACCENT.wiring;
+
+// The four views (and the wire list behind them) load on demand: the Studio's first load stays small.
+const WiringViews = dynamic(() => import("./wiring/WiringViews").then((m) => m.WiringViews), {
+  ssr: false,
+  loading: () => <WiringViewsSkeleton />,
+});
+
+/** Same size as the tab bar + drawing frame, so nothing jumps when the views arrive. */
+function WiringViewsSkeleton() {
+  return (
+    <div className="space-y-3" role="status" aria-busy="true" data-testid="studio-wiring-views-skeleton">
+      <Bar className="h-[52px] w-full rounded-full" />
+      <Bar className="h-[min(60dvh,560px)] w-full rounded-[20px]" />
+    </div>
+  );
+}
 
 export function WiringStep({
   ctx,
@@ -63,21 +79,35 @@ export function WiringStep({
 
   const drawn = doc.checks.length > 0 && doc.netlist.nets.length > 0;
 
+  // The schematic drawing code (and the wire list it colours from) loads once there is a circuit to draw.
+  const [sch, setSch] = useState<Schematic | null>(null);
+  useEffect(() => {
+    if (!drawn || sch) return;
+    let live = true;
+    void import("@/lib/studio/schematic").then((m) => {
+      if (live) setSch(m);
+    });
+    return () => {
+      live = false;
+    };
+  }, [drawn, sch]);
+
   const svg = useMemo(() => {
-    if (!drawn) return "";
+    if (!drawn || !sch) return "";
     try {
-      return renderSchematicSVG(doc.components, doc.netlist.nets, getPart, { locale, title: doc.spec.name });
+      return sch.renderSchematicSVG(doc.components, doc.netlist.nets, getPart, { locale, title: doc.spec.name });
     } catch {
       return "";
     }
-  }, [drawn, doc.components, doc.netlist.nets, doc.spec.name, locale, getPart]);
+  }, [drawn, sch, doc.components, doc.netlist.nets, doc.spec.name, locale, getPart]);
   const summary = useMemo(() => {
+    if (!sch) return "";
     try {
-      return summaryLine(doc.spec, doc.components, getPart, locale);
+      return sch.summaryLine(doc.spec, doc.components, getPart, locale);
     } catch {
       return "";
     }
-  }, [doc.spec, doc.components, locale, getPart]);
+  }, [sch, doc.spec, doc.components, locale, getPart]);
 
   async function draw() {
     setProblem(null);
@@ -148,7 +178,7 @@ export function WiringStep({
         </div>
       )}
 
-      {!drawn && busy && <WiringSkeleton label={t("wiringDrawing")} />}
+      {((!drawn && busy) || (drawn && !sch)) && <WiringSkeleton label={t("wiringDrawing")} />}
 
       {drawn && svg && (
         <div className="space-y-3 motion-safe:animate-rise">
