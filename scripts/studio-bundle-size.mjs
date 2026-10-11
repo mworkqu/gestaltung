@@ -5,14 +5,19 @@
 //
 // Reads .next/app-build-manifest.json (initial chunks per app route) and
 // .next/react-loadable-manifest.json (next/dynamic + import() chunks, keyed by
-// the importing file). Counted:
-//   initial  = chunks of /[locale]/projects/[id]/studio/page not on the base page
-//   lazy     = chunks behind dynamic imports from components/studio/** or lib/studio/**
-//              that are not already initial (the 3D viewer, PrintStep's builds, STL export…)
-//   worker   = the geometry Web Worker bundle(s) (own file, fetched by the worker only)
-// Budget = initial + lazy (what a visitor's main thread downloads to see the Studio).
-// The worker is reported separately (it runs off the main thread, fetched when the
-// first case is built). Exit code 1 when over budget.
+// the importing file). Three buckets (owner 2026-10-11: "load the engine only if the
+// user is heading to the CAD"):
+//   first load        = chunks of /[locale]/projects/[id]/studio/page not on the base page
+//   lazy before CAD   = chunks behind dynamic imports from components/studio/** or
+//                       lib/studio/** that a visitor may fetch WITHOUT the CAD (step
+//                       flows, the parts picture client, the worker transport…)
+//   lazy after CAD    = chunks only the 3D engine path fetches: the viewers (three.js +
+//                       R3F + drei), the template enclosure fallback (3D since P5-13), its
+//                       print builds and STL export, the unlocked product's Print step
+//   worker            = the geometry Web Worker bundle(s) (fetched by the worker only;
+//                       it starts on the Parts step, never on Idea)
+// Budget = first load + lazy before CAD (what a visitor's main thread downloads before
+// "Create my CAD"). After-CAD and worker are reported apart. Exit code 1 when over budget.
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -73,15 +78,27 @@ for (const [key, entry] of Object.entries(loadable)) {
 // product-job → manifold-loader → manifold-3d on the first product build) run off the main
 // thread: they belong to the worker table, not to the budget.
 const FALLBACK_ONLY = /\/geometry\/client\.ts -> \.\/(job|product-job)$/;
-// (P5-16b: product-job also loads product-render (three.js offscreen pictures) and, on fixture pages only, product-mock.)
-const WORKER_ONLY = /\/geometry\/(studio-geometry\.worker|product-job|product-preview|product-render|product-mock|manifold-loader|product-kernel)\.ts -> /;
+// (P5-16b: product-job also loads product-render (three.js offscreen pictures) and, on fixture pages only, product-mock;
+// 2026-10-11: parts-render draws the Parts step picture, its STLLoader import included.)
+const WORKER_ONLY = /\/geometry\/(studio-geometry\.worker|product-job|product-preview|product-render|parts-render|product-mock|manifold-loader|product-kernel)\.ts -> /;
 // Test-fixture-only main-thread imports (the e2e mock's Engineer view): never fetched on the live site.
 const FIXTURE_ONLY = /\/client\/mock\.ts -> /;
-const lazy = [];
+// The 3D engine path (main thread): the viewers and everything they import, the template
+// enclosure flow (EnclosureStep -> ./EnclosureTemplate and what it loads), the template
+// Print builds / STL export, and PrintProduct (only after "Create my CAD").
+const AFTER_CAD = [
+  /^components\/studio\/viewer\/(?!ViewerLazy|ProductViewerLazy)/, // imports made inside the viewer chunks
+  /-> \.\/(Viewer|ProductViewer|EnclosureTemplate|PrintProduct)$/,
+  /^components\/studio\/steps\/(EnclosureTemplate|PrintStep)\.tsx -> @\/lib\/studio\/(geometry\/client|export)$/,
+];
+const afterCad = (k) => AFTER_CAD.some((re) => re.test(k));
+const lazy = []; // before CAD
+const lazyAfter = [];
 const fallback = [];
 for (const [f, keys] of lazyBy) {
   const list = [...keys];
-  if (!list.every((k) => FALLBACK_ONLY.test(k) || WORKER_ONLY.test(k) || FIXTURE_ONLY.test(k))) lazy.push(f);
+  const main = list.filter((k) => !(FALLBACK_ONLY.test(k) || WORKER_ONLY.test(k) || FIXTURE_ONLY.test(k)));
+  if (main.length) (main.every(afterCad) ? lazyAfter : lazy).push(f);
   else if (list.some((k) => FALLBACK_ONLY.test(k))) fallback.push(f);
   // else: worker-only — listed in the worker table below (found through the worker's runtime)
 }
@@ -108,7 +125,12 @@ for (const f of readdirSync(chunkDir)) {
     if (existsSync(path.join(NEXT, file))) workers.add(file);
   }
 }
-const shared = (f) => (lazy.includes(f) || routeFiles.has(f) ? "  (shared with the main thread: one download)" : "");
+const shared = (f) =>
+  lazy.includes(f) || routeFiles.has(f)
+    ? "  (shared with the main thread before CAD: one download)"
+    : lazyAfter.includes(f)
+      ? "  (shared with the 3D engine after CAD)"
+      : "";
 
 function table(title, files, note) {
   const rows = files.map((f) => ({ f, ...gz(f) })).sort((a, b) => b.gz - a.gz);
@@ -120,15 +142,20 @@ function table(title, files, note) {
 
 console.log(`Studio route: ${ROUTE}\nBase page:    ${BASE}`);
 const tBase = table("Base page JS", [...baseFiles]);
-const tInit = table("Studio initial JS beyond the base page", initial);
-const tLazy = table("Studio lazy JS (dynamic imports from studio code)", lazy, (f) => `  ← ${[...lazyBy.get(f)].map((k) => k.split(" -> ")[1]).join(", ")}`);
+const from = (f) => `  ← ${[...lazyBy.get(f)].map((k) => k.split(" -> ")[1]).join(", ")}`;
+const tInit = table("1. First load: Studio initial JS beyond the base page", initial);
+const tLazy = table("2. Lazy before CAD (fetched without the 3D engine)", lazy, from);
+const tAfter = table("3. Lazy after CAD (the 3D engine: viewers, three.js, R3F; template fallback)", lazyAfter, from);
 const tFall = table("Fallback only (no Worker: never fetched in a modern browser)", fallback);
 const tWork = table("Geometry worker bundle (off the main thread)", [...workers], shared);
 const workerOnly = [...workers].filter((f) => !shared(f)).reduce((t, f) => t + gz(f).gz, 0);
 
 const total = tInit + tLazy;
 console.log(`\nBase page: ${kb(tBase)} kB gz`);
-console.log(`Studio beyond base (initial + lazy): ${kb(total)} kB gz  (budget ${BUDGET_KB} kB)`);
+console.log(`1. First load:      ${kb(tInit)} kB gz`);
+console.log(`2. Lazy before CAD: ${kb(tLazy)} kB gz`);
+console.log(`3. Lazy after CAD:  ${kb(tAfter)} kB gz  (not in the budget)`);
+console.log(`Studio before CAD (1 + 2): ${kb(total)} kB gz  (budget ${BUDGET_KB} kB)`);
 console.log(`Worker: ${kb(tWork)} kB gz in all, ${kb(workerOnly)} kB gz of it not shared with the main thread`);
 console.log(`Fallback (not counted): ${kb(tFall)} kB gz`);
 if (total / 1024 > BUDGET_KB) {

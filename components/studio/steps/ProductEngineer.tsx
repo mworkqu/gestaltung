@@ -4,10 +4,12 @@
 // vision score, loops, what the check thought it looks like / is missing, the
 // solver's issues and the ProductModel JSON (GET /api/studio/product/engineer).
 // Rendered only when ctx.isAdmin; loads on first open. Never shown to clients.
+// Opening it also fetches the 3D engine (super_admin may open any design's CAD).
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
+import { preloadProductViewer } from "@/components/studio/viewer/ProductViewerLazy";
 import type { EngineerDesign } from "@/lib/studio/client/api";
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { StudioCtx } from "../StudioShell";
@@ -29,7 +31,9 @@ export function ProductEngineer({ ctx, doc }: { ctx: StudioCtx; doc: StudioDoc }
       className="tile space-y-3 p-4 text-sm"
       data-testid="studio-product-engineer"
       onToggle={(e) => {
-        if ((e.currentTarget as HTMLDetailsElement).open && state.status === "idle") void load();
+        if (!(e.currentTarget as HTMLDetailsElement).open) return;
+        preloadProductViewer();
+        if (state.status === "idle") void load();
       }}
     >
       <summary className="min-h-11 cursor-pointer content-center font-bold text-heading">{t("product.engineerTitle")}</summary>

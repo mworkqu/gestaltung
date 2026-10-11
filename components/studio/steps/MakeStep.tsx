@@ -4,13 +4,16 @@
 // (quantity 1 / minimum order), then the cart opens. Asking us to make it is
 // the Studio's one "Get it made" bar (W2, components/studio/GetItMade.tsx),
 // shown under every step from the Enclosure on — not a second button here.
+// The 3D view needs the 3D engine, so it shows only once the design has its CAD
+// (or in the template enclosure flow); before that the chosen design's picture
+// (else the parts picture) stands in, and "Share picture" uses it (owner 2026-10-11).
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Factory, Loader2, ShoppingCart } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
-import { StudioViewer, type ViewerApi } from "@/components/studio/viewer/ViewerLazy";
+import { StudioViewer } from "@/components/studio/viewer/ViewerLazy";
 import { layoutComponents } from "@/lib/studio/layout";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
@@ -19,7 +22,8 @@ import type { StoreCardPart } from "@/lib/store/catalog";
 import type { StudioCtx } from "../StudioShell";
 import { Problem, StepFrame } from "../ui";
 import { storeLines, useAddAllToCart } from "../use-studio-cart";
-import { ShareActions } from "./share";
+import { pictureShareSource, ShareActions, type ShareSource } from "./share";
+import { PartsPicturePane } from "./PartsStep";
 
 const accent = STEP_ACCENT.make;
 
@@ -67,12 +71,27 @@ function BigOption({
   );
 }
 
-export function MakeStep({ ctx, doc, products }: { ctx: StudioCtx; doc: StudioDoc; products: Map<string, StoreCardPart> }) {
+export function MakeStep({
+  ctx,
+  doc,
+  products,
+  engine,
+  pictureUrl,
+}: {
+  ctx: StudioCtx;
+  doc: StudioDoc;
+  products: Map<string, StoreCardPart>;
+  /** The 3D engine may load (the design has its CAD, or the template flow). */
+  engine: boolean;
+  /** The chosen design's picture, when there is one. */
+  pictureUrl: string | null;
+}) {
   const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const router = useRouter();
   const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
-  const viewer = useRef<ViewerApi | null>(null);
+  const viewer = useRef<ShareSource | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
 
   // The finished product (same layout as the Enclosure step, so the case fits identically).
   const placed = useMemo(
@@ -121,17 +140,39 @@ export function MakeStep({ ctx, doc, products }: { ctx: StudioCtx; doc: StudioDo
             className="relative h-[260px] overflow-hidden rounded-[24px] shadow-neu-inset sm:h-[340px]"
             data-testid="studio-make-viewer"
           >
-            <StudioViewer
-              components={viewerComponents}
-              layout={layout}
-              enclosure={doc.enclosure}
-              accent={accent.base}
-              autoRotate
-              ariaLabel={t("viewerMake")}
-              onReady={(api) => {
-                viewer.current = api;
-              }}
-            />
+            {engine ? (
+              <StudioViewer
+                components={viewerComponents}
+                layout={layout}
+                enclosure={doc.enclosure}
+                accent={accent.base}
+                autoRotate
+                ariaLabel={t("viewerMake")}
+                onReady={(api) => {
+                  viewer.current = api;
+                }}
+              />
+            ) : pictureUrl ? (
+              <PictureView
+                url={pictureUrl}
+                alt={t("viewerMake")}
+                onSource={(src) => {
+                  viewer.current = src;
+                }}
+              />
+            ) : (
+              <PartsPicturePane
+                components={doc.components}
+                products={products}
+                selected={selected}
+                onSelect={setSelected}
+                picking={false}
+                locale={ctx.locale}
+                onPicture={(url) => {
+                  viewer.current = url ? pictureShareSource(url) : null;
+                }}
+              />
+            )}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-3 sm:justify-start">
             <ShareActions ctx={ctx} viewer={viewer} accent={accent.base} />
@@ -140,5 +181,19 @@ export function MakeStep({ ctx, doc, products }: { ctx: StudioCtx; doc: StudioDo
       )}
       {cart.state === "failed" && <Problem>{t("cartFailed")}</Problem>}
     </StepFrame>
+  );
+}
+
+function PictureView({ url, alt, onSource }: { url: string; alt: string; onSource: (s: ShareSource) => void }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- a blob: / signed picture of the chosen design
+    <img
+      src={url}
+      alt={alt}
+      className="h-full w-full object-contain"
+      style={{ background: "linear-gradient(180deg, #f4f7fb 0%, #e6ebf2 100%)" }}
+      onLoad={() => onSource(pictureShareSource(url))}
+      data-testid="studio-make-picture"
+    />
   );
 }

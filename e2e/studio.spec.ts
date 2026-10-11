@@ -11,7 +11,7 @@ import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, test } 
 // StudioApi (lib/studio/client/mock.ts): canned answers through our real rules
 // (netlist, schematic, enclosure), no Supabase write, no AI, no credit.
 //
-// Walk: idea (type + tap a choice) → summary → Next → parts (3D plate canvas)
+// Walk: idea (type + tap a choice) → summary → Next → parts (picture of the plate)
 // → Next → wiring (SVG) → Next → enclosure "Draw it" → a <canvas> with a real
 // size. The visitor needs at most 6 taps from the idea to the enclosure.
 
@@ -99,10 +99,10 @@ for (const locale of LOCALES) {
     await shoot3("1-idea");
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "looksRight") }));
 
-    // ── Parts: picked automatically, floating on the plate in 3D ─────────
+    // ── Parts: picked automatically, a picture of them on the plate (no 3D engine yet) ─
     await expect(shell).toHaveAttribute("data-step", "parts");
     await expect(page.getByTestId("studio-parts-list").locator("li").first()).toBeVisible();
-    await expectCanvas(page.getByTestId("studio-parts-viewer"));
+    await expectPartsPicture(page.getByTestId("studio-parts-viewer"));
     await scrollUnderBars(page, page.getByTestId("studio-parts-viewer"));
     await shoot("2-parts");
     await shoot3("2-parts");
@@ -276,7 +276,7 @@ test("design studio: final phone pictures + name on the lid", async ({ page }, i
 
   // 2 · Parts
   await expect(shell).toHaveAttribute("data-step", "parts");
-  await expectCanvas(page.getByTestId("studio-parts-viewer"));
+  await expectPartsPicture(page.getByTestId("studio-parts-viewer"));
   await page.waitForTimeout(800);
   await scrollUnderBars(page, page.getByTestId("studio-parts-viewer"));
   await shot("2-parts.png");
@@ -368,6 +368,16 @@ async function typeWhenHydrated(page: Page, input: Locator, text: string) {
     await expect(input).toHaveValue(text, { timeout: 1000 });
   }).toPass({ timeout: 15_000 });
   void page;
+}
+
+/** The Parts step picture (drawn in the worker), loaded, inside the viewer box. */
+async function expectPartsPicture(box: Locator) {
+  const img = box.getByTestId("studio-parts-picture");
+  await expect(img).toBeVisible({ timeout: 30_000 });
+  await expect(async () => {
+    expect(await img.evaluate((el: HTMLImageElement) => (el.complete ? el.naturalWidth : 0))).toBeGreaterThan(50);
+  }).toPass({ timeout: 10_000 });
+  await expect(box.locator("canvas")).toHaveCount(0);
 }
 
 /** A WebGL canvas with a real, non-zero size inside the viewer box. */

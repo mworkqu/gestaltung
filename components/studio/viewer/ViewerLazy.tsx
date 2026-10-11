@@ -12,16 +12,9 @@ export type { ViewerApi, ViewerProps, ViewerComponent, ViewerExtraObject } from 
 
 const loadViewer = () => import("./Viewer");
 
-let preloading: Promise<unknown> | null = null;
-/**
- * Start fetching the 3D viewer chunk (three.js + R3F) ahead of the Parts step, e.g. while
- * the idea chat waits for its answer. Same chunk as StudioViewer, fetched once.
- */
-export function preloadStudioViewer(): void {
-  preloading ??= loadViewer().catch(() => {
-    preloading = null;
-  });
-}
+// Owner 2026-10-11: never preloaded. The Parts step shows a worker-drawn picture; this
+// viewer (three.js + R3F) is only rendered by the template enclosure fallback and the
+// Make step of a design that has its CAD.
 
 export const StudioViewer = dynamic<ViewerProps>(loadViewer, {
   ssr: false,

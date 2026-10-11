@@ -57,7 +57,7 @@ import { cn } from "@/lib/utils";
 import { IdeaStep } from "./steps/IdeaStep";
 import { PartsStep } from "./steps/PartsStep";
 import { WiringStep } from "./steps/WiringStep";
-import { EnclosureStep } from "./steps/EnclosureStep";
+import { EnclosureStep, productFlowOf } from "./steps/EnclosureStep";
 import { PrintStep } from "./steps/PrintStep";
 import { CodeStep } from "./steps/CodeStep";
 import { MakeStep } from "./steps/MakeStep";
@@ -556,6 +556,11 @@ function StudioShellInner({
   const step = FLOW[current];
   const n = (s: FlowStep) => FLOW.indexOf(s) + 1;
   const ctx: StudioCtx = { api, locale, projectId, projectName, n, isAdmin };
+  // Owner 2026-10-11: the main-thread 3D engine only once the design has its CAD (or in
+  // the template enclosure flow, which has always been 3D). Never for pictures / parts.
+  const engine = !!doc && (!!doc.product?.unlockedId || productFlowOf(doc, previews) !== "product");
+  const chosenId = doc?.product?.chosenId ?? null;
+  const chosenPicture = previews.cards.find((c) => c.id === chosenId && c.url)?.url ?? previews.cards.find((c) => c.url)?.url ?? null;
   // W2: one "Get it made" bar from the Enclosure step onward.
   const showGetItMade = !!doc && current >= FLOW.indexOf("enclosure");
 
@@ -629,7 +634,7 @@ function StudioShellInner({
             onWiring={() => go(FLOW.indexOf("wiring"))}
           />
         )}
-        {step === "make" && doc && <MakeStep ctx={ctx} doc={doc} products={products} />}
+        {step === "make" && doc && <MakeStep ctx={ctx} doc={doc} products={products} engine={engine} pictureUrl={chosenPicture} />}
       </StepSlide>
       {showGetItMade && doc && (
         <GetItMade
