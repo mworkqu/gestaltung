@@ -115,7 +115,7 @@ export default async function DashboardFixturePage({
   return (
     <MessagesScope scope="all">
       <div className="container py-8" data-testid="fixture-dashboard-home">
-        <AdminHomeView locale={locale} counts={{ reply: 4, confirm: 2, buy: BUY.length, fix: 0 }} />
+        <AdminHomeView locale={locale} counts={{ reply: 4, confirm: 2, buy: BUY.length, fix: 0 }} continueSlot={null} />
       </div>
     </MessagesScope>
   );
