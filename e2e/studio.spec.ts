@@ -119,9 +119,8 @@ for (const locale of LOCALES) {
     await scrollUnderBars(page, page.getByText(msg(locale, "Studio", "headline_wiring")));
     await shoot("3-wiring");
     await shoot3("3-wiring");
-    // Phone: the diagram renders at a legible scale (>= 720 px wide, sideways scroll), not squeezed to the column.
-    const frameBox = await schematic.evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth }));
-    expect(frameBox.scroll, "schematic is drawn at a readable width").toBeGreaterThanOrEqual(Math.min(720, frameBox.client + 1));
+    // The diagram opens fitted inside its frame (details: e2e/studio-wiring-viewer.spec.ts).
+    await expect(page.getByTestId("studio-schematic-zoom")).toBeVisible();
     await scrollToBottom(page);
     await shoot("3b-wiring-bottom");
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }));
