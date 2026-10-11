@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isGuest } from "@/lib/supabase/guest";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
-import { normalizePhone } from "@/lib/phone";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { PhoneInput } from "@/components/phone-input";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export function SignUpForm({ turnstileEnabled = false, next = null }: { turnstil
   const t = useTranslations("Auth");
   const tCheck = useTranslations("Turnstile");
   const tClaim = useTranslations("GuestClaim");
+  const tPhone = useTranslations("Phone");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
@@ -47,6 +48,12 @@ export function SignUpForm({ turnstileEnabled = false, next = null }: { turnstil
     const data = new FormData(e.currentTarget);
     const fullName = String(data.get("fullName"));
     const phone = normalizePhone(String(data.get("phone")));
+    // W2: the same WhatsApp rule as every lead form (lib/phone.ts).
+    if (!isValidPhone(phone)) {
+      setError(tPhone("invalid"));
+      setLoading(false);
+      return;
+    }
     const email = String(data.get("email"));
     const password = String(data.get("password"));
 

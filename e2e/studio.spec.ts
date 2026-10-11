@@ -194,10 +194,10 @@ for (const locale of LOCALES) {
     await shoot2("5c-print-list");
     await expectNoHorizontalOverflow(page);
 
-    // Request printing (mocked lead): the confirmation replaces the request.
-    await page.getByRole("button", { name: msg(locale, "Studio", "requestPrint") }).click();
-    await expect(page.getByTestId("studio-print-received")).toBeVisible();
-    await expect(page.getByTestId("studio-print-received")).toContainText(msg(locale, "Studio", "printReceivedText"));
+    // W2: no "Request printing" here any more — the one "Get it made" bar does it
+    // (e2e/studio-get-it-made.spec.ts).
+    await expect(page.getByRole("button", { name: msg(locale, "Studio", "requestPrint") })).toHaveCount(0);
+    await expect(page.getByTestId("studio-get-it-made-bar")).toBeVisible();
 
     // ── Code: real sketch for the chosen board, Copy works ──────────────
     await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
@@ -316,7 +316,7 @@ test("design studio: final phone pictures + name on the lid", async ({ page }, i
   await page.waitForTimeout(1200);
   await scrollUnderBars(page, page.getByTestId("studio-print-viewer"));
   await shot("5-print.png");
-  await page.getByRole("button", { name: msg(locale, "Studio", "skipToCode") }).click();
+  await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
 
   // 6 · Code
   await expect(shell).toHaveAttribute("data-step", "code");

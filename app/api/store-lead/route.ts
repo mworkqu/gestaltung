@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { normalizePhone } from "@/lib/phone";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderLeadEmail } from "@/lib/email/lead-email";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
@@ -180,6 +180,11 @@ export async function POST(request: Request) {
   if (!name || !phone || ((isQuote || isStudio || isPrint) && !items.length)) {
     return NextResponse.json({ error: "missing_fields" }, { status: 422 });
   }
+  // W2: the same rule every form checks before sending (lib/phone.ts) — a
+  // number we can reach on WhatsApp, never "00000000" or "12345678".
+  if (!isValidPhone(phone)) {
+    return NextResponse.json({ error: "invalid_phone" }, { status: 422 });
+  }
 
   let message = String(body.message ?? "").trim().slice(0, 4000) || src.fallbackMessage;
   if (contactKind && !message.toLowerCase().startsWith(contactKind.tag.toLowerCase())) {
@@ -228,10 +233,13 @@ export async function POST(request: Request) {
     }
     const design = String(body.designName ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || projectName || "Untitled design";
     const link = projectId ? `${new URL(request.url).origin}/${locale}/projects/${projectId}/studio` : null;
+    // W2 "Get it made" pop-up: the visitor's optional note.
+    const note = String(body.note ?? "").trim().slice(0, 1000);
     message = [
       `Design Studio: ${design}${link ? ` — ${link}` : ""}`,
       projectId ? `Project: ${projectName ?? design}${link ? ` — ${link}` : ""}` : null,
       items.map((i) => `- ${i.function}`).join("\n"),
+      note ? `Note:\n${note}` : null,
     ]
       .filter(Boolean)
       .join("\n\n")

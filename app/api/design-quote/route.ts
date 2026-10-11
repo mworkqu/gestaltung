@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { normalizePhone } from "@/lib/phone";
+import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { formatFileSize } from "@/lib/format-bytes";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderLeadEmail } from "@/lib/email/lead-email";
@@ -83,6 +83,10 @@ export async function POST(request: Request) {
 
   if (!email && !phone) {
     return NextResponse.json({ error: "missing_contact" }, { status: 422 });
+  }
+  // W2: a typed phone must be one we can reach on WhatsApp (same rule as the form).
+  if (phone && !isValidPhone(phone)) {
+    return NextResponse.json({ error: "invalid_phone" }, { status: 422 });
   }
   if (!technique) {
     return NextResponse.json({ error: "missing_technique" }, { status: 422 });
