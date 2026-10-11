@@ -11,23 +11,56 @@
 // the STL into THREE meshes named "enclosure_base" / "enclosure_lid" so the
 // viewer and exports stay identical. The formats must not change: if a field is
 // needed, add it to schema.ts for both backends.
+//
+// P5-16: buildProduct(ProductModel) builds the REAL product (several bodies from
+// the form-part kit, lib/studio/product/*): the solver runs here (pure), the
+// manifold-3d kernel runs in the Studio geometry worker. The CadQuery backend
+// will take the same ProductModel JSON (docs/STUDIO_CAD.md, "Product models").
 
 import * as THREE from "three";
-import type { EnclosureSpec, LibraryPart, MechPart } from "./schema";
-import type { LayoutResult } from "./layout";
+import type { EnclosureSpec, LibraryPart, MechPart, ProductSpec } from "./schema";
+import type { LayoutInput, LayoutResult } from "./layout";
+import type { ProductModel } from "./product/schema";
+import { solveProduct, type SolvedProduct } from "./product/solve";
+import type { ProductGeometry } from "./geometry/client";
 import { buildEnclosure, type EnclosureMeta } from "./enclosure/build";
 import { buildMechGeometry } from "./mech/templates";
 
 export type CadEnclosure = { base: THREE.Mesh; lid: THREE.Mesh; meta: EnclosureMeta };
 
+/**
+ * P5-16: a whole product. `solved` = the solver's output (pure JSON: bodies, placements,
+ * cut-outs, print plans, electronics, issues, hash); `geometry` = the built pieces. The
+ * browser backend builds in the Studio worker with manifold-3d; the future CadQuery
+ * backend takes the SAME ProductModel (docs/STUDIO_CAD.md) and returns STEP + STL.
+ */
+export type CadProduct = { solved: SolvedProduct; geometry: ProductGeometry };
+
+export type BuildProductOptions = {
+  /** The chosen parts (fitted inside the product). */
+  parts?: readonly LayoutInput[];
+  spec?: ProductSpec;
+  /** true = meshes come back to the page (after "Create my CAD"); false = metadata only. */
+  geometry?: boolean;
+};
+
 export interface CadBackend {
   id: "browser" | "cadquery";
   buildEnclosure(enc: EnclosureSpec, layout: LayoutResult, parts: Map<string, LibraryPart>): Promise<CadEnclosure>;
   buildMechPart(part: MechPart): Promise<THREE.Object3D>;
+  buildProduct(model: ProductModel, opts?: BuildProductOptions): Promise<CadProduct>;
 }
 
 export class BrowserCadBackend implements CadBackend {
   readonly id = "browser" as const;
+
+  /** Solve (pure, here) then build (worker, cached by the solved hash). */
+  async buildProduct(model: ProductModel, opts: BuildProductOptions = {}): Promise<CadProduct> {
+    const solved = solveProduct(model, opts.parts ?? [], { spec: opts.spec });
+    const { getProductGeometry } = await import("./geometry/client");
+    const geometry = await getProductGeometry(solved, { geometry: opts.geometry === true });
+    return { solved, geometry };
+  }
 
   async buildEnclosure(enc: EnclosureSpec, layout: LayoutResult, parts: Map<string, LibraryPart>): Promise<CadEnclosure> {
     return buildEnclosure(enc, layout, parts);
@@ -59,6 +92,11 @@ export class CadQueryBackend implements CadBackend {
   }
 
   async buildMechPart(): Promise<THREE.Object3D> {
+    throw new Error("CadQuery backend is not enabled");
+  }
+
+  /** Future: POST the ProductModel (+ parts) to /studio/product on the Cloud Run worker → STEP + STL per piece. */
+  async buildProduct(): Promise<CadProduct> {
     throw new Error("CadQuery backend is not enabled");
   }
 }

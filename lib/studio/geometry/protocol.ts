@@ -7,6 +7,8 @@ import type { LayoutResult } from "../layout";
 import type { MechTemplate, EnclosureSpec, Environment, LibraryPart, MechPart } from "../schema";
 import type { Material } from "../mech/materials";
 import type { PackedGeometry } from "./pack";
+import type { BuiltLink, BuiltPiece } from "./product-kernel";
+import type { PlacedElectronic, SolvedProduct } from "../product/solve";
 
 export type EnclosureInput = {
   spec: EnclosureSpec;
@@ -41,11 +43,32 @@ export type PackedMechPart = {
   rotation: Vec3;
 };
 
+/** P5-16 product build. geometry false = metadata only (nothing to draw leaves the worker). */
+export type ProductInput = { solved: SolvedProduct; geometry: boolean };
+
+type MeshArrays = { positions: Float32Array; normals: Float32Array; indices: Uint32Array };
+type MetaOf<T> = Omit<T, keyof MeshArrays> & Partial<MeshArrays>;
+
+/** A built product as it crosses postMessage (arrays only when geometry was asked for). */
+export type PackedProduct = {
+  hash: string;
+  ms: number;
+  geometry: boolean;
+  pieces: MetaOf<BuiltPiece>[];
+  links: MetaOf<BuiltLink>[];
+  electronics: PlacedElectronic[];
+  bbox: SolvedProduct["bbox"];
+};
+
+export type ProductRequest = { id: number; kind: "product"; key: string; input: ProductInput };
+
 export type GeometryRequest =
   | { id: number; kind: "enclosure"; key: string; input: EnclosureInput }
-  | { id: number; kind: "mech"; key: string; encKey: string; input: MechInput };
+  | { id: number; kind: "mech"; key: string; encKey: string; input: MechInput }
+  | ProductRequest;
 
 export type GeometryReply =
   | { id: number; ok: true; kind: "enclosure"; result: PackedEnclosure; ms: number }
   | { id: number; ok: true; kind: "mech"; result: PackedMechPart[]; ms: number }
+  | { id: number; ok: true; kind: "product"; result: PackedProduct; ms: number }
   | { id: number; ok: false; error: string };

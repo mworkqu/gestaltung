@@ -20,7 +20,8 @@ import type { EnclosureSpec, Environment, LibraryPart, MechPart } from "../schem
 import type { EnclosureMeta } from "../enclosure/build";
 import { enclosureKey, mechKey } from "./key";
 import { unpackGeometry } from "./pack";
-import type { GeometryReply, GeometryRequest, PackedEnclosure, PackedMechPart } from "./protocol";
+import type { GeometryReply, GeometryRequest, PackedEnclosure, PackedMechPart, PackedProduct } from "./protocol";
+import type { SolvedProduct } from "../product/solve";
 import { persistEnclosure, readPersistedEnclosure } from "./persist";
 
 export { enclosureKey, mechKey } from "./key";
@@ -90,8 +91,12 @@ export function warmGeometryWorker(): void {
 }
 
 async function runOnMain(job: Job): Promise<GeometryReply> {
-  const { handleRequest } = await import("./job");
   geometryStats.main += 1;
+  if (job.kind === "product") {
+    const { handleProductRequest } = await import("./product-job");
+    return (await handleProductRequest({ ...job, id: 0 })).reply;
+  }
+  const { handleRequest } = await import("./job");
   return handleRequest({ ...job, id: 0 } as GeometryRequest).reply;
 }
 
@@ -262,6 +267,70 @@ export function getMechGeometry(
 }
 
 // ---------------------------------------------------------------------------
+// Products (P5-16): the real product model, built by manifold-3d in the worker
+// ---------------------------------------------------------------------------
+
+type PackedPieceMeta = Omit<PackedProduct["pieces"][number], "positions" | "normals" | "indices">;
+type PackedLinkMeta = Omit<PackedProduct["links"][number], "positions" | "normals" | "indices">;
+
+/** A built piece on the main thread: metadata, plus a BufferGeometry when geometry was asked for. */
+export type ProductPiece = PackedPieceMeta & { geometry?: THREE.BufferGeometry };
+export type ProductLink = PackedLinkMeta & { geometry?: THREE.BufferGeometry };
+export type ProductGeometry = Omit<PackedProduct, "pieces" | "links"> & { key: string; pieces: ProductPiece[]; links: ProductLink[] };
+
+const MAX_PRODUCTS = 4;
+const products = new Map<string, Promise<ProductGeometry>>();
+
+export function productKey(solved: Pick<SolvedProduct, "hash">, geometry: boolean): string {
+  return `${solved.hash}:${geometry ? "mesh" : "meta"}`;
+}
+
+function meshGeometry(m: { positions?: Float32Array; normals?: Float32Array; indices?: Uint32Array }): THREE.BufferGeometry | undefined {
+  if (!m.positions || !m.indices) return undefined;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(m.positions, 3));
+  if (m.normals) g.setAttribute("normal", new THREE.BufferAttribute(m.normals, 3));
+  else g.computeVertexNormals();
+  g.setIndex(new THREE.BufferAttribute(m.indices, 1));
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  return g;
+}
+
+/**
+ * A solved product built in the worker (cached by solvedHash here AND in the worker).
+ * `geometry: false` (the default) returns only metadata — pieces, grams, print plans,
+ * electronics placement, explode vectors — so before payment no mesh reaches the page;
+ * `geometry: true` also returns BufferGeometries in WORLD coordinates (normals included).
+ */
+export function getProductGeometry(solved: SolvedProduct, opts: { geometry?: boolean } = {}): Promise<ProductGeometry> {
+  const withGeometry = opts.geometry === true;
+  const key = productKey(solved, withGeometry);
+  const hit = touch(products, key);
+  if (hit) return hit;
+  const p = run({ kind: "product", key, input: { solved, geometry: withGeometry } }).then((r) => {
+    if (!r.ok || r.kind !== "product") throw new Error(r.ok ? "unexpected reply" : r.error);
+    geometryStats.lastMs = r.ms;
+    const { pieces, links, ...rest } = r.result;
+    return {
+      ...rest,
+      key,
+      pieces: pieces.map(({ positions, normals, indices, ...meta }) => ({ ...meta, ...(positions ? { geometry: meshGeometry({ positions, normals, indices }) } : {}) })),
+      links: links.map(({ positions, normals, indices, ...meta }) => ({ ...meta, ...(positions ? { geometry: meshGeometry({ positions, normals, indices }) } : {}) })),
+    } as ProductGeometry;
+  });
+  products.set(key, p);
+  p.catch(() => {
+    if (products.get(key) === p) products.delete(key);
+  });
+  evict(products, MAX_PRODUCTS, (g) => {
+    for (const piece of g.pieces) piece.geometry?.dispose();
+    for (const l of g.links) l.geometry?.dispose();
+  });
+  return p;
+}
+
+// ---------------------------------------------------------------------------
 // Fresh meshes over cached geometry
 // ---------------------------------------------------------------------------
 
@@ -318,5 +387,6 @@ export function resetGeometryClientForTests() {
   failAll(new Error("reset"));
   enclosures.clear();
   mechs.clear();
+  products.clear();
   geometryStats.worker = geometryStats.main = geometryStats.lastMs = geometryStats.persisted = 0;
 }

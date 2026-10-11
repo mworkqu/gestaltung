@@ -806,6 +806,24 @@ Limits to set before enabling:
 - Concurrency 1 per instance (`CAD_MAX_CONCURRENT_BUILDS`), max instances capped (start with 2), scale to zero.
 - Cost: a build is a few CPU-seconds on 2 vCPU / 2 GiB. Keep the owner's USD 1 / 5 / 10 budget alerts; add a per-user daily cap (suggest 20 builds) and a global daily cap, checked server-side before the call. The browser path stays the fallback on any error: a down worker must never block the Studio.
 
+### Product models (P5-16): `POST /studio/product` (future)
+
+Since P5-16 the Studio designs the whole product, not only a case: a `ProductModel` (lib/studio/product/schema.ts — 2–8 bodies from the form-part kit, anchors, links; plain mm, Z up, −y = front) is solved by `solveProduct()` (lib/studio/product/solve.ts) and built by the manifold-3d kernel in the Studio worker. `CadBackend.buildProduct(model, { parts, spec, geometry })` is the seam; `BrowserCadBackend` implements it now, `CadQueryBackend.buildProduct` throws "not enabled".
+
+The Cloud Run worker will take the SAME JSON and return STEP + STL per printable piece:
+
+| Field | Notes |
+|---|---|
+| `schemaVersion` | `1` |
+| `model` | `ProductModel`, exactly as stored in `projects.studio` (validated by `ProductModelSchema`) |
+| `parts[]` | per instance: `instanceId`, `partId`, `dims`, `mount`, `ports` (as for enclosures) |
+| `solved` | output of `solveProduct(model, parts)`: per body the final `form` params, world `position` / `rotation` (Euler deg, X then Y then Z) / `matrix`, `shell` (`solid` / `open_top` / `open_bottom` / `split`), `wall`, `split` {z, joint}, `lip` {inset, height}, `cutouts[]` (prisms in body-local mm: center, normal, w, h, depth, round, grille), `pockets[]`, `pieces[]` with print plan (pose + world→bed matrix), plus `links[]` (tube control points) and `electronics[]` |
+| `hash` | `solved.hash` (cache key; the server may cache by it) |
+
+As for enclosures, the server does NOT re-solve: it builds exactly what `solved` says. CadQuery mapping: `lathe_profile` / round templates → `revolve` of the filleted (r, z) outline from `latheOutline()` (shapes.ts; the same points the browser revolves); `rounded_extrude` / `loft_rounded` / `tank` / box templates → `loft` through the slices the browser hulls (rounded rect / superellipse outlines, 45° bottom chamfer, top fillet = `fillet`); shells → `shell(-wall)` with the open face removed (lathed shells: offset outline intersected with the 45° tent roof, `ROOF_BRIDGE` 40 mm); `split` → two solids cut at z with the snap lip ring (inset wall+0.2 … wall+1.4, 3 mm) or 4 M2.5 bosses; cut-outs and pockets → `cut` of the listed prisms / boxes; nozzle / tubes → `sweep` along the path. Response: `{ pieces: [{ id, step, stl, volume_mm3, bbox, checks }], log }` with one entry per `solved.bodies[].pieces[]` id; the browser loads the STLs into the same piece ids, so the viewer, explode vectors and print plans stay unchanged.
+
+Validation the server keeps: `ProductModelSchema` + `clampProductModel` mirror (2–8 bodies, form ranges in lib/studio/product/forms/params.ts), every piece a valid closed solid with volume > 0, every piece inside the MK4 volume (250 × 210 × 220) in its print pose, no two bodies intersecting (> 0.5 mm³).
+
 ### Rollout
 
 1. Implement `/studio/build` and tests in `services/cad-worker` (JSON tests need no CadQuery; geometry tests run in the Cloud Build image like P5-11).
