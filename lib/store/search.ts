@@ -23,6 +23,8 @@ export type SearchableProduct = {
   sku: string;
   category?: string | null;
   unit_price: number;
+  /** Optional: in-stock products win a score tie (the dropdown and /store agree). */
+  lead_time_class?: string | null;
 };
 
 // ── Category weights ─────────────────────────────────────────────────────────
@@ -115,8 +117,36 @@ const CONTEXT_MARKERS = new Set([
 const ACCESSORY_WORDS = new Set([
   "jumper", "wire", "cable", "connector", "header", "case", "enclosure",
   "holder", "adapter", "cover", "standoff", "sticker", "dupont",
+  // Added with the head-noun ranking: parts that go WITH a motor / board /
+  // sensor ("DC Motor Propeller Fan", "Motor Driver Shield") are not it.
+  "fan", "propeller", "blade", "wheel", "controller", "driver", "shield", "bracket",
+  "mount", "programmer", "expansion", "adaptor", "converter", "clip", "terminal",
+  "breakout", "dongle", "charger", "gear", "pulley", "coupling", "coupler",
   "سلك", "اسلاك", "كابل", "موصل", "علبه", "غطاء", "حامل",
 ]);
+
+/** The name before its first " – ", " - ", comma or bracket (same rule as lib/prototyping/bom-intent.ts headOf). */
+function headOf(name: string): string {
+  return name.split(/\s[–—-]\s|,\s|\(/)[0].trim();
+}
+
+/**
+ * The product head's words, cut at a "for / with / compatible" marker, and its
+ * head noun: the last word that is not a model code ("Small DC Motor RF-300" →
+ * "motor", "TT DC Motor with Metal Gears" → "motor", "DC Motor Propeller Fan" →
+ * "fan"). Latin names only; Arabic names put the noun first and keep the old rules.
+ */
+function headNounOf(name: string | null | undefined): { tokens: string[]; noun: string | null } {
+  const words = normalizeText(headOf(name ?? "")).match(/[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*/gu) ?? [];
+  const kept: string[] = [];
+  for (const w of words) {
+    if (CONTEXT_MARKERS.has(w)) break;
+    kept.push(w);
+  }
+  // Model codes ("RF-300", "28BYJ-48", "V1") are not the noun.
+  const nouns = kept.filter((w) => /^[a-z]+$/.test(w));
+  return { tokens: kept.flatMap((w) => w.split("-")), noun: nouns.length ? nouns[nouns.length - 1] : null };
+}
 
 type NameToken = { token: string; context: boolean; index: number };
 
@@ -146,6 +176,8 @@ function strength(word: string, token: string): number {
 }
 
 const CONTEXT_FACTOR = 0.4;
+const HEAD_NOUN_BONUS = 6;
+const ACCESSORY_PENALTY = 6;
 
 type WordHit = { value: number; subject: boolean; any: boolean };
 
@@ -195,11 +227,18 @@ export function scoreProduct(query: string, product: SearchableProduct): number 
   if (words.some((w) => cat.some((t) => strength(w, t.token) >= 2))) bonus += 1;
 
   const asked = new Set(words.map(stem));
-  const accessory = en.some((t) => !t.context && ACCESSORY_WORDS.has(stem(t.token)) && !asked.has(stem(t.token)))
+  const headEn = headNounOf(product.name);
+  // Accessory words are looked for in the product head, so a tail like
+  // "... - fits ESP32 case" does not demote the thing itself.
+  const accessory = headEn.tokens.some((t) => ACCESSORY_WORDS.has(stem(t)) && !asked.has(stem(t)))
     || ar.some((t) => !t.context && ACCESSORY_WORDS.has(t.token) && !asked.has(stem(t.token)));
+  // The head noun IS what the shopper typed ("motor" in "Small DC Motor RF-300"):
+  // the product itself. A query word that only modifies another noun ("DC Motor
+  // Propeller Fan" -> head noun "fan") gets no such bonus.
+  const headMatch = headEn.noun !== null && asked.has(stem(headEn.noun)) ? HEAD_NOUN_BONUS : 0;
 
   const tier = skuExact ? 3 : allSubject ? 2 : anyTitle ? 1 : 0;
-  return tier * 100 + title + bonus + categoryWeight(product.category) - (accessory ? 3 : 0);
+  return tier * 100 + title + bonus + headMatch + categoryWeight(product.category) - (accessory ? ACCESSORY_PENALTY : 0);
 }
 
 // ── Sort orders ──────────────────────────────────────────────────────────────
@@ -235,12 +274,14 @@ export function compareByPriceDesc(locale: string) {
   return (a: SearchableProduct, b: SearchableProduct): number => b.unit_price - a.unit_price || name(a, b);
 }
 
-/** Best match first; ties by name. Returns a new array. */
+const stockRank = (p: SearchableProduct) => (p.lead_time_class === "in_stock" ? 0 : 1);
+
+/** Best match first; ties in-stock first, then by name. Returns a new array. */
 export function rankProducts<T extends SearchableProduct>(query: string, products: readonly T[], locale = "en"): T[] {
   const name = compareByName(locale);
   return products
     .map((p) => ({ p, s: scoreProduct(query, p) }))
-    .sort((a, b) => b.s - a.s || name(a.p, b.p))
+    .sort((a, b) => b.s - a.s || stockRank(a.p) - stockRank(b.p) || name(a.p, b.p))
     .map((x) => x.p);
 }
 
