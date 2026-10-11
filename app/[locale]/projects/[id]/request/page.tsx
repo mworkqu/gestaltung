@@ -70,7 +70,6 @@ export default async function ProjectRequestPage({ params }: { params: Promise<{
     getPart,
     locale: locale === "ar" ? "ar" : "en",
     prices: priceBySku,
-    enclosureFrom: prices?.enclosure_from ?? 0,
   });
 
   return (

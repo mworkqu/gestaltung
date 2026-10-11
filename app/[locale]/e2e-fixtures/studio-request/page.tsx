@@ -4,7 +4,6 @@ import { setRequestLocale } from "next-intl/server";
 
 import { RequestReceived } from "@/components/studio/RequestReceived";
 import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
-import { DEFAULT_SERVICE_PRICES } from "@/lib/pricing/defaults";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { getPart } from "@/lib/studio/library";
@@ -57,7 +56,6 @@ export default async function StudioRequestFixturePage({ params }: { params: Pro
     getPart,
     locale: lang,
     prices: new Map(),
-    enclosureFrom: DEFAULT_SERVICE_PRICES.enclosure_from,
   });
   return (
     <div className="container max-w-4xl py-6 sm:py-10">

@@ -7,11 +7,12 @@
 // Price rule (an ESTIMATE, labelled so on the page; an engineer confirms the
 // real price on WhatsApp — never a promise):
 //   known  = the store price of every part we sell (quantity 1, pack price as listed)
-//   low    = enclosure "from" price (store_settings.service_prices.enclosure_from,
-//            QAR 800 by default, lib/pricing/defaults.ts) + known, rounded down to QAR 10
-//   high   = (enclosure_from + known) × ESTIMATE_SPREAD, rounded up to QAR 50
+//   print  = PRINT_BASE_QAR + PRINT_QAR_PER_GRAM × printed grams
+//            (owner rule 2026-10-11: QAR 100 base + QAR 0.7 per gram of material)
+//   low    = print + known, rounded down to QAR 10
+//   high   = (print + known) × ESTIMATE_SPREAD, rounded up to QAR 50
 // ESTIMATE_SPREAD covers the parts we still have to source, finishing and
-// assembly. OWNER TO CONFIRM (default 1.5). The usage-price rule
+// assembly (default 1.5). The usage-price rule
 // (lib/pricing/usage-price.ts) is for per-use costs such as cloud CAD builds;
 // none apply to a made product, so it is not part of this estimate.
 
@@ -19,20 +20,22 @@ import type { Locale } from "./client/api";
 import type { LibraryPart, StudioDoc } from "./schema";
 
 export const ESTIMATE_SPREAD = 1.5;
+export const PRINT_BASE_QAR = 100;
+export const PRINT_QAR_PER_GRAM = 0.7;
 
 /** Set on doc.answers when "Get it made" was sent (ISO time). */
 export const REQUEST_SENT_KEY = "request:sent";
 
 export type PriceEstimate = { low: number; high: number };
 
-export function priceEstimate({
-  enclosureFrom,
-  partsQar,
-}: {
-  enclosureFrom: number;
-  partsQar: number;
-}): PriceEstimate | null {
-  const base = (Number.isFinite(enclosureFrom) && enclosureFrom > 0 ? enclosureFrom : 0) + (Number.isFinite(partsQar) && partsQar > 0 ? partsQar : 0);
+/** Printing price: QAR 100 base + QAR 0.7 per gram of material. */
+export function printPrice(grams: number): number {
+  const g = Number.isFinite(grams) && grams > 0 ? grams : 0;
+  return PRINT_BASE_QAR + PRINT_QAR_PER_GRAM * g;
+}
+
+export function priceEstimate({ printedGrams, partsQar }: { printedGrams: number; partsQar: number }): PriceEstimate | null {
+  const base = printPrice(printedGrams) + (Number.isFinite(partsQar) && partsQar > 0 ? partsQar : 0);
   if (base <= 0) return null;
   const low = Math.max(10, Math.floor(base / 10) * 10);
   const high = Math.max(low + 50, Math.ceil((base * ESTIMATE_SPREAD) / 50) * 50);
@@ -64,14 +67,12 @@ export function requestSummary({
   getPart,
   locale,
   prices,
-  enclosureFrom,
 }: {
   doc: StudioDoc | null;
   projectName: string;
   getPart: (id: string) => LibraryPart | undefined;
   locale: Locale;
   prices: ReadonlyMap<string, number>;
-  enclosureFrom: number;
 }): RequestSummary {
   const parts: SummaryPart[] = [];
   let partsQar = 0;
@@ -109,7 +110,7 @@ export function requestSummary({
     printedGrams,
     enclosure: e ? { template: e.template, colour: e.colour, finish: e.finish } : null,
     partsQar: Math.round(partsQar * 100) / 100,
-    estimate: priceEstimate({ enclosureFrom, partsQar }),
+    estimate: priceEstimate({ printedGrams, partsQar }),
     requestedAt: typeof sent === "string" && sent ? sent : null,
   };
 }
