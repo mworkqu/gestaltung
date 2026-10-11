@@ -10,7 +10,7 @@ import { useState, useSyncExternalStore, type RefObject } from "react";
 import { useTranslations } from "next-intl";
 import { ImageDown, Loader2, MessageCircle } from "lucide-react";
 
-import type { ViewerApi } from "@/components/studio/viewer/ViewerLazy";
+import type { ViewerApi } from "@/components/studio/viewer/types";
 import { downloadBlob } from "@/lib/studio/download";
 import { fileSlug } from "@/lib/studio/client/steps";
 import type { StudioCtx } from "../StudioShell";
@@ -33,6 +33,31 @@ export function whatsappHref(text: string): string {
 
 type State = "idle" | "making" | "saved" | "failed";
 
+/** What "Share picture" needs: the 3D viewer, or a picture (no 3D engine before the CAD). */
+export type ShareSource = Pick<ViewerApi, "toSharePNG">;
+
+/** A share source from a picture already on the page (a design preview or the parts picture). */
+export function pictureShareSource(url: string): ShareSource {
+  return {
+    async toSharePNG(opts) {
+      const { canvasToPNG, composeShareImage, SHARE_SIZE } = await import("@/components/studio/viewer/share-image");
+      const img = new Image();
+      img.decoding = "async";
+      img.src = url;
+      await img.decode();
+      // Fit the picture into a square frame (contain), then the branded share card.
+      const side = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+      const sq = document.createElement("canvas");
+      sq.width = side;
+      sq.height = side;
+      const ctx = sq.getContext("2d");
+      if (!ctx) throw new Error("share image: no 2D context");
+      ctx.drawImage(img, (side - img.naturalWidth) / 2, (side - img.naturalHeight) / 2);
+      return canvasToPNG(composeShareImage(sq, { ...opts, size: opts.size ?? SHARE_SIZE }));
+    },
+  };
+}
+
 export function ShareActions({
   ctx,
   viewer,
@@ -40,7 +65,7 @@ export function ShareActions({
   disabled,
 }: {
   ctx: StudioCtx;
-  viewer: RefObject<ViewerApi | null>;
+  viewer: RefObject<ShareSource | null>;
   accent: string;
   disabled?: boolean;
 }) {

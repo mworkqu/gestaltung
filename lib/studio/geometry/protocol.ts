@@ -145,13 +145,32 @@ export type ProductStlFile = {
 };
 export type ProductStlResult = { files: ProductStlFile[]; combined: { name: string; data: ArrayBuffer } | null };
 
+// ---------------------------------------------------------------------------
+// Parts step picture: the picked parts on their plate, drawn in the worker so the
+// page needs no 3D engine before "Create my CAD". Only PNG bytes + where each part
+// sits on the picture (0–1, for tap targets) come back.
+// ---------------------------------------------------------------------------
+
+export type PartsPictureInput = {
+  /** [instanceId, part] pairs, in list order. */
+  parts: [string, LibraryPart][];
+  /** Picture size in px (the page asks for its box × device pixel ratio, capped). */
+  width: number;
+  height: number;
+  /** Plate rim colour (the Parts step accent). */
+  accent: string;
+};
+export type PartsPictureSpot = { instanceId: string; x: number; y: number };
+export type PartsPictureResult = { png: ArrayBuffer; width: number; height: number; spots: PartsPictureSpot[] };
+
 export type GeometryRequest =
   | { id: number; kind: "enclosure"; key: string; input: EnclosureInput }
   | { id: number; kind: "mech"; key: string; encKey: string; input: MechInput }
   | ProductRequest
   | { id: number; kind: "productPreview"; input: ProductPreviewInput }
   | { id: number; kind: "productUnlocked"; input: ProductUnlockInput }
-  | { id: number; kind: "productStl"; input: ProductStlInput };
+  | { id: number; kind: "productStl"; input: ProductStlInput }
+  | { id: number; kind: "partsPicture"; input: PartsPictureInput };
 
 export type GeometryReply =
   | { id: number; ok: true; kind: "enclosure"; result: PackedEnclosure; ms: number }
@@ -160,6 +179,7 @@ export type GeometryReply =
   | { id: number; ok: true; kind: "productPreview"; result: ProductPreviewResult; ms: number }
   | { id: number; ok: true; kind: "productUnlocked"; result: ProductUnlockResult; ms: number }
   | { id: number; ok: true; kind: "productStl"; result: ProductStlResult; ms: number }
+  | { id: number; ok: true; kind: "partsPicture"; result: PartsPictureResult; ms: number }
   | { id: number; ok: false; error: string };
 
 /** A progress message for a running request (not its reply). */

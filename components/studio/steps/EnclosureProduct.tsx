@@ -15,15 +15,20 @@
 //    electronics), the finishes and "Share a picture".
 //  * Guests: after today's free designs, "Sign in to see more designs" (W1
 //    return path). super_admin also gets the Engineer view.
+//  * The 3D engine (three + R3F + the viewer) downloads only after "Create my CAD"
+//    succeeded (owner 2026-10-11). A visitor who CAN open it (enough CAD credits,
+//    or super_admin) gets it prefetched while the browser is idle on this step;
+//    no credits / not signed in = never fetched. The animated loader covers the
+//    pictures being made and the engine + model opening.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Layers, Loader2, RefreshCw, Sparkles } from "lucide-react";
 
 import { AccessNote } from "@/components/credits/access-note";
 import { AuthReturnLink } from "@/components/auth/auth-return-link";
-import { ProductViewer } from "@/components/studio/viewer/ProductViewerLazy";
-import { ViewerSkeleton, type ViewerApi } from "@/components/studio/viewer/ViewerLazy";
+import { ProductViewer, ProductViewerLoading, preloadProductViewer } from "@/components/studio/viewer/ProductViewerLazy";
+import type { ViewerApi } from "@/components/studio/viewer/types";
 import { track } from "@/lib/analytics";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { STEP_ACCENT } from "@/lib/studio/palette";
@@ -36,6 +41,7 @@ import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { ShareActions } from "./share";
 import { accessReason, problemKey } from "./problem";
 import { ProductEngineer } from "./ProductEngineer";
+import { StudioLoader } from "../StudioLoader";
 
 const accent = STEP_ACCENT.enclosure;
 /** "Take it apart" opens this far at once (the slider then goes 0–1). */
@@ -78,6 +84,20 @@ export function EnclosureProduct({
   const chosenId = product?.chosenId && cards.some((c) => c.id === product.chosenId) ? product.chosenId : (ready[0]?.id ?? null);
   const running = previews.phase === "running" || previews.phase === "idle";
   const finish = (doc.answers?.[PRODUCT_FINISH_KEY] as Finish | undefined) ?? null;
+
+  // Smart prefetch: only for someone the unlock will let through (the credits hook the
+  // step already reads; no extra request). Idle time, so the pictures come first.
+  const canOpen = !!ctx.isAdmin || access?.allowed === true;
+  useEffect(() => {
+    if (unlockedId || !canOpen || !chosenId) return;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(preloadProductViewer, { timeout: 4000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(preloadProductViewer, 1500);
+    return () => window.clearTimeout(id);
+  }, [unlockedId, canOpen, chosenId]);
 
   const nameOf = (c: Pick<ProductCard, "archetype">) => t(`product.name_${c.archetype}`);
   const whyOf = (c: Pick<ProductCard, "archetype" | "why">) => c.why[locale]?.trim() || t(`product.why_${c.archetype}`);
@@ -151,7 +171,7 @@ export function EnclosureProduct({
               <Problem>{t("failed")}</Problem>
             </div>
           ) : (
-            <ViewerSkeleton />
+            <ProductViewerLoading />
           )}
         </div>
 
@@ -252,7 +272,18 @@ export function EnclosureProduct({
         {running ? progress : ""}
       </p>
 
+      {busy ? (
+        <div className="grid min-h-[260px] place-items-center rounded-[24px] shadow-neu-inset">
+          <StudioLoader label={t("loader.cad")} accent={accent.base} ink={accent.ink} testId="studio-cad-loader" />
+        </div>
+      ) : running && cards.length === 0 ? (
+        <div className="grid min-h-[260px] place-items-center rounded-[24px] shadow-neu-inset" data-testid="studio-product-loading">
+          <StudioLoader label={t("loader.pictures")} accent={accent.base} ink={accent.ink} status={false} />
+        </div>
+      ) : null}
+
       <div
+        hidden={busy || (running && cards.length === 0)}
         role="radiogroup"
         aria-label={t("product.picturesLabel")}
         data-testid="studio-product-pictures"

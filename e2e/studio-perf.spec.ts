@@ -45,7 +45,7 @@ test("studio perf: first render, parts canvas, enclosure build off the main thre
     return { fcp: w.__perf.fcp ?? null, lcp: w.__perf.lcp ?? null, domInteractive: nav?.domInteractive ?? null, load: nav?.loadEventEnd ?? null };
   });
 
-  // Idea → Parts: time from "Looks right" to a visible, sized WebGL canvas.
+  // Idea → Parts: time from "Looks right" to the parts picture.
   await expect(async () => {
     await input.fill("A little desk friend that lights up when I walk in");
     await expect(input).toHaveValue("A little desk friend that lights up when I walk in", { timeout: 1000 });
@@ -61,23 +61,12 @@ test("studio perf: first render, parts canvas, enclosure build off the main thre
   }
   const t0 = await page.evaluate(() => performance.now());
   await page.getByRole("button", { name: msg("en", "Studio", "looksRight") }).click();
-  const canvas = page.getByTestId("studio-parts-viewer").locator("canvas").first();
+  // 2026-10-11: the Parts step shows a picture drawn in the worker (no 3D engine on the page).
+  const canvas = page.getByTestId("studio-parts-viewer").getByTestId("studio-parts-picture");
   await expect(canvas).toBeVisible({ timeout: 60_000 });
-  await expect(async () => {
-    const b = await canvas.boundingBox();
-    expect(b?.width ?? 0).toBeGreaterThan(50);
-  }).toPass({ timeout: 30_000 });
   const canvasShownMs = (await page.evaluate(() => performance.now())) - t0;
-  // First drawn frame: the canvas has non-background pixels.
   await expect(async () => {
-    const drawn = await canvas.evaluate((c: HTMLCanvasElement) => {
-      const gl = (c.getContext("webgl2") ?? c.getContext("webgl")) as WebGLRenderingContext | null;
-      if (!gl) return false;
-      const px = new Uint8Array(4 * 16);
-      gl.readPixels(Math.floor(c.width / 2) - 2, Math.floor(c.height / 2) - 2, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      return px.some((v, i) => i % 4 === 3 && v > 0);
-    });
-    expect(drawn).toBe(true);
+    expect(await canvas.evaluate((img: HTMLImageElement) => (img.complete ? img.naturalWidth : 0))).toBeGreaterThan(50);
   }).toPass({ timeout: 60_000 });
   const partsCanvasMs = (await page.evaluate(() => performance.now())) - t0;
   if (profile) {

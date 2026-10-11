@@ -33,7 +33,6 @@ import {
 } from "@/lib/studio/client/steps";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { cn } from "@/lib/utils";
-import { preloadStudioViewer } from "@/components/studio/viewer/ViewerLazy";
 import type { StudioCtx } from "../StudioShell";
 import { Bar, MainButton, Problem, StepFrame } from "../ui";
 import { problemKey } from "./problem";
@@ -137,11 +136,8 @@ export function IdeaStep({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, [handoffIdea]);
 
-  // The Parts step opens on the 3D plate: fetch the viewer while the visitor talks to us
-  // (never during the first load, so the page itself stays light).
-  useEffect(() => {
-    if (idea || spec) preloadStudioViewer();
-  }, [idea, spec]);
+  // No 3D engine and no geometry worker are fetched here (owner 2026-10-11): the Parts
+  // step shows a picture drawn by the worker, which starts when that step opens.
 
   useEffect(() => {
     const el = logRef.current;

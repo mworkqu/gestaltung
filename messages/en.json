@@ -4097,6 +4097,13 @@
     "noOthers": "No other options for this one yet.",
     "addedForYou": "Added for you",
     "sourceIt": "We'll source this",
+    "loader": {
+      "parts": "Laying out your parts",
+      "pictures": "Drawing your designs",
+      "cad": "Opening your 3D model",
+      "partsAlt": "Your parts laid out on a plate",
+      "partsGrid": "Your parts"
+    },
     "partsPopover": {
       "open": "Show details for {name}",
       "inStock": "In stock in Lusail",

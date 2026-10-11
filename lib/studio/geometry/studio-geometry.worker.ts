@@ -36,6 +36,17 @@ ctx.onmessage = (e) => {
       .catch((err: unknown) => ctx.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }));
     return;
   }
+  if (req.kind === "partsPicture") {
+    // The Parts step picture (three.js + the library part models, its own lazy chunk).
+    const t0 = performance.now();
+    import("./parts-render")
+      .then((m) => m.renderPartsPicture(req.input))
+      .then((result) =>
+        ctx.postMessage({ id: req.id, ok: true, kind: "partsPicture", result, ms: Math.round(performance.now() - t0) }, [result.png]),
+      )
+      .catch((err: unknown) => ctx.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }));
+    return;
+  }
   const { reply, transfer } = handleRequest(req);
   ctx.postMessage(reply, transfer);
 };
