@@ -326,6 +326,89 @@ test("screenshots: Plant Waterer, 1366, EN", async ({ page }, info) => {
   await page.screenshot({ path: path.join(SHOTS, "05-code-wire-preview.png") });
 });
 
+// ── 3D: drag a part (P5-17d) ──
+
+type PartOnScreen = { id: string; board: boolean; size: number; x: number; y: number };
+const partsOnScreen = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __wiring3dParts?: () => PartOnScreen[] }).__wiring3dParts?.() ?? []);
+
+/** Opens the 3D tab and waits for the scene (test hook) to report its parts. */
+async function open3d(page: Page): Promise<PartOnScreen[]> {
+  await openTab(page, "3d");
+  await expect.poll(async () => (await partsOnScreen(page)).length, { timeout: 20_000 }).toBeGreaterThan(1);
+  await page.waitForTimeout(1500); // camera fit + first frames
+  return partsOnScreen(page);
+}
+
+/** Drags the part with the mouse by (dx, dy) px; returns where it was grabbed. */
+async function dragPart(page: Page, p: PartOnScreen, dx: number, dy: number) {
+  await page.mouse.move(p.x, p.y);
+  await page.mouse.down();
+  await page.mouse.move(p.x + dx / 4, p.y + dy / 4, { steps: 3 });
+  await page.mouse.move(p.x + dx, p.y + dy, { steps: 12 });
+  await page.mouse.up();
+}
+
+test("3D: drag a part on the mat, its wires follow, Reset layout puts it back", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "mouse drag on the desktop project");
+  test.setTimeout(120_000);
+  await open(page, "en", "plant_waterer");
+  await draw(page, "en");
+  const parts = await open3d(page);
+  const box = (await page.getByTestId("studio-wiring-3d").locator("canvas").boundingBox())!;
+  const reset = page.getByTestId("studio-wiring-3d-reset");
+  await expect(reset).toHaveCount(0);
+  // The bulkiest part that is not the board, well inside the view (its centre is solid).
+  const p = parts
+    .filter((q) => !q.board && q.x > box.x + 60 && q.x < box.x + box.width - 60 && q.y > box.y + 60 && q.y < box.y + box.height - 60)
+    .sort((a, b) => b.size - a.size)[0];
+  expect(p, "a part inside the view").toBeTruthy();
+  await dragPart(page, p, 90, 70);
+  await expect(reset).toBeVisible();
+  const after = (await partsOnScreen(page)).find((q) => q.id === p.id)!;
+  expect(Math.hypot(after.x - p.x, after.y - p.y), "the part moved").toBeGreaterThan(30);
+  // Kept for the session (reload restores the spot).
+  await page.reload();
+  await draw(page, "en");
+  await open3d(page);
+  await expect(reset).toBeVisible();
+  await reset.click();
+  await expect(reset).toHaveCount(0);
+  await page.waitForTimeout(600);
+  const back = (await partsOnScreen(page)).find((q) => q.id === p.id)!;
+  expect(Math.hypot(back.x - p.x, back.y - p.y), "Reset layout puts it back").toBeLessThan(6);
+});
+
+test("screenshots: 3D drag, 1366 EN + 375 EN", async ({ page }, info) => {
+  test.skip(!process.env.P517_SHOTS || info.project.name !== "desktop", "set P517_SHOTS=1 (desktop project)");
+  test.setTimeout(180_000);
+  mkdirSync(SHOTS, { recursive: true });
+  const panel = () => page.getByTestId("studio-wiring-3d");
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await open(page, "en", "plant_waterer");
+  await draw(page, "en");
+  let parts = await open3d(page);
+  await panel().scrollIntoViewIfNeeded();
+  parts = await partsOnScreen(page);
+  await panel().screenshot({ path: path.join(SHOTS, "08-3d-1366-before-drag.png") });
+  const box = (await panel().locator("canvas").boundingBox())!;
+  const p = parts.filter((q) => !q.board && q.y > box.y + 60 && q.y < box.y + box.height - 60).sort((a, b) => b.x - a.x)[0];
+  await dragPart(page, p, -60, 110);
+  await page.mouse.move(box.x + 5, box.y + 5);
+  await page.waitForTimeout(500);
+  await panel().screenshot({ path: path.join(SHOTS, "09-3d-1366-after-drag.png") });
+
+  await page.getByTestId("studio-wiring-3d-reset").click();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.reload();
+  await draw(page, "en");
+  await open3d(page);
+  await panel().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  await panel().screenshot({ path: path.join(SHOTS, "10-3d-375.png") });
+  await expectNoHorizontalOverflow(page);
+});
+
 test("screenshots: Plant Waterer, 375, AR", async ({ page }, info) => {
   test.skip(!process.env.P517_SHOTS || info.project.name !== "desktop", "set P517_SHOTS=1 (desktop project)");
   test.setTimeout(120_000);

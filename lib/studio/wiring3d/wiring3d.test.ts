@@ -4,8 +4,8 @@ import { buildWiring } from "../netlist";
 import { buildConnections } from "../connections";
 import { DEFAULT_SPEC, type LibraryPart } from "../schema";
 import { pins3dFor, slotRows } from "./pins3d";
-import { apartLift, layoutMat, pinWorld } from "./layout";
-import { buildWires, wirePath } from "./wires";
+import { apartLift, applyMoves, CLEAR, layoutMat, MOVE_CLEAR, movePart, pinWorld, resolveMove, type Placement } from "./layout";
+import { buildWires, touchesPart, wirePath } from "./wires";
 
 const CHECKED = [
   "arduino_uno", "esp32_devkit", "esp32_c3_mini", "soil_moisture_cap", "pump_5v", "motor_driver", "relay_module",
@@ -141,6 +141,82 @@ describe("layoutMat", () => {
     const l = layoutMat(items, connections);
     const lift = apartLift(l);
     for (const p of l.placements) expect(lift.get(p.instanceId)! > 0).toBe(!p.board);
+  });
+});
+
+/** Clearance between two footprints (mm; negative = overlap). */
+const clearance = (p: Placement, q: Placement) =>
+  Math.max(Math.abs(p.pos[0] - q.pos[0]) - (p.w + q.w) / 2, Math.abs(p.pos[1] - q.pos[1]) - (p.d + q.d) / 2);
+
+const noOverlap = (ps: Placement[], min = 0) => {
+  for (let i = 0; i < ps.length; i++)
+    for (let j = i + 1; j < ps.length; j++)
+      expect(clearance(ps[i], ps[j]), `${ps[i].instanceId} vs ${ps[j].instanceId}`).toBeGreaterThanOrEqual(min - 1e-6);
+};
+
+describe("layoutMat: tight", () => {
+  it.each(Object.entries(FIXTURES))("%s: every part sits 8–12 mm from its nearest neighbour", (_, ids) => {
+    const { connections, items } = wire(ids);
+    const { placements } = layoutMat(items, connections);
+    noOverlap(placements, CLEAR);
+    for (const p of placements) {
+      const near = Math.min(...placements.filter((q) => q !== p).map((q) => clearance(p, q)));
+      expect(near, p.instanceId).toBeGreaterThanOrEqual(CLEAR - 1e-6);
+      expect(near, p.instanceId).toBeLessThanOrEqual(12.5);
+    }
+  });
+});
+
+describe("moving parts", () => {
+  const setup = () => {
+    const { w, connections, items } = wire(FIXTURES.plant);
+    return { w, connections, layout: layoutMat(items, connections) };
+  };
+
+  it("a free spot is taken as is; the layout stays deterministic", () => {
+    const { layout } = setup();
+    const p = layout.placements.find((q) => !q.board)!;
+    const want: [number, number] = [layout.bounds.maxX + 80, 0];
+    expect(resolveMove(layout.placements, p.instanceId, want)).toEqual(want);
+    const moved = movePart(layout, p.instanceId, want);
+    expect(moved.placements.find((q) => q.instanceId === p.instanceId)!.pos.slice(0, 2)).toEqual(want);
+    expect(moved.bounds.maxX).toBeGreaterThan(layout.bounds.maxX);
+    expect(applyMoves(layout, { [p.instanceId]: want })).toEqual(applyMoves(layout, { [p.instanceId]: want }));
+  });
+
+  it("dropping a part on another never overlaps (pushed back or held)", () => {
+    const { layout } = setup();
+    const board = layout.placements.find((q) => q.board)!;
+    for (const p of layout.placements.filter((q) => !q.board)) {
+      for (const want of [[0, 0], [board.w / 2, 0], [0, -board.d / 2], [3, 4]] as [number, number][]) {
+        const xy = resolveMove(layout.placements, p.instanceId, want);
+        noOverlap(movePart(layout, p.instanceId, xy).placements, MOVE_CLEAR);
+      }
+    }
+  });
+
+  it("applyMoves drops a move that would overlap and keeps the rest", () => {
+    const { layout } = setup();
+    const [a, b] = layout.placements.filter((q) => !q.board);
+    const far: [number, number] = [layout.bounds.maxX + 100, layout.bounds.maxY + 100];
+    const out = applyMoves(layout, { [a.instanceId]: [0, 0], [b.instanceId]: far, gone_1: [5, 5] });
+    expect(out.placements.find((q) => q.instanceId === a.instanceId)!.pos).toEqual(a.pos);
+    expect(out.placements.find((q) => q.instanceId === b.instanceId)!.pos.slice(0, 2)).toEqual(far);
+    noOverlap(out.placements);
+  });
+
+  it("wires follow a moved part, and rebuilding only its wires matches the full build", () => {
+    const { w, connections, layout } = setup();
+    const p = layout.placements.find((q) => !q.board && connections.some((c) => c.to.part === q.instanceId && !c.viaPart))!;
+    const moved = movePart(layout, p.instanceId, [layout.bounds.maxX + 60, layout.bounds.minY - 40]);
+    const full = buildWires({ connections, layout: moved, getPart, nets: w.netlist.nets });
+    const mine = buildWires({ connections, layout: moved, getPart, nets: w.netlist.nets, only: (c) => touchesPart(c, p.instanceId) });
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine).toEqual(full.filter((s) => touchesPart(connections.find((c) => c.id === s.id)!, p.instanceId)));
+    const c = connections.find((x) => x.to.part === p.instanceId && !x.viaPart)!;
+    const seg = mine.find((s) => s.id === c.id)!;
+    const pl = moved.placements.find((q) => q.instanceId === p.instanceId)!;
+    expect(seg.points.at(-1)).toEqual(pinWorld(pl, pins3dFor(part(c.to.partId))[c.to.pin]).pos);
   });
 });
 

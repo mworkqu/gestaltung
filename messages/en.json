@@ -4351,7 +4351,9 @@
       },
       "three": {
         "canvasLabel": "Your parts in 3D with their wires",
-        "hint": "Tap a wire to see where it goes. Drag to turn, pinch to zoom.",
+        "hint": "Tap a wire to see where it goes. Drag empty space to turn, pinch to zoom.",
+        "dragHint": "Drag a part to move it.",
+        "reset": "Reset layout",
         "apart": "Take it apart",
         "together": "Put it back",
         "noWebgl": "This browser can't show 3D. The Wiring tab shows the same wires."

@@ -61,10 +61,16 @@ export type WireInput = {
   nets: Net[];
   /** Per-instance lift ("Take it apart"), mm. */
   lift?: (instanceId: string) => number;
+  /** Only build these connections (the wire spread still follows each one's place in `connections`). */
+  only?: (c: Connection) => boolean;
 };
 
+/** Does this connection touch the part (either end or its series helper)? */
+export const touchesPart = (c: Connection, instanceId: string) =>
+  c.from.part === instanceId || c.to.part === instanceId || c.viaPart === instanceId;
+
 /** Every wire segment of the circuit, in connection order. Ends with a missing part/pin are skipped. */
-export function buildWires({ connections, layout, getPart, nets, lift }: WireInput): WireSegment[] {
+export function buildWires({ connections, layout, getPart, nets, lift, only }: WireInput): WireSegment[] {
   const byId = new Map<string, Placement>(layout.placements.map((p) => [p.instanceId, p]));
   const end = (inst: string, partId: string, pin: string): Pin3d | null => {
     const pl = byId.get(inst);
@@ -74,6 +80,7 @@ export function buildWires({ connections, layout, getPart, nets, lift }: WireInp
   };
   const out: WireSegment[] = [];
   connections.forEach((c, i) => {
+    if (only && !only(c)) return;
     const spread = ((i % 5) - 2) * 1.6;
     const a = end(c.from.part, c.from.partId, c.from.pin);
     const b = end(c.to.part, c.to.partId, c.to.pin);

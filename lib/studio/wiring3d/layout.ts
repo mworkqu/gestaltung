@@ -38,8 +38,14 @@ export type MatLayout = {
   bounds: { minX: number; maxX: number; minY: number; maxY: number; maxZ: number };
 };
 
-/** Gap between parts (mm). */
-export const GAP = 14;
+/** Gap between a row and the board, and between parts in a row (mm). */
+export const GAP = 10;
+/** Minimum clearance kept between any two part footprints by the auto layout (mm). */
+export const CLEAR = 8;
+/** Minimum clearance when the client drags a part (mm). */
+export const MOVE_CLEAR = 2;
+/** A dragged part stays within this distance of the board centre (mm). */
+export const MAX_REACH = 320;
 /** Breadboard strip: height and the margin around the helper's legs. */
 export const BREADBOARD_H = 5;
 export const BREADBOARD_PAD = 6;
@@ -190,7 +196,7 @@ export function layoutMat(items: MatItem[], connections: Connection[]): MatLayou
     const f = footprint(d.item.part, 0, d.breadboard);
     return Math.max(f.w, f.d);
   };
-  const limit = (side: Side) => Math.max(side === "left" || side === "right" ? board.part.dims.y : board.part.dims.x, 40) + 70;
+  const limit = (side: Side) => Math.max(side === "left" || side === "right" ? board.part.dims.y : board.part.dims.x, 40) + 50;
   for (const side of SIDES) {
     for (let guard = 0; guard < 20; guard++) {
       const row = drafts.filter((d) => d.side === side).sort((a, b) => a.key - b.key || a.order - b.order);
@@ -250,24 +256,106 @@ export function layoutMat(items: MatItem[], connections: Connection[]): MatLayou
       };
       // Push outward until clear of everything already placed.
       const [vx, vy] = SIDE_VEC[side];
-      for (let k = 0; k < 400 && placed.some((q) => overlaps(p, q, GAP / 2)); k++) {
-        p.pos = [p.pos[0] + vx * 2, p.pos[1] + vy * 2, p.pos[2]];
+      for (let k = 0; k < 800 && placed.some((q) => overlaps(p, q, CLEAR)); k++) {
+        p.pos = [p.pos[0] + vx, p.pos[1] + vy, p.pos[2]];
       }
       placed.push(p);
     });
   }
 
+  // Keep the input order for rendering.
+  const byId = new Map(placed.map((p) => [p.instanceId, p]));
+  const placements = items.map((i) => byId.get(i.instanceId)!).filter(Boolean);
+  return { placements, bounds: boundsOf(placements) };
+}
+
+/** Footprint bounds of a set of placements (incl. breadboard strips), mm. */
+export function boundsOf(placements: Placement[]): MatLayout["bounds"] {
+  if (!placements.length) return { minX: -40, maxX: 40, minY: -30, maxY: 30, maxZ: 10 };
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, maxZ = 0;
-  for (const p of placed) {
+  for (const p of placements) {
     minX = Math.min(minX, p.pos[0] - p.w / 2);
     maxX = Math.max(maxX, p.pos[0] + p.w / 2);
     minY = Math.min(minY, p.pos[1] - p.d / 2);
     maxY = Math.max(maxY, p.pos[1] + p.d / 2);
     maxZ = Math.max(maxZ, (p.breadboard ? 0 : p.pos[2]) + p.h);
   }
-  // Keep the input order for rendering.
-  const byId = new Map(placed.map((p) => [p.instanceId, p]));
-  return { placements: items.map((i) => byId.get(i.instanceId)!).filter(Boolean), bounds: { minX, maxX, minY, maxY, maxZ } };
+  return { minX, maxX, minY, maxY, maxZ };
+}
+
+// ── Moving parts by hand (drag on the mat) ─────────────────────────────────
+
+/** Client-moved part centres on the mat (x, y mm), keyed by instanceId. */
+export type MatMoves = Record<string, [number, number]>;
+
+const clashes = (p: Placement, x: number, y: number, others: Placement[], clear: number) =>
+  others.some(
+    (q) => Math.abs(x - q.pos[0]) * 2 < p.w + q.w + clear * 2 && Math.abs(y - q.pos[1]) * 2 < p.d + q.d + clear * 2,
+  );
+
+const reach = (v: number) => Math.max(-MAX_REACH, Math.min(MAX_REACH, v));
+
+/**
+ * Where a dragged part may go: the wanted spot when it is clear; else pushed out
+ * of whatever it hits along the shorter way; else the furthest clear point on
+ * the way from where it was. Stays within MAX_REACH of the board. Pure.
+ */
+export function resolveMove(placements: Placement[], id: string, want: [number, number], from?: [number, number]): [number, number] {
+  const p = placements.find((q) => q.instanceId === id);
+  if (!p) return want;
+  const others = placements.filter((q) => q.instanceId !== id);
+  const start: [number, number] = from ?? [p.pos[0], p.pos[1]];
+  let x = reach(want[0]);
+  let y = reach(want[1]);
+  if (!clashes(p, x, y, others, MOVE_CLEAR)) return [x, y];
+  // Push back out of the parts it overlaps (smallest way out, a few rounds).
+  for (let k = 0; k < 6; k++) {
+    const hit = others.find((q) => clashes(p, x, y, [q], MOVE_CLEAR));
+    if (!hit) break;
+    const px = (p.w + hit.w) / 2 + MOVE_CLEAR - Math.abs(x - hit.pos[0]);
+    const py = (p.d + hit.d) / 2 + MOVE_CLEAR - Math.abs(y - hit.pos[1]);
+    if (px < py) x += (x >= hit.pos[0] ? 1 : -1) * (px + 0.01);
+    else y += (y >= hit.pos[1] ? 1 : -1) * (py + 0.01);
+    x = reach(x);
+    y = reach(y);
+  }
+  if (!clashes(p, x, y, others, MOVE_CLEAR)) return [x, y];
+  // Still blocked: the furthest clear point on the straight way from the start.
+  if (clashes(p, start[0], start[1], others, MOVE_CLEAR)) return start;
+  let lo = 0;
+  let hi = 1;
+  const at = (t: number): [number, number] => [reach(start[0] + (want[0] - start[0]) * t), reach(start[1] + (want[1] - start[1]) * t)];
+  for (let k = 0; k < 16; k++) {
+    const mid = (lo + hi) / 2;
+    const [mx, my] = at(mid);
+    if (clashes(p, mx, my, others, MOVE_CLEAR)) hi = mid;
+    else lo = mid;
+  }
+  return at(lo);
+}
+
+/** Place one part at (x, y) (already resolved). Returns a new layout. */
+export function movePart(layout: MatLayout, id: string, xy: [number, number]): MatLayout {
+  const placements = layout.placements.map((p) => (p.instanceId === id ? { ...p, pos: [xy[0], xy[1], p.pos[2]] as Vec3 } : p));
+  return { placements, bounds: boundsOf(placements) };
+}
+
+/**
+ * The auto layout with the client's moves on top (in placement order). A move
+ * for a part that is gone, or one that would now overlap (the parts changed), is
+ * dropped. Same input → same output.
+ */
+export function applyMoves(layout: MatLayout, moves: MatMoves): MatLayout {
+  let out = layout;
+  for (const p of layout.placements) {
+    const m = moves[p.instanceId];
+    if (!m || !Number.isFinite(m[0]) || !Number.isFinite(m[1])) continue;
+    const cur = out.placements.find((q) => q.instanceId === p.instanceId)!;
+    const others = out.placements.filter((q) => q.instanceId !== p.instanceId);
+    if (Math.abs(m[0]) > MAX_REACH || Math.abs(m[1]) > MAX_REACH || clashes(cur, m[0], m[1], others, MOVE_CLEAR)) continue;
+    out = movePart(out, p.instanceId, m);
+  }
+  return out;
 }
 
 /** "Take it apart": how high each part rises (board stays down). */
