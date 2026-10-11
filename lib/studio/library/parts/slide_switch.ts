@@ -11,7 +11,7 @@ export const slideSwitch: LibraryPart = {
     ar: "ذراع صغير تنزلق به لتشغيل شيء أو إطفائه.",
   },
   category: "input",
-  storeSkus: [],
+  storeSkus: ["VLT-32326837993574"],
   tags: ["switch", "slide", "toggle", "power-switch", "on-off", "lever", "mode", "input", "select", "side", "control", "ss12d"],
   dims: { x: 11.6, y: 8.2, z: 9 },
   model: { kind: "procedural", builder: "slideSwitch", params: {} },

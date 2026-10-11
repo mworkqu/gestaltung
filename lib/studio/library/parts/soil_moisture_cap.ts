@@ -11,7 +11,7 @@ export const soilMoistureCap: LibraryPart = {
     ar: "يُغرس في التربة ويخبر منتجك إن كان النبات عطشان.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-39679645679718"],
   tags: ["soil", "moisture", "plant", "garden", "watering", "irrigation", "capacitive", "analog", "wet", "dry", "greenhouse", "farm", "agriculture", "sensor", "humidity"],
   dims: { x: 98, y: 23, z: 7.6 },
   model: {

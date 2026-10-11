@@ -10,7 +10,7 @@ export const pirHcsr501: LibraryPart = {
     ar: "يلاحظ عندما يتحرّك شخص بالقرب منه.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-12191844204646"],
   tags: ["motion", "presence", "pir", "hc-sr501", "movement", "occupancy", "security", "alarm", "detect", "people", "infrared"],
   dims: { x: 32.2, y: 24.3, z: 18 },
   model: { kind: "procedural", builder: "pirSensor", params: {} },

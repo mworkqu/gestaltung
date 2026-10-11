@@ -10,7 +10,7 @@ export const oled13I2c: LibraryPart = {
     ar: "شاشة أكبر وأوضح للنصوص والأرقام والصور البسيطة.",
   },
   category: "display",
-  storeSkus: [],
+  storeSkus: ["VLT-12192015777894"],
   tags: ["display", "screen", "oled", "sh1106", "ssd1306", "i2c", "text", "graphics", "1.3", "monitor", "readout", "large", "dashboard", "clock"],
   dims: { x: 35.4, y: 33.5, z: 4 },
   model: {

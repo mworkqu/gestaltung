@@ -13,7 +13,7 @@ export const pump5v: LibraryPart = {
     ar: "مضخة صغيرة توضع في كوب أو خزان ماء وتسقي النبتة عندما تأمرها اللوحة.",
   },
   category: "actuator",
-  storeSkus: [],
+  storeSkus: ["VLT-39404718030950"],
   tags: ["pump", "water", "watering", "irrigation", "plant", "garden", "submersible", "inductive", "dc", "motor", "5v", "actuator", "aquarium", "fountain"],
   dims: { x: 53, y: 24, z: 33 },
   model: { kind: "procedural", builder: "waterPump", params: {} },

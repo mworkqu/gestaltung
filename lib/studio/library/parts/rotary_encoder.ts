@@ -10,7 +10,7 @@ export const rotaryEncoder: LibraryPart = {
     ar: "مقبض تديره لتغيير قيمة وتضغط عليه للتأكيد.",
   },
   category: "input",
-  storeSkus: [],
+  storeSkus: ["VLT-31976915828838"],
   tags: ["knob", "encoder", "rotary", "ky-040", "dial", "turn", "volume", "menu", "scroll", "select", "input", "control", "settings", "click", "adjust"],
   dims: { x: 26.5, y: 19.5, z: 30 },
   model: {

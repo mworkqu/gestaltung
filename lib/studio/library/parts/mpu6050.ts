@@ -10,7 +10,7 @@ export const mpu6050: LibraryPart = {
     ar: "يشعر بالاهتزاز والميلان والدوران ليعرف منتجك كيف يتم تحريكه.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-12191956992102"],
   tags: ["motion", "tilt", "accelerometer", "gyroscope", "gyro", "imu", "mpu6050", "gy-521", "orientation", "shake", "balance", "robot", "drone", "wearable", "step", "gesture", "i2c", "sensor", "vibration"],
   dims: { x: 21.2, y: 16.4, z: 10 },
   model: {

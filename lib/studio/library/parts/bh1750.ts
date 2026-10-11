@@ -10,7 +10,7 @@ export const bh1750: LibraryPart = {
     ar: "يخبر منتجك بمدى سطوع الغرفة أو الشمس بوحدات حقيقية.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-32268616302694"],
   tags: ["light", "lux", "brightness", "ambient", "daylight", "bh1750", "gy-302", "i2c", "sun", "lamp", "auto-brightness", "greenhouse", "sensor", "illuminance"],
   dims: { x: 18.5, y: 14, z: 10 },
   model: {

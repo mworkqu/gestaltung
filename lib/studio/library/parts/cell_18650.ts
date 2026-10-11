@@ -9,7 +9,7 @@ export const cell18650: LibraryPart = {
     ar: "تخزّن الطاقة ليعمل منتجك دون وصلة كهرباء.",
   },
   category: "power",
-  storeSkus: [],
+  storeSkus: ["VLT-31994281295974", "VLT-39439341912166"],
   tags: ["battery", "18650", "li-ion", "lithium", "rechargeable", "cordless", "portable", "power", "3.7v", "holder"],
   dims: { x: 76, y: 22, z: 19.5 },
   model: { kind: "procedural", builder: "battery18650", params: {} },

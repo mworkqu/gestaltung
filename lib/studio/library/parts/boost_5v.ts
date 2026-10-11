@@ -11,7 +11,7 @@ export const boost5v: LibraryPart = {
     ar: "يرفع جهد بطارية 3.7 فولت إلى 5 فولت ثابتة للقطع التي تحتاج أكثر مما تعطيه البطارية.",
   },
   category: "power",
-  storeSkus: [],
+  storeSkus: ["VLT-32066279571558"],
   tags: ["boost", "5v", "step-up", "stepup", "converter", "regulator", "voltage", "mt3608", "battery-powered", "portable", "power", "upconverter"],
   dims: { x: 23, y: 12.5, z: 5.2 },
   model: {

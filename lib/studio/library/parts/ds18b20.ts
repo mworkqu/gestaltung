@@ -10,7 +10,7 @@ export const ds18b20: LibraryPart = {
     ar: "مسبار محكم الإغلاق على كابل يقيس حرارة السوائل أو التربة أو الهواء.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-12686903771238", "VLT-49966863778109"],
   tags: ["temperature", "ds18b20", "waterproof", "probe", "onewire", "1-wire", "thermometer", "liquid", "water", "aquarium", "fridge", "soil", "cable", "outdoor", "sensor", "heat"],
   dims: { x: 62, y: 12, z: 9 },
   model: { kind: "procedural", builder: "ds18b20Probe", params: {} },

@@ -49,7 +49,7 @@ export const picoW: LibraryPart = {
     ar: "لوحة صغيرة متينة تنفّذ برنامجك ويمكنها الاتصال بالواي فاي.",
   },
   category: "mcu",
-  storeSkus: [],
+  storeSkus: ["VLT-49762818523453"],
   tags: ["pico", "picow", "rp2040", "raspberry", "wifi", "microcontroller", "brain", "controller", "micropython", "python", "iot", "wireless", "devkit", "3.3v", "dual-core"],
   dims: { x: 51, y: 21, z: 9 },
   model: {

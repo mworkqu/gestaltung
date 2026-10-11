@@ -10,7 +10,7 @@ export const buckConverter: LibraryPart = {
     ar: "يخفض جهداً أعلى (مثل 9 أو 12 فولت) بأمان إلى 5 فولت تحتاجها قطعك.",
   },
   category: "power",
-  storeSkus: [],
+  storeSkus: ["VLT-12177679908966"],
   tags: ["buck", "step-down", "stepdown", "converter", "regulator", "voltage", "adjustable", "mp1584", "12v", "9v", "power", "dc", "reducer", "trimmer"],
   dims: { x: 22, y: 17, z: 4.6 },
   model: {

@@ -11,7 +11,7 @@ export const n20Motor: LibraryPart = {
     ar: "محرّك صغير بتروس يدير عجلة أو ترساً ببطء وبقوة جيدة.",
   },
   category: "actuator",
-  storeSkus: [],
+  storeSkus: ["VLT-39837922558054"],
   tags: ["motor", "inductive", "dc", "n20", "gear", "gearmotor", "geared", "wheel", "robot", "car", "spin", "rotate", "6v", "actuator", "movement", "drive"],
   dims: { x: 34, y: 12, z: 10 },
   model: { kind: "procedural", builder: "n20Motor", params: {} },

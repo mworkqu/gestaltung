@@ -9,7 +9,7 @@ export const button6mm: LibraryPart = {
     ar: "اضغط عليه ليبدأ منتجك بتنفيذ أمر ما.",
   },
   category: "input",
-  storeSkus: [],
+  storeSkus: ["VLT-12186719191142"],
   tags: ["button", "switch", "push", "press", "tactile", "input", "click", "trigger", "start", "reset", "control"],
   dims: { x: 6, y: 6, z: 8 },
   model: { kind: "procedural", builder: "pushButton", params: { cap: "#3a3d44" } },

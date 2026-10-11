@@ -12,7 +12,7 @@ export const hcsr04: LibraryPart = {
     ar: "يقيس بُعد الجسم بإرسال صوت أعلى من أن يُسمع.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-12191967740006"],
   tags: ["distance", "ultrasonic", "hc-sr04", "hcsr04", "range", "proximity", "obstacle", "level", "parking", "robot", "sonar", "measure", "tank", "5v", "sensor"],
   dims: { x: 45, y: 16.5, z: 26 },
   model: { kind: "procedural", builder: "ultrasonicSensor", params: { spacing: 26 } },

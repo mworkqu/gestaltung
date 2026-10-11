@@ -11,7 +11,7 @@ export const microsdModule: LibraryPart = {
     ar: "تحفظ القراءات والملفات على بطاقة ذاكرة يمكنك إخراجها وقراءتها على الحاسوب.",
   },
   category: "connector",
-  storeSkus: [],
+  storeSkus: ["VLT-12186723942502"],
   tags: ["sd", "microsd", "micro-sd", "card", "memory", "storage", "logger", "datalogger", "log", "spi", "record", "save", "audio", "files", "flash"],
   dims: { x: 42, y: 24, z: 9 },
   model: {
