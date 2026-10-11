@@ -204,6 +204,9 @@
     "whatsappPrompt": "Need help? WhatsApp us"
   },
   "Auth": {
+    "continueWith": "Continue with {provider}",
+    "orDivider": "or",
+    "oauthError": "Sign-in with {provider} didn't work. Try again or use your email.",
     "signInKicker": "Account access",
     "signInHeading": "Sign in",
     "signInIntro": "Sign in to see your orders and projects.",

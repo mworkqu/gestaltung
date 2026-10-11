@@ -15,12 +15,26 @@ import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
+import { SocialSignIn } from "@/components/auth/social-sign-in";
+import type { OAuthProvider } from "@/lib/auth/providers";
 
 // turnstileEnabled (P2-08): the store_settings switch from the server page.
 // Off (default) = no widget and the exact same signInWithPassword call as before.
 // next (W1): an already-validated "/{locale}/…" path (lib/auth/next-path.ts)
 // to return to after signing in; null = the role's dashboard.
-export function SignInForm({ turnstileEnabled = false, next = null }: { turnstileEnabled?: boolean; next?: string | null }) {
+// providers / oauthError: social sign-in buttons (only the enabled ones) and
+// the provider that just failed (?oauth_error=), both from the server page.
+export function SignInForm({
+  turnstileEnabled = false,
+  next = null,
+  providers = [],
+  oauthError = null,
+}: {
+  turnstileEnabled?: boolean;
+  next?: string | null;
+  providers?: OAuthProvider[];
+  oauthError?: OAuthProvider | null;
+}) {
   const t = useTranslations("Auth");
   const tClaim = useTranslations("GuestClaim");
   const nextRouter = useNextRouter();
@@ -109,6 +123,7 @@ export function SignInForm({ turnstileEnabled = false, next = null }: { turnstil
       altLabel={t("signUpLink")}
       altHref={authAltHref("/sign-up", next)}
     >
+      <SocialSignIn providers={providers} next={next} errorProvider={oauthError} />
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <label htmlFor="email" className={mono("block text-[10px] text-mutedtext")}>

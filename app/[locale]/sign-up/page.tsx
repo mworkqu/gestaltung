@@ -9,6 +9,7 @@ import { SignUpForm } from "@/components/auth/sign-up-form";
 import { metaFor } from "@/lib/meta";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+import { getEnabledProviders } from "@/lib/auth/providers-server";
 
 // Reads the session cookie to redirect already-signed-in users; keep per-request.
 export const dynamic = "force-dynamic";
@@ -34,9 +35,11 @@ export default async function SignUpPage({
     redirect(next ?? `/${locale}${dashboardPathForRole(session.profile.role)}`);
   }
 
+  const [turnstileEnabled, providers] = await Promise.all([turnstileEnabledForPages(), getEnabledProviders()]);
+
   return (
     <MessagesScope scope="auth">
-      <SignUpForm next={next} turnstileEnabled={await turnstileEnabledForPages()} />
+      <SignUpForm next={next} turnstileEnabled={turnstileEnabled} providers={providers} />
     </MessagesScope>
   );
 }

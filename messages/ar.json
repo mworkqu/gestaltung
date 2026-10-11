@@ -204,6 +204,9 @@
     "whatsappPrompt": "تحتاج مساعدة؟ راسلنا على واتساب"
   },
   "Auth": {
+    "continueWith": "المتابعة باستخدام {provider}",
+    "orDivider": "أو",
+    "oauthError": "لم ينجح تسجيل الدخول باستخدام {provider}. حاول مرة أخرى أو استخدم بريدك الإلكتروني.",
     "signInKicker": "الدخول إلى الحساب",
     "signInHeading": "تسجيل الدخول",
     "signInIntro": "سجّل الدخول لترى طلباتك ومشاريعك.",

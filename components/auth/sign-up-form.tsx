@@ -16,12 +16,23 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { PhoneInput } from "@/components/phone-input";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
 import { cn } from "@/lib/utils";
+import { SocialSignIn } from "@/components/auth/social-sign-in";
+import type { OAuthProvider } from "@/lib/auth/providers";
 
 // turnstileEnabled (P2-08): the store_settings switch from the server page.
 // Off (default) = no widget and the exact same signUp call as before. The guest
 // upgrade (updateUser) is not a CAPTCHA-protected endpoint and sends no token.
 // next (W1): an already-validated "/{locale}/…" path to return to.
-export function SignUpForm({ turnstileEnabled = false, next = null }: { turnstileEnabled?: boolean; next?: string | null }) {
+// providers: social sign-in buttons (only the enabled ones), from the server page.
+export function SignUpForm({
+  turnstileEnabled = false,
+  next = null,
+  providers = [],
+}: {
+  turnstileEnabled?: boolean;
+  next?: string | null;
+  providers?: OAuthProvider[];
+}) {
   const t = useTranslations("Auth");
   const tCheck = useTranslations("Turnstile");
   const tClaim = useTranslations("GuestClaim");
@@ -167,6 +178,7 @@ export function SignUpForm({ turnstileEnabled = false, next = null }: { turnstil
       altLabel={t("signInLink")}
       altHref={authAltHref("/sign-in", next)}
     >
+      <SocialSignIn providers={providers} next={next} />
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <label

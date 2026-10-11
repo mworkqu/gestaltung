@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { handleClaimGuest, isMissingFunction, sameOrigin } from "@/lib/auth/claim-guest";
+import { handleClaimGuest, sameOrigin } from "@/lib/auth/claim-guest";
+import { claimGuestDeps } from "@/lib/auth/claim-guest-server";
 
 // POST /api/auth/claim-guest  { token: <the guest's anonymous access token> }
 //
@@ -35,25 +36,7 @@ export async function POST(request: Request) {
   if (!service) return Response.json({ ok: false, error: "claim_failed" }, { status: 500 });
   const supabase = await createClient();
 
-  const out = await handleClaimGuest(body, {
-    async sessionUser() {
-      const { data, error } = await supabase.auth.getUser();
-      return error || !data.user ? null : { id: data.user.id, is_anonymous: data.user.is_anonymous ?? false };
-    },
-    async userFromToken(token) {
-      const { data, error } = await service.auth.getUser(token);
-      return error || !data.user ? null : { id: data.user.id, is_anonymous: data.user.is_anonymous ?? false };
-    },
-    async claim(from, to) {
-      const { data, error } = await service.rpc("claim_guest_work", { p_from: from, p_to: to });
-      if (error) {
-        if (isMissingFunction(error)) return { ok: false, missing: true };
-        console.error("[claim-guest] claim_guest_work failed:", error.code ?? "", error.message);
-        return { ok: false, message: error.message };
-      }
-      return { ok: true, data };
-    },
-  });
+  const out = await handleClaimGuest(body, claimGuestDeps(supabase, service));
 
   return Response.json(out.body, { status: out.status, headers: { "Cache-Control": "no-store" } });
 }
