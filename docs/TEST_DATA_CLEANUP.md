@@ -36,6 +36,12 @@ A running list. Add a row whenever test or demo data is written to production. N
 
 Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test = true. The test email in the info@ mailbox is deleted by hand.
 
+## Studio walkthrough live test (2026-10-11)
+
+- Project `89ba3df7-d74c-4b3c-acc7-ac4b4b103704` "Plant Waterer" (brief "TEST automatic small plant watering monitor"), on the owner's account: Studio walked Idea → Enclosure. No request sent.
+- Project `150257ef-d0d6-4297-9214-b833a26e6ef5` "TEST W1 claim - delete": created by guest `ad7575eb-f160-4dbd-8116-f7429b1be8e9`, then moved to the owner's account by claim_guest_work (0071 check).
+- Guest users `ad7575eb-f160-4dbd-8116-f7429b1be8e9` and one earlier anonymous user from a failed script run (owns nothing): the weekly anonymous cleanup removes them once 30 days old.
+
 ## Already deleted
 
 - Crash-repro project `6b5907f2-c957-43f9-bce8-42e73beeff33` "TEST crash repro — delete" (created 2026-10-09): already deleted by the owner. No action.
