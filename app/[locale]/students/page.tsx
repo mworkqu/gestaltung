@@ -1,5 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowRight, Bot, Box, CircuitBoard, CloudSun, ListChecks, Sprout, type LucideIcon } from "lucide-react";
+import { ArrowRight, Bot, Box, CircuitBoard, CloudSun, GraduationCap, ListChecks, Sprout, type LucideIcon } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,11 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
   const isRtl = locale === "ar";
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
 
-  const gets: { key: "get1" | "get2" | "get3"; icon: LucideIcon }[] = [
+  const gets: { key: "get1" | "get2" | "get3" | "get4"; icon: LucideIcon }[] = [
     { key: "get1", icon: ListChecks },
     { key: "get2", icon: CircuitBoard },
     { key: "get3", icon: Box },
+    { key: "get4", icon: GraduationCap },
   ];
 
   // The store search contract (lib/store/catalog.ts STORE_URL_PARAMS): /store?q=...
@@ -64,7 +65,7 @@ export default async function StudentsPage({ params }: { params: Promise<{ local
       {/* What you get */}
       <section className="neu animate-fade-up delay-1 card-pad">
         <h2 className="mb-6 title-section">{t("getHeading")}</h2>
-        <ul className="grid gap-5 lg:grid-cols-3">
+        <ul className="grid gap-5 sm:grid-cols-2">
           {gets.map(({ key, icon: Icon }) => (
             <li key={key} className="min-w-0 tile">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">

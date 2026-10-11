@@ -5,6 +5,7 @@ import {
   CircuitBoard,
   FolderKanban,
   Gift,
+  GraduationCap,
   ListChecks,
   MessageCircle,
   PencilRuler,
@@ -153,6 +154,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         cad: formatQar(ORDER_DELIVERED_CREDITS.cad),
       }),
     },
+    { icon: GraduationCap, title: t("creditEduTitle"), text: t("creditEduText") },
   ];
 
   const serviceCards: {
