@@ -8,11 +8,11 @@
 // manifold-3d (WASM) lazily — workers that only build enclosures never fetch it.
 
 import { handleRequest } from "./job";
-import type { GeometryReply, GeometryRequest } from "./protocol";
+import type { GeometryRequest, WorkerMessage } from "./protocol";
 
 const ctx = self as unknown as {
   onmessage: ((e: MessageEvent<GeometryRequest>) => void) | null;
-  postMessage(message: GeometryReply, transfer?: Transferable[]): void;
+  postMessage(message: WorkerMessage, transfer?: Transferable[]): void;
 };
 
 ctx.onmessage = (e) => {
@@ -26,6 +26,13 @@ ctx.onmessage = (e) => {
     import("./product-job")
       .then((m) => m.handleProductRequest(req))
       .then(({ reply, transfer }) => ctx.postMessage(reply, transfer))
+      .catch((err: unknown) => ctx.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }));
+    return;
+  }
+  if (req.kind === "productPreview" || req.kind === "productUnlocked" || req.kind === "productStl") {
+    // P5-16 Phase 2b: preview pictures (streamed), unlocked meshes, STLs. Same lazy chunk.
+    import("./product-job")
+      .then((m) => m.handleProductJob(req, (msg, transfer) => ctx.postMessage(msg, transfer)))
       .catch((err: unknown) => ctx.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }));
     return;
   }

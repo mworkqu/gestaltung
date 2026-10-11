@@ -93,7 +93,7 @@ export function handleRequest(req: GeometryRequest): { reply: GeometryReply; tra
   const ms = () => Math.round((typeof performance !== "undefined" ? performance.now() : Date.now()) - t0);
   try {
     // Products are async (WASM) and live in product-job.ts, loaded on demand.
-    if (req.kind === "product") return { reply: { id: req.id, ok: false, error: "product requests go to product-job" }, transfer: [] };
+    if (req.kind !== "enclosure" && req.kind !== "mech") return { reply: { id: req.id, ok: false, error: "product requests go to product-job" }, transfer: [] };
     if (req.kind === "enclosure") {
       const result = runEnclosure(req.key, req.input);
       return {

@@ -71,6 +71,7 @@ export default async function StudioPage({
           requestedStep={step}
           libraryParts={libraryParts}
           initial={initial}
+          isAdmin={isAdmin}
         />
         <TurnstileChallenge enabled={turnstileEnabled} />
       </div>

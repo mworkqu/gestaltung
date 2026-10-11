@@ -330,6 +330,9 @@ export const StudioDocSchema = z.object({
   product: ProductDocSchema.optional(),
 });
 export type StudioDoc = z.infer<typeof StudioDocSchema>;
+/** Page-side names for the same types (P5-16 Phase 2b). */
+export type StudioProduct = ProductDoc;
+export type StudioProductDesign = ProductDesign;
 
 // ---------------------------------------------------------------------------
 // Clamp helpers

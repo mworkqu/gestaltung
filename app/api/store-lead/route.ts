@@ -247,11 +247,23 @@ export async function POST(request: Request) {
     const design = String(body.designName ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || projectName || "Untitled design";
     // W2 "Get it made" pop-up: the visitor's optional note.
     const note = String(body.note ?? "").trim().slice(0, 1000);
+    // P5-16: an unlocked product sends every printed body's STL (the visitor's own cad-files folder only).
+    let files: string[] = [];
+    if (body.files !== undefined && projectId) {
+      try {
+        const supabase = await createClient();
+        const { data: auth } = await supabase.auth.getUser();
+        files = printFiles(body.files, auth.user?.id ?? null, projectId);
+      } catch (err) {
+        console.error("store-lead: studio files lookup failed", err);
+      }
+    }
     message = [
       `Design Studio: ${design}${link ? ` — ${link}` : ""}`,
       projectId ? `Project: ${projectName ?? design}${link ? ` — ${link}` : ""}` : null,
       items.map((i) => `- ${i.function}`).join("\n"),
       note ? `Note:\n${note}` : null,
+      files.length ? `Files:\n${files.map((f) => `- ${f}`).join("\n")}` : null,
     ]
       .filter(Boolean)
       .join("\n\n")

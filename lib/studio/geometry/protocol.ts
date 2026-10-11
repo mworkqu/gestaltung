@@ -9,6 +9,9 @@ import type { Material } from "../mech/materials";
 import type { PackedGeometry } from "./pack";
 import type { BuiltLink, BuiltPiece } from "./product-kernel";
 import type { PlacedElectronic, SolvedProduct } from "../product/solve";
+import type { Archetype, Scene } from "../product/schema";
+import type { SceneMetrics } from "../product/scene";
+import type { ProductSpec } from "../schema";
 
 export type EnclosureInput = {
   spec: EnclosureSpec;
@@ -62,13 +65,102 @@ export type PackedProduct = {
 
 export type ProductRequest = { id: number; kind: "product"; key: string; input: ProductInput };
 
+// ---------------------------------------------------------------------------
+// P5-16 Phase 2b: preview pictures, "Create my CAD", per-body STLs.
+// The worker talks to /api/studio/product/* itself (same-origin, cookies); the
+// page gets ONLY pictures, progress and page-safe metadata before payment.
+// ---------------------------------------------------------------------------
+
+/** e2e fixture only (E2E_FIXTURES): the worker answers the product endpoints itself, no network. */
+export type ProductMockOptions = {
+  /** Fixed vision score (default 8). */
+  score?: number;
+  /** Design builds allowed before "guest_limit" (null = no limit). */
+  guestLimitAfter?: number | null;
+  /** Every design fails (tests the template fallback). */
+  fail?: boolean;
+};
+
+type ProductCommon = {
+  projectId: string;
+  /** The spec + parts the page already has (the solver needs them; never secret). */
+  spec: ProductSpec;
+  /** [instanceId, part] pairs. */
+  parts: [string, LibraryPart][];
+  /** "/api/studio/product" on the live site. */
+  apiBase: string;
+  mock?: ProductMockOptions | null;
+};
+
+export type ProductPreviewInput = ProductCommon & { count: number; exclude?: Archetype[] };
+export type ProductUnlockInput = ProductCommon & { designId: string };
+/** STL files of a product already built in this worker (after unlock). */
+export type ProductStlInput = { hash: string; name: string };
+
+export type ProductStage = "designing" | "checking" | "polishing";
+export type ProductWhy = { en: string; ar: string };
+
+/** Streamed while a productPreview runs. NEVER carries a model or geometry. */
+export type ProductEvent =
+  | { kind: "productProgress"; stage: ProductStage; designId?: string; index?: number; total?: number }
+  | {
+      kind: "productPicture";
+      designId: string;
+      archetype: Archetype;
+      why: ProductWhy;
+      previewPath: string | null;
+      /** PNG bytes (3/4 view in its scene, ≤ 1024 px), transferred. */
+      png: ArrayBuffer;
+      ms: number;
+    };
+
+export type ProductPreviewDesign = {
+  id: string;
+  archetype: Archetype;
+  why: ProductWhy;
+  previewPath: string | null;
+  status: "ready" | "failed";
+};
+export type ProductPreviewError = "guest_limit" | "sign_in" | "no_render" | "failed";
+export type ProductPreviewResult = { designs: ProductPreviewDesign[]; error?: ProductPreviewError; ms: number };
+
+/** After payment only: the built product with geometry, and what the viewer needs for the scene. */
+export type ProductUnlockResult = PackedProduct & { designId: string; scene: Scene; stage: SceneMetrics };
+
+export type ProductStlFile = {
+  id: string;
+  bodyId: string;
+  piece: "whole" | "bottom" | "top";
+  role: string;
+  material: string;
+  grams: number;
+  name: string;
+  data: ArrayBuffer;
+};
+export type ProductStlResult = { files: ProductStlFile[]; combined: { name: string; data: ArrayBuffer } | null };
+
 export type GeometryRequest =
   | { id: number; kind: "enclosure"; key: string; input: EnclosureInput }
   | { id: number; kind: "mech"; key: string; encKey: string; input: MechInput }
-  | ProductRequest;
+  | ProductRequest
+  | { id: number; kind: "productPreview"; input: ProductPreviewInput }
+  | { id: number; kind: "productUnlocked"; input: ProductUnlockInput }
+  | { id: number; kind: "productStl"; input: ProductStlInput };
 
 export type GeometryReply =
   | { id: number; ok: true; kind: "enclosure"; result: PackedEnclosure; ms: number }
   | { id: number; ok: true; kind: "mech"; result: PackedMechPart[]; ms: number }
   | { id: number; ok: true; kind: "product"; result: PackedProduct; ms: number }
+  | { id: number; ok: true; kind: "productPreview"; result: ProductPreviewResult; ms: number }
+  | { id: number; ok: true; kind: "productUnlocked"; result: ProductUnlockResult; ms: number }
+  | { id: number; ok: true; kind: "productStl"; result: ProductStlResult; ms: number }
   | { id: number; ok: false; error: string };
+
+/** A progress message for a running request (not its reply). */
+export type GeometryEvent = { id: number; event: ProductEvent };
+
+export type WorkerMessage = GeometryReply | GeometryEvent;
+
+export function isGeometryEvent(m: WorkerMessage): m is GeometryEvent {
+  return typeof m === "object" && m !== null && "event" in m;
+}

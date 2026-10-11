@@ -46,9 +46,11 @@ export function stepDone(step: FlowStep, doc: StudioDoc | null): boolean {
     case "wiring":
       return doc.checks.length > 0 && doc.netlist.nets.length > 0;
     case "enclosure":
-      return doc.enclosure !== null;
+      // P5-16: a product whose CAD was created counts like a drawn case.
+      return doc.enclosure !== null || !!doc.product?.unlockedId;
     case "print":
-      return doc.enclosure !== null && doc.mech.length > 0;
+      // The unlocked product's printed bodies come straight from its model (no mech list).
+      return (doc.enclosure !== null && doc.mech.length > 0) || !!doc.product?.unlockedId;
     case "code":
       return hasPassed("code", doc);
     case "make":

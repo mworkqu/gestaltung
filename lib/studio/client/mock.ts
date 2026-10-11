@@ -14,10 +14,61 @@ import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { specParts } from "@/lib/studio/ai/pick";
 import { guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
 import { clampSpec, type StudioComponent } from "@/lib/studio/schema";
-import type { Locale, StudioApi } from "./api";
+import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
+import { mockOptionsFromUrl } from "./product";
 import { forModel } from "./steps";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * P5-16 product endpoints for the fixture (?product=1). The worker answers design /
+ * check / preview / model itself (lib/studio/geometry/product-mock.ts); here are the
+ * page's own calls. ?unlock=no_credits | sign_in makes "Create my CAD" refuse.
+ */
+export function mockProductApi(): ProductApi {
+  return {
+    base: "",
+    mock: mockOptionsFromUrl(),
+    async choose(designId) {
+      await wait(60);
+      return { ok: true, data: { chosenId: designId } };
+    },
+    async unlock(designId) {
+      await wait(150);
+      let gate: string | null = null;
+      try {
+        gate = new URLSearchParams(window.location.search).get("unlock");
+      } catch {
+        /* no window */
+      }
+      if (gate === "no_credits") return { ok: false, status: 402, error: "no_credits" };
+      if (gate === "sign_in") return { ok: false, status: 403, error: "sign_in" };
+      return { ok: true, data: { unlockedId: designId } };
+    },
+    async engineer(doc) {
+      // The same archetype defaults the worker's mock designs (deterministic), solved here.
+      const [{ rankArchetypes, defaultProductFor }, { solveProduct }] = await Promise.all([
+        import("@/lib/studio/product/archetypes"),
+        import("@/lib/studio/product/solve"),
+      ]);
+      const parts = doc.components.flatMap((c) => {
+        const part = getPart(c.partId);
+        return part ? [{ instanceId: c.instanceId, part }] : [];
+      });
+      const shown = new Set((doc.product?.designs ?? []).map((d) => d.archetype));
+      const archetypes = shown.size ? [...shown] : rankArchetypes(doc.spec).slice(0, 3).map((r) => r.archetype);
+      const designs: EngineerDesign[] = archetypes.map((archetype) => {
+        const model = defaultProductFor(doc.spec, parts, { archetype });
+        const solved = solveProduct(model, parts, { spec: doc.spec });
+        return { id: `d_${`mk${archetype.replace(/_/g, "")}`.slice(0, 16)}`, model: solved.model, solvedHash: solved.hash, score: mockOptionsFromUrl().score ?? 8, loops: 0, looksLike: archetype.replace(/_/g, " "), missing: [], issues: solved.issues, source: "default" };
+      });
+      return { ok: true, data: { designs } };
+    },
+    async previewUrl() {
+      return null;
+    },
+  };
+}
 
 const QUESTION: Record<Locale, { question: string; choices: string[] }> = {
   en: { question: "Where will it live?", choices: ["On my desk", "On a wall", "In my hand"] },

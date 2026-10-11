@@ -20,7 +20,18 @@ import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { chatStorageKey, parseHandoff } from "@/lib/projects/create-from-chat";
 import type { LibraryPart } from "@/lib/studio/schema";
 import { StudioLibraryProvider, useStudioLibrary } from "./StudioLibraryProvider";
-import { emptyStudioDoc, type EnclosureSpec, type MechPart, type ProductSpec, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
+import {
+  emptyStudioDoc,
+  type EnclosureSpec,
+  type Finish,
+  type MechPart,
+  type ProductSpec,
+  type StudioComponent,
+  type StudioDoc,
+  type StudioProduct,
+} from "@/lib/studio/schema";
+import { fileSlug } from "@/lib/studio/client/steps";
+import { PRODUCT_FINISH_KEY, useProductPreviews, useUnlockedProduct } from "./use-product";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { withStudioCache } from "@/lib/studio/client/cache";
 import { liveStudioApi, type LoadResult, type Locale, type StudioApi, type StudioProject } from "@/lib/studio/client/api";
@@ -58,6 +69,8 @@ export type StudioCtx = {
   projectName: string;
   /** Step number (1-based) and accent come from the step id. */
   n: (step: FlowStep) => number;
+  /** super_admin (checked on the server): the Engineer view of the product designs. */
+  isAdmin?: boolean;
 };
 
 type Loaded =
@@ -82,6 +95,8 @@ type ShellProps = {
    * straight away (server HTML), no client load. Absent = the browser loads it (skeleton first).
    */
   initial?: Extract<LoadResult, { ok: true }> | null;
+  /** super_admin (checked on the server page): Engineer view of the product designs. */
+  isAdmin?: boolean;
 };
 
 /** Owner-edited / new library parts (studio_parts, validated on the server); none = the code library. */
@@ -100,6 +115,7 @@ function StudioShellInner({
   requestedStep = null,
   api: injected,
   initial = null,
+  isAdmin = false,
 }: ShellProps) {
   const t = useTranslations("Studio");
   const { getPart } = useStudioLibrary();
@@ -356,6 +372,7 @@ function StudioShellInner({
             layout: [],
             mech: [],
             firmware: undefined,
+            product: undefined,
           };
       commit(nextDoc);
       void api.rename(spec.name);
@@ -442,6 +459,39 @@ function StudioShellInner({
 
   const flushBeforeServer = useCallback(() => flush(), [flush]);
 
+  // ── P5-16 product designs (pictures in the background after Parts) ───────
+  const onProduct = useCallback(
+    (update: (prev: StudioProduct | undefined) => StudioProduct) => {
+      const base = latest.current;
+      if (!base) return;
+      commit({ ...base, product: update(base.product) });
+    },
+    [commit],
+  );
+  const onProductFinish = useCallback(
+    (finish: Finish) => {
+      const base = latest.current;
+      if (!base) return;
+      commit({ ...base, answers: { ...(base.answers ?? {}), [PRODUCT_FINISH_KEY]: finish } });
+    },
+    [commit],
+  );
+  const previews = useProductPreviews({ api, doc, getPart, active: current > FLOW.indexOf("parts"), onProduct });
+  const unlocked = useUnlockedProduct({ api, doc, getPart, active: current >= FLOW.indexOf("enclosure") });
+  // "Get it made" for an unlocked product sends every printed body as an STL.
+  const unlockedHash = unlocked.data?.hash ?? null;
+  const productFiles = useMemo(
+    () =>
+      unlockedHash
+        ? async () => {
+            const { productStls } = await import("@/lib/studio/client/product");
+            const r = await productStls(unlockedHash, fileSlug(latest.current?.spec.name ?? "product"));
+            return r.files.map((f) => ({ name: f.name, data: f.data }));
+          }
+        : undefined,
+    [unlockedHash],
+  );
+
   // ── W2 "Get it made" ─────────────────────────────────────────────────────
   const router = useRouter();
   // Back from sign-in / sign-up with ?getItMade=1: reopen the pop-up once and drop the flag.
@@ -505,7 +555,7 @@ function StudioShellInner({
   const projectName = doc?.spec.name ?? loaded.project.name;
   const step = FLOW[current];
   const n = (s: FlowStep) => FLOW.indexOf(s) + 1;
-  const ctx: StudioCtx = { api, locale, projectId, projectName, n };
+  const ctx: StudioCtx = { api, locale, projectId, projectName, n, isAdmin };
   // W2: one "Get it made" bar from the Enclosure step onward.
   const showGetItMade = !!doc && current >= FLOW.indexOf("enclosure");
 
@@ -554,10 +604,20 @@ function StudioShellInner({
           <WiringStep ctx={ctx} doc={doc} beforeServer={flushBeforeServer} onWiring={onWiring} onNext={next} />
         )}
         {step === "enclosure" && doc && (
-          <EnclosureStep ctx={ctx} doc={doc} beforeServer={flushBeforeServer} onEnclosure={onEnclosure} onNext={next} />
+          <EnclosureStep
+            ctx={ctx}
+            doc={doc}
+            previews={previews}
+            unlocked={unlocked}
+            beforeServer={flushBeforeServer}
+            onEnclosure={onEnclosure}
+            onProduct={onProduct}
+            onFinish={onProductFinish}
+            onNext={next}
+          />
         )}
         {step === "print" && doc && (
-          <PrintStep ctx={ctx} doc={doc} beforeServer={flushBeforeServer} onMech={onMech} onNext={next} />
+          <PrintStep ctx={ctx} doc={doc} unlocked={unlocked} beforeServer={flushBeforeServer} onMech={onMech} onNext={next} />
         )}
         {step === "code" && doc && (
           <CodeStep
@@ -577,6 +637,7 @@ function StudioShellInner({
           doc={doc}
           locale={locale}
           autoOpen={reopenGetItMade}
+          productFiles={productFiles}
           beforeLeave={() => void flush()}
           onSent={onRequestSent}
         />
