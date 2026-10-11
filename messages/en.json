@@ -4253,6 +4253,18 @@
     "shareFailed": "We couldn't make the picture. Please try again.",
     "viewerMake": "3D view of your product",
     "product": {
+      "why_stake_device": "Stands in the soil beside the plant: the stake holds the sensor at the roots and the head keeps the electronics dry and easy to see.",
+      "why_planter_insert": "Sits inside the pot with the plant, so nothing clutters the shelf and the sensor stays close to the soil.",
+      "why_desk_object": "A compact, rounded body for the desk: stable on its base, easy to reach, with the controls and light on top.",
+      "why_lamp": "A lamp shape: a steady base, a taller body and a diffused light that is soft on the eyes.",
+      "why_wall_mount": "Mounts flat on the wall at hand height, with the button and light facing you and the cable hidden behind.",
+      "why_handheld": "Shaped to hold in one hand: a slim, tapered grip with the buttons under your thumb.",
+      "why_wearable_band": "A small, light pod on a band, so you can wear it all day without noticing it.",
+      "why_pet_feeder": "A wide, stable base with the food container on top and a bowl in front, so food drops where your pet eats.",
+      "why_dispenser": "A container on a steady base with the outlet at the front, so it dispenses right where your hand is.",
+      "why_vehicle_mount": "A low, compact body with a clip, so it sits on the dashboard without blocking the view.",
+      "why_outdoor_box": "A sealed, rugged box with a sloped lid, so rain runs off and the electronics stay dry.",
+      "why_tabletop_robot": "A friendly body with a head on top, so it faces you from the table and shows what it is doing with light.",
       "headline": "Here is your product",
       "intro": "We designed it around your parts. Pick the design you like. You pay only when you open its CAD.",
       "headlineOpen": "Your product in 3D",
@@ -4312,19 +4324,7 @@
       "name_dispenser": "Dispenser",
       "name_vehicle_mount": "Car mount",
       "name_outdoor_box": "Outdoor box",
-      "name_tabletop_robot": "Tabletop robot",
-      "why_stake_device": "It stands in the soil beside your plant, senses it and waters right at the roots.",
-      "why_planter_insert": "It sits inside the pot, low and out of the way of the leaves.",
-      "why_desk_object": "A calm piece for a desk or shelf, easy to reach and to read.",
-      "why_lamp": "A base that holds the light up where it is useful, with the controls in reach.",
-      "why_wall_mount": "It sits flat on the wall at the right height, with the front facing you.",
-      "why_handheld": "Shaped to fit your hand, with the buttons under your thumb.",
-      "why_wearable_band": "Small and light enough to wear all day.",
-      "why_pet_feeder": "A stable base on the floor with the food where your pet can reach it.",
-      "why_dispenser": "It holds the supply on top and gives out just what is needed.",
-      "why_vehicle_mount": "It stays put on the dashboard and faces the driver.",
-      "why_outdoor_box": "A closed, sturdy box that keeps the electronics dry outside.",
-      "why_tabletop_robot": "A friendly body that stands on the table and looks at you."
+      "name_tabletop_robot": "Tabletop robot"
     },
     "material_resin_clear": "Clear resin",
     "material_aluminium": "Aluminium"
@@ -4479,5 +4479,9 @@
   "HomeHero": {
     "visualLabel": "Start a project: a sample case that opens to show the parts inside",
     "opensWhatsapp": "(opens WhatsApp)"
+  },
+  "StudioPreview": {
+    "alt": "Picture of your chosen design",
+    "altNamed": "Picture of the chosen design for {name}"
   }
 }

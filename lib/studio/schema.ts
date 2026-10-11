@@ -11,6 +11,8 @@
 // JSON is meant to feed a future CadQuery backend unchanged (lib/studio/cad-adapter.ts).
 
 import { z } from "zod";
+
+// Type-only (erased): product/schema.ts imports this file, a value import would be a cycle.
 import type { Archetype } from "./product/schema";
 
 // ---------------------------------------------------------------------------
@@ -270,6 +272,44 @@ export const LayoutItemSchema = z.object({
 });
 export type LayoutItem = z.infer<typeof LayoutItemSchema>;
 
+// ---------------------------------------------------------------------------
+// Product designs (P5-16) — the PAGE-SAFE part only
+// ---------------------------------------------------------------------------
+// Pictures + public metadata. The ProductModels themselves live server-side in
+// projects.studio.productPrivate (lib/studio/product/private.ts): never in this
+// schema, so every doc parse strips them, and the server owns this field too —
+// a doc save from the page keeps the stored `product` (lib/studio/server/doc.ts).
+
+export const PRODUCT_DESIGN_STATUSES = ["building", "ready", "failed"] as const;
+export type ProductDesignStatus = (typeof PRODUCT_DESIGN_STATUSES)[number];
+
+/** Design ids are minted by the server: d_ + 10 base-36 chars. */
+export const PRODUCT_DESIGN_ID = /^d_[a-z0-9]{6,16}$/;
+/** At most this many designs are kept on a project (oldest unchosen ones drop first). */
+export const PRODUCT_DESIGNS_MAX = 9;
+
+/** An archetype name (the list lives in product/schema.ts; the server only writes real ones). */
+const ArchetypeName = z.custom<Archetype>((v) => typeof v === "string" && /^[a-z_]{3,32}$/.test(v), "archetype");
+
+export const ProductDesignSchema = z.object({
+  id: z.string().regex(PRODUCT_DESIGN_ID),
+  archetype: ArchetypeName,
+  why: z.object({ en: z.string().max(160), ar: z.string().max(160) }),
+  /** Storage path of the chosen 3/4 picture (bucket project-images), or null before it is rendered. */
+  previewPath: z.string().max(200).nullable(),
+  status: z.enum(PRODUCT_DESIGN_STATUSES),
+});
+export type ProductDesign = z.infer<typeof ProductDesignSchema>;
+
+export const ProductDocSchema = z.object({
+  designs: z.array(ProductDesignSchema).max(PRODUCT_DESIGNS_MAX),
+  chosenId: z.string().nullable(),
+  unlockedId: z.string().nullable(),
+  /** Hash of the spec + parts the designs were made for (a new spec starts a new set). */
+  specHash: z.string().max(64),
+});
+export type ProductDoc = z.infer<typeof ProductDocSchema>;
+
 export const StudioDocSchema = z.object({
   version: z.literal(1),
   spec: ProductSpecSchema,
@@ -286,32 +326,13 @@ export const StudioDocSchema = z.object({
   answers: z.record(z.string(), z.string()).optional(),
   /** The step the visitor was last on (W1): the Studio reopens there. Loose string so a renamed step never breaks old docs. */
   lastStep: z.string().max(32).optional(),
-  /**
-   * P5-16 product designs, PAGE-SAFE part only (pictures + why + status). The models
-   * live server-side in projects.studio.productPrivate and never reach the page
-   * before "Create my CAD" (docs/STUDIO_PRODUCT.md).
-   */
-  product: z
-    .object({
-      designs: z.array(
-        z.object({
-          id: z.string(),
-          // (archetype enum lives in ./product/schema, which imports this file: checked as a string here)
-          archetype: z.custom<Archetype>((v) => typeof v === "string"),
-          why: z.object({ en: z.string(), ar: z.string() }),
-          previewPath: z.string().nullable(),
-          status: z.enum(["building", "ready", "failed"]),
-        }),
-      ),
-      chosenId: z.string().nullable(),
-      unlockedId: z.string().nullable(),
-      specHash: z.string(),
-    })
-    .optional(),
+  /** P5-16 product designs: pictures + public metadata only (server-owned, see ProductDocSchema). */
+  product: ProductDocSchema.optional(),
 });
 export type StudioDoc = z.infer<typeof StudioDocSchema>;
-export type StudioProduct = NonNullable<StudioDoc["product"]>;
-export type StudioProductDesign = StudioProduct["designs"][number];
+/** Page-side names for the same types (P5-16 Phase 2b). */
+export type StudioProduct = ProductDoc;
+export type StudioProductDesign = ProductDesign;
 
 // ---------------------------------------------------------------------------
 // Clamp helpers

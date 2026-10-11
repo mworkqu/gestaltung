@@ -10,7 +10,8 @@
 import type { CallResult } from "@/lib/prototyping/ai-call";
 import type { ClampLog } from "../schema";
 
-export type StudioStep = "spec" | "pick" | "enclosure" | "mech";
+/** product = the AI product designer, vision = its picture check (P5-16). */
+export type StudioStep = "spec" | "pick" | "enclosure" | "mech" | "product" | "vision";
 
 export type Validated<T> = { value: T | null; errors: string[] };
 
@@ -20,6 +21,10 @@ export type StudioCallRequest<T> = {
   prompt: string;
   schema: object;
   validate: (raw: unknown) => Validated<T>;
+  /** Inline images (vision check only). */
+  images?: readonly { mimeType: "image/png" | "image/jpeg"; data: string }[];
+  /** Overrides the 45 s default (the product designer writes long JSON). */
+  timeoutMs?: number;
 };
 
 export type StudioCall = <T>(req: StudioCallRequest<T>) => Promise<CallResult<T>>;

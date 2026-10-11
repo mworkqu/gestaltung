@@ -13,6 +13,8 @@ export type AiCache = Lru<unknown>;
 
 export const specCache: AiCache = new Lru<unknown>(200, TEN_MINUTES);
 export const pickCache: AiCache = new Lru<unknown>(200, TEN_MINUTES);
+/** P5-16 product designer answers (spec + parts + archetypes → validated designs). */
+export const productDesignCache: AiCache = new Lru<unknown>(100, TEN_MINUTES);
 
 /** Reads through `cache`; only a model answer is stored. A hit never calls `make`. */
 export async function outcomeCached<T>(
