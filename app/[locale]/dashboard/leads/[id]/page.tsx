@@ -4,12 +4,14 @@ import { ArrowLeft, Mail, MessageCircle } from "lucide-react";
 
 import { QuoteCalcCard } from "@/components/admin/quote-calc-card";
 import { QuoteForm } from "@/components/admin/quote-form";
+import { ProductPicture } from "@/components/projects/product-picture";
 import { Link } from "@/i18n/navigation";
 import { leadKind } from "@/lib/admin/lead-kind";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
 import { parseQuoteCalc } from "@/lib/studio/request-summary";
+import { projectPreviewUrl } from "@/lib/studio/server/preview-url";
 import { createClient } from "@/lib/supabase/server";
 import type { Inquiry } from "@/lib/supabase/types";
 
@@ -41,6 +43,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ loc
 
   const t = await getTranslations("Leads");
   const tq = await getTranslations("LeadQuote");
+  const tp = await getTranslations("StudioPreview");
+  // The client's chosen Studio design picture (P5-16), signed with the admin's session.
+  const pictureUrl = lead.project_id ? await projectPreviewUrl(supabase, lead.project_id) : null;
   const migrated = "quote_calc" in lead;
   const calc = parseQuoteCalc(lead.quote_calc);
   const parsed = parseLeadMessage(lead.message);
@@ -57,7 +62,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ loc
 
       <section className="neu space-y-3 p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+          {pictureUrl && <ProductPicture url={pictureUrl} alt={tp("alt")} size={96} />}
+          <div className="min-w-0 flex-1">
             <h1 className="title-page break-words">{lead.name}</h1>
             <p className="mt-1 text-xs text-faint">
               {t(`kind_${leadKind(lead.message)}`)} · {t("colDate")} {dateFmt.format(new Date(lead.created_at))} · {t(`status_${lead.status}`)}

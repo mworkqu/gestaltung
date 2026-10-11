@@ -1,12 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { ProductPicture } from "@/components/projects/product-picture";
 import { RequestReceived } from "@/components/studio/RequestReceived";
 import { signInHref } from "@/lib/auth/next-path";
 import { pageMetadata } from "@/lib/seo";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { requestSummary } from "@/lib/studio/request-summary";
 import { loadDoc } from "@/lib/studio/server/doc";
+import { projectPreviewUrl } from "@/lib/studio/server/preview-url";
 import { getProjectQuote, getQuoteRule, linkedPrices } from "@/lib/studio/server/quote";
 import { createClient } from "@/lib/supabase/server";
 
@@ -48,11 +50,13 @@ export default async function ProjectRequestPage({ params }: { params: Promise<{
   const isAdmin = (me as { role?: string } | null)?.role === "super_admin";
   if (!row || (row.user_id !== user.id && !isAdmin)) notFound();
 
-  const [loaded, lib, rule, ownerQuote] = await Promise.all([
+  const [loaded, lib, rule, ownerQuote, pictureUrl, tp] = await Promise.all([
     loadDoc(supabase, id),
     studioLibrary().catch(() => null),
     getQuoteRule(supabase),
     getProjectQuote(supabase, id),
+    projectPreviewUrl(supabase, id),
+    getTranslations({ locale, namespace: "StudioPreview" }),
   ]);
   const doc = loaded.ok && loaded.available ? loaded.doc : null;
   const getPart = (pid: string) => lib?.getPart(pid);
@@ -70,6 +74,11 @@ export default async function ProjectRequestPage({ params }: { params: Promise<{
 
   return (
     <div className="container max-w-4xl py-6 sm:py-10">
+      {pictureUrl && (
+        <div className="mb-4 flex justify-center sm:justify-start" data-testid="chosen-design-picture">
+          <ProductPicture url={pictureUrl} alt={tp("altNamed", { name: row.name || "" })} size={160} />
+        </div>
+      )}
       <RequestReceived summary={summary} locale={locale} designHref={`/projects/${id}/studio?step=make`} ownerQuote={ownerQuote} />
     </div>
   );

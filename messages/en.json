@@ -4251,7 +4251,21 @@
     "shareText": "Look what I designed: {name} — {link}",
     "shareSaved": "Picture saved to your downloads.",
     "shareFailed": "We couldn't make the picture. Please try again.",
-    "viewerMake": "3D view of your product"
+    "viewerMake": "3D view of your product",
+    "product": {
+      "why_stake_device": "Stands in the soil beside the plant: the stake holds the sensor at the roots and the head keeps the electronics dry and easy to see.",
+      "why_planter_insert": "Sits inside the pot with the plant, so nothing clutters the shelf and the sensor stays close to the soil.",
+      "why_desk_object": "A compact, rounded body for the desk: stable on its base, easy to reach, with the controls and light on top.",
+      "why_lamp": "A lamp shape: a steady base, a taller body and a diffused light that is soft on the eyes.",
+      "why_wall_mount": "Mounts flat on the wall at hand height, with the button and light facing you and the cable hidden behind.",
+      "why_handheld": "Shaped to hold in one hand: a slim, tapered grip with the buttons under your thumb.",
+      "why_wearable_band": "A small, light pod on a band, so you can wear it all day without noticing it.",
+      "why_pet_feeder": "A wide, stable base with the food container on top and a bowl in front, so food drops where your pet eats.",
+      "why_dispenser": "A container on a steady base with the outlet at the front, so it dispenses right where your hand is.",
+      "why_vehicle_mount": "A low, compact body with a clip, so it sits on the dashboard without blocking the view.",
+      "why_outdoor_box": "A sealed, rugged box with a sloped lid, so rain runs off and the electronics stay dry.",
+      "why_tabletop_robot": "A friendly body with a head on top, so it faces you from the table and shows what it is doing with light."
+    }
   },
   "StudioLibrary": {
     "pageTitle": "Studio parts",
@@ -4403,5 +4417,9 @@
   "HomeHero": {
     "visualLabel": "Start a project: a sample case that opens to show the parts inside",
     "opensWhatsapp": "(opens WhatsApp)"
+  },
+  "StudioPreview": {
+    "alt": "Picture of your chosen design",
+    "altNamed": "Picture of the chosen design for {name}"
   }
 }
