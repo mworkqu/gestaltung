@@ -6,7 +6,8 @@
 import { useMemo } from "react";
 import { useLocale } from "next-intl";
 
-import { mockStudioApi } from "@/lib/studio/client/mock";
+import { mockProductApi, mockStudioApi } from "@/lib/studio/client/mock";
+import { GOLDEN_IDEAS, type GoldenIdea } from "@/lib/studio/product/__fixtures__/golden";
 import type { StudioApi } from "@/lib/studio/client/api";
 import { getPart } from "@/lib/studio/library";
 import { buildWiring } from "@/lib/studio/netlist";
@@ -25,18 +26,31 @@ export function StudioFixture({
   stored = false,
   step = null,
   preset = null,
+  product = false,
+  idea = null,
+  admin = false,
 }: {
   stored?: boolean;
   step?: string | null;
   preset?: "plant" | null;
+  /** ?product=1: the P5-16 product pipeline (worker-side mock endpoints, no network). */
+  product?: boolean;
+  /** ?idea=<golden key>: one of the five acceptance ideas, parts picked and wired. */
+  idea?: GoldenIdea["key"] | null;
+  /** ?admin=1: the super_admin Engineer view. */
+  admin?: boolean;
 }) {
   const locale = useLocale() === "ar" ? "ar" : "en";
-  const api = useMemo(() => withCounts(withGate(withLook(withDelay(stored ? withTabStore(mockStudioApi()) : mockStudioApi())))), [stored]);
+  const api = useMemo(() => {
+    const base = withCounts(withGate(withLook(withDelay(stored ? withTabStore(mockStudioApi()) : mockStudioApi()))));
+    return product ? { ...base, product: mockProductApi() } : base;
+  }, [stored, product]);
   // ?preset=plant (read by the page) opens on the Enclosure step with a plant idea already wired (W6 e2e).
   const initial = useMemo(() => {
-    const doc = preset === "plant" ? plantDoc(locale) : null;
+    const golden = idea ? GOLDEN_IDEAS.find((g) => g.key === idea) : null;
+    const doc = golden ? goldenDoc(golden, locale) : preset === "plant" ? plantDoc(locale) : null;
     return doc ? { ...FIXTURE_INITIAL, project: { ...FIXTURE_INITIAL.project, name: doc.spec.name }, doc } : FIXTURE_INITIAL;
-  }, [locale, preset]);
+  }, [locale, preset, idea]);
   // Same first state the mock's load() gives, handed over up front like the real page does
   // (lib/studio/server/initial.ts), so the fixture's first render matches production.
   // ?store=1 (W1 e2e): the doc lives in this tab's sessionStorage and loads in the browser,
@@ -47,9 +61,24 @@ export function StudioFixture({
       destination="Google Gemini"
       api={api}
       initial={stored ? null : initial}
-      requestedStep={stored ? step : null}
+      requestedStep={stored || idea ? step : null}
+      isAdmin={admin}
     />
   );
+}
+
+/** One of the five P5-16 acceptance ideas, parts picked and wired (the Enclosure step is next). */
+function goldenDoc(g: GoldenIdea, locale: "en" | "ar"): StudioDoc {
+  const counts = new Map<string, number>();
+  const picked = g.partIds
+    .filter((id) => getPart(id))
+    .map((id) => {
+      const n = (counts.get(id) ?? 0) + 1;
+      counts.set(id, n);
+      return { partId: id, instanceId: `${id}_${n}`, label: getPart(id)!.name[locale], reason: "" };
+    });
+  const w = buildWiring(picked, g.spec, getPart, locale);
+  return { ...emptyStudioDoc(g.spec), components: w.components, netlist: w.netlist, checks: w.checks };
 }
 
 const TAB_STORE_KEY = "g360:e2e-studio-doc";

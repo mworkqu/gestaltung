@@ -11,6 +11,7 @@
 // JSON is meant to feed a future CadQuery backend unchanged (lib/studio/cad-adapter.ts).
 
 import { z } from "zod";
+import type { Archetype } from "./product/schema";
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -285,8 +286,32 @@ export const StudioDocSchema = z.object({
   answers: z.record(z.string(), z.string()).optional(),
   /** The step the visitor was last on (W1): the Studio reopens there. Loose string so a renamed step never breaks old docs. */
   lastStep: z.string().max(32).optional(),
+  /**
+   * P5-16 product designs, PAGE-SAFE part only (pictures + why + status). The models
+   * live server-side in projects.studio.productPrivate and never reach the page
+   * before "Create my CAD" (docs/STUDIO_PRODUCT.md).
+   */
+  product: z
+    .object({
+      designs: z.array(
+        z.object({
+          id: z.string(),
+          // (archetype enum lives in ./product/schema, which imports this file: checked as a string here)
+          archetype: z.custom<Archetype>((v) => typeof v === "string"),
+          why: z.object({ en: z.string(), ar: z.string() }),
+          previewPath: z.string().nullable(),
+          status: z.enum(["building", "ready", "failed"]),
+        }),
+      ),
+      chosenId: z.string().nullable(),
+      unlockedId: z.string().nullable(),
+      specHash: z.string(),
+    })
+    .optional(),
 });
 export type StudioDoc = z.infer<typeof StudioDocSchema>;
+export type StudioProduct = NonNullable<StudioDoc["product"]>;
+export type StudioProductDesign = StudioProduct["designs"][number];
 
 // ---------------------------------------------------------------------------
 // Clamp helpers

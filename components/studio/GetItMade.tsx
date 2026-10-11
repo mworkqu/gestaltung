@@ -22,7 +22,7 @@ import { formatPhoneDisplay, isValidPhone, normalizePhone } from "@/lib/phone";
 import { isPlausibleEmail } from "@/lib/store/shipping";
 import { track } from "@/lib/analytics";
 import { useStudioLibrary } from "./StudioLibraryProvider";
-import type { Locale, Profile, StudioApi } from "@/lib/studio/client/api";
+import type { Locale, PrintFile, Profile, StudioApi } from "@/lib/studio/client/api";
 import type { StudioDoc } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,7 @@ export function GetItMade({
   doc,
   locale,
   autoOpen = false,
+  productFiles,
   beforeLeave,
   onSent,
 }: {
@@ -47,6 +48,8 @@ export function GetItMade({
   locale: Locale;
   /** Open once on mount (back from sign-in with ?getItMade=1). */
   autoOpen?: boolean;
+  /** P5-16: the unlocked product's STLs (every printed body), uploaded with the request. */
+  productFiles?: () => Promise<PrintFile[]>;
   /** Save pending edits before the visitor leaves for the sign-in page. */
   beforeLeave: () => void;
   /** The lead went out: the shell records it on the doc and opens the quote page. */
@@ -153,6 +156,15 @@ export function GetItMade({
     setPhase("sending");
     const phoneE164 = normalizePhone(finalPhone);
     const items = doc.components.filter((c) => !c.auto).map((c) => getPart(c.partId)?.name.en ?? c.label);
+    // An unlocked product: every printed body's STL goes with the request (best-effort, never blocks it).
+    let files: string[] = [];
+    if (productFiles) {
+      try {
+        files = await api.uploadPrintFiles(await productFiles());
+      } catch {
+        files = [];
+      }
+    }
     const ok = await api
       .requestQuote({
         name: finalName || tS("defaultContactName"),
@@ -162,6 +174,7 @@ export function GetItMade({
         items: items.length ? items : [doc.spec.name],
         locale,
         designName: doc.spec.name,
+        ...(files.length ? { files } : {}),
       })
       .catch(() => false);
     if (!ok) {

@@ -21,6 +21,7 @@ import type { EnclosureMeta } from "../enclosure/build";
 import { enclosureKey, mechKey } from "./key";
 import { unpackGeometry } from "./pack";
 import type { GeometryReply, GeometryRequest, PackedEnclosure, PackedMechPart, PackedProduct } from "./protocol";
+import { geometryStats, postToWorker, resetTransportForTests, warmGeometryWorker, type Job } from "./transport";
 import type { SolvedProduct } from "../product/solve";
 import { persistEnclosure, readPersistedEnclosure } from "./persist";
 
@@ -40,55 +41,11 @@ export type MechGeometryPart = Omit<PackedMechPart, "geometry"> & { geometry?: T
 export type MechGeometry = { key: string; encKey: string; parts: MechGeometryPart[]; ms: number };
 
 // ---------------------------------------------------------------------------
-// Worker transport (one worker, requests matched by id)
+// Worker transport: lib/studio/geometry/transport.ts (one worker, shared with the
+// product preview client, no three.js). Where no Worker exists the job runs here.
 // ---------------------------------------------------------------------------
 
-type Pending = { resolve: (r: GeometryReply) => void; reject: (e: Error) => void };
-type Job = GeometryRequest extends infer R ? (R extends GeometryRequest ? Omit<R, "id"> : never) : never;
-
-let worker: Worker | null | undefined; // undefined = not tried yet, null = unavailable
-let nextId = 1;
-const pending = new Map<number, Pending>();
-
-/** Where the last job ran ("worker" / "main"); read by tests and the perf probe. */
-export const geometryStats = { worker: 0, main: 0, lastMs: 0, persisted: 0 };
-
-function failAll(err: Error) {
-  for (const p of pending.values()) p.reject(err);
-  pending.clear();
-}
-
-function getWorker(): Worker | null {
-  if (worker !== undefined) return worker;
-  if (typeof window === "undefined" || typeof Worker === "undefined") return (worker = null);
-  try {
-    const w = new Worker(new URL("./studio-geometry.worker.ts", import.meta.url), { type: "module", name: "studio-geometry" });
-    w.onmessage = (e: MessageEvent<GeometryReply>) => {
-      const p = pending.get(e.data?.id);
-      if (!p) return;
-      pending.delete(e.data.id);
-      p.resolve(e.data);
-    };
-    const broken = (e: Event) => {
-      // Failed to load (CSP, old browser) or crashed: everything waiting falls back to the main thread.
-      e.preventDefault?.();
-      if (worker === w) worker = null;
-      w.terminate();
-      failAll(new Error("geometry worker stopped"));
-    };
-    w.onerror = broken;
-    w.onmessageerror = broken;
-    worker = w;
-  } catch {
-    worker = null;
-  }
-  return worker;
-}
-
-/** Start the worker (and its scripts) before the first build, e.g. when the Enclosure step opens. */
-export function warmGeometryWorker(): void {
-  getWorker();
-}
+export { geometryStats, warmGeometryWorker };
 
 async function runOnMain(job: Job): Promise<GeometryReply> {
   geometryStats.main += 1;
@@ -96,24 +53,19 @@ async function runOnMain(job: Job): Promise<GeometryReply> {
     const { handleProductRequest } = await import("./product-job");
     return (await handleProductRequest({ ...job, id: 0 })).reply;
   }
-  const { handleRequest } = await import("./job");
-  return handleRequest({ ...job, id: 0 } as GeometryRequest).reply;
+  if (job.kind === "enclosure" || job.kind === "mech") {
+    const { handleRequest } = await import("./job");
+    return handleRequest({ ...job, id: 0 } as GeometryRequest).reply;
+  }
+  // Preview pictures need the worker's OffscreenCanvas: no main-thread fallback (the page keeps the template flow).
+  return { id: 0, ok: false, error: "no_worker" };
 }
 
 async function run(job: Job): Promise<GeometryReply> {
-  const w = getWorker();
-  if (w) {
-    try {
-      const id = nextId++;
-      const reply = await new Promise<GeometryReply>((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        w.postMessage({ ...job, id } as GeometryRequest);
-      });
-      geometryStats.worker += 1;
-      return reply;
-    } catch {
-      /* worker unavailable: same job on the main thread */
-    }
+  try {
+    return await postToWorker(job);
+  } catch {
+    /* worker unavailable: same job on the main thread */
   }
   return runOnMain(job);
 }
@@ -382,9 +334,7 @@ export function mechObjects(m: MechGeometry, enc: EnclosureGeometry): BuiltMechP
 
 /** Test hook: forget the worker + caches. */
 export function resetGeometryClientForTests() {
-  worker?.terminate();
-  worker = undefined;
-  failAll(new Error("reset"));
+  resetTransportForTests();
   enclosures.clear();
   mechs.clear();
   products.clear();

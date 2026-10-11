@@ -73,12 +73,15 @@ for (const [key, entry] of Object.entries(loadable)) {
 // product-job → manifold-loader → manifold-3d on the first product build) run off the main
 // thread: they belong to the worker table, not to the budget.
 const FALLBACK_ONLY = /\/geometry\/client\.ts -> \.\/(job|product-job)$/;
-const WORKER_ONLY = /\/geometry\/(studio-geometry\.worker|product-job|manifold-loader|product-kernel)\.ts -> /;
+// (P5-16b: product-job also loads product-render (three.js offscreen pictures) and, on fixture pages only, product-mock.)
+const WORKER_ONLY = /\/geometry\/(studio-geometry\.worker|product-job|product-preview|product-render|product-mock|manifold-loader|product-kernel)\.ts -> /;
+// Test-fixture-only main-thread imports (the e2e mock's Engineer view): never fetched on the live site.
+const FIXTURE_ONLY = /\/client\/mock\.ts -> /;
 const lazy = [];
 const fallback = [];
 for (const [f, keys] of lazyBy) {
   const list = [...keys];
-  if (!list.every((k) => FALLBACK_ONLY.test(k) || WORKER_ONLY.test(k))) lazy.push(f);
+  if (!list.every((k) => FALLBACK_ONLY.test(k) || WORKER_ONLY.test(k) || FIXTURE_ONLY.test(k))) lazy.push(f);
   else if (list.some((k) => FALLBACK_ONLY.test(k))) fallback.push(f);
   // else: worker-only — listed in the worker table below (found through the worker's runtime)
 }
@@ -93,9 +96,13 @@ for (const f of readdirSync(chunkDir)) {
   const text = readFileSync(path.join(chunkDir, f), "utf8");
   if (!text.includes("[studio-geometry-worker]")) continue;
   workers.add(`static/chunks/${f}`);
-  const m = text.match(/"static\/chunks\/"\+\(([^)]*)\)\+"\."\+\(\{([^}]*)\}\)\[\w+\]\+"\.js"/);
+  // Named chunks: `(e===964?"0f3c8638":…)` or, with more of them, `(({964:"0f3c8638",…})[e]||e)`.
+  const m = text.match(/"static\/chunks\/"\+(.*?)\+"\."\+\(\{([^}]*)\}\)\[\w+\]\+"\.js"/);
   if (!m) continue;
-  const names = new Map([...m[1].matchAll(/(\d+)===\w+\?"([^"]+)"/g)].map((x) => [x[1], x[2]]));
+  const names = new Map([
+    ...[...m[1].matchAll(/(\d+)===\w+\?"([^"]+)"/g)].map((x) => [x[1], x[2]]),
+    ...[...m[1].matchAll(/(\d+):"([^"]+)"/g)].map((x) => [x[1], x[2]]),
+  ]);
   for (const [, id, hash] of m[2].matchAll(/(\d+):"([0-9a-f]+)"/g)) {
     const file = `static/chunks/${names.get(id) ?? id}.${hash}.js`;
     if (existsSync(path.join(NEXT, file))) workers.add(file);

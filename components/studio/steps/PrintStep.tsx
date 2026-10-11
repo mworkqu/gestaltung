@@ -15,6 +15,7 @@
 //    made" bar (W2, components/studio/GetItMade.tsx), not a button here.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import type * as THREE from "three";
 import {
@@ -40,6 +41,7 @@ import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { MechPart, MechTemplate, StudioDoc } from "@/lib/studio/schema";
 import { fileSlug } from "@/lib/studio/client/steps";
 import type { StudioCtx } from "../StudioShell";
+import type { UnlockedProduct } from "../use-product";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 
 const accent = STEP_ACCENT.print;
@@ -88,7 +90,29 @@ function rowsOf(built: BuiltMechPart[]): Row[] {
   return [...rows.values()].sort((a, b) => rank(a) - rank(b));
 }
 
+// P5-16: an unlocked product prints its own bodies (PrintProduct.tsx, its own chunk).
+const PrintProduct = dynamic(() => import("./PrintProduct").then((m) => m.PrintProduct));
+
 export function PrintStep({
+  ctx,
+  doc,
+  unlocked,
+  beforeServer,
+  onMech,
+  onNext,
+}: {
+  ctx: StudioCtx;
+  doc: StudioDoc;
+  unlocked: UnlockedProduct;
+  beforeServer: () => Promise<void>;
+  onMech: (mech: MechPart[], serverVersion: number | null) => void;
+  onNext: () => void;
+}) {
+  if (doc.product?.unlockedId) return <PrintProduct ctx={ctx} unlocked={unlocked} onNext={onNext} />;
+  return <PrintTemplate ctx={ctx} doc={doc} beforeServer={beforeServer} onMech={onMech} onNext={onNext} />;
+}
+
+function PrintTemplate({
   ctx,
   doc,
   beforeServer,

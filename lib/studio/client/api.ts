@@ -12,6 +12,8 @@ import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
 import { EMPTY_SPEC, hasAiConsent, type Spec } from "@/lib/prototyping/spec";
 import { STORE_CARD_COLUMNS, type StoreCardPart } from "@/lib/store/catalog";
 import type { EnclosureSpec, MechPart, Net, ProductSpec, StudioCheck, StudioComponent, StudioDoc } from "@/lib/studio/schema";
+import type { ProductMockOptions } from "@/lib/studio/geometry/protocol";
+import { PROJECT_IMAGE_BUCKET } from "@/lib/projects/constants";
 import type { IdeaMessage } from "./steps";
 
 export type Locale = "en" | "ar";
@@ -83,6 +85,8 @@ export type QuoteRequest = {
   /** W2 "Get it made" pop-up. */
   email?: string;
   note?: string;
+  /** P5-16: the unlocked product's STLs, uploaded first (cad-files/<user>/<project>/print/…). */
+  files?: string[];
 };
 
 export interface StudioApi {
@@ -118,6 +122,48 @@ export interface StudioApi {
   /** W2: keep a typed name / WhatsApp number on the profile so it is never asked again (best-effort). */
   saveContact(c: { fullName?: string; phone?: string }): Promise<void>;
   requestQuote(q: QuoteRequest): Promise<boolean>;
+  /**
+   * P5-16 product designs (Phase 2b). Absent = the Studio keeps the template enclosure
+   * flow. The worker calls design / check / preview / model itself (`base`); the page
+   * only calls choose / unlock / engineer.
+   */
+  product?: ProductApi;
+}
+
+/** What the Engineer view (super_admin) shows per design (GET /engineer = productPrivate). */
+export type EngineerDesign = {
+  id: string;
+  model?: unknown;
+  solvedHash?: string;
+  score?: number;
+  loops?: number;
+  looksLike?: string;
+  missing?: string[];
+  issues?: unknown[];
+  source?: string;
+};
+
+export interface ProductApi {
+  /** Endpoint base the worker uses ("/api/studio/product"). */
+  readonly base: string;
+  /** e2e fixture only: the worker answers the endpoints itself. */
+  readonly mock: ProductMockOptions | null;
+  choose(designId: string): Promise<Res<{ chosenId: string }>>;
+  /** "Create my CAD": 1 CAD credit (same mechanism as the enclosure). 402 no_credits / 401|403 sign_in. */
+  unlock(designId: string): Promise<Res<{ unlockedId: string }>>;
+  /** super_admin only. `doc` is what the browser has (the mock uses it). */
+  engineer(doc: StudioDoc): Promise<Res<{ designs: EngineerDesign[] }>>;
+  /** A URL for a stored preview picture (signed when the bucket is private); null = unknown. */
+  previewUrl(path: string): Promise<string | null>;
+}
+
+/** previewPath → bucket + key: "studio-previews/…" lives in the project-images bucket; "bucket/…" names its bucket. */
+export function previewObject(path: string): { bucket: string; key: string } | null {
+  const clean = path.replace(/^\/+/, "");
+  if (!clean || clean.includes("..")) return null;
+  if (clean.startsWith("studio-previews/")) return { bucket: PROJECT_IMAGE_BUCKET, key: clean };
+  const [bucket, ...rest] = clean.split("/");
+  return rest.length ? { bucket, key: rest.join("/") } : null;
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<Res<T>> {
@@ -314,8 +360,39 @@ export function liveStudioApi(projectId: string): StudioApi {
         projectId,
         designName: q.designName,
         items: q.items.map((name) => ({ function: name, quantity: 1 })),
+        ...(q.files?.length ? { files: q.files } : {}),
       });
       return r.ok;
     },
+
+    product: {
+      base: PRODUCT_BASE,
+      mock: null,
+      choose: (designId) => postJson(`${PRODUCT_BASE}/choose`, { projectId, designId }),
+      unlock: (designId) => postJson(`${PRODUCT_BASE}/unlock`, { projectId, designId }),
+      async engineer() {
+        try {
+          const res = await fetch(`${PRODUCT_BASE}/engineer?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
+          const data = (await res.json().catch(() => ({}))) as { designs?: EngineerDesign[]; error?: string };
+          if (!res.ok || data.error) return { ok: false, status: res.status, error: data.error ?? "failed" };
+          return { ok: true, data: { designs: Array.isArray(data.designs) ? data.designs : [] } };
+        } catch {
+          return { ok: false, status: 0, error: "failed" };
+        }
+      },
+      async previewUrl(path) {
+        if (/^(https?:|blob:|data:|\/)/.test(path)) return path;
+        const obj = previewObject(path);
+        if (!obj) return null;
+        try {
+          const { data } = await (await db()).storage.from(obj.bucket).createSignedUrl(obj.key, 3600);
+          return data?.signedUrl ?? null;
+        } catch {
+          return null;
+        }
+      },
+    },
   };
 }
+
+const PRODUCT_BASE = "/api/studio/product";
