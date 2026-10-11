@@ -1,30 +1,45 @@
 "use client";
 
-// Step 1 · Your idea. A short chat (POST /api/studio/spec): the visitor types,
-// the AI asks at most a few tap-able questions, then returns the product
-// spec, shown as a friendly summary card with ONE main button. The input is
-// focused on load and after every reply (phones too) and is never disabled,
-// so the keyboard stays up. Answers are kept in doc.answers and never asked
-// again; "Edit" reopens the same conversation.
+// Step 1 · Your idea (W3). A real conversation beside a LIVE product card:
+//
+//  * Split layout: the chat at the start, the card at the end (logical grid
+//    columns, so Arabic mirrors by itself); on phones the card is a collapsible
+//    panel above the chat.
+//  * The card fills in straight from the visitor's own words (draftSpec: no AI,
+//    instant) and highlights each row the moment it is learned; the AI's spec
+//    then completes it. While the AI thinks: a typing dot in the chat and
+//    skeleton bars in the rows still to come (shown at once, well under 300 ms).
+//  * The chat never disappears. After the card is shown, anything typed is a
+//    change request ("make it solar") that updates the card (POST
+//    /api/studio/spec with `current`). When parts were already picked for the old
+//    card, the ONE main button becomes "Update my parts" — later steps are never
+//    redone silently.
+//  * The input is focused on load and after every reply (phones too) and is
+//    never disabled, so the keyboard stays up. Answers live in doc.answers and
+//    are never asked again.
 //
 // Consent: a project created on /projects/new already has it; otherwise the
 // existing consent line shows and is recorded on the first send.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, Send } from "lucide-react";
+import { Check, ChevronDown, Send } from "lucide-react";
 
 import { ChatConsent } from "@/components/prototyping/chat-thread";
 import type { ProductSpec, StudioDoc } from "@/lib/studio/schema";
-import { answersFrom, factKeys, historyFrom, type IdeaMessage } from "@/lib/studio/client/steps";
+import { draftSpec } from "@/lib/studio/ai/spec-guards";
+import {
+  answersFrom, cardRows, changedRows, forModel, historyFrom, sameSpec, type CardRow, type IdeaMessage,
+} from "@/lib/studio/client/steps";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { cn } from "@/lib/utils";
 import { preloadStudioViewer } from "@/components/studio/viewer/ViewerLazy";
 import type { StudioCtx } from "../StudioShell";
-import { linkCls, MainButton, Problem, StepFrame } from "../ui";
+import { Bar, MainButton, Problem, StepFrame } from "../ui";
 import { problemKey } from "./problem";
 
 const accent = STEP_ACCENT.idea;
+const FRESH_MS = 1600;
 
 export function IdeaStep({
   ctx,
@@ -50,11 +65,12 @@ export function IdeaStep({
   const [idea, setIdea] = useState(saved.idea);
   const [messages, setMessages] = useState<IdeaMessage[]>(saved.messages);
   const [spec, setSpec] = useState<ProductSpec | null>(doc?.spec ?? null);
-  const [mode, setMode] = useState<"chat" | "summary">(doc ? "summary" : "chat");
   const [input, setInput] = useState(!doc && !handoffIdea && brief ? brief.slice(0, 600) : "");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [ticked, setTicked] = useState(false);
+  // Phones: the card panel opens by itself once the spec is there.
+  const [cardOpen, setCardOpen] = useState(Boolean(doc?.spec));
   const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
@@ -64,10 +80,10 @@ export function IdeaStep({
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   };
 
-  async function ask(nextIdea: string, history: IdeaMessage[]) {
+  async function ask(nextIdea: string, history: IdeaMessage[], current: ProductSpec | null) {
     setBusy(true);
     setProblem(null);
-    const r = await ctx.api.spec({ idea: nextIdea, messages: history, locale: ctx.locale });
+    const r = await ctx.api.spec({ idea: nextIdea, messages: forModel(history), locale: ctx.locale, current });
     setBusy(false);
     if (!r.ok) {
       setProblem(t(problemKey(r)));
@@ -76,7 +92,9 @@ export function IdeaStep({
     }
     if ("spec" in r.data) {
       setSpec(r.data.spec);
-      setMode("summary");
+      if (current) setMessages([...history, { role: "assistant", text: "", note: true }]);
+      else setCardOpen(true);
+      focusInput();
       return;
     }
     setMessages([...history, { role: "assistant", text: r.data.question, choices: r.data.choices }]);
@@ -101,11 +119,12 @@ export function IdeaStep({
     setInput("");
     if (!idea) {
       setIdea(text);
-      await ask(text, messages);
+      await ask(text, messages, null);
     } else {
       const history: IdeaMessage[] = [...messages, { role: "user", text }];
       setMessages(history);
-      await ask(idea, history);
+      // Once the card is there, every message is a change request on top of it.
+      await ask(idea, history, spec);
     }
   }
 
@@ -114,13 +133,9 @@ export function IdeaStep({
     if (started.current || !handoffIdea || doc) return;
     started.current = true;
     setIdea(handoffIdea);
-    void ask(handoffIdea, []);
+    void ask(handoffIdea, [], null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, [handoffIdea]);
-
-  useEffect(() => {
-    if (mode === "chat") focusInput();
-  }, [mode]);
 
   // The Parts step opens on the 3D plate: fetch the viewer while the visitor talks to us
   // (never during the first load, so the page itself stays light).
@@ -133,156 +148,292 @@ export function IdeaStep({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, busy, idea]);
 
+  // ── The live card ────────────────────────────────────────────────────────
+  const draft = useMemo(() => (spec ? null : draftSpec(idea, forModel(messages), ctx.locale)), [spec, idea, messages, ctx.locale]);
+  const cardSpec = spec ?? draft!.spec;
+  const rows = useMemo(() => cardRows(cardSpec, spec ? "all" : draft!.touched), [cardSpec, spec, draft]);
+  const fresh = useFreshRows(rows);
+  const known = rows.filter((r) => r.key).length;
+
   const last = messages[messages.length - 1];
-  const choices = !busy && last?.role === "assistant" ? last.choices ?? [] : [];
+  const choices = !busy && last?.role === "assistant" && !last.note ? last.choices ?? [] : [];
   const shown: IdeaMessage[] = [{ role: "assistant", text: t("ideaFirst") }, ...(idea ? [{ role: "user" as const, text: idea }] : []), ...messages];
 
-  const title = t("title_idea");
-  const n = ctx.n("idea");
+  // One main button: "Update my parts" only when parts were picked for a card that has since changed.
+  const changed = Boolean(spec && doc && !sameSpec(spec, doc.spec));
+  const redoParts = changed && (doc?.components.length ?? 0) > 0;
+  const confirm = () => spec && onConfirm(spec, answersFrom(idea || spec.oneLine || spec.name, messages));
 
-  if (mode === "summary" && spec) {
-    const facts = factKeys(spec);
-    return (
-      <StepFrame
-        step="idea"
-        n={n}
-        title={title}
-        headline={t("summaryHeading")}
-        intro={t("intro_summary")}
-        footer={
-          <MainButton onClick={() => onConfirm(spec, answersFrom(idea || spec.oneLine || spec.name, messages))}>
-            {t("looksRight")}
-          </MainButton>
-        }
-        secondary={
-          <button type="button" className={linkCls} onClick={() => setMode("chat")}>
-            {t("edit")}
-          </button>
-        }
-      >
-        <div
-          className="tile space-y-4 border-0 p-5 sm:p-6"
-          style={{ background: `linear-gradient(135deg, ${accent.soft} 0%, #eef2f7 70%)` }}
-          data-testid="studio-idea-summary"
-        >
-          <div className="space-y-1">
-            <h2 className="text-xl font-extrabold tracking-tight text-heading" dir="auto">
-              {spec.name}
-            </h2>
-            {spec.oneLine && (
-              <p className="text-sm leading-relaxed text-body" dir="auto">
-                {spec.oneLine}
-              </p>
-            )}
-          </div>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {facts.map((k) => (
-              <li key={k} className="flex items-start gap-2 text-sm font-medium text-heading">
-                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full" style={{ background: accent.base }}>
-                  <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden />
-                </span>
-                {t(k)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </StepFrame>
-    );
-  }
+  const label = spec ? t("ideaCard.refinePlaceholder") : idea ? t("yourAnswer") : t("ideaPlaceholder");
 
   return (
-    <StepFrame step="idea" n={n} title={title} headline={t("headline_idea")} intro={t("intro_idea")}>
-      <div
-        ref={logRef}
-        role="log"
-        aria-live="polite"
-        aria-label={t("chatLog")}
-        className="max-h-[52dvh] space-y-3 overflow-y-auto rounded-2xl bg-panel/60 p-3 shadow-neu-inset sm:p-4"
-      >
-        {shown.map((m, i) => (
-          <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-            <p
-              dir="auto"
-              className={cn(
-                "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed motion-safe:animate-rise",
-                m.role === "user" ? "rounded-ee-md bg-cobalt text-white" : "rounded-es-md bg-surface text-heading shadow-neu-sm",
-              )}
-            >
-              {m.text}
+    <StepFrame
+      step="idea"
+      n={ctx.n("idea")}
+      title={t("title_idea")}
+      headline={spec ? t("summaryHeading") : t("headline_idea")}
+      intro={spec ? t("intro_summary") : t("intro_idea")}
+      footer={
+        spec ? (
+          <MainButton onClick={confirm} disabled={busy} data-testid="studio-idea-confirm">
+            {redoParts ? t("ideaCard.updateParts") : t("looksRight")}
+          </MainButton>
+        ) : undefined
+      }
+    >
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:items-start lg:gap-6">
+        {/* The card: end column on desktop, a collapsible panel above the chat on phones. */}
+        <div className="min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1" data-testid="studio-idea-card-col">
+          <SpecCard
+            spec={cardSpec}
+            draft={!spec}
+            idea={idea}
+            rows={rows}
+            fresh={fresh}
+            busy={busy}
+            known={known}
+            open={cardOpen}
+            onToggle={() => setCardOpen((o) => !o)}
+          />
+          {redoParts && (
+            <p className="mt-3 text-sm leading-relaxed text-mutedtext" data-testid="studio-update-parts-note">
+              {t("ideaCard.updatePartsNote")}
             </p>
+          )}
+        </div>
+
+        <div className="min-w-0 space-y-3 lg:col-start-1 lg:row-start-1" data-testid="studio-idea-chat">
+          <div
+            ref={logRef}
+            role="log"
+            aria-live="polite"
+            aria-label={t("chatLog")}
+            className="max-h-[52dvh] space-y-3 overflow-y-auto rounded-2xl bg-panel/60 p-3 shadow-neu-inset sm:p-4 lg:max-h-[60dvh]"
+          >
+            {shown.map((m, i) => (
+              <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
+                <p
+                  dir="auto"
+                  className={cn(
+                    "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed motion-safe:animate-rise",
+                    m.role === "user" ? "rounded-ee-md bg-cobalt text-white" : "rounded-es-md bg-surface text-heading shadow-neu-sm",
+                  )}
+                >
+                  {m.note ? t("ideaCard.refined") : m.text}
+                </p>
+              </div>
+            ))}
+            {busy && (
+              <div className="flex justify-start" data-testid="studio-typing">
+                <span className="inline-flex items-center gap-1 rounded-2xl rounded-es-md bg-surface px-3.5 py-3 shadow-neu-sm">
+                  <span className="sr-only">{t("thinking")}</span>
+                  {[0, 1, 2].map((d) => (
+                    <span
+                      key={d}
+                      aria-hidden
+                      className="h-1.5 w-1.5 rounded-full motion-safe:animate-bounce"
+                      style={{ background: accent.base, animationDelay: `${d * 140}ms` }}
+                    />
+                  ))}
+                </span>
+              </div>
+            )}
           </div>
-        ))}
-        {busy && (
-          <div className="flex justify-start" data-testid="studio-typing">
-            <span className="inline-flex items-center gap-1 rounded-2xl rounded-es-md bg-surface px-3.5 py-3 shadow-neu-sm">
-              <span className="sr-only">{t("thinking")}</span>
-              {[0, 1, 2].map((d) => (
-                <span
-                  key={d}
-                  aria-hidden
-                  className="h-1.5 w-1.5 rounded-full motion-safe:animate-bounce"
-                  style={{ background: accent.base, animationDelay: `${d * 140}ms` }}
-                />
+
+          {choices.length > 0 && (
+            <div className="flex flex-wrap gap-2" data-testid="studio-choices">
+              {choices.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => void send(c)}
+                  dir="auto"
+                  className="min-h-11 rounded-full border-2 bg-surface px-4 py-2 text-sm font-semibold text-heading shadow-neu-sm transition-[transform,background-color] hover:bg-white active:scale-[0.97]"
+                  style={{ borderColor: accent.base }}
+                >
+                  {c}
+                </button>
               ))}
-            </span>
+            </div>
+          )}
+
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send(input);
+            }}
+          >
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={label}
+              aria-label={label}
+              dir="auto"
+              autoFocus
+              enterKeyHint="send"
+              maxLength={1500}
+              className="min-h-12 min-w-0 flex-1 rounded-full border border-white/60 bg-panel px-4 text-base text-heading shadow-neu-inset outline-none placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
+            />
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              aria-label={t("send")}
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-cobalt text-white transition-colors hover:bg-cobalt-hover disabled:opacity-50"
+            >
+              <Send className="h-4 w-4 rtl:-scale-x-100" strokeWidth={1.75} />
+            </button>
+          </form>
+          {!consented && (
+            <ChatConsent destination={destination} checked={ticked} onChange={setTicked} disabled={busy} id="studio-consent" />
+          )}
+          {problem && <Problem>{problem}</Problem>}
+        </div>
+      </div>
+    </StepFrame>
+  );
+}
+
+/** Row ids that just changed, for a short highlight (cleared after FRESH_MS). */
+function useFreshRows(rows: CardRow[]): Set<string> {
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  const prev = useRef(rows);
+  const key = rows.map((r) => `${r.id}:${r.key ?? ""}`).join("|");
+  useEffect(() => {
+    const changed = changedRows(prev.current, rows);
+    prev.current = rows;
+    if (!changed.length) return;
+    setFresh(new Set(changed));
+    const id = setTimeout(() => setFresh(new Set()), FRESH_MS);
+    return () => {
+      clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the row contents
+  }, [key]);
+  return fresh;
+}
+
+/** The product card the owner loves (same gradient tile, check bullets), now live. */
+function SpecCard({
+  spec,
+  draft,
+  idea,
+  rows,
+  fresh,
+  busy,
+  known,
+  open,
+  onToggle,
+}: {
+  spec: ProductSpec;
+  draft: boolean;
+  idea: string;
+  rows: CardRow[];
+  fresh: Set<string>;
+  busy: boolean;
+  known: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const t = useTranslations("Studio");
+  const name = draft ? t("ideaCard.draftName") : spec.name;
+  const line = draft ? idea.slice(0, 160) : spec.oneLine;
+  const bodyId = "studio-idea-card-body";
+  return (
+    <section
+      aria-label={t("ideaCard.aria")}
+      className="tile overflow-hidden border-0 p-0"
+      style={{ background: `linear-gradient(135deg, ${accent.soft} 0%, #eef2f7 70%)` }}
+      data-testid="studio-idea-summary"
+      data-state={draft ? "draft" : "spec"}
+    >
+      {/* Phones: one bar that opens and closes the card. */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        aria-label={open ? t("ideaCard.hide") : t("ideaCard.show")}
+        className="flex min-h-12 w-full items-center gap-3 px-5 py-3 text-start lg:hidden"
+        data-testid="studio-idea-card-toggle"
+      >
+        <span className="min-w-0 flex-1">
+          {/* Open: the card's own heading below says the name, so the bar keeps only the count. */}
+          <span className={cn("block truncate text-sm font-bold text-heading", open && "sr-only")} dir="auto">
+            {name}
+          </span>
+          <span className="block text-xs text-mutedtext">{t("ideaCard.known", { n: String(known), total: String(rows.length) })}</span>
+        </span>
+        <ChevronDown
+          aria-hidden
+          className={cn("h-5 w-5 shrink-0 text-mutedtext transition-transform motion-reduce:transition-none", open && "rotate-180")}
+          strokeWidth={1.75}
+        />
+      </button>
+
+      <div id={bodyId} className={cn("space-y-4 p-5 max-lg:pt-1 sm:p-6", !open && "max-lg:hidden")}>
+        <div className="space-y-1">
+          <h2 className="text-xl font-extrabold tracking-tight text-heading" dir="auto">
+            {name}
+          </h2>
+          {line && (
+            <p className="text-sm leading-relaxed text-body" dir="auto">
+              {line}
+            </p>
+          )}
+          {draft && busy && (
+            <p className="text-xs font-semibold motion-safe:animate-pulse" style={{ color: accent.ink }}>
+              {t("ideaCard.learning")}
+            </p>
+          )}
+        </div>
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1" data-testid="studio-idea-facts">
+          {rows.map((r) => (
+            <li
+              key={r.id}
+              data-row={r.id}
+              data-known={r.key ? "1" : "0"}
+              data-fresh={fresh.has(r.id) ? "1" : undefined}
+              className={cn(
+                "flex items-start gap-2 rounded-xl px-1.5 py-1 text-sm font-medium transition-[background-color,box-shadow] duration-500 motion-reduce:transition-none",
+                fresh.has(r.id) && "bg-white/70 ring-2",
+              )}
+              style={fresh.has(r.id) ? ({ "--tw-ring-color": accent.base } as React.CSSProperties) : undefined}
+            >
+              {r.key ? (
+                <>
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full" style={{ background: accent.base }}>
+                    <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden />
+                  </span>
+                  <span className="text-heading">{t(r.key)}</span>
+                </>
+              ) : (
+                <>
+                  <span aria-hidden className="mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 border-dashed" style={{ borderColor: accent.base }} />
+                  {busy ? (
+                    <Bar className="mt-1 h-3 w-32" />
+                  ) : (
+                    <span className="text-faint">{r.hint ? t(`ideaCard.${r.hint}`) : null}</span>
+                  )}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+        {!draft && spec.features.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-semibold text-mutedtext">{t("ideaCard.includes")}</p>
+            <ul className="flex flex-wrap gap-1.5">
+              {spec.features.slice(0, 5).map((f) => (
+                <li key={f} dir="auto" className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-medium text-heading">
+                  {f}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
-
-      {choices.length > 0 && (
-        <div className="flex flex-wrap gap-2" data-testid="studio-choices">
-          {choices.map((c) => (
-            <button
-              key={c}
-              type="button"
-              onClick={() => void send(c)}
-              dir="auto"
-              className="min-h-11 rounded-full border-2 bg-surface px-4 py-2 text-sm font-semibold text-heading shadow-neu-sm transition-[transform,background-color] hover:bg-white active:scale-[0.97]"
-              style={{ borderColor: accent.base }}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <form
-        className="flex items-center gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send(input);
-        }}
-      >
-        <input
-          ref={inputRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={idea ? t("yourAnswer") : t("ideaPlaceholder")}
-          aria-label={idea ? t("yourAnswer") : t("ideaPlaceholder")}
-          dir="auto"
-          autoFocus
-          enterKeyHint="send"
-          maxLength={1500}
-          className="min-h-12 min-w-0 flex-1 rounded-full border border-white/60 bg-panel px-4 text-base text-heading shadow-neu-inset outline-none placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
-        />
-        <button
-          type="submit"
-          disabled={busy || !input.trim()}
-          aria-label={t("send")}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-cobalt text-white transition-colors hover:bg-cobalt-hover disabled:opacity-50"
-        >
-          <Send className="h-4 w-4 rtl:-scale-x-100" strokeWidth={1.75} />
-        </button>
-      </form>
-      {!consented && (
-        <ChatConsent destination={destination} checked={ticked} onChange={setTicked} disabled={busy} id="studio-consent" />
-      )}
-      {problem && <Problem>{problem}</Problem>}
-      {spec && (
-        <button type="button" className={linkCls} onClick={() => setMode("summary")}>
-          {t("looksRight")}
-        </button>
-      )}
-    </StepFrame>
+    </section>
   );
 }

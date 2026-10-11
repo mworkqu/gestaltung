@@ -40,7 +40,7 @@ describe("runSpecChat", () => {
 
   it("cuts long questions to 140 and choices to 40 characters", async () => {
     const m = fakeModel([{ question: "Q".repeat(300), choices: ["x".repeat(80), "short"] }]);
-    const r = await runSpecChat({ call: m.call, idea: "idea", messages: [], locale: "en" });
+    const r = await runSpecChat({ call: m.call, idea: "a desk lamp", messages: [], locale: "en" });
     if (!r.ok || r.value.kind !== "question") throw new Error("expected a question");
     expect(r.value.question.length).toBe(140);
     expect(r.value.choices[0].length).toBe(40);
@@ -48,7 +48,7 @@ describe("runSpecChat", () => {
 
   it("returns a valid spec, quantity always 1, enums clamped", async () => {
     const m = fakeModel([{ spec: { ...SPEC, quantity: 50, style: "Soft Tech", power: "nuclear" } }]);
-    const r = await runSpecChat({ call: m.call, idea: "idea", messages: asked(2), locale: "en" });
+    const r = await runSpecChat({ call: m.call, idea: "a desk lamp", messages: asked(2), locale: "en" });
     if (!r.ok || r.value.kind !== "spec") throw new Error("expected a spec");
     expect(r.value.spec.quantity).toBe(1);
     expect(r.value.spec.style).toBe("soft_tech");
@@ -62,7 +62,7 @@ describe("runSpecChat", () => {
       { question: "Only one choice?", choices: ["yes"] },
       { question: "Indoor or outdoor?", choices: ["Indoor", "Outdoor"] },
     ]);
-    const r = await runSpecChat({ call: m.call, idea: "idea", messages: [], locale: "en" });
+    const r = await runSpecChat({ call: m.call, idea: "a desk lamp", messages: [], locale: "en" });
     expect(r.ok && r.value.kind).toBe("question");
     expect(m.prompts).toHaveLength(2);
     expect(m.prompts[1]).toContain("offer 2–4 short choices");
@@ -70,7 +70,7 @@ describe("runSpecChat", () => {
 
   it("forces the spec after 4 questions (a question is rejected, then 'Return the spec now')", async () => {
     const m = fakeModel([{ question: "One more?", choices: ["a", "b"] }, { spec: SPEC }]);
-    const r = await runSpecChat({ call: m.call, idea: "idea", messages: asked(4), locale: "en" });
+    const r = await runSpecChat({ call: m.call, idea: "a desk lamp", messages: asked(4), locale: "en" });
     expect(r.ok && r.value.kind).toBe("spec");
     expect(m.prompts[0]).toContain("Return the spec now.");
     expect(m.prompts[1]).toContain("return the spec now, not a question");
@@ -87,13 +87,13 @@ describe("runSpecChat", () => {
 
   it("provider down → error, no default", async () => {
     const m = fakeModel([new ProviderError("unavailable", "503")]);
-    const r = await runSpecChat({ call: m.call, idea: "x", messages: [], locale: "en" });
+    const r = await runSpecChat({ call: m.call, idea: "a desk lamp", messages: [], locale: "en" });
     expect(r).toMatchObject({ ok: false, error: "unavailable" });
   });
 
   it("never puts the clamp log in the turn itself", async () => {
     const m = fakeModel([{ spec: { ...SPEC, quantity: 9 } }]);
-    const r = await runSpecChat({ call: m.call, idea: "x", messages: [], locale: "en" });
+    const r = await runSpecChat({ call: m.call, idea: "a desk lamp", messages: [], locale: "en" });
     if (!r.ok) throw new Error("expected ok");
     expect(r.clampLog.length).toBeGreaterThan(0);
     const body = JSON.stringify(r.value);

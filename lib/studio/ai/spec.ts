@@ -5,8 +5,18 @@
 // ("Return the spec now"); a question in reply is rejected, so validatedCall's
 // one retry is that second "return the spec now" request. Two failures → a
 // safe default spec built from the user's own words. quantity is always 1.
+//
+// W3: every turn goes through the deterministic guards (spec-guards.ts):
+//  * a vague idea gets ONE clarifying question with chips, without a model call;
+//  * every spec (model, default, refinement) keeps the visitor's function words,
+//    a matching power source and the placement the idea implies;
+//  * `current` = the card already shown: the last user message is a change
+//    request ("make it solar"); the model must return the updated spec, and the
+//    fallback is the current card with the guards applied (never a blank one).
+// This is the ONE place the spec call is made (W8 may wrap it with a cache).
 
 import { clampSpec, type ClampLog, type ProductSpec } from "../schema";
+import { guardSpec, vagueTurn } from "./spec-guards";
 import {
   CHOICE_MAX, MAX_QUESTIONS, QUESTION_MAX, SPEC_RESPONSE_SCHEMA, SPEC_SYSTEM, specPrompt, type ChatMessage,
 } from "./prompts";
@@ -73,13 +83,24 @@ export async function runSpecChat(opts: {
   idea: string;
   messages: ChatMessage[];
   locale: "en" | "ar";
+  /** The spec card already shown: the last user message refines it. */
+  current?: ProductSpec | null;
 }): Promise<Outcome<SpecTurn>> {
+  const ctx = { idea: opts.idea, messages: opts.messages, locale: opts.locale };
+  const current = opts.current ?? null;
+
+  // A vague idea ("something with Arduino"): one short question with chips, no model call.
+  if (!current) {
+    const vague = vagueTurn(opts.idea, opts.messages, opts.locale);
+    if (vague) return { ok: true, value: vague, source: "rules", clampLog: [], problems: [] };
+  }
+
   const log: ClampLog = [];
-  const forceSpec = questionsAsked(opts.messages) >= MAX_QUESTIONS;
+  const forceSpec = Boolean(current) || questionsAsked(opts.messages) >= MAX_QUESTIONS;
   const r = await opts.call<SpecTurn>({
     step: "spec",
     system: SPEC_SYSTEM,
-    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, forceSpec }),
+    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, forceSpec, current }),
     schema: SPEC_RESPONSE_SCHEMA,
     validate: (raw) => {
       // Only the accepted attempt's changes are kept.
@@ -89,12 +110,17 @@ export async function runSpecChat(opts: {
       return res;
     },
   });
-  if (r.ok) return { ok: true, value: r.value, source: "model", clampLog: log, problems: [] };
+  const guard = (spec: ProductSpec, into: ClampLog): SpecTurn => ({ kind: "spec", spec: guardSpec(spec, ctx, into).spec });
+  if (r.ok) {
+    const value = r.value.kind === "spec" ? guard(r.value.spec, log) : r.value;
+    return { ok: true, value, source: "model", clampLog: log, problems: [] };
+  }
   if (r.error !== "invalid") return { ok: false, error: r.error, clampLog: log, problems: r.problems };
   const fallback: ClampLog = [];
+  const base = current ?? defaultSpec(opts.idea, opts.messages, fallback);
   return {
     ok: true,
-    value: { kind: "spec", spec: defaultSpec(opts.idea, opts.messages, fallback) },
+    value: guard(base, fallback),
     source: "default",
     clampLog: fallback,
     problems: r.problems,

@@ -7,8 +7,8 @@
 
 import {
   COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
-  MECH_TEMPLATES, MATERIALS, OUTPUTS, PHASE_TEMPLATES, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
-  type EnclosureTemplate, type MechTemplate,
+  MECH_TEMPLATES, MATERIALS, OUTPUTS, PHASE_TEMPLATES, PLACEMENTS, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
+  type EnclosureTemplate, type MechTemplate, type ProductSpec,
 } from "../schema";
 
 export const MAX_QUESTIONS = 4;
@@ -42,6 +42,11 @@ export const SPEC_SYSTEM =
   "Use plain words in the user's language (English or Arabic). " +
   "Never re-ask something already answered in the history. " +
   "If 4 questions were already asked, return the spec. " +
+  "If the idea states no function (e.g. 'something with Arduino'), ask what it should do; never repeat the idea back as the product. " +
+  "Keep every function word the user wrote: 'automatic watering' needs a pump (outputs: pump) and a power source that can drive it; " +
+  "'beeps' needs a buzzer; 'shows' needs a screen; 'lights up' needs a led. " +
+  "Infer where it lives from the idea instead of a generic default: a plant monitor stands in the soil of the pot (placement plant_soil), " +
+  "a wearable sits on the body (use wearable, placement on_body, or on_wrist for a watch/bracelet) and runs on a battery. " +
   "Return EITHER {question, choices} OR {spec}, never both. quantity is always 1.";
 
 export const PRODUCT_SPEC_SCHEMA = {
@@ -57,6 +62,7 @@ export const PRODUCT_SPEC_SCHEMA = {
     outputs: enumList(OUTPUTS),
     sizeHint: enumOf(SIZE_HINTS),
     style: enumOf(STYLES),
+    placement: enumOf(PLACEMENTS, "Only when the use alone would be wrong: plant_soil (in a plant pot / soil), on_body, on_wrist"),
     quantity: { type: "INTEGER", description: "Always 1" },
   },
   required: ["name", "oneLine", "use", "power", "environment", "features", "inputs", "outputs", "sizeHint", "style", "quantity"],
@@ -73,12 +79,30 @@ export const SPEC_RESPONSE_SCHEMA = {
 
 export type ChatMessage = { role: "user" | "assistant"; text: string; choices?: string[] };
 
-export function specPrompt(opts: { idea: string; messages: ChatMessage[]; locale: "en" | "ar"; forceSpec: boolean }): string {
+export function specPrompt(opts: {
+  idea: string;
+  messages: ChatMessage[];
+  locale: "en" | "ar";
+  forceSpec: boolean;
+  /** The card as it stands: the last user message is a change request on top of it (W3 refinement). */
+  current?: ProductSpec | null;
+}): string {
   const history = opts.messages.length
     ? opts.messages
         .map((m) => `${m.role === "user" ? "User" : "You"}: ${m.text}${m.choices?.length ? ` [choices: ${m.choices.join(" | ")}]` : ""}`)
         .join("\n")
     : "(none yet)";
+  if (opts.current) {
+    const change = [...opts.messages].reverse().find((m) => m.role === "user")?.text ?? "";
+    return [
+      `Idea:\n${opts.idea || "(see the conversation)"}`,
+      `Conversation so far:\n${history}`,
+      `Current spec:\n${JSON.stringify(opts.current)}`,
+      `The user now asks for this change: ${change}`,
+      "Return the updated spec now: apply the change, keep everything else as it is. Never return a question.",
+      `Language for names and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+    ].join("\n\n");
+  }
   return [
     `Idea:\n${opts.idea || "(see the conversation)"}`,
     `Conversation so far:\n${history}`,

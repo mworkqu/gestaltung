@@ -19,6 +19,15 @@ export const SpecBody = z.object({
   locale: Locale,
   idea: z.string().max(4000).optional().default(""),
   messages: z.array(z.unknown()).max(64).optional().default([]),
+  /** W3 refinement: the spec card already shown (any shape → a valid spec), or nothing. */
+  current: z
+    .unknown()
+    .optional()
+    .transform((v): ProductSpec | null => {
+      if (v === undefined || v === null) return null;
+      const r = ProductSpecSchema.safeParse(v);
+      return r.success ? r.data : clampSpec(v);
+    }),
 });
 
 export const PickBody = z.object({

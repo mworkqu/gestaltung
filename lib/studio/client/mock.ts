@@ -10,8 +10,11 @@ import { getPart } from "@/lib/studio/library";
 import { buildWiring } from "@/lib/studio/netlist";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
+import { specParts } from "@/lib/studio/ai/pick";
+import { guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
 import { clampSpec, type StudioComponent } from "@/lib/studio/schema";
 import type { Locale, StudioApi } from "./api";
+import { forModel } from "./steps";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -38,14 +41,21 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
     async save(_doc, version) {
       return { ok: true, version: version + 1 };
     },
-    async spec({ messages, locale, idea }) {
+    async spec({ messages, locale, idea, current }) {
       await wait(250);
-      if (!messages.some((m) => m.role === "assistant")) return { ok: true, data: QUESTION[locale] };
+      // The same deterministic guards as the server (lib/studio/ai/spec.ts), so the e2e
+      // sees the real vague-idea question, function words and placement.
+      const turn = { idea, messages: forModel(messages), locale };
+      const vague = current ? null : vagueTurn(turn.idea, turn.messages, locale);
+      if (vague) return { ok: true, data: { question: vague.question, choices: vague.choices } };
+      if (current) return { ok: true, data: { spec: guardSpec(current, turn).spec } };
+      if (!turn.messages.some((m) => m.role === "assistant")) return { ok: true, data: QUESTION[locale] };
+      const plant = WORDS.plant.test(userTexts(idea, turn.messages).join(" "));
       return {
         ok: true,
         data: {
-          spec: clampSpec({
-            name: locale === "ar" ? "رفيق المكتب" : "Desk buddy",
+          spec: guardSpec(clampSpec({
+            name: plant ? (locale === "ar" ? "مساعد النبتة" : "Plant helper") : locale === "ar" ? "رفيق المكتب" : "Desk buddy",
             oneLine: idea.slice(0, 120) || "A little desk friend that waves when you walk in.",
             use: "desk",
             power: "usb",
@@ -56,7 +66,7 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
             sizeHint: "palm",
             style: "rounded",
             quantity: 1,
-          }),
+          }), turn).spec,
         },
       };
     },
@@ -68,6 +78,11 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
         label: getPart(p.partId)!.name[locale],
         reason: p.reason[locale],
       }));
+      // The parts the spec names (pump for "automatic watering"…), as the server's enforcePick adds them.
+      for (const id of specParts(spec)) {
+        const part = getPart(id);
+        if (part && !picked.some((c) => c.partId === id)) picked.splice(1, 0, { partId: id, instanceId: `${id}_1`, label: part.name[locale] });
+      }
       let components = picked;
       try {
         components = buildWiring(picked, spec, getPart, locale).components;
