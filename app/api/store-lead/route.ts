@@ -5,6 +5,9 @@ import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderLeadEmail } from "@/lib/email/lead-email";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { buildQuoteCalc, isMissingQuoteColumn } from "@/lib/studio/server/quote";
+import type { QuoteCalc } from "@/lib/studio/request-summary";
 import { CAD_BUCKET } from "@/lib/design/constants";
 import { readTurnstileToken } from "@/lib/turnstile";
 import { checkTurnstile, turnstileEnforced } from "@/lib/turnstile-server";
@@ -218,21 +221,30 @@ export async function POST(request: Request) {
       .slice(0, 4000);
   }
 
+  // W2b: the Studio estimate calculation, computed HERE from the saved doc
+  // (never from the browser) and stored with the lead (inquiries.quote_calc).
+  let quoteCalc: QuoteCalc | null = null;
+  let quoteProjectId: string | null = null;
   if (isStudio) {
     // "Design Studio: <name> — <project link>", then the parts (quantity is always 1).
     const projectId = typeof body.projectId === "string" && UUID.test(body.projectId) ? body.projectId : null;
     let projectName: string | null = null;
+    const link = projectId ? `${new URL(request.url).origin}/${locale}/projects/${projectId}/studio` : null;
     if (projectId) {
       try {
         const supabase = await createClient();
         const { data } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle();
         projectName = (data?.name as string | undefined) ?? null;
+        // Only a project the caller can read (RLS) gets a calculation.
+        if (data) {
+          quoteCalc = await buildQuoteCalc(supabase, projectId, link);
+          if (quoteCalc) quoteProjectId = projectId;
+        }
       } catch (err) {
-        console.error("store-lead: project name lookup failed", err);
+        console.error("store-lead: project name / quote lookup failed", err);
       }
     }
     const design = String(body.designName ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || projectName || "Untitled design";
-    const link = projectId ? `${new URL(request.url).origin}/${locale}/projects/${projectId}/studio` : null;
     // W2 "Get it made" pop-up: the visitor's optional note.
     const note = String(body.note ?? "").trim().slice(0, 1000);
     message = [
@@ -291,14 +303,29 @@ export async function POST(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   ) {
-    try {
-      const supabase = await createClient();
-      const { error } = await supabase
-        .from("inquiries")
-        .insert({ name, phone, email, message, locale, status: "new" });
-      saved = !error;
-    } catch {
-      saved = false;
+    const row = { name, phone, email, message, locale, status: "new" };
+    // W2b: a Studio request with its calculation is written by the server
+    // (service role) — the 0073 guard nulls these columns for anon/authenticated
+    // inserts. Before 0073 (missing column) or without the service key, the
+    // plain lead is saved as before; the calculation is only lost, never the lead.
+    const svc = quoteCalc && quoteProjectId ? createServiceClient() : null;
+    if (svc) {
+      try {
+        const { error } = await svc.from("inquiries").insert({ ...row, project_id: quoteProjectId, quote_calc: quoteCalc });
+        saved = !error;
+        if (error && !isMissingQuoteColumn(error)) console.error("store-lead: studio quote insert failed", error.message);
+      } catch (err) {
+        console.error("store-lead: studio quote insert failed", err);
+      }
+    }
+    if (!saved) {
+      try {
+        const supabase = await createClient();
+        const { error } = await supabase.from("inquiries").insert(row);
+        saved = !error;
+      } catch {
+        saved = false;
+      }
     }
   }
 

@@ -158,6 +158,14 @@ export type Inquiry = {
   locale: string;
   status: InquiryStatus;
   created_at: string;
+  is_test?: boolean | null;
+  // W2b (0073): absent before the migration runs.
+  project_id?: string | null;
+  quote_calc?: unknown;
+  final_quote_qar?: number | string | null;
+  quote_note?: string | null;
+  quoted_at?: string | null;
+  quoted_by?: string | null;
 };
 
 // ── Projects ────────────────────────────────────────────────────────────────

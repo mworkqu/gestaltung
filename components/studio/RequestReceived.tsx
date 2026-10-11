@@ -47,11 +47,14 @@ export async function RequestReceived({
   summary,
   locale,
   designHref,
+  ownerQuote = null,
 }: {
   summary: RequestSummary;
   locale: string;
   /** Back to the Studio (the real project, or the e2e fixture). */
   designHref: string;
+  /** W2b: the price the owner quoted in the admin; replaces the estimate range. */
+  ownerQuote?: { finalQar: number; note: string | null } | null;
 }) {
   const t = await getTranslations({ locale, namespace: "StudioRequest" });
   const tS = await getTranslations({ locale, namespace: "Studio" });
@@ -170,6 +173,18 @@ export async function RequestReceived({
         </div>
       </section>
 
+      {ownerQuote ? (
+        <section className="neu space-y-3 p-6 sm:p-8" aria-labelledby="request-quote" data-testid="studio-request-quote">
+          <h2 id="request-quote" className="title-section">
+            {t("quoteTitle")}
+          </h2>
+          <p className="text-2xl font-extrabold text-heading" dir={lang === "ar" ? "rtl" : "ltr"}>
+            {t("quoteAmount", { amount: qar(ownerQuote.finalQar, locale) })}
+          </p>
+          {ownerQuote.note && <p className="max-w-prose whitespace-pre-line text-sm text-body" data-testid="studio-request-quote-note">{ownerQuote.note}</p>}
+          <p className="max-w-prose text-sm text-mutedtext">{t("quoteText")}</p>
+        </section>
+      ) : (
       <section className="neu space-y-3 p-6 sm:p-8" aria-labelledby="request-estimate" data-testid="studio-request-estimate">
         <div className="flex flex-wrap items-center gap-2">
           <h2 id="request-estimate" className="title-section">
@@ -184,6 +199,7 @@ export async function RequestReceived({
         ) : null}
         <p className="max-w-prose text-sm text-body">{summary.estimate ? t("estimateNote") : t("estimateNone")}</p>
       </section>
+      )}
     </div>
   );
 }
