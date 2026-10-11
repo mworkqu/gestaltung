@@ -10,7 +10,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { drainOutbox } from "@/lib/notifications/drain";
 import { siteUrlFor } from "@/lib/projects/recovery";
-import { canTransition, isOrderStatus, toPre0053Status, type OrderStatus } from "@/lib/orders/status";
+import { canTransition, isOrderStatus, normaliseOrderStatus, toPre0053Status, type OrderStatus } from "@/lib/orders/status";
+import { canMarkTest, nextStepFor } from "@/lib/orders/admin-rules";
+import { setWhatsappSent } from "@/lib/orders/whatsapp";
 
 function safeLocale(formData: FormData): "en" | "ar" {
   return String(formData.get("locale")) === "ar" ? "ar" : "en";
@@ -135,8 +137,82 @@ export async function toggleWhatsappSent(formData: FormData): Promise<void> {
   if (!id) return;
 
   const supabase = await createClient();
-  await supabase.from("part_orders").update({ whatsapp_sent: next }).eq("id", id);
+  await setWhatsappSent(supabase, id, next);
 
   revalidatePath(`/${locale}/dashboard/store/orders`);
   revalidatePath(`/${locale}/dashboard/store/orders/${id}`);
+}
+
+export type OrderActionError = OrderStatusError | "paid_order" | "no_next_step";
+export type OrderActionState = { ok: true } | { ok: false; error: OrderActionError };
+
+/**
+ * The next-step button (D3): moves the order to the ONE obvious next status.
+ * The server decides the target from the order's current status and payment
+ * method (nextStepFor), never from the browser, then uses the normal status
+ * path (set_order_status: validates, writes order_status_history, queues the
+ * status email).
+ */
+export async function advanceOrder(formData: FormData): Promise<OrderActionState> {
+  const locale = safeLocale(formData);
+  await requireSuperAdmin(locale);
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return { ok: false, error: "not_found" };
+
+  const supabase = await createClient();
+  const { data: row } = await supabase.from("part_orders").select("status, payment_method").eq("id", id).maybeSingle();
+  if (!row) return { ok: false, error: "not_found" };
+  const step = nextStepFor(row.status, (row as { payment_method?: string | null }).payment_method);
+  if (!step) return { ok: false, error: "no_next_step" };
+
+  const res = await applyOrderStatus(id, step.to, "");
+  if (!res?.ok) return { ok: false, error: res?.error ?? "failed" };
+  revalidateOrder(locale, id);
+  await drainSoon();
+  return { ok: true };
+}
+
+/** Cancel an order (never deleted): the normal status change to "cancelled", logged in the history. */
+export async function cancelOrder(formData: FormData): Promise<OrderActionState> {
+  const locale = safeLocale(formData);
+  await requireSuperAdmin(locale);
+
+  const id = String(formData.get("id") ?? "");
+  const note = String(formData.get("note") ?? "").trim().slice(0, 1000);
+  if (!id) return { ok: false, error: "not_found" };
+
+  const res = await applyOrderStatus(id, "cancelled", note);
+  if (!res?.ok) return { ok: false, error: res?.error ?? "failed" };
+  revalidateOrder(locale, id);
+  await drainSoon();
+  return { ok: true };
+}
+
+/**
+ * Mark an order as a test (part_orders.is_test, migration 0031) or undo it.
+ * Refused on the server for paid orders and later (canMarkTest): money may have
+ * been received. Un-marking is always allowed. Nothing is deleted.
+ */
+export async function setOrderTest(formData: FormData): Promise<OrderActionState> {
+  const locale = safeLocale(formData);
+  await requireSuperAdmin(locale);
+
+  const id = String(formData.get("id") ?? "");
+  const value = formData.get("is_test") === "true";
+  if (!id) return { ok: false, error: "not_found" };
+
+  const supabase = await createClient();
+  const { data: row } = await supabase.from("part_orders").select("status").eq("id", id).maybeSingle();
+  if (!row) return { ok: false, error: "not_found" };
+  if (value && !canMarkTest(normaliseOrderStatus(row.status) ?? row.status)) return { ok: false, error: "paid_order" };
+
+  const { error } = await supabase.from("part_orders").update({ is_test: value }).eq("id", id);
+  if (error) {
+    console.error(`[orders] is_test ${id} -> ${value}: ${error.message}`);
+    return { ok: false, error: "failed" };
+  }
+  revalidateOrder(locale, id);
+  revalidatePath(`/${locale}/dashboard`);
+  return { ok: true };
 }

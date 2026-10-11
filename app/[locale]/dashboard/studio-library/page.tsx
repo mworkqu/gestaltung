@@ -1,4 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Hint } from "@/components/ui/hint";
 
 import { createClient } from "@/lib/supabase/server";
 import { StudioLibraryList, type LibraryRow } from "@/components/admin/studio-library/library-list";
@@ -63,15 +64,7 @@ export default async function StudioLibraryPage({ params }: { params: Promise<{ 
         <h1 className="text-2xl font-extrabold text-heading">{t("pageTitle")}</h1>
         <p className="mt-1 max-w-3xl text-sm text-body">
           {t("pageIntro")}
-          {/* HINT: swap this native title + "?" for components/ui/hint.tsx once D3 is merged. */}
-          <span
-            role="img"
-            aria-label={t("pageHint")}
-            title={t("pageHint")}
-            className="ms-2 inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-borderstrong text-[11px] font-bold text-mutedtext"
-          >
-            ?
-          </span>
+          <Hint label={t("pageHint")} className="ms-2" />
         </p>
         {photosFailed && <p className="mt-1 text-xs text-destructive" role="status">{t("photosFailed")}</p>}
       </div>

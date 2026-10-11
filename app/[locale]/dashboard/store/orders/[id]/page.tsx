@@ -1,16 +1,25 @@
-import { formatPhoneDisplay } from "@/lib/phone";
+import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Package } from "lucide-react";
 
-import type { PartOrder, PartOrderItem } from "@/lib/supabase/types";
+import type { PartOrder } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/parts/format";
 import { DELIVERY_AREAS } from "@/lib/parts/constants";
 import { OrderStatusControl } from "@/components/admin/order-status-control";
+import { OrderNextStep, OrderStatusPill, OrderTestCancel } from "@/components/admin/order-controls";
+import { Hint } from "@/components/ui/hint";
+import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { normaliseOrderStatus } from "@/lib/orders/status";
+import { promiseState } from "@/lib/orders/admin-rules";
+import { supplierAdminHref, suppliersOfOrder } from "@/lib/orders/line-suppliers";
+import { loadOrderLines } from "@/lib/admin/order-lines";
+import { qatarToday } from "@/lib/occasions";
+import { arabicCountForm } from "@/lib/text/count";
+import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import { WhatsappSentToggle } from "@/components/parts/whatsapp-sent-toggle";
 import { cn } from "@/lib/utils";
 import { formatDeliveryDate } from "@/lib/store/delivery";
@@ -26,6 +35,7 @@ export default async function OrderDetailPage({
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
+  const tA = await getTranslations("OrdersAdmin");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -39,19 +49,17 @@ export default async function OrderDetailPage({
   const order = orderData as PartOrder | null;
   if (!order) notFound();
 
-  const { data: itemData } = await supabase
-    .from("part_order_items")
-    .select("*")
-    .eq("order_id", id);
-  // project_id arrives with 0025 (set only for a customer's own project).
-  const items = (itemData ?? []) as (PartOrderItem & { project_id?: string | null })[];
+  // Lines with photo + supplier (D3). A failed read shows a notice, not an empty order.
+  const { byOrder, failed: linesFailed } = await loadOrderLines(supabase, [id]);
+  const items = byOrder.get(id) ?? [];
+  const suppliers = suppliersOfOrder(items);
 
   // Status history (0053). Missing table before 0053 → null ("starts with 0053").
   const { data: historyData, error: historyError } = await supabase
     .from("order_status_history")
     .select("id, status, note, changed_at, changed_by")
     .eq("order_id", id)
-    .order("changed_at", { ascending: false });
+    .order("changed_at", { ascending: true });
   const history = historyError
     ? null
     : ((historyData ?? []) as { id: string; status: string; note: string | null; changed_at: string; changed_by: string | null }[]);
@@ -59,7 +67,7 @@ export default async function OrderDetailPage({
 
   // Order <-> project (SITE_AUDIT #47): each line bought for a project links to
   // it (/projects/<id>; super_admin can open any project under RLS).
-  const projectIds = [...new Set(items.map((it) => it.project_id).filter((v): v is string => Boolean(v)))];
+  const projectIds = [...new Set(items.map((it) => it.projectId).filter((v): v is string => Boolean(v)))];
   const projectNames = new Map<string, string>();
   if (projectIds.length) {
     const { data: projData, error: projError } = await supabase.from("projects").select("id, name").in("id", projectIds);
@@ -67,7 +75,7 @@ export default async function OrderDetailPage({
     if (projError) console.error("order detail: project names", projError);
     for (const pr of projData ?? []) projectNames.set(pr.id as string, pr.name as string);
   }
-  const soleProject = projectIds.length === 1 && items.every((it) => it.project_id === projectIds[0]) ? projectIds[0] : null;
+  const soleProject = projectIds.length === 1 && items.every((it) => it.projectId === projectIds[0]) ? projectIds[0] : null;
 
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "2-digit",
@@ -91,15 +99,23 @@ export default async function OrderDetailPage({
     held_by?: string | null;
     delay_notified_at?: string | null;
     payment_method?: string | null;
+    is_test?: boolean | null;
   };
+  const isTest = ship.is_test === true;
   const areaLabel = (DELIVERY_AREAS as readonly string[]).includes(order.delivery_area)
     ? t(`area_${order.delivery_area}`)
     : order.delivery_area;
 
+  const today = qatarToday();
+  const promise = promiseState(ship.promised_date, today, order.status);
+  const waDigits = toWhatsAppDigits(order.customer_phone);
+  // Day counts pick their wording through ICU `select` (Arabic has six plural forms; digits stay Western).
+  const countForm = (n: number) => (isRtl ? arabicCountForm(n) : n === 1 ? "one" : "other");
+
   const field = (label: string, value: React.ReactNode) => (
     <div className="flex justify-between gap-4 border-b border-borderstrong/40 py-2.5 last:border-0">
       <dt className={mono("text-[10px] text-mutedtext")}>{label}</dt>
-      <dd className="text-end text-sm text-body">{value}</dd>
+      <dd className="min-w-0 text-end text-sm text-body">{value}</dd>
     </div>
   );
 
@@ -108,9 +124,18 @@ export default async function OrderDetailPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
-          <h1 className="mt-2 text-2xl font-extrabold text-heading">
-            {t("orderRef", { id: order.id.slice(0, 8) })}
-          </h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-extrabold text-heading">
+              {t("orderRef", { id: order.id.slice(0, 8) })}
+            </h1>
+            <OrderStatusPill status={order.status} />
+            {isTest && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-panel px-2.5 py-1 text-xs font-semibold text-mutedtext">
+                {tA("badge_test")}
+                <Hint label={tA("badge_test_hint")} />
+              </span>
+            )}
+          </div>
           {soleProject && (
             <p className="mt-1 text-sm text-mutedtext">
               <span className={mono("me-2 text-[10px]")}>{t("orderProjectLink")}</span>
@@ -120,25 +145,43 @@ export default async function OrderDetailPage({
             </p>
           )}
         </div>
-        <Button asChild variant="outline" className="rounded-full">
-          <Link href="/dashboard/store/orders">
-            <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
-            {t("backToOrders")}
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <OrderNextStep
+            id={order.id}
+            status={order.status}
+            paymentMethod={ship.payment_method}
+            supplierNames={suppliers.map((s) => s.name)}
+            size="default"
+          />
+          <Button asChild variant="outline" className="rounded-full">
+            <Link href="/dashboard/store/orders">
+              <ArrowLeft className={cn("h-4 w-4", isRtl && "rotate-180")} />
+              {t("backToOrders")}
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {linesFailed && (
+        <p role="alert" className="text-sm font-medium text-destructive">
+          {tA("lines_failed")}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* Line items */}
         <div className="neu overflow-x-auto p-2">
-          <table className="w-full min-w-[480px] border-collapse text-sm">
+          <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-borderstrong/60">
                 <th className={cn("px-4 py-3 text-start text-[10px] font-semibold text-mutedtext", mono())}>
-                  {t("colName")}
+                  {tA("col_product")}
                 </th>
                 <th className={cn("px-4 py-3 text-start text-[10px] font-semibold text-mutedtext", mono())}>
-                  {t("colSku")}
+                  <span className="inline-flex items-center gap-1.5">
+                    {tA("col_supplier")}
+                    <Hint label={tA("col_supplier_hint")} />
+                  </span>
                 </th>
                 <th className={cn("px-4 py-3 text-end text-[10px] font-semibold text-mutedtext", mono())}>
                   {t("colQty")}
@@ -154,25 +197,53 @@ export default async function OrderDetailPage({
             <tbody>
               {items.map((it) => (
                 <tr key={it.id} className="border-b border-borderstrong/40 last:border-0">
-                  <td className="px-4 py-3 font-medium text-heading">
-                    {it.part_name}
-                    {it.project_id && (
-                      <Link
-                        href={`/projects/${it.project_id}`}
-                        className="block text-[11px] font-semibold text-cobalt hover:text-cobalt-hover"
-                      >
-                        {t("orderProjectLink")}
-                        {!soleProject && projectNames.has(it.project_id) ? ` · ${projectNames.get(it.project_id)}` : ""}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-borderstrong/60 bg-white">
+                        {it.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- hotlinked supplier photos, resized by the CDN
+                          <img
+                            src={sizedImage(it.photo, IMAGE_WIDTHS.thumb) ?? it.photo}
+                            alt=""
+                            width={48}
+                            height={48}
+                            loading="lazy"
+                            className="h-full w-full object-contain"
+                          />
+                        ) : (
+                          <Package className="h-5 w-5 text-faint" aria-hidden="true" />
+                        )}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-medium text-heading">{it.name}</p>
+                        <p className="font-mono text-[11px] text-mutedtext">{it.sku}</p>
+                        {it.projectId && (
+                          <Link
+                            href={`/projects/${it.projectId}`}
+                            className="block text-[11px] font-semibold text-cobalt hover:text-cobalt-hover"
+                          >
+                            {t("orderProjectLink")}
+                            {!soleProject && projectNames.has(it.projectId) ? ` · ${projectNames.get(it.projectId)}` : ""}
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    {it.supplier ? (
+                      <Link href={supplierAdminHref(it.supplier.code)} className="font-semibold text-cobalt hover:underline">
+                        {it.supplier.name}
                       </Link>
+                    ) : (
+                      <span className="text-mutedtext">{tA("supplier_none")}</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-mutedtext">{it.part_sku}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-body">{it.quantity}</td>
                   <td className="px-4 py-3 text-end tabular-nums text-body">
-                    {formatPrice(it.unit_price_qar, locale)}
+                    {formatPrice(it.unitPrice, locale)}
                   </td>
                   <td className="px-4 py-3 text-end tabular-nums font-semibold text-heading">
-                    {formatPrice(it.line_total_qar, locale)}
+                    {formatPrice(it.lineTotal, locale)}
                   </td>
                 </tr>
               ))}
@@ -206,17 +277,36 @@ export default async function OrderDetailPage({
             {field(t("colCustomer"), order.customer_name)}
             {field(
               t("colPhone"),
-              <span dir="ltr" className="font-mono text-xs">
-                {formatPhoneDisplay(order.customer_phone)}
-              </span>
+              <div className="flex flex-col items-end gap-2">
+                <span dir="ltr" className="font-mono text-xs">
+                  {formatPhoneDisplay(order.customer_phone)}
+                </span>
+                {waDigits && (
+                  <a
+                    href={`https://wa.me/${waDigits}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid="order-whatsapp-button"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-ink hover:brightness-95 max-md:min-h-11"
+                  >
+                    <WhatsAppIcon />
+                    {tA("whatsapp_button")}
+                  </a>
+                )}
+              </div>
             )}
             {order.customer_email &&
               field(
                 t("emailLabel"),
                 <span dir="ltr">{order.customer_email}</span>
               )}
-            {field(t("colArea"), areaLabel)}
-            {order.delivery_notes && field(t("notesLabel"), order.delivery_notes)}
+            {field(
+              tA("address"),
+              <span>
+                {areaLabel}
+                {order.delivery_notes && <span className="block whitespace-pre-line text-mutedtext">{order.delivery_notes}</span>}
+              </span>
+            )}
             {field(t("colDate"), dateFmt.format(new Date(order.created_at)))}
             {ship.shipping_tier &&
               field(
@@ -227,7 +317,18 @@ export default async function OrderDetailPage({
             {ship.promised_date &&
               field(
                 tD("promised"),
-                `${ship.early_promised_date ? `${formatDeliveryDate(ship.early_promised_date, locale)} / ` : ""}${formatDeliveryDate(ship.promised_date, locale)}${ship.held_by ? ` · ${tD("heldBy", { item: ship.held_by })}` : ""}`
+                <span data-testid="order-promise">
+                  {`${ship.early_promised_date ? `${formatDeliveryDate(ship.early_promised_date, locale)} / ` : ""}${formatDeliveryDate(ship.promised_date, locale)}${ship.held_by ? ` · ${tD("heldBy", { item: ship.held_by })}` : ""}`}
+                  <span className="block text-mutedtext">{tA("promise_today_is", { date: formatDeliveryDate(today, locale) })}</span>
+                  {promise.kind === "later" && (
+                    <span className="block font-semibold text-heading">{tA("promise_later", { days: String(promise.days), form: countForm(promise.days) })}</span>
+                  )}
+                  {promise.kind === "today" && <span className="block font-semibold text-heading">{tA("promise_due_today")}</span>}
+                  {promise.kind === "late" && (
+                    <span className="block font-semibold text-destructive">{tA("promise_late", { days: String(promise.days), form: countForm(promise.days) })}</span>
+                  )}
+                  {promise.kind === "closed" && <span className="block text-mutedtext">{tA("promise_closed")}</span>}
+                </span>
               )}
             {ship.delay_notified_at && field(tD("delayNotified"), dateFmt.format(new Date(ship.delay_notified_at)))}
             {ship.payment_method && field(tPay("label"), tPay(`${ship.payment_method}_title`))}
@@ -236,9 +337,7 @@ export default async function OrderDetailPage({
           <div className="neu space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
               <span className={mono("text-[10px] text-mutedtext")}>{t("colStatus")}</span>
-              <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-heading shadow-neu-inset">
-                {t(`order_status_${currentStatus}`)}
-              </span>
+              <OrderStatusPill status={order.status} />
             </div>
             <div className="border-t border-borderstrong/40 pt-4">
               <p className={mono("mb-3 text-[10px] text-mutedtext")}>{t("statusChange")}</p>
@@ -251,11 +350,19 @@ export default async function OrderDetailPage({
               ) : history.length === 0 ? (
                 <p className="text-sm text-mutedtext">{t("historyEmpty")}</p>
               ) : (
-                <ol className="space-y-3">
-                  {history.map((h) => {
+                <ol className="relative space-y-4 border-s border-borderstrong ps-5" data-testid="order-timeline">
+                  {history.map((h, i) => {
                     const s = normaliseOrderStatus(h.status);
+                    const last = i === history.length - 1;
                     return (
-                      <li key={h.id} className="text-sm">
+                      <li key={h.id} className="relative text-sm">
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "absolute -start-[1.65rem] top-1 h-3 w-3 rounded-full border-2 border-surface",
+                            last ? "bg-cobalt" : "bg-faint"
+                          )}
+                        />
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <span className="font-semibold text-heading">{s ? t(`order_status_${s}`) : h.status}</span>
                           <span className="text-[12px] text-mutedtext">{dateFmt.format(new Date(h.changed_at))}</span>
@@ -268,8 +375,19 @@ export default async function OrderDetailPage({
               )}
             </div>
             <div className="flex items-center justify-between gap-3 border-t border-borderstrong/40 pt-4">
-              <span className={mono("text-[10px] text-mutedtext")}>{t("whatsappSent")}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <WhatsAppIcon className="text-[#25D366]" />
+                <span className={mono("text-[10px] text-mutedtext")}>{tA("col_whatsapp")}</span>
+                <Hint label={tA("col_whatsapp_hint")} />
+              </span>
               <WhatsappSentToggle id={order.id} sent={order.whatsapp_sent} />
+            </div>
+            <div className="border-t border-borderstrong/40 pt-4">
+              <p className={mono("mb-3 flex items-center gap-1.5 text-[10px] text-mutedtext")}>
+                {tA("test_cancel_title")}
+                <Hint label={tA("mark_test_hint")} />
+              </p>
+              <OrderTestCancel id={order.id} status={order.status} isTest={isTest} shortId={order.id.slice(0, 8)} />
             </div>
           </div>
         </aside>

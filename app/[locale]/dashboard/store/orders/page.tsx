@@ -1,22 +1,17 @@
-import { formatPhoneDisplay } from "@/lib/phone";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ClipboardList, ArrowLeft } from "lucide-react";
 
-import type { PartOrder } from "@/lib/supabase/types";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { formatPrice } from "@/lib/parts/format";
-import { DELIVERY_AREAS } from "@/lib/parts/constants";
-import { OrderStatusSelect } from "@/components/parts/order-status-select";
-import { WhatsappSentToggle } from "@/components/parts/whatsapp-sent-toggle";
+import { OrdersTable, type OrderListRow } from "@/components/admin/orders-table";
+import { loadOrderLines } from "@/lib/admin/order-lines";
+import { parseShowHidden } from "@/lib/orders/admin-rules";
 import { ListPagination } from "@/components/dashboard/list-pagination";
 import { paginate, parsePage, type SearchParamsLike } from "@/lib/admin/pagination";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-
-type OrderRow = PartOrder & { part_order_items: { count: number }[] };
 
 export default async function PartsOrdersPage({
   params,
@@ -30,30 +25,32 @@ export default async function PartsOrdersPage({
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
+  const tA = await getTranslations("OrdersAdmin");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
+  // Test and cancelled orders are hidden unless the URL says ?show=all.
+  const showHidden = parseShowHidden(sp.show);
+
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("part_orders")
-    .select("*, part_order_items(count)")
-    .order("created_at", { ascending: false });
+  let listQuery = supabase.from("part_orders").select("*, part_order_items(count)").order("created_at", { ascending: false });
+  if (!showHidden) listQuery = listQuery.not("is_test", "is", true).neq("status", "cancelled");
+  const [{ data, error }, hiddenRes] = await Promise.all([
+    listQuery,
+    supabase.from("part_orders").select("id", { count: "exact", head: true }).or("is_test.eq.true,status.eq.cancelled"),
+  ]);
+  const hiddenCount = hiddenRes.error ? 0 : (hiddenRes.count ?? 0);
 
-  const orders = (data ?? []) as unknown as OrderRow[];
-  // D2: 100 rows per page, ?page= kept next to any filters in the URL.
+  const orders = (data ?? []) as unknown as OrderListRow[];
+  // D2: 100 rows per page, ?page= kept next to ?show= in the URL.
   const paged = paginate(orders, parsePage(sp.page));
-
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-
-  const areaLabel = (area: string) =>
-    (DELIVERY_AREAS as readonly string[]).includes(area)
-      ? t(`area_${area}`)
-      : area;
+  const { byOrder, failed: linesFailed } = error
+    ? { byOrder: new Map(), failed: false }
+    : await loadOrderLines(
+        supabase,
+        paged.items.map((o) => o.id)
+      );
 
   return (
     <div>
@@ -75,9 +72,26 @@ export default async function PartsOrdersPage({
         </Button>
       </div>
 
+      {(hiddenCount > 0 || showHidden) && (
+        <p className="mt-4 text-sm text-mutedtext">
+          <Link
+            href={showHidden ? "/dashboard/store/orders" : "/dashboard/store/orders?show=all"}
+            className="font-semibold text-cobalt hover:underline"
+          >
+            {showHidden ? tA("hide_hidden") : tA("show_hidden", { count: hiddenCount })}
+          </Link>
+        </p>
+      )}
+
       {error && (
         <p className="mt-8 text-sm font-medium text-destructive">
           {t("error_unknown")}
+        </p>
+      )}
+
+      {linesFailed && (
+        <p role="alert" className="mt-4 text-sm font-medium text-destructive">
+          {tA("lines_failed")}
         </p>
       )}
 
@@ -91,95 +105,9 @@ export default async function PartsOrdersPage({
         </div>
       )}
 
-      {!error && orders.length > 0 && (
-        <div className="neu mt-8 overflow-x-auto p-2">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-borderstrong/60">
-                <Th mono={mono}>{t("colOrderId")}</Th>
-                <Th mono={mono}>{t("colDate")}</Th>
-                <Th mono={mono}>{t("colCustomer")}</Th>
-                <Th mono={mono}>{t("colPhone")}</Th>
-                <Th mono={mono}>{t("colArea")}</Th>
-                <Th mono={mono} numeric>
-                  {t("colItems")}
-                </Th>
-                <Th mono={mono} numeric>
-                  {t("colTotal")}
-                </Th>
-                <Th mono={mono}>{t("colStatus")}</Th>
-                <Th mono={mono}>{t("colWhatsapp")}</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.items.map((o) => {
-                const itemCount = o.part_order_items?.[0]?.count ?? 0;
-                return (
-                  <tr
-                    key={o.id}
-                    className="border-b border-borderstrong/40 last:border-0 hover:bg-panel/50"
-                  >
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/dashboard/store/orders/${o.id}`}
-                        className="font-mono text-xs text-cobalt hover:underline"
-                      >
-                        {o.id.slice(0, 8)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-body">
-                      {dateFmt.format(new Date(o.created_at))}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-heading">
-                      {o.customer_name}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-mutedtext" dir="ltr">
-                      {formatPhoneDisplay(o.customer_phone)}
-                    </td>
-                    <td className="px-4 py-3 text-body">{areaLabel(o.delivery_area)}</td>
-                    <td className="px-4 py-3 text-end tabular-nums text-body">
-                      {itemCount}
-                    </td>
-                    <td className="px-4 py-3 text-end tabular-nums font-semibold text-heading">
-                      {formatPrice(o.total_qar, locale)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <OrderStatusSelect id={o.id} status={o.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <WhatsappSentToggle id={o.id} sent={o.whatsapp_sent} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {!error && orders.length > 0 && <OrdersTable orders={paged.items} lines={byOrder} locale={locale} />}
 
       {!error && <ListPagination className="mt-4" pathname="/dashboard/store/orders" params={sp} paged={paged} />}
     </div>
-  );
-}
-
-function Th({
-  children,
-  mono,
-  numeric,
-}: {
-  children: React.ReactNode;
-  mono: (extra?: string) => string;
-  numeric?: boolean;
-}) {
-  return (
-    <th
-      className={cn(
-        "px-4 py-3 text-[10px] font-semibold text-mutedtext",
-        numeric ? "text-end" : "text-start",
-        mono()
-      )}
-    >
-      {children}
-    </th>
   );
 }
