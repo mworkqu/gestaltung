@@ -19,7 +19,7 @@ import { OrbitControls } from "three-stdlib";
 
 import { buildPartModel } from "@/lib/studio/models";
 import type { ProductUnlockResult } from "@/lib/studio/client/product";
-import { buildSceneProps, setPropsOpacity } from "@/lib/studio/product/scene/props";
+import { buildSceneProps, sceneHintsFromPieces, setPropsOpacity } from "@/lib/studio/product/scene/props";
 import {
   VIEW_DIRS,
   applyRendererLook,
@@ -106,7 +106,7 @@ export default function ProductViewer({ product, getPart, explode, finish = null
     const root = new THREE.Group();
     scene.add(root);
 
-    const props = buildSceneProps(product.scene, product.stage, product.bbox);
+    const props = buildSceneProps(product.scene, product.stage, product.bbox, sceneHintsFromPieces(product.pieces));
     root.add(props.group);
     const pieces: Scene3["pieces"] = [];
     for (const p of product.pieces) {

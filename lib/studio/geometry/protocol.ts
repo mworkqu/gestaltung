@@ -79,6 +79,12 @@ export type ProductMockOptions = {
   guestLimitAfter?: number | null;
   /** Every design fails (tests the template fallback). */
   fail?: boolean;
+  /**
+   * ?productremote=1: the endpoints go over the network to the fixed test path
+   * /__e2e/studio-product instead (a Playwright harness answers them, e.g. with the
+   * real designer + vision check run in node). Nothing on the server answers it.
+   */
+  remote?: boolean;
 };
 
 type ProductCommon = {

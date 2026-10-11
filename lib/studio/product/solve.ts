@@ -617,8 +617,13 @@ function ensureHomes(model: ProductModel, g: Groups, spec: ProductSpec | undefin
     }
   }
 
-  if (g.buttons.length && !model.bodies.some((b) => b.role === "button_cap")) {
-    addBody(model, { id: "button", role: "button_cap", form: { kind: "button_cap", d: 14, h: 4, dome: 0.5, stem: 0 }, attach: { to: host().id, anchor: "top", offset: [0, 0, 0], ...(host().attach.rotate ? { rotate: host().attach.rotate } : {}) }, material: "PLA", colour: accent, finish: "soft_touch" }, issues, "button");
+  // One cap per switch (a remote with three buttons shows three caps, not one cap and two holes).
+  const capCount = model.bodies.filter((b) => b.role === "button_cap" && b.form.kind === "button_cap").length;
+  const capColour = model.bodies.find((b) => b.role === "button_cap")?.colour ?? accent;
+  for (let i = capCount; i < g.buttons.length; i++) {
+    const first = i === 0;
+    const added = addBody(model, { id: "button", role: "button_cap", form: { kind: "button_cap", d: first ? 14 : 10, h: first ? 4 : 3, dome: 0.5, stem: 0 }, attach: { to: host().id, anchor: "top", offset: [0, 0, 0], ...(host().attach.rotate ? { rotate: host().attach.rotate } : {}) }, material: "PLA", colour: capColour, finish: "soft_touch" }, issues, "button");
+    if (!added) break;
   }
 }
 

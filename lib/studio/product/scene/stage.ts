@@ -127,7 +127,19 @@ export type PieceLook = {
 };
 
 /** A warm glow for clear light rings / windows ("lights up to show what it's doing"). */
-const GLOW = "#ffd59a";
+const GLOW = "#ff8f1f";
+/** Neutral clear colours glow warm; a coloured clear part glows in its own colour. */
+const NEUTRAL_CLEAR: readonly Colour[] = ["mist", "chalk", "graphite", "sand"];
+
+/** The light colour of a glowing clear body. */
+export function glowColour(p: Pick<PieceLook, "colour" | "colourHex">): THREE.Color {
+  if (NEUTRAL_CLEAR.includes(p.colour)) return new THREE.Color(GLOW);
+  // Saturated and bright, so ACES keeps the hue instead of washing it to white.
+  const c = new THREE.Color(p.colourHex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  return new THREE.Color().setHSL(hsl.h, Math.max(0.75, hsl.s), 0.58);
+}
 
 export function pieceMaterial(p: PieceLook, finishOverride?: Finish | null): THREE.Material {
   if (p.material === "aluminium") {
@@ -135,18 +147,34 @@ export function pieceMaterial(p: PieceLook, finishOverride?: Finish | null): THR
   }
   if (p.material === "resin_clear") {
     const glows = p.role === "light_ring" || p.role === "window";
-    const c = new THREE.Color(p.colourHex).lerp(new THREE.Color("#ffffff"), 0.55);
+    if (glows) {
+      // Frosted, lit from inside: the light colour on a pale body, bright enough to read
+      // as "on" under the ACES tone mapping.
+      const light = glowColour(p);
+      return new THREE.MeshPhysicalMaterial({
+        color: light.clone().lerp(new THREE.Color("#ffffff"), 0.1),
+        roughness: 0.4,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.96,
+        emissive: light,
+        emissiveIntensity: 0.85,
+        clearcoat: 0.4,
+        clearcoatRoughness: 0.2,
+      });
+    }
+    // Clear, not lit (a hopper, a tank window): see-through so what is inside shows.
+    const c = new THREE.Color(p.colourHex).lerp(new THREE.Color("#ffffff"), 0.6);
     return new THREE.MeshPhysicalMaterial({
       color: c,
-      roughness: 0.18,
+      roughness: 0.08,
       metalness: 0,
       transparent: true,
-      opacity: glows ? 0.82 : 0.5,
-      emissive: new THREE.Color(glows ? GLOW : "#000000"),
-      emissiveIntensity: glows ? 0.9 : 0,
-      clearcoat: 0.6,
-      clearcoatRoughness: 0.1,
-      depthWrite: !glows ? false : true,
+      opacity: 0.32,
+      clearcoat: 1,
+      clearcoatRoughness: 0.05,
+      depthWrite: false,
+      side: THREE.DoubleSide,
     });
   }
   if (p.material === "TPU") return makeEnclosureMaterial("soft_touch", p.colour);

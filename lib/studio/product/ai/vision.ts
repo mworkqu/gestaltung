@@ -75,6 +75,7 @@ export function visionPrompt(i: { idea: string; spec: ProductSpec; partNames: st
     `Product: ${s.name}. ${s.oneLine} Use: ${s.use}${s.placement ? ` (${s.placement})` : ""}; size: ${s.sizeHint}.`,
     `Parts inside: ${i.partNames.slice(0, 20).join(", ") || "none"}.`,
     `Question: does this look like a ${s.name} at a glance, and are all its functional parts visible?`,
+    "USB / power sockets are cut into the back or the underside (checked by our solver to be reachable), so they are usually out of view: do not count them as missing.",
     `Images in order: front, side, three-quarter view. Check round ${i.loop + 1} of 3.`,
     "The design JSON (patch this):",
     JSON.stringify(i.model),
