@@ -113,6 +113,8 @@ export interface StudioApi {
   rename(name: string): Promise<void>;
   storeProducts(skus: string[]): Promise<Map<string, StoreCardPart>>;
   profile(): Promise<Profile>;
+  /** D4: an anonymous (guest) session, for the "Saved on this device" wording. Absent = not a guest. */
+  isGuest?(): Promise<boolean>;
   /** W2: keep a typed name / WhatsApp number on the profile so it is never asked again (best-effort). */
   saveContact(c: { fullName?: string; phone?: string }): Promise<void>;
   requestQuote(q: QuoteRequest): Promise<boolean>;
@@ -263,6 +265,11 @@ export function liveStudioApi(projectId: string): StudioApi {
         .is("merged_into", null);
       for (const p of (data ?? []) as unknown as StoreCardPart[]) out.set(p.sku, p);
       return out;
+    },
+
+    async isGuest() {
+      const { data: auth } = await (await db()).auth.getUser();
+      return auth.user?.is_anonymous === true;
     },
 
     async profile() {

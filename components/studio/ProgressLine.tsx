@@ -5,7 +5,7 @@
 // aria-current="step", future ones disabled. Built from FLOW, so adding a
 // step (Phase 2 "print") is one entry in lib/studio/client/steps.ts.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -18,11 +18,14 @@ export function ProgressLine({
   furthest,
   done,
   onGo,
+  status = null,
 }: {
   current: number;
   furthest: number;
   done: (step: FlowStep) => boolean;
   onGo: (index: number) => void;
+  /** D4: the "Saved ✓ / Saving…" line under the dots. */
+  status?: ReactNode;
 }) {
   const t = useTranslations("Studio");
   const top = useStickyTop();
@@ -77,6 +80,7 @@ export function ProgressLine({
           );
         })}
       </ol>
+      {status && <div className="flex justify-end px-3 pt-1.5 sm:px-5">{status}</div>}
     </nav>
   );
 }

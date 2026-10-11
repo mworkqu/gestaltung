@@ -2,6 +2,7 @@ import { Suspense, type ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 
 import { AdminOverview } from "@/components/dashboard/admin-overview";
+import { ContinueCard, ContinueCardSkeleton } from "@/components/dashboard/continue-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@/i18n/navigation";
 import { loadFixParts } from "@/lib/admin/fix-data";
@@ -67,10 +68,13 @@ export async function AdminHomeView({
   locale,
   counts,
   numbers,
+  continueSlot,
 }: {
   locale: string;
   counts: Counts | Promise<Counts>;
   numbers?: ReactNode;
+  /** The "Continue where you left off" card. Omitted = the live card (reads Supabase); the e2e fixture passes null. */
+  continueSlot?: ReactNode;
 }) {
   const t = await getTranslations("AdminHome");
   const tNav = await getTranslations("DashboardNav");
@@ -84,7 +88,13 @@ export async function AdminHomeView({
         <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("title")}</h1>
       </div>
 
-      {/* D4: the "Continue where you left off" card goes here. */}
+      {continueSlot === undefined ? (
+        <Suspense fallback={<ContinueCardSkeleton />}>
+          <ContinueCard />
+        </Suspense>
+      ) : (
+        continueSlot
+      )}
 
       {numbers && (
         <section id={NUMBERS_ANCHOR} aria-labelledby="home-numbers" className="scroll-mt-6 space-y-4">

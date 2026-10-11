@@ -33,10 +33,11 @@ import {
   passedAnswers,
   sameSpec,
   stepDone,
-  withLastStep,
   type FlowStep,
 } from "@/lib/studio/client/steps";
+import { saveStatus, shouldWarnOnLeave, stepChangeSave, type SaveStatus } from "@/lib/studio/client/save-state";
 import { ProgressLine } from "./ProgressLine";
+import { SaveIndicator } from "./SaveIndicator";
 import { Bar, MainButton } from "./ui";
 import { GET_IT_MADE_PARAM, GetItMade } from "./GetItMade";
 import { REQUEST_SENT_KEY } from "@/lib/studio/request-summary";
@@ -65,6 +66,7 @@ type Loaded =
   | { state: "ready"; project: StudioProject };
 
 const SAVE_DELAY_MS = 700;
+const RETRY_DELAY_MS = 8000;
 
 type ShellProps = {
   projectId: string;
@@ -122,6 +124,17 @@ function StudioShellInner({
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chain = useRef<Promise<void>>(Promise.resolve());
+  // D4: what the header indicator shows, and the same truth for the beforeunload guard.
+  const inFlight = useRef(false);
+  const failed = useRef(false);
+  const [status, setStatus] = useState<SaveStatus>("saved");
+  const statusRef = useRef<SaveStatus>("saved");
+  const [guest, setGuest] = useState(false);
+  const refreshStatus = useCallback(() => {
+    const next = saveStatus({ dirty: dirty.current && persist.current, inFlight: inFlight.current, failed: failed.current });
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
 
   const flush = useCallback((): Promise<void> => {
     if (timer.current) {
@@ -129,9 +142,16 @@ function StudioShellInner({
       timer.current = null;
     }
     chain.current = chain.current.then(async () => {
-      if (!dirty.current || !persist.current || !latest.current) return;
+      if (!dirty.current || !persist.current || !latest.current) {
+        refreshStatus();
+        return;
+      }
       dirty.current = false;
+      inFlight.current = true;
+      failed.current = false;
+      refreshStatus();
       const r = await api.save(latest.current, version.current);
+      inFlight.current = false;
       if (r.ok) version.current = r.version;
       else if (r.error === "conflict") {
         // Someone saved first (another tab): theirs wins, ours is dropped.
@@ -141,10 +161,16 @@ function StudioShellInner({
           setDoc(r.doc);
         }
       } else if (r.error === "run_0068") persist.current = false;
-      else dirty.current = true; // network blip: try again with the next change
+      else {
+        // Network blip: keep the change, show "Not saved", and try again shortly.
+        dirty.current = true;
+        failed.current = true;
+        if (!timer.current) timer.current = setTimeout(() => void flush(), RETRY_DELAY_MS);
+      }
+      refreshStatus();
     });
     return chain.current;
-  }, [api]);
+  }, [api, refreshStatus]);
 
   /** Apply a new doc. `serverVersion` = the route already saved it (no PUT). */
   const commit = useCallback(
@@ -156,10 +182,12 @@ function StudioShellInner({
         return;
       }
       dirty.current = true;
+      failed.current = false;
+      refreshStatus();
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), SAVE_DELAY_MS);
     },
-    [flush],
+    [flush, refreshStatus],
   );
 
   // Load once (skipped when the server already did; the /projects/new hand-off still runs here).
@@ -209,11 +237,31 @@ function StudioShellInner({
   // Save what is pending when the page goes away.
   useEffect(() => {
     const onHide = () => void flush();
+    // D4: while a change is unsaved (pending, in flight or failed) the browser asks before closing.
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!shouldWarnOnLeave(statusRef.current, persist.current)) return;
+      void flush();
+      e.preventDefault();
+      e.returnValue = "";
+    };
     window.addEventListener("pagehide", onHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
     return () => {
       window.removeEventListener("pagehide", onHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      // Leaving through an in-app link (Dashboard, header): save what is pending.
+      void flush();
     };
   }, [flush]);
+
+  // Guests are saved on this device's session: the indicator says so.
+  useEffect(() => {
+    let alive = true;
+    void api.isGuest?.().then((g) => alive && setGuest(g)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [api]);
 
   const furthest = furthestStep(doc, visited);
   const go = useCallback(
@@ -227,8 +275,8 @@ function StudioShellInner({
         if (answers !== base.answers) commit({ ...base, answers });
       }
       // W1: remember the step on the doc, so the project reopens here (any device, after sign-in).
-      const withStep = latest.current ? withLastStep(latest.current, FLOW[idx]) : null;
-      if (withStep && withStep !== latest.current) commit(withStep);
+      const stepSave = stepChangeSave(latest.current, FLOW[idx]);
+      if (stepSave.save && stepSave.doc) commit(stepSave.doc);
       currentRef.current = idx;
       void flush();
       setCurrent(idx);
@@ -471,7 +519,13 @@ function StudioShellInner({
       data-testid="studio-shell"
       data-step={step}
     >
-      <ProgressLine current={current} furthest={furthest} done={(s) => stepDone(s, doc)} onGo={go} />
+      <ProgressLine
+        current={current}
+        furthest={furthest}
+        done={(s) => stepDone(s, doc)}
+        onGo={go}
+        status={doc && persist.current ? <SaveIndicator status={status} guest={guest} onRetry={() => void flush()} /> : null}
+      />
       <StepSlide index={current}>
         {step === "idea" && (
           <IdeaStep
