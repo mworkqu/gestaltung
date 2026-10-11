@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2, Save, TriangleAlert } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 
 import { saveCleanupSettings, saveTurnstileSwitch } from "@/app/[locale]/dashboard/usage/actions";
 import { CLEANUP_MIN_DAYS, type CleanupSettings } from "@/lib/cleanup/anonymous";
@@ -45,7 +45,7 @@ export function SafetySettings({
     <span
       className={cn(
         "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-        set ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+        set ? "bg-emerald-100 text-emerald-800" : "bg-panel text-mutedtext shadow-neu-inset"
       )}
     >
       {set ? t("keySet") : t("keyMissing")}
@@ -69,10 +69,10 @@ export function SafetySettings({
             <dd>{keyBadge(turnstile.secretSet)}</dd>
           </div>
         </dl>
-        <p className="flex gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-900">
-          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <span>{t("turnstileWarning")}</span>
-        </p>
+        <details className="text-[12px] text-mutedtext">
+          <summary className="min-h-6 cursor-pointer font-medium text-cobalt">{t("turnstileOrderTitle")}</summary>
+          <p className="mt-1.5 leading-relaxed">{t("turnstileWarning")}</p>
+        </details>
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2 text-sm text-body">
             <input type="checkbox" checked={tsOn} onChange={(e) => setTsOn(e.target.checked)} />

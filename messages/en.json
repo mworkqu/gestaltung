@@ -1928,6 +1928,33 @@
     "packNeed": "need {need} · {n, plural, one {# pack} other {# packs}} of {pack}"
   },
   "AiUsage": {
+    "health": {
+      "title": "Status at a glance",
+      "intro": "One line per item. The detailed tables are further down.",
+      "ok": "OK",
+      "action": "Needs action",
+      "off": "Off on purpose",
+      "howToFix": "How to fix",
+      "fixIntro": "Add these in Vercel → Project → Settings → Environment Variables (Production), then redeploy:",
+      "name_turnstile": "Bot check",
+      "name_gemini": "Main AI (Gemini)",
+      "name_groq": "Voice to text (Groq)",
+      "name_cleanup": "Guest account cleanup",
+      "name_charging": "Charging for AI",
+      "turnstile_on": "Bot check is on. Sign-ups and forms ask visitors for a quick check, so fake sign-ups are blocked.",
+      "turnstile_onMissingKeys": "Bot check is switched on, but a key is missing, so it is not protecting anything yet. Add the missing key, or switch it off.",
+      "turnstile_offNoKeys": "Bot check is off. Fine for now; turn it on if fake sign-ups appear. Needs two keys from Cloudflare (free).",
+      "turnstile_offKeysReady": "Bot check is off, but both keys are in place. Fine for now; switch it on below if fake sign-ups appear.",
+      "gemini_ok": "The main AI is connected. Project descriptions are turned into parts lists by the full reader.",
+      "gemini_missing": "The main AI key is missing, so projects fall back to the basic reader and parts lists will be poorer. Add the key (free from Google AI Studio).",
+      "groq_ok": "Voice to text is connected. Customers can speak their idea or upload a recording.",
+      "groq_missing": "The voice key is missing, so recorded or uploaded audio cannot be turned into text. Typing and live dictation still work. Add the key (free from Groq).",
+      "cleanup_disabled": "Guest cleanup is off. Unused guest accounts pile up, which is harmless for now.",
+      "cleanup_dryRun": "Guest cleanup only counts for now and deletes nothing. Fine until you have checked the counts; then untick the dry run below.",
+      "cleanup_live": "Guest cleanup runs every week. Unused guest accounts older than the limit are removed automatically.",
+      "charging_on": "AI use is charged. Customers pay for each AI step.",
+      "charging_off": "AI use is free for customers during launch and nothing is charged yet. Switch charging on below when you are ready."
+    },
     "kicker": "Admin",
     "title": "AI usage",
     "intro": "Every call to an AI provider, counted from our own log. Calls stop at {threshold} of a daily free allowance and fall back to the basic reader — nothing runs into paid usage.",
@@ -3106,6 +3133,7 @@
     "cancel": "Cancel"
   },
   "Safety": {
+    "turnstileOrderTitle": "Order for switching it on",
     "kicker": "Safety",
     "turnstileTitle": "Bot check (Cloudflare Turnstile)",
     "turnstileHelp": "When on, sign-in, sign-up, password reset, new guest sessions, the contact and callback forms and guest analyses ask for a quick Cloudflare check. When off, nothing asks for a check.",

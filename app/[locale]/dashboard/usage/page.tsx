@@ -5,6 +5,8 @@ import { PROVIDERS, dayStart, guardThreshold, nextReset, providerLimits, type Pr
 import { cn } from "@/lib/utils";
 import { AI_PRICE_QAR } from "@/lib/credits/constants";
 import { AiPricing } from "@/components/admin/ai-pricing";
+import { HealthLines } from "@/components/admin/health-lines";
+import { healthStatus } from "@/lib/admin/health-status";
 import { SafetySettings, type CleanupRun } from "@/components/admin/safety-settings";
 import { TURNSTILE_KEY, parseTurnstileSettings, turnstileEnv } from "@/lib/turnstile";
 import { CLEANUP_KEY, parseCleanupSettings } from "@/lib/cleanup/anonymous";
@@ -165,6 +167,16 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   ]);
   const safetyValue = (key: string) => (safetyRows ?? []).find((r) => r.key === key)?.value;
   const keys = turnstileEnv();
+  const turnstileSettings = parseTurnstileSettings(safetyValue(TURNSTILE_KEY));
+  const cleanupSettings = parseCleanupSettings(safetyValue(CLEANUP_KEY));
+  // Booleans only: "set / not set". No secret value leaves the server.
+  const health = healthStatus({
+    turnstile: { enabled: turnstileSettings.enabled, siteKeySet: !!keys.siteKey?.trim(), secretSet: !!keys.secret?.trim() },
+    geminiKeySet: !!process.env.GEMINI_API_KEY?.trim(),
+    groqKeySet: !!process.env.GROQ_API_KEY?.trim(),
+    cleanup: { enabled: cleanupSettings.enabled, dryRun: cleanupSettings.dryRun },
+    charging: pricing ? Boolean(pricing.charging) : null,
+  });
 
   return (
     <div className="space-y-8">
@@ -175,6 +187,8 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
           {t("intro", { threshold: pct.format(guardThreshold()) })}
         </p>
       </div>
+
+      <HealthLines items={health} />
 
       <section className="neu space-y-4 p-6">
         <div>
@@ -213,11 +227,11 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
       <SafetySettings
         locale={locale}
         turnstile={{
-          enabled: parseTurnstileSettings(safetyValue(TURNSTILE_KEY)).enabled,
+          enabled: turnstileSettings.enabled,
           siteKeySet: !!keys.siteKey?.trim(),
           secretSet: !!keys.secret?.trim(),
         }}
-        cleanup={parseCleanupSettings(safetyValue(CLEANUP_KEY))}
+        cleanup={cleanupSettings}
         runs={runsRes.error ? null : ((runsRes.data ?? []) as CleanupRun[])}
       />
 
