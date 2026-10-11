@@ -31,7 +31,7 @@ export function StudioFixture({
   preset?: "plant" | null;
 }) {
   const locale = useLocale() === "ar" ? "ar" : "en";
-  const api = useMemo(() => withGate(withLook(withDelay(stored ? withTabStore(mockStudioApi()) : mockStudioApi()))), [stored]);
+  const api = useMemo(() => withCounts(withGate(withLook(withDelay(stored ? withTabStore(mockStudioApi()) : mockStudioApi())))), [stored]);
   // ?preset=plant (read by the page) opens on the Enclosure step with a plant idea already wired (W6 e2e).
   const initial = useMemo(() => {
     const doc = preset === "plant" ? plantDoc(locale) : null;
@@ -171,6 +171,30 @@ function withLook(api: StudioApi): StudioApi {
           },
         },
       };
+    },
+  };
+}
+
+/** W8 e2e: how many times the (mocked) model was asked, as window.__g360Ai = {spec, pick}. The tab cache sits ABOVE this. */
+function withCounts(api: StudioApi): StudioApi {
+  const counts = { spec: 0, pick: 0 };
+  let ms = 0;
+  try {
+    (window as unknown as { __g360Ai?: typeof counts }).__g360Ai = counts;
+    ms = Math.min(5000, Math.max(0, Number(new URLSearchParams(window.location.search).get("pickdelay")) || 0));
+  } catch {
+    /* no window (server render) */
+  }
+  return {
+    ...api,
+    async spec(...a: Parameters<StudioApi["spec"]>) {
+      counts.spec++;
+      return api.spec(...a);
+    },
+    async pick(...a: Parameters<StudioApi["pick"]>) {
+      counts.pick++;
+      if (ms) await new Promise((r) => setTimeout(r, ms));
+      return api.pick(...a);
     },
   };
 }

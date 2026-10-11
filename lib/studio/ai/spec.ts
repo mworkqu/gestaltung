@@ -13,10 +13,12 @@
 //  * `current` = the card already shown: the last user message is a change
 //    request ("make it solar"); the model must return the updated spec, and the
 //    fallback is the current card with the guards applied (never a blank one).
-// This is the ONE place the spec call is made (W8 may wrap it with a cache).
+// This is the ONE place the spec call is made. W8: an optional `cache` (the route passes
+// specCache) returns the same answer for the same chat + card without calling the model.
 
 import { clampSpec, type ClampLog, type ProductSpec } from "../schema";
 import { guardSpec, vagueTurn } from "./spec-guards";
+import { outcomeCached, specKey, type AiCache } from "./cache";
 import {
   CHOICE_MAX, MAX_QUESTIONS, QUESTION_MAX, SPEC_RESPONSE_SCHEMA, SPEC_SYSTEM, specPrompt, type ChatMessage,
 } from "./prompts";
@@ -85,6 +87,8 @@ export async function runSpecChat(opts: {
   locale: "en" | "ar";
   /** The spec card already shown: the last user message refines it. */
   current?: ProductSpec | null;
+  /** W8: answers a repeated chat + card without a model call. */
+  cache?: AiCache | null;
 }): Promise<Outcome<SpecTurn>> {
   const ctx = { idea: opts.idea, messages: opts.messages, locale: opts.locale };
   const current = opts.current ?? null;
@@ -95,6 +99,15 @@ export async function runSpecChat(opts: {
     if (vague) return { ok: true, value: vague, source: "rules", clampLog: [], problems: [] };
   }
 
+  const key = specKey({ idea: opts.idea, messages: opts.messages, locale: opts.locale, current });
+  return outcomeCached(opts.cache, key, () => modelTurn(opts, ctx, current));
+}
+
+async function modelTurn(
+  opts: { call: StudioCall; idea: string; messages: ChatMessage[]; locale: "en" | "ar" },
+  ctx: { idea: string; messages: ChatMessage[]; locale: "en" | "ar" },
+  current: ProductSpec | null,
+): Promise<Outcome<SpecTurn>> {
   const log: ClampLog = [];
   const forceSpec = Boolean(current) || questionsAsked(opts.messages) >= MAX_QUESTIONS;
   const r = await opts.call<SpecTurn>({

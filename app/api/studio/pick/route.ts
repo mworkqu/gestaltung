@@ -3,6 +3,7 @@ import { studioLibrary } from "@/lib/studio/library/remote";
 import { buildWiring } from "@/lib/studio/netlist";
 import { emptyStudioDoc, type StudioComponent } from "@/lib/studio/schema";
 import { runPick } from "@/lib/studio/ai/pick";
+import { pickCache } from "@/lib/studio/ai/cache";
 import { updateDoc } from "@/lib/studio/server/doc";
 import { callErrorStatus, PickBody } from "@/lib/studio/server/http";
 import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context";
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
     index: libraryIndexForAI(),
     locale: body.locale,
     nameFor: (id, locale) => getPart(id)?.name[locale],
+    cache: pickCache, // W8: the same spec is not asked twice
   });
   if (!r.ok) return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });
   logClamp("pick", project.id, r.clampLog, r.source, r.problems);

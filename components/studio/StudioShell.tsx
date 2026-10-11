@@ -22,6 +22,7 @@ import type { LibraryPart } from "@/lib/studio/schema";
 import { StudioLibraryProvider, useStudioLibrary } from "./StudioLibraryProvider";
 import { emptyStudioDoc, type EnclosureSpec, type MechPart, type ProductSpec, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
+import { withStudioCache } from "@/lib/studio/client/cache";
 import { liveStudioApi, type LoadResult, type Locale, type StudioApi, type StudioProject } from "@/lib/studio/client/api";
 import {
   FLOW,
@@ -97,7 +98,8 @@ function StudioShellInner({
   const t = useTranslations("Studio");
   const { getPart } = useStudioLibrary();
   const locale: Locale = useLocale() === "ar" ? "ar" : "en";
-  const api = useMemo(() => injected ?? liveStudioApi(projectId), [injected, projectId]);
+  // W8: repeat chat turns / picks for the same spec come from the tab cache, never the model.
+  const api = useMemo(() => withStudioCache(injected ?? liveStudioApi(projectId)), [injected, projectId]);
 
   // Read once: a server-provided first state is applied exactly as a client load would be.
   const [start0] = useState(() => (initial ? initialStep(initial.doc, requestedStep) : 0));

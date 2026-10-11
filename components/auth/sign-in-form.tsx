@@ -9,7 +9,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardPathForRole } from "@/lib/auth/redirects";
 import { authAltHref, returnsToProject } from "@/lib/auth/next-path";
-import { claimGuestWork, guestAccessToken } from "@/lib/auth/claim-guest-client";
+import { claimGuestWorkBounded, guestAccessToken } from "@/lib/auth/claim-guest-client";
 import type { Role } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
@@ -34,10 +34,12 @@ export function SignInForm({ turnstileEnabled = false, next = null }: { turnstil
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
 
-  // Warm the page they return to while they type (sign-in should feel quick).
+  // Warm the page they land on while they type (sign-in should feel quick): the page
+  // they return to, else the dashboard every role lands on today.
   useEffect(() => {
     if (next) nextRouter.prefetch(next);
-  }, [next, nextRouter]);
+    else router.prefetch(dashboardPathForRole("client"));
+  }, [next, nextRouter, router]);
 
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -76,7 +78,9 @@ export function SignInForm({ turnstileEnabled = false, next = null }: { turnstil
     }
 
     // Never throws; a failure is kept for this tab and the site shows "Try again".
-    if (guestToken) await claimGuestWork(guestToken);
+    // W8: waits at most a few seconds, so a slow claim cannot stall the redirect (a
+    // late one clears the notice itself and reloads, so the account's data shows).
+    if (guestToken) await claimGuestWorkBounded(guestToken, { onLateDone: () => window.location.reload() });
 
     // Back to where they were (a Studio step …): no role lookup needed.
     if (next) {
@@ -85,17 +89,11 @@ export function SignInForm({ turnstileEnabled = false, next = null }: { turnstil
       return;
     }
 
-    // Branch to the role-appropriate landing page (Stage 4: all → /dashboard).
-    let role: Role = "client";
-    const userId = signInData.user?.id;
-    if (userId) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .single<{ role: Role }>();
-      if (profile?.role) role = profile.role;
-    }
+    // Branch to the role-appropriate landing page (Stage 4: all → /dashboard). W8: no
+    // profiles lookup here: the role is read from the session when it carries one,
+    // else the default (every role lands on the same page today).
+    const claimed = signInData.user?.app_metadata?.role;
+    const role: Role = claimed === "super_admin" || claimed === "workshop" || claimed === "client" ? claimed : "client";
 
     // Locale-agnostic path; the i18n router prepends the active locale.
     router.push(dashboardPathForRole(role));
@@ -164,10 +162,11 @@ export function SignInForm({ turnstileEnabled = false, next = null }: { turnstil
           type="submit"
           size="lg"
           disabled={loading}
+          aria-busy={loading}
           className="w-full rounded-full"
         >
-          {loading && <Loader2 className="animate-spin" />}
-          {t("signInSubmit")}
+          {loading && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}
+          {loading ? t("signingIn") : t("signInSubmit")}
         </Button>
       </form>
     </AuthShell>
