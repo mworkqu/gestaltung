@@ -328,3 +328,6 @@ function Strip({ data }: { data: Data }) {
     </section>
   );
 }
+
+/** Default export for the lazy gate (components/home/your-work-gate.tsx). */
+export default YourWorkStrip;

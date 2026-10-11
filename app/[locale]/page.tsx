@@ -4,10 +4,7 @@ import {
   ArrowRight,
   GraduationCap,
   Lightbulb,
-  MessageCircle,
-  PackageCheck,
   Plus,
-  Rocket,
   Search,
   ShoppingBag,
   UploadCloud,
@@ -19,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { ReviewsStrip } from "@/components/home/reviews-strip";
+import { FounderCards } from "@/components/home/founder-cards";
 import { HomeCallback } from "@/components/store-landing/callback-form";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
@@ -131,17 +129,7 @@ export default async function Home({
           </h2>
           <p className="max-w-2xl text-sm leading-relaxed text-body sm:text-base">{t("foundersIntro")}</p>
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="neu min-w-0 p-5">
-            <ChoiceHead icon={<Rocket className="h-4 w-4" />} title={t("founders1Title")} text={t("founders1Text")} />
-          </div>
-          <div className="neu min-w-0 p-5">
-            <ChoiceHead icon={<PackageCheck className="h-4 w-4" />} title={t("founders2Title")} text={t("founders2Text")} />
-          </div>
-          <div className="neu min-w-0 p-5">
-            <ChoiceHead icon={<MessageCircle className="h-4 w-4" />} title={t("founders3Title")} text={t("founders3Text")} />
-          </div>
-        </div>
+        <FounderCards locale={locale} variant="neu" />
       </section>
 
       {/* Paths (P1-01): the three ways in, demoted to a compact row. */}
@@ -151,6 +139,7 @@ export default async function Home({
           {/* Shop parts */}
           <div className="neu animate-fade-up delay-1 flex min-w-0 flex-col gap-4 p-5">
             <ChoiceHead icon={<ShoppingBag className="h-4 w-4" />} title={t("choiceBuyTitle")} text={t("choiceBuyText")} />
+            {/* v1 home (only served while site_v2 is off) keeps the plain form; the instant results (W7) live on the v2 home. */}
             <form action={`/${locale}/store`} className="flex items-stretch gap-2">
               <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3 shadow-neu-inset">
                 <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />

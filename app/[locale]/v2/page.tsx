@@ -1,16 +1,5 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import {
-  ArrowRight,
-  GraduationCap,
-  Lightbulb,
-  MessageCircle,
-  PackageCheck,
-  Plus,
-  Rocket,
-  Search,
-  ShoppingBag,
-  UploadCloud,
-} from "lucide-react";
+import { ArrowRight, GraduationCap, Lightbulb, Plus, ShoppingBag, UploadCloud } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { OccasionBanner } from "@/components/store/occasion-banner";
@@ -18,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { DesignDropzone } from "@/components/design/design-dropzone";
 import { PartCard } from "@/components/parts/part-card";
 import { HomeCallback } from "@/components/store-landing/callback-form";
-import { YourWorkStrip } from "@/components/home/your-work-strip";
+import { YourWorkStrip } from "@/components/home/your-work-gate";
+import { FounderCards } from "@/components/home/founder-cards";
+import { HeroVisual } from "@/components/home/hero-visual";
+import { HomeStoreSearch } from "@/components/search/home-store-search";
 import { ReviewsStrip } from "@/components/home/reviews-strip";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
@@ -56,6 +48,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
   const t = await getTranslations("StoreLanding");
   const tv = await getTranslations("Videos");
   const ts = await getTranslations("SiteV2");
+  const th = await getTranslations("HomeHero");
   const isRtl = locale === "ar";
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -87,7 +80,9 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
         {/* 1. Hero: outcome, one sub line, ONE primary CTA, a small shop link, the proof line. */}
         <section className="neu animate-rise relative overflow-hidden px-5 pb-8 pt-8 sm:px-12 sm:pb-12 sm:pt-14 lg:px-16 lg:pb-16 lg:pt-20">
           <BlueprintDecor />
-          <div className="relative space-y-4 sm:space-y-7">
+          {/* W7: text on the start, the live 3D enclosure on the end (below the text on phones). */}
+          <div className="relative grid grid-cols-1 items-center gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-12">
+          <div className="min-w-0 space-y-4 sm:space-y-7">
             <h1 className={cn(V2_TITLE, "max-w-4xl")}>{t("heroH1")}</h1>
             <p className="max-w-2xl text-base leading-relaxed text-body sm:text-xl">{t("heroSub")}</p>
             <div className="flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-8">
@@ -114,6 +109,8 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
               <IsolatedTitle text={t("heroProof")} locale={locale} />
             </p>
           </div>
+          <HeroVisual label={th("visualLabel")} className="w-full max-w-xl justify-self-center lg:max-w-none" />
+          </div>
         </section>
 
         <OccasionBanner locale={locale} />
@@ -126,25 +123,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
             title={t("foundersHeading")}
             intro={t("foundersIntro")}
           />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="tile min-w-0">
-              <ChoiceHead icon={<Rocket className="h-4 w-4" />} title={t("founders1Title")} text={t("founders1Text")} />
-            </div>
-            <div className="tile min-w-0">
-              <ChoiceHead
-                icon={<PackageCheck className="h-4 w-4" />}
-                title={t("founders2Title")}
-                text={t("founders2Text")}
-              />
-            </div>
-            <div className="tile min-w-0">
-              <ChoiceHead
-                icon={<MessageCircle className="h-4 w-4" />}
-                title={t("founders3Title")}
-                text={t("founders3Text")}
-              />
-            </div>
-          </div>
+          <FounderCards locale={locale} />
         </section>
 
         {/* 3. Paths: Plan / Make / Shop, compact (same functions as v1). */}
@@ -198,20 +177,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
                 title={t("choiceBuyTitle")}
                 text={t("choiceBuyText")}
               />
-              <form action={`/${locale}/store`} className="flex items-stretch gap-2">
-                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-white/60 bg-panel px-3 shadow-neu-inset">
-                  <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={1.75} />
-                  <input
-                    name="q"
-                    aria-label={t("searchPh")}
-                    placeholder={t("searchPh")}
-                    className="w-full min-w-0 flex-1 bg-transparent py-2.5 text-sm text-heading outline-none placeholder:text-faint"
-                  />
-                </div>
-                <Button type="submit" className="rounded-2xl px-4">
-                  {t("searchBtn")}
-                </Button>
-              </form>
+              <HomeStoreSearch locale={locale} placeholder={t("searchPh")} submitLabel={t("searchBtn")} />
               <TrackClick event="path_chosen" params={{ path: "shop" }}>
                 <Link
                   href="/store"
