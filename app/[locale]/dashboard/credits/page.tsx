@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { GRANT_REASONS, QUICK_AMOUNTS, mailtoLink, recentUse } from "@/lib/credits/grant-reasons";
 import { grantCredits } from "./actions";
 
 // AI credits admin (0042): find a user → balances → grant → their ledger;
@@ -82,6 +83,7 @@ export default async function CreditsAdminPage({
     ledger = (data ?? []) as LedgerRow[];
   }
   const usage = (usageRes.data ?? []) as UsageRow[];
+  const recent = recentUse(ledger);
   const th = "px-3 pb-2 text-start font-medium";
   const td = "px-3 py-2";
 
@@ -159,29 +161,90 @@ export default async function CreditsAdminPage({
           {granted && <p className="rounded-xl bg-buy-bg px-3 py-2 text-sm text-buy">{t("adminGranted")}</p>}
           {err && <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{t(`adminErr_${err}`)}</p>}
 
-          <form action={grantCredits} className="flex flex-wrap items-end gap-2">
+          {/* D7: balance and recent use, inline. */}
+          <div className="tile space-y-1 text-sm">
+            <p className="font-semibold text-heading">
+              {t("balanceInline", { wiring: selected.wiring, cad: selected.cad })}
+            </p>
+            {recent.length ? (
+              <p className="text-mutedtext">
+                {t("recentUse")}{" "}
+                {recent.map((l) => `${t(`kind_${l.kind}`)} ${l.delta} (${date(l.created_at)})`).join(" · ")}
+              </p>
+            ) : (
+              <p className="text-mutedtext">{t("recentUseNone")}</p>
+            )}
+          </div>
+
+          <form action={grantCredits} className="space-y-3">
             <input type="hidden" name="locale" value={locale} />
             <input type="hidden" name="user" value={selected.id} />
             {q && <input type="hidden" name="q" value={q} />}
-            <label className="flex flex-col gap-1 text-[11px] text-mutedtext">
-              {t("adminKind")}
-              <select name="kind" className={field} defaultValue="wiring">
-                <option value="wiring">{t("kind_wiring")}</option>
-                <option value="cad">{t("kind_cad")}</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] text-mutedtext">
-              {t("adminAmount")}
-              <input name="amount" type="number" step={1} defaultValue={1} required className={cn(field, "w-24")} />
-            </label>
-            <label className="flex min-w-[16rem] flex-1 flex-col gap-1 text-[11px] text-mutedtext">
-              {t("adminNote")}
-              <input name="note" required placeholder={t("adminNotePlaceholder")} className={field} />
-            </label>
-            <button type="submit" className="rounded-lg bg-cobalt px-3 py-1.5 text-xs font-semibold text-white hover:bg-cobalt-hover">
-              {t("adminGrant")}
-            </button>
+            {/* First submit button = what Enter does in a text field: the custom amount, never a quick grant. */}
+            <button type="submit" tabIndex={-1} aria-hidden className="hidden" />
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="flex flex-col gap-1 text-[11px] text-mutedtext">
+                {t("adminKind")}
+                <select name="kind" className={field} defaultValue="wiring">
+                  <option value="wiring">{t("kind_wiring")}</option>
+                  <option value="cad">{t("kind_cad")}</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-[11px] text-mutedtext">
+                {t("grantReason")}
+                <select name="reason" className={field} defaultValue="bank_transfer">
+                  {GRANT_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {t(`reason_${r}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-[14rem] flex-1 flex-col gap-1 text-[11px] text-mutedtext">
+                {t("grantDetails")}
+                <input name="note" placeholder={t("adminNotePlaceholder")} className={field} />
+              </label>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1 text-[11px] text-mutedtext">
+                {t("grantQuick")}
+                <div className="flex gap-2">
+                  {QUICK_AMOUNTS.map((n) => (
+                    <button
+                      key={n}
+                      type="submit"
+                      name="amount"
+                      value={n}
+                      className="rounded-lg bg-cobalt px-3 py-1.5 text-xs font-semibold text-white hover:bg-cobalt-hover max-md:min-h-11"
+                    >
+                      +{n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="flex flex-col gap-1 text-[11px] text-mutedtext">
+                {t("grantCustom")}
+                <input name="customAmount" type="number" step={1} placeholder="5" className={cn(field, "w-24")} />
+              </label>
+              <button type="submit" className="rounded-lg border border-borderstrong bg-panel px-3 py-1.5 text-xs font-semibold text-heading hover:text-cobalt max-md:min-h-11">
+                {t("adminGrant")}
+              </button>
+            </div>
+            <p className="text-[11.5px] text-mutedtext">{t("grantHelp")}</p>
           </form>
+
+          {/* D7: the grant emails the user by itself (credits_admin_grant, 0046 trigger); this link is for a personal note. */}
+          <div className="tile flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="max-w-[60ch] text-mutedtext">{t("emailAuto")}</p>
+            {selected.email && (
+              <a
+                href={mailtoLink(selected.email, t("emailSubject"), t("emailBody"))}
+                className="text-xs font-semibold text-cobalt hover:text-cobalt-hover max-md:inline-flex max-md:min-h-11 max-md:items-center"
+              >
+                {t("emailUser")}
+              </a>
+            )}
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-sm">

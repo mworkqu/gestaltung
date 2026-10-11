@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { StudioLibraryList, type LibraryRow } from "@/components/admin/studio-library/library-list";
 import { LIBRARY } from "@/lib/studio/library";
+import { popoverPhoto } from "@/lib/studio/part-photo";
 import { adminRows } from "@/lib/studio/library/admin-rows";
 import type { StudioPartRow } from "@/lib/studio/library/merge";
 
@@ -24,7 +25,26 @@ export default async function StudioLibraryPage({ params }: { params: Promise<{ 
   const readOnly = !!error;
   if (error && !MISSING.has(error.code ?? "")) console.error("[studio-library] read failed:", error.code, error.message);
 
-  const rows: LibraryRow[] = adminRows(LIBRARY, (data ?? []) as StudioPartRow[]).map((r) => ({
+  const admin = adminRows(LIBRARY, (data ?? []) as StudioPartRow[]);
+
+  // Store photo per row: the first linked SKU's product, one read for all rows.
+  const firstSkus = [...new Set(admin.map((r) => r.skus[0]).filter((s): s is string => !!s))];
+  const photoBySku = new Map<string, string>();
+  let photosFailed = false;
+  if (firstSkus.length) {
+    const res = await supabase.from("parts").select("sku, image_url, images").in("sku", firstSkus);
+    if (res.error) {
+      photosFailed = true;
+      console.error("[studio-library] photo read failed:", res.error.code, res.error.message);
+    } else {
+      for (const p of (res.data ?? []) as { sku: string; image_url: string | null; images: unknown }[]) {
+        const url = popoverPhoto(p, 96);
+        if (url) photoBySku.set(p.sku, url);
+      }
+    }
+  }
+
+  const rows: LibraryRow[] = admin.map((r) => ({
     id: r.id,
     name: locale === "ar" && r.part?.name.ar ? r.part.name.ar : r.name,
     category: r.category,
@@ -32,13 +52,28 @@ export default async function StudioLibraryPage({ params }: { params: Promise<{ 
     enabled: r.enabled,
     skus: r.skus.join(", "),
     problems: r.problems,
+    dims: r.part?.dims ?? null,
+    look: r.part?.look.body ?? null,
+    photo: r.skus[0] ? (photoBySku.get(r.skus[0]) ?? null) : null,
   }));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-heading">{t("pageTitle")}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-mutedtext">{t("pageIntro")}</p>
+        <p className="mt-1 max-w-3xl text-sm text-body">
+          {t("pageIntro")}
+          {/* HINT: swap this native title + "?" for components/ui/hint.tsx once D3 is merged. */}
+          <span
+            role="img"
+            aria-label={t("pageHint")}
+            title={t("pageHint")}
+            className="ms-2 inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-borderstrong text-[11px] font-bold text-mutedtext"
+          >
+            ?
+          </span>
+        </p>
+        {photosFailed && <p className="mt-1 text-xs text-destructive" role="status">{t("photosFailed")}</p>}
       </div>
       {readOnly && (
         <p className="neu p-4 text-sm font-semibold text-amber-800" role="status">

@@ -13,6 +13,8 @@ import { HeaderGate } from "@/components/header-gate";
 import { TrustBlock } from "@/components/trust-block";
 import { TrustGate } from "@/components/trust-gate";
 import { Footer } from "@/components/footer";
+import { FooterGate } from "@/components/footer-gate";
+import { DashboardFooter } from "@/components/dashboard-footer";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { GuestClaimNotice } from "@/components/auth/guest-claim-notice";
 import { CookieNotice } from "@/components/cookie-notice";
@@ -116,7 +118,9 @@ export default async function LocaleLayout({
                 <TrustGate>
                   <TrustBlock />
                 </TrustGate>
-                <Footer />
+                <FooterGate compact={<DashboardFooter />}>
+                  <Footer />
+                </FooterGate>
               </div>
             </CartProvider>
           </AuthProvider>

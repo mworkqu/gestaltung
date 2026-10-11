@@ -13,6 +13,7 @@ import { Loader2, Plus, Save } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { resetPart, savePartSkus, setPartEnabled, type SaveResult, type SkuLookup } from "@/app/[locale]/dashboard/studio-library/actions";
 import type { PartSource } from "@/lib/studio/library/merge";
+import { LOOK_HEX, isoBox, shade } from "@/lib/studio/library/thumb";
 import { SkuCheckButton, SkuCheckResult } from "./sku-check";
 
 export type LibraryRow = {
@@ -24,7 +25,27 @@ export type LibraryRow = {
   enabled: boolean | null;
   skus: string;
   problems: string[];
+  /** Part size in mm (for the static 3D-shape thumbnail); null for a broken new row. */
+  dims: { x: number; y: number; z: number } | null;
+  /** Body look (pcb_green, metal, ...) tints the thumbnail. */
+  look: string | null;
+  /** Store photo URL of the first linked SKU (already sized); null when none. */
+  photo: string | null;
 };
+
+/** Static isometric box of the part's real size: the cheap "3D shape" preview. */
+function ShapeThumb({ dims, look, label }: { dims: LibraryRow["dims"]; look: string | null; label: string }) {
+  if (!dims) return <div className="h-14 w-14 shrink-0 rounded-xl bg-panel" aria-hidden />;
+  const base = LOOK_HEX[look ?? ""] ?? "#8a94a0";
+  const b = isoBox(dims, 56);
+  return (
+    <svg viewBox="0 0 56 56" role="img" aria-label={label} className="h-14 w-14 shrink-0 rounded-xl bg-panel">
+      <polygon points={b.left} fill={shade(base, 0.7)} />
+      <polygon points={b.right} fill={shade(base, 0.5)} />
+      <polygon points={b.top} fill={shade(base, 1.15)} />
+    </svg>
+  );
+}
 
 const input =
   "w-full rounded-lg border border-white/60 bg-surface px-3 py-2 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60 disabled:opacity-60";
@@ -58,11 +79,24 @@ function Row({ row, locale, readOnly }: { row: LibraryRow; locale: string; readO
   return (
     <li className="tile min-w-0 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-heading">{row.name}</p>
-          <p className="text-xs text-mutedtext">
-            <span className="font-mono" dir="ltr">{row.id}</span> · {t(`cat_${row.category}`)}
-          </p>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2">
+            <ShapeThumb dims={row.dims} look={row.look} label={t("thumbShape")} />
+            {row.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={row.photo} alt={t("thumbStore")} width={56} height={56} loading="lazy" decoding="async" className="h-14 w-14 shrink-0 rounded-xl bg-white object-contain" />
+            ) : (
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-panel px-1 text-center text-[10px] leading-tight text-faint" title={t("noPhotoTitle")}>
+                {t("noPhoto")}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-heading">{row.name}</p>
+            <p className="text-xs text-mutedtext">
+              <span className="font-mono" dir="ltr">{row.id}</span> · {t(`cat_${row.category}`)}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${badge}`}>{t(`source_${row.source}`)}</span>

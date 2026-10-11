@@ -168,8 +168,10 @@ export default async function ReviewsAdminPage({
             ))}
             {!rows.length && !notReady && (
               <tr>
-                <td colSpan={8} className="px-3 py-4 text-center text-mutedtext">
-                  {t("empty")}
+                <td colSpan={8} className="px-3 py-6 text-center text-mutedtext">
+                  <p className="font-medium text-heading">{all.length ? t("emptyTab") : t("empty")}</p>
+                  {/* When the request goes out: the delivered email (lib/email/templates/order-status.ts) carries the 1-5 tap, sent when an order is marked Delivered. */}
+                  <p className="mx-auto mt-1 max-w-[60ch] text-xs">{t("emptyHint")}</p>
                 </td>
               </tr>
             )}

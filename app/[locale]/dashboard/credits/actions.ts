@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getSessionContext } from "@/lib/auth/get-session";
+import { buildGrantNote, parseGrantReason, pickAmount } from "@/lib/credits/grant-reasons";
 import { createClient } from "@/lib/supabase/server";
 
 // Manual credit grant (bank transfer / WhatsApp top-ups until online payment
@@ -16,8 +17,10 @@ export async function grantCredits(formData: FormData) {
   const user = String(formData.get("user") ?? "");
   const q = String(formData.get("q") ?? "");
   const kind = formData.get("kind") === "cad" ? "cad" : "wiring";
-  const amount = Math.trunc(Number(formData.get("amount")));
-  const note = String(formData.get("note") ?? "").trim();
+  // D7: a quick button (+1/+3/+10, field "amount") wins over the custom field.
+  const picked = pickAmount(formData.get("amount"), formData.get("customAmount"));
+  const amount = Number.isNaN(picked) ? 0 : picked; // 0 → admin_grant answers bad_amount
+  const note = buildGrantNote(parseGrantReason(formData.get("reason")), String(formData.get("note") ?? ""));
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_grant", { p_user: user, p_kind: kind, p_amount: amount, p_note: note });
