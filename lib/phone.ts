@@ -61,14 +61,35 @@ export function toWhatsAppDigits(raw: string): string | null {
   return normalised.slice(1);
 }
 
+/** Qatar mobiles (WhatsApp) start with 3, 5, 6 or 7; landlines (4…) can't take WhatsApp. */
+const QA_MOBILE = /^[3567]\d{7}$/;
+
 /**
- * A number we can actually call back (audit Phase 6): a Qatar number (8 digits,
- * with or without +974), or an international one written with + / 00 and
- * 8–15 digits. Forms use this to show an error before sending.
+ * Junk that passes a digit count: every digit the same ("55555555") or a
+ * running sequence up or down, wrapping 9→0 ("34567890", "76543210").
+ */
+export function isObviousFakeNumber(digits: string): boolean {
+  if (digits.length < 2) return false;
+  if (/^(\d)\1+$/.test(digits)) return true;
+  const step = (i: number) => (Number(digits[i + 1]) - Number(digits[i]) + 10) % 10;
+  const first = step(0);
+  if (first !== 1 && first !== 9) return false;
+  for (let i = 1; i < digits.length - 1; i++) if (step(i) !== first) return false;
+  return true;
+}
+
+/**
+ * A number we can actually call back on WhatsApp (W2, 2026-10-11): a Qatar
+ * MOBILE (+974 and 8 digits starting 3, 5, 6 or 7 — typed with or without
+ * +974 / 00974), never all one digit or a running sequence; or an
+ * international number written with + / 00 and 8–15 digits (unchanged).
+ * Every form checks this before sending AND /api/store-lead + /api/design-quote
+ * refuse anything else (422 invalid_phone), so client and server agree.
  */
 export function isValidPhone(raw: string): boolean {
   const n = normalizePhone(raw);
-  if (/^\+974\d{8}$/.test(n)) return true;
+  const qa = /^\+974(\d{8})$/.exec(n);
+  if (qa) return QA_MOBILE.test(qa[1]) && !isObviousFakeNumber(qa[1]);
   return /^\+\d{8,15}$/.test(n) && !n.startsWith("+974");
 }
 

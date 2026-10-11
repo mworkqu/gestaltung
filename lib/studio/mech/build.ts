@@ -27,18 +27,8 @@ export type BuiltMechPart = {
 
 export type MechEnclosure = { base: THREE.Mesh; lid: THREE.Mesh; dims: MechDims };
 
-export const MECH_NAMES: Record<MechTemplate, { en: string; ar: string }> = {
-  standoff: { en: "Standoff", ar: "عمود تثبيت" },
-  pcb_cradle: { en: "Board cradle", ar: "حامل اللوحة" },
-  battery_clip: { en: "Battery clip", ar: "مشبك البطارية" },
-  sensor_mount: { en: "Sensor mount", ar: "حامل المستشعر" },
-  cable_clip: { en: "Cable clip", ar: "مشبك السلك" },
-  button_extender: { en: "Button extender", ar: "ممدّد الزر" },
-  light_pipe: { en: "Light pipe", ar: "موجّه الضوء" },
-  wall_bracket: { en: "Wall bracket", ar: "حامل الحائط" },
-  lid: { en: "Lid", ar: "الغطاء" },
-  base: { en: "Base", ar: "القاعدة" },
-};
+import { MECH_NAMES } from "./names";
+export { MECH_NAMES };
 
 export function buildMechParts(
   mech: readonly MechPart[],

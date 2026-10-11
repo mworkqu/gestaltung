@@ -166,7 +166,7 @@ export function CostSummary({
 function QuoteRequest({
   projectId,
   lines,
-  profilePhone,
+  profilePhone: storedPhone,
   onPhoneSaved,
 }: {
   projectId: string;
@@ -174,6 +174,10 @@ function QuoteRequest({
   profilePhone?: string | null;
   onPhoneSaved?: (phone: string) => void;
 }) {
+  // W2: an old stored number that fails today's rule is asked again (the lead route refuses it).
+  const profilePhone = storedPhone && isValidPhone(storedPhone) ? storedPhone : null;
+  const tPhone = useTranslations("Phone");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const t = useTranslations("Prototyping");
   const tC = useTranslations("Contact");
   const tD = useTranslations("Delivery");
@@ -192,6 +196,11 @@ function QuoteRequest({
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     const typedPhone = String(f.get("phone") ?? "").trim();
+    if (!profilePhone && !isValidPhone(typedPhone)) {
+      setPhoneError(tPhone("invalid"));
+      return;
+    }
+    setPhoneError(null);
     setState("sending");
     try {
       // The route writes the message (items, note, project link and name).
@@ -297,6 +306,11 @@ function QuoteRequest({
                       placeholder={tC("whatsappPlaceholder")}
                       codeAriaLabel={tC("countryCode")}
                     />
+                    {phoneError && (
+                      <p role="alert" className="text-xs text-destructive">
+                        {phoneError}
+                      </p>
+                    )}
                   </div>
                 )}
                 <label className="block space-y-1">

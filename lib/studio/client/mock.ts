@@ -7,6 +7,7 @@
 // (defaultMechParts); the firmware is a small canned sketch for the chosen board.
 
 import { getPart } from "@/lib/studio/library";
+import { isValidPhone } from "@/lib/phone";
 import { buildWiring } from "@/lib/studio/netlist";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
@@ -160,11 +161,28 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
     async storeProducts() {
       return new Map();
     },
+    // W2: a signed-in maker with an email but no name or phone on file, so the
+    // "Get it made" pop-up asks for exactly those two. ?who=guest = a guest session.
     async profile() {
-      return { userId: null, phone: "+97455555555", fullName: "Test" };
+      let who: string | null = null;
+      try {
+        who = new URLSearchParams(window.location.search).get("who");
+      } catch {
+        /* no window */
+      }
+      if (who === "guest") return { userId: "mock-guest", phone: null, fullName: null, email: null, guest: true };
+      return { userId: "mock-user", phone: null, fullName: null, email: "maker@example.com", guest: false };
     },
-    async requestQuote() {
+    async saveContact() {},
+    async requestQuote(q) {
       await wait(200);
+      // Same rule as /api/store-lead (422 invalid_phone), and the request is kept for the e2e.
+      if (!isValidPhone(q.phone)) return false;
+      try {
+        (window as unknown as { __g360LastQuote?: unknown }).__g360LastQuote = q;
+      } catch {
+        /* no window */
+      }
       return true;
     },
   };

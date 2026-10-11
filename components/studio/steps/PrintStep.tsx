@@ -11,10 +11,8 @@
 //    one step); this step is the printable-parts list, grams and STL downloads;
 //  * the list says what each part is in plain words, its material and grams
 //    (a stake pod's soil spike is its own row);
-//  * main button "Request printing from Gestaltung360": the STLs go to the
-//    visitor's own folder of the private cad-files bucket, then one lead
-//    (/api/store-lead source print_request). Quantity is always 1. The
-//    WhatsApp number is asked only when the profile has none (PhonePrompt).
+//  * main button "Next". Asking us to make it is the Studio's one "Get it
+//    made" bar (W2, components/studio/GetItMade.tsx), not a button here.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -23,20 +21,16 @@ import {
   BatteryMedium,
   Box,
   Cable,
-  CheckCircle2,
   CircleDot,
   Cylinder,
   Download,
   Frame,
   Layers,
   Lightbulb,
-  Loader2,
   PanelTop,
-  Printer,
   Radar,
 } from "lucide-react";
 
-import { PhonePrompt } from "@/components/projects/phone-prompt";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { downloadBlob } from "@/lib/studio/download";
 import { layoutComponents, layoutResultOf } from "@/lib/studio/layout";
@@ -45,7 +39,6 @@ import type { BuiltMechPart } from "@/lib/studio/mech/build";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { MechPart, MechTemplate, StudioDoc } from "@/lib/studio/schema";
 import { fileSlug } from "@/lib/studio/client/steps";
-import type { Profile } from "@/lib/studio/client/api";
 import type { StudioCtx } from "../StudioShell";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 
@@ -227,63 +220,8 @@ export function PrintStep({
     for (const b of row.parts) downloadBlob(fileName(b), printableSTL(b.object), "model/stl");
   }
 
-  // ── Request printing ─────────────────────────────────────────────────────
-  const [req, setReq] = useState<"idle" | "checking" | "phone" | "sending" | "sent" | "failed">("idle");
-  const [profile, setProfile] = useState<Profile | null>(null);
-
-  async function send(p: Profile, phone: string) {
-    if (!built?.length) return;
-    setReq("sending");
-    const { printableSTL } = await import("@/lib/studio/export");
-    const files = built.map((b) => ({ name: fileName(b), data: printableSTL(b.object) }));
-    const paths = await ctx.api.uploadPrintFiles(files).catch(() => [] as string[]);
-    const ok = await ctx.api.requestPrint({
-      name: p.fullName || t("defaultContactName"),
-      phone,
-      locale,
-      designName: doc.spec.name,
-      parts: rows.map((r) => ({ name: r.count > 1 ? `${r.name.en} × ${r.count}` : r.name.en, material: r.material, grams: r.grams })),
-      totalGrams: total,
-      files: paths,
-    });
-    setReq(ok ? "sent" : "failed");
-  }
-
-  async function requestPrint() {
-    setReq("checking");
-    const p = await ctx.api.profile();
-    setProfile(p);
-    if (p.phone) await send(p, p.phone);
-    else if (p.userId) setReq("phone");
-    else setReq("failed");
-  }
-
-  const busy = req === "checking" || req === "sending";
   const ready = !!built && built.length > 0;
   const loading = !ready && !buildFailed && (fetching || doc.mech.length > 0 || !!doc.enclosure);
-
-  if (req === "sent") {
-    return (
-      <StepFrame
-        step="print"
-        n={ctx.n("print")}
-        title={t("title_print")}
-        headline={t("requestReceived")}
-        intro={t("printReceivedText")}
-        footer={<MainButton onClick={onNext}>{t("next")}</MainButton>}
-      >
-        <div
-          className="tile flex items-center gap-3 border-0 p-5 motion-safe:animate-rise"
-          style={{ background: accent.soft }}
-          role="status"
-          data-testid="studio-print-received"
-        >
-          <CheckCircle2 className="h-8 w-8 shrink-0" style={{ color: accent.ink }} strokeWidth={1.5} aria-hidden />
-          <p className="text-base font-semibold text-heading">{t("printReceivedText")}</p>
-        </div>
-      </StepFrame>
-    );
-  }
 
   return (
     <StepFrame
@@ -292,22 +230,12 @@ export function PrintStep({
       title={t("title_print")}
       headline={t("headline_print")}
       intro={t("intro_print")}
-      footer={
-        <MainButton onClick={() => void requestPrint()} disabled={!ready || busy}>
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Printer className="h-4 w-4" strokeWidth={1.75} aria-hidden />}
-          {busy ? t("requestPrintSending") : t("requestPrint")}
-        </MainButton>
-      }
+      footer={<MainButton onClick={onNext}>{t("next")}</MainButton>}
       secondary={
-        <>
-          <button type="button" className={linkCls} onClick={() => void downloadAll()} disabled={!ready}>
-            <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-            {t("downloadAllStl")}
-          </button>
-          <button type="button" className={linkCls} onClick={onNext}>
-            {t("skipToCode")}
-          </button>
-        </>
+        <button type="button" className={linkCls} onClick={() => void downloadAll()} disabled={!ready}>
+          <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+          {t("downloadAllStl")}
+        </button>
       }
     >
       <div className="space-y-3">
@@ -373,15 +301,6 @@ export function PrintStep({
         )}
       </div>
 
-      {req === "phone" && profile?.userId && (
-        <PhonePrompt
-          userId={profile.userId}
-          variant="quote"
-          onSaved={(phone) => void send(profile, phone)}
-          onDismiss={() => setReq("idle")}
-        />
-      )}
-      {req === "failed" && <Problem>{t("requestFailed")}</Problem>}
     </StepFrame>
   );
 }

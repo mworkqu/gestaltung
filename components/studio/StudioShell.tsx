@@ -38,6 +38,10 @@ import {
 } from "@/lib/studio/client/steps";
 import { ProgressLine } from "./ProgressLine";
 import { Bar, MainButton } from "./ui";
+import { GET_IT_MADE_PARAM, GetItMade } from "./GetItMade";
+import { REQUEST_SENT_KEY } from "@/lib/studio/request-summary";
+import { useRouter } from "@/i18n/navigation";
+import { cn } from "@/lib/utils";
 import { IdeaStep } from "./steps/IdeaStep";
 import { PartsStep } from "./steps/PartsStep";
 import { WiringStep } from "./steps/WiringStep";
@@ -390,6 +394,30 @@ function StudioShellInner({
 
   const flushBeforeServer = useCallback(() => flush(), [flush]);
 
+  // ── W2 "Get it made" ─────────────────────────────────────────────────────
+  const router = useRouter();
+  // Back from sign-in / sign-up with ?getItMade=1: reopen the pop-up once and drop the flag.
+  const [reopenGetItMade, setReopenGetItMade] = useState(false);
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get(GET_IT_MADE_PARAM) !== "1") return;
+      url.searchParams.delete(GET_IT_MADE_PARAM);
+      window.history.replaceState(window.history.state, "", url.toString());
+      setReopenGetItMade(true);
+    } catch {
+      /* no URL: the visitor opens it by hand */
+    }
+  }, [ready]);
+  const onRequestSent = useCallback(async () => {
+    const base = latest.current;
+    if (base) commit({ ...base, answers: { ...(base.answers ?? {}), [REQUEST_SENT_KEY]: new Date().toISOString() } });
+    await flush();
+    // The e2e fixture has no project row: its own quote page renders a canned doc.
+    router.push(api.mode === "mock" ? "/e2e-fixtures/studio-request" : `/projects/${projectId}/request`);
+  }, [api.mode, commit, flush, projectId, router]);
+
   // ── Render ───────────────────────────────────────────────────────────────
   if (loaded.state === "loading") {
     return (
@@ -430,9 +458,19 @@ function StudioShellInner({
   const step = FLOW[current];
   const n = (s: FlowStep) => FLOW.indexOf(s) + 1;
   const ctx: StudioCtx = { api, locale, projectId, projectName, n };
+  // W2: one "Get it made" bar from the Enclosure step onward.
+  const showGetItMade = !!doc && current >= FLOW.indexOf("enclosure");
 
   return (
-    <div className="space-y-5" data-testid="studio-shell" data-step={step}>
+    <div
+      className={cn(
+        "space-y-5",
+        // Phones: room for the fixed bar, and each step's own sticky button sits just above it.
+        showGetItMade && "max-sm:pb-24 max-sm:[&_.sticky]:bottom-[calc(4.75rem+env(safe-area-inset-bottom))]",
+      )}
+      data-testid="studio-shell"
+      data-step={step}
+    >
       <ProgressLine current={current} furthest={furthest} done={(s) => stepDone(s, doc)} onGo={go} />
       <StepSlide index={current}>
         {step === "idea" && (
@@ -479,6 +517,16 @@ function StudioShellInner({
         )}
         {step === "make" && doc && <MakeStep ctx={ctx} doc={doc} products={products} />}
       </StepSlide>
+      {showGetItMade && doc && (
+        <GetItMade
+          api={api}
+          doc={doc}
+          locale={locale}
+          autoOpen={reopenGetItMade}
+          beforeLeave={() => void flush()}
+          onSent={onRequestSent}
+        />
+      )}
     </div>
   );
 }

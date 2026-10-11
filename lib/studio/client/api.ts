@@ -65,8 +65,25 @@ export type PrintRequest = {
   /** Storage paths ("cad-files/<user>/<project>/print/…") of the uploaded STLs. */
   files: string[];
 };
-export type Profile = { userId: string | null; phone: string | null; fullName: string | null };
-export type QuoteRequest = { name: string; phone: string; items: string[]; locale: Locale; designName: string };
+export type Profile = {
+  userId: string | null;
+  phone: string | null;
+  fullName: string | null;
+  /** The account email (W2: prefilled in "Get it made"); null for guests. */
+  email?: string | null;
+  /** An anonymous (guest) session: "Get it made" asks to sign in / up first (W2). */
+  guest?: boolean;
+};
+export type QuoteRequest = {
+  name: string;
+  phone: string;
+  items: string[];
+  locale: Locale;
+  designName: string;
+  /** W2 "Get it made" pop-up. */
+  email?: string;
+  note?: string;
+};
 
 export interface StudioApi {
   /** "live" talks to Supabase and the routes; "mock" is the e2e fixture. */
@@ -96,6 +113,8 @@ export interface StudioApi {
   rename(name: string): Promise<void>;
   storeProducts(skus: string[]): Promise<Map<string, StoreCardPart>>;
   profile(): Promise<Profile>;
+  /** W2: keep a typed name / WhatsApp number on the profile so it is never asked again (best-effort). */
+  saveContact(c: { fullName?: string; phone?: string }): Promise<void>;
   requestQuote(q: QuoteRequest): Promise<boolean>;
 }
 
@@ -249,10 +268,32 @@ export function liveStudioApi(projectId: string): StudioApi {
     async profile() {
       const { data: auth } = await (await db()).auth.getUser();
       const user = auth.user;
-      if (!user) return { userId: null, phone: null, fullName: null };
+      if (!user) return { userId: null, phone: null, fullName: null, email: null, guest: true };
       const { data } = await (await db()).from("profiles").select("phone, full_name").eq("id", user.id).maybeSingle();
       const row = (data ?? {}) as { phone?: string | null; full_name?: string | null };
-      return { userId: user.id, phone: row.phone?.trim() || null, fullName: row.full_name?.trim() || null };
+      const meta = (user.user_metadata ?? {}) as { full_name?: unknown };
+      const metaName = typeof meta.full_name === "string" ? meta.full_name.trim() : "";
+      return {
+        userId: user.id,
+        phone: row.phone?.trim() || null,
+        fullName: row.full_name?.trim() || metaName || null,
+        email: user.email?.trim() || null,
+        guest: user.is_anonymous === true,
+      };
+    },
+
+    async saveContact(c) {
+      const patch: Record<string, string> = {};
+      if (c.fullName?.trim()) patch.full_name = c.fullName.trim().slice(0, 120);
+      if (c.phone?.trim()) patch.phone = c.phone.trim();
+      if (!Object.keys(patch).length) return;
+      try {
+        const { data: auth } = await (await db()).auth.getUser();
+        if (!auth.user) return;
+        await (await db()).from("profiles").update(patch).eq("id", auth.user.id);
+      } catch {
+        /* best-effort: the request went out either way */
+      }
     },
 
     async requestQuote(q) {
@@ -260,6 +301,8 @@ export function liveStudioApi(projectId: string): StudioApi {
         source: "studio_quote",
         name: q.name,
         phone: q.phone,
+        ...(q.email ? { email: q.email } : {}),
+        ...(q.note ? { note: q.note } : {}),
         locale: q.locale,
         projectId,
         designName: q.designName,
