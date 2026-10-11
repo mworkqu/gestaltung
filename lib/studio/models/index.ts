@@ -23,6 +23,7 @@ import { buzzer } from "./buzzer";
 import { speakerAmp } from "./speakerAmp";
 import { servo } from "./servo";
 import { n20Motor } from "./n20Motor";
+import { waterPump } from "./waterPump";
 import { slideSwitch } from "./slideSwitch";
 import { ds18b20Probe } from "./ds18b20Probe";
 import { lcdModule } from "./lcdModule";
@@ -46,6 +47,7 @@ export const BUILDERS: Record<string, ModelBuilder> = {
   speakerAmp,
   servo,
   n20Motor,
+  waterPump,
   slideSwitch,
   ds18b20Probe,
   lcdModule,

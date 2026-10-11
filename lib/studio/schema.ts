@@ -20,7 +20,14 @@ export const USES = ["desk", "handheld", "wall", "wearable", "outdoor", "vehicle
 export const POWERS = ["usb", "battery", "battery_usb", "mains_adapter"] as const;
 export const ENVIRONMENTS = ["indoor", "outdoor"] as const;
 export const INPUTS = ["button", "touch", "knob", "none"] as const;
-export const OUTPUTS = ["screen", "led", "buzzer", "speaker", "motor", "relay"] as const;
+/** pump (W3): a small water pump, e.g. "automatic watering" (lib/studio/ai/spec-guards.ts keeps it). */
+export const OUTPUTS = ["screen", "led", "buzzer", "speaker", "motor", "relay", "pump"] as const;
+/**
+ * Where the product physically lives when "use" alone would say the wrong thing (W3):
+ * plant_soil = stands in the soil of a plant pot / bed; on_body / on_wrist = worn.
+ * Optional: absent = the use (desk, wall, …) says it all.
+ */
+export const PLACEMENTS = ["plant_soil", "on_body", "on_wrist"] as const;
 export const SIZE_HINTS = ["pocket", "palm", "desk", "large"] as const;
 export const STYLES = ["rounded", "soft_tech", "rugged", "minimal"] as const;
 
@@ -76,6 +83,7 @@ export type Input = (typeof INPUTS)[number];
 export type Output = (typeof OUTPUTS)[number];
 export type SizeHint = (typeof SIZE_HINTS)[number];
 export type Style = (typeof STYLES)[number];
+export type Placement = (typeof PLACEMENTS)[number];
 export type Category = (typeof CATEGORIES)[number];
 export type Look = (typeof LOOKS)[number];
 export type PortKind = (typeof PORT_KINDS)[number];
@@ -125,6 +133,7 @@ export const ProductSpecSchema = z.object({
   outputs: z.array(z.enum(OUTPUTS)),
   sizeHint: z.enum(SIZE_HINTS),
   style: z.enum(STYLES),
+  placement: z.enum(PLACEMENTS).optional(),
   quantity: z.literal(1),
 });
 export type ProductSpec = z.infer<typeof ProductSpecSchema>;
@@ -391,6 +400,9 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   const cleanInputs = inputs.length > 1 ? inputs.filter((i) => i !== "none") : inputs;
   if (o.quantity !== undefined && o.quantity !== 1) log.push({ path: "quantity", from: o.quantity, to: 1 });
   const use = pickEnum(USES, o.use, DEFAULT_SPEC.use, "use", log);
+  const rawPlacement = typeof o.placement === "string" ? o.placement.trim().toLowerCase() : "";
+  const placement = rawPlacement ? (PLACEMENTS as readonly string[]).find((p) => p === rawPlacement) : undefined;
+  if (o.placement !== undefined && o.placement !== null && o.placement !== "" && !placement) log.push({ path: "placement", from: o.placement, to: null });
   return {
     name,
     oneLine: typeof o.oneLine === "string" && o.oneLine.trim() ? clampStr(o.oneLine, LIMITS.oneLine.max, "", "oneLine", log) : "",
@@ -402,6 +414,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
     outputs: enumList(OUTPUTS, o.outputs, "outputs", log),
     sizeHint: pickEnum(SIZE_HINTS, o.sizeHint, DEFAULT_SPEC.sizeHint, "sizeHint", log),
     style: pickEnum(STYLES, o.style, DEFAULT_SPEC.style, "style", log),
+    ...(placement ? { placement: placement as Placement } : {}),
     quantity: 1,
   };
 }

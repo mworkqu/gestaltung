@@ -74,7 +74,8 @@ export interface StudioApi {
   readonly projectId: string;
   load(): Promise<LoadResult>;
   save(doc: StudioDoc, version: number): Promise<SaveResult>;
-  spec(body: { idea: string; messages: IdeaMessage[]; locale: Locale }): Promise<Res<SpecReply>>;
+  /** `current` = the card already shown: the last user message refines it (W3). */
+  spec(body: { idea: string; messages: IdeaMessage[]; locale: Locale; current?: ProductSpec | null }): Promise<Res<SpecReply>>;
   pick(spec: ProductSpec, locale: Locale): Promise<Res<PickReply>>;
   wiring(spec: ProductSpec, components: StudioComponent[], locale: Locale): Promise<Res<WiringReply>>;
   enclosure(
@@ -167,7 +168,7 @@ export function liveStudioApi(projectId: string): StudioApi {
       }
     },
 
-    spec: ({ idea, messages, locale }) => postJson("/api/studio/spec", { projectId, locale, idea, messages }),
+    spec: ({ idea, messages, locale, current }) => postJson("/api/studio/spec", { projectId, locale, idea, messages, current: current ?? null }),
     pick: (spec, locale) => postJson("/api/studio/pick", { projectId, locale, spec }),
     wiring: (spec, components, locale) => postJson("/api/studio/wiring", { projectId, locale, spec, components }),
     enclosure: (spec, components, bbox, locale) =>

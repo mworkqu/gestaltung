@@ -33,6 +33,7 @@ import { speakerAmp } from "./parts/speaker_amp";
 import { relayModule } from "./parts/relay_module";
 import { sg90Servo } from "./parts/sg90_servo";
 import { n20Motor } from "./parts/n20_motor";
+import { pump5v } from "./parts/pump_5v";
 import { motorDriver } from "./parts/motor_driver";
 import { rotaryEncoder } from "./parts/rotary_encoder";
 import { slideSwitch } from "./parts/slide_switch";
@@ -74,6 +75,7 @@ export const LIBRARY: LibraryPart[] = [
   relayModule,
   sg90Servo,
   n20Motor,
+  pump5v,
   motorDriver,
   rotaryEncoder,
   slideSwitch,

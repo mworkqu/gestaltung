@@ -31,6 +31,20 @@ export const POWER_PARTS: Record<ProductSpec["power"], readonly string[]> = {
   mains_adapter: [],
 };
 
+/**
+ * Library parts the spec itself asks for (W3, from the idea guards): a pump output needs
+ * the water pump (the wiring adds its driver), a valve needs the relay that switches it,
+ * a plant that is watched needs the soil probe. Only ids present in the library are added.
+ */
+export function specParts(spec: ProductSpec): string[] {
+  const ids: string[] = [];
+  const feature = (re: RegExp) => spec.features.some((f) => re.test(f));
+  if (spec.outputs.includes("pump")) ids.push("pump_5v");
+  if (spec.outputs.includes("relay") && feature(/valve|solenoid|صمام/i)) ids.push("relay_module");
+  if (spec.placement === "plant_soil" && feature(/soil|moist|رطوبة|تربة/i)) ids.push("soil_moisture_cap");
+  return ids;
+}
+
 /** Optional localized display name (e.g. getPart(id)?.name[locale]). */
 export type NameFor = (id: string, locale: "en" | "ar") => string | undefined;
 
@@ -98,6 +112,14 @@ export function enforcePick(
     log.push({ path: "components.power", from: null, to: id });
   }
   if (power.length) list.splice(list.length && isMcu(list[0]) ? 1 : 0, 0, ...power);
+
+  // Parts the spec itself names (W3): the model may drop them, we never do.
+  for (const id of specParts(opts.spec)) {
+    const entry = byId.get(id);
+    if (!entry || list.some((p) => p.partId === id)) continue;
+    list.splice(list.length && isMcu(list[0]) ? 1 : 0, 0, { partId: id, label: name(entry) });
+    log.push({ path: "components.spec", from: null, to: id });
+  }
 
   if (list.length > MAX_COMPONENTS) {
     log.push({ path: "components", from: list.length, to: MAX_COMPONENTS });

@@ -16,7 +16,9 @@ const phase2Ids = [
   "ws2812_ring", "buzzer", "speaker_amp", "relay_module", "sg90_servo", "n20_motor", "motor_driver",
   "rotary_encoder", "slide_switch", "microsd_module", "rtc_ds3231", "usbc_breakout", "level_shifter_4ch",
 ];
-const ids = [...phase1Ids, ...phase2Ids];
+// W3: the water pump the idea guards add for "automatic watering".
+const w3Ids = ["pump_5v"];
+const ids = [...phase1Ids, ...phase2Ids, ...w3Ids];
 
 function vertexCount(g: THREE.Group): number {
   let n = 0;

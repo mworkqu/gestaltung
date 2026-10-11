@@ -4,6 +4,9 @@ import { DEFAULT_ENCLOSURE, DEFAULT_SPEC, emptyStudioDoc, type StudioDoc } from 
 import {
   FLOW,
   answersFrom,
+  cardRows,
+  changedRows,
+  forModel,
   factKeys,
   fileSlug,
   firstOpenStep,
@@ -116,5 +119,49 @@ describe("studio flow", () => {
     expect(looksLeftFromVersions(4)).toBe(2);
     expect(fileSlug("My Desk Lamp!")).toBe("my-desk-lamp");
     expect(fileSlug("مصباح")).toBe("design");
+  });
+});
+
+describe("idea chat W3: refinements and the live card", () => {
+  it("stores change requests typed after the card and reads them back with our note", () => {
+    const messages = [
+      { role: "assistant" as const, text: "Where will it live?", choices: ["Desk", "Wall"] },
+      { role: "user" as const, text: "Desk" },
+      { role: "user" as const, text: "make it solar" },
+      { role: "assistant" as const, text: "", note: true as const },
+      { role: "user" as const, text: "add a pump" },
+      { role: "assistant" as const, text: "", note: true as const },
+    ];
+    const answers = answersFrom("A plant helper", messages);
+    expect(answers).toEqual({ idea: "A plant helper", "q:Where will it live?": "Desk", "r:1": "make it solar", "r:2": "add a pump" });
+    expect(historyFrom(answers).messages).toEqual([
+      { role: "assistant", text: "Where will it live?" },
+      { role: "user", text: "Desk" },
+      { role: "user", text: "make it solar" },
+      { role: "assistant", text: "", note: true },
+      { role: "user", text: "add a pump" },
+      { role: "assistant", text: "", note: true },
+    ]);
+    // The AI never sees our notes.
+    expect(forModel(messages).some((m) => m.text === "")).toBe(false);
+    expect(forModel(messages)).toHaveLength(4);
+  });
+
+  it("a spec straight after the idea: the first message is a change request", () => {
+    expect(answersFrom("lamp", [{ role: "user", text: "make it red" }])).toEqual({ idea: "lamp", "r:1": "make it red" });
+  });
+
+  it("card rows: hints until known, placement before use, pump first", () => {
+    const draft = cardRows({ ...DEFAULT_SPEC, outputs: ["pump"], placement: "plant_soil" }, new Set(["place", "does"] as const));
+    expect(draft.map((r) => r.key)).toEqual(["fact_place_plant_soil", "fact_out_pump", null, null]);
+    expect(draft.map((r) => r.hint)).toEqual(["card_hint_place", null, "card_hint_power", "card_hint_size"]);
+    const full = cardRows({ ...DEFAULT_SPEC, outputs: ["pump", "led"], inputs: ["button"], placement: "plant_soil" }, "all");
+    expect(full.every((r) => r.key)).toBe(true);
+    expect(full.map((r) => r.key)).toContain("fact_in_button");
+    expect(changedRows(draft, full)).toEqual(["does_1", "power", "input", "size"]);
+  });
+
+  it("facts use the placement when there is one", () => {
+    expect(factKeys({ ...DEFAULT_SPEC, placement: "on_wrist" })[0]).toBe("fact_place_on_wrist");
   });
 });

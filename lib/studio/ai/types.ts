@@ -24,9 +24,9 @@ export type StudioCallRequest<T> = {
 
 export type StudioCall = <T>(req: StudioCallRequest<T>) => Promise<CallResult<T>>;
 
-/** A result the route can return: from the model, or the safe default. */
+/** A result the route can return: from the model, the safe default, or our own rules (no model call). */
 export type Outcome<T> =
-  | { ok: true; value: T; source: "model" | "default"; clampLog: ClampLog; problems: string[]; model?: string | null }
+  | { ok: true; value: T; source: "model" | "default" | "rules"; clampLog: ClampLog; problems: string[]; model?: string | null }
   /** paused = daily guard; the route answers 429 and never falls back. */
   | { ok: false; error: "paused" | "rate_limited" | "unavailable"; clampLog: ClampLog; problems: string[] };
 

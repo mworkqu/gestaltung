@@ -5,7 +5,9 @@ import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context
 // POST /api/studio/spec — one idea-chat turn. Answers {question, choices} or
 // {spec}. Free (no credit); same limits as /api/brief-chat (a session, guests
 // count; last 16 messages × 1,500 chars; the daily guard → 429). Needs the
-// project's AI consent. After 4 questions the spec is forced.
+// project's AI consent. After 4 questions the spec is forced. With `current`
+// (W3) the last user message refines that card and a spec is always returned.
+// A vague idea is answered by our own rules (spec-guards.ts) without a model call.
 
 export const dynamic = "force-dynamic";
 // Up to two model calls of 45 s.
@@ -21,6 +23,7 @@ export async function POST(request: Request) {
     idea: body.idea.slice(0, IDEA_MAX),
     messages: cleanMessages(body.messages),
     locale: body.locale,
+    current: body.current,
   });
   if (!r.ok) return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });
   logClamp("spec", project.id, r.clampLog, r.source, r.problems);

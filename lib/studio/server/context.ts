@@ -67,7 +67,7 @@ export function studioCall(supabase: SupabaseClient, projectId: string): StudioC
     });
 }
 
-export function logClamp(step: StudioStep, projectId: string, log: ClampLog, source: "model" | "default", problems: string[] = []) {
+export function logClamp(step: StudioStep, projectId: string, log: ClampLog, source: "model" | "default" | "rules", problems: string[] = []) {
   if (source === "default") console.warn(`[studio/${step}] ${projectId}: safe default used${problems.length ? ` — ${problems.join("; ")}` : ""}`);
   if (log.length) console.info(`[studio/${step}] ${projectId}: ${log.length} value(s) clamped`, JSON.stringify(log).slice(0, 2000));
 }

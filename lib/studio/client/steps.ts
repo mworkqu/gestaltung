@@ -6,6 +6,7 @@
 
 import type { StepId } from "@/lib/studio/palette";
 import type { ProductSpec, StudioDoc } from "@/lib/studio/schema";
+import type { CardSlot } from "@/lib/studio/ai/spec-guards";
 
 export const FLOW = ["idea", "parts", "wiring", "enclosure", "print", "code", "make"] as const satisfies readonly StepId[];
 export type FlowStep = (typeof FLOW)[number];
@@ -93,18 +94,27 @@ export function sameSpec(a: ProductSpec | null | undefined, b: ProductSpec | nul
 // order they were given, so later steps never ask again and "Edit" reopens the
 // same conversation.
 
-export type IdeaMessage = { role: "user" | "assistant"; text: string; choices?: string[] };
+/**
+ * note = our own short "Updated your card" line after a change request (W3): shown in the
+ * chat, never sent to the AI, never stored (it is put back after every stored change).
+ */
+export type IdeaMessage = { role: "user" | "assistant"; text: string; choices?: string[]; note?: true };
 
 export const IDEA_KEY = "idea";
 const Q_PREFIX = "q:";
+/** A change request typed after the card was shown ("make it solar"), in order: r:1, r:2… */
+const R_PREFIX = "r:";
 
 export function answersFrom(idea: string, messages: IdeaMessage[]): Record<string, string> {
   const out: Record<string, string> = {};
   if (idea.trim()) out[IDEA_KEY] = idea.trim().slice(0, 2000);
+  let r = 0;
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i];
+    const prev = messages[i - 1];
     const next = messages[i + 1];
-    if (m.role === "assistant" && next?.role === "user") out[`${Q_PREFIX}${m.text.slice(0, 300)}`] = next.text.slice(0, 1500);
+    if (m.role === "assistant" && !m.note && next?.role === "user") out[`${Q_PREFIX}${m.text.slice(0, 300)}`] = next.text.slice(0, 1500);
+    else if (m.role === "user" && (!prev || prev.role === "user" || prev.note)) out[`${R_PREFIX}${++r}`] = m.text.slice(0, 1500);
   }
   return out;
 }
@@ -115,8 +125,53 @@ export function historyFrom(answers: Record<string, string> | undefined): { idea
   for (const [k, v] of Object.entries(answers ?? {})) {
     if (k === IDEA_KEY) idea = v;
     else if (k.startsWith(Q_PREFIX)) messages.push({ role: "assistant", text: k.slice(Q_PREFIX.length) }, { role: "user", text: v });
+    else if (k.startsWith(R_PREFIX)) messages.push({ role: "user", text: v }, { role: "assistant", text: "", note: true });
   }
   return { idea, messages };
+}
+
+/** The chat as the AI sees it: our own notes left out. */
+export function forModel(messages: readonly IdeaMessage[]): IdeaMessage[] {
+  return messages.filter((m) => !m.note).map(({ role, text, choices }) => (choices ? { role, text, choices } : { role, text }));
+}
+
+// ── The live spec card (W3) ─────────────────────────────────────────────────
+// One row per thing we learn; a row the chat has not filled yet shows a quiet
+// hint (card_hint_*) instead of a fact. Keys live under Studio.
+
+export type { CardSlot };
+export type CardRow = { id: string; slot: CardSlot; key: string | null; hint: string | null };
+
+export function placeKey(spec: ProductSpec): string {
+  return spec.placement ? `fact_place_${spec.placement}` : `fact_use_${spec.use}`;
+}
+
+/**
+ * Rows of the card. `known` = the rows learned so far (a draft from the visitor's words),
+ * or "all" once the AI returned the spec.
+ */
+export function cardRows(spec: ProductSpec, known: ReadonlySet<CardSlot> | "all"): CardRow[] {
+  const has = (s: CardSlot) => known === "all" || known.has(s);
+  const rows: CardRow[] = [
+    { id: "place", slot: "place", key: has("place") ? placeKey(spec) : null, hint: "card_hint_place" },
+  ];
+  const outs = has("does") ? spec.outputs.slice(0, 2) : [];
+  if (outs.length) outs.forEach((o, i) => rows.push({ id: `does_${i}`, slot: "does", key: `fact_out_${o}`, hint: null }));
+  else if (known !== "all") rows.push({ id: "does_0", slot: "does", key: null, hint: "card_hint_does" });
+  rows.push({ id: "power", slot: "power", key: has("power") ? `fact_power_${spec.power}` : null, hint: "card_hint_power" });
+  if (known === "all") {
+    if (spec.environment === "outdoor" && spec.use !== "outdoor") rows.push({ id: "env", slot: "place", key: "fact_env_outdoor", hint: null });
+    const input = spec.inputs.find((i) => i !== "none");
+    if (input) rows.push({ id: "input", slot: "does", key: `fact_in_${input}`, hint: null });
+  }
+  rows.push({ id: "size", slot: "size", key: has("size") ? `fact_size_${spec.sizeHint}` : null, hint: "card_hint_size" });
+  return rows;
+}
+
+/** Row ids whose fact changed between two renders (they get a short highlight). */
+export function changedRows(before: readonly CardRow[], after: readonly CardRow[]): string[] {
+  const prev = new Map(before.map((r) => [r.id, r.key]));
+  return after.filter((r) => r.key && prev.get(r.id) !== r.key).map((r) => r.id);
 }
 
 // ── Friendly facts for the idea summary ─────────────────────────────────────
@@ -124,7 +179,7 @@ export function historyFrom(answers: Record<string, string> | undefined): { idea
 // sentences, never the enum words themselves.
 
 export function factKeys(spec: ProductSpec): string[] {
-  const keys = [`fact_use_${spec.use}`, `fact_power_${spec.power}`];
+  const keys = [placeKey(spec), `fact_power_${spec.power}`];
   if (spec.environment === "outdoor" && spec.use !== "outdoor") keys.push("fact_env_outdoor");
   const outs = spec.outputs.slice(0, 2).map((o) => `fact_out_${o}`);
   const ins = spec.inputs.filter((i) => i !== "none").slice(0, 1).map((i) => `fact_in_${i}`);
