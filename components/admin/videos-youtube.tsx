@@ -8,6 +8,7 @@
 // resumable upload). Connect = GET /api/admin/youtube/connect (Google OAuth);
 // Disconnect = disconnectYoutube() server action. No token ever reaches here.
 
+import { Hint } from "@/components/ui/hint";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -58,18 +59,9 @@ const primaryBtn =
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s) % 60).padStart(2, "0")}`;
 
-/** HINT: small "?" with a native title; the lead swaps it for components/ui/hint.tsx. */
+/** Short "?" hint (shared components/ui/hint.tsx: hover, tap and keyboard). */
 function QHint({ text, label }: { text: string; label: string }) {
-  return (
-    <span
-      role="img"
-      title={text}
-      aria-label={`${label}: ${text}`}
-      className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full border border-borderstrong text-[11px] font-bold text-mutedtext"
-    >
-      ?
-    </span>
-  );
+  return <Hint label={text} triggerLabel={label} />;
 }
 
 export function VideosYoutube({
@@ -161,7 +153,6 @@ export function VideosYoutube({
                   })}{" "}
                   {t("quotaReset", { hour: String(quota.resetHourQatar) })}
                 </span>
-                {/* HINT: quota cost explanation */}
                 <QHint label={t("quotaHintAria")} text={t("quotaHint", { cost: String(uploadCost), total: String(dailyQuota) })} />
               </div>
             )}
@@ -401,7 +392,6 @@ function ClipRow({
                 <label htmlFor={`${id}-p`} className="block text-xs font-medium text-body">
                   {t("fieldPrivacy")}
                 </label>
-                {/* HINT: unaudited API projects upload as private */}
                 <QHint label={t("privacyHintAria")} text={t("privacyHint")} />
               </div>
               <select
@@ -423,7 +413,6 @@ function ClipRow({
                 <input type="checkbox" checked={addToSite} onChange={(e) => setAddToSite(e.target.checked)} />
                 {t("fieldSite")}
               </label>
-              {/* HINT: private videos do not play for visitors */}
               <QHint label={t("siteHintAria")} text={t("siteHint")} />
             </div>
           </div>
