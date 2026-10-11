@@ -5,6 +5,7 @@
 // delivery date comes from — then the product form. The Sourcing panel is
 // rendered on the server and passed in as `delivery`.
 
+import { Hint } from "@/components/ui/hint";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
@@ -49,16 +50,7 @@ export function PartEditor({
           {deliveryMissing && (
             <span className="text-[11px] font-bold uppercase tracking-wide text-red-700">{t("addThis")}</span>
           )}
-          {/* HINT: swap for components/ui/hint.tsx (D3) once it lands. */}
-          <span
-            role="img"
-            tabIndex={0}
-            aria-label={t("deliveryHint")}
-            title={t("deliveryHint")}
-            className="inline-flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-borderstrong text-[11px] font-bold text-mutedtext focus:outline-none focus-visible:ring-2 focus-visible:ring-cobalt/60"
-          >
-            ?
-          </span>
+          <Hint label={t("deliveryHint")} />
         </div>
         <p className="mb-4 text-xs text-mutedtext">{t("deliveryHint")}</p>
         {delivery}

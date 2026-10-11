@@ -6,6 +6,7 @@
 // actions (confirm step + "N fixed, M failed — see why"), and a side drawer
 // that fixes one product in place. Grouping rules: lib/admin/fix-groups.ts.
 
+import { Hint as SharedHint } from "@/components/ui/hint";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -45,19 +46,8 @@ const field =
   "w-full rounded-xl border border-white/60 bg-panel px-3 py-2 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
 const missingBox = "rounded-xl p-3 ring-2 ring-red-400";
 
-// HINT: swap for components/ui/hint.tsx (D3) once it lands.
 function Hint({ text }: { text: string }) {
-  return (
-    <span
-      role="img"
-      tabIndex={0}
-      aria-label={text}
-      title={text}
-      className="inline-flex h-5 w-5 shrink-0 cursor-help items-center justify-center rounded-full border border-borderstrong text-[11px] font-bold text-mutedtext focus:outline-none focus-visible:ring-2 focus-visible:ring-cobalt/60"
-    >
-      ?
-    </span>
-  );
+  return <SharedHint label={text} />;
 }
 
 export function FixList({
@@ -259,7 +249,6 @@ export function FixList({
                 <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-xs font-bold tabular-nums text-red-700">
                   {g.count}
                 </span>
-                {/* HINT: group explanation */}
                 <Hint text={t(`hint_${g.issue}`)} />
               </div>
               <label className="flex min-h-11 items-center gap-2 text-xs font-semibold text-body">
@@ -359,7 +348,6 @@ export function FixList({
                   <label className="space-y-1 text-xs font-semibold text-body">
                     <span className="flex items-center gap-1.5">
                       {t("supplierLabel")}
-                      {/* HINT: where the date comes from */}
                       <Hint text={t("hint_supplierPick")} />
                     </span>
                     <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className={field}>
