@@ -2663,6 +2663,17 @@
     "accept": "Accept",
     "decline": "Decline"
   },
+  "GuestClaim": {
+    "title": "Your project is not in your account yet",
+    "text": "We couldn't move the work you did as a guest to your account.",
+    "stillFailing": "That didn't work either. Please try again in a moment.",
+    "tryAgain": "Try again",
+    "retrying": "Moving your project…",
+    "dismiss": "Close",
+    "signInIntro": "Sign in and you'll be back where you left off, with your project.",
+    "signUpIntro": "Create your account and you'll be back where you left off, with your project.",
+    "backToProject": "Back to your project"
+  },
   "Phone": {
     "invalid": "Please enter a phone number we can reach on WhatsApp, e.g. 5555 1234 or +974 5555 1234."
   },

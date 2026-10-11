@@ -7,7 +7,7 @@ import { useMemo } from "react";
 
 import { mockStudioApi } from "@/lib/studio/client/mock";
 import type { StudioApi } from "@/lib/studio/client/api";
-import { ENCLOSURE_TEMPLATES, type EnclosureTemplate } from "@/lib/studio/schema";
+import { ENCLOSURE_TEMPLATES, parseStudioDoc, type EnclosureTemplate } from "@/lib/studio/schema";
 import { StudioShell } from "./StudioShell";
 
 const FIXTURE_INITIAL = {
@@ -18,11 +18,67 @@ const FIXTURE_INITIAL = {
   persist: false,
 };
 
-export function StudioFixture() {
-  const api = useMemo(() => withLook(withDelay(mockStudioApi())), []);
+export function StudioFixture({ stored = false, step = null }: { stored?: boolean; step?: string | null }) {
+  const api = useMemo(() => withGate(withLook(withDelay(stored ? withTabStore(mockStudioApi()) : mockStudioApi()))), [stored]);
   // Same first state the mock's load() gives, handed over up front like the real page does
   // (lib/studio/server/initial.ts), so the fixture's first render matches production.
-  return <StudioShell projectId={api.projectId} destination="Google Gemini" api={api} initial={FIXTURE_INITIAL} />;
+  // ?store=1 (W1 e2e): the doc lives in this tab's sessionStorage and loads in the browser,
+  // so leaving for the sign-in page and coming back finds the same project.
+  return (
+    <StudioShell
+      projectId={api.projectId}
+      destination="Google Gemini"
+      api={api}
+      initial={stored ? null : FIXTURE_INITIAL}
+      requestedStep={stored ? step : null}
+    />
+  );
+}
+
+const TAB_STORE_KEY = "g360:e2e-studio-doc";
+
+/** ?store=1: load/save the doc in sessionStorage (one project per tab). */
+function withTabStore(api: StudioApi): StudioApi {
+  return {
+    ...api,
+    async load() {
+      const r = await api.load();
+      if (!r.ok) return r;
+      try {
+        const raw = sessionStorage.getItem(TAB_STORE_KEY);
+        const saved = raw ? (JSON.parse(raw) as { doc: unknown; version: number }) : null;
+        const doc = saved ? parseStudioDoc(saved.doc) : null;
+        return { ...r, doc, version: saved?.version ?? 0, persist: true };
+      } catch {
+        return { ...r, persist: true };
+      }
+    },
+    async save(doc, version) {
+      try {
+        sessionStorage.setItem(TAB_STORE_KEY, JSON.stringify({ doc, version: version + 1 }));
+      } catch {
+        /* storage blocked */
+      }
+      return { ok: true, version: version + 1 };
+    },
+  };
+}
+
+/** ?gate=sign_in (W1 e2e): drawing the wiring answers "sign in first", like a guest on the live site. */
+function withGate(api: StudioApi): StudioApi {
+  let gate: string | null = null;
+  try {
+    gate = new URLSearchParams(window.location.search).get("gate");
+  } catch {
+    /* no window */
+  }
+  if (gate !== "sign_in") return api;
+  return {
+    ...api,
+    async wiring() {
+      return { ok: false, status: 401, error: "sign_in" };
+    },
+  };
 }
 
 /** ?delay=<ms> adds that wait to the wiring + enclosure calls, so the e2e can see the skeletons. */

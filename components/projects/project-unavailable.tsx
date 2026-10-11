@@ -1,6 +1,7 @@
 import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
+import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { Button } from "@/components/ui/button";
 
 // The "This project isn't available here" body, shared by the project page and
@@ -28,7 +29,7 @@ export function ProjectUnavailable({
       <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
         {!signedIn && (
           <Button asChild size="lg">
-            <Link href="/sign-up">{t("unavailableSignUp")}</Link>
+            <AuthReturnLink kind="sign-up">{t("unavailableSignUp")}</AuthReturnLink>
           </Button>
         )}
         <Button asChild size="lg" variant={signedIn ? "default" : "outline"}>
@@ -37,12 +38,9 @@ export function ProjectUnavailable({
       </div>
       {!signedIn && (
         <p>
-          <Link
-            href="/sign-in"
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-mutedtext underline underline-offset-2 transition-colors hover:text-heading"
-          >
+          <AuthReturnLink className="inline-flex min-h-11 items-center text-sm font-semibold text-mutedtext underline underline-offset-2 transition-colors hover:text-heading">
             {t("signInCta")}
-          </Link>
+          </AuthReturnLink>
         </p>
       )}
     </div>

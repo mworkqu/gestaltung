@@ -13,14 +13,21 @@ import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
-export default async function StudioFixturePage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function StudioFixturePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ store?: string; step?: string }>;
+}) {
   if (!e2eFixturesEnabled()) notFound();
   const { locale } = await params;
   setRequestLocale(locale);
+  const sp = await searchParams;
   return (
     <MessagesScope scope="studio">
       <div className="container max-w-5xl py-5 sm:py-8">
-        <StudioFixture />
+        <StudioFixture stored={sp.store === "1"} step={typeof sp.step === "string" ? sp.step : null} />
       </div>
     </MessagesScope>
   );

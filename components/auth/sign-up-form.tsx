@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import NextLink from "next/link";
+import { useRouter as useNextRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
+import { authAltHref, returnsToProject } from "@/lib/auth/next-path";
 import { createClient } from "@/lib/supabase/client";
 import { isGuest } from "@/lib/supabase/guest";
 import { Button } from "@/components/ui/button";
@@ -17,12 +20,15 @@ import { cn } from "@/lib/utils";
 // turnstileEnabled (P2-08): the store_settings switch from the server page.
 // Off (default) = no widget and the exact same signUp call as before. The guest
 // upgrade (updateUser) is not a CAPTCHA-protected endpoint and sends no token.
-export function SignUpForm({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
+// next (W1): an already-validated "/{locale}/…" path to return to.
+export function SignUpForm({ turnstileEnabled = false, next = null }: { turnstileEnabled?: boolean; next?: string | null }) {
   const t = useTranslations("Auth");
   const tCheck = useTranslations("Turnstile");
+  const tClaim = useTranslations("GuestClaim");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
+  const nextRouter = useNextRouter();
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -99,6 +105,12 @@ export function SignUpForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
     // their inbox. If it's OFF (recommended for local testing), we have a
     // session and can go straight to the dashboard.
     if (hasSession) {
+      // W1: back to where they were (a validated "/{locale}/…" path), else the dashboard.
+      if (next) {
+        nextRouter.push(next);
+        nextRouter.refresh();
+        return;
+      }
       router.push(`/dashboard`);
       router.refresh();
       return;
@@ -116,7 +128,7 @@ export function SignUpForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
         intro={t("checkEmailIntro")}
         altPrompt={t("haveAccount")}
         altLabel={t("signInLink")}
-        altHref="/sign-in"
+        altHref={authAltHref("/sign-in", next)}
       >
         <div className="neu-inset flex items-start gap-4 p-6">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cobalt shadow-neu-sm">
@@ -126,6 +138,15 @@ export function SignUpForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
             {t("checkEmailBody")}
           </p>
         </div>
+        {/* A guest who upgraded keeps the same account (same auth.uid()), so their work is already theirs. */}
+        {next && (
+          <NextLink
+            href={next}
+            className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-cobalt px-5 text-sm font-semibold text-white transition-colors hover:bg-cobalt-hover"
+          >
+            {tClaim("backToProject")}
+          </NextLink>
+        )}
       </AuthShell>
     );
   }
@@ -134,10 +155,10 @@ export function SignUpForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
     <AuthShell
       kicker={t("signUpKicker")}
       heading={t("signUpHeading")}
-      intro={t("signUpIntro")}
+      intro={returnsToProject(next) ? tClaim("signUpIntro") : t("signUpIntro")}
       altPrompt={t("haveAccount")}
       altLabel={t("signInLink")}
-      altHref="/sign-in"
+      altHref={authAltHref("/sign-in", next)}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">

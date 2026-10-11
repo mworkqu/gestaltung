@@ -14,6 +14,7 @@ import { TrustBlock } from "@/components/trust-block";
 import { TrustGate } from "@/components/trust-gate";
 import { Footer } from "@/components/footer";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { GuestClaimNotice } from "@/components/auth/guest-claim-notice";
 import { CookieNotice } from "@/components/cookie-notice";
 import { CartProvider } from "@/components/parts/cart-provider";
 import "../globals.css";
@@ -120,6 +121,8 @@ export default async function LocaleLayout({
             </CartProvider>
           </AuthProvider>
           <CookieNotice gaId={gaId} />
+          {/* W1: "Try again" when moving a guest's work to the account failed. */}
+          <GuestClaimNotice />
         </NextIntlClientProvider>
       </body>
     </html>

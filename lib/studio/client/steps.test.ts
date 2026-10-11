@@ -17,6 +17,7 @@ import {
   nextInstanceId,
   sameSpec,
   stepDone,
+  withLastStep,
 } from "./steps";
 
 const withParts = (): StudioDoc => ({
@@ -72,6 +73,16 @@ describe("studio flow", () => {
     expect(initialStep(withParts(), "parts")).toBe(1);
     expect(initialStep(withParts(), "make")).toBe(2); // not reachable yet
     expect(initialStep(withParts(), "nonsense")).toBe(2);
+    // W1: no ?step= → the step the visitor was last on, when still reachable.
+    expect(initialStep({ ...withParts(), lastStep: "parts" }, null)).toBe(1);
+    expect(initialStep({ ...withParts(), lastStep: "idea" }, undefined)).toBe(0);
+    expect(initialStep({ ...withParts(), lastStep: "make" }, null)).toBe(2);
+    expect(initialStep({ ...withParts(), lastStep: "renamed-step" }, null)).toBe(2);
+    expect(initialStep({ ...withParts(), lastStep: "idea" }, "parts")).toBe(1); // ?step= wins
+    const d = withParts();
+    expect(withLastStep(d, "parts").lastStep).toBe("parts");
+    const same = { ...d, lastStep: "wiring" };
+    expect(withLastStep(same, "wiring")).toBe(same);
     expect(furthestStep(withParts(), 4)).toBe(4);
     expect(furthestStep(withParts(), 0)).toBe(2);
   });

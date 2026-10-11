@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
-import { Link } from "@/i18n/navigation";
+import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { chatStorageKey, parseHandoff } from "@/lib/projects/create-from-chat";
 import type { LibraryPart } from "@/lib/studio/schema";
 import { StudioLibraryProvider, useStudioLibrary } from "./StudioLibraryProvider";
@@ -32,6 +32,7 @@ import {
   passedAnswers,
   sameSpec,
   stepDone,
+  withLastStep,
   type FlowStep,
 } from "@/lib/studio/client/steps";
 import { ProgressLine } from "./ProgressLine";
@@ -219,6 +220,9 @@ function StudioShellInner({
         const answers = markPassed(base.answers, leaving);
         if (answers !== base.answers) commit({ ...base, answers });
       }
+      // W1: remember the step on the doc, so the project reopens here (any device, after sign-in).
+      const withStep = latest.current ? withLastStep(latest.current, FLOW[idx]) : null;
+      if (withStep && withStep !== latest.current) commit(withStep);
       currentRef.current = idx;
       void flush();
       setCurrent(idx);
@@ -236,6 +240,22 @@ function StudioShellInner({
     [flush, commit],
   );
   const next = useCallback(() => go(current + 1), [go, current]);
+
+  // W1: the URL always names the open step (?step=), so a sign-in link taken from
+  // here returns to exactly this step, even before the visitor moved.
+  const ready = loaded.state === "ready";
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      const url = new URL(window.location.href);
+      const step = FLOW[currentRef.current];
+      if (url.searchParams.get("step") === step) return;
+      url.searchParams.set("step", step);
+      window.history.replaceState(window.history.state, "", url.toString());
+    } catch {
+      /* no URL update: fine */
+    }
+  }, [ready]);
 
   // ── Store products for the parts (shared by Parts and Make) ──────────────
   const skus = useMemo(
@@ -390,9 +410,9 @@ function StudioShellInner({
           {loaded.error === "sign_in" ? t("signInNeeded") : t("loadFailed")}
         </p>
         {loaded.error === "sign_in" ? (
-          <Link href="/sign-in" className="inline-flex min-h-11 items-center font-semibold text-cobalt hover:text-cobalt-hover">
+          <AuthReturnLink className="inline-flex min-h-11 items-center font-semibold text-cobalt hover:text-cobalt-hover">
             {t("signIn")}
-          </Link>
+          </AuthReturnLink>
         ) : (
           <MainButton onClick={() => window.location.reload()}>{t("tryAgain")}</MainButton>
         )}
