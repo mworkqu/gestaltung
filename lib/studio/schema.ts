@@ -171,6 +171,17 @@ export const PinSchema = z.object({
 });
 export type Pin = z.infer<typeof PinSchema>;
 
+/** Optional hand-tuned 2D wiring drawing (P5-17); everything is derived from pins/dims when absent (lib/studio/drawing2d.ts). */
+export const Drawing2DOverrideSchema = z.object({
+  w: z.number().positive().optional(),
+  h: z.number().positive().optional(),
+  colour: z.string().optional(),
+  decor: z.enum(["none", "chip", "screen", "led", "resistor", "ring"]).optional(),
+  /** Which edge each pin sits on in the drawing. */
+  edges: z.record(z.string(), z.enum(["left", "right"])).optional(),
+});
+export type Drawing2DOverride = z.infer<typeof Drawing2DOverrideSchema>;
+
 export const LibraryPartSchema = z.object({
   id: z.string().regex(/^[a-z0-9_]+$/),
   name: z.object({ en: z.string(), ar: z.string() }),
@@ -198,6 +209,19 @@ export const LibraryPartSchema = z.object({
   clearance: z.number().nonnegative(),
   /** Internal helper parts (resistor, level shifter) are hidden from the picker and never shown as "a part to choose". */
   helper: z.boolean().optional(),
+  /** 3D wiring: explicit pin positions on the model (mm, Z up, part frame) where lib/studio/wiring3d/pins3d.ts derives them wrong. */
+  pins3d: z.record(z.string(), z.tuple([z.number(), z.number(), z.number()])).optional(),
+  /** 2D wiring drawing overrides (P5-17); lib/studio/drawing2d.ts derives everything else from pins/dims. */
+  drawing2d: z
+    .object({
+      w: z.number().positive().optional(),
+      h: z.number().positive().optional(),
+      colour: z.string().optional(),
+      decor: z.enum(["none", "chip", "screen", "led", "resistor", "ring"]).optional(),
+      /** Which edge each pin sits on in the drawing. */
+      edges: z.record(z.string(), z.enum(["left", "right"])).optional(),
+    })
+    .optional(),
 });
 export type LibraryPart = z.infer<typeof LibraryPartSchema>;
 

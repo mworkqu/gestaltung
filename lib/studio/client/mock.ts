@@ -9,14 +9,48 @@
 import { getPart } from "@/lib/studio/library";
 import { isValidPhone } from "@/lib/phone";
 import { buildWiring } from "@/lib/studio/netlist";
+import { buildConnections, pinBlock, pinConstants } from "@/lib/studio/connections";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { specParts } from "@/lib/studio/ai/pick";
 import { guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
-import { clampSpec, type StudioComponent } from "@/lib/studio/schema";
+import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/schema";
 import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
 import { mockOptionsFromUrl } from "./product";
 import { forModel } from "./steps";
+
+/**
+ * A small canned sketch whose pin block is built from the request's own wiring,
+ * exactly like the server's (P5-17), so the fixture shows LED_PIN etc.
+ */
+function mockSketch(name: string, board: string, components: StudioComponent[], spec: ProductSpec, locale: Locale): string {
+  let constants: ReturnType<typeof pinConstants> = [];
+  try {
+    const w = buildWiring(components, spec, getPart, locale);
+    constants = pinConstants(buildConnections(w.components, w.netlist.nets, getPart), getPart);
+  } catch {
+    /* no wiring: a sketch without pins */
+  }
+  const outputs = constants.filter((c) => /LED|PUMP|MOTOR|RELAY|BUZZER|SERVO|SG90|RING|WS2812|SPEAKER/.test(c.name));
+  const inputs = constants.filter((c) => !outputs.includes(c) && !/^(I2C|SPI)_/.test(c.name));
+  const analog = (c: (typeof constants)[number]) => /^A\d/.test(c.value) || /SOIL|LDR|LIGHT/.test(c.name);
+  return [
+    `// ${name} — starter sketch for the ${board}`,
+    "",
+    ...(constants.length ? [pinBlock(constants), ""] : []),
+    "void setup() {",
+    "  Serial.begin(115200);",
+    ...inputs.map((c) => `  pinMode(${c.name}, INPUT);`),
+    ...outputs.map((c) => `  pinMode(${c.name}, OUTPUT);`),
+    "}",
+    "",
+    "void loop() {",
+    ...inputs.map((c) => `  Serial.println(${analog(c) ? "analogRead" : "digitalRead"}(${c.name}));`),
+    ...outputs.map((c) => `  digitalWrite(${c.name}, !digitalRead(${c.name}));`),
+    "  delay(500);",
+    "}",
+  ].join("\n");
+}
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -165,23 +199,7 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       await wait(250);
       const mcu = components.map((c) => getPart(c.partId)).find((p) => p?.category === "mcu");
       const board = mcu?.id === "arduino_uno" ? "Arduino Uno" : mcu?.id === "pico_w" ? "Raspberry Pi Pico W" : "ESP32 Dev Module";
-      const code = [
-        `// ${spec.name} — starter sketch for the ${board}`,
-        "const int MOTION_PIN = 27; // motion sensor OUT",
-        "const int LED_PIN = 26;    // the small light",
-        "",
-        "void setup() {",
-        "  Serial.begin(115200);",
-        "  pinMode(MOTION_PIN, INPUT);",
-        "  pinMode(LED_PIN, OUTPUT);",
-        "}",
-        "",
-        "void loop() {",
-        "  bool someone = digitalRead(MOTION_PIN) == HIGH;",
-        "  digitalWrite(LED_PIN, someone ? HIGH : LOW);",
-        "  delay(50);",
-        "}",
-      ].join("\n");
+      const code = mockSketch(spec.name, board, components.filter((c) => !c.auto), spec, locale);
       return {
         ok: true,
         data: {

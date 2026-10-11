@@ -19,6 +19,7 @@
 
 import { esc } from "@/lib/prototyping/netlist";
 import { NET_COLOURS } from "./palette";
+import { buildConnections, netColourMap, WIRE_HEX, WIRE_OUTLINE, type Connection, type WireColour } from "./connections";
 import type { LibraryPart, Net, Pin, ProductSpec, StudioComponent } from "./schema";
 import {
   isMcu,
@@ -32,7 +33,15 @@ import {
 } from "./netlist";
 import { plainName } from "./plain-checks";
 
-export type SchematicOpts = { locale: Locale; title?: string };
+export type SchematicOpts = {
+  locale: Locale;
+  title?: string;
+  /** The shared wires (lib/studio/connections.ts); built from the netlist when omitted. */
+  connections?: Connection[];
+};
+
+/** White wires would vanish on the white paper: the schematic draws them in their outline grey. */
+const inkOf = (c: WireColour) => (c === "white" ? WIRE_OUTLINE.white ?? "#94a3b8" : WIRE_HEX[c]);
 
 // ── Look ────────────────────────────────────────────────────────────────────
 
@@ -164,13 +173,32 @@ export function renderSchematicSVG(
     const power = pins.some((x) => isPowerRole(x.pin.role) || (isPowerSource(x.e.p) && x.pin.role !== "gnd"));
     kindOf.set(n.name, ground ? "ground" : power ? "power" : "signal");
   }
+  // Colours and ids come from the shared connections (red supply, black ground, one signal colour per net).
+  const conns = opts.connections ?? buildConnections(components, nets, getPart);
+  const shared = netColourMap(conns);
+  const connOfNet = new Map<string, string>(); // net → first connection id (the hook for click / hover)
+  for (const c of conns) if (!connOfNet.has(c.net)) connOfNet.set(c.net, c.id);
+  // The far half of a wire through a series helper is the same wire: same colour, same id.
+  for (const c of conns) {
+    if (!c.viaPart) continue;
+    for (const n of nets) {
+      if (!n.pins.some((r) => r.startsWith(`${c.viaPart}.`)) || n.name === c.net) continue;
+      if (!shared.has(n.name)) shared.set(n.name, c.wireColour);
+      if (!connOfNet.has(n.name)) connOfNet.set(n.name, c.id);
+    }
+  }
   const colour = new Map<string, string>();
   let sig = 0;
   for (const n of nets) {
     const k = kindOf.get(n.name)!;
-    colour.set(n.name, k === "ground" ? NET_COLOURS.ground : k === "power" ? NET_COLOURS.power : NET_COLOURS.signals[sig++ % NET_COLOURS.signals.length]);
+    const fallback = k === "ground" ? NET_COLOURS.ground : k === "power" ? NET_COLOURS.power : NET_COLOURS.signals[sig++ % NET_COLOURS.signals.length];
+    const sc = shared.get(n.name);
+    colour.set(n.name, sc ? inkOf(sc) : fallback);
   }
   const col = (net?: string) => (net ? colour.get(net) ?? INK : MUTED);
+  /** data-net (+ data-conn when the net is a drawn wire) for an element of this net. */
+  const dn = (net?: string) =>
+    net ? `data-net="${esc(net)}"${connOfNet.has(net) ? ` data-conn="${esc(connOfNet.get(net)!)}"` : ""}` : "";
   const isRailish = (net?: string) => !!net && kindOf.get(net) !== "signal";
 
   const mcu = entries.find((e) => isMcu(e.p));
@@ -489,7 +517,7 @@ export function renderSchematicSVG(
     const x0 = x, x1 = x + s * 6, x2 = x1 + s * w;
     const pts = [[x0, y], [x1, y - 7], [x2, y - 7], [x2, y + 7], [x1, y + 7]].map(([a, b]) => `${f(a)},${f(b)}`).join(" ");
     segs.push({ x1: Math.min(x0, x2), y1: y, x2: Math.max(x0, x2), y2: y, net });
-    return `<g data-net="${esc(net)}"><polygon points="${pts}" fill="${PAPER}" stroke="${c}" stroke-width="1.4"/><text x="${f((x1 + x2) / 2)}" y="${f(y + 3)}" text-anchor="middle" font-family="${MONO}" font-size="11" font-weight="600" fill="${c}">${esc(net)}</text></g>`;
+    return `<g ${dn(net)}><polygon points="${pts}" fill="${PAPER}" stroke="${c}" stroke-width="1.4"/><text x="${f((x1 + x2) / 2)}" y="${f(y + 3)}" text-anchor="middle" font-family="${MONO}" font-size="11" font-weight="600" fill="${c}">${esc(net)}</text></g>`;
   };
   const nc = (x: number, y: number) =>
     `<path d="M${f(x - 3)} ${f(y - 3)}L${f(x + 3)} ${f(y + 3)}M${f(x + 3)} ${f(y - 3)}L${f(x - 3)} ${f(y + 3)}" stroke="${MUTED}" stroke-width="1.4"/>`;
@@ -503,8 +531,8 @@ export function renderSchematicSVG(
     }
     const k = kindOf.get(net.name)!;
     if (k === "signal") continue;
-    if (net.name === "GND") labels.push(`<g data-net="GND">${groundSym(end.x, end.y, end.dir)}</g>`);
-    else labels.push(`<g data-net="${esc(net.name)}">${powerSym(end.x, end.y, end.dir, net.name, k === "ground" ? NET_COLOURS.ground : NET_COLOURS.power)}</g>`);
+    if (net.name === "GND") labels.push(`<g ${dn("GND")}>${groundSym(end.x, end.y, end.dir)}</g>`);
+    else labels.push(`<g ${dn(net.name)}>${powerSym(end.x, end.y, end.dir, net.name, col(net.name))}</g>`);
   }
 
   // ── Signal routing ──
@@ -583,7 +611,7 @@ export function renderSchematicSVG(
       segs.push(...chosen);
       const c = col(n.name);
       const d = chosen.map((s) => `M${f(s.x1)} ${f(s.y1)}L${f(s.x2)} ${f(s.y2)}`).join("");
-      let g = `<g data-net="${esc(n.name)}"><path d="${d}" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+      let g = `<g ${dn(n.name)}><path d="${d}" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
       if (track !== null && pts.length > 2) {
         const x = trackX(track);
         const lo = Math.min(...ys), hi = Math.max(...ys);
@@ -613,7 +641,7 @@ export function renderSchematicSVG(
       const net = netOf.get(`${inst}.${p.id}`)?.name;
       const c = col(net);
       const tx = anchorInside === "end" ? x - 6 : x + 6;
-      return `<path d="M${f(x)} ${f(y)}H${f(x + outward * STUB)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(x)}" cy="${f(y)}" r="2" fill="${c}"/><text x="${f(tx)}" y="${f(y + 3)}" text-anchor="${anchorInside}" font-family="${MONO}" font-size="11" fill="${INK}">${esc(pinText(p))}</text>`;
+      return `<path ${dn(net)} d="M${f(x)} ${f(y)}H${f(x + outward * STUB)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle ${dn(net)} cx="${f(x)}" cy="${f(y)}" r="2" fill="${c}"/><text x="${f(tx)}" y="${f(y + 3)}" text-anchor="${anchorInside}" font-family="${MONO}" font-size="11" fill="${INK}">${esc(pinText(p))}</text>`;
     };
     it.inner.forEach((p, i) => (g += pinRow(p, i, innerX, it.col === "L" ? 1 : -1, it.col === "L" ? "end" : "start")));
     it.outer.forEach((p, i) => (g += pinRow(p, i, outerX, it.col === "L" ? -1 : 1, it.col === "L" ? "start" : "end")));
@@ -629,7 +657,7 @@ export function renderSchematicSVG(
     let x = it.col === "L" ? it.x + it.w : it.x;
     let g = `<g data-chain="${esc(ch.firstNet)}">`;
     const wire = (x1: number, x2: number, net?: string) =>
-      `<path d="M${f(x1)} ${f(cy)}H${f(x2)}" stroke="${col(net)}" stroke-width="2" stroke-linecap="round"/>`;
+      `<path ${dn(net)} d="M${f(x1)} ${f(cy)}H${f(x2)}" stroke="${col(net)}" stroke-width="2" stroke-linecap="round"/>`;
     g += `<circle cx="${f(x)}" cy="${f(cy)}" r="2" fill="${col(ch.firstNet)}"/>`;
     let net: string | undefined = ch.firstNet;
     g += wire(x, x + s * STUB, net);
@@ -672,8 +700,8 @@ export function renderSchematicSVG(
       g += wire(x, x + s * 6, endNet) + powerSym(x + s * 6, cy, s < 0 ? "L" : "R", endNet, ch.end.type === "ground" ? NET_COLOURS.ground : NET_COLOURS.power);
     else if (ch.end.type === "label" && endNet) g += flag(x, cy, s < 0 ? "L" : "R", endNet);
     else g += nc(x, cy);
-    g += `<g data-net="${esc(ch.firstNet)}"></g>`;
-    for (const el of ch.els) if (el.outNet) g += `<g data-net="${esc(el.outNet)}"></g>`;
+    g += `<g ${dn(ch.firstNet)}></g>`;
+    for (const el of ch.els) if (el.outNet) g += `<g ${dn(el.outNet)}></g>`;
     out.push(g + "</g>");
   }
 
@@ -688,7 +716,7 @@ export function renderSchematicSVG(
       const net = netOf.get(r)?.name;
       const c = col(net);
       const edge = side === "L" ? mcuX : mcuX + mcuW;
-      g += `<path d="M${f(edge)} ${f(e.y)}H${f(e.x)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(edge)}" cy="${f(e.y)}" r="2" fill="${c}"/>`;
+      g += `<path ${dn(net)} d="M${f(edge)} ${f(e.y)}H${f(e.x)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(edge)}" cy="${f(e.y)}" r="2" fill="${c}"/>`;
       g += `<text x="${f(side === "L" ? edge + 6 : edge - 6)}" y="${f(e.y + 3)}" text-anchor="${side === "L" ? "start" : "end"}" font-family="${MONO}" font-size="11" fill="${INK}">${esc(pinText(p))}</text>`;
     }
     for (const p of [...topPins, ...bottomPins]) {
@@ -697,7 +725,7 @@ export function renderSchematicSVG(
       const net = netOf.get(r)?.name;
       const c = col(net);
       const edge = e.dir === "U" ? mcuTop : mcuTop + mcuH;
-      g += `<path d="M${f(e.x)} ${f(edge)}V${f(e.y)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(e.x)}" cy="${f(edge)}" r="2" fill="${c}"/>`;
+      g += `<path ${dn(net)} d="M${f(e.x)} ${f(edge)}V${f(e.y)}" stroke="${c}" stroke-width="2" stroke-linecap="round"/><circle cx="${f(e.x)}" cy="${f(edge)}" r="2" fill="${c}"/>`;
       g += `<text x="${f(e.x)}" y="${f(e.dir === "U" ? edge + 13 : edge - 6)}" text-anchor="middle" font-family="${MONO}" font-size="11" fill="${INK}">${esc(pinText(p))}</text>`;
     }
     out.push(g + "</g>");
@@ -710,7 +738,7 @@ export function renderSchematicSVG(
   // Nets with nothing to draw still get a hook so the UI can find every net.
   const drawn = new Set<string>();
   for (const s of [...wires, ...labels, ...out].join("").matchAll(/data-net="([^"]*)"/g)) drawn.add(s[1]);
-  const hooks = nets.filter((n) => !drawn.has(esc(n.name))).map((n) => `<g data-net="${esc(n.name)}"></g>`).join("");
+  const hooks = nets.filter((n) => !drawn.has(esc(n.name))).map((n) => `<g ${dn(n.name)}></g>`).join("");
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${aria}" font-family="${SANS}" direction="ltr">` +

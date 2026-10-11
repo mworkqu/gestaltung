@@ -128,3 +128,30 @@ describe("summaryLine", () => {
     expect(summaryLine(DEFAULT_SPEC, [], getPart, "en")).toBe("USB powered · indoors");
   });
 });
+
+describe("renderSchematicSVG shared ids and colours (P5-17)", () => {
+  it("carries data-net and data-conn for every connection and draws nets in the shared colours", async () => {
+    const { buildConnections, netColourMap, WIRE_HEX, WIRE_OUTLINE } = await import("./connections");
+    const ids = ["esp32_devkit", "soil_moisture_cap", "pump_5v", "motor_driver", "led_5mm", "usbc_power_5v"];
+    const w = buildWiring(comps(...ids), DEFAULT_SPEC, getPart, "en");
+    const connections = buildConnections(w.components, w.netlist.nets, getPart);
+    const svg = renderSchematicSVG(w.components, w.netlist.nets, getPart, { locale: "en" });
+    expect(connections.length).toBeGreaterThan(5);
+    const colours = netColourMap(connections);
+    const firstOfNet = new Map<string, string>();
+    for (const c of connections) if (!firstOfNet.has(c.net)) firstOfNet.set(c.net, c.id);
+    for (const c of connections) {
+      expect(svg, c.id).toContain(`data-net="${esc(c.net)}" data-conn="${firstOfNet.get(c.net)}"`);
+      expect(svg, c.net).toContain(`data-net="${esc(c.net)}"`);
+      const hex = c.wireColour === "white" ? WIRE_OUTLINE.white! : WIRE_HEX[c.wireColour];
+      expect(svg, `${c.net} ${hex}`).toContain(hex);
+      expect(colours.get(c.net)).toBe(c.wireColour);
+    }
+    // Supply is red and ground black in the schematic too.
+    expect(connections.some((c) => c.wireColour === "red")).toBe(true);
+    expect(svg).toContain(WIRE_HEX.red);
+    expect(svg).toContain(WIRE_HEX.black);
+    // Same input, same drawing; and passing the connections explicitly changes nothing.
+    expect(renderSchematicSVG(w.components, w.netlist.nets, getPart, { locale: "en", connections })).toBe(svg);
+  });
+});

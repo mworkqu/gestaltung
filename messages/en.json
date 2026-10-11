@@ -4340,22 +4340,56 @@
       "showInWiring": "Show in wiring",
       "viewLoading": "Drawing this view…",
       "drawing": {
-        "_": ""
+        "label": "Wiring drawing of your circuit: the real boards with every pin named, joined by coloured wires"
       },
       "three": {
-        "_": ""
+        "canvasLabel": "Your parts in 3D with their wires",
+        "hint": "Tap a wire to see where it goes. Drag to turn, pinch to zoom.",
+        "apart": "Take it apart",
+        "together": "Put it back",
+        "noWebgl": "This browser can't show 3D. The Wiring tab shows the same wires."
       },
       "pins": {
-        "_": ""
+        "progress": "{done} of {total} wired",
+        "copy": "Copy",
+        "copied": "Copied",
+        "print": "Print",
+        "empty": "No wires to list yet.",
+        "colDone": "Done",
+        "colBoardPin": "Board pin",
+        "colGoesTo": "Goes to",
+        "colPartPin": "Part pin",
+        "colColour": "Wire colour",
+        "colNote": "Note",
+        "colEngineer": "Wire and net",
+        "tickLabel": "Wired: {from} to {to}"
       },
       "guide": {
-        "_": ""
+        "start": "Wire it step by step",
+        "region": "Step-by-step wiring",
+        "close": "Close",
+        "back": "Back",
+        "next": "Next",
+        "done": "Done",
+        "markDone": "Mark as done",
+        "marked": "Marked as done"
       },
       "code": {
-        "_": ""
+        "pinsUpdated": "Pins updated",
+        "pinsUpdatedText": "Your wiring changed, so we updated the pin block. The rest of your code is unchanged.",
+        "dismiss": "Dismiss",
+        "removed": "Removed",
+        "added": "Added",
+        "powerWire": "This wire is power/ground — the code does not use a pin for it.",
+        "previewTitle": "Wiring snippet",
+        "closePreview": "Close",
+        "via": "Through the {part}",
+        "lineLabel": "Line {n}: {name}, wire from {from} to {to}. Press Enter to see the wire."
       },
       "wokwi": {
-        "_": ""
+        "download": "Download for Wokwi",
+        "guide": "Open wokwi.com → new project → upload these 2 files",
+        "failed": "We couldn't make the file. Try again."
       }
     }
   },

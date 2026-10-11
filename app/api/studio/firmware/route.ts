@@ -5,6 +5,8 @@ import { FIRMWARE_SCHEMA, circuitForPrompt, cleanFirmware, findController } from
 import type { Netlist } from "@/lib/prototyping/netlist";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { buildWiring } from "@/lib/studio/netlist";
+import { buildConnections, pinBlock, pinConstants } from "@/lib/studio/connections";
+import { syncPinBlock } from "@/lib/studio/code-link";
 import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
 import { FirmwareBody } from "@/lib/studio/server/http";
 import { studioRequest } from "@/lib/studio/server/context";
@@ -34,8 +36,10 @@ export async function POST(request: Request) {
   if (!spec || !components.length) return Response.json({ error: "no_circuit" }, { status: 409 });
 
   let netlist: Netlist;
+  let w: ReturnType<typeof buildWiring>;
   try {
-    netlist = buildWiring(components.filter((c) => !c.auto), spec, getPart, body.locale).legacy as Netlist;
+    w = buildWiring(components.filter((c) => !c.auto), spec, getPart, body.locale);
+    netlist = w.legacy as Netlist;
   } catch (e) {
     console.error("[studio/firmware] buildWiring failed:", e instanceof Error ? e.message : e);
     return Response.json({ error: "no_circuit" }, { status: 409 });
@@ -45,6 +49,12 @@ export async function POST(request: Request) {
 
   if (!geminiConfigured()) return Response.json({ error: "unavailable" }, { status: 503 });
   if ((await quota(supabase, "gemini")).paused) return Response.json({ error: "paused" }, { status: 429 });
+
+  // P5-17: the pin constants come from the SAME wiring the views draw. The model is
+  // told to start with this exact block; the block is put back verbatim afterwards.
+  const connections = buildConnections(w.components, w.netlist.nets, getPart);
+  const constants = pinConstants(connections, getPart);
+  const block = constants.length ? pinBlock(constants) : null;
 
   const ar = body.locale === "ar";
   const system =
@@ -56,7 +66,11 @@ export async function POST(request: Request) {
     "Do what the product description asks; when it leaves a behaviour open, choose a safe simple default and say so in notes. " +
     "Never drive a motor, pump, relay or heater directly without the driver the circuit shows. " +
     `Write steps (at most 5 short plain sentences: install the board and libraries, select the board, upload) and notes in ${ar ? "Arabic" : "English"}; ` +
-    "code comments in English.";
+    "code comments in English." +
+    (block
+      ? " The sketch MUST contain the pin block given below, copied VERBATIM (same lines, same markers) right after the #include lines. " +
+        "Use ONLY those constant names for the pins everywhere in the code; never write a raw pin number and never redefine them."
+      : "");
   const brief = [
     spec.oneLine,
     spec.features.length ? `Features: ${spec.features.join(", ")}` : null,
@@ -64,7 +78,7 @@ export async function POST(request: Request) {
   ]
     .filter(Boolean)
     .join("\n");
-  const prompt = `Product: ${spec.name}\n\nWhat it does:\n${brief.slice(0, 3000)}\n\nCircuit:\n${circuitForPrompt(netlist)}`;
+  const prompt = `Product: ${spec.name}\n\nWhat it does:\n${brief.slice(0, 3000)}\n\nCircuit:\n${circuitForPrompt(netlist)}${block ? `\n\nPin block (copy verbatim):\n${block}` : ""}`;
 
   try {
     const res = await callGemini({ system, prompt, schema: FIRMWARE_SCHEMA, temperature: 0.2, timeoutMs: 100_000 });
@@ -83,6 +97,7 @@ export async function POST(request: Request) {
       errorCode: firmware ? null : "malformed",
     });
     if (!firmware) return Response.json({ error: "failed" }, { status: 502 });
+    firmware.code = syncPinBlock(firmware.code, connections, getPart).code;
     const board = firmware.board || (findController(netlist)?.function ?? "").replace(/ microcontroller board$/, "");
     const stored = await updateDoc(supabase, project.id, (d) => (d ? { ...d, firmware: { board, code: firmware.code } } : null));
     return Response.json({
