@@ -30,7 +30,12 @@ export const DESIGNER_SYSTEM =
   "USB needs a port the user can reach; " +
   "4 proportions: keep the archetype and size it from the size hint (palm ≈ 70–100 mm head, pocket smaller, desk and large bigger); " +
   "5 look: 2–3 colours from the palette, a finish per body and ONE signature detail (a light halo, a leaf-shaped cap, a grip texture…). " +
-  "Start from the default design you are given for each archetype and improve it; keep body ids short snake_case. " +
+  "The product must stand out from its scene as a designed object: never colour it like its surroundings " +
+  "(in a plant pot no green bodies — leaves are green; use warm white or sand with one accent). " +
+  "Light rings, shades and windows are resin_clear and glow; keep them large enough to see from a three-quarter view. " +
+  "Start from the default design you are given for each archetype and improve it: its silhouette and functional bodies are " +
+  "already tuned to be recognised at a glance. KEEP EVERY BODY of the default (same id, role and attach target and anchor); " +
+  "you may resize, recolour, refinish, add features and add up to 2 new bodies; keep new body ids short snake_case. " +
   "All sizes are millimetres, Z up, -y is the front. Every body except the first attaches to another body (attach.to = its id) " +
   "or to 'ground' / 'scene'; children touch the parent's anchor face, offset slides along that face. " +
   "why_en and why_ar: one friendly sentence (max 160 characters) telling the client why this design suits the product — " +

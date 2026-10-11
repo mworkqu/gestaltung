@@ -23,6 +23,8 @@ export type ProductNeeds = {
   soil: boolean;
   light: boolean;
   button: boolean;
+  /** How many push buttons the parts list has (each gets its own cap). */
+  buttons: number;
   speaker: boolean;
   screen: boolean;
   touch: boolean;
@@ -41,7 +43,8 @@ export function needsOf(spec: ProductSpec, parts: readonly LayoutInput[] = []): 
   const s = shapeSignals(spec);
   let main: Colour = "chalk";
   let accent: Colour = "sage";
-  if (s.plant) [main, accent] = ["chalk", "sage"];
+  // Plant products: warm white with a water-blue accent, so the product never melts into the leaves.
+  if (s.plant) [main, accent] = ["chalk", "ocean"];
   else if (s.outdoor || spec.style === "rugged") [main, accent] = ["graphite", "sun"];
   else if (spec.style === "soft_tech") [main, accent] = ["mist", "cobalt"];
   else if (spec.style === "minimal") [main, accent] = ["chalk", "graphite"];
@@ -51,6 +54,7 @@ export function needsOf(spec: ProductSpec, parts: readonly LayoutInput[] = []): 
     soil: ps.some(isSoilProbe),
     light: out.includes("led") || ps.some(isLight),
     button: ins.includes("button") || ps.some(isButtonPart),
+    buttons: ps.filter(isButtonPart).length,
     speaker: out.includes("speaker") || out.includes("buzzer") || ps.some((p) => p.ports.some((q) => q.kind === "speaker_grille")),
     screen: out.includes("screen"),
     touch: ins.includes("touch"),
@@ -140,11 +144,11 @@ const RATIONALE: Record<Archetype, string> = {
   stake_device: "Stands in the soil on its stake, with a palm-sized head, a glowing status ring and a drip outlet aimed at the roots.",
   planter_insert: "A low pebble that sits on the soil with its probe tips in the ground, so it hides among the leaves.",
   desk_object: "A soft, low block that sits steady on a desk, with everything you touch on its top.",
-  lamp: "A weighted base with a glowing clear column and a soft cap you touch to dim it.",
+  lamp: "A weighted base with a touch pad to dim it, a slim stem and a frosted head that glows.",
   wall_mount: "A slim plate on the wall with one big button and a light you can see from the door.",
-  handheld: "A long, rounded body that sits in the hand, buttons under the thumb and the signal window at the front.",
+  handheld: "A long, rounded body that sits in the hand, a column of keys under the thumb, a red power key and the signal window at the front.",
   wearable_band: "A small rounded pod on a soft strap, light enough to wear all day.",
-  pet_feeder: "A food hopper on a sturdy base, with the bowl at the front at cat height.",
+  pet_feeder: "A clear food hopper on a sturdy base, so you see what is left, with a chute that drops each meal into the bowl.",
   dispenser: "A tall body with the tank on top and the outlet at the front, at hand height.",
   vehicle_mount: "A compact face that clips into a car vent, angled towards the driver.",
   outdoor_box: "A sealed, screwed box with drain holes and a mounting flange, made for sun and rain.",
@@ -158,22 +162,23 @@ function stakeDevice(n: ProductNeeds): Raw {
     body("stake", "stake", n.soil
       ? { kind: "stake", section: "blade", length: stakeLen, width: 28, thick: 12, taper: 0.35 }
       : { kind: "stake", section: "cross", length: stakeLen, width: 18, thick: 3.2, taper: 0.3 },
-      { to: "ground", anchor: "top", offset: [0, 0, -(stakeLen - 28)] }, "PETG", n.main, "matte_plastic"),
+      { to: "ground", anchor: "top", offset: [0, 0, -(stakeLen - 28)] }, "PETG", "graphite", "matte_plastic"),
     body("head", "housing", { kind: "lathe_profile", points: pts([[34, 0], [39, 9], [41, 18], [41, 30]], s), round: 4, segments: 96 },
       { to: "stake", anchor: "top" }, "PLA", n.main, "soft_touch"),
   ];
   let top = "head";
   if (n.light) {
-    bodies.push(body("halo", "light_ring", { kind: "ring", shape: "round", w: k(76, s), d: k(76, s), t: 3, h: 6 }, { to: "head", anchor: "top" }, "resin_clear", "mist", "glossy_plastic"));
+    // Signature detail: a tall glowing status band between the head and its cap.
+    bodies.push(body("halo", "light_ring", { kind: "ring", shape: "round", w: k(76, s), d: k(76, s), t: 3, h: 10 }, { to: "head", anchor: "top" }, "resin_clear", "mist", "glossy_plastic"));
     top = "halo";
   }
-  bodies.push(body("cap", "lid", { kind: "lathe_profile", points: pts([[41, 0], [40, 5], [33, 15], [19, 23], [5, 26]], s), round: 4, segments: 96 }, { to: top, anchor: "top" }, "PLA", n.accent, "soft_touch"));
+  bodies.push(body("cap", "lid", { kind: "lathe_profile", points: pts([[41, 0], [40, 5], [33, 15], [19, 23], [5, 26]], s), round: 4, segments: 96 }, { to: top, anchor: "top" }, "PLA", n.main, "soft_touch"));
   if (n.soil) bodies.push(body("probe_tips", "stake", { kind: "prongs", length: 18, d: 3, spacing: 12 }, { to: "stake", anchor: "bottom" }, "aluminium", "graphite", "anodized_aluminium"));
   const links: Raw[] = [];
   if (n.pump) {
     bodies.push(body("nozzle", "nozzle", { kind: "nozzle", length: 16, d: 8, bore: 2.5, angle: 55, drop: 14 }, { to: "head", anchor: "front" }, "PLA", n.accent, "matte_plastic"));
     bodies.push(body("reservoir", "reservoir", { kind: "tank", shape: "round", w: 72, d: 72, h: 92, r: 12, lidH: 8, window: 1 },
-      { to: "scene", anchor: "bottom", offset: [POT.radius + 14 + 36, 0, 0] }, "PETG", "mist", "glossy_plastic"));
+      { to: "scene", anchor: "bottom", offset: [POT.radius + 14 + 36, 0, 0] }, "resin_clear", "mist", "glossy_plastic"));
     links.push({ kind: "tube", from: { body: "reservoir", anchor: "top" }, to: { body: "head", anchor: "back" }, diameter: 6, colour: "mist" });
   }
   return { archetype: "stake_device", scene: "plant_pot", rationale: RATIONALE.stake_device, bodies, electronicsHost: "head", links };
@@ -198,7 +203,7 @@ function planterInsert(n: ProductNeeds): Raw {
   const links: Raw[] = [];
   if (n.pump) {
     bodies.push(body("nozzle", "nozzle", { kind: "nozzle", length: 14, d: 8, bore: 2.5, angle: 60, drop: 10 }, { to: "pebble", anchor: "front" }, "PLA", n.accent, "matte_plastic"));
-    bodies.push(body("reservoir", "reservoir", { kind: "tank", shape: "round", w: 72, d: 72, h: 92, r: 12, lidH: 8, window: 1 }, { to: "scene", anchor: "bottom", offset: [POT.radius + 14 + 36, 0, 0] }, "PETG", "mist", "glossy_plastic"));
+    bodies.push(body("reservoir", "reservoir", { kind: "tank", shape: "round", w: 72, d: 72, h: 92, r: 12, lidH: 8, window: 1 }, { to: "scene", anchor: "bottom", offset: [POT.radius + 14 + 36, 0, 0] }, "resin_clear", "mist", "glossy_plastic"));
     links.push({ kind: "tube", from: { body: "reservoir", anchor: "top" }, to: { body: "pebble", anchor: "back" }, diameter: 6, colour: "mist" });
   }
   return { archetype: "planter_insert", scene: "plant_pot", rationale: RATIONALE.planter_insert, bodies, electronicsHost: "pebble", links };
@@ -222,13 +227,19 @@ function deskObject(n: ProductNeeds): Raw {
 }
 
 function lamp(n: ProductNeeds): Raw {
-  const s = n.scale;
+  // A real lamp silhouette: a weighted disc base with a touch pad, a slim stem, and a
+  // head whose frosted dome is the light (the LED ring shines up into it).
+  const s = Math.min(n.scale, 1.15);
+  const dark: Colour = n.main === "graphite" ? "chalk" : "graphite";
   const bodies: Raw[] = [
-    body("base", "base", { kind: "lathe_profile", points: pts([[52, 0], [56, 4], [56, 18], [44, 26], [32, 30]], s), round: 4, segments: 96 }, { to: "ground", anchor: "top" }, "PLA", n.main, "matte_plastic"),
-    body("column", "light_ring", { kind: "ring", shape: "round", w: k(58, s), d: k(58, s), t: 3, h: k(110, s) }, { to: "base", anchor: "top" }, "resin_clear", "mist", "glossy_plastic"),
-    body("cap", "lid", { kind: "lathe_profile", points: pts([[32, 0], [32, 4], [26, 12], [12, 18], [4, 19]], s), round: 3, segments: 96 }, { to: "column", anchor: "top" }, "PLA", n.accent, "soft_touch"),
+    body("base", "base", { kind: "lathe_profile", points: pts([[58, 0], [60, 4], [60, 12], [48, 19], [40, 20]], s), round: 3, segments: 96 }, { to: "ground", anchor: "top" }, "PLA", n.main, "matte_plastic"),
+    // The touch pad is a printed disc over a copper electrode (no switch under it), so it is a cover, not a key cap.
+    body("touch_pad", "cover", { kind: "button_cap", d: 24, h: 2, dome: 0.2, stem: 0 }, { to: "base", anchor: "top", offset: [0, k(-27, s), 0] }, "PLA", n.accent === dark ? "coral" : n.accent, "soft_touch"),
+    body("stem", "handle", { kind: "lathe_profile", points: [[8, 0], [6.5, 6], [6, 150], [7, 158]], round: 2, segments: 64 }, { to: "base", anchor: "top" }, "PLA", dark, "matte_plastic"),
+    body("head", "housing", { kind: "lathe_profile", points: pts([[22, 0], [30, 4], [37, 10], [38, 16]], s), round: 3, segments: 96 }, { to: "stem", anchor: "top" }, "PLA", n.main, "soft_touch"),
+    body("shade", "light_ring", { kind: "lathe_profile", points: pts([[38, 0], [39, 6], [35, 22], [24, 33], [8, 38]], s), round: 4, segments: 96 }, { to: "head", anchor: "top" }, "resin_clear", "mist", "glossy_plastic", { shell: "open_bottom" }),
   ];
-  return { archetype: "lamp", scene: "desk", rationale: RATIONALE.lamp, bodies, electronicsHost: "base", links: [] };
+  return { archetype: "lamp", scene: "desk", rationale: RATIONALE.lamp, bodies, electronicsHost: "head", links: [] };
 }
 
 function wallMount(n: ProductNeeds): Raw {
@@ -249,11 +260,19 @@ function wallMount(n: ProductNeeds): Raw {
 
 function handheld(n: ProductNeeds): Raw {
   const s = n.scale;
+  const keys: Colour = n.main === "graphite" ? "chalk" : "graphite";
+  const len = Math.min(200, k(168, s));
   const bodies: Raw[] = [
-    body("shell", "housing", { kind: "loft_rounded", shape: "rrect", w0: k(46, s), d0: k(168, s), w1: k(42, s), d1: k(168, s), h: 22, r: 14, fillet: 6, shiftY: 0 }, { to: "ground", anchor: "top" }, "PLA", n.main, "soft_touch",
+    body("shell", "housing", { kind: "loft_rounded", shape: "rrect", w0: k(46, s), d0: len, w1: k(42, s), d1: len, h: 22, r: 14, fillet: 6, shiftY: 0 }, { to: "ground", anchor: "top" }, "PLA", n.main, "soft_touch",
       { features: [{ kind: "texture_grip", face: "left", count: 8 }] }),
-    body("button", "button_cap", { kind: "button_cap", d: 16, h: 3, dome: 0.5, stem: 0 }, { to: "shell", anchor: "top", offset: [0, -30, 0] }, "PLA", n.accent, "soft_touch"),
   ];
+  // One cap per switch (the solver moves each over its switch), in a column on the top.
+  const caps = Math.max(1, Math.min(4, n.buttons));
+  for (let i = 0; i < caps; i++) {
+    bodies.push(body(i ? `button_${i + 1}` : "button", "button_cap", { kind: "button_cap", d: 10, h: 3, dome: 0.5, stem: 0 }, { to: "shell", anchor: "top", offset: [0, -30 + 14 * i, 0] }, "PLA", keys, "soft_touch"));
+  }
+  // The red power key at the far end: the first thing anyone looks for on a remote.
+  bodies.push(body("power", "button_cap", { kind: "button_cap", d: 9, h: 2.5, dome: 0.4, stem: 0 }, { to: "shell", anchor: "top", offset: [0, -(len / 2 - 18), 0] }, "PLA", "coral", "soft_touch"));
   if (n.light) bodies.push(body("lens", "window", { kind: "rounded_extrude", shape: "rrect", w: 16, d: 8, h: 2.5, r: 3.9, fillet: 1 }, { to: "shell", anchor: "front", rotate: [90, 0, 0] }, "resin_clear", "graphite", "glossy_plastic"));
   return { archetype: "handheld", scene: "hand", rationale: RATIONALE.handheld, bodies, electronicsHost: "shell", links: [] };
 }
@@ -275,7 +294,10 @@ function petFeeder(n: ProductNeeds): Raw {
   const bowlR = 58;
   const bodies: Raw[] = [
     body("base", "housing", { kind: "rounded_extrude", shape: "rrect", w: W, d: D, h: 70, r: 30, fillet: 6 }, { to: "ground", anchor: "top" }, "PLA", n.main, "matte_plastic"),
-    body("hopper", "reservoir", { kind: "tank", shape: "round", w: 116, d: 116, h: 140, r: 20, lidH: 10, window: 1 }, { to: "base", anchor: "top", offset: [0, 8, 0] }, "PETG", "mist", "glossy_plastic"),
+    // Clear hopper: you see how much food is left.
+    body("hopper", "reservoir", { kind: "tank", shape: "round", w: 116, d: 116, h: 140, r: 20, lidH: 10, window: 0 }, { to: "base", anchor: "top", offset: [0, 8, 0] }, "resin_clear", "mist", "glossy_plastic"),
+    // The chute the food drops down, over the bowl.
+    body("chute", "nozzle", { kind: "nozzle", length: 40, d: 14, bore: 5, angle: 70, drop: 18 }, { to: "base", anchor: "front", offset: [0, 0, 24] }, "PLA", n.accent, "matte_plastic"),
     body("bowl", "base", { kind: "lathe_profile", points: [[44, 0], [50, 4], [56, 20], [bowlR, 28]], round: 3, segments: 96 }, { to: "ground", anchor: "top", offset: [0, -(D / 2 + bowlR + 1), 0] }, "PETG", n.accent, "glossy_plastic", { shell: "open_top" }),
   ];
   return { archetype: "pet_feeder", scene: "pet_bowl", rationale: RATIONALE.pet_feeder, bodies, electronicsHost: "base", links: [] };

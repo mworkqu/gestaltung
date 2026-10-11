@@ -37,7 +37,50 @@ export const PROP_COLOURS = {
   pebble: "#c3c7cc",
   bowl: "#c7d3e2",
   kibble: "#b88a5d",
+  kibbleDeep: "#8a5a33",
+  water: "#7fb6dc",
+  sofa: "#9eaab9",
+  sofaDark: "#8b98a8",
 } as const;
+
+/**
+ * What the props may know about the product's own bodies (world boxes): a clear
+ * hopper gets food drawn inside it, a product bowl gets food in it (and the scene
+ * then adds no second bowl). Optional: without it the props only use the bbox.
+ */
+export type SceneHint = { role: string; material: string; box: Box3 };
+
+/** Hints from built pieces (world positions), for the worker pictures and the viewer. */
+export function sceneHintsFromPieces(pieces: readonly { role: string; material: string; bodyId?: string; positions?: Float32Array }[]): SceneHint[] {
+  // One box per body (a tank and its fill lid are two pieces of one body).
+  const byBody = new Map<string, SceneHint>();
+  const out: SceneHint[] = [];
+  for (const p of pieces) {
+    const pos = p.positions;
+    if (!pos || pos.length < 3) continue;
+    const min: [number, number, number] = [Infinity, Infinity, Infinity];
+    const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < pos.length; i += 3) {
+      for (let k = 0; k < 3; k++) {
+        const v = pos[i + k];
+        if (v < min[k]) min[k] = v;
+        if (v > max[k]) max[k] = v;
+      }
+    }
+    const prev = p.bodyId ? byBody.get(p.bodyId) : undefined;
+    if (prev) {
+      for (let k = 0; k < 3; k++) {
+        prev.box.min[k] = Math.min(prev.box.min[k], min[k]);
+        prev.box.max[k] = Math.max(prev.box.max[k], max[k]);
+      }
+      continue;
+    }
+    const h: SceneHint = { role: p.role, material: p.material, box: { min, max } };
+    if (p.bodyId) byBody.set(p.bodyId, h);
+    out.push(h);
+  }
+  return out;
+}
 
 export type SceneProps = {
   group: THREE.Group;
@@ -167,7 +210,25 @@ function plant(ctx: Ctx, at: [number, number], away: number, height: number, soi
   });
 }
 
-function plantPotProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
+/** Water inside clear reservoirs (about two thirds full), so a clear tank reads as "the water". */
+function waterIn(ctx: Ctx, hints: readonly SceneHint[]) {
+  for (const h of hints.filter((x) => x.role === "reservoir" && x.material === "resin_clear")) {
+    const he = extentOf(h.box);
+    const r = Math.max(6, Math.min(he.w, he.d) / 2 - 3);
+    const z0 = h.box.min[2] + 3;
+    const top = z0 + (he.h - 6) * 0.66;
+    const g = new THREE.CylinderGeometry(r, r, Math.max(2, top - z0), 64);
+    g.rotateX(Math.PI / 2);
+    g.translate(he.cx, he.cy, (z0 + top) / 2);
+    const m = new THREE.MeshPhysicalMaterial({ color: PROP_COLOURS.water, roughness: 0.1, transparent: true, opacity: 0.55, depthWrite: false });
+    m.userData.prop = true;
+    ctx.mats.push(m);
+    add(ctx, g, m);
+  }
+}
+
+function plantPotProps(ctx: Ctx, stage: SceneMetrics, product: Box3, hints: readonly SceneHint[] = []): Box3 {
+  waterIn(ctx, hints);
   const pot = stage.pot ?? { radius: 75, wall: 6, rimAbove: 10, depth: 110 };
   const soilZ = stage.groundZ;
   const bottomZ = soilZ - pot.depth;
@@ -206,7 +267,10 @@ function plantPotProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
   if (Math.hypot(e.cx, e.cy) < 4) away = Math.atan2(0.35, -1); // product in the middle: plant back-left
   const off = soilR * 0.42;
   const at: [number, number] = [Math.cos(away) * off, Math.sin(away) * off];
-  const height = Math.max(110, Math.min(200, Math.max(e.h, 60) * 0.95));
+  // The plant frames the product without hiding it: about as tall as the product stands
+  // above the soil (never the whole stake depth), leaves fanning away from it.
+  const above = Math.max(40, product.max[2] - soilZ);
+  const height = Math.max(105, Math.min(165, above * 1.3));
   plant(ctx, at, away, height, soilZ);
   // Table the pot stands on.
   floor(ctx, bottomZ, Math.max(rTop, e.w / 2, e.d / 2) * 1.2, PROP_COLOURS.table);
@@ -240,32 +304,33 @@ function wallProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
   return box([e.cx - e.w * 0.9 - 24, wallY - e.d - 10, product.min[2] - 30], [e.cx + e.w * 0.9 + 24, wallY + 4, product.max[2] + 30]);
 }
 
-/** An open palm under the product: rounded palm, four fingers and a thumb. */
+/**
+ * "hand" scene: a hand-held product lying on a sofa seat with a cushion behind (an
+ * open-palm prop read as odd blobs in the pictures). Soft fabric colours, no texture.
+ */
 function handProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
   const e = extentOf(product);
-  const skin = mat(ctx, PROP_COLOURS.hand, { roughness: 0.72 });
+  const fabric = mat(ctx, PROP_COLOURS.sofa, { roughness: 0.95 });
+  const fabricDark = mat(ctx, PROP_COLOURS.sofaDark, { roughness: 0.95 });
   const top = product.min[2];
-  const palmW = Math.max(78, Math.min(110, e.w * 1.15));
-  const palmL = Math.max(86, Math.min(120, e.d * 0.75));
-  const palm = slab(palmW, palmL, 22, palmW * 0.42, top);
-  palm.translate(e.cx, e.cy - palmL * 0.2, 0);
-  add(ctx, palm, skin, ctx.group, { cast: true });
-  const fingerR = palmW / 10;
-  const lens = [0.72, 0.82, 0.78, 0.6];
-  lens.forEach((k, i) => {
-    const len = palmL * k;
-    const g = new THREE.CapsuleGeometry(fingerR, len, 6, 16);
-    // Capsule axis is Y: lie it along +y (towards the back), resting at the palm's level.
-    const x = e.cx - palmW / 2 + fingerR * 1.25 + i * ((palmW - fingerR * 2.5) / 3);
-    g.translate(x, e.cy - palmL * 0.2 + palmL / 2 + len / 2 + fingerR * 0.6, top - fingerR - 1);
-    add(ctx, g, skin, ctx.group, { cast: true });
-  });
-  const thumb = new THREE.CapsuleGeometry(fingerR * 1.15, palmL * 0.45, 6, 16);
-  thumb.rotateZ(-0.9);
-  thumb.translate(e.cx + palmW / 2 + fingerR * 0.8, e.cy - palmL * 0.25, top - fingerR * 1.2);
-  add(ctx, thumb, skin, ctx.group, { cast: true });
-  floor(ctx, top - 140, palmL * 1.5, PROP_COLOURS.floor);
-  return box([e.cx - palmW / 2 - 30, e.cy - palmL * 0.75, top - 24], [e.cx + palmW / 2 + 30, e.cy + palmL * 1.2, top]);
+  const span = Math.max(e.w, e.d);
+  // Seat cushion the product rests on: wide, soft, rounded.
+  const seatW = Math.max(420, span * 2.8);
+  const seatD = Math.max(300, span * 2);
+  const seat = slab(seatW, seatD, 60, 40, top);
+  seat.translate(e.cx, e.cy, 0);
+  add(ctx, seat, fabric);
+  // A seam between two seat cushions, off to one side.
+  const seam = new THREE.BoxGeometry(3, seatD * 0.96, 2);
+  seam.translate(e.cx + seatW * 0.28, e.cy, top - 0.4);
+  add(ctx, seam, fabricDark);
+  // Back cushion behind, leaning back a little (low, so the product stays the subject).
+  const back = slab(seatW * 0.96, 90, 50, 30, 0);
+  back.rotateX(-1.25);
+  back.translate(e.cx, e.cy + seatD / 2 + 10, top + 22);
+  add(ctx, back, fabricDark, ctx.group, { cast: true });
+  floor(ctx, top - 60 - 300, seatW, PROP_COLOURS.floor);
+  return box([e.cx - e.w * 0.6 - 16, e.cy - e.d * 0.6 - 12, top - 14], [e.cx + e.w * 0.6 + 16, e.cy + e.d * 0.6 + 16, top]);
 }
 
 function floorProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
@@ -321,11 +386,45 @@ function outdoorProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
   return box([product.min[0] - 30, product.min[1] - 30, z], [product.max[0] + 30, product.max[1] + 30, z + 10]);
 }
 
-function petBowlProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
+/** Kibble: small flattened pellets scattered over a disc of radius r at height z (deterministic). */
+function kibble(ctx: Ctx, cx: number, cy: number, z: number, r: number, count: number, layers = 1) {
+  const kib = mat(ctx, PROP_COLOURS.kibble, { roughness: 0.9 });
+  for (let i = 0; i < count; i++) {
+    const a = i * 2.39996;
+    const rr = r * Math.sqrt((i + 0.5) / count);
+    const layer = i % layers;
+    const g = new THREE.SphereGeometry(4.2, 10, 8);
+    g.scale(1.2, 1, 0.7);
+    g.rotateZ(a);
+    g.translate(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, z + layer * 5 + (i % 3) * 1.2);
+    add(ctx, g, kib);
+  }
+}
+
+function petBowlProps(ctx: Ctx, stage: SceneMetrics, product: Box3, hints: readonly SceneHint[]): Box3 {
   const e = extentOf(product);
   const z = stage.floorZ;
   floor(ctx, z, Math.max(e.w, e.d) * 1.4, PROP_COLOURS.floor);
-  // A bowl beside the feeder (on the reading-end side), with a little food.
+  // Food inside a clear hopper (filled to about 60 %), so "see what is left" reads.
+  for (const h of hints.filter((x) => x.role === "reservoir" && x.material === "resin_clear")) {
+    const he = extentOf(h.box);
+    const r = Math.max(8, Math.min(he.w, he.d) / 2 - 6);
+    const z0 = h.box.min[2] + 4;
+    const fillTop = z0 + (he.h - 8) * 0.6;
+    // A packed column of food with loose pellets on top.
+    const col = new THREE.CylinderGeometry(r, r, Math.max(2, fillTop - z0 - 2), 48);
+    col.rotateX(Math.PI / 2);
+    col.translate(he.cx, he.cy, (z0 + fillTop - 2) / 2);
+    add(ctx, col, mat(ctx, PROP_COLOURS.kibbleDeep, { roughness: 0.95 }));
+    kibble(ctx, he.cx, he.cy, fillTop - 2, r - 4, 26, 2);
+  }
+  // The product's own bowl (a low open body standing in front) gets the food; else a bowl beside the feeder.
+  const own = hints.find((x) => x.role === "base" && x.box.max[2] - x.box.min[2] < 60 && x.box.min[2] <= z + 1 && x.box.max[1] < product.max[1] - 20);
+  if (own) {
+    const oe = extentOf(own.box);
+    kibble(ctx, oe.cx, oe.cy, own.box.min[2] + 7, Math.min(oe.w, oe.d) * 0.28, 16);
+    return box([product.min[0] - 10, product.min[1] - 10, z], [product.max[0] + 10, product.max[1] + 10, z + 40]);
+  }
   const R = 62;
   const cx = product.max[0] + R + 26;
   const cy = e.cy - e.d * 0.15;
@@ -344,29 +443,22 @@ function petBowlProps(ctx: Ctx, stage: SceneMetrics, product: Box3): Box3 {
   bowl.rotateX(Math.PI / 2);
   bowl.translate(cx, cy, 0);
   add(ctx, bowl, mat(ctx, PROP_COLOURS.bowl, { roughness: 0.5 }), ctx.group, { cast: true });
-  const kib = mat(ctx, PROP_COLOURS.kibble, { roughness: 0.9 });
-  for (let i = 0; i < 14; i++) {
-    const a = i * 2.4;
-    const r = (i % 4) * 9 + 4;
-    const g = new THREE.SphereGeometry(4.2, 10, 8);
-    g.scale(1.2, 1, 0.7);
-    g.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r, z + 9 + (i % 3) * 2);
-    add(ctx, g, kib);
-  }
+  kibble(ctx, cx, cy, z + 9, 30, 14);
   return box([product.min[0] - 10, Math.min(product.min[1], cy - R) - 10, z], [cx + R + 6, Math.max(product.max[1], cy + R) + 10, z + 40]);
 }
 
 /**
  * The props for a solved product's scene. `stage` = SolvedProduct.stage, `product` =
- * SolvedProduct.bbox (world). Everything is in one group named "scene_props".
+ * SolvedProduct.bbox (world), `hints` = the product's own bodies (sceneHintsFromPieces).
+ * Everything is in one group named "scene_props".
  */
-export function buildSceneProps(scene: Scene, stage: SceneMetrics, product: Box3): SceneProps {
+export function buildSceneProps(scene: Scene, stage: SceneMetrics, product: Box3, hints: readonly SceneHint[] = []): SceneProps {
   const ctx: Ctx = { group: new THREE.Group(), geos: [], mats: [] };
   ctx.group.name = PROPS_NAME;
   let focus: Box3 | null = null;
   switch (scene) {
     case "plant_pot":
-      focus = plantPotProps(ctx, stage, product);
+      focus = plantPotProps(ctx, stage, product, hints);
       break;
     case "desk":
       focus = deskProps(ctx, stage, product);
@@ -387,7 +479,7 @@ export function buildSceneProps(scene: Scene, stage: SceneMetrics, product: Box3
       focus = outdoorProps(ctx, stage, product);
       break;
     case "pet_bowl":
-      focus = petBowlProps(ctx, stage, product);
+      focus = petBowlProps(ctx, stage, product, hints);
       break;
   }
   return {

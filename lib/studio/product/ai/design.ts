@@ -97,11 +97,40 @@ export function modelProblems(raw: unknown, label: string): string[] {
 type RawDesign = { archetype: Archetype; model: ProductModel; why: { en?: unknown; ar?: unknown }; log: ClampLog };
 
 /**
+ * The default's bodies the AI dropped. The defaults are tuned to be recognised at a
+ * glance (the bowl of a feeder, the stem of a lamp, the plate of a doorbell), so the
+ * designer refines them and may add to them, but keeps them (P5-16d: real runs showed
+ * designs that dropped the bowl or the wall plate scoring 3–5).
+ */
+export function droppedDefaultBodies(raw: Record<string, unknown>, def: ProductModel): ProductModel["bodies"] {
+  const ids = new Set((Array.isArray(raw.bodies) ? raw.bodies : []).map((b) => (isObj(b) ? b.id : null)).filter((x): x is string => typeof x === "string"));
+  return def.bodies.filter((b) => !ids.has(b.id));
+}
+
+/** Put the dropped default bodies back (when their parent is still there and there is room). */
+export function restoreDefaultBodies(model: ProductModel, def: ProductModel): ProductModel {
+  const missing = def.bodies.filter((b) => !model.bodies.some((x) => x.id === b.id));
+  if (!missing.length) return model;
+  const out = structuredClone(model);
+  for (const b of missing) {
+    if (out.bodies.length >= PRODUCT_LIMITS.bodies.max) break;
+    const parentOk = (ROOTS as readonly string[]).includes(b.attach.to) || out.bodies.some((x) => x.id === b.attach.to);
+    if (parentOk) out.bodies.push(structuredClone(b));
+  }
+  return clampProductModel(out);
+}
+
+/**
  * Validate the designer's answer. Strict (first answer): every asked archetype
  * once, every model structurally sound. Lenient (the retry): keep the sound
  * designs; the caller fills the rest with defaults.
  */
-export function validateDesigns(raw: unknown, archetypes: readonly Archetype[], strict: boolean): { value: RawDesign[] | null; errors: string[] } {
+export function validateDesigns(
+  raw: unknown,
+  archetypes: readonly Archetype[],
+  strict: boolean,
+  defaults?: ReadonlyMap<Archetype, ProductModel>,
+): { value: RawDesign[] | null; errors: string[] } {
   if (!isObj(raw) || !Array.isArray(raw.designs)) return { value: null, errors: ['the answer must be {"designs": [...]}'] };
   const errors: string[] = [];
   const out: RawDesign[] = [];
@@ -112,12 +141,16 @@ export function validateDesigns(raw: unknown, archetypes: readonly Archetype[], 
       continue;
     }
     const problems = modelProblems(d.model, a);
+    const def = defaults?.get(a);
+    const dropped = def && isObj(d.model) ? droppedDefaultBodies(d.model, def) : [];
+    // A dropped default body is put back deterministically (no extra model call on the free tier).
     if (problems.length) {
       errors.push(...problems);
       continue;
     }
     const log: ClampLog = [];
-    const model = clampProductModel({ ...(d.model as object), archetype: a }, log);
+    let model = clampProductModel({ ...(d.model as object), archetype: a }, log);
+    if (def && dropped.length) model = restoreDefaultBodies(model, def);
     out.push({ archetype: a, model, why: { en: d.why_en, ar: d.why_ar }, log });
   }
   if (strict ? errors.length > 0 : out.length === 0) return { value: null, errors: errors.slice(0, 12) };
@@ -165,6 +198,7 @@ export async function runProductDesign(opts: {
   if (raw) raw = structuredClone(raw);
   else {
     let attempt = 0;
+    const defaultModels = new Map(archetypes.map((a) => [a, archetypeDefault(a, spec, parts)] as const));
     const r = await opts.call<RawDesign[]>({
       step: "product",
       system: DESIGNER_SYSTEM,
@@ -172,10 +206,10 @@ export async function runProductDesign(opts: {
         spec,
         brief: opts.brief,
         parts: designerParts(parts),
-        starts: archetypes.map((a) => ({ archetype: a, model: archetypeDefault(a, spec, parts) })),
+        starts: archetypes.map((a) => ({ archetype: a, model: defaultModels.get(a)! })),
       }),
       schema: designerSchema(archetypes),
-      validate: (v) => validateDesigns(v, archetypes, attempt++ === 0),
+      validate: (v) => validateDesigns(v, archetypes, attempt++ === 0, defaultModels),
       timeoutMs: 90_000,
     });
     if (!r.ok) return defaults([r.error, ...r.problems]);

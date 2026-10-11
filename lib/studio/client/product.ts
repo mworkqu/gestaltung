@@ -82,6 +82,7 @@ export function mockOptionsFromUrl(): ProductMockOptions {
       score: Number.isFinite(score) && score >= 1 && score <= 10 ? score : 8,
       guestLimitAfter: limit !== null && Number.isFinite(Number(limit)) ? Number(limit) : null,
       fail: q.get("productfail") === "1",
+      remote: q.get("productremote") === "1",
     };
   } catch {
     return { score: 8, guestLimitAfter: null, fail: false };

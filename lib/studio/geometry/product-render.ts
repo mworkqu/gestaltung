@@ -13,7 +13,7 @@
 import * as THREE from "three";
 import type { BuiltProduct } from "./product-kernel";
 import type { SolvedProduct } from "../product/solve";
-import { buildSceneProps } from "../product/scene/props";
+import { buildSceneProps, sceneHintsFromPieces } from "../product/scene/props";
 import {
   VIEW_DIRS,
   applyRendererLook,
@@ -121,7 +121,7 @@ export async function renderProductShots(built: BuiltProduct, solved: SolvedStag
   scene.environmentIntensity = STAGE_LOOK.envIntensity;
   const lights = makeLights();
   scene.add(lights.group);
-  const props = buildSceneProps(solved.scene, solved.stage, solved.bbox);
+  const props = buildSceneProps(solved.scene, solved.stage, solved.bbox, sceneHintsFromPieces(built.pieces));
   scene.add(props.group);
   const product = productGroup(built);
   scene.add(product.group);

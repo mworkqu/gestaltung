@@ -88,7 +88,11 @@ export async function handleProductRequest(req: ProductRequest): Promise<{ reply
 
 type PostFn = (message: WorkerMessage, transfer?: Transferable[]) => void;
 
+/** Test harness path for ?productremote=1 (fixture only; answered by Playwright, never by the server). */
+const E2E_REMOTE_BASE = "/__e2e/studio-product";
+
 async function httpFor(input: ProductPreviewInput | ProductUnlockInput): Promise<Http> {
+  if (input.mock?.remote) return fetchHttp(E2E_REMOTE_BASE);
   if (input.mock) {
     // Fixture pages only (the page sends `mock` only with its mock StudioApi).
     const { mockProductHttp } = await import("./product-mock");
