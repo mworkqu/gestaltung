@@ -29,6 +29,7 @@ export async function AdminHome({ locale }: { locale: string }) {
       .from("part_orders")
       .select("id, status, customer_name, is_test")
       .in("status", [...ORDER_STATUSES_TO_HANDLE])
+      .not("is_test", "is", true) // orders marked as test (D3) never count; countConfirm also drops TEST-looking rows
       .limit(1000)
   ).then(
     (r) => (r.error ? null : countConfirm(r.data ?? [])),
