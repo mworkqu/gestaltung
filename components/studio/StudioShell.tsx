@@ -388,20 +388,33 @@ function StudioShellInner({
       commit(
         edited
           ? // A changed list: the old circuit and layout no longer apply.
-            { ...base, components, netlist: { nets: [] }, checks: [], layout: [], mech: [], firmware: undefined }
+            {
+              ...base,
+              components,
+              netlist: { nets: [] },
+              checks: [],
+              layout: [],
+              mech: [],
+              // P5-17: same board → the client's code stays; the Code step swaps only its pin block.
+              firmware: sameBoard(base.components, components, getPart) ? base.firmware : undefined,
+            }
           : { ...base, components },
         edited ? undefined : serverVersion,
       );
     },
-    [commit],
+    [commit, getPart],
   );
 
   const onWiring = useCallback(
     (w: { components: StudioComponent[]; netlist: StudioDoc["netlist"]; checks: StudioDoc["checks"] }, serverVersion: number | null) => {
       const base = latest.current;
       if (!base) return;
-      // A different circuit: the old starter code no longer matches its pins.
-      const same = !base.firmware || JSON.stringify(base.netlist) === JSON.stringify(w.netlist);
+      // A different circuit on the same board keeps the code (the Code step updates only the
+      // pin block, P5-17); another board drops it.
+      const same =
+        !base.firmware ||
+        JSON.stringify(base.netlist) === JSON.stringify(w.netlist) ||
+        sameBoard(base.components, w.components, getPart);
       if (same) {
         commit({ ...base, components: w.components, netlist: w.netlist, checks: w.checks }, serverVersion);
         return;
@@ -410,7 +423,7 @@ function StudioShellInner({
       if (typeof serverVersion === "number") version.current = serverVersion;
       commit({ ...base, components: w.components, netlist: w.netlist, checks: w.checks, firmware: undefined });
     },
-    [commit],
+    [commit, getPart],
   );
 
   const onEnclosure = useCallback(
@@ -458,6 +471,31 @@ function StudioShellInner({
   );
 
   const flushBeforeServer = useCallback(() => flush(), [flush]);
+
+  // ── P5-17 wiring views ↔ code: one wire highlighted across steps ─────────
+  const [wireFocus, setWireFocus] = useState<{ id: string; step: "wiring" | "code"; n: number } | null>(null);
+  const showInCode = useCallback(
+    (id: string) => {
+      setWireFocus((f) => ({ id, step: "code", n: (f?.n ?? 0) + 1 }));
+      go(FLOW.indexOf("code"));
+    },
+    [go],
+  );
+  const showInWiring = useCallback(
+    (id: string) => {
+      setWireFocus((f) => ({ id, step: "wiring", n: (f?.n ?? 0) + 1 }));
+      go(FLOW.indexOf("wiring"));
+    },
+    [go],
+  );
+  const onWiringTicks = useCallback(
+    (wiringTicks: string[]) => {
+      const base = latest.current;
+      if (!base) return;
+      commit({ ...base, wiringTicks });
+    },
+    [commit],
+  );
 
   // ── P5-16 product designs (pictures in the background after Parts) ───────
   const onProduct = useCallback(
@@ -601,7 +639,16 @@ function StudioShellInner({
           />
         )}
         {step === "wiring" && doc && (
-          <WiringStep ctx={ctx} doc={doc} beforeServer={flushBeforeServer} onWiring={onWiring} onNext={next} />
+          <WiringStep
+            ctx={ctx}
+            doc={doc}
+            beforeServer={flushBeforeServer}
+            onWiring={onWiring}
+            onNext={next}
+            focusId={wireFocus?.step === "wiring" ? wireFocus.id : null}
+            onTicks={onWiringTicks}
+            onShowInCode={showInCode}
+          />
         )}
         {step === "enclosure" && doc && (
           <EnclosureStep
@@ -627,6 +674,8 @@ function StudioShellInner({
             onFirmware={onFirmware}
             onNext={next}
             onWiring={() => go(FLOW.indexOf("wiring"))}
+            focusId={wireFocus?.step === "code" ? wireFocus.id : null}
+            onShowInWiring={showInWiring}
           />
         )}
         {step === "make" && doc && <MakeStep ctx={ctx} doc={doc} products={products} />}
@@ -671,4 +720,11 @@ function StepSlide({ index, children }: { index: number; children: React.ReactNo
     );
   }, [index]);
   return <div ref={ref}>{children}</div>;
+}
+
+/** P5-17: the same main board (MCU part) before and after a change — the client's code still fits. */
+function sameBoard(a: StudioComponent[], b: StudioComponent[], getPart: (id: string) => LibraryPart | undefined): boolean {
+  const board = (cs: StudioComponent[]) => cs.find((c) => getPart(c.partId)?.category === "mcu")?.partId ?? null;
+  const x = board(a);
+  return x !== null && x === board(b);
 }

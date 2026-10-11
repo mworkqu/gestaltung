@@ -328,6 +328,8 @@ export const StudioDocSchema = z.object({
   lastStep: z.string().max(32).optional(),
   /** P5-16 product designs: pictures + public metadata only (server-owned, see ProductDocSchema). */
   product: ProductDocSchema.optional(),
+  /** P5-17 pin-list checklist: connectionKey() of every wire the client ticked while wiring. */
+  wiringTicks: z.array(z.string().max(120)).max(300).optional(),
 });
 export type StudioDoc = z.infer<typeof StudioDocSchema>;
 /** Page-side names for the same types (P5-16 Phase 2b). */

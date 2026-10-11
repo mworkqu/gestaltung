@@ -4327,7 +4327,37 @@
       "name_tabletop_robot": "Tabletop robot"
     },
     "material_resin_clear": "Clear resin",
-    "material_aluminium": "Aluminium"
+    "material_aluminium": "Aluminium",
+    "views": {
+      "tabsLabel": "Ways to see your wiring",
+      "tabWiring": "Wiring",
+      "tab3d": "3D",
+      "tabSchematic": "Schematic",
+      "tabPins": "Pin list",
+      "wireLabel": "{from} → {to} ({colour})",
+      "clearSelection": "Clear",
+      "showInCode": "Show in code",
+      "showInWiring": "Show in wiring",
+      "viewLoading": "Drawing this view…",
+      "drawing": {
+        "_": ""
+      },
+      "three": {
+        "_": ""
+      },
+      "pins": {
+        "_": ""
+      },
+      "guide": {
+        "_": ""
+      },
+      "code": {
+        "_": ""
+      },
+      "wokwi": {
+        "_": ""
+      }
+    }
   },
   "StudioLibrary": {
     "pageTitle": "Studio parts",

@@ -4327,7 +4327,37 @@
       "name_tabletop_robot": "روبوت مكتبي"
     },
     "material_resin_clear": "راتنج شفاف",
-    "material_aluminium": "ألمنيوم"
+    "material_aluminium": "ألمنيوم",
+    "views": {
+      "tabsLabel": "طرق عرض توصيلاتك",
+      "tabWiring": "التوصيل",
+      "tab3d": "ثلاثي الأبعاد",
+      "tabSchematic": "المخطط",
+      "tabPins": "قائمة الأطراف",
+      "wireLabel": "{from} ← {to} ({colour})",
+      "clearSelection": "إلغاء",
+      "showInCode": "اعرضه في الكود",
+      "showInWiring": "اعرضه في التوصيل",
+      "viewLoading": "جارٍ رسم هذا العرض…",
+      "drawing": {
+        "_": ""
+      },
+      "three": {
+        "_": ""
+      },
+      "pins": {
+        "_": ""
+      },
+      "guide": {
+        "_": ""
+      },
+      "code": {
+        "_": ""
+      },
+      "wokwi": {
+        "_": ""
+      }
+    }
   },
   "StudioLibrary": {
     "pageTitle": "قطع الاستوديو",

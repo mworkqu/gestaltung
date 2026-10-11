@@ -23,7 +23,7 @@ import { fileSlug } from "@/lib/studio/client/steps";
 import type { StudioCtx } from "../StudioShell";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { accessReason, problemKey } from "./problem";
-import { SchematicFrame } from "./wiring/SchematicFrame";
+import { WiringViews } from "./wiring/WiringViews";
 
 const accent = STEP_ACCENT.wiring;
 
@@ -33,6 +33,9 @@ export function WiringStep({
   beforeServer,
   onWiring,
   onNext,
+  focusId,
+  onTicks,
+  onShowInCode,
 }: {
   ctx: StudioCtx;
   doc: StudioDoc;
@@ -42,6 +45,12 @@ export function WiringStep({
     serverVersion: number | null,
   ) => void;
   onNext: () => void;
+  /** P5-17: a wire to open selected ("Show in wiring" from the Code step). */
+  focusId?: string | null;
+  /** P5-17: pin-list ticks (saved on the doc). */
+  onTicks: (ticks: string[]) => void;
+  /** P5-17: open the Code step at the lines that use this wire. */
+  onShowInCode?: (id: string) => void;
 }) {
   const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
@@ -148,7 +157,15 @@ export function WiringStep({
               {summary}
             </p>
           )}
-          <SchematicFrame svg={svg} label={t("schematicLabel")} />
+          <WiringViews
+            doc={doc}
+            schematicSvg={svg}
+            engineer={!!ctx.isAdmin}
+            locale={locale}
+            focusId={focusId ?? null}
+            onTicks={onTicks}
+            onShowInCode={onShowInCode}
+          />
           {doc.checks.length > 0 && (
             <div className="space-y-2">
               <h2 className="text-sm font-bold text-heading">{t("checksHeading")}</h2>

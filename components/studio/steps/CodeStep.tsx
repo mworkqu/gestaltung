@@ -28,6 +28,8 @@ export function CodeStep({
   onFirmware,
   onNext,
   onWiring,
+  focusId,
+  onShowInWiring,
 }: {
   ctx: StudioCtx;
   doc: StudioDoc;
@@ -36,7 +38,13 @@ export function CodeStep({
   onNext: () => void;
   /** Go back to the Wiring step. */
   onWiring: () => void;
+  /** P5-17: a wire to scroll to and highlight ("Show in code" from the Wiring step). */
+  focusId?: string | null;
+  /** P5-17: open the Wiring step with this wire selected. */
+  onShowInWiring?: (id: string) => void;
 }) {
+  void focusId;
+  void onShowInWiring;
   const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const mcu = doc.components.map((c) => getPart(c.partId)).find((p) => p?.category === "mcu");
