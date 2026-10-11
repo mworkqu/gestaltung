@@ -11,7 +11,7 @@ export const motorDriver: LibraryPart = {
     ar: "تتيح للوحتك تدوير محرّك صغير للأمام وللخلف بأي سرعة.",
   },
   category: "actuator",
-  storeSkus: [],
+  storeSkus: ["VLT-50432140345661"],
   tags: ["driver", "module", "motor_driver", "h-bridge", "drv8833", "motor", "dc", "speed", "direction", "pwm", "robot", "wheel", "controller", "actuator"],
   dims: { x: 20, y: 16, z: 8.5 },
   model: {

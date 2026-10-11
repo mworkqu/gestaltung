@@ -11,7 +11,7 @@ export const sg90Servo: LibraryPart = {
     ar: "يدير ذراعاً إلى زاوية دقيقة، للأغطية والمزاليج والمؤشرات والروبوتات الصغيرة.",
   },
   category: "actuator",
-  storeSkus: [],
+  storeSkus: ["VLT-12186802913382"],
   tags: ["servo", "sg90", "motor", "angle", "arm", "pwm", "flap", "latch", "lock", "feeder", "robot", "gripper", "pointer", "door", "5v", "actuator", "movement"],
   dims: { x: 32.5, y: 12.2, z: 29.8 },
   model: { kind: "procedural", builder: "servo", params: {} },

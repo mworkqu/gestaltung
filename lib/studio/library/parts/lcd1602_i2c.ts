@@ -11,7 +11,7 @@ export const lcd1602I2c: LibraryPart = {
     ar: "شاشة كلاسيكية مضاءة تعرض سطرين من 16 حرفاً أو رقماً.",
   },
   category: "display",
-  storeSkus: [],
+  storeSkus: ["VLT-12179048038502"],
   tags: ["display", "screen", "lcd", "lcd1602", "1602", "16x2", "text", "characters", "i2c", "backlight", "monitor", "readout", "5v", "menu", "status"],
   dims: { x: 80, y: 36, z: 12.2 },
   model: { kind: "procedural", builder: "lcdModule", params: { backH: 4.2 } },

@@ -9,7 +9,7 @@ export const led5mm: LibraryPart = {
     ar: "ضوء صغير يوضّح ما يفعله منتجك.",
   },
   category: "output",
-  storeSkus: [],
+  storeSkus: ["VLT-12363645747302"],
   tags: ["led", "light", "indicator", "status", "lamp", "glow", "signal", "blink", "output"],
   dims: { x: 5.8, y: 5.8, z: 14.5 },
   model: { kind: "procedural", builder: "led", params: { colour: "#ff3b30" } },

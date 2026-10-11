@@ -10,7 +10,7 @@ export const ldrModule: LibraryPart = {
     ar: "تخبر منتجك إن كان المكان مضيئاً أو مظلماً، كمستوى أو كإجابة نعم/لا.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-31509205942374"],
   tags: ["light", "ldr", "photoresistor", "photocell", "dark", "bright", "night", "analog", "lm393", "dusk", "streetlight", "sensor", "brightness", "daylight"],
   dims: { x: 32, y: 14, z: 11 },
   model: {

@@ -20,7 +20,7 @@ export const arduinoUno: LibraryPart = {
     ar: "لوحة سهلة للمبتدئين تقرأ الحسّاسات وتشغّل الأشياء وتطفئها.",
   },
   category: "mcu",
-  storeSkus: [],
+  storeSkus: ["VLT-39705290276966"],
   tags: ["arduino", "uno", "atmega328", "microcontroller", "brain", "controller", "beginner", "5v", "prototype", "learning"],
   dims: { x: 68.6, y: 53.3, z: 12.5 },
   model: {

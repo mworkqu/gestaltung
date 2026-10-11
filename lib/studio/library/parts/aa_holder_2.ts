@@ -10,7 +10,7 @@ export const aaHolder2: LibraryPart = {
     ar: "يحمل بطاريتين AA عاديتين لتشغيل منتجك دون وصلة كهرباء.",
   },
   category: "power",
-  storeSkus: [],
+  storeSkus: ["VLT-39658425679974"],
   tags: ["battery", "aa", "alkaline", "holder", "cordless", "portable", "power", "3v", "disposable", "toy", "remote", "low-power"],
   dims: { x: 58, y: 32, z: 15.5 },
   model: { kind: "procedural", builder: "aaHolder", params: {} },

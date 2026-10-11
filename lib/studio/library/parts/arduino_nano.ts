@@ -45,7 +45,7 @@ export const arduinoNano: LibraryPart = {
     ar: "لوحة صغيرة سهلة للمبتدئين تقرأ الحسّاسات وتشغّل الأشياء وتطفئها.",
   },
   category: "mcu",
-  storeSkus: [],
+  storeSkus: ["VLT-39398727876710"],
   tags: ["arduino", "nano", "atmega328", "microcontroller", "brain", "controller", "beginner", "5v", "prototype", "learning", "small", "compact", "breadboard"],
   dims: { x: 43.2, y: 17.8, z: 9 },
   model: {

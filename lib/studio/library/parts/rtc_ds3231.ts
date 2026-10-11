@@ -10,7 +10,7 @@ export const rtcDs3231: LibraryPart = {
     ar: "تتذكّر التاريخ والوقت بدقة حتى عند إطفاء منتجك.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-12191884935270"],
   tags: ["clock", "rtc", "ds3231", "time", "date", "timer", "schedule", "alarm", "i2c", "logger", "datalogger", "timestamp", "coin-cell", "calendar"],
   dims: { x: 38, y: 22, z: 11 },
   model: {

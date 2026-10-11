@@ -10,7 +10,7 @@ export const usbcBreakout: LibraryPart = {
     ar: "لوحة صغيرة بمقبس USB-C لتوصيل كابل بمنتجك.",
   },
   category: "connector",
-  storeSkus: [],
+  storeSkus: ["VLT-39687267778662"],
   tags: ["usb-c", "usbc", "usb", "socket", "connector", "breakout", "port", "plug", "power-in", "charging", "cable", "input"],
   dims: { x: 16, y: 12, z: 4.4 },
   model: {

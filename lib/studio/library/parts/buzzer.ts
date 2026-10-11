@@ -10,7 +10,7 @@ export const buzzer: LibraryPart = {
     ar: "تُصدر صفيراً لجذب الانتباه، مثل المنبّه أو نقرة الزر.",
   },
   category: "output",
-  storeSkus: [],
+  storeSkus: ["VLT-39533592674406"],
   tags: ["buzzer", "beeper", "alarm", "alert", "sound", "beep", "piezo", "active", "notification", "warning", "pwm", "timer", "doorbell", "output"],
   dims: { x: 12.2, y: 12.2, z: 14.7 },
   model: { kind: "procedural", builder: "buzzer", params: {} },

@@ -48,7 +48,7 @@ export const esp32Devkit: LibraryPart = {
     ar: "حاسوب صغير ينفّذ برنامجك ويتصل بالواي فاي والبلوتوث.",
   },
   category: "mcu",
-  storeSkus: [],
+  storeSkus: ["VLT-39404697223270"],
   tags: ["esp32", "wifi", "bluetooth", "ble", "microcontroller", "brain", "controller", "iot", "smart", "wireless", "devkit", "3.3v"],
   dims: { x: 51.5, y: 28.5, z: 10 },
   model: {

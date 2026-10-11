@@ -12,7 +12,7 @@ export const relayModule: LibraryPart = {
     ar: "تتيح للوحة صغيرة تشغيل وإطفاء حمل أكبر بأمان، مثل المصباح أو المضخة أو السخّان.",
   },
   category: "actuator",
-  storeSkus: [],
+  storeSkus: ["VLT-12339538559078"],
   tags: ["relay", "module", "driver", "relay_module", "switch", "mains", "high-power", "lamp", "light", "pump", "heater", "fan", "appliance", "on-off", "230v", "5v", "actuator", "smart-plug", "irrigation", "valve"],
   dims: { x: 50.5, y: 26, z: 17.1 },
   model: {

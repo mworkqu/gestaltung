@@ -11,7 +11,7 @@ export const levelShifter4ch: LibraryPart = {
     ar: "يتيح لقطعة 5 فولت ولوحة 3.3 فولت التخاطب دون تلف.",
   },
   category: "connector",
-  storeSkus: [],
+  storeSkus: ["VLT-12179093618790"],
   tags: ["level_shifter", "level-shifter", "shifter", "logic-level", "converter", "voltage", "translator", "bss138", "3.3v", "5v", "bidirectional", "i2c", "protection"],
   dims: { x: 16, y: 13, z: 8.5 },
   model: {

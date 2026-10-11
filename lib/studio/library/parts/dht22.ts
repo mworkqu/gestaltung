@@ -10,7 +10,7 @@ export const dht22: LibraryPart = {
     ar: "يقيس درجة حرارة الهواء ونسبة رطوبته.",
   },
   category: "sensor",
-  storeSkus: [],
+  storeSkus: ["VLT-12177957683302"],
   tags: ["temperature", "humidity", "dht22", "am2302", "climate", "weather", "air", "thermometer", "room", "greenhouse", "sensor"],
   dims: { x: 7.7, y: 30, z: 15.1 },
   model: { kind: "procedural", builder: "dht22", params: {} },

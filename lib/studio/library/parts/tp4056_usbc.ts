@@ -9,7 +9,7 @@ export const tp4056Usbc: LibraryPart = {
     ar: "تشحن البطارية بأمان من أي كابل USB-C.",
   },
   category: "power",
-  storeSkus: [],
+  storeSkus: ["VLT-30570301948006"],
   tags: ["charger", "tp4056", "usb-c", "usbc", "battery", "charging", "li-ion", "lithium", "protection", "rechargeable"],
   dims: { x: 26, y: 17, z: 4.4 },
   model: { kind: "procedural", builder: "chargerBoard", params: {} },

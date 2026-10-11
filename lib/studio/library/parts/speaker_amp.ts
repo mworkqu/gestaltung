@@ -10,7 +10,7 @@ export const speakerAmp: LibraryPart = {
     ar: "تشغّل نغمات وأصواتاً بسيطة بصوت يُسمع في أرجاء الغرفة.",
   },
   category: "output",
-  storeSkus: [],
+  storeSkus: ["VLT-32066932539494", "VLT-31976493678694"],
   tags: ["speaker", "amplifier", "amp", "audio", "sound", "music", "voice", "tone", "pam8403", "pwm", "melody", "alarm", "announce", "output", "loud"],
   dims: { x: 50, y: 28, z: 7.5 },
   model: { kind: "procedural", builder: "speakerAmp", params: { spkR: 14 } },

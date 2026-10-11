@@ -151,7 +151,9 @@ describe("library", () => {
       expect(/[؀-ۿ]/.test(p.name.ar), `${p.id} name.ar`).toBe(true);
       expect(/[؀-ۿ]/.test(p.blurb.ar), `${p.id} blurb.ar`).toBe(true);
       expect(p.blurb.en.length).toBeGreaterThan(10);
-      expect(p.storeSkus).toEqual([]);
+      // Linked by hand (docs/STUDIO_SKU_LINKS.md): only real store SKUs, no duplicates.
+      for (const sku of p.storeSkus) expect(sku, `${p.id} sku`).toMatch(/^(VLT|DK|MS)-[A-Za-z0-9]+$/);
+      expect(new Set(p.storeSkus).size, `${p.id} duplicate skus`).toBe(p.storeSkus.length);
     }
   });
 
