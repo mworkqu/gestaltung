@@ -16,8 +16,8 @@ import {
   pinOffer,
   saveOffer,
   setPricingMode,
-  type OfferInput,
 } from "@/app/[locale]/dashboard/store/sourcing/actions";
+import type { OfferInput } from "@/lib/store/offer-clean";
 import {
   AVAILABILITIES,
   type PartSourcing,

@@ -12,6 +12,7 @@ import { Check, ClipboardCopy, Download, Loader2, PackageCheck, Plus } from "luc
 
 import { markBought } from "@/app/[locale]/dashboard/store/stock/actions";
 import { Link } from "@/i18n/navigation";
+import { useEditHref } from "@/components/admin/use-edit-href";
 import { buildOrderGroups, groupsCsv, whatsappText, type Interest, type StockItem } from "@/lib/admin/stock-lists";
 import { formatPrice } from "@/lib/parts/format";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
@@ -33,6 +34,7 @@ export function StockListsView({
 }) {
   const t = useTranslations("AdminStock");
   const router = useRouter();
+  const edit = useEditHref();
   const [pending, start] = useTransition();
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [copied, setCopied] = useState<string | null>(null);
@@ -128,11 +130,11 @@ export function StockListsView({
   const row = (it: StockItem, withAction: boolean) => {
     const on = picked[it.part.id] !== undefined;
     return (
-      <li key={it.part.id} className={cn("neu-inset rounded-xl p-3", on && "ring-2 ring-cobalt/40")}>
+      <li key={it.part.id} id={`stock-${it.part.id}`} className={cn("neu-inset rounded-xl p-3", on && "ring-2 ring-cobalt/40")}>
         <div className="flex items-start gap-3">
           {photo(it)}
           <div className="min-w-0 flex-1">
-            <Link href={`/dashboard/store/${it.part.id}/edit`} className="block break-words text-sm font-semibold text-heading hover:text-cobalt">
+            <Link href={edit(it.part.id, `stock-${it.part.id}`)} className="block break-words text-sm font-semibold text-heading hover:text-cobalt">
               {it.part.name}
             </Link>
             <ul className="mt-1 space-y-0.5 text-xs text-mutedtext">

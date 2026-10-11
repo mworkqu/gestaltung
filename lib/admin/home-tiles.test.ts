@@ -74,6 +74,12 @@ describe("Fix", () => {
     expect(fixIssues({ ...ok, unit_price: null })).toEqual(["price"]);
     expect(fixIssues({ ...ok, hasSupplier: false, lead_time_class: null })).toEqual(["supplier", "delivery"]);
   });
+  it("on request (D1) stops asking for a supplier and a date, not for a photo or price", () => {
+    const onRequest = { ...ok, hasSupplier: false, lead_time_class: null, onRequest: true };
+    expect(fixIssues(onRequest)).toEqual([]);
+    expect(fixIssues({ ...onRequest, image_url: null, unit_price: 0 })).toEqual(["photo", "price"]);
+    expect(countFix([onRequest])).toBe(0);
+  });
   it("counts live products only", () => {
     const broken = { ...ok, lead_time_class: null };
     expect(
