@@ -31,6 +31,76 @@ export const POWER_PARTS: Record<ProductSpec["power"], readonly string[]> = {
   mains_adapter: [],
 };
 
+/** Battery sources (a cell or pack that powers the product). Chargers/converters are not sources. */
+const BATTERY_IDS = new Set(["cell_18650", "lipo_1000", "aa_holder_2"]);
+const NOT_A_CELL = ["charger", "converter", "regulator", "boost", "buck", "step-up", "stepdown"];
+/** Wall / USB supply boards that are a power source in their own right. */
+const SUPPLY_IDS = new Set(["usbc_power_5v"]);
+/** Li-ion charger: only makes sense with a rechargeable cell. */
+const CHARGER_IDS = new Set(["tp4056_usbc"]);
+/** Alkaline holders must not get a Li-ion charger. */
+const ALKALINE_IDS = new Set(["aa_holder_2"]);
+const BACKUP_RE = /\b(back-?up|redundan\w*|spare|fail-?over|second battery|two batteries|dual power)\b/i;
+
+export function isBatteryCell(e: Pick<PickIndexEntry, "id" | "category" | "tags"> | undefined): boolean {
+  if (!e || e.category !== "power") return false;
+  if (BATTERY_IDS.has(e.id)) return true;
+  const tags = e.tags ?? [];
+  return tags.includes("battery") && !NOT_A_CELL.some((t) => tags.includes(t));
+}
+
+/** Does the spec explicitly ask for a backup / second power source? */
+export function specWantsBackupPower(spec: ProductSpec): boolean {
+  return BACKUP_RE.test([spec.name, spec.oneLine, ...spec.features].join(" . "));
+}
+
+/**
+ * One power source, deterministically. Several batteries → keep one (the one
+ * POWER_PARTS names for the spec, else the first); a battery next to a wall
+ * supply board → keep what the spec's power asks for; a charger without a
+ * rechargeable cell goes. Unless the spec asks for a backup. Pure; every
+ * removal is logged.
+ */
+export function enforceSinglePower<T extends { partId: string }>(
+  list: T[],
+  opts: { spec: ProductSpec; byId: ReadonlyMap<string, PickIndexEntry>; log: ClampLog },
+): T[] {
+  const { spec, byId, log } = opts;
+  if (specWantsBackupPower(spec)) return list;
+  let out = list;
+  const drop = (items: T[], why: string, keep: string | null) => {
+    for (const p of items) log.push({ path: `components.power.${why}`, from: p.partId, to: keep });
+    out = out.filter((p) => !items.includes(p));
+  };
+  const cells = () => out.filter((p) => isBatteryCell(byId.get(p.partId)));
+  const supplies = () => out.filter((p) => SUPPLY_IDS.has(p.partId));
+
+  // Mains / USB products carry no battery; battery products carry no supply board.
+  if (cells().length && supplies().length) {
+    if (spec.power === "usb" || spec.power === "mains_adapter") drop(cells(), "battery_vs_supply", supplies()[0].partId);
+    else drop(supplies(), "supply_vs_battery", cells()[0].partId);
+  }
+
+  // Several batteries → one.
+  const c = cells();
+  if (c.length > 1) {
+    const preferred = POWER_PARTS[spec.power].find((id) => c.some((p) => p.partId === id));
+    const keep = c.find((p) => p.partId === preferred) ?? c[0];
+    drop(c.filter((p) => p !== keep), "duplicate_battery", keep.partId);
+  }
+  // Several supply boards → one.
+  const sup = supplies();
+  if (sup.length > 1) drop(sup.slice(1), "duplicate_supply", sup[0].partId);
+
+  // A charger needs a rechargeable cell (not alkaline, not nothing).
+  const kept = cells();
+  const chargers = out.filter((p) => CHARGER_IDS.has(p.partId));
+  if (chargers.length && !kept.some((p) => !ALKALINE_IDS.has(p.partId))) {
+    drop(chargers, "charger_without_cell", kept[0]?.partId ?? null);
+  }
+  return out;
+}
+
 /** Optional localized display name (e.g. getPart(id)?.name[locale]). */
 export type NameFor = (id: string, locale: "en" | "ar") => string | undefined;
 
@@ -89,15 +159,22 @@ export function enforcePick(
   const mcuIdx = list.findIndex(isMcu);
   if (mcuIdx > 0) list.unshift(...list.splice(mcuIdx, 1));
 
+  // Two batteries / a battery plus a wall supply: one power source.
+  list = enforceSinglePower(list, { spec: opts.spec, byId, log });
+
   // Power parts spec.power needs.
   const power: Pending[] = [];
   for (const id of POWER_PARTS[opts.spec.power]) {
     const entry = byId.get(id);
     if (!entry || list.some((p) => p.partId === id)) continue;
+    // A cell the model already chose stands in for the default cell.
+    if (isBatteryCell(entry) && list.some((p) => isBatteryCell(byId.get(p.partId)))) continue;
     power.push({ partId: id, label: name(entry) });
     log.push({ path: "components.power", from: null, to: id });
   }
   if (power.length) list.splice(list.length && isMcu(list[0]) ? 1 : 0, 0, ...power);
+  // Added parts can again pair a charger with the wrong cell, or a cell with a supply.
+  list = enforceSinglePower(list, { spec: opts.spec, byId, log });
 
   if (list.length > MAX_COMPONENTS) {
     log.push({ path: "components", from: list.length, to: MAX_COMPONENTS });

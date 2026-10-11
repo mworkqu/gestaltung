@@ -237,7 +237,7 @@ export function liveStudioApi(projectId: string): StudioApi {
       if (!wanted.length) return out;
       const { data } = await (await db())
         .from("parts")
-        .select(STORE_CARD_COLUMNS)
+        .select(`${STORE_CARD_COLUMNS}, images`)
         .in("sku", wanted)
         .eq("is_published", true)
         .is("merged_into", null);
