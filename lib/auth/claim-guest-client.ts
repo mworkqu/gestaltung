@@ -101,6 +101,33 @@ export async function claimGuestWork(token: string): Promise<boolean> {
   return ok;
 }
 
+/** How long sign-in waits for the claim before it moves on (W8). The claim keeps running. */
+export const CLAIM_WAIT_MS = 2_500;
+
+/**
+ * Same as claimGuestWork, but sign-in never waits longer than `ms`. When the claim is slow the
+ * visitor is let through with the usual "Try again" notice showing (kept as pending); the
+ * request itself carries on and clears the notice when it lands, calling `onLateDone` so the
+ * page can show the account's data. true = done within the wait.
+ */
+export async function claimGuestWorkBounded(
+  token: string,
+  opts: { ms?: number; onLateDone?: () => void } = {},
+): Promise<boolean> {
+  let late = false;
+  const work = claimGuestWork(token).then((ok) => {
+    if (late && ok) opts.onLateDone?.();
+    return ok;
+  });
+  const slow = new Promise<"slow">((resolve) => setTimeout(() => resolve("slow"), opts.ms ?? CLAIM_WAIT_MS));
+  const first = await Promise.race([work, slow]);
+  if (first !== "slow") return first;
+  late = true;
+  remember(token);
+  announce("pending");
+  return false;
+}
+
 /** "Try again" for a pending claim. true = done (or nothing was pending). */
 export async function retryPendingClaim(): Promise<boolean> {
   const token = pendingClaimToken();

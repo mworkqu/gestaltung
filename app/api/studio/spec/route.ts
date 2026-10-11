@@ -1,3 +1,4 @@
+import { specCache } from "@/lib/studio/ai/cache";
 import { runSpecChat, cleanMessages, IDEA_MAX } from "@/lib/studio/ai/spec";
 import { callErrorStatus, SpecBody } from "@/lib/studio/server/http";
 import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context";
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
     messages: cleanMessages(body.messages),
     locale: body.locale,
     current: body.current,
+    cache: specCache, // W8: the same chat + card is not asked twice
   });
   if (!r.ok) return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });
   logClamp("spec", project.id, r.clampLog, r.source, r.problems);

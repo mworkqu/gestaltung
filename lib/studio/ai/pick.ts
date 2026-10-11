@@ -8,6 +8,7 @@
 
 import type { ClampLog, ProductSpec, StudioComponent } from "../schema";
 import { LABEL_MAX, MAX_COMPONENTS, PICK_RESPONSE_SCHEMA, PICK_SYSTEM, REASON_MAX, pickPrompt } from "./prompts";
+import { outcomeCached, pickKey, type AiCache } from "./cache";
 import { cut, isObj, type Outcome, type StudioCall } from "./types";
 
 /** What libraryIndexForAI() gives the model (only id + category are relied on here). */
@@ -241,6 +242,18 @@ export function validatePick(
 }
 
 export async function runPick(opts: {
+  call: StudioCall;
+  spec: ProductSpec;
+  index: readonly PickIndexEntry[];
+  locale: "en" | "ar";
+  nameFor?: NameFor;
+  /** W8: the same spec (and language, and library) is answered without a model call. */
+  cache?: AiCache | null;
+}): Promise<Outcome<Picked>> {
+  return outcomeCached(opts.cache, pickKey(opts), () => pickWithModel(opts));
+}
+
+async function pickWithModel(opts: {
   call: StudioCall;
   spec: ProductSpec;
   index: readonly PickIndexEntry[];

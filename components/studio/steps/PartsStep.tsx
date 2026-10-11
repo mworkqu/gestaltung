@@ -41,6 +41,8 @@ import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
 import { Bar, linkCls, MainButton, Problem, Sheet, StepFrame } from "../ui";
 import { productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
+import { usePickProgress } from "../use-pick-progress";
+import { PICK_STAGES } from "@/lib/studio/client/progress";
 import { problemKey } from "./problem";
 
 const accent = STEP_ACCENT.parts;
@@ -235,6 +237,7 @@ export function PartsStep({
   const sel = doc.components.find((c) => c.instanceId === selected);
   const selPart = sel ? getPart(sel.partId) : undefined;
   const loading = busy && doc.components.length === 0;
+  const step = usePickProgress(loading);
   const addableCats = CATEGORIES.filter((c) => partsByCategory(c).length > 0);
 
   return (
@@ -306,8 +309,9 @@ export function PartsStep({
                   </div>
                 </div>
               ))}
-              <p className="text-sm font-medium" style={{ color: accent.ink }}>
-                {t("partsLoading")}
+              <p className="text-sm font-medium" style={{ color: accent.ink }} data-testid="studio-parts-progress" data-step={step}>
+                {t("partsProgress", { n: step, total: PICK_STAGES })}
+                <span className="block text-[13px] font-normal text-body">{t(`partsStage_${step}`)}</span>
               </p>
             </div>
           ) : (
