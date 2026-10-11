@@ -3591,6 +3591,17 @@
     "noOthers": "لا توجد بدائل لهذه القطعة بعد.",
     "addedForYou": "أضفناها لك",
     "sourceIt": "سنوفّرها لك",
+    "partsPopover": {
+      "open": "عرض تفاصيل {name}",
+      "inStock": "متوفرة في لوسيل",
+      "sourceTime": "سنوفّرها لك، خلال حوالي {time}",
+      "sourceNoTime": "سنوفّرها لك ونؤكد لك الموعد",
+      "time_in_stock": "يومين",
+      "time_3_5_days": "3 إلى 5 أيام",
+      "time_1_2_weeks": "أسبوع إلى أسبوعين",
+      "time_2_4_weeks": "2 إلى 4 أسابيع",
+      "noPrice": "يُؤكَّد السعر في عرضك"
+    },
     "partsTotal": "مجموع القطع",
     "addAllToCart": "أضف الكل إلى السلة",
     "addingToCart": "جارٍ الإضافة…",

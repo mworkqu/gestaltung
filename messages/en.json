@@ -3591,6 +3591,17 @@
     "noOthers": "No other options for this one yet.",
     "addedForYou": "Added for you",
     "sourceIt": "We'll source this",
+    "partsPopover": {
+      "open": "Show details for {name}",
+      "inStock": "In stock in Lusail",
+      "sourceTime": "We'll source this, about {time}",
+      "sourceNoTime": "We'll source this and confirm the time",
+      "time_in_stock": "2 days",
+      "time_3_5_days": "3 to 5 days",
+      "time_1_2_weeks": "1 to 2 weeks",
+      "time_2_4_weeks": "2 to 4 weeks",
+      "noPrice": "Price confirmed in your quote"
+    },
     "partsTotal": "Parts total",
     "addAllToCart": "Add all to cart",
     "addingToCart": "Adding…",

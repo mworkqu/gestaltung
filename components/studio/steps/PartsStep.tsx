@@ -34,6 +34,7 @@ import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
+import { popoverPhoto, stockLine } from "@/lib/studio/part-photo";
 import { CATEGORIES, type Category, type LibraryPart, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import { nextInstanceId } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,62 @@ function PartTile({ part, product, size = 56 }: { part: LibraryPart | undefined;
   );
 }
 
+/** Hover (mouse) / tap / keyboard popover: store photo (else the icon), name, purpose, price, stock. */
+function PartPopover({
+  id,
+  part,
+  product,
+  name,
+  purpose,
+  locale,
+}: {
+  id: string;
+  part: LibraryPart | undefined;
+  product: StoreCardPart | null;
+  name: string;
+  purpose: string;
+  locale: "en" | "ar";
+}) {
+  const t = useTranslations("Studio.partsPopover");
+  const photo = popoverPhoto(product as Parameters<typeof popoverPhoto>[0], 280);
+  const Icon = part ? CATEGORY_ICON[part.category] : Cpu;
+  const stock = stockLine(product);
+  const price = product ? formatPrice(Number(product.unit_price ?? 0) * Math.max(1, product.min_order_qty ?? 1), locale) : null;
+  return (
+    <div
+      id={id}
+      role="group"
+      aria-label={name}
+      className="tile absolute start-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-3rem))] space-y-2 p-3 text-start shadow-neu motion-safe:animate-rise"
+    >
+      <div className="grid h-36 place-items-center overflow-hidden rounded-xl" style={{ background: photo ? "#fff" : accent.soft }}>
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photo} alt="" width={280} height={144} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+        ) : (
+          <Icon className="h-12 w-12" style={{ color: accent.ink }} strokeWidth={1.25} aria-hidden />
+        )}
+      </div>
+      <p className="text-sm font-bold text-heading">{name}</p>
+      {purpose && <p className="text-[13px] leading-snug text-body">{purpose}</p>}
+      <p className="text-[13px] font-semibold" style={{ color: accent.ink }}>
+        {price ?? <span className="text-mutedtext">{t("noPrice")}</span>}
+      </p>
+      <p className="flex items-center gap-1.5 text-[13px] text-body">
+        <span
+          className={cn("inline-block h-2 w-2 shrink-0 rounded-full", stock.kind === "in_stock" ? "bg-emerald-500" : "bg-amber-400")}
+          aria-hidden
+        />
+        {stock.kind === "in_stock"
+          ? t("inStock")
+          : stock.cls
+            ? t("sourceTime", { time: t(`time_${stock.cls}`) })
+            : t("sourceNoTime")}
+      </p>
+    </div>
+  );
+}
+
 export function PartsStep({
   ctx,
   doc,
@@ -107,6 +164,8 @@ export function PartsStep({
   const [swapFor, setSwapFor] = useState<StudioComponent | null>(null);
   const [adding, setAdding] = useState(false);
   const [addCat, setAddCat] = useState<Category>("sensor");
+  const [popFor, setPopFor] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const started = useRef(false);
   const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
 
@@ -129,6 +188,23 @@ export function PartsStep({
     void pick();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on entry
   }, []);
+
+  // Popover closes on Esc and on a press outside the list.
+  useEffect(() => {
+    if (!popFor) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPopFor(null);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (!listRef.current?.contains(e.target as Node)) setPopFor(null);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [popFor]);
 
   const edit = (next: StudioComponent[]) => onComponents(next.filter((c) => !c.auto), null, true);
 
@@ -235,7 +311,7 @@ export function PartsStep({
               </p>
             </div>
           ) : (
-            <ul className="space-y-2.5" data-testid="studio-parts-list">
+            <ul ref={listRef} className="space-y-2.5" data-testid="studio-parts-list">
               {doc.components.map((c) => {
                 const part = getPart(c.partId);
                 const product = productFor(c.partId, products, getPart);
@@ -243,16 +319,51 @@ export function PartsStep({
                 return (
                   <li
                     key={c.instanceId}
-                    className={cn("tile flex items-start gap-3 p-3 transition-[box-shadow,border-color]", isSel && "ring-2")}
-                    style={isSel ? ({ "--tw-ring-color": accent.base } as React.CSSProperties) : undefined}
+                    className={cn(
+                      "tile relative flex items-start gap-3 p-3 transition-[box-shadow,border-color] motion-safe:transition-[box-shadow,border-color,transform]",
+                      "hover:ring-1 motion-safe:hover:-translate-y-0.5 hover:shadow-neu",
+                      isSel && "ring-2 shadow-neu motion-safe:-translate-y-0.5",
+                      popFor === c.instanceId && "z-20",
+                    )}
+                    style={{ "--tw-ring-color": accent.base } as React.CSSProperties}
+                    onPointerEnter={(e) => e.pointerType === "mouse" && setPopFor(c.instanceId)}
+                    onPointerLeave={(e) => e.pointerType === "mouse" && setPopFor((p) => (p === c.instanceId ? null : p))}
+                    data-testid="studio-part-row"
+                    data-selected={isSel ? "true" : undefined}
                   >
+                    <button
+                      type="button"
+                      onClick={(e) =>
+                        // Mouse: hover already opened it, keep it. Tap / keyboard: toggle.
+                        (e.nativeEvent as PointerEvent).pointerType === "mouse"
+                          ? setPopFor(c.instanceId)
+                          : setPopFor(popFor === c.instanceId ? null : c.instanceId)
+                      }
+                      className="shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2"
+                      style={{ "--tw-ring-color": accent.base } as React.CSSProperties}
+                      aria-expanded={popFor === c.instanceId}
+                      aria-controls={`part-pop-${c.instanceId}`}
+                      aria-label={t("partsPopover.open", { name: part?.name[locale] ?? c.label })}
+                      data-testid="studio-part-info"
+                    >
+                      <PartTile part={part} product={product} />
+                    </button>
+                    {popFor === c.instanceId && (
+                      <PartPopover
+                        id={`part-pop-${c.instanceId}`}
+                        part={part}
+                        product={product}
+                        name={product ? partName(product, locale) : part?.name[locale] ?? c.label}
+                        purpose={c.reason || part?.blurb[locale] || ""}
+                        locale={locale}
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => setSelected(isSel ? null : c.instanceId)}
                       className="flex min-w-0 flex-1 items-start gap-3 text-start"
                       aria-pressed={isSel}
                     >
-                      <PartTile part={part} product={product} />
                       <span className="min-w-0 space-y-0.5">
                         <span className="block text-sm font-bold text-heading">
                           {product ? partName(product, locale) : part?.name[locale] ?? c.label}
