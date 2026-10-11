@@ -128,7 +128,7 @@ for (const locale of LOCALES) {
     expect(await page.getByTestId("studio-request-printed").locator("li").count()).toBeGreaterThanOrEqual(2);
     const estimate = page.getByTestId("studio-request-estimate");
     await expect(estimate).toContainText(msg(locale, "StudioRequest", "estimateLabel"));
-    await expect(estimate).toContainText(/d{3}/);
+    await expect(estimate).toContainText(/[0-9٠-٩]{3}/);
     await expect(estimate).toContainText(/1[,٬]?200/);
     await expect(quote.getByRole("link", { name: msg(locale, "StudioRequest", "myProjects") })).toHaveAttribute("href", `/${locale}/projects`);
     await expectNoHorizontalOverflow(page);
