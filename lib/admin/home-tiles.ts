@@ -58,6 +58,8 @@ export type FixPart = {
   lead_time_class?: string | null;
   /** True when the product has at least one supplier offer (active or not). */
   hasSupplier: boolean;
+  /** The owner marked it "on request" in the Fix list (D1): supplier + delivery are not asked for. */
+  onRequest?: boolean;
 };
 
 function hasPhoto(p: FixPart): boolean {
@@ -71,6 +73,7 @@ export function fixIssues(p: FixPart): FixIssue[] {
   if (!hasPhoto(p)) issues.push("photo");
   const price = Number(p.unit_price);
   if (!Number.isFinite(price) || price <= 0) issues.push("price");
+  if (p.onRequest) return issues;
   if (!p.hasSupplier) issues.push("supplier");
   if (!p.lead_time_class) issues.push("delivery");
   return issues;

@@ -12,6 +12,7 @@ import { StockBadge } from "@/components/parts/stock-badge";
 import { PublishedToggle } from "@/components/parts/published-toggle";
 import { DeletePartButton } from "@/components/parts/delete-part-button";
 import { cn } from "@/lib/utils";
+import { editHref, listUrl } from "@/lib/admin/return-to";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ export default async function PartsCatalogManager({
   const { category, stock, published, merged, review } = await searchParams;
   const showMerged = merged === "1";
   const reviewOnly = review === "1";
+  // D1: edit links carry this list's URL (filters + row anchor) as returnTo.
+  const listQuery = { category, stock, published, merged, review };
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
@@ -182,6 +185,7 @@ export default async function PartsCatalogManager({
               {parts.map((p) => (
                 <tr
                   key={p.id}
+                  id={`part-${p.id}`}
                   className="border-b border-borderstrong/40 last:border-0 hover:bg-panel/50"
                 >
                   <td className="px-4 py-3 font-mono text-xs text-mutedtext">{p.sku}</td>
@@ -240,7 +244,7 @@ export default async function PartsCatalogManager({
                         aria-label={t("edit")}
                         className="h-8 w-8 text-mutedtext hover:text-cobalt"
                       >
-                        <Link href={`/dashboard/store/${p.id}/edit`}>
+                        <Link href={editHref(p.id, listUrl(locale, "/dashboard/store", listQuery, `part-${p.id}`))}>
                           <Pencil className="h-4 w-4" />
                         </Link>
                       </Button>

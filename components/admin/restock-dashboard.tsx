@@ -12,6 +12,7 @@ import { Check, Download, Loader2, PackageCheck, Save } from "lucide-react";
 
 import { markReceived, saveRestockWeights, saveSupplierMinimum } from "@/app/[locale]/dashboard/store/restock/actions";
 import { Link } from "@/i18n/navigation";
+import { useEditHref } from "@/components/admin/use-edit-href";
 import { formatPrice } from "@/lib/parts/format";
 import { draftCsv, groupDraft, orderQty, type RestockRow, type RestockWeights } from "@/lib/store/restock";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ export function RestockDashboard({
   const t = useTranslations("Restock");
   const tD = useTranslations("Delivery");
   const router = useRouter();
+  const edit = useEditHref();
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [receiving, setReceiving] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -94,12 +96,12 @@ export function RestockDashboard({
                 {rows.map((r) => {
                   const on = picked[r.partId] !== undefined;
                   return (
-                    <tr key={r.partId} className={cn("border-t border-borderstrong/40 align-top", on && "bg-cobalt/5")}>
+                    <tr key={r.partId} id={`restock-${r.partId}`} className={cn("border-t border-borderstrong/40 align-top", on && "bg-cobalt/5")}>
                       <td className="px-2 py-2">
                         <input type="checkbox" checked={on} onChange={() => toggle(r)} aria-label={t("addToDraft")} />
                       </td>
                       <td className="px-2 py-2">
-                        <Link href={`/dashboard/store/${r.partId}/edit`} className="font-medium text-heading hover:text-cobalt">
+                        <Link href={edit(r.partId, `restock-${r.partId}`)} className="font-medium text-heading hover:text-cobalt">
                           {r.name}
                         </Link>
                         <span className="block font-mono text-[10.5px] text-faint">{r.sku}</span>

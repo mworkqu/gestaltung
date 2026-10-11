@@ -12,6 +12,7 @@ import { parseSheet, type ExistingPart, type SkippedRow } from "@/lib/parts/shee
 import type { StockStatus } from "@/lib/supabase/types";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { isStoreCategory, type StoreCategory } from "@/lib/store/store-categories";
+import { returnToOrCatalog } from "@/lib/admin/return-to";
 
 export type PartFormState = { error?: string };
 
@@ -128,7 +129,7 @@ export async function createPart(
 
   revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
-  redirect(`/${locale}/dashboard/store`);
+  redirect(returnToOrCatalog(formData.get("returnTo"), locale));
 }
 
 export async function updatePart(
@@ -158,7 +159,9 @@ export async function updatePart(
 
   revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
-  redirect(`/${locale}/dashboard/store`);
+  revalidatePath(`/${locale}/dashboard/store/fix`);
+  // D1: back to the list the owner came from (validated), else the catalog.
+  redirect(returnToOrCatalog(formData.get("returnTo"), locale));
 }
 
 // Deleting a product also deletes the duplicates merged into it (0030,

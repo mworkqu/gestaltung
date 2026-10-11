@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
-import { AVAILABILITIES, PRICING_MODES, type Availability, type PricingMode } from "@/lib/store/sourcing";
+import { PRICING_MODES, type PricingMode } from "@/lib/store/sourcing";
+import { cleanOffer, offerNum, offerText, type OfferInput } from "@/lib/store/offer-clean";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { HOLIDAYS_KEY, isIsoDate, parseHolidays } from "@/lib/store/working-days";
 
@@ -24,51 +25,9 @@ function revalidate(locale: string, partId?: string) {
   if (partId) revalidatePath(`/${locale}/dashboard/store/${partId}/edit`);
 }
 
-const num = (v: unknown) => {
-  if (v === "" || v === null || v === undefined) return null;
-  const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? n : null;
-};
-const int1 = (v: unknown) => Math.max(1, Math.trunc(Number(v)) || 1);
-const text = (v: unknown) => {
-  const s = String(v ?? "").trim();
-  return s === "" ? null : s;
-};
-
-export type OfferInput = {
-  supplier_id: string;
-  supplier_sku?: string;
-  supplier_url?: string;
-  cost?: number | string | null;
-  retail_price?: number | string | null;
-  currency?: string;
-  pack_size?: number | string;
-  moq?: number | string;
-  availability?: string;
-  lead_time_days?: number | string | null;
-  active?: boolean;
-};
-
-function cleanOffer(o: OfferInput) {
-  const url = text(o.supplier_url);
-  const lead = num(o.lead_time_days);
-  return {
-    supplier_id: o.supplier_id,
-    supplier_sku: text(o.supplier_sku),
-    supplier_url: url && /^https?:\/\//i.test(url) ? url : null,
-    cost: num(o.cost),
-    retail_price: num(o.retail_price),
-    currency: (text(o.currency) ?? "USD").toUpperCase().slice(0, 3),
-    pack_size: int1(o.pack_size),
-    moq: int1(o.moq),
-    availability: ((AVAILABILITIES as readonly string[]).includes(String(o.availability))
-      ? o.availability
-      : "unknown") as Availability,
-    lead_time_days: lead === null ? null : Math.trunc(lead),
-    active: o.active !== false,
-    last_checked_at: new Date().toISOString(),
-  };
-}
+// The offer cleaning is shared with the Fix list (lib/store/offer-clean.ts).
+const num = offerNum;
+const text = offerText;
 
 export async function saveOffer(locale: string, partId: string, offerId: string | null, input: OfferInput) {
   await requireAdmin();
