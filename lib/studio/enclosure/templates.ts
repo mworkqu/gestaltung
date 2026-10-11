@@ -4,14 +4,18 @@
 // geometry, the cut-outs and the tests all agree on one definition.
 //
 // Enclosure space (all mm, Z up): outer shell spans x ∈ [-W/2, W/2],
-// y ∈ [-D/2, D/2], z ∈ [0, H]; the floor top is at z = floorZ (= wall) and the
-// layout is placed with its z = 0 on that floor (contentOffset). For soft_wedge
+// y ∈ [-D/2, D/2], z ∈ [0, H]; the floor top is at z = floorZ (= wall; wall +
+// the spike socket for stake_pod) and the layout is placed with its z = 0 on
+// that floor (contentOffset). For soft_wedge
 // H is the BACK height; the top falls towards the front (-y). For dome_base the
 // outer top is a half-ellipsoid (topAt depends on x AND y): a cylinder up to
-// dome.z0, then a cap rising dome.rise to H.
+// dome.z0, then a cap rising dome.rise to H. stake_pod's spike hangs below
+// z = 0 (a separate printed part, see StakeDims).
+//
+// Which template suits a product (and why) lives in shape-pick.ts; templateFor /
+// defaultEnclosureFor are re-exported from there.
 
 import {
-  DEFAULT_ENCLOSURE,
   LIMITS,
   MECH_PARAMS,
   THROUGH_LID,
@@ -19,13 +23,14 @@ import {
   type EnclosureTemplate,
   type LayoutItem,
   type LibraryPart,
-  type ProductSpec,
 } from "../schema";
 import { hasTopPort, isPokeSensor, mountLift, POKE_OUT, worldBox, type LayoutResult, type Vec3 } from "../layout";
 
-/** Templates the browser builder can make (all eight since Phase 3). */
+export { defaultEnclosureFor, templateFor } from "./shape-pick";
+
+/** Templates the browser builder can make (all of them: eight since Phase 3, stake_pod since W6). */
 export const BUILDABLE_TEMPLATES = [
-  "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper", "lantern", "dome_base", "wall_plate",
+  "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper", "lantern", "dome_base", "wall_plate", "stake_pod",
 ] as const;
 export type BuildableTemplate = (typeof BUILDABLE_TEMPLATES)[number];
 
@@ -33,6 +38,24 @@ export type ShapeKind = "rrect" | "stadium" | "circle";
 
 /** dome_base: outer top = z0 + rise·√(1 − (r/R)²), R = W/2 (tangent to the cylinder wall at r = R). */
 export type DomeDims = { z0: number; rise: number };
+
+/**
+ * stake_pod: a round pod on a separate soil spike. The spike is a "+"-section
+ * stake (arm = half the span of one bar, thick = bar thickness) that tapers to a
+ * point over `length` below z = 0; its top `peg` mm push into a "+" socket in the
+ * pod's thick floor (socket = spike section + clearance, `depth` deep from z = 0).
+ * Printing: the pod stands on its flat bottom (the socket roof is a short bridge);
+ * the spike stands on its flat peg end and only narrows upwards, so no supports.
+ */
+export type StakeDims = {
+  arm: number;
+  thick: number;
+  /** Spike length below the pod (mm). */
+  length: number;
+  /** Peg length that goes into the socket (mm). */
+  peg: number;
+  socket: { arm: number; thick: number; depth: number };
+};
 
 export type EnclosureDims = {
   /** Template actually built. */
@@ -61,6 +84,8 @@ export type EnclosureDims = {
   taper?: { axis: "x" | "y"; amount: number };
   /** dome_base: the domed lid. */
   dome?: DomeDims;
+  /** stake_pod: the soil spike and its socket in the floor. */
+  stake?: StakeDims;
   /** Where the layout's origin goes inside the enclosure. */
   contentOffset: Vec3;
 };
@@ -88,6 +113,18 @@ const DOME_RISE = { low: 0.25, mid: 0.35, tall: 0.5 } as const;
 /** wall_plate: smallest footprint side and corner radius (two keyholes need room). */
 export const WALL_PLATE_MIN_SIDE = 40;
 export const WALL_PLATE_MIN_RADIUS = 6;
+/** stake_pod: socket depth below the floor, fit clearance, spike bar thickness, smallest pod. */
+export const STAKE = { socketDepth: 8, fit: 0.3, thick: 2.6, minSide: 36, minLength: 60, maxLength: 110 } as const;
+/** handheld_taper: thinnest wall left where a big grip fillet meets the cavity's edge (mm). */
+export const GRIP_MIN_WALL = 1.2;
+
+/**
+ * handheld_taper grip fillet: as round as the wall allows. Where an outer fillet f > wall
+ * meets the cavity's square edge the plastic left is f − √2·(f − wall); keep it ≥ GRIP_MIN_WALL.
+ */
+export function gripFillet(wall: number): number {
+  return (Math.SQRT2 * wall - GRIP_MIN_WALL) / (Math.SQRT2 - 1);
+}
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const r1 = (n: number) => Math.round(n * 100) / 100;
@@ -223,12 +260,30 @@ export function exitDistance(d: EnclosureDims, ox: number, oy: number, dx: numbe
 type Need = { iw: number; id: number; ih: number };
 
 /** Templates with a square / round footprint (widthToDepth is ignored). */
-const SQUARE_FOOTPRINT: readonly BuildableTemplate[] = ["puck", "dome_base", "lantern"];
+const SQUARE_FOOTPRINT: readonly BuildableTemplate[] = ["puck", "dome_base", "lantern", "stake_pod"];
+
+/** Floor top (z) of a template: the wall, plus the spike socket for a stake pod. */
+function floorFor(tpl: BuildableTemplate, wall: number): number {
+  return tpl === "stake_pod" ? wall + STAKE.socketDepth : wall;
+}
+
+function stakeDims(W: number, H: number): StakeDims {
+  const arm = r1(clamp(0.16 * W, 6, 9));
+  const thick = STAKE.thick;
+  return {
+    arm,
+    thick,
+    length: r1(clamp(1.3 * Math.max(W, H), STAKE.minLength, STAKE.maxLength)),
+    peg: STAKE.socketDepth - 0.6,
+    socket: { arm: r1(arm + STAKE.fit), thick: r1(thick + 2 * STAKE.fit), depth: STAKE.socketDepth },
+  };
+}
 
 function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): EnclosureDims {
   const wall = clamp(spec.wall, LIMITS.wall.min, LIMITS.wall.max);
   const clearance = clamp(spec.clearance, LIMITS.clearance.min, LIMITS.clearance.max);
   const bias = spec.proportions.heightBias;
+  const floorZ = floorFor(tpl, wall);
   let W = need.iw + 2 * wall;
   let D = need.id + 2 * wall;
   if (SQUARE_FOOTPRINT.includes(tpl)) {
@@ -239,15 +294,16 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     if (W / D < r) W = D * r;
     else D = Math.max(D, W / r);
   }
-  const minFoot = tpl === "wall_plate" ? WALL_PLATE_MIN_SIDE : LIMITS.minFootprint;
+  const minFoot = tpl === "wall_plate" ? WALL_PLATE_MIN_SIDE : tpl === "stake_pod" ? STAKE.minSide : LIMITS.minFootprint;
   W = Math.max(W, minFoot);
   D = Math.max(D, minFoot);
   const minSide = Math.min(W, D);
 
-  let H = need.ih + 2 * wall;
+  // Floor (wall, or wall + spike socket) + the parts' height + the lid wall.
+  let H = need.ih + floorZ + wall;
   // A wall plate stays as thin as its parts allow; a lantern is tall on purpose.
   const ratio = tpl === "lantern" ? LANTERN_RATIO[bias] : tpl === "wall_plate" ? 0 : BIAS_RATIO[bias];
-  H = Math.max(H, ratio * minSide, 2 * wall + LIP.height + 4);
+  H = Math.max(H, ratio * minSide, floorZ + wall + LIP.height + 4);
 
   let dome: DomeDims | undefined;
   if (tpl === "dome_base") {
@@ -266,12 +322,17 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     H = frontH + D * Math.tan((wedgeDeg * Math.PI) / 180);
   }
 
-  const shape: ShapeKind = tpl === "puck" || tpl === "dome_base" ? "circle" : tpl === "pill" ? "stadium" : "rrect";
-  const wantR = tpl === "wall_plate" ? Math.max(spec.cornerRadius, WALL_PLATE_MIN_RADIUS) : spec.cornerRadius;
+  const shape: ShapeKind = tpl === "puck" || tpl === "dome_base" || tpl === "stake_pod" ? "circle" : tpl === "pill" ? "stadium" : "rrect";
+  const grip = tpl === "handheld_taper";
+  // A handheld taper gets round corners in plan too (nothing sharp in the palm).
+  const wantR =
+    tpl === "wall_plate" ? Math.max(spec.cornerRadius, WALL_PLATE_MIN_RADIUS) : grip ? Math.max(spec.cornerRadius, 0.3 * minSide) : spec.cornerRadius;
   const cornerRadius =
     shape === "circle" ? W / 2 : shape === "stadium" ? minSide / 2 : clamp(wantR, LIMITS.cornerRadius.min, 0.33 * minSide);
-  const edgeFillet = clamp(
-    Math.min(spec.edgeFillet, 0.9 * wall, cornerRadius - 0.5, (dome ? dome.z0 : H) / 4),
+  // Grip-friendly: a handheld taper rounds its top and bottom edges as far as the wall allows.
+  const wantFillet = grip ? Math.max(spec.edgeFillet, gripFillet(wall)) : Math.min(spec.edgeFillet, 0.9 * wall);
+  let edgeFillet = clamp(
+    Math.min(wantFillet, cornerRadius - 0.5, (dome ? dome.z0 : H) / 4),
     LIMITS.edgeFillet.min,
     LIMITS.edgeFillet.max,
   );
@@ -297,7 +358,9 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     lidStyle = "cap";
     if (splitZ + LIP.flange + 2.5 > innerTopRef) splitZ = innerTopRef - LIP.flange - 2.5;
   }
-  splitZ = Math.max(splitZ, wall + LIP.height + 0.8);
+  splitZ = Math.max(splitZ, floorZ + LIP.height + 0.8);
+  // The grip fillet stays above the lid's lip flange (which sits just over the split).
+  if (grip) edgeFillet = clamp(Math.min(edgeFillet, H - (splitZ + 0.6 + LIP.flange) - 0.3), LIMITS.edgeFillet.min, LIMITS.edgeFillet.max);
 
   return {
     template: tpl,
@@ -308,18 +371,19 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     H: r1(H),
     innerW: r1(W - 2 * wall),
     innerD: r1(D - 2 * wall),
-    innerH: r1(H - 2 * wall),
+    innerH: r1(H - wall - floorZ),
     wall,
     clearance,
     cornerRadius: r1(cornerRadius),
     edgeFillet: r1(edgeFillet),
-    floorZ: wall,
+    floorZ,
     splitZ: r1(splitZ),
     lidStyle,
     ...(wedgeDeg !== undefined ? { wedgeDeg, frontH: r1(frontH!) } : {}),
     ...(tpl === "handheld_taper" ? { taper: { axis: W >= D ? ("x" as const) : ("y" as const), amount: TAPER_AMOUNT } } : {}),
     ...(dome ? { dome } : {}),
-    contentOffset: [0, 0, wall],
+    ...(tpl === "stake_pod" ? { stake: stakeDims(W, H) } : {}),
+    contentOffset: [0, 0, floorZ],
   };
 }
 
@@ -452,47 +516,3 @@ export function settleLayout(layout: LayoutItem[], parts: Map<string, LibraryPar
   });
 }
 
-// ---------------------------------------------------------------------------
-// Default template suggestion (safe fallback when the AI fails)
-// ---------------------------------------------------------------------------
-
-export function templateFor(spec: ProductSpec): EnclosureTemplate {
-  const text = `${spec.name} ${spec.oneLine} ${spec.features.join(" ")}`.toLowerCase();
-  const round = /\b(round|circular|puck|disc|disk|coaster|dome|domed)\b/.test(text);
-  const lampish = /\b(lamp|light|lights|nightlight|glow|lantern)\b/.test(text);
-  const sensorish = /\b(sensor|motion|presence|pir|detector|smoke|air|temperature|humidity)\b/.test(text);
-  const ring = /\b(ring|neopixel|ws2812|rgb)\b/.test(text);
-  const carried = spec.use === "handheld" || spec.use === "wearable";
-  if (spec.use === "wall") return "wall_plate";
-  // Tall light / speaker products standing on a desk.
-  const tallOutput = spec.outputs.includes("speaker") || (spec.outputs.includes("led") && (ring || lampish));
-  if (tallOutput && !carried && (spec.sizeHint === "desk" || spec.sizeHint === "large")) return "lantern";
-  // Round sensors / lamps / speakers on a desk.
-  if (round && !carried && (sensorish || lampish || spec.outputs.includes("speaker"))) return "dome_base";
-  if (round && (spec.sizeHint === "pocket" || spec.sizeHint === "palm")) return "puck";
-  if (spec.use === "desk" && spec.outputs.includes("screen")) return "soft_wedge";
-  if (spec.use === "wearable") return "pill";
-  if (spec.use === "handheld") return spec.sizeHint === "pocket" ? "pill" : "handheld_taper";
-  return "rounded_box";
-}
-
-/** A complete, valid EnclosureSpec for a product — used when the AI answer is unusable. */
-export function defaultEnclosureFor(spec: ProductSpec): EnclosureSpec {
-  const template = templateFor(spec);
-  const heightBias = spec.use === "wall" || template === "puck" || template === "wall_plate" ? "low" : "mid";
-  const square = template === "puck" || template === "dome_base" || template === "lantern";
-  const widthToDepth = square ? 1 : template === "pill" || template === "handheld_taper" ? 2 : 1.4;
-  const feet: EnclosureSpec["feet"] =
-    template === "wall_plate" ? "none" : template === "dome_base" ? "ring" : spec.use === "desk" ? "rubber_4" : "none";
-  const out: EnclosureSpec = {
-    ...DEFAULT_ENCLOSURE,
-    template,
-    proportions: { widthToDepth, heightBias },
-    feet,
-    ...(spec.environment === "outdoor" ? { wall: 2.4 } : {}),
-  };
-  if (template === "wall_plate") out.cornerRadius = 8;
-  if (template === "lantern") out.vents = { pattern: "slots", face: "+x", count: 6 };
-  if (template === "dome_base" && spec.outputs.includes("speaker")) out.vents = { pattern: "grille", face: "+z", count: 9 };
-  return out;
-}

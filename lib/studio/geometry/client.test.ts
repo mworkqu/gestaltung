@@ -6,7 +6,12 @@ import { buildEnclosure } from "../enclosure/build";
 import { spec } from "../enclosure/test-fixtures";
 import { defaultMechParts, mechSummary } from "../ai/mech-default";
 import { exportObjectsSTL } from "../export";
-import { enclosureMeshes, geometryStats, getEnclosureGeometry, getMechGeometry, mechObjects, resetGeometryClientForTests } from "./client";
+import * as THREE from "three";
+import { STAKE_SPIKE_ID } from "../mech/build";
+import {
+  enclosureMeshes, geometryStats, getEnclosureGeometry, getMechGeometry, hasEnclosureGeometry, mechObjects, prebuildInOrder,
+  resetGeometryClientForTests,
+} from "./client";
 import { enclosureKey, hashText, mechKey, stableJson } from "./key";
 import { packGeometry, transferablesOf, unpackGeometry } from "./pack";
 import { handleRequest } from "./job";
@@ -104,6 +109,42 @@ describe("geometry client (no Worker → same job on the main thread)", () => {
     expect(lid && (lid.object as unknown as { geometry: unknown }).geometry).toBe(enc.lid);
     for (const b of list) expect(b.printable.estGrams).toBeGreaterThan(0);
     expect(await getMechGeometry(spec(), lr, parts, mech)).toBe(m);
+  });
+
+  it("stake pod: the spike is shown with the case and printed as its own part (peg end down)", async () => {
+    const { parts, lr, components } = scene();
+    const s = spec({ template: "stake_pod" });
+    const enc = await getEnclosureGeometry(s, lr, parts);
+    const meshes = enclosureMeshes(enc);
+    const spike = meshes.base.children.find((c) => c.name === "enclosure_spike") as THREE.Mesh;
+    expect(spike).toBeTruthy();
+    // Same material as the case (not the dark rubber-feet one).
+    expect(spike.material).toBe(meshes.base.material);
+    const mech = defaultMechParts(
+      mechSummary({ components, layout: lr.layout, getPart: (id) => getPart(id), enclosure: { w: enc.meta.W, d: enc.meta.D, h: enc.meta.H }, template: "stake_pod" }),
+    );
+    const list = mechObjects(await getMechGeometry(s, lr, parts, mech), enc);
+    const printed = list.find((b) => b.id === STAKE_SPIKE_ID)!;
+    expect(printed).toBeTruthy();
+    expect(printed.printable.material).toBe("PETG");
+    expect(printed.printable.estGrams).toBeGreaterThan(0);
+    // Its own geometry (not the base's), turned over so the slicer file rests on the flat peg.
+    expect((printed.object as THREE.Mesh).geometry).not.toBe(enc.base);
+    expect(printed.object.rotation.x).toBeCloseTo(Math.PI, 6);
+    expect(list.filter((b) => b.template === "base" && b.id !== STAKE_SPIKE_ID)).toHaveLength(1);
+  });
+
+  it("builds background shapes one at a time, first one first, and stops when asked", async () => {
+    const { parts, lr } = scene();
+    const order: string[] = [];
+    const shapes = (["puck", "dome_base", "pill"] as const).map((template) => () =>
+      getEnclosureGeometry(spec({ template }), lr, parts, { persist: false }).then(() => order.push(template)),
+    );
+    expect(await prebuildInOrder(shapes, () => false)).toBe(3);
+    expect(order).toEqual(["puck", "dome_base", "pill"]);
+    expect(hasEnclosureGeometry(spec({ template: "dome_base", colour: "coral" }), lr, parts)).toBe(true);
+    let n = 0;
+    expect(await prebuildInOrder(shapes, () => n++ > 0)).toBe(1);
   });
 
   it("a failing job answers ok:false instead of throwing", () => {

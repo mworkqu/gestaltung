@@ -49,7 +49,7 @@ export function buildMechParts(
 ): BuiltMechPart[] {
   const dims = enclosure?.dims ?? dimsFromLayout(layout);
   const places = placeMechParts(mech, layout, parts, dims);
-  return mech.map((m, i) => {
+  const list = mech.map((m, i): BuiltMechPart => {
     const pl = places[i];
     const material = defaultMaterial(m.template, m.printable?.material, opts.environment);
     const shell = enclosure && (m.template === "lid" || m.template === "base") ? enclosure[m.template] : null;
@@ -78,4 +78,33 @@ export function buildMechParts(
       triangles: triangleCount(mesh.geometry),
     };
   });
+  // stake_pod: the soil spike is printed on its own, peg end down (turned over here so the
+  // slicer files rest on the flat peg; the case viewer shows it in place under the pod).
+  const spike = enclosure?.base.children.find((c) => c.name === SPIKE_MESH) as THREE.Mesh | undefined;
+  if (spike && mech.some((m) => m.template === "base")) {
+    const geometry = spike.geometry.clone();
+    const mesh = new THREE.Mesh(geometry, materialFor("PETG"));
+    mesh.rotation.x = Math.PI;
+    mesh.name = STAKE_SPIKE_ID;
+    mesh.userData = { mechId: STAKE_SPIKE_ID, template: "base", forInstance: null };
+    const volumeMm3 = Math.abs(signedVolume(geometry));
+    list.push({
+      id: STAKE_SPIKE_ID,
+      template: "base",
+      name: STAKE_SPIKE_NAME,
+      object: mesh,
+      explode: [0, 0, -Math.max(20, dims.H * 0.8)],
+      // Soil is wet: PETG, whatever the environment.
+      printable: { material: "PETG", estGrams: estGrams(volumeMm3, "PETG") },
+      volumeMm3,
+      triangles: triangleCount(geometry),
+    });
+  }
+  return list;
 }
+
+/** The stake pod's soil spike in the printed-parts list (an extra part next to lid + base). */
+export const STAKE_SPIKE_ID = "stake_spike";
+export const STAKE_SPIKE_NAME = { en: "Soil spike", ar: "وتد التربة" } as const;
+/** Same name as lib/studio/enclosure/build.ts SPIKE_MESH (kept here so this file needs no CSG import). */
+const SPIKE_MESH = "enclosure_spike";

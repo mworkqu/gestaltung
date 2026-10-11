@@ -170,26 +170,34 @@ for (const locale of LOCALES) {
     await expect(progress.locator('[aria-current="step"]')).toContainText(msg(locale, "Studio", "step_enclosure"));
     await expectNoHorizontalOverflow(page);
 
-    // ── Phase 2 · Print parts: case + parts in 3D, "Take it apart", grams ──
+    // ── "Take it apart" lives under the enclosure's 3D view (W6) ───────────
+    const takeApart = page.getByTestId("studio-take-apart");
+    await expect(takeApart).toHaveAttribute("aria-pressed", "false");
+    const slider = page.getByTestId("studio-explode").locator('input[type="range"]');
+    await expect(slider).toHaveCount(0);
+    await takeApart.click();
+    await expect(takeApart).toHaveAttribute("aria-pressed", "true");
+    await slider.fill("1");
+    await expect(slider).toHaveValue("1");
+    await page.waitForTimeout(1200); // the viewer eases the parts apart (650 ms, wall-clock)
+    await scrollUnderBars(page, page.getByTestId("studio-enclosure-viewer"));
+    await shoot2("5b-exploded");
+    await takeApart.click();
+    await expect(slider).toHaveCount(0);
+
+    // ── Phase 2 · Print parts: the printable list, grams, STL downloads ────
     await tap(page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }));
     await expect(shell).toHaveAttribute("data-step", "print");
     await expect(progress.locator('[aria-current="step"]')).toContainText(msg(locale, "Studio", "step_print"));
-    await expectCanvas(page.getByTestId("studio-print-viewer"));
+    await expect(page.getByTestId("studio-print-viewer")).toHaveCount(0);
     const list = page.getByTestId("studio-print-list");
     await expect(list.locator("li").first()).toBeVisible({ timeout: 20_000 });
     expect(await list.locator("li").count()).toBeGreaterThanOrEqual(3);
     await expect(list).toContainText(msg(locale, "Studio", "material_PLA"));
     await expect(page.getByTestId("studio-print-total")).toContainText(/\d/);
-    const slider = page.getByTestId("studio-explode").locator('input[type="range"]');
-    await expect(slider).toHaveValue("0");
     await page.waitForTimeout(600);
-    await scrollUnderBars(page, page.getByTestId("studio-print-viewer"));
     await shoot2("5-print-parts");
     await shoot3("5-print");
-    await slider.fill("1");
-    await expect(slider).toHaveValue("1");
-    await page.waitForTimeout(1200); // the viewer eases the parts apart (650 ms, wall-clock)
-    await shoot2("5b-exploded");
     await scrollToBottom(page);
     await shoot2("5c-print-list");
     await expectNoHorizontalOverflow(page);
@@ -305,16 +313,20 @@ test("design studio: final phone pictures + name on the lid", async ({ page }, i
   await page.waitForTimeout(600);
   await scrollUnderBars(page, encViewer);
   await shot("4-enclosure.png");
-  await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
-
-  // 5 · Print, taken apart ~0.7
-  await expect(shell).toHaveAttribute("data-step", "print");
-  await expect(page.getByTestId("studio-print-list").locator("li").first()).toBeVisible({ timeout: 30_000 });
+  // Taken apart ~0.7, right under the 3D view (W6).
+  await page.getByTestId("studio-take-apart").click();
   const slider = page.getByTestId("studio-explode").locator('input[type="range"]');
   await slider.fill("0.7");
   await expect(slider).toHaveValue("0.7");
   await page.waitForTimeout(1200);
-  await scrollUnderBars(page, page.getByTestId("studio-print-viewer"));
+  await scrollUnderBars(page, encViewer);
+  await shot("4b-enclosure-apart.png");
+  await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
+
+  // 5 · Print: the printable list
+  await expect(shell).toHaveAttribute("data-step", "print");
+  await expect(page.getByTestId("studio-print-list").locator("li").first()).toBeVisible({ timeout: 30_000 });
+  await scrollUnderBars(page, page.getByTestId("studio-print-list"));
   await shot("5-print.png");
   await page.getByRole("button", { name: msg(locale, "Studio", "skipToCode") }).click();
 

@@ -66,6 +66,8 @@ export async function runEnclosure(opts: {
   previous?: readonly EnclosureSpec[];
   /** templateFor(spec) when lib/studio/enclosure/templates.ts provides it. */
   fallback?: EnclosureSpec;
+  /** Our shape rules, best first (shape-pick.ts rankShapes): told to the model as a hint. */
+  suggested?: { template: EnclosureTemplate; reason: string }[];
 }): Promise<Outcome<EnclosureSpec>> {
   const templates = (opts.templates ?? AI_TEMPLATES).filter((t) => (ENCLOSURE_TEMPLATES as readonly string[]).includes(t));
   const previous = opts.previous ?? [];
@@ -73,7 +75,14 @@ export async function runEnclosure(opts: {
   const r = await opts.call<EnclosureSpec>({
     step: "enclosure",
     system: ENCLOSURE_SYSTEM,
-    prompt: enclosurePrompt({ spec: opts.spec, components: opts.components.slice(0, 20), bbox: opts.bbox, templates, previous: [...previous] }),
+    prompt: enclosurePrompt({
+      spec: opts.spec,
+      components: opts.components.slice(0, 20),
+      bbox: opts.bbox,
+      templates,
+      previous: [...previous],
+      suggested: opts.suggested?.slice(0, 3),
+    }),
     schema: enclosureSchema(templates),
     validate: (raw) => {
       const attempt: ClampLog = [];

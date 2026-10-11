@@ -1,6 +1,6 @@
 import { canUse } from "@/lib/credits/server";
 import { studioLibrary } from "@/lib/studio/library/remote";
-import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
+import { applyShapePick, defaultEnclosureFor, rankShapes } from "@/lib/studio/enclosure/shape-pick";
 import { emptyStudioDoc, type EnclosureSpec } from "@/lib/studio/schema";
 import { runEnclosure, safeBbox } from "@/lib/studio/ai/enclosure";
 import { AI_TEMPLATES } from "@/lib/studio/ai/prompts";
@@ -87,6 +87,8 @@ export async function POST(request: Request) {
     previous: previous.slice(-3),
     // Default look on model failure: the rule-picked template (+ its feet / vents) for this product.
     fallback: defaultEnclosureFor(body.spec),
+    // Placement / holding / environment / size → our ranked shapes, as a hint (W6).
+    suggested: rankShapes(body.spec).map((s) => ({ template: s.template, reason: s.reason })),
   });
   if (!r.ok) {
     await fail(r.error);
@@ -100,9 +102,11 @@ export async function POST(request: Request) {
     return Response.json({ enclosure: r.value, version: null, versionsLeft: null, generationId: null, fallback: true });
   }
 
+  // The first look follows a strong shape rule (a plant idea gets a pot-friendly shape).
+  const look = applyShapePick(r.value, body.spec, previous);
   const { error: codeError } = await supabase.rpc("cad_set_code", {
     p_id: generationId,
-    p_scad: JSON.stringify(r.value),
+    p_scad: JSON.stringify(look),
     p_model: r.model ?? "gemini",
   });
   if (codeError) {
@@ -122,12 +126,12 @@ export async function POST(request: Request) {
 
   const saved = await updateDoc(supabase, project.id, (doc) => {
     const base = doc ?? emptyStudioDoc(body.spec);
-    const versions = [...(base.enclosureVersions ?? []), r.value].slice(-3);
-    return { ...base, enclosure: r.value, enclosureVersions: versions };
+    const versions = [...(base.enclosureVersions ?? []), look].slice(-3);
+    return { ...base, enclosure: look, enclosureVersions: versions };
   });
 
   return Response.json({
-    enclosure: r.value,
+    enclosure: look,
     version,
     versionsLeft,
     generationId,

@@ -18,16 +18,19 @@ export default async function StudioFixturePage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ store?: string; step?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   if (!e2eFixturesEnabled()) notFound();
   const { locale } = await params;
   setRequestLocale(locale);
   const sp = await searchParams;
+  const str = (v: unknown) => (typeof v === "string" ? v : null);
+  // ?preset=plant starts on the Enclosure step with a wired plant idea (read here, so server and client agree).
+  const preset = sp.preset === "plant" ? "plant" : null;
   return (
     <MessagesScope scope="studio">
       <div className="container max-w-5xl py-5 sm:py-8">
-        <StudioFixture stored={sp.store === "1"} step={typeof sp.step === "string" ? sp.step : null} />
+        <StudioFixture stored={sp.store === "1"} step={str(sp.step)} preset={preset} />
       </div>
     </MessagesScope>
   );

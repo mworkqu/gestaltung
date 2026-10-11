@@ -19,6 +19,10 @@ type Props = {
 
 const XRAY_OPACITY = 0.25;
 const XRAY_MS = 250;
+/** Same name as lib/studio/enclosure/build.ts SPIKE_MESH (no CSG import in the viewer chunk). */
+const SPIKE = "enclosure_spike";
+/** How far the spike slides out of its socket at full "Take it apart" (mm). */
+const SPIKE_DROP_MM = 24;
 
 function setRest(mesh: THREE.Mesh, kind: "base" | "lid", name: string) {
   mesh.name = name;
@@ -49,18 +53,27 @@ export default function EnclosureMesh({ base, lid, finish, colour, accentColour,
     };
   }, [mats]);
 
+  // A stake pod's spike (a child of the base): the case's finish, and it slides down out of
+  // its socket when the case is taken apart.
+  const spike = base.children.find((c) => c.name === SPIKE) as THREE.Mesh | undefined;
+
   useLayoutEffect(() => {
     setRest(base, "base", "enclosure_base");
     setRest(lid, "lid", "enclosure_lid");
     base.material = mats.base;
     lid.material = mats.lid;
-    for (const m of [base, lid]) {
+    if (spike) {
+      spike.material = mats.base;
+      const data: StudioObjectData = { kind: "extra", rest: [0, 0, 0], vector: [0, 0, -SPIKE_DROP_MM] };
+      spike.userData.studio = data;
+    }
+    for (const m of spike ? [base, lid, spike] : [base, lid]) {
       m.receiveShadow = true;
       m.castShadow = opacity.current > 0.99;
     }
     applyOpacity([mats.base, mats.lid], opacity.current);
     markDirty();
-  }, [base, lid, mats, markDirty]);
+  }, [base, lid, spike, mats, markDirty]);
 
   useEffect(() => {
     invalidate();
@@ -74,6 +87,7 @@ export default function EnclosureMesh({ base, lid, finish, colour, accentColour,
     opacity.current = next;
     applyOpacity([mats.base, mats.lid], next);
     base.castShadow = lid.castShadow = next > 0.99;
+    if (spike) spike.castShadow = next > 0.99;
     if (next !== goal) invalidate();
   });
 

@@ -506,7 +506,10 @@ function Scene(p: SceneProps) {
   const tPos = useMemo<[number, number, number]>(() => [centre[0], 0, -centre[1]], [centre]);
   const oPos = useMemo<[number, number, number]>(() => [-centre[0], 0, centre[1]], [centre]);
   // The base drops a little when exploded; the shadow plane follows it.
-  const floorY = plate ? -PLATE_T - 0.2 : -0.2 - BASE_DROP_MM * explodeTarget;
+  // A stake pod stands on the tip of its soil spike.
+  // (Taken apart, the spike also slides 24 mm out of its socket: EnclosureMesh SPIKE_DROP_MM.)
+  const sink = enc?.meta.dims.stake?.length ?? 0;
+  const floorY = plate ? -PLATE_T - 0.2 : -0.2 - sink - (BASE_DROP_MM + (sink ? 24 : 0)) * explodeTarget;
 
   const [radius, setRadius] = useState(100);
   const lights = useRef<LightRefs>({ key: null, fill: null, rim: null });

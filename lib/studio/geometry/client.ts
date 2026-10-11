@@ -20,7 +20,8 @@ import type { EnclosureSpec, Environment, LibraryPart, MechPart } from "../schem
 import type { EnclosureMeta } from "../enclosure/build";
 import { enclosureKey, mechKey } from "./key";
 import { unpackGeometry } from "./pack";
-import type { GeometryReply, GeometryRequest, PackedMechPart } from "./protocol";
+import type { GeometryReply, GeometryRequest, PackedEnclosure, PackedMechPart } from "./protocol";
+import { persistEnclosure, readPersistedEnclosure } from "./persist";
 
 export { enclosureKey, mechKey } from "./key";
 
@@ -49,7 +50,7 @@ let nextId = 1;
 const pending = new Map<number, Pending>();
 
 /** Where the last job ran ("worker" / "main"); read by tests and the perf probe. */
-export const geometryStats = { worker: 0, main: 0, lastMs: 0 };
+export const geometryStats = { worker: 0, main: 0, lastMs: 0, persisted: 0 };
 
 function failAll(err: Error) {
   for (const p of pending.values()) p.reject(err);
@@ -152,27 +153,52 @@ function inputOf(spec: EnclosureSpec, layout: LayoutResult, parts: Map<string, L
   return { spec, layout, parts: [...parts.entries()] };
 }
 
-/** The enclosure for this spec + layout + parts (cached; built in the worker). Rejects when the build fails. */
+function fromPacked(key: string, packed: PackedEnclosure, ms: number): EnclosureGeometry {
+  return {
+    key,
+    base: unpackGeometry(packed.base),
+    lid: unpackGeometry(packed.lid),
+    feet: packed.feet.map((f) => ({ name: f.name, geometry: unpackGeometry(f.geometry) })),
+    meta: packed.meta,
+    ms,
+  };
+}
+
+/** Whether a shape is already built in memory (no worker job needed). */
+export function hasEnclosureGeometry(spec: EnclosureSpec, layout: LayoutResult, parts: Map<string, LibraryPart>): boolean {
+  return enclosures.has(enclosureKey(spec, layout, parts));
+}
+
+/**
+ * The enclosure for this spec + layout + parts (cached; built in the worker). Rejects when the build fails.
+ * The visitor's own case is also kept in this browser (persist.ts): a reload shows it at once.
+ * Background builds ("Other shapes") pass `persist: false` so they never push it out.
+ */
 export function getEnclosureGeometry(
   spec: EnclosureSpec,
   layout: LayoutResult,
   parts: Map<string, LibraryPart>,
+  opts: { persist?: boolean } = {},
 ): Promise<EnclosureGeometry> {
   const key = enclosureKey(spec, layout, parts);
   const hit = touch(enclosures, key);
   if (hit) return hit;
-  const p = run({ kind: "enclosure", key, input: inputOf(spec, layout, parts) }).then((r) => {
+  const keep = opts.persist !== false;
+  const p = (async (): Promise<EnclosureGeometry> => {
+    if (keep) {
+      const saved = await readPersistedEnclosure(key);
+      if (saved) {
+        geometryStats.persisted += 1;
+        return fromPacked(key, saved.data, saved.ms);
+      }
+    }
+    const r = await run({ kind: "enclosure", key, input: inputOf(spec, layout, parts) });
     if (!r.ok || r.kind !== "enclosure") throw new Error(r.ok ? "unexpected reply" : r.error);
     geometryStats.lastMs = r.ms;
-    return {
-      key,
-      base: unpackGeometry(r.result.base),
-      lid: unpackGeometry(r.result.lid),
-      feet: r.result.feet.map((f) => ({ name: f.name, geometry: unpackGeometry(f.geometry) })),
-      meta: r.result.meta,
-      ms: r.ms,
-    };
-  });
+    const g = fromPacked(key, r.result, r.ms);
+    if (keep) persistEnclosure(key, r.result, r.ms);
+    return g;
+  })();
   enclosures.set(key, p);
   // A failed build is not cached (the next call tries again).
   p.catch(() => {
@@ -180,6 +206,25 @@ export function getEnclosureGeometry(
   });
   evict(enclosures, MAX_ENCLOSURES, disposeEnclosure);
   return p;
+}
+
+/**
+ * Background builds, ONE AT A TIME in the given order (the first one is ready first), so a
+ * tap on "Other shapes" swaps the case instantly. Stops as soon as `stop()` says so; a
+ * failed build is skipped. Never persisted (only the shown case is kept in the browser).
+ */
+export async function prebuildInOrder(jobs: (() => Promise<unknown>)[], stop: () => boolean): Promise<number> {
+  let done = 0;
+  for (const job of jobs) {
+    if (stop()) break;
+    try {
+      await job();
+      done += 1;
+    } catch {
+      /* a variant that cannot be built is simply not offered pre-built */
+    }
+  }
+  return done;
 }
 
 /** The printed parts for this case (cached; built in the worker next to the case they fit). */
@@ -230,7 +275,8 @@ export function enclosureMeshes(g: EnclosureGeometry): { base: THREE.Mesh; lid: 
   const base = new THREE.Mesh(g.base, shellMaterial());
   base.name = "enclosure_base";
   for (const f of g.feet) {
-    const m = new THREE.Mesh(f.geometry, feetMaterial());
+    // Rubber feet are dark; a stake pod's spike is printed like the case (the viewer gives it the case's finish).
+    const m = new THREE.Mesh(f.geometry, f.name === "enclosure_spike" ? shellMaterial() : feetMaterial());
     m.name = f.name;
     base.add(m);
   }
@@ -272,5 +318,5 @@ export function resetGeometryClientForTests() {
   failAll(new Error("reset"));
   enclosures.clear();
   mechs.clear();
-  geometryStats.worker = geometryStats.main = geometryStats.lastMs = 0;
+  geometryStats.worker = geometryStats.main = geometryStats.lastMs = geometryStats.persisted = 0;
 }
