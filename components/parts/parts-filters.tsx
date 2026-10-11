@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 
@@ -18,8 +18,17 @@ import {
 import { materialLabel } from "@/lib/parts/part-key";
 import { categoryLabel } from "@/lib/store/category-label";
 import { cn } from "@/lib/utils";
+import { comboboxAttrs, LazyStoreSuggest, useSuggestArmed } from "@/components/search/suggest-shell";
 
 const DEBOUNCE_MS = 300;
+/**
+ * W7: the first search from the plain /store listing moves to the search route
+ * (next.config.mjs rewrite), which mounts a NEW bar and dropped the caret mid-word.
+ * A bar mounted within this window after a keystroke takes the focus back (and
+ * re-opens the instant results).
+ */
+const REFOCUS_MS = 4000;
+let lastTypedAt = 0;
 
 // Search + filter bar for the public catalog. The URL is the single source of
 // truth: every control navigates to /store?… (storeQuery: empty values drop,
@@ -52,6 +61,11 @@ export function PartsFilters({
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const [text, setText] = useState(state.q);
+  // W7: instant results under the search box (top 6, Add to cart in place), loaded on first focus.
+  const suggestId = useId();
+  const searchForm = useRef<HTMLFormElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const [suggestArmed, armSuggest] = useSuggestArmed();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The q we last navigated to: a URL change to anything else (back button,
   // "Clear filters", a link) replaces the box; our own navigation doesn't, so
@@ -64,6 +78,12 @@ export function PartsFilters({
     }
   }, [state.q]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  useEffect(() => {
+    const el = searchInput.current;
+    if (!el || Date.now() - lastTypedAt > REFOCUS_MS) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, []);
   // The drawer is a phone-only control: if the window grows past md (rotated
   // tablet, resized desktop window) while it is open, close it.
   useEffect(() => {
@@ -105,6 +125,7 @@ export function PartsFilters({
   }
 
   function onType(value: string) {
+    lastTypedAt = Date.now();
     setText(value);
     cancelTyping();
     // Typing replaces the history entry instead of adding one per pause.
@@ -237,6 +258,7 @@ export function PartsFilters({
     <div className="neu flex flex-col gap-4 p-4 sm:p-5" aria-busy={pending}>
       {/* Search: always visible, also on phones. */}
       <form
+        ref={searchForm}
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
@@ -253,9 +275,14 @@ export function PartsFilters({
             id="store-search"
             type="search"
             value={text}
-            onChange={(e) => onType(e.target.value)}
+            ref={searchInput}
+            onFocus={armSuggest}
+            onChange={(e) => {
+              onType(e.target.value);
+              armSuggest();
+            }}
+            {...comboboxAttrs(suggestId)}
             placeholder={t("searchPlaceholder")}
-            autoComplete="off"
             enterKeyHint="search"
             maxLength={100}
             className={cn(fieldClass, "w-full ps-9 pe-10 [&::-webkit-search-cancel-button]:hidden")}
@@ -276,6 +303,7 @@ export function PartsFilters({
               </button>
             )}
           </span>
+          {suggestArmed && <LazyStoreSuggest query={text} input={searchInput} wrapper={searchForm} listId={suggestId} />}
         </div>
       </form>
 

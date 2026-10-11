@@ -3965,5 +3965,18 @@
     "checksTitle": "The Studio can't use this part yet:",
     "savePart": "Save part",
     "backToList": "Back to the list"
+  },
+  "StoreSearch": {
+    "listLabel": "Matching products",
+    "searching": "Searching…",
+    "seeAll": "See all {count} results",
+    "noMatches": "No matching products yet. Press Enter to search the whole store.",
+    "addToCart": "Add to cart",
+    "addAria": "Add {name} to cart",
+    "added": "Added"
+  },
+  "HomeHero": {
+    "visualLabel": "Start a project: a sample case that opens to show the parts inside",
+    "opensWhatsapp": "(opens WhatsApp)"
   }
 }

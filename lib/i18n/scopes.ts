@@ -35,8 +35,9 @@ export const BASE_MESSAGES = [
 
 export const MESSAGE_SCOPES = {
   // YourWork + Orders: the signed-in "Your work" strip on the v2 home (P3-05).
-  home: ["Delivery", "Hero", "Orders", "Parts", "Phone", "StoreLanding", "Turnstile", "YourWork"],
-  store: ["Delivery", "Parts", "Turnstile"],
+  // StoreSearch: the instant store search combobox (W7) on home + store.
+  home: ["Delivery", "Hero", "Orders", "Parts", "Phone", "StoreLanding", "StoreSearch", "Turnstile", "YourWork"],
+  store: ["Delivery", "Parts", "StoreSearch", "Turnstile"],
   product: ["Delivery", "Parts", "Turnstile"],
   cart: ["Cart", "Delivery", "Parts"],
   checkout: ["Checkout", "Credits", "Delivery", "Parts", "PayMethods", "Phone"],
