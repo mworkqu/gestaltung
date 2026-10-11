@@ -120,6 +120,21 @@ const nextConfig = {
       },
     ];
   },
+
+  // P5-16: manifold-3d (WASM, loaded lazily in the Studio geometry worker only) has an
+  // `await import("node:module")` behind its Node-only branch, which browsers never run.
+  // Map that node: import to an empty module in client bundles (manifold-3d only).
+  webpack(config, { isServer, webpack }) {
+    if (!isServer) {
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(/^node:/, (resource) => {
+          if (/[\\/]manifold-3d([\\/]|$)/.test(resource.context ?? "")) resource.request = resource.request.replace(/^node:/, "");
+        }),
+      );
+      config.resolve.fallback = { ...(config.resolve.fallback ?? {}), module: false };
+    }
+    return config;
+  },
 };
 
 export default withNextIntl(nextConfig);

@@ -67,12 +67,21 @@ for (const [key, entry] of Object.entries(loadable)) {
     lazyBy.get(f).add(key.replace(/\\/g, "/"));
   }
 }
-// The geometry worker's synchronous fallback (`import("./job")` in lib/studio/geometry/client.ts)
-// is only fetched where no Worker can start (never in a modern browser): reported apart.
-const FALLBACK_ONLY = /\/geometry\/client\.ts -> \.\/job$/;
+// The geometry worker's synchronous fallback (`import("./job")` / `import("./product-job")` in
+// lib/studio/geometry/client.ts) is only fetched where no Worker can start (never in a modern
+// browser): reported apart. Dynamic imports made INSIDE the worker (P5-16: the worker loads
+// product-job → manifold-loader → manifold-3d on the first product build) run off the main
+// thread: they belong to the worker table, not to the budget.
+const FALLBACK_ONLY = /\/geometry\/client\.ts -> \.\/(job|product-job)$/;
+const WORKER_ONLY = /\/geometry\/(studio-geometry\.worker|product-job|manifold-loader|product-kernel)\.ts -> /;
 const lazy = [];
 const fallback = [];
-for (const [f, keys] of lazyBy) ([...keys].every((k) => FALLBACK_ONLY.test(k)) ? fallback : lazy).push(f);
+for (const [f, keys] of lazyBy) {
+  const list = [...keys];
+  if (!list.every((k) => FALLBACK_ONLY.test(k) || WORKER_ONLY.test(k))) lazy.push(f);
+  else if (list.some((k) => FALLBACK_ONLY.test(k))) fallback.push(f);
+  // else: worker-only — listed in the worker table below (found through the worker's runtime)
+}
 
 // Worker bundles: webpack emits each `new Worker(new URL(...))` target as its own chunk
 // (found by the "[studio-geometry-worker]" tag in its code) plus the chunks it loads with
