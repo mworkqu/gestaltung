@@ -10,6 +10,8 @@ import { formatPrice } from "@/lib/parts/format";
 import { DELIVERY_AREAS } from "@/lib/parts/constants";
 import { OrderStatusSelect } from "@/components/parts/order-status-select";
 import { WhatsappSentToggle } from "@/components/parts/whatsapp-sent-toggle";
+import { ListPagination } from "@/components/dashboard/list-pagination";
+import { paginate, parsePage, type SearchParamsLike } from "@/lib/admin/pagination";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +20,13 @@ type OrderRow = PartOrder & { part_order_items: { count: number }[] };
 
 export default async function PartsOrdersPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<SearchParamsLike>;
 }) {
   const { locale } = await params;
+  const sp = await searchParams;
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
@@ -36,6 +41,8 @@ export default async function PartsOrdersPage({
     .order("created_at", { ascending: false });
 
   const orders = (data ?? []) as unknown as OrderRow[];
+  // D2: 100 rows per page, ?page= kept next to any filters in the URL.
+  const paged = paginate(orders, parsePage(sp.page));
 
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
     day: "2-digit",
@@ -105,7 +112,7 @@ export default async function PartsOrdersPage({
               </tr>
             </thead>
             <tbody>
-              {orders.map((o) => {
+              {paged.items.map((o) => {
                 const itemCount = o.part_order_items?.[0]?.count ?? 0;
                 return (
                   <tr
@@ -149,6 +156,8 @@ export default async function PartsOrdersPage({
           </table>
         </div>
       )}
+
+      {!error && <ListPagination className="mt-4" pathname="/dashboard/store/orders" params={sp} paged={paged} />}
     </div>
   );
 }

@@ -4,7 +4,12 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
 import { guestRedirect } from "@/lib/auth/guest-redirect";
 import { DashboardNav, type NavGroup } from "@/components/dashboard/dashboard-nav";
-import { adminNavGroups } from "@/components/dashboard/admin-nav-groups";
+import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
+import { adminNavGroups, adminTabSets } from "@/components/dashboard/admin-nav-groups";
+import { BackToTop } from "@/components/back-to-top";
+import { loadNavBadges } from "@/lib/admin/nav-badges";
+import type { NavBadges } from "@/lib/admin/nav";
+import { createClient } from "@/lib/supabase/server";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { metaFor } from "@/lib/meta";
 import { MessagesScope } from "@/components/i18n/messages-scope";
@@ -50,17 +55,23 @@ export default async function DashboardLayout({
           ],
         },
       ];
+  // Sidebar badges (D2): not awaited, streamed into the nav so the page never waits.
+  const badges = isSuperAdmin ? loadNavBadges(await createClient()).catch((): NavBadges => ({})) : undefined;
 
   return (
     <MessagesScope scope="all">
     <div className="container py-8">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         <aside className="space-y-3">
-          <DashboardNav groups={groups} />
+          <DashboardNav groups={groups} badges={badges} />
           <SignOutButton />
         </aside>
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0">
+          {isSuperAdmin && <DashboardTabs sets={adminTabSets(t)} />}
+          {children}
+        </div>
       </div>
+      <BackToTop afterScreens={2} />
     </div>
     </MessagesScope>
   );

@@ -1,60 +1,88 @@
-import type { NavGroup } from "@/components/dashboard/dashboard-nav";
+import type { NavGroup, NavTabSet } from "@/lib/admin/nav";
 
-// Every dashboard page the owner can reach, grouped by job. Used by the
-// sidebar (dashboard layout) and by the "More" menu on the dashboard home, so
-// the two can never drift apart.
+// Every dashboard page the owner can reach, in the four groups he chose
+// (D2, 2026-10-11): Today · Sell · Build · Settings. Pages that belong
+// together (catalog / quick add / specs, discounts / occasions, suppliers /
+// lookup / Voltaat) stay separate routes and are joined by a tab bar
+// (adminTabSets), so every old deep link keeps working. Pure: used by the
+// sidebar (dashboard layout), the e2e fixture and the tests.
 export function adminNavGroups(t: (key: string) => string): NavGroup[] {
   return [
     {
+      label: t("group_today"),
+      items: [{ href: "/dashboard", label: t("home"), icon: "home" }],
+    },
+    {
+      label: t("group_sell"),
       items: [
-        { href: "/dashboard", label: t("home") },
-        { href: "/dashboard/overview", label: t("numbers") },
+        { href: "/dashboard/store/orders", label: t("partsOrders"), icon: "orders", badge: "orders" },
+        {
+          href: "/dashboard/store",
+          label: t("partsCatalog"),
+          icon: "products",
+          match: ["/dashboard/store/quick", "/dashboard/store/attributes", "/dashboard/store/import", "/dashboard/store/new"],
+        },
+        { href: "/dashboard/store/fix", label: t("fixList"), icon: "fix", badge: "fix" },
+        { href: "/dashboard/store/stock", label: t("restockNav"), icon: "restock", match: ["/dashboard/store/restock"] },
+        { href: "/dashboard/store/discounts", label: t("discountsNav"), icon: "discounts", match: ["/dashboard/store/occasions"] },
+        { href: "/dashboard/reviews", label: t("reviews"), icon: "reviews", badge: "reviews" },
       ],
     },
     {
-      label: t("group_customers"),
+      label: t("group_build"),
       items: [
-        { href: "/dashboard/leads", label: t("leads") },
-        { href: "/dashboard/store/orders", label: t("partsOrders") },
-        { href: "/dashboard/projects", label: t("projects") },
-        { href: "/dashboard/credits", label: t("aiCredits") },
-        { href: "/dashboard/reviews", label: t("reviews") },
-      ],
-    },
-    {
-      label: t("group_store"),
-      items: [
-        { href: "/dashboard/store/overview", label: t("overviewStore") },
-        { href: "/dashboard/store", label: t("partsCatalog") },
-        { href: "/dashboard/store/quick", label: t("quickAdd") },
-        { href: "/dashboard/store/attributes", label: t("storeAttributes") },
-        { href: "/dashboard/store/stock", label: t("stockToBuy") },
-        { href: "/dashboard/store/fix", label: t("fixProducts") },
-        { href: "/dashboard/store/restock", label: t("restock") },
-        { href: "/dashboard/store/gaps", label: t("sourcingGaps") },
-        { href: "/dashboard/store/occasions", label: t("occasions") },
-        { href: "/dashboard/store/discounts", label: t("discounts") },
-        { href: "/dashboard/store/youtube", label: t("youtube") },
-      ],
-    },
-    {
-      label: t("group_studio"),
-      items: [{ href: "/dashboard/studio-library", label: t("studioLibrary") }],
-    },
-    {
-      label: t("group_suppliers"),
-      items: [
-        { href: "/dashboard/store/suppliers", label: t("suppliers") },
-        { href: "/dashboard/store/suppliers/lookup", label: t("findParts") },
-        { href: "/dashboard/store/suppliers/voltaat", label: t("voltaatSync") },
+        { href: "/dashboard/leads", label: t("leads"), icon: "leads", badge: "leads" },
+        { href: "/dashboard/projects", label: t("projects"), icon: "projects" },
+        { href: "/dashboard/credits", label: t("aiCredits"), icon: "credits" },
+        { href: "/dashboard/studio-library", label: t("studioLibrary"), icon: "studio" },
       ],
     },
     {
       label: t("group_settings"),
       items: [
-        { href: "/dashboard/usage", label: t("aiUsage") },
-        { href: "/dashboard/notifications", label: t("notifications") },
-        { href: "/inventory", label: t("inventory") },
+        { href: "/dashboard/store/suppliers", label: t("suppliersNav"), icon: "suppliers", match: ["/dashboard/store/overview"] },
+        { href: "/dashboard/store/gaps", label: t("sourcingGaps"), icon: "gaps" },
+        { href: "/dashboard/store/youtube", label: t("videosNav"), icon: "videos" },
+        { href: "/dashboard/usage", label: t("aiUsage"), icon: "usage" },
+        { href: "/dashboard/notifications", label: t("notifications"), icon: "notifications" },
+        { href: "/inventory", label: t("inventory"), icon: "inventory" },
+      ],
+    },
+  ];
+}
+
+/** Pages shown as tabs of one nav item. Each tab is still its own route. */
+export function adminTabSets(t: (key: string) => string): NavTabSet[] {
+  return [
+    {
+      id: "products",
+      tabs: [
+        { href: "/dashboard/store", label: t("tabCatalog") },
+        { href: "/dashboard/store/quick", label: t("quickAdd") },
+        { href: "/dashboard/store/attributes", label: t("storeAttributes") },
+      ],
+    },
+    {
+      id: "restock",
+      tabs: [
+        { href: "/dashboard/store/stock", label: t("stockToBuy") },
+        { href: "/dashboard/store/restock", label: t("restock") },
+      ],
+    },
+    {
+      id: "discounts",
+      tabs: [
+        { href: "/dashboard/store/discounts", label: t("discounts") },
+        { href: "/dashboard/store/occasions", label: t("occasions") },
+      ],
+    },
+    {
+      id: "suppliers",
+      tabs: [
+        { href: "/dashboard/store/suppliers", label: t("suppliers") },
+        { href: "/dashboard/store/suppliers/lookup", label: t("findParts") },
+        { href: "/dashboard/store/suppliers/voltaat", label: t("voltaatSync") },
+        { href: "/dashboard/store/overview", label: t("overviewStore") },
       ],
     },
   ];

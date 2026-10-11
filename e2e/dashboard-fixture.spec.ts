@@ -26,7 +26,7 @@ test("dashboard fixture: home tiles and stock lists", async ({ page }, info) => 
   const home = page.getByTestId("fixture-dashboard-home");
   await expect(home.getByRole("heading", { level: 1, name: msg("en", "AdminHome", "title") })).toBeVisible();
   for (const key of ["reply", "confirm", "buy", "fix"]) {
-    await expect(home.getByRole("heading", { level: 2, name: msg("en", "AdminHome", `${key}Title`) })).toBeVisible();
+    await expect(home.getByRole("heading", { level: 3, name: msg("en", "AdminHome", `${key}Title`) })).toBeVisible();
   }
   await expectNoHorizontalOverflow(page);
   if (phone) await page.screenshot({ path: path.join(FINAL, "dash-1-home.png") });

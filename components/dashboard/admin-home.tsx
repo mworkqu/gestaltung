@@ -1,20 +1,23 @@
+import { Suspense, type ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
-import { ChevronDown } from "lucide-react";
 
-import { adminNavGroups } from "@/components/dashboard/admin-nav-groups";
+import { AdminOverview } from "@/components/dashboard/admin-overview";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@/i18n/navigation";
 import { loadFixParts } from "@/lib/admin/fix-data";
 import { buildTiles, countConfirm, countReply, ORDER_STATUSES_TO_HANDLE, type TileKey } from "@/lib/admin/home-tiles";
+import { NUMBERS_ANCHOR } from "@/lib/admin/nav";
 import { loadStockData } from "@/lib/admin/stock-data";
 import { arabicCountForm } from "@/lib/text/count";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
-// The owner's first screen (P5-12): four big tiles, each one number and one
-// action - Reply, Confirm, Buy, Fix - and a single "More" menu with every other
-// dashboard page. The old counts / funnel / cohorts live at /dashboard/overview.
-// Test data never counts (lib/admin/test-data.ts). A number that cannot be read
-// shows a dash, never a wrong 0.
+// The owner's dashboard Home. D2 (2026-10-11): "Numbers & funnels" merged in -
+// its cards, funnel and latest lists are the top section (#numbers, the old
+// /dashboard/overview redirects there), the four action tiles (Reply, Confirm,
+// Buy, Fix; P5-12) stay below. Every other page is in the sidebar, so the old
+// "More" menu is gone. Test data never counts (lib/admin/test-data.ts). A
+// number that cannot be read shows a dash, never a wrong 0.
 export async function AdminHome({ locale }: { locale: string }) {
   const db = await createClient();
 
@@ -43,85 +46,116 @@ export async function AdminHome({ locale }: { locale: string }) {
     () => null
   );
 
-  const [r, c, b, f] = await Promise.all([reply, confirm, buy, fix]);
-  return <AdminHomeView locale={locale} counts={{ reply: r ?? -1, confirm: c ?? -1, buy: b ?? -1, fix: f ?? -1 }} />;
+  // Not awaited here: the numbers section renders while the tiles load.
+  const counts = Promise.all([reply, confirm, buy, fix]).then(([r, c, b, f]) => ({
+    reply: r ?? -1,
+    confirm: c ?? -1,
+    buy: b ?? -1,
+    fix: f ?? -1,
+  }));
+  return <AdminHomeView locale={locale} counts={counts} numbers={<AdminOverview locale={locale} embedded />} />;
 }
 
-/** The four tiles + More menu for given counts (-1 = could not be read). No I/O (e2e fixture renders it too). */
-export async function AdminHomeView({ locale, counts }: { locale: string; counts: Record<TileKey, number> }) {
+type Counts = Record<TileKey, number>;
+
+/**
+ * Home for given counts (-1 = could not be read) and an optional numbers
+ * section. No I/O of its own (the e2e fixture renders it with sample counts).
+ */
+export async function AdminHomeView({
+  locale,
+  counts,
+  numbers,
+}: {
+  locale: string;
+  counts: Counts | Promise<Counts>;
+  numbers?: ReactNode;
+}) {
   const t = await getTranslations("AdminHome");
   const tNav = await getTranslations("DashboardNav");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const tiles = buildTiles(counts);
-
-  const groups = adminNavGroups((k) => tNav(k));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-8">
       <div>
         <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
         <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("title")}</h1>
-        <p className="mt-1 text-sm text-mutedtext">{t("intro")}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {tiles.map((tile) => {
-          const known = tile.count >= 0;
-          const key: TileKey = tile.key;
-          const help = !known
-            ? t("loadError")
-            : tile.count === 0
-              ? t(`${key}Zero`)
-              : t(`${key}Help`, { count: String(tile.count), form: arabicCountForm(tile.count) });
-          const urgent = known && tile.count > 0;
-          return (
-            <section key={key} aria-labelledby={`tile-${key}`} className="neu flex flex-col gap-3 p-5 sm:p-6">
-              <h2 id={`tile-${key}`} className="text-lg font-extrabold text-heading">
-                {t(`${key}Title`)}
-              </h2>
-              <p className={cn("text-6xl font-extrabold leading-none tabular-nums", urgent ? "text-cobalt" : "text-heading")}>
-                {known ? String(tile.count) : "—"}
-              </p>
-              <p className="text-sm leading-relaxed text-mutedtext">{help}</p>
-              <Link
-                href={tile.href}
-                className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-cobalt px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cobalt-hover"
-              >
-                {t(`${key}Action`)}
-              </Link>
-            </section>
-          );
-        })}
-      </div>
+      {/* D4: the "Continue where you left off" card goes here. */}
 
-      <details className="neu group p-1">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-bold text-heading [&::-webkit-details-marker]:hidden">
-          <span>
-            {t("more")}
-            <span className="ms-2 text-xs font-normal text-mutedtext">{t("moreHint")}</span>
-          </span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-mutedtext transition-transform group-open:rotate-180" />
-        </summary>
-        <nav aria-label={t("more")} className="space-y-5 px-4 pb-4 pt-2">
-          {groups.map((g, gi) => (
-            <div key={gi} className="space-y-1">
-              {g.label && <p className={mono("px-1 text-[10px] text-faint")}>{g.label}</p>}
-              <ul className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                {g.items
-                  .filter((i) => i.href !== "/dashboard")
-                  .map((i) => (
-                    <li key={i.href}>
-                      <Link href={i.href} className="block rounded-lg px-1 py-2.5 text-sm text-body hover:text-cobalt">
-                        {i.label}
-                      </Link>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          ))}
-        </nav>
-      </details>
+      {numbers && (
+        <section id={NUMBERS_ANCHOR} aria-labelledby="home-numbers" className="scroll-mt-6 space-y-4">
+          <h2 id="home-numbers" className="sr-only">
+            {tNav("numbers")}
+          </h2>
+          {numbers}
+        </section>
+      )}
+
+      <section aria-labelledby="home-todo" className="space-y-4">
+        <div>
+          <h2 id="home-todo" className="text-lg font-extrabold text-heading">
+            {tNav("homeTodo")}
+          </h2>
+          <p className="mt-1 text-sm text-mutedtext">{t("intro")}</p>
+        </div>
+        <Suspense fallback={<TilesSkeleton />}>
+          <Tiles counts={counts} />
+        </Suspense>
+      </section>
+    </div>
+  );
+}
+
+async function Tiles({ counts }: { counts: Counts | Promise<Counts> }) {
+  const t = await getTranslations("AdminHome");
+  const tiles = buildTiles(await counts);
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {tiles.map((tile) => {
+        const known = tile.count >= 0;
+        const key: TileKey = tile.key;
+        const help = !known
+          ? t("loadError")
+          : tile.count === 0
+            ? t(`${key}Zero`)
+            : t(`${key}Help`, { count: String(tile.count), form: arabicCountForm(tile.count) });
+        const urgent = known && tile.count > 0;
+        return (
+          <section key={key} aria-labelledby={`tile-${key}`} className="neu flex flex-col gap-3 p-5 sm:p-6">
+            <h3 id={`tile-${key}`} className="text-lg font-extrabold text-heading">
+              {t(`${key}Title`)}
+            </h3>
+            <p className={cn("text-6xl font-extrabold leading-none tabular-nums", urgent ? "text-cobalt" : "text-heading")}>
+              {known ? String(tile.count) : "—"}
+            </p>
+            <p className="text-sm leading-relaxed text-mutedtext">{help}</p>
+            <Link
+              href={tile.href}
+              className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-cobalt px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cobalt-hover"
+            >
+              {t(`${key}Action`)}
+            </Link>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function TilesSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="neu flex flex-col gap-3 p-5 sm:p-6">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-14 w-20" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="mt-2 h-11 w-full rounded-xl" />
+        </div>
+      ))}
     </div>
   );
 }

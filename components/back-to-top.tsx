@@ -6,21 +6,29 @@ import { ArrowUp } from "lucide-react";
 
 const SHOW_AFTER_PX = 600;
 
-// Floating "back to top" button for long lists (the store). Appears after
-// 600 px of scroll, jumps instantly (not smoothly) when the visitor prefers
+// Floating "back to top" button for long lists (the store; every dashboard
+// page). Appears after 600 px of scroll, or after `afterScreens` screen
+// heights when given (the dashboard uses 2), jumps instantly (not smoothly) when the visitor prefers
 // reduced motion, and sits above the iOS home indicator via the safe-area
 // inset. Bottom-end corner, under the sticky header's z-index and the modals',
 // so it never covers the header's cart / language controls or a dialog.
-export function BackToTop() {
+export function BackToTop({ afterScreens }: { afterScreens?: number } = {}) {
   const t = useTranslations("Parts");
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > SHOW_AFTER_PX);
+    const onScroll = () => {
+      const after = afterScreens && afterScreens > 0 ? window.innerHeight * afterScreens : SHOW_AFTER_PX;
+      setVisible(window.scrollY > after);
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [afterScreens]);
 
   if (!visible) return null;
 

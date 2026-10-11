@@ -22,7 +22,9 @@ import { cn } from "@/lib/utils";
 // new messages, open orders, product requests, parts customers need that we
 // don't sell, active projects, products without a delivery date. Then the
 // latest messages and orders. Test rows (is_test) are left out.
-export async function AdminOverview({ locale }: { locale: string }) {
+// D2 (2026-10-11): rendered as the top section of the dashboard Home
+// (`embedded` = without its own page heading); /dashboard/overview redirects there.
+export async function AdminOverview({ locale, embedded = false }: { locale: string; embedded?: boolean }) {
   const t = await getTranslations("Admin");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -144,11 +146,13 @@ export async function AdminOverview({ locale }: { locale: string }) {
 
   return (
     <div className="space-y-8">
-      <div>
-        <p className={mono("text-[10px] text-azure")}>{t("todayKicker")}</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("todayTitle")}</h1>
-        <p className="mt-1 text-sm text-mutedtext">{t("todayIntro")}</p>
-      </div>
+      {!embedded && (
+        <div>
+          <p className={mono("text-[10px] text-azure")}>{t("todayKicker")}</p>
+          <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("todayTitle")}</h1>
+          <p className="mt-1 text-sm text-mutedtext">{t("todayIntro")}</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((c) => (

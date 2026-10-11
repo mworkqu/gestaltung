@@ -4,6 +4,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { StockListsView } from "@/components/admin/stock-lists-view";
 import { AdminHomeView } from "@/components/dashboard/admin-home";
+import { adminNavGroups } from "@/components/dashboard/admin-nav-groups";
+import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 import type { Interest, StockItem, StockPart } from "@/lib/admin/stock-lists";
@@ -13,7 +15,8 @@ import { cn } from "@/lib/utils";
 // lists with STATIC sample data (no Supabase, no session), so the e2e suite
 // can photograph the owner's dashboard (the real one needs a super_admin
 // session, which the read-only suite never creates). ?view=stock shows the
-// stock page. 404 everywhere else. Nothing here is real data.
+// stock page, ?view=nav the super-admin sidebar (D2) beside a long page.
+// 404 everywhere else. Nothing here is real data.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
@@ -68,6 +71,28 @@ export default async function DashboardFixturePage({
   const { locale } = await params;
   const { view } = await searchParams;
   setRequestLocale(locale);
+
+  if (view === "nav") {
+    const tNav = await getTranslations("DashboardNav");
+    return (
+      <MessagesScope scope="all">
+        <div className="container py-8" data-testid="fixture-dashboard-nav">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <aside className="space-y-3">
+              <DashboardNav groups={adminNavGroups(tNav)} badges={{ orders: 2, fix: 14, leads: 4, reviews: 0 }} />
+            </aside>
+            <div className="min-w-0 space-y-4">
+              {Array.from({ length: 30 }, (_, i) => (
+                <div key={i} className="neu h-24 p-4 text-sm text-mutedtext">
+                  Sample row {i + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </MessagesScope>
+    );
+  }
 
   if (view === "stock") {
     const t = await getTranslations("AdminStock");
