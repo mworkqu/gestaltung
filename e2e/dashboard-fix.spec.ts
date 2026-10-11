@@ -35,14 +35,14 @@ for (const locale of LOCALES) {
     // Select all in the group → bottom bar → Set delivery time → confirm step → back.
     await delivery.getByLabel(m("selectAllGroup")).check();
     await expect(page.getByText(m("selected").replace("{count}", "4"))).toBeVisible();
-    await page.getByRole("button", { name: m("actionDelivery") }).click();
+    await page.getByRole("button", { name: m("actionDelivery"), exact: true }).click();
     await expect(page.getByRole("combobox").first()).toBeVisible();
-    await page.getByRole("button", { name: m("next") }).click();
-    await expect(page.getByRole("button", { name: m("confirm") })).toBeVisible();
-    await page.getByRole("button", { name: m("back") }).click();
-    await page.getByRole("button", { name: m("back") }).click();
-    await page.getByRole("button", { name: m("clear") }).click();
-    await expect(page.getByRole("button", { name: m("actionDelivery") })).toHaveCount(0);
+    await page.getByRole("button", { name: m("next"), exact: true }).click();
+    await expect(page.getByRole("button", { name: m("confirm"), exact: true })).toBeVisible();
+    await page.getByRole("button", { name: m("back"), exact: true }).click();
+    await page.getByRole("button", { name: m("back"), exact: true }).click();
+    await page.getByRole("button", { name: m("clear"), exact: true }).click();
+    await expect(page.getByRole("button", { name: m("actionDelivery"), exact: true })).toHaveCount(0);
 
     await expectNoHorizontalOverflow(page);
 
@@ -54,7 +54,7 @@ for (const locale of LOCALES) {
     await expect(dialog.getByRole("textbox")).toHaveCount(1);
     await expect(dialog.getByText(m("priceHint"))).toBeVisible();
     await expect(dialog.getByRole("link", { name: m("fullEdit") })).toHaveAttribute("href", /returnTo=/);
-    await dialog.getByRole("button", { name: m("close") }).click();
+    await dialog.getByRole("button", { name: m("close"), exact: true }).click();
     await expect(dialog).toBeHidden();
 
     // Drawer for a delivery gap shows the offer mini-form first.
