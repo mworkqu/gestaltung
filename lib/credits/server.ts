@@ -61,8 +61,8 @@ async function spendOnce(supabase: SupabaseClient, step: "wiring" | "cad", proje
   return { ok: true, charged: d.charged, cost: d.cost, balance: d.balance };
 }
 
-/** The caller's IP, hashed with a server secret — never stored in the clear. */
-function ipHash(request: Request): string | null {
+/** The caller's IP, hashed with a server secret — never stored in the clear (also the Studio guest limit). */
+export function ipHash(request: Request): string | null {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip")?.trim() || "";
   if (!ip) return null;

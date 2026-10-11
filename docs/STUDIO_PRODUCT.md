@@ -99,3 +99,34 @@ Main thread: `getProductGeometry(solved, { geometry })` (lib/studio/geometry/cli
 ## Tests
 
 `lib/studio/product/{schema,forms,archetypes,solve,golden}.test.ts` (pure) and `lib/studio/geometry/product-kernel.test.ts` (heavy, real WASM in node: 5 goldens + 12 archetypes + seeded fuzz: every piece watertight by manifold status AND by `meshIsWatertight`, on the MK4 bed, no body intersections > 0.5 mm³; STL; worker cache). If the heavy file times out on a loaded machine, run it alone: `npx vitest run lib/studio/geometry/product-kernel.test.ts`.
+
+## Phase 2a — AI designer, vision check, product API (server side)
+
+The worker (Phase 2b) talks to `app/api/studio/product/*`; the page only ever gets pictures + public metadata.
+
+| File | What |
+|---|---|
+| `lib/studio/schema.ts` | page-safe `StudioDoc.product` (`ProductDocSchema`: designs `{id, archetype, why {en, ar}, previewPath, status}`, `chosenId`, `unlockedId`, `specHash`) |
+| `lib/studio/product/private.ts` | server-only `projects.studio.productPrivate` (`{designs: [{id, model, solvedHash, score, loops, looksLike, missing, issues, source, best}]}`), `serverOwnedOf`, `mergeServerOwned`, `trimPrivate` (192 kB), `finalModel` (= best checked version) |
+| `lib/studio/server/doc.ts` | every doc parse drops `productPrivate`; `saveDoc` writes the STORED `product` + `productPrivate` back (read together with the version, so a page save can neither erase, forge nor unlock); `loadDocPrivate` / `updateProductDoc` for the product routes only |
+| `lib/studio/product/ai/prompt.ts` | designer system prompt (job → use → functional parts → archetype + proportions → look, one line each in `thinking`), Gemini `responseSchema` (one design per asked archetype; `form` = flat object of all kit params) |
+| `lib/studio/product/ai/design.ts` | `pickArchetypes` (rankArchetypes minus `exclude`), `runProductDesign` (one call for all designs, starts from each archetype default; strict check, one retry with the problems, lenient on the retry; failure / no key → defaults), cache by spec + parts + archetypes (`productDesignCache`, 10 min) |
+| `lib/studio/product/ai/physical.ts` | `ensurePhysical`: opaque light ring / window → resin_clear; soil probe on a non-grounded head → its own stake + cable; then the Phase 1 solver homes (pump → reservoir + tube + nozzle, probe → stake + prongs, LED → clear ring / lens, button → cap, USB to a reachable side); returns the solver's model, issues, hash |
+| `lib/studio/product/ai/why.ts` | "Why this design" EN + AR ≤ 160: the AI's lines when usable, else `Studio.product.why_<archetype>` |
+| `lib/studio/product/ai/vision.ts` | vision prompt ("does this look like <product> at a glance, are all functional parts visible"), strict JSON `{score, looksLike, missing, patches}`; patch values come as `valueJson` strings; only `PATCHABLE_PATHS`, ≤ 8 |
+| `lib/studio/product/ai/concept.ts` | `store_settings.studio_concept_image` reader (default off) + a STUB generator: image-output Gemini models are not on the free tier, so nothing is generated and nothing calls it yet |
+| `lib/studio/product/store.ts` | pure state transforms: `addDesigns` (a new spec keeps only chosen / unlocked; cap 9), `applyCheck` (best-scoring checked version kept), `applyPreview` (ready + final model), `applyChoose`, `applyUnlock` |
+| `lib/studio/server/product.ts` | bodies, no-store JSON, guest limit, preview upload, `isSuperAdmin` |
+| `lib/studio/server/preview-url.ts` | `chosenPreviewPath`, `previewUrl(s)`, `projectPreviewUrl` — signed with the viewer's own session; used by My projects, `/projects/[id]/request`, `/dashboard/leads/[id]` (`components/projects/product-picture.tsx`) |
+
+Endpoints (JSON, `Cache-Control: no-store`; a session is required, guest sessions own their projects; the project is read under RLS = owner check):
+
+- `POST design {projectId, count 1–3 (default 3), exclude?}` → `{designs: [{id, model, why, archetype}]}`; 409 `no_parts` (doc without parts) / `run_0068`. Guests: 429 `guest_limit` after 3 builds per Qatar day per guest session or per hashed IP (`ipHash`, the bom_rate_check salt), counted in the existing `ai_rate_limits` table via the service client (keys `studio:u:<uid>`, `studio:ip:<hash>`) — not in `ai_usage` (no IP / per-build column there). The AI calls themselves are metered in `ai_usage` (feature studio, step product / vision).
+- `POST check {projectId, designId, images {front, side, iso}, loop 0–2}` → `{score, looksLike, missing, model, changed}`; `{skipped: "no_key", model}` without a key; `{skipped: "quota", model}` on quota / rate limit / outage / two unreadable answers.
+- `POST preview {projectId, designId, png}` → `{previewPath}`; existing private bucket `project-images`, path `studio-previews/<projectId>/<designId>.png`, uploaded with the service client after the owner check (its insert policy wants the user id as first folder); read back by the owner / super_admin through 0045 `owns_storage_project` (folder 2 = project id). 503 `storage_unavailable` without the service key.
+- `POST choose {projectId, designId}` → `{chosenId}` (free).
+- `POST unlock {projectId, designId}` → `{unlockedId, model, charged, changesLeft}`; same cad flow as the enclosure route (`credit_can_use` → `cad_begin` "studio product: …" (parent = last delivered `studio %` generation while versions are left) → `cad_set_code` (model JSON) → `cad_deliver`); 403 `sign_in` (guests), 402 `no_credits`; the unlocked design answers again without a charge.
+- `GET model?projectId&designId` → `{model}` only when `product.unlockedId === designId` or super_admin, else 403 `locked`.
+- `GET engineer?projectId` → super_admin only: `{product, productPrivate}`.
+
+Known limits: the owner can still read `projects.studio` (incl. `productPrivate`) with their own session straight through PostgREST — hiding it needs a column privilege (a migration); page code never reads it. Previews of deleted projects stay in the bucket. Tests: `lib/studio/product/ai/{design,vision}.test.ts`, `lib/studio/product/private.test.ts`, `lib/studio/server/{product,product-routes}.test.ts` (mocked Supabase `lib/studio/server/fake-supabase.ts` + mocked Gemini).

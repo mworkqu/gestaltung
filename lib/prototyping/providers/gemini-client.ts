@@ -34,6 +34,8 @@ export async function callGemini(opts: {
   temperature?: number;
   /** Long structured answers (parts lists, circuits) need more than the default. */
   timeoutMs?: number;
+  /** Inline images sent after the prompt text (Studio vision check, P5-16). Base64, no data: prefix. */
+  images?: readonly { mimeType: "image/png" | "image/jpeg"; data: string }[];
 }): Promise<GeminiResult> {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) throw new ProviderError("missing_key");
@@ -44,7 +46,12 @@ export async function callGemini(opts: {
 
   const request = JSON.stringify({
     systemInstruction: { parts: [{ text: opts.system }] },
-    contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: opts.prompt }, ...(opts.images ?? []).map((i) => ({ inlineData: { mimeType: i.mimeType, data: i.data } }))],
+      },
+    ],
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: opts.schema,

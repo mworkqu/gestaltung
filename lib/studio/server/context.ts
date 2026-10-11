@@ -23,6 +23,8 @@ export const STUDIO_TEMPERATURE = 0.2;
 export type StudioCtx<T> = {
   supabase: SupabaseClient;
   userId: string;
+  /** A guest's anonymous session (P5-16 guest limits). */
+  isAnonymous: boolean;
   body: T;
   project: { id: string; spec: Spec | null };
 };
@@ -48,7 +50,7 @@ export async function studioRequest<S extends z.ZodTypeAny>(
   const row = project as { id: string; spec: Spec | null };
   if (opts.consent && !hasAiConsent(row.spec)) return Response.json({ error: "consent" }, { status: 403 });
 
-  return { supabase, userId: user.id, body, project: row };
+  return { supabase, userId: user.id, isAnonymous: user.is_anonymous === true, body, project: row };
 }
 
 export function studioCall(supabase: SupabaseClient, projectId: string): StudioCall {
@@ -63,7 +65,8 @@ export function studioCall(supabase: SupabaseClient, projectId: string): StudioC
       schema: req.schema,
       validate: req.validate,
       temperature: STUDIO_TEMPERATURE,
-      timeoutMs: 45_000,
+      timeoutMs: req.timeoutMs ?? 45_000,
+      ...(req.images?.length ? { images: req.images } : {}),
     });
 }
 

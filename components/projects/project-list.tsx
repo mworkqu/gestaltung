@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/supabase/guest";
 import { deriveProjectStatus, type ProjectStatusKind } from "@/lib/projects/item-status";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
+import { ProductPicture } from "@/components/projects/product-picture";
 import type { Project } from "@/lib/supabase/types";
 import { PROJECT_LIMIT } from "@/lib/credits/constants";
 import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
@@ -40,7 +41,8 @@ type OrderLineRow = {
   order: { status: string } | { status: string }[] | null;
 };
 
-export function ProjectList() {
+/** previews: project id → signed URL of its chosen Studio design picture (made on the server). */
+export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Record<string, string>; previewAlt?: string } = {}) {
   const t = useTranslations("Projects");
   const format = useFormatter();
   const [projects, setProjects] = useState<CardProject[] | null>(null);
@@ -216,7 +218,8 @@ export function ProjectList() {
             className="neu neu-hover flex h-full flex-col gap-3 p-5 transition-shadow"
           >
             <div className="flex items-start justify-between gap-3">
-              <p className="min-w-0 break-words text-base font-semibold text-heading">{p.name}</p>
+              {previews[p.id] && <ProductPicture url={previews[p.id]} alt={previewAlt} size={56} />}
+              <p className="min-w-0 flex-1 break-words text-base font-semibold text-heading">{p.name}</p>
               <Tag
                 variant={p.status === "planning" ? "neutral" : p.status === "ordered" ? "inventory" : "buy"}
                 className="shrink-0"
