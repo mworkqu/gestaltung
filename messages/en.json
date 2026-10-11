@@ -3610,6 +3610,15 @@
     "wiringDrawing": "Drawing your wiring…",
     "wiringNeedParts": "Pick your parts first, then we'll draw how they connect.",
     "schematicLabel": "Wiring diagram",
+    "schematic": {
+      "fit": "Fit",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fullscreen": "Full screen",
+      "exitFullscreen": "Close full screen",
+      "zoomLevel": "Zoom level",
+      "hint": "Drag to move. Ctrl + scroll or pinch to zoom."
+    },
     "zoomIn": "Zoom in",
     "zoomOut": "Zoom out",
     "zoomFit": "Fit to width",

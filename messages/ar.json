@@ -3610,6 +3610,15 @@
     "wiringDrawing": "نرسم توصيلاتك…",
     "wiringNeedParts": "اختر قطعك أولًا، ثم نرسم كيف تتصل ببعضها.",
     "schematicLabel": "مخطط التوصيل",
+    "schematic": {
+      "fit": "ملاءمة",
+      "zoomIn": "تكبير",
+      "zoomOut": "تصغير",
+      "fullscreen": "ملء الشاشة",
+      "exitFullscreen": "إغلاق ملء الشاشة",
+      "zoomLevel": "مستوى التكبير",
+      "hint": "اسحب للتحريك. اضغط Ctrl مع العجلة أو اقرص بإصبعين للتكبير."
+    },
     "zoomIn": "تكبير",
     "zoomOut": "تصغير",
     "zoomFit": "ملاءمة العرض",
