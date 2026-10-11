@@ -9,8 +9,8 @@ import { pinListRows } from "./pin-list";
 import { renderSchematicSVG } from "./schematic";
 import { DEFAULT_SPEC, type StudioComponent } from "./schema";
 import { renderWiringSVG } from "./wiring-drawing";
-import { layoutMat, pinWorld } from "./wiring3d/layout";
-import { pins3dFor } from "./wiring3d/pins3d";
+import { layoutMat } from "./wiring3d/layout";
+import { wireProblems } from "./wiring3d/verify";
 import { buildWires } from "./wiring3d/wires";
 
 const comps = (ids: string[]): StudioComponent[] => ids.map((id, i) => ({ partId: id, instanceId: `${id}_${i + 1}`, label: id }));
@@ -20,6 +20,7 @@ const FIXTURES: Record<string, string[]> = {
   "Plant Waterer": ["esp32_devkit", "soil_moisture_cap", "pump_5v", "led_5mm", "usbc_power_5v"],
   "desk lamp": golden("desk_lamp"),
   "cat feeder": golden("cat_feeder"),
+  doorbell: golden("doorbell"),
 };
 
 const reEsc = (s: string) => s.replace(/[-/\^$*+?.()|[\]{}]/g, "\$&");
@@ -59,23 +60,21 @@ describe.each(Object.entries(FIXTURES))("views agree: %s", (_name, ids) => {
     }
   });
 
-  it("3D wires: same ids, ends on the right pins", () => {
+  it("3D wires on the breadboard: same ids and colours, every end on its pin or a hole of its net", () => {
     const items = w.components.flatMap((c) => {
       const p = getPart(c.partId);
       return p ? [{ instanceId: c.instanceId, part: p }] : [];
     });
-    const layout = layoutMat(items, connections);
-    const byId = new Map(layout.placements.map((p) => [p.instanceId, p]));
-    const at = (inst: string, partId: string, pin: string) => pinWorld(byId.get(inst)!, pins3dFor(getPart(partId)!)[pin]).pos;
+    const layout = layoutMat(items, connections, nets);
+    expect(layout.breadboard).not.toBeNull();
     const segs = buildWires({ connections, layout, getPart, nets });
     expect(new Set(segs.map((s) => s.id))).toEqual(new Set(connections.map((c) => c.id)));
     for (const c of connections) {
       const mine = segs.filter((s) => s.id === c.id);
-      expect(mine.length, c.id).toBe(c.viaPart ? 2 : 1);
+      expect(mine.length, c.id).toBeGreaterThan(0);
       expect(mine.every((s) => s.colour === c.wireColour)).toBe(true);
-      expect(mine[0].points[0], c.id).toEqual(at(c.from.part, c.from.partId, c.from.pin));
-      expect(mine[mine.length - 1].points.at(-1), c.id).toEqual(at(c.to.part, c.to.partId, c.to.pin));
     }
+    expect(wireProblems(segs, connections, layout, getPart, nets)).toEqual([]);
   });
 
   it("Pin list: one row per connection, same id, colour and board pin label", () => {

@@ -4351,6 +4351,7 @@
       },
       "three": {
         "canvasLabel": "Your parts in 3D with their wires",
+        "breadboardHint": "Built on a breadboard, the way you'd wire it.",
         "hint": "Tap a wire to see where it goes. Drag empty space to turn, pinch to zoom.",
         "dragHint": "Drag a part to move it.",
         "reset": "Reset layout",

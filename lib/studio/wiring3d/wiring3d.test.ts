@@ -4,8 +4,11 @@ import { buildWiring } from "../netlist";
 import { buildConnections } from "../connections";
 import { DEFAULT_SPEC, type LibraryPart } from "../schema";
 import { pins3dFor, slotRows } from "./pins3d";
-import { apartLift, applyMoves, CLEAR, layoutMat, MOVE_CLEAR, movePart, pinWorld, resolveMove, type Placement } from "./layout";
-import { buildWires, touchesPart, wirePath } from "./wires";
+import { apartLift, applyMoves, CLEAR, layoutMat, MOVE_CLEAR, movePart, pinWorld, resolveMove, settleMove, snapToBreadboard, type MatLayout } from "./layout";
+import { buildWires, jumperPath, railNets, touchesPart, wirePath, type WireEnd, type WireSegment } from "./wires";
+import { allHoles, breadboardSpec, fits, groupOf, holeWorld, plugFor, plugHoles, type Occupant } from "./breadboard";
+import { groupNets, wireProblems } from "./verify";
+import type { Net } from "../schema";
 
 const CHECKED = [
   "arduino_uno", "esp32_devkit", "esp32_c3_mini", "soil_moisture_cap", "pump_5v", "motor_driver", "relay_module",
@@ -94,182 +97,350 @@ describe("pins3d", () => {
 });
 
 const wire = (ids: string[]) => {
-  const comps = ids.map((id) => ({ partId: id, instanceId: `${id}_1`, label: id }));
+  const comps = ids.map((id, i) => ({ partId: id, instanceId: `${id}_${i + 1}`, label: id }));
   const w = buildWiring(comps, DEFAULT_SPEC, getPart, "en");
   const connections = buildConnections(w.components, w.netlist.nets, getPart);
   const items = w.components.flatMap((c) => {
     const p = getPart(c.partId);
     return p ? [{ instanceId: c.instanceId, part: p }] : [];
   });
-  return { w, connections, items };
+  const nets: Net[] = w.netlist.nets;
+  return { w, connections, items, nets, layout: () => layoutMat(items, connections, nets) };
 };
 
 const FIXTURES = {
-  plant: ["esp32_devkit", "soil_moisture_cap", "pump_5v", "led_5mm", "usbc_power_5v"],
+  plant: ["esp32_c3_mini", "soil_moisture_cap", "pump_5v", "motor_driver", "ws2812_ring"],
+  doorbell: ["esp32_c3_mini", "button_6mm", "speaker_amp", "led_5mm", "lipo_1000", "tp4056_usbc"],
   uno: ["arduino_uno", "soil_moisture_cap", "relay_module", "led_5mm", "oled_096_i2c", "dht22"],
   busy: ["esp32_devkit", "sg90_servo", "ws2812_ring", "button_6mm", "dht22", "oled_096_i2c", "led_5mm", "usbc_power_5v"],
 };
 
+type R = { x: number; y: number; w: number; d: number };
+const rect = (p: { pos: number[]; w: number; d: number }): R => ({ x: p.pos[0], y: p.pos[1], w: p.w, d: p.d });
+/** Clearance between two footprints (mm; negative = overlap). */
+const clearance = (p: R, q: R) => Math.max(Math.abs(p.x - q.x) - (p.w + q.w) / 2, Math.abs(p.y - q.y) - (p.d + q.d) / 2);
+const bbRect = (l: MatLayout): R => ({ x: l.breadboard!.pos[0], y: l.breadboard!.pos[1], w: l.breadboard!.w, d: l.breadboard!.d });
+/** Everything on the mat (the breadboard counts as one block; plugged parts are inside it). */
+const matRects = (l: MatLayout): [string, R][] => [
+  ...l.placements.filter((p) => !p.breadboard).map((p) => [p.instanceId, rect(p)] as [string, R]),
+  ["breadboard", bbRect(l)],
+];
+
+function expectNoOverlap(l: MatLayout, min = 0) {
+  const ms = matRects(l);
+  for (let i = 0; i < ms.length; i++)
+    for (let j = i + 1; j < ms.length; j++)
+      expect(clearance(ms[i][1], ms[j][1]), `${ms[i][0]} vs ${ms[j][0]}`).toBeGreaterThanOrEqual(min - 1e-6);
+  const bb = l.breadboard!;
+  const plugged = l.placements.filter((p) => p.breadboard);
+  for (const p of plugged) {
+    expect(Math.abs(p.pos[0] - bb.pos[0]) + p.w / 2, `${p.instanceId} over the board`).toBeLessThanOrEqual(bb.w / 2 + 1e-6);
+    expect(Math.abs(p.pos[1] - bb.pos[1]) + p.d / 2, `${p.instanceId} over the board`).toBeLessThanOrEqual(bb.d / 2 + 1e-6);
+    for (const h of p.holes ?? []) {
+      expect(h.col).toBeGreaterThanOrEqual(0);
+      expect(h.col).toBeLessThan(bb.cols);
+    }
+  }
+  for (let i = 0; i < plugged.length; i++)
+    for (let j = i + 1; j < plugged.length; j++)
+      expect(clearance(rect(plugged[i]), rect(plugged[j])), `${plugged[i].instanceId} vs ${plugged[j].instanceId}`).toBeGreaterThanOrEqual(-1e-6);
+  expect(groupNets(l).conflicts).toEqual([]);
+}
+
+describe("breadboard", () => {
+  it("half-size = 30 columns, 400 points; full-size = 63 columns", () => {
+    const half = breadboardSpec(30);
+    expect(allHoles(30)).toHaveLength(400);
+    expect(half.w).toBeGreaterThan(80);
+    expect(half.w).toBeLessThan(86);
+    expect(breadboardSpec(63).w).toBeGreaterThan(160);
+  });
+
+  it("one column on one side of the channel is one group; rails are one group", () => {
+    expect(groupOf({ col: 4, row: 0 })).toBe(groupOf({ col: 4, row: 4 }));
+    expect(groupOf({ col: 4, row: 4 })).not.toBe(groupOf({ col: 4, row: 5 }));
+    expect(groupOf({ col: 4, row: 0 })).not.toBe(groupOf({ col: 5, row: 0 }));
+    expect(groupOf({ col: 0, row: 10 })).toBe(groupOf({ col: 28, row: 10 }));
+    expect(groupOf({ col: 0, row: 10 })).not.toBe(groupOf({ col: 0, row: 11 }));
+  });
+
+  it("small through-hole parts plug in; boards and big or odd parts stay on the mat", () => {
+    for (const id of ["led_5mm", "resistor_220", "button_6mm", "dht22", "oled_096_i2c", "motor_driver", "bh1750", "mpu6050"])
+      expect(plugFor(part(id)), id).not.toBeNull();
+    for (const id of ["esp32_devkit", "arduino_uno", "esp32_c3_mini", "pump_5v", "sg90_servo", "relay_module", "usbc_power_5v", "soil_moisture_cap", "lipo_1000", "aa_holder_2", "speaker_amp"])
+      expect(plugFor(part(id)), id).toBeNull();
+  });
+
+  it("a 6 mm button goes across the centre channel; a DHT22 stands with its 4 pins in one row", () => {
+    const b = plugFor(part("button_6mm"), "A")!.bottom;
+    expect(b.pins.filter((p) => p.id === "A").every((p) => p.row === 4)).toBe(true);
+    expect(b.pins.filter((p) => p.id === "B").every((p) => p.row === 5)).toBe(true);
+    const d = plugFor(part("dht22"))!.bottom;
+    expect(d.tilt).toBe(90);
+    expect(d.pins.map((p) => p.dc).sort()).toEqual([0, 1, 3]);
+    expect(new Set(d.pins.map((p) => p.row)).size).toBe(1);
+  });
+
+  it("refuses a column that holds another net, accepts the same net", () => {
+    const spec = breadboardSpec(30);
+    const led = plugFor(part("led_5mm"))!.bottom;
+    const other: Occupant = { holes: [{ col: 5, row: 0, net: "GND" }], rect: { x: -100, y: -100, w: 1, d: 1 } };
+    const at = plugHoles(led, 5).find((h) => h.col === 5)!.id;
+    expect(fits(spec, led, 5, (p) => (p === at ? "LED1" : "X"), [other])).toBe(false);
+    expect(fits(spec, led, 5, (p) => (p === at ? "GND" : "X"), [other])).toBe(true);
+    expect(fits(spec, led, 29, () => "X", [])).toBe(false); // second leg off the end
+  });
+});
+
 describe("layoutMat", () => {
-  it.each(Object.entries(FIXTURES))("%s: board at the centre, no overlaps, deterministic", (_, ids) => {
-    const { connections, items } = wire(ids);
-    const a = layoutMat(items, connections);
-    expect(a).toEqual(layoutMat(items, connections));
+  it.each(Object.entries(FIXTURES))("%s: breadboard in the middle, board beside it, no overlaps, deterministic", (_, ids) => {
+    const { items, layout } = wire(ids);
+    const a = layout();
+    expect(a).toEqual(layout());
     expect(a.placements).toHaveLength(items.length);
+    expect(a.breadboard!.pos).toEqual([0, 0]);
     const board = a.placements.find((p) => p.board)!;
     expect(getPart(board.partId)?.category).toBe("mcu");
-    expect(board.pos).toEqual([0, 0, 0]);
-    for (let i = 0; i < a.placements.length; i++) {
-      for (let j = i + 1; j < a.placements.length; j++) {
-        const p = a.placements[i];
-        const q = a.placements[j];
-        const clear = Math.abs(p.pos[0] - q.pos[0]) * 2 >= p.w + q.w || Math.abs(p.pos[1] - q.pos[1]) * 2 >= p.d + q.d;
-        expect(clear, `${p.instanceId} overlaps ${q.instanceId}`).toBe(true);
-      }
+    expect(board.breadboard).toBe(false);
+    expect(board.pos[0] + board.w / 2).toBeLessThanOrEqual(-a.breadboard!.w / 2 - 1e-6);
+    expectNoOverlap(a, CLEAR);
+  });
+
+  it.each(Object.entries(FIXTURES))("%s: mat parts sit 8–12 mm from their nearest neighbour", (_, ids) => {
+    const a = wire(ids).layout();
+    const ms = matRects(a);
+    for (const [id, r] of ms.filter(([id]) => id !== "breadboard" && !a.placements.find((p) => p.instanceId === id)!.board)) {
+      const near = Math.min(...ms.filter(([o]) => o !== id).map(([, q]) => clearance(r, q)));
+      expect(near, id).toBeGreaterThanOrEqual(CLEAR - 1e-6);
+      expect(near, id).toBeLessThanOrEqual(12.5);
     }
   });
 
-  it("the series resistor stands on a breadboard strip", () => {
-    const { connections, items } = wire(FIXTURES.plant);
-    const r = layoutMat(items, connections).placements.find((p) => p.partId === "resistor_220");
-    expect(r?.breadboard).toBe(true);
-    expect(r!.pos[2]).toBeGreaterThan(0);
+  it("half-size by default, full-size when the parts don't fit", () => {
+    expect(wire(FIXTURES.busy).layout().breadboard!.cols).toBe(30);
+    const many = wire(["esp32_devkit", "led_5mm", "led_5mm", "led_5mm", "led_5mm", "button_6mm", "button_6mm", "button_6mm", "dht22", "oled_096_i2c"]);
+    const l = many.layout();
+    expect(l.breadboard!.cols).toBe(63);
+    expect(l.placements.filter((p) => p.breadboard).length).toBeGreaterThan(6);
+    expectNoOverlap(l);
   });
 
-  it("Take it apart lifts every part but the board", () => {
-    const { connections, items } = wire(FIXTURES.uno);
-    const l = layoutMat(items, connections);
+  it("LED + resistor: both plug in, the resistor bridges the board's column and the LED's column", () => {
+    const { connections, layout, nets } = wire(FIXTURES.doorbell);
+    const l = layout();
+    const c = connections.find((x) => x.viaPart)!;
+    const r = l.placements.find((p) => p.instanceId === c.viaPart)!;
+    const led = l.placements.find((p) => p.instanceId === c.to.part)!;
+    expect(r.breadboard).toBe(true);
+    expect(led.breadboard).toBe(true);
+    const near = r.holes!.find((h) => r.pinNets![h.id] === c.net)!;
+    const far = r.holes!.find((h) => h !== near)!;
+    const anode = led.holes!.find((h) => h.id === c.to.pin)!;
+    expect(groupOf(anode)).toBe(groupOf(far));
+    expect(groupOf(near)).not.toBe(groupOf(far));
+    // The board's jumper goes into the resistor's near column, and that is the whole wire.
+    const segs = buildWires({ connections, layout: l, getPart, nets }).filter((s) => s.id === c.id);
+    expect(segs).toHaveLength(1);
+    expect(segs[0].ends[0]).toEqual({ kind: "pin", part: c.from.part, pin: c.from.pin });
+    const end = segs[0].ends[1];
+    expect(end.kind).toBe("hole");
+    expect(groupOf(end as Extract<WireEnd, { kind: "hole" }>)).toBe(groupOf(near));
+  });
+
+  it("the button's ground side sits below the channel, next to the − rail", () => {
+    const l = wire(FIXTURES.doorbell).layout();
+    const b = l.placements.find((p) => p.partId === "button_6mm")!;
+    expect(b.breadboard).toBe(true);
+    expect(b.holes!.filter((h) => h.id === "A").every((h) => h.row < 5)).toBe(true);
+  });
+
+  it("Take it apart lifts every part but the board (the breadboard stays)", () => {
+    const l = wire(FIXTURES.uno).layout();
     const lift = apartLift(l);
     for (const p of l.placements) expect(lift.get(p.instanceId)! > 0).toBe(!p.board);
   });
 });
 
-/** Clearance between two footprints (mm; negative = overlap). */
-const clearance = (p: Placement, q: Placement) =>
-  Math.max(Math.abs(p.pos[0] - q.pos[0]) - (p.w + q.w) / 2, Math.abs(p.pos[1] - q.pos[1]) - (p.d + q.d) / 2);
-
-const noOverlap = (ps: Placement[], min = 0) => {
-  for (let i = 0; i < ps.length; i++)
-    for (let j = i + 1; j < ps.length; j++)
-      expect(clearance(ps[i], ps[j]), `${ps[i].instanceId} vs ${ps[j].instanceId}`).toBeGreaterThanOrEqual(min - 1e-6);
-};
-
-describe("layoutMat: tight", () => {
-  it.each(Object.entries(FIXTURES))("%s: every part sits 8–12 mm from its nearest neighbour", (_, ids) => {
-    const { connections, items } = wire(ids);
-    const { placements } = layoutMat(items, connections);
-    noOverlap(placements, CLEAR);
-    for (const p of placements) {
-      const near = Math.min(...placements.filter((q) => q !== p).map((q) => clearance(p, q)));
-      expect(near, p.instanceId).toBeGreaterThanOrEqual(CLEAR - 1e-6);
-      expect(near, p.instanceId).toBeLessThanOrEqual(12.5);
-    }
-  });
-});
-
 describe("moving parts", () => {
   const setup = () => {
-    const { w, connections, items } = wire(FIXTURES.plant);
-    return { w, connections, layout: layoutMat(items, connections) };
+    const f = wire(FIXTURES.doorbell);
+    return { ...f, layout: f.layout() };
   };
 
-  it("a free spot is taken as is; the layout stays deterministic", () => {
+  it("a free spot on the mat is taken as is; deterministic", () => {
     const { layout } = setup();
-    const p = layout.placements.find((q) => !q.board)!;
+    const p = layout.placements.find((q) => !q.board && !q.breadboard)!;
     const want: [number, number] = [layout.bounds.maxX + 80, 0];
-    expect(resolveMove(layout.placements, p.instanceId, want)).toEqual(want);
+    expect(resolveMove(layout, p.instanceId, want)).toEqual(want);
     const moved = movePart(layout, p.instanceId, want);
     expect(moved.placements.find((q) => q.instanceId === p.instanceId)!.pos.slice(0, 2)).toEqual(want);
     expect(moved.bounds.maxX).toBeGreaterThan(layout.bounds.maxX);
     expect(applyMoves(layout, { [p.instanceId]: want })).toEqual(applyMoves(layout, { [p.instanceId]: want }));
   });
 
-  it("dropping a part on another never overlaps (pushed back or held)", () => {
+  it("dropping a mat part on the board or the breadboard never overlaps", () => {
     const { layout } = setup();
     const board = layout.placements.find((q) => q.board)!;
-    for (const p of layout.placements.filter((q) => !q.board)) {
-      for (const want of [[0, 0], [board.w / 2, 0], [0, -board.d / 2], [3, 4]] as [number, number][]) {
-        const xy = resolveMove(layout.placements, p.instanceId, want);
-        noOverlap(movePart(layout, p.instanceId, xy).placements, MOVE_CLEAR);
+    for (const p of layout.placements.filter((q) => !q.breadboard && !q.board)) {
+      for (const want of [[0, 0], [board.pos[0], board.pos[1]], [10, 20], [-20, -5]] as [number, number][]) {
+        const xy = settleMove(layout, p.instanceId, want);
+        const out = applyMoves(layout, { [p.instanceId]: xy });
+        expectNoOverlap(out, MOVE_CLEAR);
+        expect(out.placements.find((q) => q.instanceId === p.instanceId)!.pos.slice(0, 2)).toEqual(xy);
       }
     }
   });
 
   it("applyMoves drops a move that would overlap and keeps the rest", () => {
     const { layout } = setup();
-    const [a, b] = layout.placements.filter((q) => !q.board);
+    const [a, b] = layout.placements.filter((q) => !q.board && !q.breadboard);
     const far: [number, number] = [layout.bounds.maxX + 100, layout.bounds.maxY + 100];
     const out = applyMoves(layout, { [a.instanceId]: [0, 0], [b.instanceId]: far, gone_1: [5, 5] });
-    expect(out.placements.find((q) => q.instanceId === a.instanceId)!.pos).toEqual(a.pos);
+    expect(out.placements.find((q) => q.instanceId === a.instanceId)).toEqual(a);
     expect(out.placements.find((q) => q.instanceId === b.instanceId)!.pos.slice(0, 2)).toEqual(far);
-    noOverlap(out.placements);
+    expectNoOverlap(out);
+  });
+
+  it("dragging a plugged LED onto the mat unplugs it; its jumpers then go to its legs", () => {
+    const { layout, connections, nets } = setup();
+    const led = layout.placements.find((q) => q.partId === "led_5mm")!;
+    const spot: [number, number] = [layout.bounds.maxX + 30, layout.bounds.maxY + 30];
+    const out = applyMoves(layout, { [led.instanceId]: settleMove(layout, led.instanceId, spot) });
+    const moved = out.placements.find((q) => q.instanceId === led.instanceId)!;
+    expect(moved.breadboard).toBe(false);
+    expect(moved.pos[2]).toBe(0);
+    const segs = buildWires({ connections, layout: out, getPart, nets });
+    expect(wireProblems(segs, connections, out, getPart, nets)).toEqual([]);
+    const c = connections.find((x) => x.viaPart)!;
+    expect(segs.filter((s) => s.id === c.id).at(-1)!.ends[1]).toEqual({ kind: "pin", part: led.instanceId, pin: c.to.pin });
+  });
+
+  it("dropping a pluggable part over the breadboard snaps it into free holes, never into another net's column", () => {
+    const { layout, connections, nets } = setup();
+    const btn = layout.placements.find((q) => q.partId === "button_6mm")!;
+    const bb = layout.breadboard!;
+    // Off the board first, then back onto the board right on top of the resistor.
+    const off = applyMoves(layout, { [btn.instanceId]: [layout.bounds.maxX + 30, 0] });
+    expect(off.placements.find((q) => q.instanceId === btn.instanceId)!.breadboard).toBe(false);
+    const res = layout.placements.find((q) => q.partId === "resistor_220")!;
+    const xy = settleMove(off, btn.instanceId, [res.pos[0], bb.pos[1] - 2]);
+    const back = applyMoves(layout, { [btn.instanceId]: xy });
+    const snapped = back.placements.find((q) => q.instanceId === btn.instanceId)!;
+    expect(snapped.breadboard).toBe(true);
+    expectNoOverlap(back);
+    expect(snapToBreadboard(off, btn.instanceId, xy)!.pos.slice(0, 2)).toEqual(xy);
+    const segs = buildWires({ connections, layout: back, getPart, nets });
+    expect(wireProblems(segs, connections, back, getPart, nets)).toEqual([]);
   });
 
   it("wires follow a moved part, and rebuilding only its wires matches the full build", () => {
-    const { w, connections, layout } = setup();
-    const p = layout.placements.find((q) => !q.board && connections.some((c) => c.to.part === q.instanceId && !c.viaPart))!;
+    const { connections, layout, nets } = setup();
+    const p = layout.placements.find((q) => !q.board && !q.breadboard && connections.some((c) => c.to.part === q.instanceId && !c.viaPart))!;
     const moved = movePart(layout, p.instanceId, [layout.bounds.maxX + 60, layout.bounds.minY - 40]);
-    const full = buildWires({ connections, layout: moved, getPart, nets: w.netlist.nets });
-    const mine = buildWires({ connections, layout: moved, getPart, nets: w.netlist.nets, only: (c) => touchesPart(c, p.instanceId) });
+    const full = buildWires({ connections, layout: moved, getPart, nets });
+    const mine = buildWires({ connections, layout: moved, getPart, nets, only: (c) => touchesPart(c, p.instanceId) });
     expect(mine.length).toBeGreaterThan(0);
     expect(mine).toEqual(full.filter((s) => touchesPart(connections.find((c) => c.id === s.id)!, p.instanceId)));
     const c = connections.find((x) => x.to.part === p.instanceId && !x.viaPart)!;
-    const seg = mine.find((s) => s.id === c.id)!;
+    const seg = mine.filter((s) => s.id === c.id).find((s) => s.ends.some((e) => e.kind === "pin" && e.part === p.instanceId))!;
     const pl = moved.placements.find((q) => q.instanceId === p.instanceId)!;
-    expect(seg.points.at(-1)).toEqual(pinWorld(pl, pins3dFor(part(c.to.partId))[c.to.pin]).pos);
+    expect(seg.points[0]).toEqual(pinWorld(pl, pins3dFor(part(c.to.partId))[c.to.pin]).pos);
   });
 });
 
-describe("wires", () => {
-  it.each(Object.entries(FIXTURES))("%s: each wire starts and ends on its pins", (_, ids) => {
-    const { w, connections, items } = wire(ids);
-    const layout = layoutMat(items, connections);
-    const byId = new Map(layout.placements.map((p) => [p.instanceId, p]));
-    const at = (inst: string, partId: string, pin: string) => pinWorld(byId.get(inst)!, pins3dFor(part(partId))[pin]).pos;
-    const segs = buildWires({ connections, layout, getPart, nets: w.netlist.nets });
-    for (const c of connections) {
-      const mine = segs.filter((s) => s.id === c.id);
-      expect(mine.length, c.id).toBe(c.viaPart ? 2 : 1);
-      for (const s of mine) {
-        expect(s.colour).toBe(c.wireColour);
-        for (const p of s.points) for (const v of p) expect(Number.isFinite(v)).toBe(true);
+describe("wires on the breadboard", () => {
+  it.each(Object.entries(FIXTURES))("%s: every connection has a jumper in its colour; every end on its pin or a hole of its net", (_, ids) => {
+    const { connections, layout, nets } = wire(ids);
+    const l = layout();
+    const segs = buildWires({ connections, layout: l, getPart, nets });
+    expect(new Set(segs.map((s) => s.id))).toEqual(new Set(connections.map((c) => c.id)));
+    for (const s of segs) for (const p of s.points) for (const v of p) expect(Number.isFinite(v)).toBe(true);
+    expect(wireProblems(segs, connections, l, getPart, nets)).toEqual([]);
+    expect(buildWires({ connections, layout: l, getPart, nets })).toEqual(segs);
+  });
+
+  it.each(Object.entries(FIXTURES))("%s: no two jumpers share a hole, and none goes into a leg's hole", (_, ids) => {
+    const { connections, layout, nets } = wire(ids);
+    const l = layout();
+    const used = new Set(l.placements.flatMap((p) => (p.breadboard ? (p.holes ?? []).map((h) => `${h.col}:${h.row}`) : [])));
+    for (const s of buildWires({ connections, layout: l, getPart, nets }))
+      for (const e of s.ends) {
+        if (e.kind !== "hole") continue;
+        const k = `${e.col}:${e.row}`;
+        expect(used.has(k), `${s.id} ${k}`).toBe(false);
+        used.add(k);
       }
-      const first = mine[0].points[0];
-      const last = mine[mine.length - 1].points.at(-1)!;
-      expect(first).toEqual(at(c.from.part, c.from.partId, c.from.pin));
-      expect(last).toEqual(at(c.to.part, c.to.partId, c.to.pin));
+  });
+
+  it("ground runs on the − rail, the board's supply on a + rail, each fed by ONE jumper shared by its net", () => {
+    const { connections, layout, nets } = wire(FIXTURES.doorbell);
+    const l = layout();
+    const rails = railNets(connections, l);
+    expect(rails.get("GND")).toBe(10);
+    const segs = buildWires({ connections, layout: l, getPart, nets });
+    for (const [net] of rails) {
+      const feeds = segs.filter((s) => s.shared && connections.find((c) => c.id === s.id)!.net === net);
+      expect(feeds, net).toHaveLength(1);
+      const all = connections.filter((c) => c.net === net).map((c) => c.id);
+      expect(feeds[0].id).toBe(all[0]);
+      expect(feeds[0].shared).toEqual(all);
+      expect(feeds[0].colour).toBe(net === "GND" ? "black" : "red");
     }
+    // A net that touches neither the board nor a plugged part (battery → charger) stays a direct wire.
+    const bat = connections.find((c) => c.net === "VBAT")!;
+    expect(rails.has("VBAT")).toBe(false);
+    expect(segs.filter((s) => s.id === bat.id)).toHaveLength(1);
   });
 
-  it("via wires go board pin → resistor leg a, leg b → host", () => {
-    const { w, connections, items } = wire(FIXTURES.plant);
-    const layout = layoutMat(items, connections);
-    const c = connections.find((x) => x.viaPart)!;
-    const segs = buildWires({ connections, layout, getPart, nets: w.netlist.nets }).filter((s) => s.id === c.id);
-    const r = layout.placements.find((p) => p.instanceId === c.viaPart)!;
-    const legs = pins3dFor(part("resistor_220"));
-    const ends = [segs[0].points.at(-1)!, segs[1].points[0]];
-    const legPos = ["1", "2"].map((id) => pinWorld(r, legs[id]).pos);
-    expect(legPos).toContainEqual(ends[0]);
-    expect(legPos).toContainEqual(ends[1]);
-    expect(ends[0]).not.toEqual(ends[1]);
+  it("ground above the board's middle goes to the top − rail, bridged once to the bottom one", () => {
+    const { connections, layout, nets } = wire(FIXTURES.plant);
+    const l = layout();
+    const segs = buildWires({ connections, layout: l, getPart, nets });
+    const top = segs.filter((s) => s.ends.some((e) => e.kind === "hole" && e.row === 12));
+    expect(top.length).toBeGreaterThan(1);
+    const bridges = segs.filter((s) => s.ends[0].kind === "hole" && s.ends[0].row === 10 && s.ends[1].kind === "hole" && s.ends[1].row === 12);
+    expect(bridges).toHaveLength(1);
+    expect(bridges[0].id).toBe(connections.find((c) => c.net === "GND")!.id);
+    expect(bridges[0].shared).toEqual(connections.filter((c) => c.net === "GND").map((c) => c.id));
   });
 
-  it("lifted parts drag their wire ends up", () => {
-    const { w, connections, items } = wire(FIXTURES.uno);
-    const layout = layoutMat(items, connections);
-    const lift = apartLift(layout);
-    const flat = buildWires({ connections, layout, getPart, nets: w.netlist.nets });
-    const up = buildWires({ connections, layout, getPart, nets: w.netlist.nets, lift: (id) => lift.get(id) ?? 0 });
-    const c = connections.find((x) => !x.viaPart && lift.get(x.to.part)! > 0)!;
+  it("lifted parts drag their wire ends up; holes stay down", () => {
+    const { connections, layout, nets } = wire(FIXTURES.uno);
+    const l = layout();
+    const lift = apartLift(l);
+    const flat = buildWires({ connections, layout: l, getPart, nets });
+    const up = buildWires({ connections, layout: l, getPart, nets, lift: (id) => lift.get(id) ?? 0 });
+    const c = connections.find(
+      (x) => !x.viaPart && x.role !== "power" && x.role !== "ground" && !l.placements.find((p) => p.instanceId === x.to.part)!.breadboard,
+    )!;
     const i = flat.findIndex((s) => s.id === c.id);
     expect(up[i].points.at(-1)![2] - flat[i].points.at(-1)![2]).toBeCloseTo(lift.get(c.to.part)!);
+    const hole = flat.findIndex((s) => s.ends[1].kind === "hole");
+    expect(up[hole].points.at(-1)).toEqual(flat[hole].points.at(-1));
   });
 
-  it("the arch rises above both ends", () => {
+  it("jumpers rise out of their holes; a jumper over a module arches above it", () => {
     const pts = wirePath({ pos: [0, 0, 10], dir: [0, 0, 1] }, { pos: [60, 0, 2], dir: [-1, 0, 0] });
     expect(pts[0]).toEqual([0, 0, 10]);
     expect(pts.at(-1)).toEqual([60, 0, 2]);
     expect(Math.max(...pts.map((p) => p[2]))).toBeGreaterThan(15);
+    const j = jumperPath([0, 0, 8], [0, -6.35, 8]);
+    expect(j[0]).toEqual([0, 0, 8]);
+    expect(Math.min(j[1][2], j[2][2])).toBeGreaterThan(8);
+    const over = jumperPath([0, -14, 8], [0, 22, 8], 20);
+    expect(Math.max(...over.map((p) => p[2]))).toBeGreaterThan(20);
+  });
+
+  it("holes the wires end in are real holes of the board", () => {
+    const { connections, layout, nets } = wire(FIXTURES.plant);
+    const l = layout();
+    const segs: WireSegment[] = buildWires({ connections, layout: l, getPart, nets });
+    const keys = new Set(allHoles(l.breadboard!.cols).map((h) => `${h.col}:${h.row}`));
+    for (const s of segs)
+      s.ends.forEach((e, i) => {
+        if (e.kind !== "hole") return;
+        expect(keys.has(`${e.col}:${e.row}`)).toBe(true);
+        expect(i === 0 ? s.points[0] : s.points.at(-1)).toEqual(holeWorld(l.breadboard!, e));
+      });
   });
 });

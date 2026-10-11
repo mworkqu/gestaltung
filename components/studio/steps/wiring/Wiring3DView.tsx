@@ -24,6 +24,13 @@
 // its own wires are rebuilt per move, it never overlaps another part; the spot
 // is kept per session (sessionStorage, page + parts list) and "Reset layout"
 // brings the auto layout back. A tap without movement still works as before.
+// Breadboard (P5-17e): the parts are built the way people prototype — small
+// parts plugged into a solderless breadboard (one textured box, holes drawn on
+// a canvas texture), the board beside it, power / ground on the rails, short
+// jumpers (lib/studio/wiring3d/{breadboard,layout,wires}.ts). A rail feed jumper
+// belongs to the first connection of its net and glows with any of them.
+// Dropping a part over the breadboard plugs it into the nearest free columns
+// (settleMove); "Take it apart" lifts the parts out, the breadboard stays.
 // frameloop "demand": a frame only on camera moves, drags, hover/selection and
 // the short animations.
 
@@ -40,17 +47,20 @@ import { buildPartModel } from "@/lib/studio/models";
 import type { GetPart, Locale } from "@/lib/studio/netlist";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { LibraryPart, Net, StudioDoc } from "@/lib/studio/schema";
+import { holeWorld, type BreadboardSpec } from "@/lib/studio/wiring3d/breadboard";
+import { buildBreadboardModel } from "@/lib/studio/wiring3d/breadboard-model";
 import {
   apartLift,
   applyMoves,
-  BREADBOARD_H,
   layoutMat,
   movePart,
+  pinWorld,
   resolveMove,
+  settleMove,
   type MatLayout,
   type MatMoves,
-  type Placement,
 } from "@/lib/studio/wiring3d/layout";
+import { pins3dFor, type Vec3 } from "@/lib/studio/wiring3d/pins3d";
 import { buildWires, touchesPart, type WireSegment } from "@/lib/studio/wiring3d/wires";
 import { cn } from "@/lib/utils";
 import { LeanCanvas } from "../../viewer/LeanCanvas";
@@ -158,7 +168,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the parts list
     [compKey, getPart],
   );
-  const auto = useMemo(() => layoutMat(items, connections), [items, connections]);
+  const auto = useMemo(() => layoutMat(items, connections, doc.netlist.nets), [items, connections, doc.netlist.nets]);
   // Parts the client moved by hand (per session, per page + parts list).
   const storeKey = useMemo(() => movesKey(compKey), [compKey]);
   const [moves, setMoves] = useState<{ key: string; moves: MatMoves }>(() => ({ key: storeKey, moves: loadMoves(storeKey) }));
@@ -294,7 +304,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
         )}
       </div>
       <p className="text-sm text-mutedtext">
-        {t("hint")} {t("dragHint")}
+        {t("breadboardHint")} {t("hint")} {t("dragHint")}
       </p>
     </div>
   );
@@ -453,16 +463,18 @@ function Scene(p: SceneProps) {
   const wireGroup = useMemo(() => new THREE.Group(), []);
   const wires = useRef<WireMesh[]>([]);
   const indexOf = useMemo(() => new Map(connections.map((c, i) => [c.id, i])), [connections]);
+  // A rail feed jumper belongs to the first connection of its net but lights up with any of them (seg.shared).
   const look = useCallback(
-    (id: string): WireLook => {
-      const i = indexOf.get(id) ?? 0;
+    (seg: WireSegment): WireLook => {
+      const i = indexOf.get(seg.id) ?? 0;
+      const hit = !!activeId && (seg.id === activeId || !!seg.shared?.includes(activeId));
       if (guide !== null) {
         // Build guide: wires already laid look normal, the current one glows, later ones are faint.
         if (i > guide) return "ghost";
-        if (id === activeId) return "glow";
+        if (hit) return "glow";
         return activeId === connections[guide]?.id ? "normal" : "dim";
       }
-      if (activeId) return id === activeId ? "glow" : "dim";
+      if (activeId) return hit ? "glow" : "dim";
       return "normal";
     },
     [indexOf, guide, activeId, connections],
@@ -475,7 +487,7 @@ function Scene(p: SceneProps) {
         false,
         "centripetal",
       );
-      const l = look(seg.id);
+      const l = look(seg);
       const r = l === "glow" ? R_GLOW : R_WIRE;
       const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, TUBE_SEG, r, TUBE_RAD, false), wireMaterial(seg.colour, l));
       mesh.castShadow = l === "normal" || l === "glow";
@@ -572,8 +584,9 @@ function Scene(p: SceneProps) {
       let prog = 1;
       if (d && w.seg.id === d.id) {
         const pAll = Math.min(1, (performance.now() - d.start) / DRAW_MS);
-        const twoParts = wires.current.filter((x) => x.seg.id === d.id).length > 1;
-        prog = twoParts ? Math.min(1, Math.max(0, pAll * 2 - w.seg.part)) : pAll;
+        // Several jumpers: laid one after the other.
+        const n = wires.current.filter((x) => x.seg.id === d.id).length;
+        prog = Math.min(1, Math.max(0, pAll * n - w.seg.part));
       }
       const tris = Math.floor((idx.count / 3) * prog);
       w.mesh.geometry.setDrawRange(0, tris * 3);
@@ -605,7 +618,19 @@ function Scene(p: SceneProps) {
       for (const el of els) if (el) el.style.opacity = "0";
       return;
     }
-    const ends = [segs[0].seg.points[0], segs[segs.length - 1].seg.points[segs[segs.length - 1].seg.points.length - 1]];
+    // Labels sit on the two parts' own pins (a plugged part: the hole its leg is in), not on the rail.
+    const conn = connById.get(activeId!);
+    const anchor = (e: Connection["from"] | undefined): Vec3 | null => {
+      const pl = e && live.current.placements.find((q) => q.instanceId === e.part);
+      if (!e || !pl) return null;
+      const h = pl.breadboard && live.current.breadboard ? pl.holes?.find((q) => q.id === e.pin) : undefined;
+      if (h) return holeWorld(live.current.breadboard!, h);
+      const part = getPart(e.partId);
+      const pin = part ? pins3dFor(part)[e.pin] : undefined;
+      return pin ? pinWorld(pl, pin, (lifts.get(pl.instanceId) ?? 0) * tRef.current).pos : null;
+    };
+    const fallback = [segs[0].seg.points[0], segs[segs.length - 1].seg.points[segs[segs.length - 1].seg.points.length - 1]];
+    const ends = [anchor(conn?.from) ?? fallback[0], anchor(conn?.to) ?? fallback[1]];
     const at = ends.map((q) => {
       v.set(q[0], q[1], q[2] + 3);
       g.localToWorld(v);
@@ -695,7 +720,8 @@ function Scene(p: SceneProps) {
       drag.current = null;
       setControls(true);
       el.style.cursor = hoverPart.current ? "grab" : "";
-      if (d.moved) cbs.current.onMovePart(d.id, d.xy);
+      // Dropped over the breadboard: it plugs into the nearest free columns; else it lies on the mat.
+      if (d.moved) cbs.current.onMovePart(d.id, settleMove(live.current, d.id, d.xy));
       else if (how === "up") cbs.current.onSelect(null); // a tap on a part, as before (nothing to show)
     };
     const onDownCapture = (e: PointerEvent) => {
@@ -718,7 +744,7 @@ function Scene(p: SceneProps) {
         d.moved = true;
         el.style.cursor = "grabbing";
       }
-      const xy = resolveMove(live.current.placements, d.id, [hitV.x + d.off[0], hitV.y + d.off[1]], d.xy);
+      const xy = resolveMove(live.current, d.id, [hitV.x + d.off[0], hitV.y + d.off[1]], d.xy);
       if (xy[0] === d.xy[0] && xy[1] === d.xy[1]) return;
       d.xy = xy;
       live.current = movePart(live.current, d.id, xy);
@@ -810,6 +836,7 @@ function Scene(p: SceneProps) {
       <Lights layout={layout} />
       <group rotation={CONTENT_ROT} ref={contentRef}>
         <Mat layout={layout} />
+        {layout.breadboard && <BreadboardModel spec={layout.breadboard} />}
         {layout.placements.map((pl) => {
           const model = models.get(pl.instanceId);
           if (!model) return null;
@@ -827,9 +854,10 @@ function Scene(p: SceneProps) {
               onPointerOver={onPartOver}
               onPointerOut={onPartOut}
             >
-              {pl.breadboard && <Breadboard pl={pl} />}
               <group position={[0, 0, pl.pos[2]]} rotation={[0, 0, (pl.rotZ * Math.PI) / 180]}>
-                <primitive object={model} />
+                <group position={pl.offset} rotation={[(pl.tilt * Math.PI) / 180, 0, 0]}>
+                  <primitive object={model} />
+                </group>
               </group>
             </group>
           );
@@ -843,7 +871,7 @@ function Scene(p: SceneProps) {
   );
 }
 
-// ── Mat + breadboard strip ─────────────────────────────────────────────────
+// ── Mat + breadboard ─────────────────────────────────────────────────
 
 function Mat({ layout }: { layout: MatLayout }) {
   const { minX, maxX, minY, maxY } = layout.bounds;
@@ -884,37 +912,12 @@ function Mat({ layout }: { layout: MatLayout }) {
   return <primitive object={res.g} position={[cx, cy, 0]} />;
 }
 
-let bbMats: { body: THREE.MeshStandardMaterial; red: THREE.MeshStandardMaterial; blue: THREE.MeshStandardMaterial } | null = null;
-function Breadboard({ pl }: { pl: Placement }) {
-  const res = useMemo(() => {
-    bbMats ??= {
-      body: new THREE.MeshStandardMaterial({ color: "#f3f1ea", roughness: 0.6 }),
-      red: new THREE.MeshStandardMaterial({ color: "#dc2626", roughness: 0.5 }),
-      blue: new THREE.MeshStandardMaterial({ color: "#2563eb", roughness: 0.5 }),
-    };
-    const g = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(pl.w, pl.d, BREADBOARD_H), bbMats.body);
-    body.position.z = BREADBOARD_H / 2;
-    body.castShadow = true;
-    body.receiveShadow = true;
-    g.add(body);
-    for (const [s, m] of [[1, bbMats.red], [-1, bbMats.blue]] as const) {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(pl.w - 2, 0.6, 0.06), m);
-      stripe.position.set(0, s * (pl.d / 2 - 1.2), BREADBOARD_H + 0.03);
-      g.add(stripe);
-    }
-    g.traverse((o) => {
-      (o as THREE.Mesh).raycast = () => undefined;
-    });
-    return g;
-  }, [pl.w, pl.d]);
-  useEffect(
-    () => () => {
-      res.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-    },
-    [res],
-  );
-  return <primitive object={res} />;
+/** The breadboard (one textured box; it never lifts and never takes a tap). */
+function BreadboardModel({ spec }: { spec: BreadboardSpec }) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt only when the board itself changes
+  const res = useMemo(() => buildBreadboardModel(spec), [spec.cols, spec.pos[0], spec.pos[1]]);
+  useEffect(() => () => res.dispose(), [res]);
+  return <primitive object={res.group} />;
 }
 
 // ── Lights (the viewer's rig) ──────────────────────────────────────────────

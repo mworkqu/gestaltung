@@ -421,3 +421,26 @@ test("screenshots: Plant Waterer, 375, AR", async ({ page }, info) => {
   await openTab(page, "pins");
   await shot(page, "07-ar-375-pins.png");
 });
+
+// ── 3D on a breadboard (P5-17e): screenshots only ──
+test("screenshots: 3D breadboard, Plant Waterer + doorbell 1366, doorbell 375", async ({ page }, info) => {
+  test.skip(!process.env.P517_SHOTS || info.project.name !== "desktop", "set P517_SHOTS=1 (desktop project)");
+  test.setTimeout(180_000);
+  mkdirSync(SHOTS, { recursive: true });
+  const shots: [string, number, number, string][] = [
+    ["plant_waterer", 1366, 900, "11-breadboard-plant-1366.png"],
+    ["doorbell", 1366, 900, "12-breadboard-doorbell-1366.png"],
+    ["doorbell", 375, 812, "13-breadboard-doorbell-375.png"],
+  ];
+  for (const [idea, width, height, file] of shots) {
+    await page.setViewportSize({ width, height });
+    await open(page, "en", idea);
+    await draw(page, "en");
+    await open3d(page);
+    const panel = page.getByTestId("studio-wiring-3d");
+    await panel.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
+    await panel.screenshot({ path: path.join(SHOTS, file) });
+    if (width <= 375) await expectNoHorizontalOverflow(page);
+  }
+});

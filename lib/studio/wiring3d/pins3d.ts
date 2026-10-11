@@ -178,6 +178,11 @@ export const OVERRIDES: Record<string, Override> = {
     AOUT: at([47, 0, 4.6], [1, 0, 0]),
     GND: at([47, 2.54, 4.6], [1, 0, 0]),
   },
+  // Red / black lead into the white JST plug at the -x end (models/lipoPouch.ts).
+  lipo_1000: {
+    BAT_PLUS: at([-31, 1.0, 3.25], [-1, 0, 0]),
+    BAT_MINUS: at([-31, -1.0, 3.25], [-1, 0, 0]),
+  },
   // Four pins toward -y across the body width; pin 3 is not connected (models/dht22.ts).
   dht22: {
     VCC: at([0, -15, 7.55 - 1.5 * PITCH], [0, -1, 0]),
