@@ -323,17 +323,21 @@ function StudioShellInner({
   );
 
   const onEnclosure = useCallback(
-    (enclosure: EnclosureSpec, opts: { serverVersion?: number | null; fresh?: boolean; layout?: StudioDoc["layout"] }) => {
+    (
+      enclosure: EnclosureSpec,
+      opts: { serverVersion?: number | null; fresh?: boolean; layout?: StudioDoc["layout"]; reshape?: boolean },
+    ) => {
       const base = latest.current;
       if (!base) return;
       const versions = opts.fresh ? [...(base.enclosureVersions ?? []), enclosure].slice(-3) : base.enclosureVersions;
-      // A new look changes the case's size: its printed parts are worked out again.
+      // A new look (or another shape picked under "Other shapes") changes the case's size:
+      // its printed parts are worked out again.
       const nextDoc: StudioDoc = {
         ...base,
         enclosure,
         enclosureVersions: versions,
         layout: opts.layout ?? base.layout,
-        ...(opts.fresh ? { mech: [] } : {}),
+        ...(opts.fresh || opts.reshape ? { mech: [] } : {}),
       };
       if (opts.fresh && typeof opts.serverVersion === "number") {
         // The route saved the enclosure; the layout is ours to add.

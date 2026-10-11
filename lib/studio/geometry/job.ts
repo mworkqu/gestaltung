@@ -6,13 +6,14 @@
 
 import type * as THREE from "three";
 import { buildEnclosure, type BuiltEnclosure } from "../enclosure/build";
-import { buildMechParts } from "../mech/build";
+import { buildMechParts, STAKE_SPIKE_ID } from "../mech/build";
 import type { LibraryPart } from "../schema";
 import { packGeometry, transferablesOf } from "./pack";
 import type { EnclosureInput, GeometryReply, GeometryRequest, MechInput, PackedEnclosure, PackedMechPart } from "./protocol";
 
 // Built enclosures by key (the mech build reuses the case it was cut for).
-const MAX_CACHED = 3;
+// The shown case + its three "Other shapes" variants (built in the background) all stay.
+const MAX_CACHED = 5;
 const built = new Map<string, BuiltEnclosure>();
 
 function partsMap(input: EnclosureInput): Map<string, LibraryPart> {
@@ -67,7 +68,8 @@ export function runMech(encKey: string, input: MechInput): PackedMechPart[] {
   );
   return list.map((b) => {
     const mesh = b.object as THREE.Mesh;
-    const shell = b.template === "lid" || b.template === "base" ? b.template : undefined;
+    // lid / base reuse the case's geometry on the main thread; the stake spike is its own part.
+    const shell = b.id !== STAKE_SPIKE_ID && (b.template === "lid" || b.template === "base") ? b.template : undefined;
     const out: PackedMechPart = {
       id: b.id,
       template: b.template,

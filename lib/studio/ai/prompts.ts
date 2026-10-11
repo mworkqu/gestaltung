@@ -143,7 +143,10 @@ export const ENCLOSURE_SYSTEM =
   "soft_wedge = desk device with a screen (tilted top); puck = small round palm-sized object; " +
   "handheld_taper = held in the hand; lantern = tall light or speaker standing on a desk (light slots around " +
   "its top band, up to 3 times as tall as wide); dome_base = round sensor, lamp or speaker on a desk (domed lid, " +
-  "ring feet); wall_plate = mounted on a wall (thin plate, keyholes on the back, no feet). " +
+  "ring feet); wall_plate = mounted on a wall (thin plate, keyholes on the back, no feet); " +
+  "stake_pod = round pod on a spike pushed into the soil of a plant pot or garden bed (no feet; vents on a side). " +
+  "Match the product's placement, how it is held, indoor/outdoor and size; when our shape rules suggest a " +
+  "template, prefer it for the first look unless the product clearly needs another. " +
   "Vents: slots, holes or hex for airflow; grille = concentric arcs over a speaker (usually the +z top); " +
   "louvres = angled slats on a side face (+x/-x/+y/-y) for products near rain or dust. " +
   "label = optional short product name raised on the lid, Latin letters, digits, space, - . & only, at most " +
@@ -193,6 +196,8 @@ export function enclosurePrompt(opts: {
   bbox: { w: number; d: number; h: number };
   templates: readonly EnclosureTemplate[];
   previous: unknown[];
+  /** Our shape rules (shape-pick.ts rankShapes), best first: template + the reason code. */
+  suggested?: { template: EnclosureTemplate; reason: string }[];
 }): string {
   const lines = [
     `Product:\n${JSON.stringify(opts.spec)}`,
@@ -200,6 +205,10 @@ export function enclosurePrompt(opts: {
     `Space the parts need (mm): ${JSON.stringify(opts.bbox)}`,
     `Allowed templates: ${opts.templates.join(", ")}`,
   ];
+  const suggested = (opts.suggested ?? []).filter((s) => opts.templates.includes(s.template));
+  if (suggested.length) {
+    lines.push(`Our shape rules suggest, best first: ${suggested.map((s) => `${s.template} (${s.reason})`).join(", ")}`);
+  }
   if (opts.previous.length) {
     lines.push(
       `Looks already shown to the user:\n${JSON.stringify(opts.previous)}\n` +

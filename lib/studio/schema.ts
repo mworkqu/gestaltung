@@ -42,10 +42,10 @@ export const PIN_ROLES = [
 ] as const;
 export const PIN_SIDES = ["left", "right", "top", "bottom"] as const;
 
-/** All eight enclosure templates (lantern / dome_base / wall_plate since Phase 3). */
+/** All enclosure templates (lantern / dome_base / wall_plate since Phase 3, stake_pod since W6). */
 export const ENCLOSURE_TEMPLATES = [
   "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper",
-  "lantern", "dome_base", "wall_plate",
+  "lantern", "dome_base", "wall_plate", "stake_pod",
 ] as const;
 export const HEIGHT_BIASES = ["low", "mid", "tall"] as const;
 export const LIDS = ["snap", "screw_4", "slide", "twist"] as const;
@@ -422,7 +422,7 @@ export const DEFAULT_ENCLOSURE: EnclosureSpec = {
 
 /** Templates allowed for the current phase (renderer can build these). */
 export const PHASE_TEMPLATES: readonly EnclosureTemplate[] = [
-  "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper", "lantern", "dome_base", "wall_plate",
+  "rounded_box", "pill", "soft_wedge", "puck", "handheld_taper", "lantern", "dome_base", "wall_plate", "stake_pod",
 ];
 
 export type ClampEnclosureOpts = {
@@ -468,9 +468,14 @@ export function clampEnclosure(input: unknown, log: ClampLog = [], opts: ClampEn
     log.push({ path: "vents.face", from: ventFace, to: "+x" });
     ventFace = "+x";
   }
+  if (template === "stake_pod" && ventPattern !== "none" && ventFace === "-z") {
+    // The pod's bottom holds the spike socket and sits over wet soil: vents go on a side.
+    log.push({ path: "vents.face", from: ventFace, to: "+x" });
+    ventFace = "+x";
+  }
   let feet = pickEnum(FEET, o.feet, d.feet, "feet", log);
-  if (template === "wall_plate" && feet !== "none") {
-    // A wall plate hangs on the wall: no feet.
+  if ((template === "wall_plate" || template === "stake_pod") && feet !== "none") {
+    // A wall plate hangs on the wall and a stake pod stands on its spike: no feet.
     log.push({ path: "feet", from: feet, to: "none" });
     feet = "none";
   }

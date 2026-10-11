@@ -8,23 +8,43 @@
 // X-ray shows the parts inside; "Download STL (rough)" exports base and lid.
 // "Name on the lid" (optional, ≤ 16) is a local edit too: debounced 400 ms,
 // then the geometry worker raises it on the lid (no API call, no credit).
+//
+// W6 — everything 3D lives here:
+//  * "Why this shape" (shape-pick.ts: placement / holding / environment / size)
+//    and "Other shapes": the next three DIFFERENT templates for this product,
+//    adapted from the current look (colour, finish, lid name kept). A tap is a
+//    local edit like a colour (no AI, no credit); the case's printed parts are
+//    worked out again (reshape).
+//  * "Take it apart" toggle + slider under the 3D view: the case opens and the
+//    printed stands / clips (standoffs under boards with holes, cradles …) show
+//    in place. The parts list = doc.mech, else the same deterministic list the
+//    Print step falls back to (no API call here).
+//  * Speed: the viewer shows the last built case from this browser at once
+//    (geometry/persist.ts); once the case is up, the worker builds the printed
+//    parts, then the three other shapes, one at a time, first one first.
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Download, Eye, Loader2, Sparkles } from "lucide-react";
+import type * as THREE from "three";
+import { Download, Eye, Layers, Loader2, Sparkles } from "lucide-react";
 
 import { AccessNote } from "@/components/credits/access-note";
 import { StudioViewer, type ViewerApi } from "@/components/studio/viewer/ViewerLazy";
+import type { ViewerExtraObject } from "@/components/studio/viewer/types";
 import { track } from "@/lib/analytics";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { arabicCountForm } from "@/lib/text/count";
+import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { downloadBlob } from "@/lib/studio/download";
 import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
 import { labelSupport } from "@/lib/studio/enclosure/label-font";
-import { layoutComponents } from "@/lib/studio/layout";
+import { shapeReason, shapeVariants } from "@/lib/studio/enclosure/shape-pick";
+import { shapeOf, stableJson } from "@/lib/studio/geometry/key";
+import type { BuiltMechPart } from "@/lib/studio/mech/build";
+import { layoutComponents, layoutResultOf } from "@/lib/studio/layout";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { COLOUR_HEX, STEP_ACCENT } from "@/lib/studio/palette";
-import { COLOURS, FINISHES, LIMITS, type EnclosureSpec, type StudioDoc } from "@/lib/studio/schema";
+import { COLOURS, FINISHES, LIMITS, type EnclosureSpec, type MechPart, type StudioDoc } from "@/lib/studio/schema";
 import { fileSlug, looksLeftFromVersions } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
@@ -35,6 +55,10 @@ import { accessReason, problemKey } from "./problem";
 const accent = STEP_ACCENT.enclosure;
 /** Typing pause before the lid is rebuilt with the new name. */
 const LABEL_DEBOUNCE_MS = 400;
+/** "Take it apart" opens this far at once (the slider then goes 0–1). */
+const APART_DEFAULT = 0.65;
+/** Printed parts shown with the case (the lid, base and stake spike are the case itself). */
+const isHolder = (b: BuiltMechPart) => b.template !== "lid" && b.template !== "base";
 
 export function EnclosureStep({
   ctx,
@@ -48,7 +72,7 @@ export function EnclosureStep({
   beforeServer: () => Promise<void>;
   onEnclosure: (
     enclosure: EnclosureSpec,
-    opts: { serverVersion?: number | null; fresh?: boolean; layout?: StudioDoc["layout"] },
+    opts: { serverVersion?: number | null; fresh?: boolean; layout?: StudioDoc["layout"]; reshape?: boolean },
   ) => void;
   onNext: () => void;
 }) {
@@ -158,8 +182,11 @@ export function EnclosureStep({
   }
   // What the last built case said about its label (only trusted for the text it was built with).
   const [labelBuilt, setLabelBuilt] = useState<{ text: string; skipped?: string } | null>(null);
+  // The shape the viewer has finished building (background work starts after it).
+  const [readyShape, setReadyShape] = useState<string | null>(null);
   const onEnclosureMeta = useCallback((meta: EnclosureMeta | null) => {
     setLabelBuilt(meta ? { text: encRef.current?.label ?? "", skipped: meta.labelSkipped } : null);
+    setReadyShape(meta && encRef.current ? stableJson(shapeOf(encRef.current)) : null);
   }, []);
   const support = labelSupport(labelDraft);
   const draftText = labelDraft.replace(/\s+/g, " ").trim();
@@ -172,8 +199,105 @@ export function EnclosureStep({
           ? t("labelSpace")
           : null;
 
+  // ── Why this shape + other shapes ────────────────────────────────────────
+  const current = doc.enclosure;
+  const shapeKey = current ? stableJson(shapeOf(current)) : "";
+  const why = current ? shapeReason(doc.spec, current.template) : null;
+  const variants = useMemo(
+    () => (current ? shapeVariants(doc.spec, current) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- materials (colour / finish) are carried over at tap time
+    [doc.spec, shapeKey],
+  );
+  function pickShape(v: EnclosureSpec) {
+    const enc = encRef.current;
+    if (!enc) return;
+    // Keep what the visitor chose since (colour, finish, lid name); only the shape changes.
+    const next: EnclosureSpec = { ...v, colour: enc.colour, finish: enc.finish };
+    if (enc.accentColour) next.accentColour = enc.accentColour;
+    else delete next.accentColour;
+    if (enc.label) next.label = enc.label;
+    else delete next.label;
+    onEnclosure(next, { reshape: true });
+  }
+
+  // ── Take it apart (+ the printed stands and clips) ──────────────────────
+  const [apart, setApart] = useState(false);
+  const [explode, setExplode] = useState(0);
+  const partsMap = useMemo(() => new Map(placed.map(({ c, part }) => [c.instanceId, part])), [placed]);
+  const mechList = useMemo<MechPart[]>(() => {
+    if (doc.mech.length) return doc.mech;
+    if (!current || placed.length === 0) return [];
+    // The same deterministic list the Print step falls back to (no API call, no credit).
+    const b = layoutBounds(doc.components, layout.layout, getPart);
+    const pad = 2 * (current.wall + current.clearance);
+    return defaultMechParts(
+      mechSummary({
+        components: doc.components,
+        layout: layout.layout,
+        getPart,
+        enclosure: b ? { w: b.w + pad, d: b.d + pad, h: b.h + pad } : { w: 60, d: 40, h: 25 },
+        template: current.template,
+      }),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the shape, not on colour
+  }, [doc.mech, shapeKey, layout, placed, getPart]);
+  const mechKeyText = JSON.stringify(mechList);
+  const [holders, setHolders] = useState<BuiltMechPart[] | null>(null);
+
+  // Once the case is on screen: the printed parts, then the other shapes — one job at a time
+  // in the shared worker (cached by shape), so "Take it apart" and a shape tap are instant.
+  useEffect(() => {
+    if (!current || readyShape !== shapeKey || placed.length === 0) return;
+    let stopped = false;
+    const enclosure = current;
+    void (async () => {
+      const geo = await import("@/lib/studio/geometry/client");
+      const lr = layoutResultOf(layout.layout, partsMap);
+      const env = doc.spec.environment;
+      await geo.prebuildInOrder(
+        [
+          async () => {
+            if (!mechList.length) return;
+            const [enc, mech] = await Promise.all([
+              geo.getEnclosureGeometry(enclosure, lr, partsMap),
+              geo.getMechGeometry(enclosure, lr, partsMap, mechList, env),
+            ]);
+            if (!stopped) setHolders(geo.mechObjects(mech, enc).filter(isHolder));
+          },
+          ...variants.map((v) => () => geo.getEnclosureGeometry(v, lr, partsMap, { persist: false })),
+        ],
+        () => stopped,
+      );
+    })();
+    return () => {
+      stopped = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the built shape + the parts list
+  }, [readyShape, shapeKey, mechKeyText, partsMap]);
+  // A new shape: the old stands and clips no longer fit.
+  useEffect(() => {
+    setHolders(null);
+  }, [shapeKey, mechKeyText]);
+  useEffect(
+    () => () => {
+      // Geometry belongs to the geometry cache; only the per-part materials are ours.
+      for (const b of holders ?? []) ((b.object as THREE.Mesh).material as THREE.Material | undefined)?.dispose();
+    },
+    [holders],
+  );
+  const extraObjects = useMemo<ViewerExtraObject[] | undefined>(
+    () => (apart && holders ? holders.map((b) => ({ name: b.id, object: b.object, explode: b.explode })) : undefined),
+    [apart, holders],
+  );
+  function toggleApart() {
+    const next = !apart;
+    setApart(next);
+    setExplode(next ? APART_DEFAULT : 0);
+  }
+
   async function downloadStl() {
-    const objects = viewer.current?.getObjects().filter((o) => o.name === "enclosure_base" || o.name === "enclosure_lid") ?? [];
+    const names = ["enclosure_base", "enclosure_lid", "enclosure_spike"];
+    const objects = viewer.current?.getObjects().filter((o) => names.includes(o.name)) ?? [];
     if (!objects.length) return;
     const { exportObjectsSTL } = await import("@/lib/studio/export");
     const slug = fileSlug(ctx.projectName);
@@ -235,6 +359,8 @@ export function EnclosureStep({
           layout={layout.layout}
           enclosure={enclosure}
           xray={xray}
+          extraObjects={extraObjects}
+          explode={apart ? explode : 0}
           accent={accent.base}
           autoRotate
           ariaLabel={t("viewerEnclosure")}
@@ -259,6 +385,71 @@ export function EnclosureStep({
           </button>
         )}
       </div>
+
+      {enclosure && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="studio-explode">
+          <button
+            type="button"
+            onClick={toggleApart}
+            aria-pressed={apart}
+            data-testid="studio-take-apart"
+            className={cn(
+              "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors",
+              apart ? "text-white" : "bg-panel text-heading shadow-neu-sm hover:bg-white",
+            )}
+            style={apart ? { background: accent.ink } : undefined}
+          >
+            <Layers className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+            {t("takeApart")}
+          </button>
+          {apart && (
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={explode}
+              onChange={(e) => setExplode(Number(e.target.value))}
+              aria-label={t("shape.apartAmount")}
+              className="h-11 min-w-0 flex-1 basis-40 cursor-pointer"
+              style={{ accentColor: accent.ink }}
+            />
+          )}
+          {apart && holders && holders.length > 0 && (
+            <p className="w-full text-xs text-mutedtext">{t("shape.holders")}</p>
+          )}
+        </div>
+      )}
+
+      {enclosure && why && (
+        <p className="text-sm text-body" data-testid="studio-shape-why" data-template={enclosure.template}>
+          <span className="font-bold text-heading">{t("shape.whyLabel")}</span>{" "}
+          {t(why.startsWith("fit_") ? `shape.${why}` : `shape.why_${why}`)}
+        </p>
+      )}
+
+      {enclosure && variants.length > 0 && (
+        <fieldset className="space-y-2" data-testid="studio-other-shapes">
+          <legend className="text-sm font-bold text-heading">{t("shape.others")}</legend>
+          <div className="flex flex-wrap gap-2">
+            {variants.map((v) => {
+              const name = t(`shape.name_${v.template}`);
+              return (
+                <button
+                  key={v.template}
+                  type="button"
+                  onClick={() => pickShape(v)}
+                  aria-label={t("shape.tryShape", { name })}
+                  data-template={v.template}
+                  className="min-h-11 rounded-full bg-panel px-4 text-sm font-semibold text-heading shadow-neu-sm transition-colors hover:bg-white active:scale-95 motion-reduce:active:scale-100"
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
 
       {enclosure && looksLeft !== null && looksLeft > 0 && (
         <p className="text-sm font-medium" style={{ color: accent.ink }}>

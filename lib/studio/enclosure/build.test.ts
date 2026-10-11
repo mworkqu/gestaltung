@@ -40,8 +40,8 @@ describe("buildEnclosure", () => {
       expect(base.geometry.boundingBox!.max.z).toBeLessThanOrEqual(meta.splitZ + 1e-3);
       expect(computeMeshVolume(base)).toBeGreaterThan(0);
       expect(computeMeshVolume(lid)).toBeGreaterThan(0);
-      // Rubber feet as child meshes — a wall plate hangs on the wall, so none.
-      expect(base.children.length).toBe(template === "wall_plate" ? 0 : 4);
+      // Rubber feet as child meshes — a wall plate hangs on the wall, so none; a stake pod has only its spike.
+      expect(base.children.length).toBe(template === "wall_plate" ? 0 : template === "stake_pod" ? 1 : 4);
       expect(meta.triangles).toBeLessThan(60000);
       const nor = base.geometry.getAttribute("normal");
       expect(nor).toBeTruthy();
@@ -76,6 +76,63 @@ describe("buildEnclosure", () => {
     // Side-wall cut reaches past the outer wall; top cuts go through the lid.
     expect(usb.center[0] - usb.depth / 2).toBeLessThan(-d.W / 2);
     for (const c of cuts.filter((x) => x.face === "+z")) expect(c.center[2] + c.depth / 2).toBeGreaterThan(d.H);
+  });
+
+  it("stake_pod: a socket in the floor and a printable spike", () => {
+    const { lr, parts } = setup();
+    const { base, meta } = buildEnclosure(spec({ template: "stake_pod", feet: "rubber_4" }), lr, parts);
+    const d = meta.dims;
+    expect(d.stake).toBeTruthy();
+    const k = d.stake!;
+    expect(d.floorZ).toBeCloseTo(d.wall + k.socket.depth, 6);
+    expect(d.contentOffset[2]).toBe(d.floorZ);
+    // The socket is wider than the spike by the fit clearance on every side.
+    expect(k.socket.arm - k.arm).toBeCloseTo(0.3, 6);
+    expect(k.socket.thick - k.thick).toBeCloseTo(0.6, 6);
+    expect(k.peg).toBeLessThan(k.socket.depth);
+    // A ray going up the middle meets the socket roof, not the pod's bottom face.
+    base.material = new THREE.MeshBasicMaterial({ side: THREE.FrontSide });
+    base.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster(new THREE.Vector3(0, 0, -5), new THREE.Vector3(0, 0, 1));
+    const hit = ray.intersectObject(base, false)[0];
+    expect(hit.point.z).toBeCloseTo(k.socket.depth, 3);
+    // The spike: its own child mesh (no rubber feet), peg up to `peg`, tip `length` below the pod.
+    const spike = base.children.find((c) => c.name === "enclosure_spike") as THREE.Mesh;
+    expect(spike).toBeTruthy();
+    expect(base.children.some((c) => c.name.startsWith("enclosure_foot"))).toBe(false);
+    spike.geometry.computeBoundingBox();
+    const sb = spike.geometry.boundingBox!;
+    expect(sb.max.z).toBeCloseTo(k.peg, 3);
+    expect(sb.min.z).toBeCloseTo(-k.length, 3);
+    expect(sb.max.x).toBeCloseTo(k.arm, 3);
+    expect(computeMeshVolume(spike)).toBeGreaterThan(0);
+    // Printed peg end down it only ever narrows upwards: every face either points sideways
+    // with an upward-facing (or vertical) slope, or is a flat cap — no downward overhang.
+    const nor = spike.geometry.getAttribute("normal");
+    for (let i = 0; i < nor.count; i++) {
+      // Flipped for printing, a face normal n becomes -n; an overhang would have -n.z < -0.75 (steeper than ~41°).
+      const nz = -nor.getZ(i);
+      const isCap = Math.abs(nz) > 0.999;
+      if (!isCap) expect(nz).toBeGreaterThan(-0.75);
+    }
+    // The spike reaches well into the soil and the pod obeys the height rule.
+    expect(k.length).toBeGreaterThanOrEqual(60);
+    expect(d.W).toBe(d.D);
+    expect(d.shape).toBe("circle");
+  });
+
+  it("handheld_taper: grip-friendly fillets that keep the wall", () => {
+    const { lr } = setup();
+    const d = enclosureDims(spec({ template: "handheld_taper", edgeFillet: 1 }), lr);
+    // Rounder than any other template's edge (others stop at 0.9 × wall) …
+    expect(d.edgeFillet).toBeGreaterThan(0.9 * d.wall);
+    // … but the plastic left where the fillet meets the cavity edge stays ≥ 1.2 mm.
+    const left = d.edgeFillet - Math.SQRT2 * Math.max(0, d.edgeFillet - d.wall);
+    expect(left).toBeGreaterThanOrEqual(1.2 - 1e-6);
+    // Round corners in plan too.
+    expect(d.cornerRadius).toBeGreaterThanOrEqual(0.3 * Math.min(d.W, d.D) - 0.01);
+    const box = enclosureDims(spec({ template: "rounded_box", edgeFillet: 1 }), lr);
+    expect(d.edgeFillet).toBeGreaterThan(box.edgeFillet);
   });
 
   it("handles a tiny part and a very tall part", () => {

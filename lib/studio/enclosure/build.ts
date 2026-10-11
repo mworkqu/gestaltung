@@ -17,7 +17,10 @@
 //  * dome_base: outer = cylinder + half-ellipsoid cap (one smooth sweep), cavity = the
 //    innerTopAt surface, so the dome shell is >= wall thick everywhere;
 //  * the raised label (label.ts) is unioned onto the outer solid first (one CSG step on
-//    disjoint capsules) and so ends up in the lid mesh.
+//    disjoint capsules) and so ends up in the lid mesh;
+//  * stake_pod: a "+" socket is cut up into the thick floor from below (with the other
+//    cut-outs) and the soil spike is a separate child mesh of the base (SPIKE_MESH),
+//    printed on its own (no supports: flat peg end down, narrowing upwards).
 
 import * as THREE from "three";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -418,6 +421,95 @@ function cutGeometry(c: Cutout): THREE.BufferGeometry {
 }
 
 // ---------------------------------------------------------------------------
+// stake_pod: "+"-section spike and its socket
+// ---------------------------------------------------------------------------
+
+/** "+" outline (12 corners, CCW): bars of half-span `arm` and thickness `thick`, centred on the origin. */
+function plusOutline(arm: number, thick: number): P2[] {
+  const a = arm;
+  const h = thick / 2;
+  return [
+    [a, -h], [a, h], [h, h], [h, a], [-h, a], [-h, h],
+    [-a, h], [-a, -h], [-h, -h], [-h, -a], [h, -a], [h, -h],
+  ];
+}
+
+/**
+ * Loft through "+" rings (same corner count, top to bottom or bottom to top) with flat
+ * faces: every quad / cap gets its own vertices and face normal. Indexed (position +
+ * normal only), so it merges with the other cutters. The "+" is star-shaped around the
+ * origin, so the caps are fans from the centre.
+ */
+function plusLoft(rings: { z: number; arm: number; thick: number }[]): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const idx: number[] = [];
+  const tri = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => {
+    const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).normalize();
+    const i = pos.length / 3;
+    for (const v of [a, b, c]) {
+      pos.push(v.x, v.y, v.z);
+      nor.push(n.x, n.y, n.z);
+    }
+    idx.push(i, i + 1, i + 2);
+  };
+  const loops = rings.map((r) => plusOutline(r.arm, r.thick).map(([x, y]) => new THREE.Vector3(x, y, r.z)));
+  // Orient so the loop order runs from low z to high z (outward normals for a CCW outline).
+  const up = rings[rings.length - 1].z > rings[0].z;
+  const ordered = up ? loops : [...loops].reverse();
+  for (let k = 0; k + 1 < ordered.length; k++) {
+    const lo = ordered[k];
+    const hi = ordered[k + 1];
+    for (let j = 0; j < lo.length; j++) {
+      const j1 = (j + 1) % lo.length;
+      tri(lo[j], lo[j1], hi[j1]);
+      tri(lo[j], hi[j1], hi[j]);
+    }
+  }
+  const capOf = (loop: THREE.Vector3[], top: boolean) => {
+    const c = new THREE.Vector3(0, 0, loop[0].z);
+    for (let j = 0; j < loop.length; j++) {
+      const a = loop[j];
+      const b = loop[(j + 1) % loop.length];
+      if (top) tri(c, a, b);
+      else tri(c, b, a);
+    }
+  };
+  capOf(ordered[0], false);
+  capOf(ordered[ordered.length - 1], true);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+  g.setIndex(idx);
+  return g;
+}
+
+/** The socket cutter: the spike's "+" section + fit clearance, from below the floor up `depth`. */
+function stakeSocket(d: EnclosureDims): THREE.BufferGeometry | null {
+  if (!d.stake) return null;
+  const s = d.stake.socket;
+  return plusLoft([
+    { z: -1, arm: s.arm, thick: s.thick },
+    { z: s.depth, arm: s.arm, thick: s.thick },
+  ]);
+}
+
+/** The soil spike (its own printed part): peg into the socket, then a taper to a point below z = 0. */
+export function stakeSpike(d: EnclosureDims): THREE.BufferGeometry | null {
+  if (!d.stake) return null;
+  const k = d.stake;
+  const tip = { arm: k.thick / 2 + 0.4, thick: Math.max(1.2, k.thick * 0.6) };
+  return plusLoft([
+    { z: k.peg, arm: k.arm, thick: k.thick },
+    { z: 0, arm: k.arm, thick: k.thick },
+    { z: -k.length, arm: tip.arm, thick: tip.thick },
+  ]);
+}
+
+/** Name of the spike child mesh of the base (shown with the case, printed on its own). */
+export const SPIKE_MESH = "enclosure_spike";
+
+// ---------------------------------------------------------------------------
 // CSG helpers
 // ---------------------------------------------------------------------------
 
@@ -504,6 +596,8 @@ export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, 
   if (label.plan) outer = ev.evaluate(outer, brush(labelGeometry(label.plan, d)), ADDITION);
   let shell = ev.evaluate(outer, brush(cavitySolid(d)), SUBTRACTION);
   const cutGeos = [...cutouts, ...keyholes, ...vents].map(cutGeometry);
+  const socket = stakeSocket(d);
+  if (socket) cutGeos.push(socket);
   const cutBrush = cutGeos.length ? brush(mergeGeometries(cutGeos)!) : null;
   if (cutBrush) shell = ev.evaluate(shell, cutBrush, SUBTRACTION);
 
@@ -527,7 +621,14 @@ export function buildEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, 
   const material = () => new THREE.MeshStandardMaterial({ color: 0xf2f0eb, roughness: 0.7, metalness: 0 });
   const base = new THREE.Mesh(finish(baseBrush.geometry), material());
   base.name = "enclosure_base";
-  for (const f of feet(d, d.template === "wall_plate" ? "none" : spec.feet)) base.add(f);
+  for (const f of feet(d, d.template === "wall_plate" || d.template === "stake_pod" ? "none" : spec.feet)) base.add(f);
+  const spikeGeo = stakeSpike(d);
+  if (spikeGeo) {
+    // A separate printed part, shown in place under the pod (the viewer colours it like the case).
+    const spike = new THREE.Mesh(finish(spikeGeo), material());
+    spike.name = SPIKE_MESH;
+    base.add(spike);
+  }
   const lid = new THREE.Mesh(finish(lidBrush.geometry), material());
   lid.name = "enclosure_lid";
 

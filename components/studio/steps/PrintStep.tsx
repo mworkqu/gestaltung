@@ -6,10 +6,11 @@
 //    any failure falls back to the same deterministic list in the browser
 //    (defaultMechParts), so the step always has parts;
 //  * the browser builds them in the Studio geometry worker (lib/studio/geometry,
-//    loaded on demand, cached and shared with the viewer's case) and the viewer
-//    shows case + components + every part,
-//    with a "Take it apart" slider (the viewer eases it; reduced motion jumps);
-//  * the list says what each part is in plain words, its material and grams;
+//    loaded on demand, cached and shared with the Enclosure step's case). The 3D
+//    view with "Take it apart" lives in the Enclosure step (W6: everything 3D in
+//    one step); this step is the printable-parts list, grams and STL downloads;
+//  * the list says what each part is in plain words, its material and grams
+//    (a stake pod's soil spike is its own row);
 //  * main button "Request printing from Gestaltung360": the STLs go to the
 //    visitor's own folder of the private cad-files bucket, then one lead
 //    (/api/store-lead source print_request). Quantity is always 1. The
@@ -36,8 +37,6 @@ import {
 } from "lucide-react";
 
 import { PhonePrompt } from "@/components/projects/phone-prompt";
-import { StudioViewer } from "@/components/studio/viewer/ViewerLazy";
-import type { ViewerExtraObject } from "@/components/studio/viewer/types";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { downloadBlob } from "@/lib/studio/download";
 import { layoutComponents, layoutResultOf } from "@/lib/studio/layout";
@@ -81,7 +80,8 @@ type Row = {
 function rowsOf(built: BuiltMechPart[]): Row[] {
   const rows = new Map<string, Row>();
   for (const b of built) {
-    const key = `${b.template}:${b.printable.material}`;
+    // (The stake pod's spike is a "base"-template part with its own name: its own row.)
+    const key = `${b.template}:${b.printable.material}:${b.name.en}`;
     const row = rows.get(key);
     if (row) {
       row.count += 1;
@@ -128,11 +128,6 @@ export function PrintStep({
       ),
     [placed, doc.enclosure?.clearance, doc.spec.sizeHint],
   );
-  const viewerComponents = useMemo(
-    () => placed.map(({ c }) => ({ instanceId: c.instanceId, partId: c.partId, label: c.label })),
-    [placed],
-  );
-
   // ── The parts list (server, else the same rules in the browser) ──────────
   const started = useRef(false);
   const [fetching, setFetching] = useState(false);
@@ -215,16 +210,8 @@ export function PrintStep({
     [built],
   );
 
-  const extraObjects = useMemo<ViewerExtraObject[]>(
-    () =>
-      (built ?? [])
-        .filter((b) => b.template !== "lid" && b.template !== "base")
-        .map((b) => ({ name: b.id, object: b.object, explode: b.explode })),
-    [built],
-  );
   const rows = useMemo(() => rowsOf(built ?? []), [built]);
   const total = rows.reduce((g, r) => g + r.grams, 0);
-  const [explode, setExplode] = useState(0);
 
   // ── Downloads ────────────────────────────────────────────────────────────
   const slug = fileSlug(ctx.projectName);
@@ -323,34 +310,6 @@ export function PrintStep({
         </>
       }
     >
-      <div className="relative h-[320px] overflow-hidden rounded-[24px] shadow-neu-inset sm:h-[420px]" data-testid="studio-print-viewer">
-        <StudioViewer
-          components={viewerComponents}
-          layout={layout.layout}
-          enclosure={doc.enclosure}
-          extraObjects={extraObjects}
-          explode={explode}
-          accent={accent.base}
-          autoRotate
-          ariaLabel={t("viewerPrint")}
-        />
-      </div>
-
-      <label className="flex min-h-11 items-center gap-3" data-testid="studio-explode">
-        <span className="shrink-0 text-sm font-bold text-heading">{t("takeApart")}</span>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={explode}
-          onChange={(e) => setExplode(Number(e.target.value))}
-          disabled={!ready}
-          className="h-11 w-full cursor-pointer"
-          style={{ accentColor: accent.ink }}
-        />
-      </label>
-
       <div className="space-y-3">
         <h2 className="text-sm font-bold text-heading">{t("printListTitle")}</h2>
         {!ready ? (
