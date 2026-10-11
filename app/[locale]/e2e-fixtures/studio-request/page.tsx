@@ -45,9 +45,19 @@ function fixtureDoc(locale: "en" | "ar"): StudioDoc {
   return { ...base, mech: defaultMechParts(summary) };
 }
 
-export default async function StudioRequestFixturePage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function StudioRequestFixturePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ quoted?: string }>;
+}) {
   if (!e2eFixturesEnabled()) notFound();
   const { locale } = await params;
+  // W2b: ?quoted=1 = the owner already saved a quote (sample numbers).
+  const { quoted } = await searchParams;
+  const ownerQuote =
+    quoted === "1" ? { finalQar: 450, note: locale === "ar" ? "يشمل الطلاء الأسود المطفي." : "Includes the matte black finish." } : null;
   setRequestLocale(locale);
   const lang = locale === "ar" ? "ar" : "en";
   const summary = requestSummary({
@@ -59,7 +69,7 @@ export default async function StudioRequestFixturePage({ params }: { params: Pro
   });
   return (
     <div className="container max-w-4xl py-6 sm:py-10">
-      <RequestReceived summary={summary} locale={locale} designHref="/e2e-fixtures/studio" />
+      <RequestReceived summary={summary} locale={locale} designHref="/e2e-fixtures/studio" ownerQuote={ownerQuote} />
     </div>
   );
 }

@@ -8,7 +8,10 @@ import { LEAD_KINDS, leadKind, leadProjectId, type LeadKind } from "@/lib/admin/
 import { CAD_BUCKET } from "@/lib/design/constants";
 
 import type { Inquiry, InquiryStatus } from "@/lib/supabase/types";
-import { setLeadStatus } from "./actions";
+import { saveQuoteRule, setLeadStatus } from "./actions";
+import { QuoteAccuracySection } from "@/components/admin/quote-accuracy";
+import { quoteAccuracy, quotedRows } from "@/lib/studio/quote-accuracy";
+import { getQuoteRule, isMissingQuoteColumn } from "@/lib/studio/server/quote";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
@@ -62,6 +65,7 @@ export default async function LeadsPage({
   if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
 
   const t = await getTranslations("Leads");
+  const tq = await getTranslations("LeadQuote");
   const isRtl = locale === "ar";
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -72,6 +76,14 @@ export default async function LeadsPage({
     .select("*")
     .order("created_at", { ascending: false });
   const all = (data ?? []) as Inquiry[];
+  // W2b: quote accuracy over every quoted Studio request (any status), test
+  // rows left out. 0073 not run = no quote columns (probe when the table is empty).
+  const migrated =
+    all.length > 0
+      ? "quote_calc" in all[0]
+      : !isMissingQuoteColumn((await supabase.from("inquiries").select("id, quote_calc").limit(1)).error);
+  const ruleRead = await getQuoteRule(supabase);
+  const accuracy = quoteAccuracy(migrated ? quotedRows(all) : [], ruleRead.rule);
   const leads = all.filter(
     (l) =>
       (statusFilter === "all" || (statusFilter === "open" ? l.status !== "closed" : l.status === statusFilter)) &&
@@ -150,6 +162,15 @@ export default async function LeadsPage({
         </p>
       </div>
 
+      <QuoteAccuracySection
+        locale={locale}
+        accuracy={accuracy}
+        rule={ruleRead.rule}
+        ruleSource={ruleRead.source}
+        migrated={migrated}
+        action={saveQuoteRule}
+      />
+
       <div className="mt-6 space-y-2">
         <div className="flex flex-wrap gap-1">
           {(["open", "new", "contacted", "closed", "all"] as const).map((s) => (
@@ -214,6 +235,11 @@ export default async function LeadsPage({
                       <span className="ms-2 rounded-full bg-panel px-2 py-0.5 align-middle text-[10px] font-semibold text-cobalt shadow-neu-sm">
                         {t(`kind_${kind}`)}
                       </span>
+                      {lead.final_quote_qar !== null && lead.final_quote_qar !== undefined && (
+                        <span className="ms-2 rounded-full bg-[#e3f4ea] px-2 py-0.5 align-middle text-[10px] font-semibold text-buy">
+                          {tq("quotedBadge", { amount: String(Number(lead.final_quote_qar)) })}
+                        </span>
+                      )}
                     </p>
                     <p className={mono("mt-1 text-[10px] text-faint")}>
                       {t("colDate")} · {dateFmt.format(new Date(lead.created_at))}
@@ -329,6 +355,15 @@ export default async function LeadsPage({
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-borderstrong/60 pt-4">
+                  <Link
+                    href={`/dashboard/leads/${lead.id}`}
+                    className={cn(
+                      "inline-flex min-h-9 items-center rounded-full px-4 py-1.5 text-xs font-semibold",
+                      lead.quote_calc ? "bg-cobalt text-white hover:bg-cobalt-hover" : "border border-borderstrong text-body hover:border-azure/40 hover:text-azure"
+                    )}
+                  >
+                    {lead.quote_calc ? tq("detailsLink") : tq("openLead")}
+                  </Link>
                   {STATUS_ACTIONS[lead.status].map((next) => (
                     <form key={next} action={setLeadStatus}>
                       <input type="hidden" name="id" value={lead.id} />

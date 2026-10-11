@@ -3,7 +3,23 @@ import { describe, expect, it } from "vitest";
 import { getPart } from "./library";
 import { emptyStudioDoc, type MechPart, type StudioDoc } from "./schema";
 import { defaultEnclosureFor } from "./enclosure/templates";
-import { ESTIMATE_SPREAD, PRINT_BASE_QAR, priceEstimate, printPrice, REQUEST_SENT_KEY, requestSummary } from "./request-summary";
+import {
+  DEFAULT_QUOTE_RULE,
+  ESTIMATE_SPREAD,
+  parseFinalQuote,
+  parseQuoteCalc,
+  parseQuoteRule,
+  PRINT_BASE_QAR,
+  priceEstimate,
+  printPrice,
+  QUOTE_RULE_VERSION,
+  quoteBreakdown,
+  quoteCalcSnapshot,
+  quoteDifference,
+  REQUEST_SENT_KEY,
+  requestSummary,
+  validateQuoteRule,
+} from "./request-summary";
 
 function doc(): StudioDoc {
   const base = emptyStudioDoc({ ...emptyStudioDoc().spec, name: "Desk buddy", oneLine: "Waves when you walk in." });
@@ -64,5 +80,91 @@ describe("requestSummary", () => {
   it("copes with no Studio doc", () => {
     const s = requestSummary({ doc: null, projectName: "Old project", getPart, locale: "en", prices: new Map() });
     expect(s).toMatchObject({ name: "Old project", parts: [], printed: [], enclosure: null, requestedAt: null });
+  });
+});
+
+describe("quote rule (W2b)", () => {
+  it("parses the stored rule and falls back per field", () => {
+    expect(parseQuoteRule(null)).toEqual(DEFAULT_QUOTE_RULE);
+    expect(parseQuoteRule({ base_qar: 120, per_gram_qar: "0.85", spread: 9 })).toEqual({ base_qar: 120, per_gram_qar: 0.85, spread: 1.5 });
+    expect(DEFAULT_QUOTE_RULE).toEqual({ base_qar: 100, per_gram_qar: 0.7, spread: 1.5 });
+  });
+  it("validates the editor's numbers", () => {
+    expect(validateQuoteRule({ base_qar: "100", per_gram_qar: "0.833", spread: "1.5" })).toEqual({ ok: true, rule: { base_qar: 100, per_gram_qar: 0.83, spread: 1.5 } });
+    expect(validateQuoteRule({ base_qar: "-1", per_gram_qar: "", spread: "0.5" })).toEqual({ ok: false, bad: ["base_qar", "per_gram_qar", "spread"] });
+  });
+  it("uses the rule in the estimate", () => {
+    const rule = { base_qar: 50, per_gram_qar: 1, spread: 2 };
+    expect(printPrice(100, rule)).toBe(150);
+    expect(priceEstimate({ printedGrams: 100, partsQar: 0, rule })).toEqual({ low: 150, high: 300 });
+  });
+});
+
+describe("quoteBreakdown + snapshot (W2b)", () => {
+  const part = { ...getPart("esp32_devkit")!, storeSkus: ["VLT-ESP"] };
+  const lookup = (id: string) => (id === "esp32_devkit" ? part : getPart(id));
+
+  it("shows every step: grams × rate, base, store prices, subtotal, low and high", () => {
+    const b = quoteBreakdown({ doc: doc(), getPart: lookup, prices: new Map([["VLT-ESP", 45]]) });
+    expect(b.printed.map((r) => [r.template, r.count, r.grams, r.cost_qar])).toEqual([
+      ["base", 1, 30, 21],
+      ["lid", 1, 20, 14],
+      ["standoff", 2, 2, 1.4],
+    ]);
+    expect(b.printed[0].name).toBeTruthy();
+    expect(b.printedGrams).toBe(52);
+    expect(b.gramsQar).toBe(36.4);
+    expect(b.printQar).toBe(136.4);
+    expect(b.components.map((c) => [c.id, c.sku, c.price_qar])).toEqual([
+      ["esp32_devkit_1", "VLT-ESP", 45],
+      ["led_5mm_1", null, null],
+      ["x_1", null, null],
+    ]);
+    expect(b.partsQar).toBe(45);
+    expect(b.subtotalQar).toBe(181.4);
+    expect(b.estimate).toEqual({ low: 180, high: 300 });
+    // The client page uses the same numbers.
+    const s = requestSummary({ doc: doc(), projectName: "x", getPart: lookup, locale: "en", prices: new Map([["VLT-ESP", 45]]) });
+    expect(s.estimate).toEqual(b.estimate);
+  });
+
+  it("stores a snapshot the admin can read back", () => {
+    const b = quoteBreakdown({ doc: doc(), getPart: lookup, prices: new Map([["VLT-ESP", 45]]), rule: { base_qar: 100, per_gram_qar: 0.7, spread: 1.5 } });
+    const snap = quoteCalcSnapshot(b, { ruleSource: "settings", projectId: "p1", projectLink: "https://x/en/projects/p1/studio", now: new Date("2026-10-11T08:00:00Z") });
+    expect(snap).toMatchObject({
+      v: 1,
+      rule_version: QUOTE_RULE_VERSION,
+      rule_source: "settings",
+      base_qar: 100,
+      per_gram_qar: 0.7,
+      spread: 1.5,
+      printed_grams: 52,
+      parts_qar: 45,
+      subtotal_qar: 181.4,
+      low: 180,
+      high: 300,
+      midpoint: 240,
+      project_id: "p1",
+      computed_at: "2026-10-11T08:00:00.000Z",
+    });
+    expect(parseQuoteCalc(JSON.parse(JSON.stringify(snap)))).toEqual(snap);
+    expect(parseQuoteCalc(null)).toBeNull();
+    expect(parseQuoteCalc({ low: 1 })).toBeNull();
+  });
+
+  it("compares the owner's quote with the midpoint", () => {
+    expect(quoteDifference(283.2, { midpoint: 240 })).toEqual({ qar: 43.2, pct: 18 });
+    expect(quoteDifference(200, { midpoint: 240 })).toEqual({ qar: -40, pct: -16.7 });
+    expect(quoteDifference(200, { midpoint: null })).toBeNull();
+  });
+
+  it("reads a typed quote", () => {
+    expect(parseFinalQuote("1,250")).toBe(1250);
+    expect(parseFinalQuote(" 450.556 ")).toBe(450.56);
+    expect(parseFinalQuote("٤٥٠")).toBe(450);
+    expect(parseFinalQuote("")).toBeNull();
+    expect(parseFinalQuote("-5")).toBeNull();
+    expect(parseFinalQuote("abc")).toBeNull();
+    expect(parseFinalQuote("2000000")).toBeNull();
   });
 });
