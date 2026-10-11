@@ -9,6 +9,7 @@ import { MessageCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
+import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { Warn } from "@/components/prototyping/ui";
 import { COMPANY_WHATSAPP } from "@/lib/company";
 import { CREDIT_QAR } from "@/lib/credits/constants";
@@ -35,9 +36,10 @@ export function AccessNote({
       <Warn
         blocking={false}
         action={
-          <Link href="/sign-in" className="text-xs font-semibold text-cobalt hover:text-cobalt-hover">
+          // W1: back to this very step after signing in, with the guest's work.
+          <AuthReturnLink className="inline-flex min-h-11 items-center text-xs font-semibold text-cobalt hover:text-cobalt-hover">
             {t("signInCta")}
-          </Link>
+          </AuthReturnLink>
         }
       >
         {t(step === "wiring" ? "blockedSignInWiring" : "blockedSignInCad")}

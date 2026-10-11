@@ -274,6 +274,8 @@ export const StudioDocSchema = z.object({
   firmware: z.object({ board: z.string(), code: z.string() }).optional(),
   /** Idea chat answers already given — never asked again by a later step. */
   answers: z.record(z.string(), z.string()).optional(),
+  /** The step the visitor was last on (W1): the Studio reopens there. Loose string so a renamed step never breaks old docs. */
+  lastStep: z.string().max(32).optional(),
 });
 export type StudioDoc = z.infer<typeof StudioDocSchema>;
 

@@ -70,14 +70,24 @@ export function furthestStep(doc: StudioDoc | null, visited: number): number {
   return Math.min(FLOW.length - 1, Math.max(firstOpenStep(doc), visited));
 }
 
-/** The step to open on load: ?step= when it is reachable, else the first open one. */
+/**
+ * The step to open on load: ?step= when it is reachable, else the step the
+ * visitor was last on (doc.lastStep, W1) when still reachable, else the first
+ * open one.
+ */
 export function initialStep(doc: StudioDoc | null, requested: string | null | undefined): number {
   const open = firstOpenStep(doc);
-  if (isFlowStep(requested)) {
-    const i = FLOW.indexOf(requested);
+  for (const want of [requested, doc?.lastStep]) {
+    if (!isFlowStep(want)) continue;
+    const i = FLOW.indexOf(want);
     if (i <= open) return i;
   }
   return open;
+}
+
+/** doc with lastStep = step (same object when nothing changes). Saved with the doc, so any device reopens there. */
+export function withLastStep(doc: StudioDoc, step: FlowStep): StudioDoc {
+  return doc.lastStep === step ? doc : { ...doc, lastStep: step };
 }
 
 /** Same product idea? (key order independent for the enum lists). */

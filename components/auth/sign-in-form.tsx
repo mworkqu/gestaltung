@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter as useNextRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { Loader2 } from "lucide-react";
 
 import { Link, useRouter } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { dashboardPathForRole } from "@/lib/auth/redirects";
+import { authAltHref, returnsToProject } from "@/lib/auth/next-path";
+import { claimGuestWork, guestAccessToken } from "@/lib/auth/claim-guest-client";
 import type { Role } from "@/lib/supabase/types";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
@@ -15,8 +18,12 @@ import { cn } from "@/lib/utils";
 
 // turnstileEnabled (P2-08): the store_settings switch from the server page.
 // Off (default) = no widget and the exact same signInWithPassword call as before.
-export function SignInForm({ turnstileEnabled = false }: { turnstileEnabled?: boolean }) {
+// next (W1): an already-validated "/{locale}/…" path (lib/auth/next-path.ts)
+// to return to after signing in; null = the role's dashboard.
+export function SignInForm({ turnstileEnabled = false, next = null }: { turnstileEnabled?: boolean; next?: string | null }) {
   const t = useTranslations("Auth");
+  const tClaim = useTranslations("GuestClaim");
+  const nextRouter = useNextRouter();
   const tCheck = useTranslations("Turnstile");
   const locale = useLocale();
   const isRtl = locale === "ar";
@@ -26,6 +33,11 @@ export function SignInForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
   const [loading, setLoading] = useState(false);
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
+
+  // Warm the page they return to while they type (sign-in should feel quick).
+  useEffect(() => {
+    if (next) nextRouter.prefetch(next);
+  }, [next, nextRouter]);
 
   const mono = (extra = "") =>
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -46,6 +58,10 @@ export function SignInForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
     }
 
     const supabase = createClient();
+    // W1: a guest's work belongs to their ANONYMOUS user. Signing in swaps the
+    // session for another auth.uid(), so keep the guest token now and hand it
+    // to /api/auth/claim-guest once the new session exists.
+    const guestToken = await guestAccessToken(supabase);
     const { data: signInData, error: signInError } =
       await supabase.auth.signInWithPassword(
         captcha ? { email, password, options: { captchaToken: captcha } } : { email, password }
@@ -56,6 +72,16 @@ export function SignInForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
     if (signInError) {
       setError(/captcha/i.test(signInError.message) ? tCheck("captchaFailed") : t("errorInvalid"));
       setLoading(false);
+      return;
+    }
+
+    // Never throws; a failure is kept for this tab and the site shows "Try again".
+    if (guestToken) await claimGuestWork(guestToken);
+
+    // Back to where they were (a Studio step …): no role lookup needed.
+    if (next) {
+      nextRouter.push(next);
+      nextRouter.refresh();
       return;
     }
 
@@ -80,10 +106,10 @@ export function SignInForm({ turnstileEnabled = false }: { turnstileEnabled?: bo
     <AuthShell
       kicker={t("signInKicker")}
       heading={t("signInHeading")}
-      intro={t("signInIntro")}
+      intro={returnsToProject(next) ? tClaim("signInIntro") : t("signInIntro")}
       altPrompt={t("noAccount")}
       altLabel={t("signUpLink")}
-      altHref="/sign-up"
+      altHref={authAltHref("/sign-up", next)}
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">

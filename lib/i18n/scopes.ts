@@ -30,6 +30,7 @@ export const BASE_MESSAGES = [
   "Credits.badge",
   "Credits.badgeAdmin",
   "Credits.badgeTitle",
+  "GuestClaim",
 ] as const;
 
 export const MESSAGE_SCOPES = {
@@ -53,7 +54,7 @@ export const MESSAGE_SCOPES = {
     "Credits.overviewExpiry",
     "PriceInvite",
   ],
-  auth: ["Auth", "Turnstile"],
+  auth: ["Auth", "GuestClaim", "Turnstile"],
   projects: ["Projects", "Turnstile"],
   // /orders/[id]: only PaymentInstructions is a client component; the rest of
   // the Orders namespace is read on the server.

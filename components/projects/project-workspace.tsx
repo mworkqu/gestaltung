@@ -47,6 +47,7 @@ import { UnifiedSearch, type SearchHit } from "@/components/search/unified-searc
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tag } from "@/components/ui/tag";
 import { ProjectUnavailable } from "@/components/projects/project-unavailable";
+import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { normaliseOrderStatus } from "@/lib/orders/status";
@@ -373,12 +374,9 @@ function ProjectHeader({
           <p className="min-w-0 basis-full text-sm text-heading sm:flex-1 sm:basis-auto">
             {guestPhone ? t("guestPhoneNote", { phone: guestPhone }) : t("guestNote")}
           </p>
-          <Link
-            href="/sign-up"
-            className="shrink-0 text-sm font-semibold text-cobalt hover:text-cobalt-hover"
-          >
+          <AuthReturnLink kind="sign-up" className="shrink-0 text-sm font-semibold text-cobalt hover:text-cobalt-hover">
             {t("signUpCta")}
-          </Link>
+          </AuthReturnLink>
         </div>
       )}
     </div>
