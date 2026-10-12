@@ -70,11 +70,13 @@ const CURSOR_SCRIPT = `
   else install();
 })();`;
 
+// "-ar" recipes record the Arabic site (YouTube versions).
+const AR = slug.endsWith("-ar");
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: { width: 1280, height: 720 },
   deviceScaleFactor: 1,
-  locale: "en-GB",
+  locale: AR ? "ar-QA" : "en-GB",
   timezoneId: "Asia/Qatar",
   recordVideo: { dir, size: { width: 1280, height: 720 } },
   ...(STATE ? { storageState: STATE } : {}),
@@ -133,7 +135,7 @@ async function scrollToEl(locator, offset = 120) {
   await smoothScroll(y - offset);
 }
 async function declineCookies() {
-  const decline = page.getByRole("button", { name: "Decline", exact: true });
+  const decline = page.getByRole("button", { name: AR ? "رفض" : "Decline", exact: true });
   try {
     await decline.first().waitFor({ state: "visible", timeout: 4000 });
     await click(decline.first());
@@ -217,6 +219,75 @@ const CLIPS = {
     await wait(2500);
     await page.reload({ waitUntil: "networkidle" });
     console.log(`RENAMED ${await page.getByLabel("Project name", { exact: true }).first().inputValue()}`);
+  },
+
+  // Arabic YouTube version of idea-to-kit: the current "Plan a product" flow
+  // (Design Studio) on /ar, as a guest. Creates ONE guest project (saved to
+  // project.json); answers the Studio's tap questions, stops on the parts list.
+  async "idea-to-kit-ar"() {
+    await goto("/ar");
+    await declineCookies();
+    await wait(800);
+    mark("home");
+    await wait(1500);
+    await click(page.getByRole("link", { name: "ابدأ مشروعك" }).first());
+    await page.waitForURL(/\/projects\/new/, { timeout: 30000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(900);
+    mark("new");
+    await typeInto(page.getByPlaceholder(/خفّاقة حليب/).first(), "جهاز يسقي نبتة صغيرة تلقائيًا عندما تجف التربة، يعمل بمحوّل USB وله علبة مطبوعة ثلاثية الأبعاد");
+    mark("typed");
+    await wait(600);
+    await click(page.getByRole("checkbox").first());
+    await wait(700);
+    mark("consent");
+    await click(page.getByRole("button", { name: "ابدأ", exact: true }));
+    mark("start");
+    await page.waitForURL(/\/projects\/[0-9a-f-]{36}\/studio/, { timeout: 90000 });
+    const projectId = page.url().match(/projects\/([0-9a-f-]{36})/)[1];
+    fs.writeFileSync(path.join(dir, "project.json"), JSON.stringify({ projectId, url: page.url() }, null, 2));
+    console.log(`PROJECT ${projectId}`);
+    await page.waitForLoadState("networkidle").catch(() => {});
+    mark("studio");
+    await debug("studio");
+    // Answer the tap questions until the summary card offers "Looks right — next".
+    const confirm = page.getByTestId("studio-idea-confirm");
+    for (let i = 0; i < 6; i++) {
+      const choice = page.getByTestId("studio-choices").getByRole("button").first();
+      const which = await Promise.race([
+        confirm.waitFor({ state: "visible", timeout: 90000 }).then(() => "confirm"),
+        choice.waitFor({ state: "visible", timeout: 90000 }).then(() => "choice"),
+      ]).catch(() => "none");
+      if (which !== "choice") break;
+      await wait(1800);
+      mark(`answer-${i}`);
+      await click(choice);
+      await wait(800);
+    }
+    await confirm.waitFor({ state: "visible", timeout: 120000 });
+    await wait(1500);
+    mark("summary");
+    await debug("summary");
+    await shot("summary");
+    await wait(3000);
+    await click(confirm);
+    mark("parts-start");
+    await page.getByTestId("studio-part-row").first().waitFor({ state: "visible", timeout: 180000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(2500);
+    mark("parts");
+    await debug("parts");
+    await shot("parts");
+    const rows = page.getByTestId("studio-part-row");
+    const n = Math.min(await rows.count(), 4);
+    for (let i = 0; i < n; i++) { await moveTo(rows.nth(i)).catch(() => {}); await wait(1100); }
+    mark("rows");
+    await moveTo(page.getByText("مجموع القطع").first()).catch(() => {});
+    await wait(2500);
+    mark("total");
+    await shot("total");
+    await wait(2500);
+    mark("end");
   },
 
   // Second take of idea-to-kit, in the SAME guest session and project

@@ -42,6 +42,10 @@ Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test 
 - Project `150257ef-d0d6-4297-9214-b833a26e6ef5` "TEST W1 claim - delete": created by guest `ad7575eb-f160-4dbd-8116-f7429b1be8e9`, then moved to the owner's account by claim_guest_work (0071 check).
 - Guest users `ad7575eb-f160-4dbd-8116-f7429b1be8e9` and one earlier anonymous user from a failed script run (owns nothing): the weekly anonymous cleanup removes them once 30 days old.
 
+## Arabic YouTube video recording (2026-10-12)
+
+- Project `838c44f8-3ec8-4627-9521-130f2806ce37` (Studio "ساقي النباتات التلقائي"), created by a guest on /ar by `scripts/record-videos/record.mjs idea-to-kit-ar`. Keep it if the owner wants to re-record; nothing was ordered or sent.
+
 ## Already deleted
 
 - Crash-repro project `6b5907f2-c957-43f9-bce8-42e73beeff33` "TEST crash repro — delete" (created 2026-10-09): already deleted by the owner. No action.
