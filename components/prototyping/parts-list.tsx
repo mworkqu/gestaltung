@@ -79,7 +79,7 @@ export function PartsList({
   const shown = rows.filter((r) => rowMatchesFilter(r, filter));
   // The limit is on project_parts; store lines live in their own table.
   const full = parts.length >= MAX_PARTS;
-  const projectPartsHref = `/projects/${projectId}#parts`;
+  const projectPartsHref = `/projects/${projectId}?view=page#parts`;
 
   async function setQty(part: ProjectPart, quantity: number) {
     await createClient().from("project_parts").update({ quantity }).eq("id", part.id);

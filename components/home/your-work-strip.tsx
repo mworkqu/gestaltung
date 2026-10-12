@@ -9,6 +9,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { useCart } from "@/components/parts/cart-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadSupabase } from "@/lib/supabase/lazy";
+import { PROJECT_HREF_COLUMNS, projectHref } from "@/lib/projects/href";
 import { normaliseOrderStatus, orderShort, type OrderStatus } from "@/lib/orders/status";
 import { arabicCountForm } from "@/lib/text/count";
 import {
@@ -70,7 +71,7 @@ async function loadYourWork(userId: string): Promise<Data | null> {
       supabase.from("projects").select("id, name, updated_at").eq("user_id", userId).order("updated_at", { ascending: false });
     const withStatus = await supabase
       .from("projects")
-      .select("id, name, status, updated_at")
+      .select(`id, name, status, updated_at, ${PROJECT_HREF_COLUMNS}`)
       .eq("user_id", userId)
       .or("status.is.null,status.neq.archived")
       .order("updated_at", { ascending: false })
@@ -255,7 +256,7 @@ function Strip({ data }: { data: Data }) {
           return (
             <Link
               key={p.id}
-              href={`/projects/${p.id}`}
+              href={projectHref(p)}
               aria-label={t("openProjectAria", { name })}
               className="tile flex min-h-11 min-w-0 items-center gap-3 p-4 transition-colors hover:bg-white/60"
             >

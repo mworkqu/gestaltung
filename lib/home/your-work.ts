@@ -17,6 +17,9 @@ export type WorkProjectRow = {
   status?: string | null;
   updated_at: string;
   bom?: ProjectBom | null;
+  /** projectHref columns (lib/projects/href.ts); absent before 0068. */
+  studio_version?: number | null;
+  ai_consent?: unknown;
 };
 
 export type WorkOrderRow = { id: string; status: string; created_at: string };

@@ -204,7 +204,7 @@ ${brief.trim()}${sizeLine}${fileLine}`,
       }
       // refresh() so the server sees the session cookie the anonymous sign-in
       // just wrote, before the workspace renders.
-      router.push(`/projects/${data.id}`);
+      router.push(`/projects/${data.id}/studio`);
       router.refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : (err as { message?: string })?.message ?? String(err);

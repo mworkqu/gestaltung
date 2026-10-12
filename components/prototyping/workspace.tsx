@@ -457,7 +457,7 @@ export function PrototypingWorkspace({
   if (loading) {
     return (
       <div className="space-y-4">
-        {bar(backTo(`/projects/${projectId}`, t("backToProject")))}
+        {bar(backTo(`/projects/${projectId}?view=page`, t("backToProject")))}
         <div className="neu flex items-center justify-center p-16">
           <Loader2 className="h-5 w-5 animate-spin text-mutedtext" />
         </div>
@@ -820,7 +820,7 @@ export function PrototypingWorkspace({
     return (
       <div className="space-y-4">
         {bar(
-          backTo(`/projects/${project.id}`, t("backToProject")),
+          backTo(`/projects/${project.id}?view=page`, t("backToProject")),
           <>
             <span className="hidden h-6 w-px bg-borderstrong sm:block" />
             <div className="order-last min-w-0 basis-full sm:order-none sm:basis-auto sm:flex-1">
@@ -872,7 +872,7 @@ export function PrototypingWorkspace({
     <div className="space-y-4">
       {/* Top bar */}
       {bar(
-        backTo(`/projects/${project.id}`, t("backToProject")),
+        backTo(`/projects/${project.id}?view=page`, t("backToProject")),
         <>
           <span className="hidden h-6 w-px bg-borderstrong sm:block" />
           {/* On a phone the title takes its own row so it's never cut to one letter (audit #55). */}
@@ -1105,7 +1105,7 @@ export function PrototypingWorkspace({
                   {t("engineeringCta")}
                 </Link>
                 <Link
-                  href={`/projects/${project.id}`}
+                  href={`/projects/${project.id}?view=page`}
                   className="text-xs font-semibold text-mutedtext hover:text-heading"
                 >
                   {t("haveCad")}

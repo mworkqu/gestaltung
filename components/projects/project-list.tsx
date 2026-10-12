@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
 import { ProductPicture } from "@/components/projects/product-picture";
 import type { Project } from "@/lib/supabase/types";
+import { PROJECT_HREF_COLUMNS, projectHref } from "@/lib/projects/href";
 import { PROJECT_LIMIT } from "@/lib/credits/constants";
 import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
 
@@ -28,12 +29,17 @@ import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
 // controls stay hidden.
 
 type CardProject = Pick<Project, "id" | "name" | "brief" | "created_at"> & {
+  href: string;
   partCount: number;
   status: ProjectStatusKind;
   archived: boolean;
 };
 
-type ListRow = Pick<Project, "id" | "name" | "brief" | "created_at"> & { status?: string };
+type ListRow = Pick<Project, "id" | "name" | "brief" | "created_at"> & {
+  status?: string;
+  studio_version?: number | null;
+  ai_consent?: unknown;
+};
 
 type ProjectIdRow = { project_id: string | null };
 type OrderLineRow = {
@@ -91,7 +97,10 @@ export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Rec
 
       const list = (cols: string) =>
         supabase.from("projects").select(cols).eq("user_id", user.id).order("updated_at", { ascending: false });
-      let { data, error: listErr } = await list("id, name, brief, created_at, status");
+      // projectHref columns (studio_version, spec->aiConsent) come last so the older
+      // fallbacks (before 0068 / 0042) still load; those projects keep the project page.
+      let { data, error: listErr } = await list(`id, name, brief, created_at, status, ${PROJECT_HREF_COLUMNS}`);
+      if (listErr) ({ data, error: listErr } = await list("id, name, brief, created_at, status"));
       const withStatus = !listErr;
       if (listErr) ({ data, error: listErr } = await list("id, name, brief, created_at"));
 
@@ -146,6 +155,7 @@ export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Rec
         setProjects(
           rows.map((p) => ({
             id: p.id,
+            href: projectHref(p),
             name: p.name,
             brief: p.brief,
             created_at: p.created_at,
@@ -213,7 +223,7 @@ export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Rec
   const card = (p: CardProject) => (
         <li key={p.id} className="flex flex-col gap-2">
           <Link
-            href={`/projects/${p.id}`}
+            href={p.href}
             aria-label={p.name}
             className="neu neu-hover flex h-full flex-col gap-3 p-5 transition-shadow"
           >

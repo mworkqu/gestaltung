@@ -139,7 +139,7 @@ export default async function OrderDetailPage({
           {soleProject && (
             <p className="mt-1 text-sm text-mutedtext">
               <span className={mono("me-2 text-[10px]")}>{t("orderProjectLink")}</span>
-              <Link href={`/projects/${soleProject}`} className="font-semibold text-cobalt hover:text-cobalt-hover">
+              <Link href={`/projects/${soleProject}?view=page`} className="font-semibold text-cobalt hover:text-cobalt-hover">
                 {projectNames.get(soleProject) ?? soleProject.slice(0, 8)}
               </Link>
             </p>
@@ -219,7 +219,7 @@ export default async function OrderDetailPage({
                         <p className="font-mono text-[11px] text-mutedtext">{it.sku}</p>
                         {it.projectId && (
                           <Link
-                            href={`/projects/${it.projectId}`}
+                            href={`/projects/${it.projectId}?view=page`}
                             className="block text-[11px] font-semibold text-cobalt hover:text-cobalt-hover"
                           >
                             {t("orderProjectLink")}

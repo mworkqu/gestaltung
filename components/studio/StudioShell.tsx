@@ -48,6 +48,7 @@ import {
 } from "@/lib/studio/client/steps";
 import { saveStatus, shouldWarnOnLeave, stepChangeSave, type SaveStatus } from "@/lib/studio/client/save-state";
 import { ProgressLine } from "./ProgressLine";
+import { DeleteProject } from "./DeleteProject";
 import { SaveIndicator } from "./SaveIndicator";
 import { Bar, MainButton } from "./ui";
 import { GET_IT_MADE_PARAM, GetItMade } from "./GetItMade";
@@ -696,6 +697,7 @@ function StudioShellInner({
           onSent={onRequestSent}
         />
       )}
+      {doc && persist.current && api.mode !== "mock" && <DeleteProject projectId={projectId} />}
     </div>
   );
 }
