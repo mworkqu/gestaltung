@@ -47,7 +47,8 @@ import { usePickProgress } from "../use-pick-progress";
 import { PICK_STAGES } from "@/lib/studio/client/progress";
 import { problemKey } from "./problem";
 import { StudioLoader } from "../StudioLoader";
-import { partsPictureSupported, renderPartsPicture, spreadSpots, type PartsPicture } from "@/lib/studio/client/parts-picture";
+import { partsPictureSupported, partsSpin, spreadSpots, type PartsSpin, type PartsSpinHandle } from "@/lib/studio/client/parts-picture";
+import { PartsFlipbook } from "./PartsFlipbook";
 
 const accent = STEP_ACCENT.parts;
 
@@ -575,16 +576,25 @@ export function PartsPicturePane({
     [components, getPart],
   );
   const pairs = useMemo(() => shown.map(({ c, part }) => [c.instanceId, part] as [string, LibraryPart]), [shown]);
-  const [pic, setPic] = useState<{ key: string; value: PartsPicture } | null>(null);
+  // The turntable of this parts list: frame 0 first, the others stream in after it.
+  const [pic, setPic] = useState<{ key: string; handle: PartsSpinHandle } | null>(null);
+  const [spin, setSpin] = useState<{ key: string; value: PartsSpin } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const key = size && pairs.length ? `${pairs.map(([id, p]) => `${id}:${p.id}`).join("|")}#${size.w}x${size.h}` : "";
 
   useEffect(() => {
     if (!supported || !key || !size) return;
     let alive = true;
-    renderPartsPicture(pairs, size.w, size.h, accent.base).then(
+    const handle = partsSpin(pairs, size.w, size.h, accent.base);
+    const unsub = handle.subscribe(() => {
+      if (alive) setSpin({ key, value: handle.get() });
+    });
+    handle.first.then(
       (value) => {
-        if (alive) setPic({ key, value });
+        if (!alive) return;
+        setPic({ key, handle });
+        setSpin({ key, value: handle.get() });
+        void value;
       },
       () => {
         if (alive) setFailed(key);
@@ -592,21 +602,18 @@ export function PartsPicturePane({
     );
     return () => {
       alive = false;
+      unsub();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the parts + size
   }, [key, supported]);
 
   // A new list keeps the last picture on screen (dimmed) until the new one is drawn.
-  const current = supported ? (pic?.value ?? null) : null;
+  const current = supported ? (spin?.value ?? null) : null;
   const drawing = supported && !!key && pic?.key !== key && failed !== key;
-  const gridOnly = !current || (failed === key && pic?.key !== key);
-  const readyUrl = !gridOnly && !drawing && current ? current.url : null;
-  // Tap targets at least 44 px apart (small parts side by side would hide each other).
-  const spots = useMemo(() => {
-    const el = box.current;
-    return current ? spreadSpots(current.spots, el?.clientWidth ?? 0, el?.clientHeight ?? 0, 44) : [];
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-spread when the box size changes
-  }, [current, size]);
+  const gridOnly = !current || !current.frames[0] || (failed === key && pic?.key !== key);
+  const readyUrl = !gridOnly && !drawing && current ? (current.frames[0]?.url ?? null) : null;
+  // More frames are still coming (frame 0 is already on screen).
+  const streaming = !gridOnly && !drawing && !!current && !current.done && !current.failed;
   useEffect(() => {
     onPicture?.(readyUrl);
   }, [onPicture, readyUrl]);
@@ -620,51 +627,42 @@ export function PartsPicturePane({
       ref={box}
       className="absolute inset-0"
       style={{ background: "linear-gradient(180deg, #f4f7fb 0%, #e6ebf2 100%)" }}
-      data-picture={picking ? "picking" : !gridOnly ? (drawing ? "redrawing" : "ready") : drawing ? "drawing" : "grid"}
+      data-spin-frames={current?.total ?? 0}
+      data-spin-bytes={current?.bytes ?? 0}
+      data-spin-ms={current?.ms ?? 0}
+      data-spin-first-ms={current?.firstMs ?? 0}
+      data-picture={picking ? "picking" : !gridOnly ? (drawing ? "redrawing" : streaming ? "streaming" : "ready") : drawing ? "drawing" : "grid"}
     >
       {picking ? (
         <StudioLoader label={t("loader.parts")} accent={accent.base} ink={accent.ink} status={false} className="h-full" />
       ) : !gridOnly && current ? (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element -- a blob: picture made in the worker */}
-          <img
-            src={current.url}
-            alt={t("loader.partsAlt")}
+          <PartsFlipbook
+            frames={current.frames.map((f) => f?.url)}
+            total={current.total}
             width={current.width}
             height={current.height}
-            className={cn("h-full w-full object-cover transition-opacity", drawing && "opacity-60")}
-            data-testid="studio-parts-picture"
-          />
-          {!drawing &&
-            spots.map((spot) => {
-              const item = shown.find((x) => x.c.instanceId === spot.instanceId);
-              if (!item) return null;
-              const on = selected === spot.instanceId;
-              return (
-                <button
-                  key={spot.instanceId}
-                  type="button"
-                  onClick={() => onSelect(on ? null : spot.instanceId)}
-                  aria-pressed={on}
-                  aria-label={nameOf(item.c, item.part)}
-                  // The picture is not mirrored in Arabic: its coordinates are physical.
-                  style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%` }}
-                  className="group absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full focus-visible:outline-none"
-                  data-testid="studio-parts-spot"
-                >
-                  <span
-                    className={cn(
-                      "block rounded-full border-2 border-white shadow-neu-sm transition-[width,height,opacity]",
-                      on
-                        ? "h-5 w-5"
-                        : "h-3.5 w-3.5 opacity-80 group-hover:h-5 group-hover:w-5 group-hover:opacity-100 group-focus-visible:h-5 group-focus-visible:w-5",
-                    )}
-                    style={{ background: on ? accent.ink : accent.base }}
-                  />
-                </button>
-              );
-            })}
-          {drawing && (
+            alt={t("loader.partsAlt")}
+            hold={selected !== null}
+            dim={drawing}
+          >
+            {({ frame, spinning }) =>
+              !drawing && !spinning ? (
+                <PartsSpots
+                  spots={current.frames[frame]?.spots ?? current.frames[0]?.spots ?? []}
+                  boxRef={box}
+                  size={size}
+                  frame={frame}
+                  shown={shown}
+                  selected={selected}
+                  onSelect={onSelect}
+                  nameOf={nameOf}
+                  accent={accent}
+                />
+              ) : null
+            }
+          </PartsFlipbook>
+          {(drawing || streaming) && (
             <div className="pointer-events-none absolute end-3 top-3 rounded-2xl bg-white/85 backdrop-blur">
               <StudioLoader label={t("loader.parts")} accent={accent.base} ink={accent.ink} className="p-2" />
             </div>
@@ -701,5 +699,65 @@ export function PartsPicturePane({
         </div>
       )}
     </div>
+  );
+}
+
+/** The tap dots for the frame on screen (they only exist while the parts are not turning). */
+function PartsSpots({
+  spots,
+  boxRef,
+  size,
+  frame,
+  shown,
+  selected,
+  onSelect,
+  nameOf,
+  accent: acc,
+}: {
+  spots: { instanceId: string; x: number; y: number }[];
+  boxRef: React.RefObject<HTMLDivElement | null>;
+  size: { w: number; h: number } | null;
+  frame: number;
+  shown: { c: StudioComponent; part: LibraryPart }[];
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  nameOf: (c: StudioComponent, part: LibraryPart) => string;
+  accent: { base: string; ink: string };
+}) {
+  // Tap targets at least 44 px apart (small parts side by side would hide each other).
+  const spread = useMemo(() => {
+    const el = boxRef.current;
+    return spreadSpots(spots, el?.clientWidth ?? 0, el?.clientHeight ?? 0, 44);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-spread per frame and when the box size changes
+  }, [spots, size, frame]);
+  return (
+    <>
+      {spread.map((spot) => {
+        const item = shown.find((x) => x.c.instanceId === spot.instanceId);
+        if (!item) return null;
+        const on = selected === spot.instanceId;
+        return (
+          <button
+            key={spot.instanceId}
+            type="button"
+            onClick={() => onSelect(on ? null : spot.instanceId)}
+            aria-pressed={on}
+            aria-label={nameOf(item.c, item.part)}
+            // The picture is not mirrored in Arabic: its coordinates are physical.
+            style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%` }}
+            className="group absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full focus-visible:outline-none"
+            data-testid="studio-parts-spot"
+          >
+            <span
+              className={cn(
+                "block rounded-full border-2 border-white shadow-neu-sm transition-[width,height,opacity]",
+                on ? "h-5 w-5" : "h-3.5 w-3.5 opacity-80 group-hover:h-5 group-hover:w-5 group-hover:opacity-100 group-focus-visible:h-5 group-focus-visible:w-5",
+              )}
+              style={{ background: on ? acc.ink : acc.base }}
+            />
+          </button>
+        );
+      })}
+    </>
   );
 }

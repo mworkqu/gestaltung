@@ -1,14 +1,13 @@
 "use client";
 
 // Page side of the Parts step picture (owner 2026-10-11). Tiny on purpose: no
-// three.js here. The geometry worker draws the parts on their plate and sends a
-// PNG back (lib/studio/geometry/parts-render.ts); this file keeps one picture
-// per parts list (same list = same picture, also after going back and forth).
+// three.js here. The geometry worker draws the parts on their plate as a small
+// turntable (~30 WebP frames, streamed, frame 0 first; lib/studio/geometry/
+// parts-render.ts); this file keeps one set of frames per parts list (same list =
+// same frames, also after going back and forth). The page only flips <img> sources.
 
 import type { LibraryPart } from "@/lib/studio/schema";
-import type { PartsPictureSpot } from "@/lib/studio/geometry/protocol";
-
-export type PartsPicture = { url: string; width: number; height: number; spots: PartsPictureSpot[] };
+import type { PartsFrameEvent, PartsPictureSpot } from "@/lib/studio/geometry/protocol";
 
 /** A Worker that can draw off screen (else the page shows the icon / photo grid). */
 export function partsPictureSupported(): boolean {
@@ -63,27 +62,119 @@ export function spreadSpots<T extends { x: number; y: number }>(spots: T[], wPx:
 }
 
 const MAX_CACHED = 6;
-const cache = new Map<string, Promise<PartsPicture>>();
 
-export function renderPartsPicture(parts: [string, LibraryPart][], width: number, height: number, accent: string): Promise<PartsPicture> {
+/** The turntable frames that have arrived (by index) for one parts list. */
+export type PartsSpin = {
+  frames: (PartsFrame | undefined)[];
+  total: number;
+  width: number;
+  height: number;
+  /** Every frame arrived. */
+  done: boolean;
+  /** The worker stopped before the last frame (what arrived stays on screen as a still). */
+  failed: boolean;
+  /** Total encoded bytes of the frames received so far, and the worker's draw time (ms) once done. */
+  bytes: number;
+  ms: number;
+  /** Request start to frame 0 on the page (ms), 0 until it arrived. */
+  firstMs: number;
+};
+export type PartsFrame = { url: string; spots: PartsPictureSpot[] };
+
+export type PartsSpinHandle = {
+  get(): PartsSpin;
+  subscribe(cb: () => void): () => void;
+  /** Resolves with frame 0 as soon as it is drawn; rejects when nothing could be drawn. */
+  first: Promise<PartsSpin>;
+  /** Free the frame URLs. */
+  dispose(): void;
+};
+
+const cache = new Map<string, PartsSpinHandle>();
+
+function startSpin(parts: [string, LibraryPart][], width: number, height: number, accent: string): PartsSpinHandle {
+  const spin: PartsSpin = { frames: [], total: 0, width: 0, height: 0, done: false, failed: false, bytes: 0, ms: 0, firstMs: 0 };
+  const listeners = new Set<() => void>();
+  const decoded: HTMLImageElement[] = [];
+  const t0 = performance.now();
+  let disposed = false;
+  const notify = () => listeners.forEach((cb) => cb());
+  // Frames are immutable once stored; hand out a fresh object per change (useSyncExternalStore friendly).
+  let snapshot: PartsSpin = spin;
+  const publish = () => {
+    snapshot = { ...spin, frames: spin.frames.slice() };
+    notify();
+  };
+
+  const first = new Promise<PartsSpin>((resolve, reject) => {
+    let gotFirst = false;
+    void (async () => {
+      try {
+        const { postToWorker } = await import("@/lib/studio/geometry/transport");
+        const r = await postToWorker<PartsFrameEvent>({ kind: "partsPicture", input: { parts, width, height, accent } }, (ev) => {
+          if (ev.kind !== "partsFrame" || disposed) return;
+          const url = URL.createObjectURL(new Blob([ev.bytes], { type: ev.mime }));
+          // Decode in the background so flipping to a frame never stalls on decoding.
+          const img = new Image();
+          img.decoding = "async";
+          img.src = url;
+          void img.decode?.().catch(() => undefined);
+          decoded[ev.index] = img;
+          spin.frames[ev.index] = { url, spots: ev.spots };
+          spin.total = ev.total;
+          spin.width = ev.width;
+          spin.height = ev.height;
+          spin.bytes += ev.bytes.byteLength;
+          if (!spin.firstMs) spin.firstMs = Math.round(performance.now() - t0);
+          publish();
+          if (!gotFirst) {
+            gotFirst = true;
+            resolve(snapshot);
+          }
+        });
+        if (!r.ok) throw new Error(r.error);
+        if (r.kind !== "partsPicture") throw new Error("unexpected reply");
+        spin.done = spin.frames.filter(Boolean).length === spin.total && spin.total > 0;
+        spin.failed = !spin.done;
+        spin.ms = Math.round(performance.now() - t0);
+        publish();
+        if (!gotFirst) reject(new Error("no frames"));
+      } catch (e) {
+        spin.failed = true;
+        publish();
+        if (!gotFirst) reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    })();
+  });
+  first.catch(() => undefined);
+
+  return {
+    get: () => snapshot,
+    subscribe(cb) {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    first,
+    dispose() {
+      disposed = true;
+      for (const f of spin.frames) if (f) URL.revokeObjectURL(f.url);
+      decoded.length = 0;
+    },
+  };
+}
+
+/** Same parts list + box = the same turntable (also after going back and forth). */
+export function partsSpin(parts: [string, LibraryPart][], width: number, height: number, accent: string): PartsSpinHandle {
   const key = partsPictureKey(parts, width, height, accent);
   const hit = cache.get(key);
   if (hit) return hit;
-  const p = (async () => {
-    const { postToWorker } = await import("@/lib/studio/geometry/transport");
-    const r = await postToWorker({ kind: "partsPicture", input: { parts, width, height, accent } });
-    if (!r.ok) throw new Error(r.error);
-    if (r.kind !== "partsPicture") throw new Error("unexpected reply");
-    const url = URL.createObjectURL(new Blob([r.result.png], { type: "image/png" }));
-    return { url, width: r.result.width, height: r.result.height, spots: r.result.spots };
-  })();
-  cache.set(key, p);
-  p.catch(() => cache.delete(key));
+  const h = startSpin(parts, width, height, accent);
+  cache.set(key, h);
+  h.first.catch(() => cache.delete(key));
   while (cache.size > MAX_CACHED) {
     const oldest = cache.keys().next().value as string;
-    const old = cache.get(oldest);
+    cache.get(oldest)?.dispose();
     cache.delete(oldest);
-    void old?.then((x) => URL.revokeObjectURL(x.url)).catch(() => undefined);
   }
-  return p;
+  return h;
 }
