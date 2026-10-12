@@ -26,6 +26,7 @@ import type { Connection } from "../connections";
 import type { LibraryPart, Net } from "../schema";
 import {
   breadboardSpec,
+  colX,
   FULL_COLS,
   HALF_COLS,
   holeWorld,
@@ -84,10 +85,14 @@ export type MatLayout = {
   bounds: { minX: number; maxX: number; minY: number; maxY: number; maxZ: number };
 };
 
-/** Gap between the board / breadboard and a row of mat parts, and between parts in a row (mm). */
-export const GAP = 10;
+/** Gap between the board / breadboard and a row of mat parts, and between parts in a row (mm): room for a few wire lanes. */
+export const GAP = 18;
+/** Gap between the board and the breadboard (mm): the board's jumpers cross it side by side. */
+export const BOARD_GAP = 16;
 /** Minimum clearance kept between any two footprints on the mat by the auto layout (mm). */
-export const CLEAR = 8;
+export const CLEAR = 14;
+/** Grid the wires are routed on (= breadboard pitch); mat parts are placed so a wired pin sits on it. */
+const GRID = 2.54;
 /** Minimum clearance when the client drags a part (mm). */
 export const MOVE_CLEAR = 2;
 /** A dragged part stays within this distance of the mat centre (mm). */
@@ -350,7 +355,7 @@ export function layoutMat(items: MatItem[], connections: Connection[], nets?: Ne
   const bp: Placement = {
     instanceId: board.instanceId,
     partId: board.part.id,
-    pos: [bb.pos[0] - bb.w / 2 - GAP - bfp.w / 2, 0, 0],
+    pos: [bb.pos[0] - bb.w / 2 - BOARD_GAP - bfp.w / 2, 0, 0],
     rotZ: bRot,
     ...bfp,
     board: true,
@@ -359,6 +364,31 @@ export function layoutMat(items: MatItem[], connections: Connection[], nets?: Ne
     offset: [0, 0, 0],
     matPose: { rotZ: bRot, ...bfp },
   };
+
+  // Wires are routed on a grid aligned with the breadboard holes; a mat part sits so one wired pin is on it.
+  const origin: [number, number] = [bb.pos[0] + colX(bb.cols, 0), bb.pos[1] + rowY(0)];
+  const usedPins = (inst: string, part: LibraryPart) => {
+    const pins = pins3dFor(part);
+    const mine = new Set<string>();
+    for (const c of connections) {
+      if (c.from.part === inst) mine.add(c.from.pin);
+      if (c.to.part === inst) mine.add(c.to.pin);
+    }
+    return part.pins.map((q) => q.id).filter((id) => mine.has(id) && pins[id]);
+  };
+  /** Shift (≤ one grid step, outward from the middle) so the first wired pin lies on the grid. */
+  const align = (pl: Placement, part: LibraryPart, sx: number, sy: number) => {
+    const id = usedPins(pl.instanceId, part)[0];
+    if (!id) return;
+    const q = pinWorld(pl, pins3dFor(part)[id]).pos;
+    const snap = (v: number, o: number, s: number) => {
+      const k = (v - o) / GRID;
+      return o + (s > 0 ? Math.ceil(k - 1e-9) : s < 0 ? Math.floor(k + 1e-9) : Math.round(k)) * GRID - v;
+    };
+    pl.pos = [pl.pos[0] + snap(q[0], origin[0], sx), pl.pos[1] + snap(q[1], origin[1], sy), pl.pos[2]];
+  };
+  align(bp, board.part, -1, 0);
+  bp.matPose = { ...bp.matPose };
 
   const placed = new Map<string, Placement>([[bp.instanceId, bp]]);
   // ── Plugged parts ──
@@ -524,8 +554,10 @@ export function layoutMat(items: MatItem[], connections: Connection[], nets?: Ne
         p.pinNets = pinNets(d.item.instanceId);
       }
       const [vx, vy] = SIDE_VEC[side];
+      align(p, d.item.part, vx || (x >= cx ? 1 : -1), vy || (y >= cy ? 1 : -1));
       const hit = () => [...blockers, ...matPlaced.map(rectOf)].some((q) => overlapsR(rectOf(p), q, CLEAR));
-      for (let k = 0; k < 800 && hit(); k++) p.pos = [p.pos[0] + vx, p.pos[1] + vy, 0];
+      // Pushed out in whole grid steps, so the pin stays on the grid.
+      for (let k = 0; k < 400 && hit(); k++) p.pos = [p.pos[0] + vx * GRID, p.pos[1] + vy * GRID, 0];
       matPlaced.push(p);
       placed.set(p.instanceId, p);
     });

@@ -444,3 +444,28 @@ test("screenshots: 3D breadboard, Plant Waterer + doorbell 1366, doorbell 375", 
     if (width <= 375) await expectNoHorizontalOverflow(page);
   }
 });
+
+// ── Neat orthogonal wiring + part tags (P5-17f): screenshots only ──
+test("screenshots: neat 3D wiring, Plant Waterer + doorbell + cat feeder 1366, doorbell 375", async ({ page }, info) => {
+  test.skip(!process.env.P517_SHOTS || info.project.name !== "desktop", "set P517_SHOTS=1 (desktop project)");
+  test.setTimeout(240_000);
+  mkdirSync(SHOTS, { recursive: true });
+  const shots: [string, number, number, string][] = [
+    ["plant_waterer", 1366, 900, "14-neat-plant-1366.png"],
+    ["doorbell", 1366, 900, "15-neat-doorbell-1366.png"],
+    ["cat_feeder", 1366, 900, "16-neat-feeder-1366.png"],
+    ["doorbell", 375, 812, "17-neat-doorbell-375.png"],
+  ];
+  for (const [idea, width, height, file] of shots) {
+    await page.setViewportSize({ width, height });
+    await open(page, "en", idea);
+    await draw(page, "en");
+    await open3d(page);
+    const panel = page.getByTestId("studio-wiring-3d");
+    await panel.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(800);
+    await expect(panel.getByTestId("studio-wiring-3d-tag").first()).toBeAttached();
+    await panel.screenshot({ path: path.join(SHOTS, file) });
+    if (width <= 375) await expectNoHorizontalOverflow(page);
+  }
+});

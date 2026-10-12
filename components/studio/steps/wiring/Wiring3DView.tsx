@@ -13,15 +13,22 @@
 // Connection[] and the selection come from views-context.tsx. LeanCanvas has no
 // context bridge, so the scene gets everything as props.
 //
-// Wires: TubeGeometry (48 × 8) along a centripetal Catmull-Rom spline through
-// the points from wires.ts; an invisible fatter tube takes the taps. Hover (a
+// Wires (P5-17f): routed like a tidy Fritzing breadboard picture
+// (lib/studio/wiring3d/route.ts): straight runs with right-angle turns lying
+// low on the mat / the breadboard top, parallel wires one lane apart, around
+// parts, a small hop where one crosses another. A round tube is swept along
+// that centre line (wire-tube.ts), matte insulation with a soft clear-coat
+// highlight and a darker sleeve where it enters a pin or a hole; an
+// invisible fatter tube takes the taps. Every part carries a small name tag
+// on screen (HTML, page locale), placed beside the part where it overlaps
+// nothing; tags hide when the view is zoomed far out. Hover (a
 // mouse) or tap a wire → it glows and thickens, the rest dim. Build guide: the
 // wires before the current one show normally, the current one draws in over
 // 0.6 s (drawRange; shown at once under reduced motion), later ones are hidden.
 // "Take it apart" lifts every part but the board; the wires stretch to follow.
 // Parts can be dragged on the mat (P5-17d): pointer down on a part body -> it
 // slides in the mat plane under the pointer (OrbitControls off meanwhile), only
-// its own wires are rebuilt per move, it never overlaps another part; the spot
+// the wires are re-routed live (once per frame), it never overlaps another part; the spot
 // is kept per session (sessionStorage, page + parts list) and "Reset layout"
 // brings the auto layout back. A tap without movement still works as before.
 // Breadboard (P5-17e): the parts are built the way people prototype — small
@@ -61,12 +68,13 @@ import {
   type MatMoves,
 } from "@/lib/studio/wiring3d/layout";
 import { pins3dFor, type Vec3 } from "@/lib/studio/wiring3d/pins3d";
-import { buildWires, touchesPart, type WireSegment } from "@/lib/studio/wiring3d/wires";
+import { buildWires, WIRE_R, type WireSegment } from "@/lib/studio/wiring3d/wires";
 import { cn } from "@/lib/utils";
 import { LeanCanvas } from "../../viewer/LeanCanvas";
 import { useDocumentHidden, usePrefersReducedMotion } from "../../viewer/hooks";
 import { cloneMaterials, dimPcbEnvironment, disposeObject } from "../../viewer/materials";
 import { useWiringViews } from "./views-context";
+import { sleeveAt, tubeAlong } from "./wire-tube";
 
 const accent = STEP_ACCENT.wiring;
 const BG = "linear-gradient(180deg, #f4f7fb 0%, #e6ebf2 100%)";
@@ -77,11 +85,13 @@ const CONTENT_ROT: [number, number, number] = [-Math.PI / 2, 0, 0];
 const MAT_MARGIN = 10;
 const MAT_T = 3;
 /** Wire radius (mm): normal / highlighted. */
-const R_WIRE = 0.85;
-const R_GLOW = 1.35;
+const R_WIRE = WIRE_R;
+const R_GLOW = 1.5;
 const R_HIT = 3.2;
-const TUBE_SEG = 48;
-const TUBE_RAD = 8;
+const TUBE_RAD = 10;
+/** Sleeve where a wire enters a pin / hole: radius and length (mm). */
+const R_SLEEVE = WIRE_R * 1.3;
+const SLEEVE_LEN = 3.4;
 const DRAW_MS = 600;
 const APART_MS = 500;
 /** Pointer travel (px) before a press on a part becomes a drag. */
@@ -195,6 +205,21 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
     setFitNonce((n) => n + 1);
   };
 
+  // A name tag per part (a number is added when two parts share a name).
+  const tagRefs = useRef(new Map<string, HTMLDivElement>());
+  const tags = useMemo(() => {
+    const names = items.map((it) => partName(it.part, locale, it.instanceId));
+    const count = new Map<string, number>();
+    for (const n of names) count.set(n, (count.get(n) ?? 0) + 1);
+    const seen = new Map<string, number>();
+    return items.map((it, i) => {
+      const n = names[i];
+      const k = (seen.get(n) ?? 0) + 1;
+      seen.set(n, k);
+      return { id: it.instanceId, text: (count.get(n) ?? 1) > 1 ? `${n} ${k}` : n };
+    });
+  }, [items, locale]);
+
   const active = activeId ? byId.get(activeId) : undefined;
   const label = (end: Connection["from"]) => {
     const name = partName(getPart(end.partId), locale, end.part);
@@ -255,11 +280,30 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
                   onSelect={select}
                   labelA={labelA}
                   labelB={labelB}
+                  tags={tagRefs}
                 />
               </LeanCanvas>
             </CanvasBoundary>
           </div>
         ) : null}
+
+        {webgl &&
+          tags.map((tg) => (
+            <div
+              key={tg.id}
+              ref={(el) => {
+                if (el) tagRefs.current.set(tg.id, el);
+                else tagRefs.current.delete(tg.id);
+              }}
+              aria-hidden
+              dir={locale === "ar" ? "rtl" : "ltr"}
+              data-testid="studio-wiring-3d-tag"
+              className="pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-md border border-slate-900/[0.07] bg-white/95 px-2 py-[3px] text-[11px] font-semibold leading-tight text-heading shadow-[0_1px_4px_rgba(15,23,42,0.16)] transition-opacity duration-150 md:text-xs"
+              style={{ opacity: 0, willChange: "transform" }}
+            >
+              {tg.text}
+            </div>
+          ))}
 
         {active && webgl && (
           <>
@@ -328,12 +372,20 @@ function EndLabel({ refEl, colour, text, locale }: { refEl: RefObject<HTMLDivEle
 
 type WireLook = "normal" | "glow" | "dim" | "ghost";
 const wireMats = new Map<string, THREE.MeshStandardMaterial>();
-function wireMaterial(colour: WireColour, look: WireLook): THREE.MeshStandardMaterial {
-  const key = `${colour}:${look}`;
+/** Matte plastic insulation with a soft clear-coat highlight; `sleeve` = the darker end sleeve. */
+function wireMaterial(colour: WireColour, look: WireLook, sleeve = false): THREE.MeshStandardMaterial {
+  const key = `${colour}:${look}:${sleeve ? 1 : 0}`;
   let m = wireMats.get(key);
   if (!m) {
-    const c = new THREE.Color(WIRE_HEX[colour]);
-    m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.42, metalness: 0 });
+    const base = new THREE.Color(WIRE_HEX[colour]);
+    const c = sleeve ? base.clone().lerp(new THREE.Color(colour === "black" ? "#5b6472" : "#10141c"), colour === "black" ? 0.35 : 0.42) : base;
+    m = new THREE.MeshPhysicalMaterial({
+      color: c,
+      roughness: sleeve ? 0.66 : 0.6,
+      metalness: 0,
+      clearcoat: sleeve ? 0 : 0.18,
+      clearcoatRoughness: 0.65,
+    });
     if (look === "glow") {
       m.emissive = c.clone().lerp(new THREE.Color("#ffffff"), colour === "black" ? 0.45 : 0.15);
       m.emissiveIntensity = 0.55;
@@ -347,6 +399,10 @@ function wireMaterial(colour: WireColour, look: WireLook): THREE.MeshStandardMat
   return m;
 }
 let hitMat: THREE.MeshBasicMaterial | null = null;
+let sleeveGeo: THREE.CylinderGeometry | null = null;
+/** Unit cylinder along +Y (radius 1, height 1, base at y = 0), shared by every sleeve. */
+const sleeveGeometry = () => (sleeveGeo ??= new THREE.CylinderGeometry(1, 1, 1, 12, 1, false).translate(0, 0.5, 0));
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const hitMaterial = () => (hitMat ??= new THREE.MeshBasicMaterial({ visible: false }));
 const noRaycast: THREE.Mesh["raycast"] = () => undefined;
 
@@ -370,9 +426,15 @@ type SceneProps = {
   onSelect: (id: string | null) => void;
   labelA: RefObject<HTMLDivElement | null>;
   labelB: RefObject<HTMLDivElement | null>;
+  /** Name tag element per part instance. */
+  tags: RefObject<Map<string, HTMLDivElement>>;
 };
 
-type WireMesh = { seg: WireSegment; mesh: THREE.Mesh<THREE.TubeGeometry>; hit: THREE.Mesh<THREE.TubeGeometry> };
+type ScreenBox = { x0: number; y0: number; x1: number; y1: number };
+const overlapArea = (a: ScreenBox, b: ScreenBox) =>
+  Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0));
+
+type WireMesh = { seg: WireSegment; mesh: THREE.Mesh; hit: THREE.Mesh; sleeves: THREE.Mesh[] };
 
 function Scene(p: SceneProps) {
   const { layout, items, connections, nets, getPart, activeId, guide, apart, reducedMotion } = p;
@@ -463,6 +525,7 @@ function Scene(p: SceneProps) {
   const wireGroup = useMemo(() => new THREE.Group(), []);
   const wires = useRef<WireMesh[]>([]);
   const indexOf = useMemo(() => new Map(connections.map((c, i) => [c.id, i])), [connections]);
+  const connById = useMemo(() => new Map(connections.map((c) => [c.id, c])), [connections]);
   // A rail feed jumper belongs to the first connection of its net but lights up with any of them (seg.shared).
   const look = useCallback(
     (seg: WireSegment): WireLook => {
@@ -482,33 +545,48 @@ function Scene(p: SceneProps) {
 
   const makeWire = useCallback(
     (seg: WireSegment): WireMesh => {
-      const curve = new THREE.CatmullRomCurve3(
-        seg.points.map((q) => new THREE.Vector3(q[0], q[1], q[2])),
-        false,
-        "centripetal",
-      );
       const l = look(seg);
       const r = l === "glow" ? R_GLOW : R_WIRE;
-      const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, TUBE_SEG, r, TUBE_RAD, false), wireMaterial(seg.colour, l));
+      const mesh = new THREE.Mesh(tubeAlong(seg.points, r, TUBE_RAD), wireMaterial(seg.colour, l));
       mesh.castShadow = l === "normal" || l === "glow";
       mesh.raycast = noRaycast;
       mesh.renderOrder = l === "glow" ? 2 : l === "normal" ? 1 : 0;
-      const hit = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, R_HIT, 6, false), hitMaterial());
+      const hit = new THREE.Mesh(tubeAlong(seg.points, R_HIT, 6), hitMaterial());
       hit.userData.connectionId = seg.id;
       if (l === "ghost") hit.raycast = noRaycast;
-      wireGroup.add(mesh, hit);
-      return { seg, mesh, hit };
+      // A darker sleeve at each end, along its riser (a jumper's plastic tip).
+      const sleeves: THREE.Mesh[] = [];
+      for (const atStart of [true, false]) {
+        const sl = sleeveAt(seg.points, atStart, SLEEVE_LEN);
+        if (!sl) continue;
+        const m = new THREE.Mesh(sleeveGeometry(), wireMaterial(seg.colour, l, true));
+        const rad = l === "glow" ? R_GLOW * 1.18 : R_SLEEVE;
+        m.scale.set(rad, sl.len + 0.4, rad);
+        m.quaternion.setFromUnitVectors(Y_AXIS, new THREE.Vector3(...sl.dir));
+        m.position.set(sl.from[0] - sl.dir[0] * 0.4, sl.from[1] - sl.dir[1] * 0.4, sl.from[2] - sl.dir[2] * 0.4);
+        m.raycast = noRaycast;
+        m.castShadow = mesh.castShadow;
+        m.renderOrder = mesh.renderOrder;
+        sleeves.push(m);
+      }
+      wireGroup.add(mesh, hit, ...sleeves);
+      return { seg, mesh, hit, sleeves };
     },
     [wireGroup, look],
   );
 
+  const disposeWires = useCallback(() => {
+    for (const w of wires.current) {
+      w.mesh.geometry.dispose();
+      w.hit.geometry.dispose();
+    }
+    wireGroup.clear();
+    wires.current = [];
+  }, [wireGroup]);
+
   const rebuildWires = useCallback(
     (tt: number) => {
-      for (const w of wires.current) {
-        w.mesh.geometry.dispose();
-        w.hit.geometry.dispose();
-      }
-      wireGroup.clear();
+      disposeWires();
       const segs = buildWires({
         connections,
         layout: live.current,
@@ -518,34 +596,10 @@ function Scene(p: SceneProps) {
       });
       wires.current = segs.map(makeWire);
     },
-    [wireGroup, connections, getPart, nets, lifts, makeWire],
+    [disposeWires, connections, getPart, nets, lifts, makeWire],
   );
-
-  // A dragged part: rebuild only the wires that touch it.
-  const connById = useMemo(() => new Map(connections.map((c) => [c.id, c])), [connections]);
-  const rebuildFor = useCallback(
-    (instanceId: string, tt: number) => {
-      const keep: WireMesh[] = [];
-      for (const w of wires.current) {
-        const c = connById.get(w.seg.id);
-        if (c && touchesPart(c, instanceId)) {
-          w.mesh.geometry.dispose();
-          w.hit.geometry.dispose();
-          wireGroup.remove(w.mesh, w.hit);
-        } else keep.push(w);
-      }
-      const segs = buildWires({
-        connections,
-        layout: live.current,
-        getPart,
-        nets,
-        lift: (id) => (lifts.get(id) ?? 0) * tt,
-        only: (c) => touchesPart(c, instanceId),
-      });
-      wires.current = [...keep, ...segs.map(makeWire)];
-    },
-    [connById, wireGroup, connections, getPart, nets, lifts, makeWire],
-  );
+  // A drag re-routes everything (the moved part is an obstacle for every wire), at most once per frame.
+  const routeDirty = useRef(false);
 
   useEffect(() => {
     // A new committed layout replaces the live one (a hover or look change mid-drag does not).
@@ -557,16 +611,7 @@ function Scene(p: SceneProps) {
     placeGroups(tRef.current);
     invalidate();
   }, [layout, rebuildWires, placeGroups, invalidate]);
-  useEffect(
-    () => () => {
-      for (const w of wires.current) {
-        w.mesh.geometry.dispose();
-        w.hit.geometry.dispose();
-      }
-      wires.current = [];
-    },
-    [],
-  );
+  useEffect(() => () => disposeWires(), [disposeWires]);
 
   // ── Build guide: the current wire draws in ──
   const guideId = guide !== null ? connections[guide]?.id ?? null : null;
@@ -590,12 +635,122 @@ function Scene(p: SceneProps) {
       }
       const tris = Math.floor((idx.count / 3) * prog);
       w.mesh.geometry.setDrawRange(0, tris * 3);
+      if (w.sleeves[0]) w.sleeves[0].visible = prog > 0;
+      if (w.sleeves[1]) w.sleeves[1].visible = prog >= 1;
     }
     if (d && performance.now() - d.start >= DRAW_MS) draw.current = null;
   }, []);
 
   // ── Per frame: animations + end labels ──
   const v = useMemo(() => new THREE.Vector3(), []);
+
+  /**
+   * Name tags: each part's on-screen box from its footprint corners; the tag goes
+   * beside it (outer side first, then above / below / the other side) where it
+   * overlaps no other tag and as little of the parts as possible; no room = hidden.
+   * A part under ~34 px on screen gets no tag (zoom in), and a tag that would cover
+   * much of another part is not shown. While a wire is
+   * highlighted, its two parts' tags hide (the end labels name them) and the rest fade.
+   */
+  const placeTags = () => {
+    const g = contentRef.current;
+    const els = p.tags.current;
+    if (!g || !els) return;
+    const L = live.current;
+    const W = size.width;
+    const H = size.height;
+    const boxes = new Map<string, ScreenBox>();
+    for (const pl of L.placements) {
+      const lz = (lifts.get(pl.instanceId) ?? 0) * tRef.current;
+      const b: ScreenBox = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+      let behind = false;
+      for (const sx of [-1, 1])
+        for (const sy of [-1, 1])
+          for (const z of [pl.pos[2], pl.pos[2] + pl.h]) {
+            v.set(pl.pos[0] + (sx * pl.w) / 2, pl.pos[1] + (sy * pl.d) / 2, z + lz);
+            g.localToWorld(v);
+            v.project(camera);
+            if (v.z > 1) behind = true;
+            const x = ((v.x + 1) / 2) * W;
+            const y = ((1 - v.y) / 2) * H;
+            b.x0 = Math.min(b.x0, x);
+            b.x1 = Math.max(b.x1, x);
+            b.y0 = Math.min(b.y0, y);
+            b.y1 = Math.max(b.y1, y);
+          }
+      if (!behind) boxes.set(pl.instanceId, b);
+    }
+    const board = L.placements.find((q) => q.board);
+    const bbox = board ? boxes.get(board.instanceId) : undefined;
+    const tiny = !bbox || bbox.x1 - bbox.x0 < 18;
+    let mx = 0;
+    let my = 0;
+    for (const b of boxes.values()) {
+      mx += (b.x0 + b.x1) / 2 / boxes.size;
+      my += (b.y0 + b.y1) / 2 / boxes.size;
+    }
+    const conn = activeId ? connById.get(activeId) : undefined;
+    const involved = conn ? new Set([conn.from.part, conn.to.part, conn.viaPart].filter((x): x is string => !!x)) : null;
+    const order = [...L.placements].sort(
+      (a, b) =>
+        Number(b.board) - Number(a.board) ||
+        Number(a.breadboard) - Number(b.breadboard) ||
+        b.w * b.d - a.w * a.d ||
+        (a.instanceId < b.instanceId ? -1 : 1),
+    );
+    const placed: ScreenBox[] = [];
+    for (const pl of order) {
+      const el = els.get(pl.instanceId);
+      if (!el) continue;
+      const r = boxes.get(pl.instanceId);
+      // A part too small on screen gets no tag (zoom in to see it).
+      if (tiny || !r || Math.max(r.x1 - r.x0, r.y1 - r.y0) < 34 || involved?.has(pl.instanceId)) {
+        el.style.opacity = "0";
+        continue;
+      }
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const cx = (r.x0 + r.x1) / 2;
+      const cy = (r.y0 + r.y1) / 2;
+      const ox = cx - mx;
+      const oy = cy - my;
+      const on = Math.hypot(ox, oy) || 1;
+      const gap = 5;
+      const cands = [
+        { x: cx - w / 2, y: r.y0 - h - gap, dx: 0, dy: -1 },
+        { x: cx - w / 2, y: r.y1 + gap, dx: 0, dy: 1 },
+        { x: r.x1 + gap, y: cy - h / 2, dx: 1, dy: 0 },
+        { x: r.x0 - w - gap, y: cy - h / 2, dx: -1, dy: 0 },
+      ];
+      let best: ScreenBox | null = null;
+      let bestScore = Infinity;
+      for (const c of cands) {
+        // Slide along the part's side to stay inside the view.
+        const x = c.dy !== 0 ? Math.max(4, Math.min(W - 4 - w, c.x)) : c.x;
+        const y = c.dx !== 0 ? Math.max(4, Math.min(H - 4 - h, c.y)) : c.y;
+        const box: ScreenBox = { x0: x, y0: y, x1: x + w, y1: y + h };
+        if (box.x0 < 4 || box.y0 < 4 || box.x1 > W - 4 || box.y1 > H - 4) continue;
+        const pad: ScreenBox = { x0: box.x0 - 3, y0: box.y0 - 3, x1: box.x1 + 3, y1: box.y1 + 3 };
+        if (placed.some((q) => overlapArea(pad, q) > 0)) continue;
+        let cover = 0;
+        for (const [id, q] of boxes) if (id !== pl.instanceId) cover += overlapArea(box, q);
+        if (cover / (w * h) > 0.45) continue;
+        // Outer side first, then above (reads best from this camera).
+        const score = (cover / (w * h)) * 3 - (c.dx * ox + c.dy * oy) / on - (c.dy === -1 ? 0.35 : 0);
+        if (score < bestScore) {
+          bestScore = score;
+          best = box;
+        }
+      }
+      if (!best) {
+        el.style.opacity = "0";
+        continue;
+      }
+      placed.push(best);
+      el.style.transform = `translate(${Math.round(best.x0)}px, ${Math.round(best.y0)}px)`;
+      el.style.opacity = involved ? "0.35" : "1";
+    }
+  };
   useFrame(() => {
     const a = anim.current;
     if (a) {
@@ -607,8 +762,14 @@ function Scene(p: SceneProps) {
       if (k >= 1) anim.current = null;
       invalidate();
     }
+    if (routeDirty.current) {
+      routeDirty.current = false;
+      rebuildWires(tRef.current);
+    }
     if (draw.current) invalidate();
     applyDraw();
+
+    placeTags();
 
     // Labels at both ends of the highlighted wire.
     const g = contentRef.current;
@@ -750,7 +911,7 @@ function Scene(p: SceneProps) {
       live.current = movePart(live.current, d.id, xy);
       const grp = groupRefs.current.get(d.id);
       if (grp) grp.position.set(xy[0], xy[1], grp.position.z);
-      rebuildFor(d.id, tRef.current);
+      routeDirty.current = true;
       invalidate();
     };
     const onUp = (e: PointerEvent) => {
@@ -771,7 +932,7 @@ function Scene(p: SceneProps) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
     };
-  }, [gl, camera, ray, ndc, plane, hitV, rebuildFor, invalidate, setControls]);
+  }, [gl, camera, ray, ndc, plane, hitV, invalidate, setControls]);
   // Leaving the view mid-drag gives the camera back.
   useEffect(
     () => () => {

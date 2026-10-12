@@ -4,8 +4,8 @@ import { buildWiring } from "../netlist";
 import { buildConnections } from "../connections";
 import { DEFAULT_SPEC, type LibraryPart } from "../schema";
 import { pins3dFor, slotRows } from "./pins3d";
-import { apartLift, applyMoves, CLEAR, layoutMat, MOVE_CLEAR, movePart, pinWorld, resolveMove, settleMove, snapToBreadboard, type MatLayout } from "./layout";
-import { buildWires, jumperPath, railNets, touchesPart, wirePath, type WireEnd, type WireSegment } from "./wires";
+import { apartLift, applyMoves, CLEAR, GAP, layoutMat, MOVE_CLEAR, movePart, pinWorld, resolveMove, settleMove, snapToBreadboard, type MatLayout } from "./layout";
+import { buildWires, railNets, touchesPart, WIRE_R, type WireEnd, type WireSegment } from "./wires";
 import { allHoles, breadboardSpec, fits, groupOf, holeWorld, plugFor, plugHoles, type Occupant } from "./breadboard";
 import { groupNets, wireProblems } from "./verify";
 import type { Net } from "../schema";
@@ -206,13 +206,13 @@ describe("layoutMat", () => {
     expectNoOverlap(a, CLEAR);
   });
 
-  it.each(Object.entries(FIXTURES))("%s: mat parts sit 8–12 mm from their nearest neighbour", (_, ids) => {
+  it.each(Object.entries(FIXTURES))("%s: mat parts keep wire lanes free, but stay close (CLEAR … GAP + a grid step)", (_, ids) => {
     const a = wire(ids).layout();
     const ms = matRects(a);
     for (const [id, r] of ms.filter(([id]) => id !== "breadboard" && !a.placements.find((p) => p.instanceId === id)!.board)) {
       const near = Math.min(...ms.filter(([o]) => o !== id).map(([, q]) => clearance(r, q)));
       expect(near, id).toBeGreaterThanOrEqual(CLEAR - 1e-6);
-      expect(near, id).toBeLessThanOrEqual(12.5);
+      expect(near, id).toBeLessThanOrEqual(GAP + 2.6);
     }
   });
 
@@ -379,7 +379,9 @@ describe("wires on the breadboard", () => {
     expect(rails.get("GND")).toBe(10);
     const segs = buildWires({ connections, layout: l, getPart, nets });
     for (const [net] of rails) {
-      const feeds = segs.filter((s) => s.shared && connections.find((c) => c.id === s.id)!.net === net);
+      // (the − rail bridge, rail to rail, is not a feed)
+      const bridge = (s: WireSegment) => s.ends.every((e) => e.kind === "hole" && e.row >= 10);
+      const feeds = segs.filter((s) => s.shared && !bridge(s) && connections.find((c) => c.id === s.id)!.net === net);
       expect(feeds, net).toHaveLength(1);
       const all = connections.filter((c) => c.net === net).map((c) => c.id);
       expect(feeds[0].id).toBe(all[0]);
@@ -419,16 +421,24 @@ describe("wires on the breadboard", () => {
     expect(up[hole].points.at(-1)).toEqual(flat[hole].points.at(-1));
   });
 
-  it("jumpers rise out of their holes; a jumper over a module arches above it", () => {
-    const pts = wirePath({ pos: [0, 0, 10], dir: [0, 0, 1] }, { pos: [60, 0, 2], dir: [-1, 0, 0] });
-    expect(pts[0]).toEqual([0, 0, 10]);
-    expect(pts.at(-1)).toEqual([60, 0, 2]);
-    expect(Math.max(...pts.map((p) => p[2]))).toBeGreaterThan(15);
-    const j = jumperPath([0, 0, 8], [0, -6.35, 8]);
-    expect(j[0]).toEqual([0, 0, 8]);
-    expect(Math.min(j[1][2], j[2][2])).toBeGreaterThan(8);
-    const over = jumperPath([0, -14, 8], [0, 22, 8], 20);
-    expect(Math.max(...over.map((p) => p[2]))).toBeGreaterThan(20);
+  it("jumpers rise straight out of their holes and lie low on the breadboard top", () => {
+    const { connections, layout, nets } = wire(FIXTURES.doorbell);
+    const l = layout();
+    const bb = l.breadboard!;
+    for (const s of buildWires({ connections, layout: l, getPart, nets })) {
+      s.ends.forEach((e, i) => {
+        if (e.kind !== "hole") return;
+        const pts = i === 0 ? s.points : [...s.points].reverse();
+        // Straight up first, then flat a wire radius above the breadboard top.
+        expect(pts[1][0]).toBeCloseTo(pts[0][0], 6);
+        expect(pts[1][1]).toBeCloseTo(pts[0][1], 6);
+        expect(pts[1][2]).toBeGreaterThan(pts[0][2]);
+        expect(Math.min(...pts.slice(1, 8).map((p) => p[2]))).toBeGreaterThan(bb.h - 1);
+      });
+      // A flat run on the breadboard sits exactly one wire radius above it (no arches).
+      const onTop = s.points.filter((p) => Math.abs(p[2] - (bb.h + WIRE_R)) < 1e-6);
+      if (s.ends.every((e) => e.kind === "hole")) expect(onTop.length).toBeGreaterThan(0);
+    }
   });
 
   it("holes the wires end in are real holes of the board", () => {
