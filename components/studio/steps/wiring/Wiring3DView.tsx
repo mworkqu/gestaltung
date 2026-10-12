@@ -45,6 +45,11 @@
 // animate on their models (glow, spin, servo horn, pulse rings, screen text)
 // and active signal wires carry moving beads. frameloop "always" only while
 // it runs and something moves; reduced motion = states shown standing still.
+// Pin names (P5-17h): each part carries a silkscreen decal with every pin's
+// short name beside the pin (lib/studio/wiring3d/pin-labels.ts → pin-decal.ts,
+// one canvas texture per part); pins a wire uses sit on a pill in that wire's
+// colour. The decal fades in only when zoomed in enough to read (≈ 9 px text),
+// and always shows on the two parts of the highlighted wire.
 
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from "react";
 import { useTranslations } from "next-intl";
@@ -81,6 +86,8 @@ import { cloneMaterials, dimPcbEnvironment, disposeObject } from "../../viewer/m
 import { useWiringViews } from "./views-context";
 import { sleeveAt, tubeAlong } from "./wire-tube";
 import { createFlow, createSimRig, type SimFrame, type SimRig } from "./sim-scene";
+import { buildPinDecal, fadeFor, type PinDecal } from "./pin-decal";
+import { LABEL_SIZE, pinLabelLayout, type Box as LabelBox } from "@/lib/studio/wiring3d/pin-labels";
 import { SimStatus, TryItPanel, useSim } from "./TryItPanel";
 import type { SimOutput } from "@/lib/studio/sim/model";
 import type { SimState } from "@/lib/studio/sim/step";
@@ -382,7 +389,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
       </div>
       {sim && <SimStatus sim={sim} locale={locale} />}
       <p className="text-sm text-mutedtext">
-        {t("breadboardHint")} {t("hint")} {t("dragHint")}
+        {t("breadboardHint")} {t("hint")} {t("dragHint")} {t("zoomHint")}
       </p>
     </div>
   );
@@ -679,6 +686,50 @@ function Scene(p: SceneProps) {
     if (d && performance.now() - d.start >= DRAW_MS) draw.current = null;
   }, []);
 
+  // ── Pin names: one decal per part (rebuilt when a part turns, e.g. plugged in) ──
+  const usedPins = useMemo(() => {
+    const m = new Map<string, Map<string, string>>();
+    const mark = (e: Connection["from"], hex: string) => {
+      if (!m.has(e.part)) m.set(e.part, new Map());
+      if (!m.get(e.part)!.has(e.pin)) m.get(e.part)!.set(e.pin, hex);
+    };
+    for (const c of connections) {
+      mark(c.from, WIRE_HEX[c.wireColour]);
+      mark(c.to, WIRE_HEX[c.wireColour]);
+    }
+    return m;
+  }, [connections]);
+  const poseKey = layout.placements.map((q) => `${q.instanceId}:${q.rotZ}:${q.tilt}`).join("|");
+  const decals = useMemo(() => {
+    const m = new Map<string, PinDecal>();
+    for (const pl of layout.placements) {
+      const part = partOf.get(pl.instanceId);
+      if (!part || pl.tilt !== 0) continue;
+      try {
+        const d = buildPinDecal(pinLabelLayout(part, pl.rotZ, tallParts(models.get(pl.instanceId), part)), usedPins.get(pl.instanceId) ?? new Map());
+        if (d) m.set(pl.instanceId, d);
+      } catch (err) {
+        console.warn("[studio wiring 3d] pin labels failed", part.id, err);
+      }
+    }
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- rebuilt when a part's pose changes, not on every move
+  }, [poseKey, partOf, usedPins, models]);
+  useEffect(() => () => {
+    for (const d of decals.values()) d.dispose();
+  }, [decals]);
+  const decalAt = useMemo(() => new THREE.Vector3(), []);
+  const fadeDecals = () => {
+    const conn = activeId ? connById.get(activeId) : undefined;
+    for (const [id, d] of decals) {
+      d.mesh.getWorldPosition(decalAt);
+      const near = fadeFor(LABEL_SIZE, camera.position.distanceTo(decalAt), camera.fov, size.height);
+      const o = conn && (conn.from.part === id || conn.to.part === id) ? 1 : near;
+      d.material.opacity = o;
+      d.mesh.visible = o > 0.01;
+    }
+  };
+
   // ── Try it: outputs animate on their models, beads flow along active wires ──
   const { simFrame, simOutputs, simState } = p;
   const rig = useRef<SimRig | null>(null);
@@ -823,6 +874,7 @@ function Scene(p: SceneProps) {
   };
   useFrame((_s, dt) => {
     stepSim(dt);
+    fadeDecals();
     const a = anim.current;
     if (a) {
       const k = Math.min(1, (performance.now() - a.start) / APART_MS);
@@ -1058,10 +1110,16 @@ function Scene(p: SceneProps) {
         return { id: pl.instanceId, board: pl.board, size: pl.w * pl.d * pl.h, x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
       });
     };
+    const wc = window as unknown as { __wiring3dCamera?: () => { dist: number; min: number; max: number } };
+    wc.__wiring3dCamera = () => {
+      const c = get().controls as unknown as { target: THREE.Vector3; minDistance: number; maxDistance: number } | null;
+      return { dist: c ? camera.position.distanceTo(c.target) : -1, min: c?.minDistance ?? -1, max: c?.maxDistance ?? -1 };
+    };
     return () => {
       delete w.__wiring3dParts;
+      delete wc.__wiring3dCamera;
     };
-  }, [gl, camera, lifts]);
+  }, [gl, camera, lifts, get]);
 
   return (
     <>
@@ -1089,6 +1147,7 @@ function Scene(p: SceneProps) {
               <group position={[0, 0, pl.pos[2]]} rotation={[0, 0, (pl.rotZ * Math.PI) / 180]}>
                 <group position={pl.offset} rotation={[(pl.tilt * Math.PI) / 180, 0, 0]}>
                   <primitive object={model} />
+                  {decals.get(pl.instanceId) && <primitive object={decals.get(pl.instanceId)!.mesh} />}
                 </group>
               </group>
             </group>
@@ -1102,6 +1161,25 @@ function Scene(p: SceneProps) {
       <CameraRig layout={layout} fitKey={p.fitKey} apart={apart} reducedMotion={reducedMotion} />
     </>
   );
+}
+
+/** Footprints of the tall things on a board (chip, USB socket, relay …) that would hide a pin name; headers and pins don't count. */
+function tallParts(model: THREE.Group | undefined, part: LibraryPart): LabelBox[] {
+  if (!model) return [];
+  model.updateMatrixWorld(true);
+  const out: LabelBox[] = [];
+  const top = pinLabelLayout(part).z;
+  const area = part.dims.x * part.dims.y;
+  const b = new THREE.Box3();
+  model.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || /header|pin|socket|leg|lead|wire|pad|hole|label|silk|screw/i.test(m.name)) return;
+    b.setFromObject(m);
+    if (b.max.z < top + 0.9 || b.min.z > top + 30) return;
+    if ((b.max.x - b.min.x) * (b.max.y - b.min.y) > area * 0.6) return;
+    out.push({ x0: b.min.x, y0: b.min.y, x1: b.max.x, y1: b.max.y });
+  });
+  return out;
 }
 
 // ── Mat + breadboard ─────────────────────────────────────────────────

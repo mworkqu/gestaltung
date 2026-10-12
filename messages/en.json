@@ -4359,6 +4359,7 @@
         "breadboardHint": "Built on a breadboard, the way you'd wire it.",
         "hint": "Tap a wire to see where it goes. Drag empty space to turn, pinch to zoom.",
         "dragHint": "Drag a part to move it.",
+        "zoomHint": "Zoom in to read the pin names.",
         "reset": "Reset layout",
         "apart": "Take it apart",
         "together": "Put it back",

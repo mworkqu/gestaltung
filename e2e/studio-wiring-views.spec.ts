@@ -572,3 +572,49 @@ test("screenshots: Try it (18 plant dry 1366, 19 feeder 1366, 20 plant 375 AR)",
   await page.waitForTimeout(2500);
   await panel().screenshot({ path: path.join(SHOTS, "20-sim-plant-375-ar.png") });
 });
+
+// ── Pin names on the 3D boards (P5-17h): zoom in on the board ──
+
+/** Pans the board to the middle of the 3D view (right-drag) and zooms in with the wheel. */
+async function zoomOnBoard(page: Page, ticks: number) {
+  const canvas = page.getByTestId("studio-wiring-3d").locator("canvas");
+  const box = (await canvas.boundingBox())!;
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  for (let i = 0; i < 2; i++) {
+    const board = (await partsOnScreen(page)).find((q) => q.board)!;
+    await page.mouse.move(board.x, board.y);
+    await page.mouse.down({ button: "right" });
+    await page.mouse.move(cx, cy, { steps: 10 });
+    await page.mouse.up({ button: "right" });
+    await page.waitForTimeout(300);
+    if (i === 0) {
+      await page.mouse.move(cx, cy);
+      for (let k = 0; k < ticks; k++) {
+        await page.mouse.wheel(0, -240);
+        await page.waitForTimeout(250); // each notch = 5 % closer, one frame each
+      }
+      await page.waitForTimeout(800);
+    }
+  }
+  await page.mouse.move(box.x + 4, box.y + 4);
+  await page.waitForTimeout(800);
+}
+
+test("screenshots: pin names zoomed in (21 plant, 22 doorbell), 1366 EN", async ({ page }, info) => {
+  test.skip(!process.env.P517_SHOTS || info.project.name !== "desktop", "set P517_SHOTS=1 (desktop project)");
+  test.setTimeout(180_000);
+  mkdirSync(SHOTS, { recursive: true });
+  await page.setViewportSize({ width: 1366, height: 900 });
+  for (const [idea, file] of [["plant_waterer", "21-pin-names-zoom-plant.png"], ["doorbell", "22-pin-names-zoom-doorbell.png"]] as const) {
+    await open(page, "en", idea);
+    await draw(page, "en");
+    await open3d(page);
+    await page.getByTestId("studio-wiring-3d").scrollIntoViewIfNeeded();
+    await zoomOnBoard(page, 34);
+    // Close enough that the 1.45 mm pin names are well over 9 px.
+    const cam = await page.evaluate(() => (window as unknown as { __wiring3dCamera: () => { dist: number } }).__wiring3dCamera());
+    expect(cam.dist).toBeLessThan(120);
+    await page.getByTestId("studio-wiring-3d").screenshot({ path: path.join(SHOTS, file) });
+  }
+});
