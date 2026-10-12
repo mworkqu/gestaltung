@@ -37,13 +37,12 @@ ctx.onmessage = (e) => {
     return;
   }
   if (req.kind === "partsPicture") {
-    // The Parts step picture (three.js + the library part models, its own lazy chunk).
+    // The Parts step turntable (three.js + the library part models, its own lazy chunk).
+    // Frames are streamed as events (frame 0 first); the reply only closes the request.
     const t0 = performance.now();
     import("./parts-render")
-      .then((m) => m.renderPartsPicture(req.input))
-      .then((result) =>
-        ctx.postMessage({ id: req.id, ok: true, kind: "partsPicture", result, ms: Math.round(performance.now() - t0) }, [result.png]),
-      )
+      .then((m) => m.renderPartsTurntable(req.input, (frame) => ctx.postMessage({ id: req.id, event: frame }, [frame.bytes])))
+      .then((result) => ctx.postMessage({ id: req.id, ok: true, kind: "partsPicture", result, ms: Math.round(performance.now() - t0) }))
       .catch((err: unknown) => ctx.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }));
     return;
   }

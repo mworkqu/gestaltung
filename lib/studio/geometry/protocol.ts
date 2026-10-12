@@ -161,7 +161,24 @@ export type PartsPictureInput = {
   accent: string;
 };
 export type PartsPictureSpot = { instanceId: string; x: number; y: number };
-export type PartsPictureResult = { png: ArrayBuffer; width: number; height: number; spots: PartsPictureSpot[] };
+/**
+ * The picture is a turntable: the parts turn once around the vertical axis (with their
+ * gentle bob) in `total` small pictures. Each frame is STREAMED as a PartsFrameEvent
+ * (frame 0 first, as soon as it is drawn); the reply only closes the request.
+ */
+export type PartsFrameEvent = {
+  kind: "partsFrame";
+  index: number;
+  total: number;
+  /** WebP where the browser can encode it (else PNG), transferred. */
+  bytes: ArrayBuffer;
+  mime: string;
+  width: number;
+  height: number;
+  /** Where each part's centre lands on THIS frame (0-1), for tap targets. */
+  spots: PartsPictureSpot[];
+};
+export type PartsPictureResult = { width: number; height: number; frames: number; bytes: number; mime: string };
 
 export type GeometryRequest =
   | { id: number; kind: "enclosure"; key: string; input: EnclosureInput }
@@ -183,7 +200,7 @@ export type GeometryReply =
   | { id: number; ok: false; error: string };
 
 /** A progress message for a running request (not its reply). */
-export type GeometryEvent = { id: number; event: ProductEvent };
+export type GeometryEvent = { id: number; event: ProductEvent | PartsFrameEvent };
 
 export type WorkerMessage = GeometryReply | GeometryEvent;
 

@@ -88,6 +88,11 @@ for (const locale of LOCALES) {
       expect(await picture.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(50);
     }).toPass({ timeout: 10_000 });
     await expect(box.locator("canvas")).toHaveCount(0);
+    // The tap dots show while the parts are not turning: hold the picture (mouse over it /
+    // a tap on a touch screen), then tap a dot.
+    const flip = box.getByTestId("studio-parts-flipbook");
+    if (info.project.name === "mobile-375") await flip.tap({ position: { x: 30, y: 90 } });
+    else await flip.hover({ position: { x: 30, y: 90 } });
     const spots = box.getByTestId("studio-parts-spot");
     const rows = page.getByTestId("studio-part-row");
     await expect(spots).toHaveCount(await rows.count());

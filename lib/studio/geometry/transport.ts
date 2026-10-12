@@ -5,9 +5,9 @@
 // Requests are matched by id. A long request (P5-16 productPreview) may stream
 // events ({ id, event }) before its one reply; the caller's onEvent gets them.
 
-import { isGeometryEvent, type GeometryReply, type GeometryRequest, type ProductEvent, type WorkerMessage } from "./protocol";
+import { isGeometryEvent, type GeometryEvent, type GeometryReply, type GeometryRequest, type ProductEvent, type WorkerMessage } from "./protocol";
 
-type Pending = { resolve: (r: GeometryReply) => void; reject: (e: Error) => void; onEvent?: (e: ProductEvent) => void };
+type Pending = { resolve: (r: GeometryReply) => void; reject: (e: Error) => void; onEvent?: (e: never) => void };
 export type Job = GeometryRequest extends infer R ? (R extends GeometryRequest ? Omit<R, "id"> : never) : never;
 
 let worker: Worker | null | undefined; // undefined = not tried yet, null = unavailable
@@ -32,7 +32,7 @@ export function getWorker(): Worker | null {
       const p = pending.get(data?.id);
       if (!p) return;
       if (isGeometryEvent(data)) {
-        p.onEvent?.(data.event);
+        (p.onEvent as ((e: GeometryEvent["event"]) => void) | undefined)?.(data.event);
         return;
       }
       pending.delete(data.id);
@@ -60,12 +60,12 @@ export function warmGeometryWorker(): void {
 }
 
 /** Post a job to the worker. Rejects when there is no worker or it stopped (callers fall back). */
-export function postToWorker(job: Job, onEvent?: (e: ProductEvent) => void): Promise<GeometryReply> {
+export function postToWorker<E = ProductEvent>(job: Job, onEvent?: (e: E) => void): Promise<GeometryReply> {
   const w = getWorker();
   if (!w) return Promise.reject(new Error("no worker"));
   const id = nextId++;
   return new Promise<GeometryReply>((resolve, reject) => {
-    pending.set(id, { resolve, reject, onEvent });
+    pending.set(id, { resolve, reject, onEvent: onEvent as ((e: never) => void) | undefined });
     w.postMessage({ ...job, id } as GeometryRequest);
   }).then((r) => {
     geometryStats.worker += 1;
