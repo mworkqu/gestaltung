@@ -39,6 +39,7 @@ const segs = spec.segments.map((s) => {
   return seg;
 });
 const total = cursor;
+const [W, H] = spec.size ?? [1280, 720]; // output size; YouTube takes use [1920, 1080]
 
 function toOut(src, at) {
   const inSeg = segs.find((s) => s.src === src && at >= s.from && at <= s.to);
@@ -80,7 +81,7 @@ const fadeOut = Math.max(0, total - 0.6).toFixed(2);
 const filter = [
   ...parts,
   `${segs.map((_, i) => `[v${i}]`).join("")}concat=n=${segs.length}:v=1:a=0,` +
-    `fps=30,scale=1280:720:flags=lanczos,setsar=1,format=yuv420p,` +
+    `fps=30,scale=${W}:${H}:flags=lanczos,setsar=1,format=yuv420p,` +
     `fade=t=in:st=0:d=0.4,fade=t=out:st=${fadeOut}:d=0.6[v]`,
 ].join(";");
 
@@ -93,7 +94,7 @@ run(["-i", mp4, "-an", "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "34", "-row-mt
   "-deadline", "good", "-cpu-used", "2", webm]);
 
 // Poster: re-encode the recorder's screenshot at 1280x720.
-run(["-i", path.join(root, spec.poster), "-vf", "scale=1280:720:flags=lanczos", "-q:v", "3", path.join(out, `${slug}.jpg`)]);
+run(["-i", path.join(root, spec.poster), "-vf", `scale=${W}:${H}:flags=lanczos`, "-q:v", "3", path.join(out, `${slug}.jpg`)]);
 
 const mb = (f) => (fs.statSync(f).size / 1048576).toFixed(2);
 console.log(`${slug}: ${total.toFixed(1)} s, mp4 ${mb(mp4)} MB, webm ${mb(webm)} MB, ${cues.length} cues`);

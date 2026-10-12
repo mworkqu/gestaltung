@@ -74,11 +74,12 @@ const CURSOR_SCRIPT = `
 const AR = slug.endsWith("-ar");
 const browser = await chromium.launch();
 const context = await browser.newContext({
-  viewport: { width: 1280, height: 720 },
-  deviceScaleFactor: 1,
+  // -ar (YouTube) takes: a wider page (1600x900 CSS px) recorded at 1080p.
+  viewport: AR ? { width: 1600, height: 900 } : { width: 1280, height: 720 },
+  deviceScaleFactor: AR ? 1.2 : 1,
   locale: AR ? "ar-QA" : "en-GB",
   timezoneId: "Asia/Qatar",
-  recordVideo: { dir, size: { width: 1280, height: 720 } },
+  recordVideo: { dir, size: AR ? { width: 1920, height: 1080 } : { width: 1280, height: 720 } },
   ...(STATE ? { storageState: STATE } : {}),
 });
 await context.addInitScript(CURSOR_SCRIPT);
@@ -286,6 +287,104 @@ const CLIPS = {
     await wait(2500);
     mark("total");
     await shot("total");
+    await wait(2500);
+    mark("end");
+  },
+
+  // Arabic YouTube take 2: wiring views + 3D product design. Wiring and the 3D
+  // model need a signed-in account with credits, so this runs against the
+  // LOCAL Studio fixture (same Studio screens, plant-waterer demo project, mock
+  // API, nothing written): start `E2E_FIXTURES=1 npx next start -p 3100`, then
+  //   node record.mjs studio-3d-ar <outRoot> --base http://localhost:3100
+  async "studio-3d-ar"() {
+    await goto("/ar/e2e-fixtures/studio?product=1&idea=plant_waterer&step=wiring");
+    await declineCookies();
+    const tabs = page.getByTestId("studio-wiring-tabs");
+    const draw = page.getByRole("button", { name: /ارسم|رصيد/ }).first();
+    await tabs.or(draw).first().waitFor({ state: "visible", timeout: 30000 });
+    await wait(1500);
+    mark("wiring");
+    if (!(await tabs.isVisible())) {
+      await click(draw);
+      await tabs.waitFor({ state: "visible", timeout: 30000 });
+    }
+    await page.waitForTimeout(2500);
+    mark("wiring-drawn");
+    await debug("wiring");
+    await scrollToEl(tabs, 150);
+    await wait(2500);
+    await smoothScroll(380);
+    await wait(3500);
+    await scrollToEl(tabs, 200);
+    await wait(600);
+    mark("wiring-pic");
+    await click(page.getByTestId("studio-wiring-tab-3d"));
+    await page.getByTestId("studio-wiring-panel-3d").waitFor({ state: "visible", timeout: 20000 });
+    await wait(4500);
+    mark("breadboard");
+    await debug("breadboard");
+    await shot("breadboard");
+    // A slow orbit of the breadboard: drag across the 3D view.
+    const p3 = await page.getByTestId("studio-wiring-panel-3d").boundingBox();
+    if (p3) {
+      const cx = p3.x + p3.width / 2, cy = p3.y + p3.height / 2;
+      await page.mouse.move(cx + 120, cy); mouse = { x: cx + 120, y: cy };
+      await page.mouse.down();
+      await page.mouse.move(cx - 160, cy + 30, { steps: 90 });
+      await page.mouse.up();
+      mouse = { x: cx - 160, y: cy + 30 };
+    }
+    await wait(3000);
+    mark("orbit");
+    await scrollToEl(tabs, 200);
+    await wait(500);
+    await click(page.getByTestId("studio-wiring-tab-pins"));
+    await wait(1200);
+    const pins = page.getByTestId("studio-pin-row");
+    for (let i = 0; i < Math.min(await pins.count(), 3); i++) { await moveTo(pins.nth(i)).catch(() => {}); await wait(900); }
+    mark("pins");
+    await debug("pins");
+    await click(page.getByRole("button", { name: "التالي", exact: true }).first());
+    mark("enclosure");
+    await page.getByTestId("studio-product-pictures").waitFor({ state: "visible", timeout: 30000 });
+    await page.locator('[data-testid="studio-product-pictures"][data-phase="ready"]').waitFor({ timeout: 90000 });
+    await wait(1000);
+    mark("pictures");
+    await scrollToEl(page.getByTestId("studio-product-pictures"), 140);
+    await wait(1500);
+    const cards = page.getByTestId("studio-product-card");
+    for (let i = 0; i < Math.min(await cards.count(), 3); i++) { await moveTo(cards.nth(i)).catch(() => {}); await wait(1300); }
+    await debug("pictures");
+    await shot("pictures");
+    mark("cards");
+    await click(cards.first());
+    await wait(1200);
+    await click(page.getByTestId("studio-create-cad"));
+    mark("cad");
+    const viewer = page.getByTestId("studio-product-viewer");
+    await viewer.waitFor({ state: "visible", timeout: 90000 });
+    await wait(4000);
+    await scrollToEl(viewer, 140).catch(() => {});
+    await wait(2000);
+    mark("viewer");
+    await debug("viewer");
+    await shot("viewer");
+    const vb = await viewer.boundingBox();
+    if (vb) {
+      const cx = vb.x + vb.width / 2, cy = vb.y + vb.height / 2;
+      await page.mouse.move(cx - 150, cy); mouse = { x: cx - 150, y: cy };
+      await page.mouse.down();
+      await page.mouse.move(cx + 170, cy - 20, { steps: 100 });
+      await page.mouse.up();
+      mouse = { x: cx + 170, y: cy - 20 };
+    }
+    await wait(2500);
+    mark("orbit-3d");
+    await click(page.getByTestId("studio-take-apart"));
+    await wait(4500);
+    mark("apart");
+    await debug("apart");
+    await shot("apart");
     await wait(2500);
     mark("end");
   },

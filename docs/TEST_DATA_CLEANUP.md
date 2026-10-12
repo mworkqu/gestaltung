@@ -44,7 +44,7 @@ Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test 
 
 ## Arabic YouTube video recording (2026-10-12)
 
-- Project `838c44f8-3ec8-4627-9521-130f2806ce37` (Studio "ساقي النباتات التلقائي"), created by a guest on /ar by `scripts/record-videos/record.mjs idea-to-kit-ar`. Keep it if the owner wants to re-record; nothing was ordered or sent.
+- Projects `838c44f8-3ec8-4627-9521-130f2806ce37` and `e5946e41-b746-49c0-b73a-cbbf59af24dc` (Studio "ساقي النباتات التلقائي"), created by guests on /ar by `scripts/record-videos/record.mjs idea-to-kit-ar` (two takes). Nothing was ordered or sent.
 
 ## Already deleted
 

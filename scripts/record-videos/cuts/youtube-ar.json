@@ -1,0 +1,24 @@
+{
+  "lang": "ar",
+  "sources": ["idea-to-kit-ar/raw.webm", "studio-3d-ar/raw.webm"],
+  "intro": { "seconds": 3.5, "title": "من الفكرة إلى منتج يعمل", "sub": "صِف منتجًا بجملة واحدة، ونجهّز لك القطع والتوصيل والتصميم ثلاثي الأبعاد" },
+  "outro": { "seconds": 5, "title": "ابدأ مشروعك اليوم" },
+  "voIntro": { "vo": 1, "at": 0.6 },
+  "voOutro": { "vo": 12, "at": 0.5 },
+  "segments": [
+    { "src": 0, "from": 7.0, "to": 11.0, "speed": 1 },
+    { "src": 0, "from": 22.0, "to": 26.0, "speed": 1 },
+    { "src": 0, "from": 26.0, "to": 38.5, "speed": 1.1, "vo": 2, "at": 0.8 },
+    { "src": 0, "from": 38.5, "to": 42.5, "speed": 2 },
+    { "src": 0, "from": 42.5, "to": 52.0, "speed": 1, "vo": 3, "at": 1.5 },
+    { "src": 0, "from": 52.0, "to": 62.5, "speed": 2.5 },
+    { "src": 0, "from": 62.5, "to": 76.0, "speed": 1, "vo": 4, "at": 0.5, "vo2": 5, "at2": 8.5 },
+    { "src": 1, "from": 0.5, "to": 21.0, "speed": 1.6, "vo": 6, "at": 0.8 },
+    { "src": 1, "from": 22.0, "to": 60.0, "speed": 2.5, "vo": 7, "at": 1.0 },
+    { "src": 1, "from": 61.0, "to": 66.0, "speed": 1, "vo": 8, "at": 0.3 },
+    { "src": 1, "from": 66.5, "to": 80.0, "speed": 1.2, "vo": 9, "at": 1.0 },
+    { "src": 1, "from": 80.0, "to": 90.0, "speed": 1.2, "vo": 10, "at": 0.3 },
+    { "src": 1, "from": 90.0, "to": 143.0, "speed": 4 },
+    { "src": 1, "from": 143.0, "to": 152.0, "speed": 1, "vo": 11, "at": 0.5 }
+  ]
+}
