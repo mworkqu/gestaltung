@@ -469,3 +469,106 @@ test("screenshots: neat 3D wiring, Plant Waterer + doorbell + cat feeder 1366, d
     if (width <= 375) await expectNoHorizontalOverflow(page);
   }
 });
+
+// ── Try it: behaviour preview in the 3D tab (P5-17g) ──
+
+function simMsg(locale: Loc, ...keys: string[]): string {
+  const all = JSON.parse(readFileSync(path.join(ROOT, "messages", `${locale}.json`), "utf8")) as {
+    Studio: { views: { sim: Record<string, unknown> } };
+  };
+  let v: unknown = all.Studio.views.sim;
+  for (const k of keys) v = (v as Record<string, unknown>)[k];
+  return v as string;
+}
+
+async function startTry(page: Page) {
+  await openTab(page, "3d");
+  await expect.poll(async () => (await partsOnScreen(page)).length, { timeout: 20_000 }).toBeGreaterThan(1);
+  await page.getByTestId("studio-wiring-3d-try").click();
+  await expect(page.getByTestId("studio-sim-panel")).toBeVisible();
+  await expect(page.getByTestId("studio-sim-status")).toBeVisible();
+}
+
+for (const locale of LOCALES) {
+  test(`Try it: Plant Waterer, dry soil turns the pump on [${locale}]`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await open(page, locale, "plant_waterer");
+    await draw(page, locale);
+    await startTry(page);
+    const panel = page.getByTestId("studio-sim-panel");
+    await expect(panel).toHaveAttribute("data-outputs", /pump:off/);
+    await expect(panel).toContainText(simMsg(locale, "note"));
+    await page.getByTestId("studio-sim-control-soil").fill("90");
+    await expect(panel).toHaveAttribute("data-outputs", /pump:on/);
+    await expect(panel).toHaveAttribute("data-outputs", /ring:on/);
+    const status = page.getByTestId("studio-sim-status");
+    await expect(status).toContainText(simMsg(locale, "effect", "pumpOn"));
+    await expect(status).toContainText(simMsg(locale, "cause", "soilDry"));
+    // A higher threshold than the soil → off again.
+    await page.getByTestId("studio-sim-threshold-soil").fill("95");
+    await expect(panel).toHaveAttribute("data-outputs", /pump:off/);
+    await expectNoHorizontalOverflow(page);
+    // Stop puts it away.
+    await page.getByTestId("studio-wiring-3d-try").click();
+    await expect(page.getByTestId("studio-sim-panel")).toHaveCount(0);
+  });
+
+  test(`Try it: cat feeder, the button turns the servo [${locale}]`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await open(page, locale, "cat_feeder");
+    await draw(page, locale);
+    await startTry(page);
+    const panel = page.getByTestId("studio-sim-panel");
+    await expect(panel).toHaveAttribute("data-outputs", "servo:0");
+    await page.getByTestId("studio-sim-hold-button").click();
+    await expect.poll(async () => Number((await panel.getAttribute("data-outputs"))!.split(":")[1]), { timeout: 5000 }).toBeGreaterThan(0);
+    await expect(panel).toHaveAttribute("data-outputs", "servo:90");
+    // …and back home after the portion.
+    await expect(panel).toHaveAttribute("data-outputs", "servo:0", { timeout: 6000 });
+  });
+}
+
+test("Try it: reduced motion shows the states as words", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, "en", "plant_waterer");
+  await draw(page, "en");
+  await startTry(page);
+  await page.getByTestId("studio-sim-control-soil").fill("90");
+  await expect(page.getByTestId("studio-sim-chips")).toContainText(simMsg("en", "effect", "pumpOn"));
+});
+
+test("screenshots: Try it (18 plant dry 1366, 19 feeder 1366, 20 plant 375 AR)", async ({ page }, info) => {
+  test.skip(!process.env.P517_SHOTS || info.project.name !== "desktop", "set P517_SHOTS=1 (desktop project)");
+  test.setTimeout(180_000);
+  mkdirSync(SHOTS, { recursive: true });
+  const panel = () => page.getByTestId("studio-wiring-3d");
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await open(page, "en", "plant_waterer");
+  await draw(page, "en");
+  await startTry(page);
+  await page.getByTestId("studio-sim-control-soil").fill("88");
+  await panel().scrollIntoViewIfNeeded();
+  await page.mouse.move(2, 2);
+  await page.waitForTimeout(2500);
+  await panel().screenshot({ path: path.join(SHOTS, "18-sim-plant-dry-1366.png") });
+
+  await open(page, "en", "cat_feeder");
+  await draw(page, "en");
+  await startTry(page);
+  await panel().scrollIntoViewIfNeeded();
+  await page.getByTestId("studio-sim-hold-button").hover();
+  await page.mouse.down(); // held: the flap stays open
+  await expect(page.getByTestId("studio-sim-panel")).toHaveAttribute("data-outputs", "servo:90");
+  await page.waitForTimeout(800);
+  await panel().screenshot({ path: path.join(SHOTS, "19-sim-feeder-1366.png") });
+  await page.mouse.up();
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, "ar", "plant_waterer");
+  await draw(page, "ar");
+  await startTry(page);
+  await page.getByTestId("studio-sim-control-soil").fill("88");
+  await panel().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(2500);
+  await panel().screenshot({ path: path.join(SHOTS, "20-sim-plant-375-ar.png") });
+});

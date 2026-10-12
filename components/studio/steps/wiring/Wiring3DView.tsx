@@ -40,10 +40,15 @@
 // (settleMove); "Take it apart" lifts the parts out, the breadboard stays.
 // frameloop "demand": a frame only on camera moves, drags, hover/selection and
 // the short animations.
+// Try it (P5-17g): a behaviour preview from the spec + parts (lib/studio/sim,
+// TryItPanel.tsx, sim-scene.ts): controls for the input parts, the outputs
+// animate on their models (glow, spin, servo horn, pulse rings, screen text)
+// and active signal wires carry moving beads. frameloop "always" only while
+// it runs and something moves; reduced motion = states shown standing still.
 
 import { Component, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from "react";
 import { useTranslations } from "next-intl";
-import { Layers, RotateCcw } from "lucide-react";
+import { Layers, Play, RotateCcw, Square } from "lucide-react";
 import * as THREE from "three";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei/core/OrbitControls";
@@ -75,6 +80,10 @@ import { useDocumentHidden, usePrefersReducedMotion } from "../../viewer/hooks";
 import { cloneMaterials, dimPcbEnvironment, disposeObject } from "../../viewer/materials";
 import { useWiringViews } from "./views-context";
 import { sleeveAt, tubeAlong } from "./wire-tube";
+import { createFlow, createSimRig, type SimFrame, type SimRig } from "./sim-scene";
+import { SimStatus, TryItPanel, useSim } from "./TryItPanel";
+import type { SimOutput } from "@/lib/studio/sim/model";
+import type { SimState } from "@/lib/studio/sim/step";
 
 const accent = STEP_ACCENT.wiring;
 const BG = "linear-gradient(180deg, #f4f7fb 0%, #e6ebf2 100%)";
@@ -160,6 +169,8 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
   const hidden = useDocumentHidden();
   const [webgl, setWebgl] = useState<boolean | null>(null);
   const [apart, setApart] = useState(false);
+  const [trying, setTrying] = useState(false);
+  const tSim = useTranslations("Studio.views.sim");
   const labelA = useRef<HTMLDivElement>(null);
   const labelB = useRef<HTMLDivElement>(null);
   const down = useRef<{ x: number; y: number } | null>(null);
@@ -220,6 +231,8 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
     });
   }, [items, locale]);
 
+  const sim = useSim({ on: trying && webgl === true, doc, getPart, connections, reduced: reducedMotion, locale });
+
   const active = activeId ? byId.get(activeId) : undefined;
   const label = (end: Connection["from"]) => {
     const name = partName(getPart(end.partId), locale, end.part);
@@ -234,6 +247,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
 
   return (
     <div className="space-y-2" data-testid="studio-wiring-3d">
+      <div className="relative">
       <div
         dir="ltr"
         className="relative h-[min(75dvh,620px)] w-full touch-none select-none overflow-hidden rounded-[20px] shadow-neu-inset md:h-[min(82dvh,820px)]"
@@ -248,7 +262,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
           <div role="img" aria-label={t("canvasLabel")} className="h-full w-full">
             <CanvasBoundary fallback={fallback}>
               <LeanCanvas
-                frameloop={hidden ? "never" : "demand"}
+                frameloop={hidden ? "never" : sim && !reducedMotion && sim.moving ? "always" : "demand"}
                 dpr={[1, 2]}
                 shadows
                 gl={{ antialias: true, alpha: true }}
@@ -281,6 +295,9 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
                   labelA={labelA}
                   labelB={labelB}
                   tags={tagRefs}
+                  simFrame={sim?.frame ?? null}
+                  simOutputs={sim?.model.outputs ?? null}
+                  simState={sim?.state ?? null}
                 />
               </LeanCanvas>
             </CanvasBoundary>
@@ -332,6 +349,20 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
             )}
             <button
               type="button"
+              onClick={() => setTrying((v) => !v)}
+              aria-pressed={trying}
+              data-testid="studio-wiring-3d-try"
+              className={cn(
+                "inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors",
+                trying ? "text-white" : "bg-panel text-heading shadow-neu-sm hover:bg-white",
+              )}
+              style={trying ? { background: accent.ink } : undefined}
+            >
+              {trying ? <Square className="h-4 w-4" strokeWidth={1.75} aria-hidden /> : <Play className="h-4 w-4" strokeWidth={1.75} aria-hidden />}
+              {trying ? tSim("stop") : tSim("tryIt")}
+            </button>
+            <button
+              type="button"
               onClick={() => setApart((v) => !v)}
               aria-pressed={apart}
               data-testid="studio-wiring-3d-apart"
@@ -347,6 +378,9 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
           </div>
         )}
       </div>
+      {sim && <TryItPanel sim={sim} locale={locale} reduced={reducedMotion} />}
+      </div>
+      {sim && <SimStatus sim={sim} locale={locale} />}
       <p className="text-sm text-mutedtext">
         {t("breadboardHint")} {t("hint")} {t("dragHint")}
       </p>
@@ -428,6 +462,10 @@ type SceneProps = {
   labelB: RefObject<HTMLDivElement | null>;
   /** Name tag element per part instance. */
   tags: RefObject<Map<string, HTMLDivElement>>;
+  /** Try it: the latest sim frame (read every frame), the outputs to animate (null = off), the state (a new one = a new frame). */
+  simFrame: RefObject<SimFrame | null> | null;
+  simOutputs: SimOutput[] | null;
+  simState: SimState | null;
 };
 
 type ScreenBox = { x0: number; y0: number; x1: number; y1: number };
@@ -641,6 +679,38 @@ function Scene(p: SceneProps) {
     if (d && performance.now() - d.start >= DRAW_MS) draw.current = null;
   }, []);
 
+  // ── Try it: outputs animate on their models, beads flow along active wires ──
+  const { simFrame, simOutputs, simState } = p;
+  const rig = useRef<SimRig | null>(null);
+  useEffect(() => {
+    if (!simOutputs) return;
+    const r = createSimRig(models, partOf, simOutputs);
+    rig.current = r;
+    invalidate();
+    return () => {
+      r.dispose();
+      if (rig.current === r) rig.current = null;
+      invalidate();
+    };
+  }, [models, partOf, simOutputs, invalidate]);
+  const flow = useMemo(() => createFlow(R_WIRE * 1.3), []);
+  useEffect(() => () => flow.dispose(), [flow]);
+  // A new sim state needs a frame (demand mode: a light turning on, a servo going home).
+  useEffect(() => {
+    invalidate();
+  }, [simState, invalidate]);
+  const stepSim = (dt: number) => {
+    const f = simOutputs ? simFrame?.current ?? null : null;
+    if (rig.current && f && rig.current.apply(f, Math.min(dt, 0.1))) invalidate();
+    flow.update(
+      f
+        ? wires.current.map((w) => ({ id: w.seg.id, shared: w.seg.shared, colour: WIRE_HEX[w.seg.colour], points: w.seg.points, hidden: look(w.seg) === "ghost" }))
+        : [],
+      f,
+      performance.now() / 1000,
+    );
+  };
+
   // ── Per frame: animations + end labels ──
   const v = useMemo(() => new THREE.Vector3(), []);
 
@@ -751,7 +821,8 @@ function Scene(p: SceneProps) {
       el.style.opacity = involved ? "0.35" : "1";
     }
   };
-  useFrame(() => {
+  useFrame((_s, dt) => {
+    stepSim(dt);
     const a = anim.current;
     if (a) {
       const k = Math.min(1, (performance.now() - a.start) / APART_MS);
@@ -1026,6 +1097,7 @@ function Scene(p: SceneProps) {
         <group onPointerOver={onOver} onPointerOut={onOut} onClick={onClick}>
           <primitive object={wireGroup} />
         </group>
+        <primitive object={flow.mesh} />
       </group>
       <CameraRig layout={layout} fitKey={p.fitKey} apart={apart} reducedMotion={reducedMotion} />
     </>
