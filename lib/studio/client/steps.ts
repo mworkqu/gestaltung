@@ -107,15 +107,26 @@ export function sameSpec(a: ProductSpec | null | undefined, b: ProductSpec | nul
 // same conversation.
 
 /**
- * note = our own short "Updated your card" line after a change request (W3): shown in the
- * chat, never sent to the AI, never stored (it is put back after every stored change).
+ * note = the assistant's reply once the card exists (Part A): "Done — it's solar powered now",
+ * an answer to a question, or the scope line on the first card. Stored as a:<n> after the
+ * change request r:<n> it answers (a:0 = before any). Older docs stored no reply: those
+ * notes come back with empty text and are neither shown nor sent to the AI.
  */
-export type IdeaMessage = { role: "user" | "assistant"; text: string; choices?: string[]; note?: true };
+export type IdeaMessage = {
+  role: "user" | "assistant";
+  text: string;
+  choices?: string[];
+  note?: true;
+  /** Part A: the card really changed on this turn; the short labels of what changed (shown as a chip, never stored). */
+  changed?: string[];
+};
 
 export const IDEA_KEY = "idea";
 const Q_PREFIX = "q:";
 /** A change request typed after the card was shown ("make it solar"), in order: r:1, r:2… */
 const R_PREFIX = "r:";
+/** Part A: the assistant's reply to r:<n> (a:0 = the reply that came with the first card). */
+const A_PREFIX = "a:";
 
 export function answersFrom(idea: string, messages: IdeaMessage[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -127,6 +138,7 @@ export function answersFrom(idea: string, messages: IdeaMessage[]): Record<strin
     const next = messages[i + 1];
     if (m.role === "assistant" && !m.note && next?.role === "user") out[`${Q_PREFIX}${m.text.slice(0, 300)}`] = next.text.slice(0, 1500);
     else if (m.role === "user" && (!prev || prev.role === "user" || prev.note)) out[`${R_PREFIX}${++r}`] = m.text.slice(0, 1500);
+    else if (m.role === "assistant" && m.note && m.text.trim()) out[`${A_PREFIX}${r}`] = m.text.slice(0, 300);
   }
   return out;
 }
@@ -138,13 +150,18 @@ export function historyFrom(answers: Record<string, string> | undefined): { idea
     if (k === IDEA_KEY) idea = v;
     else if (k.startsWith(Q_PREFIX)) messages.push({ role: "assistant", text: k.slice(Q_PREFIX.length) }, { role: "user", text: v });
     else if (k.startsWith(R_PREFIX)) messages.push({ role: "user", text: v }, { role: "assistant", text: "", note: true });
+    else if (k.startsWith(A_PREFIX)) {
+      const last = messages[messages.length - 1];
+      if (last?.note && !last.text) last.text = v;
+      else messages.push({ role: "assistant", text: v, note: true });
+    }
   }
   return { idea, messages };
 }
 
-/** The chat as the AI sees it: our own notes left out. */
+/** The chat as the AI sees it: its own replies kept (Part A), empty notes and the "changed" chips left out. */
 export function forModel(messages: readonly IdeaMessage[]): IdeaMessage[] {
-  return messages.filter((m) => !m.note).map(({ role, text, choices }) => (choices ? { role, text, choices } : { role, text }));
+  return messages.filter((m) => !m.note || m.text.trim()).map(({ role, text, choices }) => (choices ? { role, text, choices } : { role, text }));
 }
 
 // ── The live spec card (W3) ─────────────────────────────────────────────────

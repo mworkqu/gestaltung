@@ -105,6 +105,8 @@ export type MechTemplate = (typeof MECH_TEMPLATES)[number];
 export const LIMITS = {
   name: { min: 3, max: 40 },
   oneLine: { max: 120 },
+  /** Part A: "a real UR10 is 1.3 m — this is the desktop version", under the card name. */
+  scaleNote: { max: 140 },
   features: { max: 8, itemMax: 60 },
   widthToDepth: { min: 0.5, max: 2.5 },
   cornerRadius: { min: 3, max: 20 },
@@ -137,6 +139,8 @@ export const ProductSpecSchema = z.object({
   sizeHint: z.enum(SIZE_HINTS),
   style: z.enum(STYLES),
   placement: z.enum(PLACEMENTS).optional(),
+  /** Set only when the idea is far beyond a desktop kit (industrial robot, car…): what we build instead. */
+  scaleNote: z.string().max(LIMITS.scaleNote.max).optional(),
   quantity: z.literal(1),
 });
 export type ProductSpec = z.infer<typeof ProductSpecSchema>;
@@ -477,6 +481,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   const rawPlacement = typeof o.placement === "string" ? o.placement.trim().toLowerCase() : "";
   const placement = rawPlacement ? (PLACEMENTS as readonly string[]).find((p) => p === rawPlacement) : undefined;
   if (o.placement !== undefined && o.placement !== null && o.placement !== "" && !placement) log.push({ path: "placement", from: o.placement, to: null });
+  const scaleNote = typeof o.scaleNote === "string" && o.scaleNote.trim() ? clampStr(o.scaleNote, LIMITS.scaleNote.max, "", "scaleNote", log) : "";
   return {
     name,
     oneLine: typeof o.oneLine === "string" && o.oneLine.trim() ? clampStr(o.oneLine, LIMITS.oneLine.max, "", "oneLine", log) : "",
@@ -489,6 +494,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
     sizeHint: pickEnum(SIZE_HINTS, o.sizeHint, DEFAULT_SPEC.sizeHint, "sizeHint", log),
     style: pickEnum(STYLES, o.style, DEFAULT_SPEC.style, "style", log),
     ...(placement ? { placement: placement as Placement } : {}),
+    ...(scaleNote ? { scaleNote } : {}),
     quantity: 1,
   };
 }

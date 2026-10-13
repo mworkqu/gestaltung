@@ -25,6 +25,12 @@ const PLANT: Record<Loc, string> = {
   ar: "جهاز صغير يسقي النبتة تلقائياً",
 };
 const SOLAR: Record<Loc, string> = { en: "make it solar", ar: "اجعله يعمل بالطاقة الشمسية" };
+const SOLAR_CHANGED: Record<Loc, string> = { en: "Now solar powered", ar: "يعمل بالطاقة الشمسية الآن" };
+const QUESTION_TEXT: Record<Loc, string> = { en: "do you know what is ur10?", ar: "هل تعرف ما هو UR10؟" };
+const QUESTION_ANSWER: Record<Loc, string> = {
+  en: "A UR10 is a big industrial robot arm.",
+  ar: "UR10 ذراع روبوت صناعية كبيرة.",
+};
 const VAGUE: Record<Loc, string> = { en: "Build something new with Arduino", ar: "شيء باستخدام الأردوينو" };
 const VAGUE_Q: Record<Loc, string> = { en: "Fun! What should it do?", ar: "رائع! ماذا تريده أن يفعل؟" };
 
@@ -129,7 +135,11 @@ for (const locale of LOCALES) {
     const refine = page.getByRole("textbox", { name: card(locale, "refinePlaceholder") });
     await typeWhenHydrated(refine, SOLAR[locale]);
     await refine.press("Enter");
-    await expect(page.getByRole("log").getByText(card(locale, "refined"))).toBeVisible();
+    // Part A: a real reply + the "updated" chip naming the change.
+    const chip = page.getByTestId("studio-idea-updated");
+    await expect(chip).toBeVisible();
+    await expect(chip).toContainText(card(locale, "updatedChip"));
+    await expect(chip).toContainText(SOLAR_CHANGED[locale]);
     await expect(cardEl).toContainText(msg(locale, "Studio", "fact_power_battery_usb"));
     await expect(row(page, "power")).toHaveAttribute("data-fresh", "1");
     // Parts were picked for the old card: ONE button, "Update my parts", nothing redone yet.
@@ -163,5 +173,47 @@ for (const locale of LOCALES) {
     await expect(page.getByTestId("studio-idea-facts").locator('[data-row="does_0"]')).toContainText(
       msg(locale, "Studio", "fact_out_pump"),
     );
+  });
+}
+
+// Part A — once the card exists the chat answers like a person (mocked API: the
+// fixture's mock answers a question with a canned reply and applies changes
+// through the same guards as the server).
+for (const locale of LOCALES) {
+  test(`idea Part A: a question gets an answer and leaves the card alone; a change shows the chip [${locale}]`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await open(page, locale);
+    const cardEl = page.getByTestId("studio-idea-summary");
+    const input = page.getByRole("textbox", { name: msg(locale, "Studio", "ideaPlaceholder") });
+    await typeWhenHydrated(input, PLANT[locale]);
+    await input.press("Enter");
+    await page.getByTestId("studio-choices").getByRole("button").first().click();
+    await expect(cardEl).toHaveAttribute("data-state", "spec");
+    const before = await page.getByTestId("studio-idea-facts").innerText();
+
+    // A question: an answer bubble, the card unchanged, no "updated" chip.
+    const refine = page.getByRole("textbox", { name: card(locale, "refinePlaceholder") });
+    await typeWhenHydrated(refine, QUESTION_TEXT[locale]);
+    await refine.press("Enter");
+    const replies = page.getByTestId("studio-idea-reply");
+    await expect(replies.last()).toContainText(QUESTION_ANSWER[locale]);
+    await expect(page.getByTestId("studio-idea-updated")).toHaveCount(0);
+    expect(await page.getByTestId("studio-idea-facts").innerText()).toBe(before);
+    await expect(page.getByRole("log")).not.toContainText("Done. Your card is updated.");
+
+    // A greeting: the canned reply, no AI, no chip.
+    await typeWhenHydrated(refine, locale === "en" ? "hi" : "مرحبا");
+    await refine.press("Enter");
+    await expect(replies).toHaveCount(2);
+    await expect(page.getByTestId("studio-idea-updated")).toHaveCount(0);
+
+    // A change: the chip lists what changed and the card updates.
+    await typeWhenHydrated(refine, SOLAR[locale]);
+    await refine.press("Enter");
+    const chip = page.getByTestId("studio-idea-updated");
+    await expect(chip).toHaveCount(1);
+    await expect(chip).toContainText(SOLAR_CHANGED[locale]);
+    await expect(cardEl).toContainText(msg(locale, "Studio", "fact_power_battery_usb"));
+    await expectNoHorizontalOverflow(page);
   });
 }

@@ -13,11 +13,11 @@ import { buildConnections, pinBlock, pinConstants } from "@/lib/studio/connectio
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { specParts } from "@/lib/studio/ai/pick";
-import { guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
+import { chatGuardTurn, guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
 import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/schema";
 import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
 import { mockOptionsFromUrl } from "./product";
-import { forModel } from "./steps";
+import { forModel, sameSpec } from "./steps";
 
 /**
  * A small canned sketch whose pin block is built from the request's own wiring,
@@ -109,6 +109,33 @@ const QUESTION: Record<Locale, { question: string; choices: string[] }> = {
   ar: { question: "أين سيُستخدم؟", choices: ["على مكتبي", "على الحائط", "في يدي"] },
 };
 
+/** Part A (mock only): a question gets an answer, never a card change. */
+const ASKS = /[?؟]\s*$|^(?:what|who|how|why|when|where|which|do you|can you|are you|is it|tell me)\b|^(?:ما|ماذا|من|كيف|لماذا|هل|متى|أين)\s/i;
+const MOCK_REPLY: Record<Locale, { answer: string; done: string; nothing: string; solar: string; updated: string }> = {
+  en: {
+    answer: "A UR10 is a big industrial robot arm. We can build a small desktop version of your idea with hobby servos.",
+    done: "Done. I updated your card.",
+    nothing: "Your card already has that. Tell me what else to change.",
+    solar: "Now solar powered",
+    updated: "Card updated",
+  },
+  ar: {
+    answer: "UR10 ذراع روبوت صناعية كبيرة. يمكننا بناء نسخة مكتبية صغيرة من فكرتك بمحركات سيرفو صغيرة.",
+    done: "تم. حدّثتُ بطاقتك.",
+    nothing: "بطاقتك فيها ذلك بالفعل. أخبرني ماذا أغيّر أيضاً.",
+    solar: "يعمل بالطاقة الشمسية الآن",
+    updated: "تم تحديث البطاقة",
+  },
+};
+
+/** Short labels of what changed between two cards (mock only; the server gets them from the model). */
+function mockChanged(before: ProductSpec, after: ProductSpec, locale: Locale): string[] {
+  const words = MOCK_REPLY[locale];
+  const solar = (s: ProductSpec) => s.features.some((f) => /solar|شمس/i.test(f));
+  if (solar(after) && !solar(before)) return [words.solar];
+  return [words.updated];
+}
+
 const PICK: { partId: string; reason: Record<Locale, string> }[] = [
   { partId: "esp32_devkit", reason: { en: "The brain: it reads the sensor and drives the screen.", ar: "العقل: يقرأ الحساس ويشغّل الشاشة." } },
   { partId: "pir_hcsr501", reason: { en: "Notices when someone walks past.", ar: "يلاحظ مرور شخص بالقرب منه." } },
@@ -132,9 +159,19 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       // The same deterministic guards as the server (lib/studio/ai/spec.ts), so the e2e
       // sees the real vague-idea question, function words and placement.
       const turn = { idea, messages: forModel(messages), locale };
+      const canned = chatGuardTurn(turn.idea, turn.messages, locale, Boolean(current));
+      if (canned?.kind === "question") return { ok: true, data: { question: canned.question, choices: canned.choices } };
+      if (canned) return { ok: true, data: { reply: canned.reply, changed: [] } };
       const vague = current ? null : vagueTurn(turn.idea, turn.messages, locale);
       if (vague) return { ok: true, data: { question: vague.question, choices: vague.choices } };
-      if (current) return { ok: true, data: { spec: guardSpec(current, turn).spec } };
+      if (current) {
+        // Part A: a question is answered (card untouched); a change request updates the card.
+        const last = [...turn.messages].reverse().find((m) => m.role === "user")?.text.trim() ?? "";
+        if (ASKS.test(last)) return { ok: true, data: { reply: MOCK_REPLY[locale].answer, changed: [] } };
+        const next = guardSpec(current, turn).spec;
+        if (sameSpec(next, current)) return { ok: true, data: { reply: MOCK_REPLY[locale].nothing, changed: [] } };
+        return { ok: true, data: { reply: MOCK_REPLY[locale].done, spec: next, changed: mockChanged(current, next, locale) } };
+      }
       if (!turn.messages.some((m) => m.role === "assistant")) return { ok: true, data: QUESTION[locale] };
       const plant = WORDS.plant.test(userTexts(idea, turn.messages).join(" "));
       return {

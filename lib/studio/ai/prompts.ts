@@ -14,6 +14,10 @@ import {
 export const MAX_QUESTIONS = 4;
 export const QUESTION_MAX = 140;
 export const CHOICE_MAX = 40;
+/** Part A: the assistant's chat reply once the card exists, and each "what changed" label. */
+export const REPLY_MAX = 220;
+export const CHANGED_MAX = 40;
+export const CHANGED_ITEMS = 4;
 export const LABEL_MAX = 30;
 export const REASON_MAX = 100;
 export const MAX_COMPONENTS = 12;
@@ -47,7 +51,24 @@ export const SPEC_SYSTEM =
   "'beeps' needs a buzzer; 'shows' needs a screen; 'lights up' needs a led. " +
   "Infer where it lives from the idea instead of a generic default: a plant monitor stands in the soil of the pot (placement plant_soil), " +
   "a wearable sits on the body (use wearable, placement on_body, or on_wrist for a watch/bracelet) and runs on a battery. " +
-  "Return EITHER {question, choices} OR {spec}, never both. quantity is always 1.";
+  "Before the card exists, return EITHER {question, choices} OR {spec} (with an optional reply), never both. quantity is always 1. " +
+  // Part A: scope honesty on the first card.
+  "We make small desktop kits (hobby servos, small motors, USB or battery power, about 60 cm at most). " +
+  "If the idea is far beyond that (an industrial robot like a UR10, a car, a full-size drone, anything bigger than about 60 cm " +
+  "or needing mains-powered motors), still return the spec of the small version we CAN build, put that small version in oneLine, " +
+  `set spec.scaleNote (at most ${LIMITS.scaleNote.max} characters) to what the real thing is versus what we build, ` +
+  "and add a reply (1–2 sentences) that says so plainly, e.g. 'A real UR10 is an industrial arm (1.3 m reach, 10 kg). " +
+  "We can build a desktop arm that moves like it, about 30–40 cm, with hobby servos.' " +
+  // Part A: once the card exists the chat answers like a person.
+  "Once a card exists, every turn returns {reply, changed, spec?}: " +
+  `reply = one or two plain sentences (at most ${REPLY_MAX} characters) in the page language, always present. ` +
+  "If the user asks for a change, apply it, return the full updated spec, list what changed in changed (short labels like " +
+  "'Now solar powered') and say it in reply. If the user asks a question about the idea or a product they mention " +
+  "(e.g. 'what is UR10'), answer briefly and relate it to what we can build; no spec. " +
+  "Off-topic or 'who made you': say you are Gestaltung's design assistant who helps turn an idea into parts, wiring and a case, " +
+  "and steer back to the idea; no spec. Rude messages: one calm line, no lecture, no spec. " +
+  "Never claim to be human. Never name the AI company or model behind you; you are Gestaltung's design assistant. " +
+  "Use Western digits (0-9) in Arabic too.";
 
 export const PRODUCT_SPEC_SCHEMA = {
   type: "OBJECT",
@@ -63,6 +84,9 @@ export const PRODUCT_SPEC_SCHEMA = {
     sizeHint: enumOf(SIZE_HINTS),
     style: enumOf(STYLES),
     placement: enumOf(PLACEMENTS, "Only when the use alone would be wrong: plant_soil (in a plant pot / soil), on_body, on_wrist"),
+    scaleNote: str(
+      `Only when the idea is far beyond a desktop kit: the real thing vs the small version we build, at most ${LIMITS.scaleNote.max} characters`,
+    ),
     quantity: { type: "INTEGER", description: "Always 1" },
   },
   required: ["name", "oneLine", "use", "power", "environment", "features", "inputs", "outputs", "sizeHint", "style", "quantity"],
@@ -74,6 +98,12 @@ export const SPEC_RESPONSE_SCHEMA = {
     question: str(`One short question, at most ${QUESTION_MAX} characters`),
     choices: { type: "ARRAY", items: str(`At most ${CHOICE_MAX} characters`), minItems: 2, maxItems: 4 },
     spec: PRODUCT_SPEC_SCHEMA,
+    reply: str(`One or two plain sentences in the page language, at most ${REPLY_MAX} characters`),
+    changed: {
+      type: "ARRAY",
+      items: str(`What changed on the card, at most ${CHANGED_MAX} characters`),
+      maxItems: CHANGED_ITEMS,
+    },
   },
 };
 
@@ -98,15 +128,17 @@ export function specPrompt(opts: {
       `Idea:\n${opts.idea || "(see the conversation)"}`,
       `Conversation so far:\n${history}`,
       `Current spec:\n${JSON.stringify(opts.current)}`,
-      `The user now asks for this change: ${change}`,
-      "Return the updated spec now: apply the change, keep everything else as it is. Never return a question.",
-      `Language for names and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+      `The user's latest message: ${change}`,
+      "Return {reply, changed, spec?}. Never return a question. " +
+        "Only when the message asks for a change: include the full updated spec (apply the change, keep everything else as it is) " +
+        "and list what changed. Otherwise leave spec out, changed empty, and just answer in reply.",
+      `Language for the reply, names and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
     ].join("\n\n");
   }
   return [
     `Idea:\n${opts.idea || "(see the conversation)"}`,
     `Conversation so far:\n${history}`,
-    `Language for any question: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+    `Language for any question, reply and the spec text: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
     opts.forceSpec ? "Return the spec now." : "Ask the next question, or return the spec if you know enough.",
   ].join("\n\n");
 }

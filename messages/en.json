@@ -4086,8 +4086,8 @@
       "card_hint_does": "What it does",
       "card_hint_power": "How it's powered",
       "card_hint_size": "How big it is",
-      "refined": "Done. Your card is updated.",
-      "refinePlaceholder": "Change anything, e.g. “make it solar”",
+      "updatedChip": "Card updated",
+      "refinePlaceholder": "Change anything or ask, e.g. “make it solar”",
       "updateParts": "Update my parts",
       "updatePartsNote": "Your parts were picked for the old card. Tap Update my parts and we'll pick them again."
     },

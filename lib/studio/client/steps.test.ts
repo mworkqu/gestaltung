@@ -158,6 +158,33 @@ describe("idea chat W3: refinements and the live card", () => {
     expect(forModel(messages)).toHaveLength(4);
   });
 
+  it("Part A: the assistant's replies are stored after the request they answer, read back, and sent to the AI", () => {
+    const messages = [
+      { role: "assistant" as const, text: "Where will it live?", choices: ["Desk", "Wall"] },
+      { role: "user" as const, text: "Desk" },
+      { role: "assistant" as const, text: "A real UR10 is 1.3 m; this is the desktop version.", note: true as const },
+      { role: "user" as const, text: "what is ur10" },
+      { role: "assistant" as const, text: "An industrial robot arm.", note: true as const },
+      { role: "user" as const, text: "make it solar" },
+      { role: "assistant" as const, text: "Done.", note: true as const, changed: ["Now solar powered"] },
+    ];
+    const answers = answersFrom("robot arm like ur10", messages);
+    expect(answers).toEqual({
+      idea: "robot arm like ur10",
+      "q:Where will it live?": "Desk",
+      "a:0": "A real UR10 is 1.3 m; this is the desktop version.",
+      "r:1": "what is ur10",
+      "a:1": "An industrial robot arm.",
+      "r:2": "make it solar",
+      "a:2": "Done.",
+    });
+    const back = historyFrom(answers).messages;
+    expect(back.map((m) => m.text)).toEqual(messages.map((m) => m.text));
+    expect(back.some((m) => "changed" in m)).toBe(false); // the chip is never stored
+    expect(forModel(messages).filter((m) => m.role === "assistant")).toHaveLength(4);
+    expect(forModel(messages).some((m) => "changed" in m || "note" in m)).toBe(false);
+  });
+
   it("a spec straight after the idea: the first message is a change request", () => {
     expect(answersFrom("lamp", [{ role: "user", text: "make it red" }])).toEqual({ idea: "lamp", "r:1": "make it red" });
   });

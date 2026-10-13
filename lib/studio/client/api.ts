@@ -31,7 +31,15 @@ export type SaveResult =
   | { ok: false; error: "conflict"; doc: StudioDoc | null; version: number }
   | { ok: false; error: "run_0068" | "failed" };
 
-export type SpecReply = { question: string; choices: string[] } | { spec: ProductSpec };
+/**
+ * One idea-chat turn: a question, the first card (maybe with a reply, e.g. scope
+ * honesty), or — once the card exists (Part A) — a reply with a spec only when the
+ * card changed and `changed` = short labels of what changed.
+ */
+export type SpecReply =
+  | { question: string; choices: string[] }
+  | { spec: ProductSpec; reply?: string }
+  | { reply: string; spec?: ProductSpec; changed: string[] };
 export type PickReply = { components: StudioComponent[]; docVersion: number | null };
 export type WiringReply = {
   components: StudioComponent[];

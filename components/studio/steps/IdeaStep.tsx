@@ -9,9 +9,11 @@
 //    instant) and highlights each row the moment it is learned; the AI's spec
 //    then completes it. While the AI thinks: a typing dot in the chat and
 //    skeleton bars in the rows still to come (shown at once, well under 300 ms).
-//  * The chat never disappears. After the card is shown, anything typed is a
-//    change request ("make it solar") that updates the card (POST
-//    /api/studio/spec with `current`). When parts were already picked for the old
+//  * The chat never disappears. After the card is shown, anything typed goes to
+//    POST /api/studio/spec with `current` and gets a real reply (Part A): a change
+//    ("make it solar") updates the card and shows an "updated" chip listing what
+//    changed; a question ("what is UR10") is answered and the card stays as it
+//    is (no chip — the chip shows only when the spec really changed). When parts were already picked for the old
 //    card, the ONE main button becomes "Update my parts" — later steps are never
 //    redone silently.
 //  * The input is focused on load and after every reply (phones too) and is
@@ -89,14 +91,22 @@ export function IdeaStep({
       focusInput();
       return;
     }
-    if ("spec" in r.data) {
-      setSpec(r.data.spec);
-      if (current) setMessages([...history, { role: "assistant", text: "", note: true }]);
-      else setCardOpen(true);
+    const data = r.data;
+    if ("question" in data) {
+      setMessages([...history, { role: "assistant", text: data.question, choices: data.choices }]);
       focusInput();
       return;
     }
-    setMessages([...history, { role: "assistant", text: r.data.question, choices: r.data.choices }]);
+    const next = data.spec ?? null;
+    // The chip only when the card really changed (deep compare), never for an answer.
+    const updated = Boolean(next && current && !sameSpec(next, current));
+    if (next && (!current || updated)) setSpec(next);
+    if (!current) setCardOpen(true);
+    const reply = data.reply?.trim() ?? "";
+    if (reply || updated) {
+      const changedLabels = "changed" in data ? data.changed : [];
+      setMessages([...history, { role: "assistant", text: reply, note: true, ...(updated ? { changed: changedLabels } : {}) }]);
+    }
     focusInput();
   }
 
@@ -153,7 +163,12 @@ export function IdeaStep({
 
   const last = messages[messages.length - 1];
   const choices = !busy && last?.role === "assistant" && !last.note ? last.choices ?? [] : [];
-  const shown: IdeaMessage[] = [{ role: "assistant", text: t("ideaFirst") }, ...(idea ? [{ role: "user" as const, text: idea }] : []), ...messages];
+  // Older docs kept an empty note after each change request: nothing to show for those.
+  const shown: IdeaMessage[] = [
+    { role: "assistant", text: t("ideaFirst") },
+    ...(idea ? [{ role: "user" as const, text: idea }] : []),
+    ...messages.filter((m) => !m.note || m.text.trim() || m.changed),
+  ];
 
   // One main button: "Update my parts" only when parts were picked for a card that has since changed.
   const changed = Boolean(spec && doc && !sameSpec(spec, doc.spec));
@@ -207,16 +222,23 @@ export function IdeaStep({
             className="max-h-[52dvh] space-y-3 overflow-y-auto rounded-2xl bg-panel/60 p-3 shadow-neu-inset sm:p-4 lg:max-h-[60dvh]"
           >
             {shown.map((m, i) => (
-              <div key={i} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
-                <p
-                  dir="auto"
-                  className={cn(
-                    "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed motion-safe:animate-rise",
-                    m.role === "user" ? "rounded-ee-md bg-cobalt text-white" : "rounded-es-md bg-surface text-heading shadow-neu-sm",
-                  )}
-                >
-                  {m.note ? t("ideaCard.refined") : m.text}
-                </p>
+              <div
+                key={i}
+                className={cn("flex flex-col gap-1.5", m.role === "user" ? "items-end" : "items-start")}
+                data-testid={m.note ? "studio-idea-reply" : undefined}
+              >
+                {m.text.trim() && (
+                  <p
+                    dir="auto"
+                    className={cn(
+                      "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed motion-safe:animate-rise",
+                      m.role === "user" ? "rounded-ee-md bg-cobalt text-white" : "rounded-es-md bg-surface text-heading shadow-neu-sm",
+                    )}
+                  >
+                    {m.text}
+                  </p>
+                )}
+                {m.changed && <UpdatedChip changed={m.changed} />}
               </div>
             ))}
             {busy && (
@@ -288,6 +310,25 @@ export function IdeaStep({
         </div>
       </div>
     </StepFrame>
+  );
+}
+
+/** "Card updated: Now solar powered · 6 joints" — only after a turn that really changed the card. */
+function UpdatedChip({ changed }: { changed: string[] }) {
+  const t = useTranslations("Studio");
+  return (
+    <p
+      className="inline-flex max-w-[85%] items-start gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-heading shadow-neu-sm motion-safe:animate-rise"
+      data-testid="studio-idea-updated"
+    >
+      <span className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full" style={{ background: accent.base }}>
+        <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} aria-hidden />
+      </span>
+      <span dir="auto">
+        {t("ideaCard.updatedChip")}
+        {changed.length > 0 && <span className="font-medium text-body">{`: ${changed.join(" · ")}`}</span>}
+      </span>
+    </p>
   );
 }
 
@@ -373,6 +414,11 @@ function SpecCard({
           <h2 className="text-xl font-extrabold tracking-tight text-heading" dir="auto">
             {name}
           </h2>
+          {!draft && spec.scaleNote && (
+            <p className="text-xs font-semibold leading-relaxed" style={{ color: accent.ink }} dir="auto" data-testid="studio-idea-scale">
+              {spec.scaleNote}
+            </p>
+          )}
           {line && (
             <p className="text-sm leading-relaxed text-body" dir="auto">
               {line}

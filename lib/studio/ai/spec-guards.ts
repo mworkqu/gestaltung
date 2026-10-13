@@ -294,3 +294,110 @@ export function draftSpec(idea: string, messages: readonly Msg[], locale: Locale
   const blank: ProductSpec = { ...DEFAULT_SPEC, outputs: [], features: [] };
   return guardSpec(blank, { idea, messages, locale });
 }
+
+// ---------------------------------------------------------------------------
+// Chat guard (Part A): messages that need no AI at all
+// ---------------------------------------------------------------------------
+// Empty / punctuation-only, emoji-only, or nothing but greetings, thanks or
+// insults ("hi", "thanks!", "are you stupid") → a canned reply in the page
+// language, no model call and no card change. Anything with a real word in it
+// ("who made you?", "what is UR10") goes to the model.
+
+export type ChatGuardKind = "empty" | "emoji" | "greeting" | "thanks" | "insult";
+
+const GREETING = new Set(
+  (
+    "hi hii hiii hello helo hey heya hiya yo sup howdy greetings morning evening afternoon good day " +
+    "مرحبا مرحباً مرحبتين اهلا أهلا اهلين أهلين هلا هاي هلو سلام السلام عليكم صباح مساء الخير النور"
+  ).split(/\s+/),
+);
+const THANKS = new Set("thanks thank thx ty cheers appreciated شكرا شكراً مشكور يعطيك العافية".split(/\s+/));
+const INSULT = new Set(
+  (
+    "stupid dumb idiot idiotic moron moronic useless dumbass trash garbage rubbish sucks suck stinks lame pathetic " +
+    "shut up hate wtf stfu fool crap terrible worst " +
+    "غبي غبية حمار حمارة تافه تافهة سخيف سخيفة اسكت فاشل فاشلة احمق أحمق اهبل أهبل كريه"
+  ).split(/\s+/),
+);
+/** Words that never change what the message is ("are you stupid", "thank you so much"). */
+const GUARD_FILLER = new Set(
+  (
+    "you u ur you're youre are r is it this that so very really such a an the and too just bot ai assistant thing " +
+    "much lot all there guys man bro i im i'm am me how so" +
+    " انت أنت انتي إنتي يا هل جدا جداً كثير مرة مره و"
+  ).split(/\s+/),
+);
+
+/** What a message is, when it needs no AI (null = a real message for the model). */
+export function chatGuardKind(text: string): ChatGuardKind | null {
+  const t = (text ?? "").trim().toLowerCase();
+  if (!/[\p{L}\p{N}]/u.test(t)) return /\p{Extended_Pictographic}/u.test(t) ? "emoji" : "empty";
+  const words = t
+    .split(/[^\p{L}\p{N}'’]+/u)
+    .map((w) => w.replace(/[’']/g, "'"))
+    .filter(Boolean);
+  let kind: ChatGuardKind | null = null;
+  for (const w of words) {
+    const bare = bareAr(w);
+    const is = (set: Set<string>) => set.has(w) || set.has(bare) || set.has(w.replace(/(.)\1+$/, "$1"));
+    if (is(INSULT)) kind = "insult"; // an insult wins over a greeting in the same line
+    else if (is(THANKS)) kind = kind === "insult" ? kind : "thanks";
+    else if (is(GREETING)) kind = kind ?? "greeting";
+    else if (!GUARD_FILLER.has(w) && !GUARD_FILLER.has(bare)) return null;
+  }
+  return kind;
+}
+
+/** Once the card is there: a calm one-line reply; the card stays as it is. */
+export const GUARD_REPLY: Record<ChatGuardKind, Record<Locale, string>> = {
+  empty: {
+    en: "Tell me what to change on the card, or ask me anything about your idea.",
+    ar: "أخبرني ماذا أغيّر في البطاقة، أو اسألني أي شيء عن فكرتك.",
+  },
+  emoji: {
+    en: "Got it. Tell me what to change on the card, or ask me anything about your idea.",
+    ar: "وصلت. أخبرني ماذا أغيّر في البطاقة، أو اسألني أي شيء عن فكرتك.",
+  },
+  greeting: {
+    en: "Hi! I'm Gestaltung's design assistant. Tell me what to change on the card, or ask me about your idea.",
+    ar: "أهلاً! أنا مساعد التصميم في جِشتالتُونج. أخبرني ماذا أغيّر في البطاقة، أو اسألني عن فكرتك.",
+  },
+  thanks: {
+    en: "You're welcome! Anything else to change on the card?",
+    ar: "على الرحب والسعة! هل تريد تغيير شيء آخر في البطاقة؟",
+  },
+  insult: {
+    en: "Sorry it's not right yet. Tell me what to change and I'll fix the card.",
+    ar: "آسف إن لم تكن البطاقة كما تريد. أخبرني ماذا أغيّر وسأعدّلها.",
+  },
+};
+
+/** Before the card: the same chips as a vague idea, after a short canned line. */
+export const GUARD_QUESTION: Record<ChatGuardKind, Record<Locale, string>> = {
+  empty: { en: "What should your product do?", ar: "ماذا تريد أن يفعل منتجك؟" },
+  emoji: { en: "What should your product do?", ar: "ماذا تريد أن يفعل منتجك؟" },
+  greeting: { en: "Hi! What should your product do?", ar: "أهلاً! ماذا تريد أن يفعل منتجك؟" },
+  thanks: { en: "Happy to help! What should your product do?", ar: "يسعدني ذلك! ماذا تريد أن يفعل منتجك؟" },
+  insult: { en: "Let's start again. What should your product do?", ar: "لنبدأ من جديد. ماذا تريد أن يفعل منتجك؟" },
+};
+
+export type GuardTurn =
+  | { kind: "reply"; reply: string; changed: string[] }
+  | { kind: "question"; question: string; choices: string[] };
+
+/**
+ * The canned turn for the visitor's latest message (the idea itself on the first
+ * turn), or null when the model should answer. `hasCard` = the spec card is shown.
+ */
+export function chatGuardTurn(
+  idea: string,
+  messages: readonly Msg[],
+  locale: Locale,
+  hasCard: boolean,
+): GuardTurn | null {
+  const last = [...messages].reverse().find((m) => m.role === "user");
+  const kind = chatGuardKind(last ? last.text : idea);
+  if (!kind) return null;
+  if (hasCard) return { kind: "reply", reply: GUARD_REPLY[kind][locale], changed: [] };
+  return { kind: "question", question: GUARD_QUESTION[kind][locale], choices: VAGUE_QUESTION[locale].choices };
+}

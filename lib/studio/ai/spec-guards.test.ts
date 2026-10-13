@@ -5,7 +5,8 @@ import { fakeModel } from "./fake-model";
 import { enforcePick, specParts } from "./pick";
 import { runSpecChat } from "./spec";
 import {
-  actuatorFor, draftSpec, guardSpec, isVague, powerSaid, userTexts, VAGUE_QUESTION, vagueTurn,
+  actuatorFor, chatGuardKind, chatGuardTurn, draftSpec, GUARD_REPLY, guardSpec, isVague, powerSaid, userTexts, VAGUE_QUESTION,
+  vagueTurn,
 } from "./spec-guards";
 import { libraryIndexForAI } from "../library";
 
@@ -203,23 +204,29 @@ describe("runSpecChat with the fixtures (scripted fake model)", () => {
     expect(r.value.spec.power).toBe("battery_usb");
   });
 
-  it("refinement: the current card is sent, a spec is forced, the guards apply", async () => {
+  it("refinement: the current card is sent, a question is refused, the guards apply to the new spec", async () => {
     const current = guardSpec(LAZY_PLANT, { idea: PLANT, messages: [], locale: "en" }).spec;
-    const m = fakeModel([{ question: "Which panel?", choices: ["Small", "Big"] }, { spec: { ...current, power: "usb" } }]);
+    const m = fakeModel([
+      { question: "Which panel?", choices: ["Small", "Big"] },
+      { reply: "Done, it runs on the sun now.", spec: { ...current, power: "usb" }, changed: ["Now solar powered"] },
+    ]);
     const r = await runSpecChat({ call: m.call, idea: PLANT, messages: [{ role: "user", text: "make it solar" }], locale: "en", current });
-    if (!r.ok || r.value.kind !== "spec") throw new Error("expected a spec");
+    if (!r.ok || r.value.kind !== "reply" || !r.value.spec) throw new Error("expected a reply with a spec");
     expect(m.prompts[0]).toContain("Current spec:");
     expect(m.prompts[0]).toContain("make it solar");
+    expect(m.prompts[1]).toContain("reply is required");
     expect(r.value.spec.power).toBe("battery_usb"); // the visitor's word beats the model
     expect(r.value.spec.outputs).toContain("pump");
+    expect(r.value.changed).toEqual(["Now solar powered"]);
   });
 
-  it("refinement fallback keeps the current card (never a blank default)", async () => {
+  it("refinement fallback keeps the current card (never a blank default) and still replies", async () => {
     const current = guardSpec(LAZY_PLANT, { idea: PLANT, messages: [], locale: "en" }).spec;
     const m = fakeModel(["nonsense", "still nonsense"]);
     const r = await runSpecChat({ call: m.call, idea: PLANT, messages: [{ role: "user", text: "add a buzzer" }], locale: "en", current });
-    if (!r.ok || r.value.kind !== "spec") throw new Error("expected a spec");
+    if (!r.ok || r.value.kind !== "reply" || !r.value.spec) throw new Error("expected a reply with a spec");
     expect(r.source).toBe("default");
+    expect(r.value.reply).toBeTruthy();
     expect(r.value.spec.name).toBe(current.name);
     expect(r.value.spec.outputs).toEqual(expect.arrayContaining(["pump", "buzzer"]));
   });
@@ -237,5 +244,69 @@ describe("parts follow the spec", () => {
     expect(ids).toContain("pump_5v");
     expect(ids).toContain("soil_moisture_cap");
     expect(ids.filter((id) => id === "esp32_devkit")).toHaveLength(1);
+  });
+});
+
+describe("chat guard (Part A): no AI for greetings, thanks, insults, emoji or empty messages", () => {
+  it.each([
+    ["", "empty"],
+    ["   ?? ...", "empty"],
+    ["👍", "emoji"],
+    ["😂😂 🔥", "emoji"],
+    ["hi", "greeting"],
+    ["Hello there!", "greeting"],
+    ["heyyy", "greeting"],
+    ["good morning", "greeting"],
+    ["مرحبا", "greeting"],
+    ["السلام عليكم", "greeting"],
+    ["thanks!", "thanks"],
+    ["thank you so much", "thanks"],
+    ["شكراً", "thanks"],
+    ["are you stupid", "insult"],
+    ["you're useless", "insult"],
+    ["hi idiot", "insult"],
+    ["انت غبي", "insult"],
+  ])("%j → %s", (text, kind) => {
+    expect(chatGuardKind(text)).toBe(kind);
+  });
+
+  it.each(["do you know what is ur10", "who create you?", "make it solar", "how are you", "hi, add a buzzer", "123", "اجعله يعمل بالطاقة الشمسية"])(
+    "%j goes to the model",
+    (text) => {
+      expect(chatGuardKind(text)).toBeNull();
+    },
+  );
+
+  it("with a card: a canned reply in the page language, nothing changed", () => {
+    const messages = [{ role: "user" as const, text: "are you stupid" }];
+    expect(chatGuardTurn(PLANT, messages, "en", true)).toEqual({ kind: "reply", reply: GUARD_REPLY.insult.en, changed: [] });
+    expect(chatGuardTurn(PLANT, messages, "ar", true)).toEqual({ kind: "reply", reply: GUARD_REPLY.insult.ar, changed: [] });
+  });
+
+  it("before the card: the idea itself is checked and answered with the what-should-it-do chips", () => {
+    const turn = chatGuardTurn("hello", [], "en", false);
+    expect(turn?.kind).toBe("question");
+    if (turn?.kind !== "question") return;
+    expect(turn.question).toMatch(/what should your product do/i);
+    expect(turn.choices).toEqual(VAGUE_QUESTION.en.choices);
+  });
+
+  it("every canned reply exists in both languages, short, without a provider name", () => {
+    for (const r of Object.values(GUARD_REPLY)) {
+      for (const text of [r.en, r.ar]) {
+        expect(text.length).toBeGreaterThan(0);
+        expect(text.length).toBeLessThanOrEqual(220);
+        expect(text).not.toMatch(/gemini|google/i);
+      }
+    }
+  });
+
+  it("runSpecChat answers a greeting without calling the model and leaves the card alone", async () => {
+    const current = guardSpec(LAZY_PLANT, { idea: PLANT, messages: [], locale: "en" }).spec;
+    const m = fakeModel([]);
+    const r = await runSpecChat({ call: m.call, idea: PLANT, messages: [{ role: "user", text: "hi" }], locale: "en", current });
+    expect(r.ok && r.source).toBe("rules");
+    expect(r.ok && r.value).toEqual({ kind: "reply", reply: GUARD_REPLY.greeting.en, changed: [] });
+    expect(m.prompts).toHaveLength(0);
   });
 });
