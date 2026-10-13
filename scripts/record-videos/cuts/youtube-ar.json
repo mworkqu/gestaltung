@@ -1,6 +1,7 @@
 {
   "lang": "ar",
   "sources": ["idea-to-kit-ar/raw.webm", "studio-3d-ar/raw.webm"],
+  "crop": [[1600, 900], [1600, 900]],
   "intro": { "seconds": 3.5, "title": "من الفكرة إلى منتج يعمل", "sub": "صِف منتجًا بجملة واحدة، ونجهّز لك القطع والتوصيل والتصميم ثلاثي الأبعاد" },
   "outro": { "seconds": 5, "title": "ابدأ مشروعك اليوم" },
   "voIntro": { "vo": 1, "at": 0.6 },

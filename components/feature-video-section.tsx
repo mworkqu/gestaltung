@@ -33,6 +33,10 @@ export async function FeatureVideoSection({
       playLabel={t("play")}
       pauseLabel={t("pause")}
       replayLabel={t("replay")}
+      sound={entry.sound}
+      soundOnLabel={t("soundOn")}
+      soundOffLabel={t("soundOff")}
+      burntInCaptions={entry.burntInCaptions}
       ratio={ratio}
       size={size}
       posterOnly={posterOnly}

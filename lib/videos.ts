@@ -1,6 +1,6 @@
 // Registry + pure helpers for the self-hosted feature videos (CC-2).
 //
-// Six short clips live in the public Supabase bucket `videos` (migration 0049):
+// Short clips live in the public Supabase bucket `videos` (migration 0049):
 //   videos/<slug>/<slug>.mp4 | .webm | .jpg (poster 1280x720) | .en.vtt | .ar.vtt
 // Nothing here reads env or touches React, so it is unit-tested
 // (lib/videos.test.ts). The player is components/feature-video.tsx.
@@ -12,6 +12,7 @@ export const VIDEO_SLUGS = [
   "wiring-check",
   "cad-model",
   "store-to-door",
+  "idea-to-product-ar",
 ] as const;
 
 export type VideoSlug = (typeof VIDEO_SLUGS)[number];
@@ -34,6 +35,10 @@ export type FeatureVideoEntry = {
    * not-yet-uploaded files never emit structured data.
    */
   published: boolean;
+  /** Has a voice-over: the player offers a sound on/off button (starts muted). */
+  sound?: boolean;
+  /** Captions are part of the picture: no <track> (it would show them twice). */
+  burntInCaptions?: boolean;
 };
 
 /** `uploaded` = ISO date of the real upload; it also marks the clip published. */
@@ -42,6 +47,7 @@ function entry(
   pages: readonly string[],
   durationSeconds: number,
   uploaded?: string,
+  extra: Pick<FeatureVideoEntry, "sound" | "burntInCaptions"> = {},
 ): FeatureVideoEntry {
   return {
     slug,
@@ -52,6 +58,7 @@ function entry(
     durationSeconds,
     uploadDate: uploaded ?? "2026-10-08",
     published: uploaded !== undefined,
+    ...extra,
   };
 }
 
@@ -65,7 +72,15 @@ export const VIDEOS: readonly FeatureVideoEntry[] = [
   entry("wiring-check", ["/projects/[id]/prototyping"], 31, "2026-10-10"),
   entry("cad-model", ["/projects/[id]/prototyping"], 31, "2026-10-10"),
   entry("store-to-door", ["/", "/how-it-works"], 40, "2026-10-10"),
+  // Arabic home only (YouTube cut, scripts/record-videos/youtube.mjs): Arabic
+  // voice-over, music and captions in the picture; idea → parts → wiring → 3D.
+  entry("idea-to-product-ar", ["/"], 132, "2026-10-13T09:00:00Z", { sound: true, burntInCaptions: true }),
 ];
+
+/** The "See it work" clip on the home page: the Arabic site has its own voiced cut. */
+export function homeVideoSlug(locale: string): VideoSlug {
+  return locale === "ar" ? "idea-to-product-ar" : "idea-to-kit";
+}
 
 export function videoEntry(slug: string): FeatureVideoEntry | undefined {
   return VIDEOS.find((v) => v.slug === slug);

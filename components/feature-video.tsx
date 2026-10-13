@@ -9,11 +9,13 @@
 //     poster-only slot (the workspace empty states play on click).
 //   - Every piece of text arrives as a prop, so public pages need no message
 //     scope (the server wrapper feature-video-section.tsx reads the copy).
+//   - A clip with a voice-over (sound) gets a second button to switch the
+//     sound on; it still starts muted (browsers block sound on autoplay).
 //   - Missing files never break a page: if no video source loads we show the
 //     poster as a plain <img>; if the poster is also missing, a placeholder.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Film, Pause, Play, RotateCcw } from "lucide-react";
+import { Film, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { canAutoplay, videoSources } from "@/lib/videos";
@@ -34,6 +36,12 @@ export type FeatureVideoProps = {
   locale: "en" | "ar";
   /** Makes the caption a link. */
   href?: string;
+  /** Voice-over clip: show a sound on/off button (both labels required). */
+  sound?: boolean;
+  soundOnLabel?: string;
+  soundOffLabel?: string;
+  /** Captions are in the picture: skip the <track>. */
+  burntInCaptions?: boolean;
 };
 
 export function FeatureVideo({
@@ -49,6 +57,10 @@ export function FeatureVideo({
   posterOnly = false,
   locale,
   href,
+  sound = false,
+  soundOnLabel,
+  soundOffLabel,
+  burntInCaptions = false,
 }: FeatureVideoProps) {
   const src = videoSources(base, slug);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -57,6 +69,7 @@ export function FeatureVideo({
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [missing, setMissing] = useState(false);
   const [posterMissing, setPosterMissing] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -156,7 +169,23 @@ export function FeatureVideo({
     }
   }, []);
 
+  // Sound on also plays (from the start if it had ended): the click is the user's
+  // gesture, so the browser allows audio.
+  const toggleSound = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const next = !video.muted;
+    video.muted = next;
+    setMuted(next);
+    if (!next && (video.paused || video.ended)) {
+      if (video.ended) video.currentTime = 0;
+      live.current.userPaused = false;
+      void video.play().catch(() => {});
+    }
+  }, []);
+
   const small = size === "small";
+  const hasSound = sound && Boolean(soundOnLabel && soundOffLabel);
   const label = ended ? replayLabel : playing ? pauseLabel : playLabel;
   const Icon = ended ? RotateCcw : playing ? Pause : Play;
   // Placeholder: before mounting, when nothing at all could load, or while a
@@ -211,13 +240,15 @@ export function FeatureVideo({
             <source src={src.webm} type="video/webm" />
             {/* The last source: when it fails, no format could be loaded. */}
             <source src={src.mp4} type="video/mp4" onError={() => setMissing(true)} />
-            <track
-              kind="captions"
-              srcLang={locale}
-              src={src.captions[locale]}
-              label={locale === "ar" ? "العربية" : "English"}
-              default
-            />
+            {!burntInCaptions && (
+              <track
+                kind="captions"
+                srcLang={locale}
+                src={src.captions[locale]}
+                label={locale === "ar" ? "العربية" : "English"}
+                default
+              />
+            )}
           </video>
         )}
 
@@ -239,6 +270,22 @@ export function FeatureVideo({
             )}
           >
             <Icon className={cn("h-5 w-5", Icon === Play && "ms-0.5")} strokeWidth={1.75} aria-hidden />
+          </button>
+        )}
+
+        {near && !missing && hasSound && (
+          <button
+            type="button"
+            onClick={toggleSound}
+            aria-label={muted ? soundOnLabel : soundOffLabel}
+            aria-pressed={!muted}
+            className={cn(
+              "absolute flex h-11 items-center gap-2 rounded-full bg-ink px-4 text-sm font-semibold text-white shadow-neu-sm transition-colors hover:bg-cobalt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cobalt/60 focus-visible:ring-offset-2",
+              small ? "bottom-2 end-2" : "bottom-3 end-3",
+            )}
+          >
+            {muted ? <VolumeX className="h-5 w-5" strokeWidth={1.75} aria-hidden /> : <Volume2 className="h-5 w-5" strokeWidth={1.75} aria-hidden />}
+            <span aria-hidden>{muted ? soundOnLabel : soundOffLabel}</span>
           </button>
         )}
       </div>

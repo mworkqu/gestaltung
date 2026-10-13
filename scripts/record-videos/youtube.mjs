@@ -7,6 +7,9 @@
 //
 // <plan> = scripts/record-videos/cuts/youtube-<lang>.json:
 //   sources:  raw takes, relative to <outRoot>
+//   crop:     optional [[w, h] | null, …] per source: the part of the frame
+//             that holds the page (top-left), e.g. [1600, 900] for a take whose
+//             video frame was larger than its viewport
 //   intro / outro: { seconds, title, sub? }
 //   voIntro / voOutro: { vo, at }   voice line N starts `at` s into the card
 //   segments: [{ src, from, to, speed, vo?, at?, vo2?, at2? }]  source seconds;
@@ -125,8 +128,12 @@ const inputs = plan.sources.flatMap((s) => ["-i", path.join(root, s)]);
 const nSrc = plan.sources.length;
 const voInputs = voice.flatMap((v) => ["-i", v.file]);
 const musicIdx = nSrc + voice.length;
+const cropOf = (src) => {
+  const c = plan.crop?.[src];
+  return c ? `crop=${c[0]}:${c[1]}:0:0,` : "";
+};
 const vparts = segs.map((s, i) =>
-  `[${s.src}:v]trim=start=${s.from}:end=${s.to},setpts=(PTS-STARTPTS)/${s.speed},fps=30,scale=1920:1080:flags=lanczos,setsar=1,format=yuv420p[v${i}]`);
+  `[${s.src}:v]trim=start=${s.from}:end=${s.to},setpts=(PTS-STARTPTS)/${s.speed},${cropOf(s.src)}fps=30,scale=1920:1080:flags=lanczos,setsar=1,format=yuv420p[v${i}]`);
 const video =
   `color=c=${BG}:s=1920x1080:r=30:d=${INTRO},format=yuv420p[vin];` +
   `color=c=${BG}:s=1920x1080:r=30:d=${OUTRO},format=yuv420p[vout];` +

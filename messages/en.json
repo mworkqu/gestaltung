@@ -3191,6 +3191,8 @@
     "play": "Play video",
     "pause": "Pause video",
     "replay": "Replay video",
+    "soundOn": "Sound on",
+    "soundOff": "Sound off",
     "idea-to-kitTitle": "From one sentence to a parts list",
     "idea-to-kitCaption": "Describe it. We list the parts, priced in QAR and matched to our store.",
     "idea-to-kitDescription": "A short walkthrough of the Gestaltung idea tool: describe a product in one sentence, answer a few questions, pick the board and power, and get a parts list priced in QAR and matched to our store.",
@@ -3208,6 +3210,9 @@
     "cad-modelDescription": "How to describe an enclosure for your board in a few words, get a 3D model you can turn around, and how one credit covers up to three versions.",
     "store-to-doorTitle": "Stocked in Qatar or sourced for you",
     "store-to-doorCaption": "See the arrival date and source before you pay. Cash on delivery, Fawran or bank transfer.",
+    "idea-to-product-arTitle": "From one sentence to a product: parts, wiring and 3D",
+    "idea-to-product-arCaption": "Describe it in one sentence. We pick the parts in QAR, draw the wiring and design it in 3D.",
+    "idea-to-product-arDescription": "An Arabic walkthrough of the Gestaltung Design Studio: describe a product in one sentence, get a parts list priced in QAR and matched to our store, the wiring diagram on a 3D breadboard, and a 3D design of the product ready for printing.",
     "store-to-doorDescription": "How an order works in the Gestaltung store: search for a part, see its arrival date and whether it is stocked in Qatar or sourced for you, add it to the cart and choose cash on delivery, Fawran or bank transfer."
   },
   "Trust": {

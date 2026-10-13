@@ -23,7 +23,7 @@ import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
 import { categoryLabel } from "@/lib/store/category-label";
 import { v2PageMetadata } from "@/lib/site-v2-server";
-import { VIDEOS, videoBase, videoJsonLd } from "@/lib/videos";
+import { VIDEOS, homeVideoSlug, videoBase, videoJsonLd } from "@/lib/videos";
 import { cn } from "@/lib/utils";
 
 // v2 home (P3-03, plan 5.2). Same ISR rule as the v1 home: static per locale,
@@ -60,7 +60,9 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
   ]);
 
   // VideoObject structured data only for a clip that is really uploaded (lib/videos.ts `published`).
-  const heroVideo = VIDEOS.find((v) => v.slug === "idea-to-kit");
+  // Arabic visitors get the voiced Arabic cut; English keeps the short clip.
+  const heroSlug = homeVideoSlug(locale);
+  const heroVideo = VIDEOS.find((v) => v.slug === heroSlug);
   const heroVideoLd = heroVideo?.published
     ? videoJsonLd({
         entry: heroVideo,
@@ -191,7 +193,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
           </div>
         </section>
 
-        {/* 4. The 45-second video (idea to kit). */}
+        {/* 4. The video: idea to kit (EN, 45 s) or the voiced Arabic cut (AR). */}
         <section aria-labelledby="v2-video" className="neu animate-fade-up delay-1 card-pad">
           <div className="grid items-center gap-8 lg:grid-cols-5 lg:gap-12">
             <div className="space-y-6 lg:col-span-2">
@@ -208,7 +210,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
               </TrackClick>
             </div>
             <div className="min-w-0 lg:col-span-3">
-              <FeatureVideoSection slug="idea-to-kit" locale={locale} size="large" />
+              <FeatureVideoSection slug={heroSlug} locale={locale} size="large" />
             </div>
           </div>
           {heroVideoLd && (

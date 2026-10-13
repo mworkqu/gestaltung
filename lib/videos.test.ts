@@ -5,16 +5,18 @@ import {
   VIDEO_FILES,
   VIDEO_SLUGS,
   canAutoplay,
+  homeVideoSlug,
   isoDuration,
   videoBase,
   videoFileNames,
   videoJsonLd,
+  videoEntry,
   videoSources,
   videoVersionSuffix,
 } from "./videos";
 
 describe("video registry", () => {
-  it("has one entry per slug; all six clips are published", () => {
+  it("has one entry per slug; every clip is published", () => {
     expect(VIDEOS.map((v) => v.slug)).toEqual([...VIDEO_SLUGS]);
     expect(VIDEOS.filter((v) => v.published).map((v) => v.slug)).toEqual([
       "idea-to-kit",
@@ -23,9 +25,19 @@ describe("video registry", () => {
       "wiring-check",
       "cad-model",
       "store-to-door",
+      "idea-to-product-ar",
     ]);
-    expect(VIDEOS.filter((v) => v.published).every((v) => v.uploadDate === "2026-10-10")).toBe(true);
-    expect(VIDEOS.map((v) => v.durationSeconds)).toEqual([45, 35, 33, 31, 31, 40]);
+    expect(VIDEOS.filter((v) => v.slug !== "idea-to-product-ar").every((v) => v.uploadDate === "2026-10-10")).toBe(true);
+    expect(VIDEOS.map((v) => v.durationSeconds)).toEqual([45, 35, 33, 31, 31, 40, 132]);
+  });
+
+  it("the Arabic home plays the voiced cut, English the short clip", () => {
+    expect(homeVideoSlug("ar")).toBe("idea-to-product-ar");
+    expect(homeVideoSlug("en")).toBe("idea-to-kit");
+    const ar = videoEntry("idea-to-product-ar");
+    expect(ar?.sound).toBe(true);
+    expect(ar?.burntInCaptions).toBe(true);
+    expect(videoEntry("idea-to-kit")?.sound).toBeUndefined();
   });
 
   it("every slug has exactly five file names with the right extensions", () => {

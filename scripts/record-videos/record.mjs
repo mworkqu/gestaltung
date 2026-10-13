@@ -74,12 +74,14 @@ const CURSOR_SCRIPT = `
 const AR = slug.endsWith("-ar");
 const browser = await chromium.launch();
 const context = await browser.newContext({
-  // -ar (YouTube) takes: a wider page (1600x900 CSS px) recorded at 1080p.
+  // -ar (YouTube) takes: a wider page (1600x900 CSS px). Playwright paints the
+  // video in CSS pixels, so the frame size must equal the viewport (a bigger
+  // frame only adds grey bands); youtube.mjs scales it up to 1080p.
   viewport: AR ? { width: 1600, height: 900 } : { width: 1280, height: 720 },
   deviceScaleFactor: AR ? 1.2 : 1,
   locale: AR ? "ar-QA" : "en-GB",
   timezoneId: "Asia/Qatar",
-  recordVideo: { dir, size: AR ? { width: 1920, height: 1080 } : { width: 1280, height: 720 } },
+  recordVideo: { dir, size: AR ? { width: 1600, height: 900 } : { width: 1280, height: 720 } },
   ...(STATE ? { storageState: STATE } : {}),
 });
 await context.addInitScript(CURSOR_SCRIPT);
