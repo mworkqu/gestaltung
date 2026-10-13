@@ -25,6 +25,7 @@
 
 import { clampSpec, type ClampLog, type ProductSpec } from "../schema";
 import { chatGuardTurn, guardSpec, vagueTurn } from "./spec-guards";
+import { actuatorCountLabel, actuatorTotals, capStrongServos } from "../actuators";
 import { outcomeCached, specKey, type AiCache } from "./cache";
 import {
   CHANGED_ITEMS, CHANGED_MAX, CHOICE_MAX, MAX_QUESTIONS, QUESTION_MAX, REPLY_MAX, SPEC_RESPONSE_SCHEMA, SPEC_SYSTEM, specPrompt,
@@ -199,8 +200,15 @@ async function modelTurn(
       return res;
     },
   });
-  const guard = (spec: ProductSpec, into: ClampLog) => guardSpec(spec, ctx, into).spec;
-  if (r.ok) return { ok: true, value: finish(r.value, current, guard, log), source: "model", clampLog: log, problems: [] };
+  const guard = (spec: ProductSpec, into: ClampLog) => {
+    const guarded = guardSpec(spec, ctx, into).spec;
+    // Part F: a 4th strong servo would take the 5 A supply over budget (power rule).
+    const capped = capStrongServos(guarded);
+    if (capped !== guarded) into.push({ path: "actuators", from: guarded.actuators, to: capped.actuators });
+    return capped;
+  };
+  const last = [...opts.messages].reverse().find((m) => m.role === "user")?.text ?? "";
+  if (r.ok) return { ok: true, value: finish(r.value, current, guard, log, last, opts.locale), source: "model", clampLog: log, problems: [] };
   if (r.error !== "invalid") return { ok: false, error: r.error, clampLog: log, problems: r.problems };
   const fallback: ClampLog = [];
   if (current) {
@@ -221,16 +229,63 @@ async function modelTurn(
   };
 }
 
+/** A question ("who create you?", "what is UR10", "هل تعرف…؟"), not a change request. */
+const ASKS =
+  /[?؟]\s*$|^(?:what|who|whom|whose|how|why|when|where|which|do you|did you|does|are you|is (?:it|this|that|a|an|the)|tell me about)\b|^(?:ما|ماذا|من|مين|كيف|لماذا|ليش|هل|متى|أين|وين)\s/i;
+/** "can you make it solar?" / "could you add a buzzer?" are change requests in a question's clothes. */
+const ASKS_FOR_CHANGE =
+  /\b(?:make|add|remove|drop|change|turn|switch|put|use|give|let)\b|\b(?:can|could|would) you\b|(?:اجعل|أضف|اضف|احذف|أزل|ازل|غيّر|ضع|استخدم)/i;
+/** The user asked to take the movers away ("no motors", "بدون محركات"). */
+const DROPS_MOVERS = /\b(?:no|without|remove|drop)\b[^.]{0,20}\b(?:motors?|servos?|joints?|pumps?|steppers?|actuators?)\b|(?:بدون|بلا|احذف|أزل|ازل)\s*(?:ال)?(?:محرك|سيرفو|مفاصل|مفصل|مضخ)/i;
+
+/** Part F: a question without a change label is answered, never turned into a card change. */
+export const isQuestionOnly = (text: string) => ASKS.test(text.trim()) && !ASKS_FOR_CHANGE.test(text);
+
+/**
+ * Part F (real-AI check): on a refine turn the model sometimes returns the card without
+ * the fields it was not asked about. Movers and the scale note stay unless the user
+ * took them away.
+ */
+export function keepCardFields(spec: ProductSpec, current: ProductSpec, lastUser: string, log: ClampLog): ProductSpec {
+  let out = spec;
+  if (current.actuators?.length && !spec.actuators?.length && !DROPS_MOVERS.test(lastUser)) {
+    log.push({ path: "actuators", from: spec.actuators ?? null, to: current.actuators });
+    out = { ...out, actuators: current.actuators };
+  }
+  if (current.scaleNote && !spec.scaleNote) {
+    log.push({ path: "scaleNote", from: null, to: current.scaleNote });
+    out = { ...out, scaleNote: current.scaleNote };
+  }
+  return out;
+}
+
 /** The guards on every spec; on a refine turn a spec equal to the card is no change at all. */
+/** "6 joints" for every kind of actuator whose total changed between the two cards. */
+export function countLabels(before: ProductSpec, after: ProductSpec, locale: "en" | "ar"): string[] {
+  const was = new Map(actuatorTotals(before).map((t) => [t.kind, t.count]));
+  return actuatorTotals(after)
+    .filter((t) => was.get(t.kind) !== t.count)
+    .map((t) => actuatorCountLabel(t.kind, t.count, locale));
+}
+
 function finish(
   turn: SpecTurn,
   current: ProductSpec | null,
   guard: (spec: ProductSpec, into: ClampLog) => ProductSpec,
   log: ClampLog,
+  lastUser = "",
+  locale: "en" | "ar" = "en",
 ): SpecTurn {
   if (turn.kind === "question") return turn;
   if (turn.kind === "spec") return { ...turn, spec: guard(turn.spec, log) };
   if (!turn.spec || !current) return { kind: "reply", reply: turn.reply, changed: [] };
-  const spec = guard(turn.spec, log);
-  return sameCard(spec, current) ? { kind: "reply", reply: turn.reply, changed: [] } : { ...turn, spec };
+  // A question that came back with a card but no change label: the card stays.
+  if (!turn.changed.length && isQuestionOnly(lastUser)) {
+    log.push({ path: "spec", from: "question with a spec", to: "dropped" });
+    return { kind: "reply", reply: turn.reply, changed: [] };
+  }
+  const spec = guard(keepCardFields(turn.spec, current, lastUser, log), log);
+  if (sameCard(spec, current)) return { kind: "reply", reply: turn.reply, changed: [] };
+  // The model changed the card but named nothing: at least say the new motor count.
+  return { ...turn, spec, changed: turn.changed.length ? turn.changed : countLabels(current, spec, locale) };
 }

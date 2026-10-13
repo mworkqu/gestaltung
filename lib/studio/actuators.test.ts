@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { actuatorCountIn, actuatorCountLabel, actuatorTotals, setActuatorCount } from "./actuators";
+import { actuatorCountIn, actuatorCountLabel, actuatorTotals, capStrongServos, setActuatorCount, STRONG_SERVO_MAX } from "./actuators";
 import type { Actuator } from "./schema";
 
 const arm: Actuator[] = [
@@ -60,5 +60,45 @@ describe("actuatorCountLabel", () => {
     expect(actuatorCountLabel("servo", 1, "en")).toBe("1 joint");
     expect(actuatorCountLabel("servo", 6, "ar")).toBe("6 مفاصل");
     expect(actuatorCountLabel("pump", 2, "ar")).toBe("مضختان");
+  });
+});
+
+describe("capStrongServos (Part F: at most 3 strong servos on the 5 A supply)", () => {
+  const spec = (actuators: Actuator[]) => ({ actuators });
+
+  it("keeps an arm that already fits (3 heavy + 3 light) as the same object", () => {
+    const arm = spec([
+      { kind: "servo", count: 3, load: "heavy", role: "base, shoulder, elbow" },
+      { kind: "servo", count: 3, load: "light", role: "wrist, gripper" },
+    ]);
+    expect(capStrongServos(arm)).toBe(arm);
+    expect(STRONG_SERVO_MAX).toBe(3);
+  });
+
+  it("servo ×4 medium (what the real model gave 'robotic arm') → 3 medium + 1 light, same total", () => {
+    const out = capStrongServos(spec([{ kind: "servo", count: 4, load: "medium", role: "joints and gripper" }]));
+    expect(out.actuators).toEqual([
+      { kind: "servo", count: 3, load: "medium", role: "joints and gripper" },
+      { kind: "servo", count: 1, load: "light" },
+    ]);
+    expect(actuatorTotals(out)).toEqual([{ kind: "servo", count: 4 }]);
+  });
+
+  it("5 heavy + 1 light → 3 heavy + 3 light (extra joints join the existing light group)", () => {
+    const out = capStrongServos(
+      spec([
+        { kind: "servo", count: 5, load: "heavy", role: "base" },
+        { kind: "servo", count: 1, load: "light", role: "gripper" },
+      ]),
+    );
+    expect(out.actuators).toEqual([
+      { kind: "servo", count: 3, load: "heavy", role: "base" },
+      { kind: "servo", count: 3, load: "light", role: "gripper" },
+    ]);
+  });
+
+  it("leaves pumps and motors alone", () => {
+    const s = spec([{ kind: "motor", count: 4, load: "heavy" }, { kind: "pump", count: 2, load: "medium" }]);
+    expect(capStrongServos(s)).toBe(s);
   });
 });

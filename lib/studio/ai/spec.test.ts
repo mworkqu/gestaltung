@@ -132,7 +132,11 @@ describe("runSpecChat once the card exists (Part A: the chat answers like a pers
     ]);
     const out = await runSpecChat({ call: m.call, idea: "robotic arm", messages: chat("make it 4 joints"), locale: "en", current: arm });
     if (!out.ok || out.value.kind !== "reply" || !out.value.spec) throw new Error("expected a reply with a spec");
-    expect(out.value.spec.actuators).toEqual([{ kind: "servo", count: 4, load: "medium", role: "arm joints" }]);
+    // Part F: at most 3 strong servos (power rule); the 4th joint becomes light.
+    expect(out.value.spec.actuators).toEqual([
+      { kind: "servo", count: 3, load: "medium", role: "arm joints" },
+      { kind: "servo", count: 1, load: "light" },
+    ]);
     expect(out.value.changed).toEqual(["4 joints"]);
     expect(m.prompts[0]).toContain('"actuators"');
   });
@@ -141,7 +145,10 @@ describe("runSpecChat once the card exists (Part A: the chat answers like a pers
     const { r } = run([{ reply: "Twenty joints!", changed: ["20 joints"], spec: { ...card, actuators: [{ kind: "servo", count: 20, load: "huge" }] } }], "20 joints");
     const out = await r;
     if (!out.ok || out.value.kind !== "reply" || !out.value.spec) throw new Error("expected a reply with a spec");
-    expect(out.value.spec.actuators).toEqual([{ kind: "servo", count: 8, load: "medium" }]);
+    expect(out.value.spec.actuators).toEqual([
+      { kind: "servo", count: 3, load: "medium" },
+      { kind: "servo", count: 5, load: "light" },
+    ]);
     expect(out.clampLog.some((l) => l.path === "actuators[0].count")).toBe(true);
   });
 
@@ -249,5 +256,73 @@ describe("cleanMessages / questionsAsked", () => {
     expect(out).toHaveLength(16);
     expect(out[0].text.length).toBe(1500);
     expect(questionsAsked(out)).toBe(8);
+  });
+});
+
+// Part F — what the real model did in the incident chat (real-AI check, 2026-10-13).
+describe("Part F guards from the real-AI check", () => {
+  const arm: ProductSpec = clampSpec({
+    ...SPEC,
+    power: "mains_adapter",
+    name: "Desktop robotic arm",
+    oneLine: "A desktop arm that moves like a UR10.",
+    scaleNote: "A real UR10 reaches 1.3 m; this is a 30–40 cm desktop version.",
+    actuators: [
+      { kind: "servo", count: 3, load: "heavy", role: "base, shoulder, elbow" },
+      { kind: "servo", count: 3, load: "light", role: "wrist, gripper" },
+    ],
+  });
+  const turn = (answer: unknown, text: string, locale: "en" | "ar" = "en") =>
+    runSpecChat({ call: fakeModel([answer]).call, idea: "robotic arm", messages: [{ role: "user", text }], locale, current: arm });
+
+  it("'who create you?' answered with a spec that drops the motors: the card stays", async () => {
+    const { actuators: _drop, ...noMotors } = arm;
+    void _drop;
+    const out = await turn({ reply: "I'm Gestaltung's design assistant.", changed: [], spec: noMotors }, "who create you?");
+    expect(out.ok && out.value).toEqual({ kind: "reply", reply: "I'm Gestaltung's design assistant.", changed: [] });
+  });
+
+  it("a real change that forgets the motors and scale note keeps them", async () => {
+    const { actuators: _a, scaleNote: _s, ...bare } = arm;
+    void _a;
+    void _s;
+    const out = await turn({ reply: "Now on a battery.", changed: ["Battery"], spec: { ...bare, power: "battery_usb" } }, "make it battery powered");
+    if (!out.ok || out.value.kind !== "reply" || !out.value.spec) throw new Error("expected a change");
+    expect(out.value.spec.power).toBe("battery_usb");
+    expect(out.value.spec.actuators).toEqual(arm.actuators);
+    expect(out.value.spec.scaleNote).toBe(arm.scaleNote);
+  });
+
+  it("'remove the motors' may drop them", async () => {
+    const { actuators: _a, ...bare } = arm;
+    void _a;
+    const out = await turn({ reply: "No motors now.", changed: ["No motors"], spec: bare }, "remove the motors");
+    if (!out.ok || out.value.kind !== "reply" || !out.value.spec) throw new Error("expected a change");
+    expect(out.value.spec.actuators).toBeUndefined();
+  });
+
+  it("'big robotic arm like ur10' with no labels: the new joint count becomes the label", async () => {
+    const four = { ...arm, actuators: [{ kind: "servo", count: 4, load: "medium" }] };
+    const out = await runSpecChat({
+      call: fakeModel([{ reply: "A UR10 is 1.3 m; yours is a 6-joint desktop arm.", changed: [], spec: arm }]).call,
+      idea: "robotic arm",
+      messages: [{ role: "user", text: "big robotic arm like ur10" }],
+      locale: "ar",
+      current: clampSpec(four),
+    });
+    if (!out.ok || out.value.kind !== "reply") throw new Error("expected a reply");
+    expect(out.value.changed).toEqual(["6 مفاصل"]);
+  });
+
+  it("'can you make it solar?' is a change request, not a question", async () => {
+    const out = await turn({ reply: "Now solar powered.", changed: ["Solar"], spec: { ...arm, power: "battery_usb", features: ["solar panel"] } }, "can you make it solar?");
+    expect(out.ok && out.value.kind === "reply" && out.value.spec?.power).toBe("battery_usb");
+  });
+
+  it("the refine prompt tells the model a reference product is a change and to keep the other fields", async () => {
+    const m = fakeModel([{ reply: "Ok.", changed: [] }]);
+    await runSpecChat({ call: m.call, idea: "robotic arm", messages: [{ role: "user", text: "big robotic arm like ur10" }], locale: "en", current: arm });
+    expect(m.prompts[0]).toContain("IS a change");
+    expect(m.prompts[0]).toContain("copy every field the user did not ask to change");
   });
 });

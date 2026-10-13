@@ -56,7 +56,10 @@ export const SPEC_SYSTEM =
   `count 1–${LIMITS.actuators.countMax}, load (light, medium, heavy), role} (at most ${LIMITS.actuators.max} groups). ` +
   "If the user names a reference product, infer its joint/motor count, e.g. 6-axis arm → servo ×6; a gripper is one more servo; " +
   "a pan-tilt head → servo ×2; a two-wheel robot → motor ×2; two plants watered separately → pump ×2. " +
-  "For an arm, base/shoulder/elbow joints are medium or heavy and wrist/gripper joints light (use separate groups with a role). " +
+  "For an arm, base/shoulder/elbow joints are medium or heavy and wrist/gripper joints light (use separate groups with a role); " +
+  "at most 3 joints are medium or heavy, every other joint and the gripper are light (one 5 V supply has to feed them all). " +
+  "A desktop copy of a 6-axis industrial arm such as a UR10 = 6 servos in total: 3 heavy (base, shoulder, elbow) + " +
+  "3 light (wrist pitch, wrist roll, gripper). " +
   "If the user changes the count ('make it 4 joints'), update spec.actuators and put e.g. '4 joints' in changed. " +
   "Before the card exists, return EITHER {question, choices} OR {spec} (with an optional reply), never both. quantity is always 1. " +
   // Part A: scope honesty on the first card.
@@ -153,7 +156,12 @@ export function specPrompt(opts: {
       `The user's latest message: ${change}`,
       "Return {reply, changed, spec?}. Never return a question. " +
         "Only when the message asks for a change: include the full updated spec (apply the change, keep everything else as it is) " +
-        "and list what changed. Otherwise leave spec out, changed empty, and just answer in reply.",
+        "and list what changed. Otherwise leave spec out, changed empty, and just answer in reply. " +
+        "A message that names a reference product to copy ('big robotic arm like a UR10', 'make it like X') IS a change: " +
+        "return the spec of the desktop version with that product's joint/motor count in actuators and a scaleNote when the real " +
+        "thing is far bigger, and list it in changed (e.g. '6 joints'). A question ('what is UR10', 'who made you') is never a change. " +
+        "When you do return a spec, copy every field the user did not ask to change exactly as it is in the current spec " +
+        "(actuators, scaleNote, placement, power…).",
       `Language for the reply, names and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
     ].join("\n\n");
   }

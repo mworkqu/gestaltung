@@ -12,7 +12,8 @@ import { buildWiring } from "@/lib/studio/netlist";
 import { buildConnections, pinBlock, pinConstants } from "@/lib/studio/connections";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
-import { specParts } from "@/lib/studio/ai/pick";
+import { enforcePick, specParts } from "@/lib/studio/ai/pick";
+import { ROBOT_ARM_MODEL_PICK, ROBOT_ARM_REPLY, robotArmSpec } from "@/lib/studio/__fixtures__/robot-arm";
 import { applyActuatorRules } from "@/lib/studio/ai/actuator-rules";
 import { chatGuardTurn, guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
 import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/schema";
@@ -138,6 +139,9 @@ const MOCK_REPLY: Record<Locale, { answer: string; done: string; nothing: string
   },
 };
 
+/** Part F: a reference industrial arm in the idea (UR10 / UR5 / "industrial robot arm"). */
+const BIG_ARM = /\bur ?(?:3|5|10|16)e?\b|industrial (?:robot|arm)|يو ?آر ?10/i;
+
 /** Short labels of what changed between two cards (mock only; the server gets them from the model). */
 function mockChanged(before: ProductSpec, after: ProductSpec, locale: Locale): string[] {
   const words = MOCK_REPLY[locale];
@@ -189,6 +193,11 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
             : mockChanged(current, next, locale);
         return { ok: true, data: { reply: MOCK_REPLY[locale].done, spec: next, changed } };
       }
+      // Part F: an industrial arm ("big robotic arm like ur10") gets the desktop version at once,
+      // with the scale note and the reply that says so (as the real model does on its first card).
+      if (BIG_ARM.test(userTexts(idea, turn.messages).join(" "))) {
+        return { ok: true, data: { spec: guardSpec(robotArmSpec(locale), turn).spec, reply: ROBOT_ARM_REPLY[locale] } };
+      }
       if (!turn.messages.some((m) => m.role === "assistant")) return { ok: true, data: QUESTION[locale] };
       const plant = WORDS.plant.test(userTexts(idea, turn.messages).join(" "));
       return {
@@ -212,6 +221,21 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
     },
     async pick(spec, locale) {
       await wait(300);
+      // Part F: a product with servos goes through the server's own enforcePick from the model's
+      // incident pick (board + one SG90): servo count, servo driver, 5 A supply = the robot arm fixture.
+      if (spec.actuators?.some((a) => a.kind === "servo")) {
+        const ruled = enforcePick(
+          { components: ROBOT_ARM_MODEL_PICK.map((partId) => ({ partId })) },
+          { spec, index: libraryIndexForAI(), locale, log: [], nameFor: (id, l) => getPart(id)?.name[l], pinsOf: (id) => getPart(id)?.pins },
+        ).components;
+        let wired = ruled;
+        try {
+          wired = buildWiring(ruled, spec, getPart, locale).components;
+        } catch {
+          /* keep the picked list */
+        }
+        return { ok: true, data: { components: wired, docVersion: null } };
+      }
       const picked: StudioComponent[] = PICK.filter((p) => getPart(p.partId)).map((p) => ({
         partId: p.partId,
         instanceId: `${p.partId}_1`,

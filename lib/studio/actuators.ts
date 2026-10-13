@@ -48,6 +48,33 @@ export function setActuatorCount<T extends Pick<ProductSpec, "actuators">>(spec:
   return { ...spec, actuators: groups.filter((a) => a.count > 0) };
 }
 
+/**
+ * Part F: at most this many medium/heavy servos. The picker makes them MG996R (stall ~2.5 A)
+ * and the power rule counts the largest stall + every other servo at 1/3 of its stall, so a
+ * 4th MG996R already takes the 5 V 5 A supply over budget. The real model sometimes returns
+ * "servo ×4 medium" for a plain robotic arm; the extra joints become light (wrist / gripper).
+ */
+export const STRONG_SERVO_MAX = 3;
+
+/** The spec with medium/heavy servos capped at STRONG_SERVO_MAX (the rest moved to a light group). Same object when nothing changes. */
+export function capStrongServos<T extends Pick<ProductSpec, "actuators">>(spec: T, max = STRONG_SERVO_MAX): T {
+  const groups: Actuator[] = (spec.actuators ?? []).map((a) => ({ ...a }));
+  const strong = groups.filter((a) => a.kind === "servo" && a.load !== "light");
+  let excess = strong.reduce((s, a) => s + a.count, 0) - max;
+  if (excess <= 0) return spec;
+  const light = groups.filter((a) => a.kind === "servo" && a.load === "light").pop();
+  if (!light && groups.length >= LIMITS.actuators.max) return spec; // no room for a light group
+  const moved = excess;
+  for (let i = strong.length - 1; i >= 0 && excess > 0; i--) {
+    const take = Math.min(strong[i].count, excess);
+    strong[i].count -= take;
+    excess -= take;
+  }
+  if (light) light.count = Math.min(LIMITS.actuators.countMax, light.count + moved);
+  const kept = groups.filter((a) => a.count > 0);
+  return { ...spec, actuators: light ? kept : [...kept, { kind: "servo", count: moved, load: "light" }] };
+}
+
 // ── Counts typed in the chat ("make it 4 joints", "2 pumps", "٤ مفاصل") ─────────────
 
 const KIND_WORDS: [ActuatorKind, RegExp][] = [
