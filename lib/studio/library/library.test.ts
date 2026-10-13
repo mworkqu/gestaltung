@@ -18,7 +18,9 @@ const phase2Ids = [
 ];
 // W3: the water pump the idea guards add for "automatic watering".
 const w3Ids = ["pump_5v"];
-const ids = [...phase1Ids, ...phase2Ids, ...w3Ids];
+// Multi-actuator stage (6-servo arm): strong servo, 16-channel servo driver, 5 A supply.
+const armIds = ["mg996r_servo", "pca9685_servo", "psu_5v_5a"];
+const ids = [...phase1Ids, ...phase2Ids, ...w3Ids, ...armIds];
 
 function vertexCount(g: THREE.Group): number {
   let n = 0;

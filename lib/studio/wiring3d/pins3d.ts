@@ -136,6 +136,28 @@ const at = (pos: Vec3, dir?: Vec3): OverrideEntry => ({ at: pos, dir });
 const ESP32_L = ["EN", "GPIO36", "GPIO39", "GPIO34", "GPIO35", "GPIO32", "GPIO33", "GPIO25", "GPIO26", "GPIO27", "GPIO14", "GPIO12", "GPIO13", "GND_L", "VIN"];
 const ESP32_R = ["GPIO23", "GPIO22", "GPIO1", "GPIO3", "GPIO21", "GPIO19", "GPIO18", "GPIO5", "GPIO17", "GPIO16", "GPIO4", "GPIO2", "GPIO15", "GND_R", "3V3"];
 
+// PCA9685 servo driver (models via pca9685_servo.ts): 16 channel headers (GND / V+ / signal rows, 2.54 mm pitch,
+// x = -4 + (n - 7.5) * 2.54), the 6-pin I2C header on the -y edge, and the V+ screw terminal at +x.
+const PCA_UP: Vec3 = [0, 0, 1];
+function pca9685Override(): Override {
+  const o: Override = {
+    GND: at([-10.35, -10.16, 9], PCA_UP),
+    OE: at([-7.81, -10.16, 9], PCA_UP),
+    SCL: at([-5.27, -10.16, 9], PCA_UP),
+    SDA: at([-2.73, -10.16, 9], PCA_UP),
+    VCC: at([-0.19, -10.16, 9], PCA_UP),
+    V_PLUS: at([24.5, 2.54, 9.7], PCA_UP),
+    V_GND: at([24.5, -2.54, 9.7], PCA_UP),
+  };
+  for (let n = 0; n < 16; n++) {
+    const x = Math.round((-4 + (n - 7.5) * PITCH) * 100) / 100;
+    o[`CH${n}_GND`] = at([x, 10.16, 9], PCA_UP);
+    o[`CH${n}_V`] = at([x, 7.62, 9], PCA_UP);
+    o[`CH${n}_PWM`] = at([x, 5.08, 9], PCA_UP);
+  }
+  return o;
+}
+
 /**
  * Parts whose real pinout the generic fill can't know. Rows/indices refer to
  * slotRows(part) (params order, slot 0 at the -x / -y end).
@@ -165,6 +187,18 @@ export const OVERRIDES: Record<string, Override> = {
     GND: at([-15.8, -1.6, 5], [-1, 0, 0]),
     VCC: at([-15.8, 0, 5], [-1, 0, 0]),
     SIG: at([-15.8, 1.6, 5], [-1, 0, 0]),
+  },
+  // MG996R: same lead layout as the SG90, at the end of its longer body (models/servo.ts, bodyL 40.7).
+  mg996r_servo: {
+    GND: at([-24.75, -1.6, 5], [-1, 0, 0]),
+    VCC: at([-24.75, 0, 5], [-1, 0, 0]),
+    SIG: at([-24.75, 1.6, 5], [-1, 0, 0]),
+  },
+  pca9685_servo: pca9685Override(),
+  // Barrel plug on the +x end: centre (+) and sleeve (-) side by side.
+  psu_5v_5a: {
+    OUT_5V: at([35, -1.5, 14.75], [1, 0, 0]),
+    GND: at([35, 1.5, 14.75], [1, 0, 0]),
   },
   // Solder pads 5V / DIN / GND at 210° / 270° / 330° on the rim (models/ledRing.ts).
   ws2812_ring: {

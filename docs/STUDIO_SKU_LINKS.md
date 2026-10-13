@@ -61,3 +61,16 @@ Prices are QAR. All chosen products are published, have a photo and (except wher
 - Weakest links, worth a glance: buck_converter (bigger LM2596 board), boost_5v (USB-output module), level_shifter_4ch (channel count not in the name), n20_motor (no delivery date), speaker_amp (photo is the amplifier only).
 - Ranking: nothing in `in_own_stock` yet (0 rows, 0069 not used), so all links are Voltaat (VLT-) products, in stock where a date exists.
 - To change a link without a deploy: Dashboard, Studio library, "link store SKUs". A DB row overrides the code part by id.
+
+## Added 2026-10-13 (multi-actuator stage, Part C), read-only look at the live published catalogue
+
+| Library part id | SKU | Store product | Price | Why |
+|---|---|---|---|---|
+| pca9685_servo | VLT-44494294942013 | PCA9685 16-Channel I2C PWM Servo Driver - 12-bit, 1.6kHz | 35 | Exact: 16-channel PCA9685 servo driver board. |
+| psu_5v_5a | VLT-50223536570685 | Generic 5V 8A AC/DC Power Adapter EU Plug | 65 | 5 V wall adapter rated above 5 A (no exact 5 A listing). EU plug (Qatar uses UK type G, so a plug adapter may be needed); barrel size is not in the listing. The cheaper 5V 6A metal-case supply (VLT-32020985512038, 45) was rejected: it is a screw-terminal mains-input unit, not a wall adapter. |
+
+No match (storeSkus left empty):
+
+| Library part id | Closest store candidates | Why rejected |
+|---|---|---|
+| mg996r_servo | VLT-39353027264614 MG946R Metal Gear Servo (35); VLT-47079651246397 MG90S (25); VLT-27935828377702 DS3218 (75) | No MG996R in the catalogue. The MG946R is a different servo (different size and stall current); the MG90S is a micro servo. |

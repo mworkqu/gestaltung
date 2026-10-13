@@ -41,6 +41,9 @@ import { microsdModule } from "./parts/microsd_module";
 import { rtcDs3231 } from "./parts/rtc_ds3231";
 import { usbcBreakout } from "./parts/usbc_breakout";
 import { levelShifter4ch } from "./parts/level_shifter_4ch";
+import { mg996rServo } from "./parts/mg996r_servo";
+import { pca9685Servo } from "./parts/pca9685_servo";
+import { psu5v5a } from "./parts/psu_5v_5a";
 
 export const LIBRARY: LibraryPart[] = [
   esp32Devkit,
@@ -83,6 +86,9 @@ export const LIBRARY: LibraryPart[] = [
   rtcDs3231,
   usbcBreakout,
   levelShifter4ch,
+  mg996rServo,
+  pca9685Servo,
+  psu5v5a,
 ];
 
 const BY_ID = new Map(LIBRARY.map((p) => [p.id, p]));
