@@ -4089,7 +4089,13 @@
       "updatedChip": "Card updated",
       "refinePlaceholder": "Change anything or ask, e.g. “make it solar”",
       "updateParts": "Update my parts",
-      "updatePartsNote": "Your parts were picked for the old card. Tap Update my parts and we'll pick them again."
+      "updatePartsNote": "Your parts were picked for the old card. Tap Update my parts and we'll pick them again.",
+      "act_servo": "{form, select, one {1 joint} other {{count} joints}} · servo motors",
+      "act_motor": "{form, select, one {1 motor} other {{count} motors}}",
+      "act_pump": "{form, select, one {1 pump} other {{count} pumps}}",
+      "act_stepper": "{form, select, one {1 stepper motor} other {{count} stepper motors}}",
+      "actFewer": "One fewer",
+      "actMore": "One more"
     },
     "partsLoading": "Picking your parts…",
     "partsProgress": "Picking your parts… {n} of {total}",

@@ -125,6 +125,26 @@ describe("runSpecChat once the card exists (Part A: the chat answers like a pers
     expect(m.prompts[0]).toContain("make it run on a battery");
   });
 
+  it("Part B: 'make it 4 joints' changes the servo count and says '4 joints'", async () => {
+    const arm = clampSpec({ ...card, actuators: [{ kind: "servo", count: 6, load: "medium", role: "arm joints" }] });
+    const m = fakeModel([
+      { reply: "Done — your arm now has 4 joints.", changed: ["4 joints"], spec: { ...arm, actuators: [{ kind: "servo", count: 4, load: "medium", role: "arm joints" }] } },
+    ]);
+    const out = await runSpecChat({ call: m.call, idea: "robotic arm", messages: chat("make it 4 joints"), locale: "en", current: arm });
+    if (!out.ok || out.value.kind !== "reply" || !out.value.spec) throw new Error("expected a reply with a spec");
+    expect(out.value.spec.actuators).toEqual([{ kind: "servo", count: 4, load: "medium", role: "arm joints" }]);
+    expect(out.value.changed).toEqual(["4 joints"]);
+    expect(m.prompts[0]).toContain('"actuators"');
+  });
+
+  it("Part B: a model count out of range is clamped, never thrown", async () => {
+    const { r } = run([{ reply: "Twenty joints!", changed: ["20 joints"], spec: { ...card, actuators: [{ kind: "servo", count: 20, load: "huge" }] } }], "20 joints");
+    const out = await r;
+    if (!out.ok || out.value.kind !== "reply" || !out.value.spec) throw new Error("expected a reply with a spec");
+    expect(out.value.spec.actuators).toEqual([{ kind: "servo", count: 8, load: "medium" }]);
+    expect(out.clampLog.some((l) => l.path === "actuators[0].count")).toBe(true);
+  });
+
   it("a question about a reference product: an answer, no spec, the card untouched", async () => {
     const { r } = run(
       [{ reply: "A UR10 is an industrial robot arm with a 1.3 m reach. Yours is a desktop arm that moves like it, with hobby servos.", changed: [] }],

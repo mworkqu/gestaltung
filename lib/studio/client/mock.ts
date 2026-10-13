@@ -18,6 +18,7 @@ import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/
 import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
 import { mockOptionsFromUrl } from "./product";
 import { forModel, sameSpec } from "./steps";
+import { actuatorCountIn, actuatorCountLabel, actuatorTotals, setActuatorCount } from "@/lib/studio/actuators";
 
 /**
  * A small canned sketch whose pin block is built from the request's own wiring,
@@ -168,9 +169,16 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
         // Part A: a question is answered (card untouched); a change request updates the card.
         const last = [...turn.messages].reverse().find((m) => m.role === "user")?.text.trim() ?? "";
         if (ASKS.test(last)) return { ok: true, data: { reply: MOCK_REPLY[locale].answer, changed: [] } };
-        const next = guardSpec(current, turn).spec;
+        let next = guardSpec(current, turn).spec;
+        // Part B: "make it 4 joints" / "2 pumps" sets that count on the card.
+        const asked = actuatorCountIn(last);
+        if (asked) next = setActuatorCount(next, asked.kind, asked.count);
         if (sameSpec(next, current)) return { ok: true, data: { reply: MOCK_REPLY[locale].nothing, changed: [] } };
-        return { ok: true, data: { reply: MOCK_REPLY[locale].done, spec: next, changed: mockChanged(current, next, locale) } };
+        const changed =
+          asked && actuatorTotals(next).find((a) => a.kind === asked.kind)?.count === asked.count
+            ? [actuatorCountLabel(asked.kind, asked.count, locale)]
+            : mockChanged(current, next, locale);
+        return { ok: true, data: { reply: MOCK_REPLY[locale].done, spec: next, changed } };
       }
       if (!turn.messages.some((m) => m.role === "assistant")) return { ok: true, data: QUESTION[locale] };
       const plant = WORDS.plant.test(userTexts(idea, turn.messages).join(" "));

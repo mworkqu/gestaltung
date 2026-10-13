@@ -32,6 +32,9 @@ export const OUTPUTS = ["screen", "led", "buzzer", "speaker", "motor", "relay", 
  */
 export const PLACEMENTS = ["plant_soil", "on_body", "on_wrist"] as const;
 export const SIZE_HINTS = ["pocket", "palm", "desk", "large"] as const;
+/** Part B: what moves the product (spec.actuators[].kind) and how hard it works (load). */
+export const ACTUATOR_KINDS = ["servo", "motor", "pump", "stepper"] as const;
+export const ACTUATOR_LOADS = ["light", "medium", "heavy"] as const;
 export const STYLES = ["rounded", "soft_tech", "rugged", "minimal"] as const;
 
 export const CATEGORIES = [
@@ -87,6 +90,8 @@ export type Output = (typeof OUTPUTS)[number];
 export type SizeHint = (typeof SIZE_HINTS)[number];
 export type Style = (typeof STYLES)[number];
 export type Placement = (typeof PLACEMENTS)[number];
+export type ActuatorKind = (typeof ACTUATOR_KINDS)[number];
+export type ActuatorLoad = (typeof ACTUATOR_LOADS)[number];
 export type Category = (typeof CATEGORIES)[number];
 export type Look = (typeof LOOKS)[number];
 export type PortKind = (typeof PORT_KINDS)[number];
@@ -108,6 +113,8 @@ export const LIMITS = {
   /** Part A: "a real UR10 is 1.3 m — this is the desktop version", under the card name. */
   scaleNote: { max: 140 },
   features: { max: 8, itemMax: 60 },
+  /** Part B: at most 4 actuator groups, each 1..8 of the same kind ("servo × 6"). */
+  actuators: { max: 4, countMin: 1, countMax: 8, roleMax: 40 },
   widthToDepth: { min: 0.5, max: 2.5 },
   cornerRadius: { min: 3, max: 20 },
   edgeFillet: { min: 1, max: 6 },
@@ -127,6 +134,15 @@ export const LIMITS = {
 // ProductSpec
 // ---------------------------------------------------------------------------
 
+/** Part B: one group of identical movers, e.g. {kind: "servo", count: 6, load: "medium", role: "arm joints"}. */
+export const ActuatorSchema = z.object({
+  kind: z.enum(ACTUATOR_KINDS),
+  count: z.number().int().min(LIMITS.actuators.countMin).max(LIMITS.actuators.countMax),
+  load: z.enum(ACTUATOR_LOADS),
+  role: z.string().max(LIMITS.actuators.roleMax).optional(),
+});
+export type Actuator = z.infer<typeof ActuatorSchema>;
+
 export const ProductSpecSchema = z.object({
   name: z.string().min(LIMITS.name.min).max(LIMITS.name.max),
   oneLine: z.string().max(LIMITS.oneLine.max),
@@ -141,6 +157,8 @@ export const ProductSpecSchema = z.object({
   placement: z.enum(PLACEMENTS).optional(),
   /** Set only when the idea is far beyond a desktop kit (industrial robot, car…): what we build instead. */
   scaleNote: z.string().max(LIMITS.scaleNote.max).optional(),
+  /** Part B: how many motors / servos / pumps, when it is more than "one of something" (max 4 groups). */
+  actuators: z.array(ActuatorSchema).max(LIMITS.actuators.max).optional(),
   quantity: z.literal(1),
 });
 export type ProductSpec = z.infer<typeof ProductSpecSchema>;
@@ -455,6 +473,45 @@ export const DEFAULT_SPEC: ProductSpec = {
   quantity: 1,
 };
 
+/**
+ * Part B: any value → valid actuator groups (absent when there are none). Bad kinds are
+ * dropped, counts rounded and clamped to 1..8, a bad load becomes "medium", groups beyond
+ * 4 are cut. Every change is logged; never throws.
+ */
+export function clampActuators(v: unknown, log: ClampLog = []): Actuator[] {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) {
+    log.push({ path: "actuators", from: v, to: [] });
+    return [];
+  }
+  const out: Actuator[] = [];
+  v.forEach((item, i) => {
+    const path = `actuators[${i}]`;
+    if (!isObj(item)) {
+      log.push({ path, from: item, to: null });
+      return;
+    }
+    // "Servos", "stepper motor", "DC motor" → the kind they name (stepper before motor).
+    const rawKind = typeof item.kind === "string" ? item.kind.trim().toLowerCase() : "";
+    const kind = (["stepper", "servo", "pump", "motor"] as const).find((k) => rawKind.includes(k)) as ActuatorKind | undefined;
+    if (!kind) {
+      log.push({ path: `${path}.kind`, from: item.kind, to: null });
+      return;
+    }
+    if (kind !== item.kind) log.push({ path: `${path}.kind`, from: item.kind, to: kind });
+    if (out.length >= LIMITS.actuators.max) {
+      log.push({ path, from: item, to: null });
+      return;
+    }
+    const count = clampNum(item.count, LIMITS.actuators.countMin, LIMITS.actuators.countMax, 1, `${path}.count`, log, { int: true });
+    const load = pickEnum(ACTUATOR_LOADS, item.load, "medium", `${path}.load`, log);
+    const role = typeof item.role === "string" && item.role.trim() ? clampStr(item.role, LIMITS.actuators.roleMax, "", `${path}.role`, log) : "";
+    if (item.role !== undefined && item.role !== null && typeof item.role !== "string") log.push({ path: `${path}.role`, from: item.role, to: null });
+    out.push({ kind, count, load, ...(role ? { role } : {}) });
+  });
+  return out;
+}
+
 /** Any value → a valid ProductSpec. quantity is always 1 on this site. */
 export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   const o = isObj(input) ? input : {};
@@ -482,6 +539,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   const placement = rawPlacement ? (PLACEMENTS as readonly string[]).find((p) => p === rawPlacement) : undefined;
   if (o.placement !== undefined && o.placement !== null && o.placement !== "" && !placement) log.push({ path: "placement", from: o.placement, to: null });
   const scaleNote = typeof o.scaleNote === "string" && o.scaleNote.trim() ? clampStr(o.scaleNote, LIMITS.scaleNote.max, "", "scaleNote", log) : "";
+  const actuators = clampActuators(o.actuators, log);
   return {
     name,
     oneLine: typeof o.oneLine === "string" && o.oneLine.trim() ? clampStr(o.oneLine, LIMITS.oneLine.max, "", "oneLine", log) : "",
@@ -495,6 +553,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
     style: pickEnum(STYLES, o.style, DEFAULT_SPEC.style, "style", log),
     ...(placement ? { placement: placement as Placement } : {}),
     ...(scaleNote ? { scaleNote } : {}),
+    ...(actuators.length ? { actuators } : {}),
     quantity: 1,
   };
 }

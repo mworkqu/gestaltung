@@ -76,6 +76,60 @@ describe("clampNum", () => {
   });
 });
 
+describe("clampSpec actuators (Part B)", () => {
+  it("keeps valid groups untouched with an empty log", () => {
+    const log: ClampLog = [];
+    const actuators = [
+      { kind: "servo", count: 6, load: "medium", role: "arm joints" },
+      { kind: "pump", count: 2, load: "light" },
+    ];
+    const out = clampSpec({ ...validSpec, actuators }, log);
+    expect(out.actuators).toEqual(actuators);
+    expect(log).toEqual([]);
+    ProductSpecSchema.parse(out);
+  });
+
+  it("leaves actuators out when there are none", () => {
+    expect("actuators" in clampSpec({ ...validSpec, actuators: [] })).toBe(false);
+    expect("actuators" in clampSpec(validSpec)).toBe(false);
+  });
+
+  it("clamps counts, fixes kinds and loads, drops junk, logs every change and never throws", () => {
+    const log: ClampLog = [];
+    const out = clampSpec(
+      {
+        ...validSpec,
+        actuators: [
+          { kind: "Servos", count: 12, load: "HEAVY" },
+          { kind: "stepper motor", count: 0, load: "huge" },
+          { kind: "laser", count: 2, load: "light" },
+          "servo",
+          { kind: "DC motor", count: "2.6", load: "light", role: "x".repeat(80) },
+          { kind: "pump", count: NaN, load: "light" },
+          { kind: "servo", count: 1, load: "light" },
+        ],
+      },
+      log,
+    );
+    expect(out.actuators).toEqual([
+      { kind: "servo", count: 8, load: "heavy" },
+      { kind: "stepper", count: 1, load: "medium" },
+      { kind: "motor", count: 3, load: "light", role: "x".repeat(40) },
+      { kind: "pump", count: 1, load: "light" },
+    ]);
+    expect(log.some((l) => l.path === "actuators[0].count" && l.to === 8)).toBe(true);
+    expect(log.some((l) => l.path === "actuators[2].kind" && l.to === null)).toBe(true);
+    expect(log.some((l) => l.path === "actuators[6]" && l.to === null)).toBe(true);
+    ProductSpecSchema.parse(out);
+  });
+
+  it.each([42, "servo x6", { kind: "servo" }])("turns a non-list %p into no actuators (logged)", (bad) => {
+    const log: ClampLog = [];
+    expect(clampSpec({ ...validSpec, actuators: bad }, log).actuators).toBeUndefined();
+    expect(log.some((l) => l.path === "actuators")).toBe(true);
+  });
+});
+
 describe("clampSpec", () => {
   it("leaves a valid spec untouched with an empty log", () => {
     const log: ClampLog = [];

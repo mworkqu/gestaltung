@@ -25,10 +25,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, ChevronDown, Send } from "lucide-react";
+import { Check, ChevronDown, Minus, Plus, Send } from "lucide-react";
 
 import { ChatConsent } from "@/components/prototyping/chat-thread";
-import type { ProductSpec, StudioDoc } from "@/lib/studio/schema";
+import { LIMITS, type ActuatorKind, type ProductSpec, type StudioDoc } from "@/lib/studio/schema";
+import { actuatorTotals, setActuatorCount } from "@/lib/studio/actuators";
+import { arabicCountForm } from "@/lib/text/count";
 import { draftSpec } from "@/lib/studio/ai/spec-guards";
 import {
   answersFrom, cardRows, changedRows, forModel, historyFrom, sameSpec, type CardRow, type IdeaMessage,
@@ -205,6 +207,8 @@ export function IdeaStep({
             known={known}
             open={cardOpen}
             onToggle={() => setCardOpen((o) => !o)}
+            // Part B: the count stepper is a card change like any other (→ "Update my parts").
+            onCount={spec && !busy ? (kind, n) => setSpec(setActuatorCount(spec, kind, n)) : undefined}
           />
           {redoParts && (
             <p className="mt-3 text-sm leading-relaxed text-mutedtext" data-testid="studio-update-parts-note">
@@ -362,6 +366,7 @@ function SpecCard({
   known,
   open,
   onToggle,
+  onCount,
 }: {
   spec: ProductSpec;
   draft: boolean;
@@ -372,6 +377,7 @@ function SpecCard({
   known: number;
   open: boolean;
   onToggle: () => void;
+  onCount?: (kind: ActuatorKind, count: number) => void;
 }) {
   const t = useTranslations("Studio");
   const name = draft ? t("ideaCard.draftName") : spec.name;
@@ -463,6 +469,7 @@ function SpecCard({
             </li>
           ))}
         </ul>
+        {!draft && <ActuatorLines spec={spec} onCount={onCount} />}
         {!draft && spec.features.length > 0 && (
           <div className="space-y-1.5">
             <p className="text-xs font-semibold text-mutedtext">{t("ideaCard.includes")}</p>
@@ -477,5 +484,55 @@ function SpecCard({
         )}
       </div>
     </section>
+  );
+}
+
+/** Part B: "6 joints · servo motors" with a 1–8 stepper per kind of mover. */
+function ActuatorLines({ spec, onCount }: { spec: ProductSpec; onCount?: (kind: ActuatorKind, count: number) => void }) {
+  const t = useTranslations("Studio");
+  const totals = actuatorTotals(spec);
+  if (!totals.length) return null;
+  const { countMin, countMax } = LIMITS.actuators;
+  return (
+    <ul className="space-y-2" data-testid="studio-idea-actuators">
+      {totals.map(({ kind, count }) => {
+        const line = t(`ideaCard.act_${kind}`, { count: String(count), form: arabicCountForm(count) });
+        const step = (n: number) => onCount?.(kind, n);
+        return (
+          <li key={kind} data-kind={kind} data-count={count} className="flex items-center gap-2 rounded-xl bg-white/70 px-2 py-1.5">
+            <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full" style={{ background: accent.base }}>
+              <Check className="h-3 w-3 text-white" strokeWidth={3} aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1 text-sm font-semibold text-heading" dir="auto" data-testid="studio-idea-actuator-line">
+              {line}
+            </span>
+            {onCount && (
+              <span className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => step(count - 1)}
+                  disabled={count <= countMin}
+                  aria-label={`${t("ideaCard.actFewer")}: ${line}`}
+                  className="grid h-11 w-11 place-items-center rounded-full bg-surface text-heading shadow-neu-sm transition-transform active:scale-95 disabled:opacity-40"
+                  data-testid="studio-idea-actuator-fewer"
+                >
+                  <Minus className="h-4 w-4" strokeWidth={2} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step(count + 1)}
+                  disabled={count >= countMax}
+                  aria-label={`${t("ideaCard.actMore")}: ${line}`}
+                  className="grid h-11 w-11 place-items-center rounded-full bg-surface text-heading shadow-neu-sm transition-transform active:scale-95 disabled:opacity-40"
+                  data-testid="studio-idea-actuator-more"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+                </button>
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

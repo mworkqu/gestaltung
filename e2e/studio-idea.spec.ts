@@ -217,3 +217,39 @@ for (const locale of LOCALES) {
     await expectNoHorizontalOverflow(page);
   });
 }
+
+// Part B — the card holds how many movers: "make it 4 joints" in the chat sets the count
+// (chip "4 joints"), and the card's stepper changes it (1–8).
+const JOINTS: Record<Loc, string> = { en: "make it 4 joints", ar: "اجعلها 4 مفاصل" };
+const JOINTS_CHANGED: Record<Loc, string> = { en: "4 joints", ar: "4 مفاصل" };
+const JOINTS_LINE: Record<Loc, (n: number) => string> = {
+  en: (n) => `${n} joints · servo motors`,
+  ar: (n) => `${n} مفاصل · محركات سيرفو`,
+};
+for (const locale of LOCALES) {
+  test(`idea Part B: the joint count from the chat and the card stepper [${locale}]`, async ({ page }) => {
+    test.setTimeout(90_000);
+    await open(page, locale);
+    const cardEl = page.getByTestId("studio-idea-summary");
+    const input = page.getByRole("textbox", { name: msg(locale, "Studio", "ideaPlaceholder") });
+    await typeWhenHydrated(input, PLANT[locale]);
+    await input.press("Enter");
+    await page.getByTestId("studio-choices").getByRole("button").first().click();
+    await expect(cardEl).toHaveAttribute("data-state", "spec");
+    await expect(page.getByTestId("studio-idea-actuators")).toHaveCount(0);
+
+    const refine = page.getByRole("textbox", { name: card(locale, "refinePlaceholder") });
+    await typeWhenHydrated(refine, JOINTS[locale]);
+    await refine.press("Enter");
+    await expect(page.getByTestId("studio-idea-updated")).toContainText(JOINTS_CHANGED[locale]);
+    const line = page.getByTestId("studio-idea-actuator-line");
+    await expect(line).toHaveText(JOINTS_LINE[locale](4));
+
+    await page.getByTestId("studio-idea-actuator-more").click();
+    await expect(line).toHaveText(JOINTS_LINE[locale](5));
+    await page.getByTestId("studio-idea-actuator-fewer").click();
+    await page.getByTestId("studio-idea-actuator-fewer").click();
+    await expect(line).toHaveText(JOINTS_LINE[locale](3));
+    await expectNoHorizontalOverflow(page);
+  });
+}

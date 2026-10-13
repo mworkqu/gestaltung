@@ -4089,7 +4089,13 @@
       "updatedChip": "تم تحديث البطاقة",
       "refinePlaceholder": "غيّر أي شيء أو اسأل، مثلاً «اجعله يعمل بالطاقة الشمسية»",
       "updateParts": "حدّث قطعي",
-      "updatePartsNote": "اخترنا قطعك للبطاقة القديمة. اضغط «حدّث قطعي» وسنختارها من جديد."
+      "updatePartsNote": "اخترنا قطعك للبطاقة القديمة. اضغط «حدّث قطعي» وسنختارها من جديد.",
+      "act_servo": "{form, select, one {مفصل واحد} two {مفصلان} few {{count} مفاصل} other {{count} مفصلًا}} · محركات سيرفو",
+      "act_motor": "{form, select, one {محرك واحد} two {محركان} few {{count} محركات} other {{count} محركًا}}",
+      "act_pump": "{form, select, one {مضخة واحدة} two {مضختان} few {{count} مضخات} other {{count} مضخة}}",
+      "act_stepper": "{form, select, one {محرك خطوي واحد} two {محركان خطويان} few {{count} محركات خطوية} other {{count} محركًا خطويًا}}",
+      "actFewer": "واحد أقل",
+      "actMore": "واحد أكثر"
     },
     "partsLoading": "نختار قطعك…",
     "partsProgress": "نختار قطعك… {n} من {total}",

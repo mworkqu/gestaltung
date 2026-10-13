@@ -6,7 +6,7 @@
 // small, and our clamp*() helpers enforce the real limits anyway.
 
 import {
-  COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
+  ACTUATOR_KINDS, ACTUATOR_LOADS, COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
   MECH_TEMPLATES, MATERIALS, OUTPUTS, PHASE_TEMPLATES, PLACEMENTS, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
   type EnclosureTemplate, type MechTemplate, type ProductSpec,
 } from "../schema";
@@ -51,6 +51,13 @@ export const SPEC_SYSTEM =
   "'beeps' needs a buzzer; 'shows' needs a screen; 'lights up' needs a led. " +
   "Infer where it lives from the idea instead of a generic default: a plant monitor stands in the soil of the pot (placement plant_soil), " +
   "a wearable sits on the body (use wearable, placement on_body, or on_wrist for a watch/bracelet) and runs on a battery. " +
+  // Part B: how many movers.
+  "When the product moves or pumps with more than one actuator, set spec.actuators: groups of {kind (servo, motor, pump, stepper), " +
+  `count 1–${LIMITS.actuators.countMax}, load (light, medium, heavy), role} (at most ${LIMITS.actuators.max} groups). ` +
+  "If the user names a reference product, infer its joint/motor count, e.g. 6-axis arm → servo ×6; a gripper is one more servo; " +
+  "a pan-tilt head → servo ×2; a two-wheel robot → motor ×2; two plants watered separately → pump ×2. " +
+  "For an arm, base/shoulder/elbow joints are medium or heavy and wrist/gripper joints light (use separate groups with a role). " +
+  "If the user changes the count ('make it 4 joints'), update spec.actuators and put e.g. '4 joints' in changed. " +
   "Before the card exists, return EITHER {question, choices} OR {spec} (with an optional reply), never both. quantity is always 1. " +
   // Part A: scope honesty on the first card.
   "We make small desktop kits (hobby servos, small motors, USB or battery power, about 60 cm at most). " +
@@ -87,6 +94,21 @@ export const PRODUCT_SPEC_SCHEMA = {
     scaleNote: str(
       `Only when the idea is far beyond a desktop kit: the real thing vs the small version we build, at most ${LIMITS.scaleNote.max} characters`,
     ),
+    actuators: {
+      type: "ARRAY",
+      maxItems: LIMITS.actuators.max,
+      description: "Only when it moves or pumps: groups of identical actuators, e.g. servo ×6 for a 6-axis arm",
+      items: {
+        type: "OBJECT",
+        properties: {
+          kind: enumOf(ACTUATOR_KINDS),
+          count: { type: "INTEGER", description: `${LIMITS.actuators.countMin}–${LIMITS.actuators.countMax}` },
+          load: enumOf(ACTUATOR_LOADS, "heavy/medium = strong joints (base, shoulder, elbow); light = wrist, gripper, pan-tilt"),
+          role: str(`What they move, at most ${LIMITS.actuators.roleMax} characters, e.g. "base, shoulder, elbow"`),
+        },
+        required: ["kind", "count", "load"],
+      },
+    },
     quantity: { type: "INTEGER", description: "Always 1" },
   },
   required: ["name", "oneLine", "use", "power", "environment", "features", "inputs", "outputs", "sizeHint", "style", "quantity"],
