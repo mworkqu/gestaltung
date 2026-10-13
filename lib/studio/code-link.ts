@@ -58,7 +58,7 @@ export function lineLinks(code: string, constants: PinConstant[]): Map<number, L
   const out = new Map<number, LineLink>();
   const lines = code.split("\n");
   for (const c of constants) {
-    const decl = new RegExp(`\\bconst\\s+int\\s+${c.name}\\b`);
+    const decl = new RegExp(`\\bconst\\s+(?:int|uint8_t)\\s+${c.name}\\b`);
     for (const i of linesUsing(code, c.name)) {
       if (out.has(i)) continue;
       out.set(i, { name: c.name, connectionId: c.connectionIds[0], declares: decl.test(lines[i] ?? "") });

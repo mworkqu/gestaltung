@@ -14,9 +14,11 @@
 //
 // Pure and client-safe. Same input → same output.
 
-import type { LibraryPart, Net, Pin, PinRole, StudioComponent } from "./schema";
+import type { LibraryPart, Net, Pin, PinRole, ProductSpec, StudioComponent } from "./schema";
 import {
   isBattery,
+  isServoDriver,
+  servoChannelOf,
   isCharger,
   isConverter,
   isMcu,
@@ -29,6 +31,7 @@ import {
   type Locale,
 } from "./netlist";
 import { plainName } from "./plain-checks";
+import { servoNames } from "./servo-plan";
 
 // ── Colours ─────────────────────────────────────────────────────────────────
 
@@ -76,7 +79,15 @@ export type ConnectionEnd = {
   pin: string;
   /** Short pin label for people ("GPIO4", "+", "VCC"). */
   label: string;
+  /**
+   * This instance's own name when it differs from the part's name (Part E: two or more
+   * servos are "Servo 1 — base", "Servo 2"…, servo-plan.ts servoNames). Read it with endName().
+   */
+  name?: Record<Locale, string>;
 };
+
+/** The other strands of a multi-wire plug (a servo's 3-wire cable on a driver channel). */
+export type ConnectionStrand = { net: string; role: "power" | "ground"; from: ConnectionEnd; to: ConnectionEnd };
 
 export type Connection = {
   /** c1, c2… in build order. */
@@ -91,6 +102,13 @@ export type Connection = {
   viaPart?: string;
   /** Library part id of `viaPart` ("resistor_220"). */
   viaPartId?: string;
+  /**
+   * Part E: a servo's 3-wire plug on a servo driver channel is ONE connection (one row,
+   * one cable in every view): this wire is the signal, `bundle` holds V+ and GND, and
+   * `channel` the driver channel it plugs into.
+   */
+  bundle?: ConnectionStrand[];
+  channel?: number;
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -119,6 +137,20 @@ export function partName(p: LibraryPart | undefined, locale: Locale, fallback = 
   return p ? plainName(p, locale) : fallback;
 }
 
+/** A connection end's name for people: its own instance name, else the part's name. */
+export function endName(e: Pick<ConnectionEnd, "part" | "partId" | "name">, getPart: GetPart, locale: Locale): string {
+  return e.name?.[locale] ?? partName(getPart(e.partId), locale, e.part);
+}
+
+/** Instance → own name (only instances that have one), from the connection ends. */
+export function instanceNames(connections: readonly Connection[], locale: Locale): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const c of connections) {
+    for (const e of [c.from, c.to]) if (e.name && !m.has(e.part)) m.set(e.part, e.name[locale]);
+  }
+  return m;
+}
+
 /** Stable key for a wire that survives re-numbering (pin-list ticks are saved by it). */
 export function connectionKey(c: Pick<Connection, "from" | "to">): string {
   return `${c.from.part}.${c.from.pin}>${c.to.part}.${c.to.pin}`;
@@ -134,7 +166,7 @@ function pinInfo(ref: string, partOf: Map<string, LibraryPart>): PinInfo | null 
   return { ref, inst, pinId, part, pin, mcu: isMcu(part) };
 }
 
-const end = (x: PinInfo): ConnectionEnd => ({ part: x.inst, partId: x.part.id, pin: x.pinId, label: pinLabel(x.part, x.pin) });
+const endOf = (x: PinInfo): ConnectionEnd => ({ part: x.inst, partId: x.part.id, pin: x.pinId, label: pinLabel(x.part, x.pin) });
 
 /** Supply outputs: a battery's +, a charger's OUT, a converter's output. */
 function isSupplyOut(x: PinInfo): boolean {
@@ -176,7 +208,13 @@ const ROLE_ORDER: Record<ConnectionRole, number> = {
  * Netlist → wires. Every net becomes (pins − 1) wires from its hub; a net that
  * runs board pin → series helper → host becomes one wire with `viaPart`.
  */
-export function buildConnections(components: StudioComponent[], nets: Net[], getPart: GetPart): Connection[] {
+export function buildConnections(
+  components: StudioComponent[],
+  nets: Net[],
+  getPart: GetPart,
+  /** For instance names from the actuator roles ("Servo 1 — base"); without it servos are numbered only. */
+  spec?: Pick<ProductSpec, "actuators">,
+): Connection[] {
   const partOf = new Map<string, LibraryPart>();
   for (const c of components) {
     const p = getPart(c.partId);
@@ -184,10 +222,52 @@ export function buildConnections(components: StudioComponent[], nets: Net[], get
   }
   const netOf = new Map<string, Net>();
   for (const n of nets) for (const r of n.pins) netOf.set(r, n);
+  const namesEn = servoNames(components, spec ?? {}, getPart, "en");
+  const namesAr = servoNames(components, spec ?? {}, getPart, "ar");
+  const end = (x: PinInfo): ConnectionEnd => {
+    const e = endOf(x);
+    const en = namesEn.get(x.inst);
+    const ar = namesAr.get(x.inst);
+    return en && ar ? { ...e, name: { en, ar } } : e;
+  };
 
   type Draft = Omit<Connection, "id" | "wireColour">;
   const drafts: Draft[] = [];
-  const folded = new Set<string>(); // nets swallowed into a via connection
+  const folded = new Set<string>(); // nets swallowed into a via connection or a servo plug
+
+  // Servo plugs (Part E): a driver channel's PWM / V / GND nets that each join the driver to
+  // the same servo become ONE connection (the servo's 3-wire cable on channel n).
+  for (const n of nets) {
+    if (n.pins.length !== 2) continue;
+    const infos = n.pins.map((r) => pinInfo(r, partOf));
+    const drv = infos.find((x) => x && isServoDriver(x.part) && /_PWM$/.test(x.pinId));
+    const dev = infos.find((x) => x && x !== drv);
+    if (!drv || !dev) continue;
+    const ch = servoChannelOf(drv.pinId);
+    if (ch === null) continue;
+    const strand = (suffix: "V" | "GND", role: "power" | "ground"): ConnectionStrand | null => {
+      const dp = pinInfo(`${drv.inst}.CH${ch}_${suffix}`, partOf);
+      const net = dp ? netOf.get(dp.ref) : undefined;
+      if (!dp || !net || net.pins.length !== 2 || folded.has(net.name)) return null;
+      const other = pinInfo(net.pins.find((r) => r !== dp.ref) ?? "", partOf);
+      if (!other || other.inst !== dev.inst) return null;
+      return { net: net.name, role, from: end(dp), to: end(other) };
+    };
+    const v = strand("V", "power");
+    const g = strand("GND", "ground");
+    if (!v || !g) continue;
+    folded.add(n.name);
+    folded.add(v.net);
+    folded.add(g.net);
+    drafts.push({
+      from: { ...end(drv), label: `CH${ch}` },
+      to: end(dev),
+      net: n.name,
+      role: "pwm",
+      bundle: [v, g],
+      channel: ch,
+    });
+  }
 
   // Series helpers first: board pin → helper leg a, helper leg b → host.
   for (const n of nets) {
@@ -245,6 +325,8 @@ export function buildConnections(components: StudioComponent[], nets: Net[], get
 export function netColourMap(connections: Connection[]): Map<string, WireColour> {
   const m = new Map<string, WireColour>();
   for (const c of connections) if (!m.has(c.net)) m.set(c.net, c.wireColour);
+  // A plug's V+ / GND strands: red / black like every supply and ground.
+  for (const c of connections) for (const b of c.bundle ?? []) if (!m.has(b.net)) m.set(b.net, b.role === "power" ? "red" : "black");
   return m;
 }
 
@@ -254,14 +336,15 @@ export function connectionsAt(connections: Connection[], part: string, pin?: str
     (c) =>
       (c.from.part === part && (!pin || c.from.pin === pin)) ||
       (c.to.part === part && (!pin || c.to.pin === pin)) ||
-      (!pin && c.viaPart === part),
+      (!pin && c.viaPart === part) ||
+      (!!pin && !!c.bundle?.some((b) => (b.from.part === part && b.from.pin === pin) || (b.to.part === part && b.to.pin === pin))),
   );
 }
 
 /** "ESP32 brain board GPIO4 → Light + (yellow)". */
 export function describeConnection(c: Connection, getPart: GetPart, locale: Locale): string {
-  const a = `${partName(getPart(c.from.partId), locale, c.from.part)} ${c.from.label}`;
-  const b = `${partName(getPart(c.to.partId), locale, c.to.part)} ${c.to.label}`;
+  const a = `${endName(c.from, getPart, locale)} ${c.from.label}`;
+  const b = `${endName(c.to, getPart, locale)} ${c.to.label}`;
   return `${a} → ${b} (${WIRE_NAME[c.wireColour][locale]})`;
 }
 
@@ -280,6 +363,11 @@ export function boardPinValue(pinId: string): string | null {
 export type PinConstant = {
   name: string;
   value: string;
+  /**
+   * What it names: a board pin (default), a servo driver channel (Part E, `const int
+   * SERVO_BASE = 0;`) or the servo driver's I2C address (`const uint8_t PCA9685_ADDR = 0x40;`).
+   */
+  kind?: "pin" | "channel" | "address";
   /** Connections this constant names (a bus pin can feed several parts). */
   connectionIds: string[];
   /** The first connection's wire, for the comment and the swatch. */
@@ -340,6 +428,52 @@ export function pinConstants(connections: Connection[], getPart: GetPart): PinCo
       comment: `${first.wireColour} wire → ${targets.join(", ")} (${ids.join(", ")})`,
     });
   }
+  return [...out, ...servoDriverConstants(connections, getPart, used)];
+}
+
+/** "Servo 1 — base" → "SERVO_BASE"; no (Latin) role → "SERVO_1". */
+function servoConstName(c: Connection, i: number): string {
+  const role = c.to.name?.en.split(" — ")[1] ?? "";
+  const code = role.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return code && !/^\d/.test(code) ? `SERVO_${code}` : `SERVO_${i + 1}`;
+}
+
+/**
+ * Part E: servos on a servo driver (PCA9685, Adafruit_PWMServoDriver) are not board pins.
+ * The block names the driver's I2C address and one channel per servo plug, in channel order:
+ * `const uint8_t PCA9685_ADDR = 0x40;` + `const int SERVO_BASE = 0;`…
+ */
+function servoDriverConstants(connections: Connection[], getPart: GetPart, used: Set<string>): PinConstant[] {
+  const plugs = connections.filter((c) => c.bundle && c.channel !== undefined).sort((a, b) => a.channel! - b.channel!);
+  if (!plugs.length) return [];
+  const drv = plugs[0].from;
+  const addr = getPart(drv.partId)?.tags.find((t) => /^0x[0-9a-f]{2}$/i.test(t)) ?? "0x40";
+  const i2c = connections.filter((c) => c.role === "i2c" && (c.to.part === drv.part || c.from.part === drv.part));
+  const out: PinConstant[] = [];
+  const unique = (base: string) => {
+    let name = base;
+    for (let n = 2; used.has(name); n++) name = `${base}_${n}`;
+    used.add(name);
+    return name;
+  };
+  out.push({
+    name: unique("PCA9685_ADDR"),
+    value: addr,
+    kind: "address",
+    connectionIds: (i2c.length ? i2c : plugs.slice(0, 1)).map((c) => c.id),
+    colour: (i2c[0] ?? plugs[0]).wireColour,
+    comment: `I2C address of the servo driver (PCA9685)${i2c.length ? ` on ${i2c.map((c) => `${c.from.label}/${c.to.label}`).join(", ")} (${i2c.map((c) => c.id).join(", ")})` : ""}`,
+  });
+  plugs.forEach((c, i) => {
+    out.push({
+      name: unique(servoConstName(c, i)),
+      value: String(c.channel),
+      kind: "channel",
+      connectionIds: [c.id],
+      colour: c.wireColour,
+      comment: `${c.wireColour} wire → ${endName(c.to, getPart, "en")} ${c.to.label}, servo driver channel ${c.channel} (${c.id})`,
+    });
+  });
   return out;
 }
 
@@ -348,9 +482,10 @@ export const PIN_BLOCK_END = "// <<< PINS <<<";
 
 /** The sketch's pin block: markers + one constant per line. */
 export function pinBlock(constants: PinConstant[]): string {
-  const w = Math.max(0, ...constants.map((c) => `const int ${c.name} = ${c.value};`.length));
+  const declOf = (c: PinConstant) => `const ${c.kind === "address" ? "uint8_t" : "int"} ${c.name} = ${c.value};`;
+  const w = Math.max(0, ...constants.map((c) => declOf(c).length));
   const lines = constants.map((c) => {
-    const decl = `const int ${c.name} = ${c.value};`;
+    const decl = declOf(c);
     return `${decl.padEnd(w)}  // ${c.comment}`;
   });
   return [PIN_BLOCK_START, ...lines, PIN_BLOCK_END].join("\n");

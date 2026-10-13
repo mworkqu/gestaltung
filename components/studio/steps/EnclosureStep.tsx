@@ -7,12 +7,17 @@
 //    that already has its case, a Studio without the product pipeline (the e2e
 //    fixture by default), a browser that cannot draw the pictures, or a pipeline
 //    that failed — never a blank screen.
+// A robot arm (servos on a servo driver, Part E) has no arm archetype: the case is a
+// base box for the board, the driver and the supply (servos are left out of the
+// packing, lib/studio/layout.ts), and one line says the arm links are a separate job.
 
 import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 
 import type { EnclosureSpec, Finish, StudioDoc, StudioProduct } from "@/lib/studio/schema";
+import { servoPlan } from "@/lib/studio/servo-plan";
 import type { StudioCtx } from "../StudioShell";
+import { useStudioLibrary } from "../StudioLibraryProvider";
 import type { ProductPreviews, UnlockedProduct } from "../use-product";
 import { Bar } from "../ui";
 
@@ -64,9 +69,16 @@ export function EnclosureStep({
   onNext: () => void;
 }) {
   const t = useTranslations("Studio");
+  const { getPart } = useStudioLibrary();
   const flow = productFlowOf(doc, previews);
-  if (flow === "product") {
-    return (
+  const arm = !!servoPlan(doc.components, doc.spec, getPart)?.driver;
+  const armNote = arm ? (
+    <p className="neu px-4 py-3 text-sm font-semibold text-heading sm:px-5" data-testid="studio-arm-links-note">
+      {t("product.armLinks")}
+    </p>
+  ) : null;
+  const body =
+    flow === "product" ? (
       <EnclosureProduct
         ctx={ctx}
         doc={doc}
@@ -77,22 +89,27 @@ export function EnclosureStep({
         onFinish={onFinish}
         onNext={onNext}
       />
+    ) : (
+      <EnclosureTemplateFlow
+        ctx={ctx}
+        doc={doc}
+        beforeServer={beforeServer}
+        onEnclosure={onEnclosure}
+        onNext={onNext}
+        note={
+          flow === "fallback" ? (
+            <p className="text-sm text-mutedtext" data-testid="studio-product-fallback">
+              {t("product.fallbackNote")}
+            </p>
+          ) : null
+        }
+      />
     );
-  }
+  if (!armNote) return body;
   return (
-    <EnclosureTemplateFlow
-      ctx={ctx}
-      doc={doc}
-      beforeServer={beforeServer}
-      onEnclosure={onEnclosure}
-      onNext={onNext}
-      note={
-        flow === "fallback" ? (
-          <p className="text-sm text-mutedtext" data-testid="studio-product-fallback">
-            {t("product.fallbackNote")}
-          </p>
-        ) : null
-      }
-    />
+    <div className="space-y-3">
+      {armNote}
+      {body}
+    </div>
   );
 }

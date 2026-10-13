@@ -4308,6 +4308,7 @@
       "viewerLabel": "Your product in 3D, in its place",
       "apartNote": "Every printed part and the electronics inside, apart.",
       "fallbackNote": "We could not draw product pictures here, so here is a case for your parts.",
+      "armLinks": "The case holds the board, the servo driver and the power supply. Arm links are designed by our engineer — ask for a quote.",
       "printHeadline": "Print your parts",
       "printIntro": "Each part of your product is its own print. Download one, or all of them together.",
       "piece_top": "top half",
@@ -4400,8 +4401,10 @@
           "knob": "Knob",
           "tilt": "Tilt",
           "time": "Time of day",
-          "power": "Switch it on"
+          "power": "Switch it on",
+          "joint": "Servo {n}"
         },
+        "jointPick": "Joint",
         "toggleOn": "On",
         "toggleOff": "Off",
         "threshold": {
@@ -4447,7 +4450,9 @@
           "level": "Level",
           "night": "It's night",
           "day": "It's day",
-          "none": "Waiting"
+          "none": "Waiting",
+          "jointMoving": "Arm moving",
+          "jointStill": "Holding position"
         },
         "effect": {
           "ledOn": "light on",

@@ -43,8 +43,8 @@ export default function CodeLinked({
 
   // P5-17: the wires and their pin constants, from the same netlist as every wiring view.
   const connections = useMemo(
-    () => (wired ? buildConnections(doc.components, doc.netlist.nets, getPart) : []),
-    [wired, doc.components, doc.netlist.nets, getPart],
+    () => (wired ? buildConnections(doc.components, doc.netlist.nets, getPart, doc.spec) : []),
+    [wired, doc.components, doc.netlist.nets, getPart, doc.spec],
   );
   const byId = useMemo(() => new Map(connections.map((c) => [c.id, c])), [connections]);
   const constants = useMemo(() => pinConstants(connections, getPart), [connections, getPart]);

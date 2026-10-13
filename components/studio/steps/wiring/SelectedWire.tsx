@@ -7,14 +7,14 @@
 import { useTranslations } from "next-intl";
 import { Code2, X } from "lucide-react";
 
-import { partName, WIRE_HEX, WIRE_NAME, WIRE_OUTLINE, type Connection } from "@/lib/studio/connections";
+import { endName, partName, WIRE_HEX, WIRE_NAME, WIRE_OUTLINE, type Connection } from "@/lib/studio/connections";
 import type { GetPart, Locale } from "@/lib/studio/netlist";
 import { linkCls } from "../../ui";
 import { useWiringViews } from "./views-context";
 
 export function wireWords(c: Connection, getPart: GetPart, locale: Locale) {
-  const from = `${partName(getPart(c.from.partId), locale, c.from.part)} ${c.from.label}`;
-  const to = `${partName(getPart(c.to.partId), locale, c.to.part)} ${c.to.label}`;
+  const from = `${endName(c.from, getPart, locale)} ${c.from.label}`;
+  const to = `${endName(c.to, getPart, locale)} ${c.to.label}`;
   const via = c.viaPartId ? partName(getPart(c.viaPartId), locale, c.viaPart) : null;
   return { from, to, colour: WIRE_NAME[c.wireColour][locale], via };
 }

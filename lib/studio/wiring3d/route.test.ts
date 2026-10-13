@@ -7,6 +7,7 @@ import { layoutMat, movePart, type MatLayout } from "./layout";
 import { crossingCount, LANE_GAP, ROUTE_CLEAR, routeWires, snapXY, type Box, type Route, type XY } from "./route";
 import { buildWires, gridOrigin, planWires } from "./wires";
 import { holeWorld } from "./breadboard";
+import { ROBOT_ARM_PART_IDS } from "../__fixtures__/robot-arm";
 
 const wire = (ids: string[]) => {
   const comps = ids.map((id, i) => ({ partId: id, instanceId: `${id}_${i + 1}`, label: id }));
@@ -26,6 +27,9 @@ const FIXTURES = {
   uno: ["arduino_uno", "soil_moisture_cap", "relay_module", "led_5mm", "oled_096_i2c", "dht22"],
   busy: ["esp32_devkit", "sg90_servo", "ws2812_ring", "button_6mm", "dht22", "oled_096_i2c", "led_5mm", "usbc_power_5v"],
   feeder: ["esp32_devkit", "sg90_servo", "usbc_power_5v", "button_6mm"],
+  // Part E: servo plugs on a PCA9685 (6 and 8 servos).
+  arm: ROBOT_ARM_PART_IDS,
+  arm8: [...ROBOT_ARM_PART_IDS, "sg90_servo", "sg90_servo"],
 };
 
 /** Crossings allowed: a tidy hand-drawn layout of these circuits needs a few (≤ 0.7 per wire; a crossing = one wire hopping one other). */
@@ -189,6 +193,15 @@ describe("route: the fixtures", () => {
     const p = l.placements.find((q) => !q.board && !q.breadboard)!;
     const moved = movePart(l, p.instanceId, [l.bounds.maxX + 40, l.bounds.minY - 30]);
     checkPlan(moved, f);
+  });
+
+  it("the robot arm (8 servo plugs, a part just moved) routes within the speed budget", () => {
+    const f = wire(FIXTURES.arm8);
+    const l = f.layout();
+    const id = l.placements.find((q) => q.partId === "sg90_servo")!.instanceId;
+    let k = 0;
+    const ms = fastest(() => planWires({ connections: f.connections, layout: movePart(l, id, [l.bounds.maxX + 25 + k++ * 2.54, 0]), getPart, nets: f.nets }));
+    expect(ms).toBeLessThan(SPEED_BUDGET);
   });
 
   it("20-odd jumpers (busy fixture, a part just moved) route within the speed budget", () => {

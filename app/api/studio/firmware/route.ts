@@ -52,9 +52,11 @@ export async function POST(request: Request) {
 
   // P5-17: the pin constants come from the SAME wiring the views draw. The model is
   // told to start with this exact block; the block is put back verbatim afterwards.
-  const connections = buildConnections(w.components, w.netlist.nets, getPart);
+  const connections = buildConnections(w.components, w.netlist.nets, getPart, spec);
   const constants = pinConstants(connections, getPart);
   const block = constants.length ? pinBlock(constants) : null;
+  // Part E: servos on a PCA9685 servo driver are driven over I2C, by channel.
+  const servoDriver = constants.some((c) => c.kind === "channel");
 
   const ar = body.locale === "ar";
   const system =
@@ -70,6 +72,11 @@ export async function POST(request: Request) {
     (block
       ? " The sketch MUST contain the pin block given below, copied VERBATIM (same lines, same markers) right after the #include lines. " +
         "Use ONLY those constant names for the pins everywhere in the code; never write a raw pin number and never redefine them."
+      : "") +
+    (servoDriver
+      ? " The servos are NOT on board pins: they sit on a PCA9685 servo driver on I2C. Use the Adafruit_PWMServoDriver library " +
+        "(Adafruit_PWMServoDriver pwm(PCA9685_ADDR); pwm.begin(); pwm.setPWMFreq(50);) and move each servo with " +
+        "pwm.setPWM(<its SERVO_… channel constant>, 0, pulse). Never use Servo.attach() for them."
       : "");
   const brief = [
     spec.oneLine,

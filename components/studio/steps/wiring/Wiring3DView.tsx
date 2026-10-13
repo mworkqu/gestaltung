@@ -59,7 +59,7 @@ import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei/core/OrbitControls";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 
-import { WIRE_HEX, partName, type Connection, type WireColour } from "@/lib/studio/connections";
+import { WIRE_HEX, endName, instanceNames, partName, type Connection, type WireColour } from "@/lib/studio/connections";
 import { buildPartModel } from "@/lib/studio/models";
 import type { GetPart, Locale } from "@/lib/studio/netlist";
 import { STEP_ACCENT } from "@/lib/studio/palette";
@@ -226,7 +226,9 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
   // A name tag per part (a number is added when two parts share a name).
   const tagRefs = useRef(new Map<string, HTMLDivElement>());
   const tags = useMemo(() => {
-    const names = items.map((it) => partName(it.part, locale, it.instanceId));
+    // Instances with their own name (Part E: "Servo 1 — base") keep it; others share the part's name.
+    const own = instanceNames(connections, locale);
+    const names = items.map((it) => own.get(it.instanceId) ?? partName(it.part, locale, it.instanceId));
     const count = new Map<string, number>();
     for (const n of names) count.set(n, (count.get(n) ?? 0) + 1);
     const seen = new Map<string, number>();
@@ -236,13 +238,13 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
       seen.set(n, k);
       return { id: it.instanceId, text: (count.get(n) ?? 1) > 1 ? `${n} ${k}` : n };
     });
-  }, [items, locale]);
+  }, [items, locale, connections]);
 
   const sim = useSim({ on: trying && webgl === true, doc, getPart, connections, reduced: reducedMotion, locale });
 
   const active = activeId ? byId.get(activeId) : undefined;
   const label = (end: Connection["from"]) => {
-    const name = partName(getPart(end.partId), locale, end.part);
+    const name = endName(end, getPart, locale);
     return `${name} ${end.label}`;
   };
 
@@ -696,6 +698,11 @@ function Scene(p: SceneProps) {
     for (const c of connections) {
       mark(c.from, WIRE_HEX[c.wireColour]);
       mark(c.to, WIRE_HEX[c.wireColour]);
+      // A servo plug's V+ / GND strands are wired too (one cable in 3D).
+      for (const b of c.bundle ?? []) {
+        mark(b.from, WIRE_HEX[b.role === "power" ? "red" : "black"]);
+        mark(b.to, WIRE_HEX[b.role === "power" ? "red" : "black"]);
+      }
     }
     return m;
   }, [connections]);

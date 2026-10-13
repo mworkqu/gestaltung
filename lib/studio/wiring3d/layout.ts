@@ -14,7 +14,12 @@
 //     Parts go left to right in build order, one free column between them;
 //   * everything else (pump, servo, battery, power boards, relays, probes, big
 //     modules) lies on the mat around the board + breadboard, on the side its
-//     wires go, turned so its pins face them, pushed out until nothing overlaps.
+//     wires go, turned so its pins face them, pushed out until nothing overlaps;
+//   * servos on a servo driver (Part E): the driver lies on the mat above the
+//     board + breadboard, its channel headers facing away from them, and its
+//     servos stand in one row beyond it in channel order (servo 1 on channel 0
+//     at the left), leads facing the driver — 6 to 8 identical servos never
+//     pile up around the board.
 //
 // Moving by hand: a part that can plug in snaps to the nearest free columns
 // when dropped over the breadboard (never into a column that holds another
@@ -414,12 +419,23 @@ export function layoutMat(items: MatItem[], connections: Connection[], nets?: Ne
     placed.set(it.instanceId, plugged(bb, base, ps.bottom, k));
   }
 
+  // ── Servo driver + its servos (Part E) ──
+  const group = servoGroup(items, connections, partOf, {
+    cx: (bp.pos[0] - bp.w / 2 + bb.pos[0] + bb.w / 2) / 2,
+    top: Math.max(bb.d / 2, bp.d / 2),
+  });
+  for (const p of group) {
+    const part = partOf.get(p.instanceId)!;
+    align(p, part, 0, 1);
+    placed.set(p.instanceId, p);
+  }
+
   // ── Mat parts around the board + breadboard ──
   const core = {
-    minX: bp.pos[0] - bp.w / 2,
-    maxX: bb.pos[0] + bb.w / 2,
+    minX: Math.min(bp.pos[0] - bp.w / 2, ...group.map((p) => p.pos[0] - p.w / 2)),
+    maxX: Math.max(bb.pos[0] + bb.w / 2, ...group.map((p) => p.pos[0] + p.w / 2)),
     minY: Math.min(-bb.d / 2, -bp.d / 2),
-    maxY: Math.max(bb.d / 2, bp.d / 2),
+    maxY: Math.max(bb.d / 2, bp.d / 2, ...group.map((p) => p.pos[1] + p.d / 2)),
   };
   const cx = (core.minX + core.maxX) / 2;
   const cy = (core.minY + core.maxY) / 2;
@@ -518,7 +534,7 @@ export function layoutMat(items: MatItem[], connections: Connection[], nets?: Ne
     d.rot = ((Math.round(deg / 90) * 90) % 360) as Rot;
   }
 
-  const blockers: Rect[] = [rectOf(bp), { x: bb.pos[0], y: bb.pos[1], w: bb.w, d: bb.d }];
+  const blockers: Rect[] = [rectOf(bp), { x: bb.pos[0], y: bb.pos[1], w: bb.w, d: bb.d }, ...group.map(rectOf)];
   const matPlaced: Placement[] = [];
   for (const side of SIDES) {
     const row = drafts.filter((d) => d.side === side).sort((a, b) => a.key - b.key || a.order - b.order);
@@ -565,6 +581,94 @@ export function layoutMat(items: MatItem[], connections: Connection[], nets?: Ne
 
   const placements = items.map((i) => placed.get(i.instanceId)!).filter(Boolean);
   return { placements, breadboard: bb, bounds: boundsOf(placements, bb) };
+}
+
+/** Gap between two servos in the servo row, and between the driver and the row (mm): room for a few wire lanes. */
+const SERVO_GAP = 16;
+
+/**
+ * The rotation (0/90/180/270) that turns the mean of `pins` (local) toward `dir` on the mat,
+ * measured from the part's centre, or from the mean of `from` pins when given.
+ */
+function rotToward(part: LibraryPart, pinIds: string[], dir: [number, number], from: string[] = []): Rot {
+  const pins = pins3dFor(part);
+  const ids = pinIds.filter((id) => pins[id]);
+  if (!ids.length) return 0;
+  const mean = (list: string[], k: 0 | 1) => list.reduce((t, id) => t + pins[id].pos[k], 0) / list.length;
+  const base = from.filter((id) => pins[id]);
+  const mx = mean(ids, 0) - (base.length ? mean(base, 0) : 0);
+  const my = mean(ids, 1) - (base.length ? mean(base, 1) : 0);
+  let best: Rot = 0;
+  let bestDot = -Infinity;
+  for (const r of [0, 90, 180, 270] as Rot[]) {
+    const [x, y] = rotXY(mx, my, r);
+    const dot = x * dir[0] + y * dir[1];
+    if (dot > bestDot + 1e-9) {
+      bestDot = dot;
+      best = r;
+    }
+  }
+  return best;
+}
+
+/**
+ * Part E: a servo driver and the servos plugged into its channels, laid out above the board
+ * + breadboard (`at.top` = their top edge, `at.cx` = their middle): the driver first, channel
+ * headers up; then one row of servos in channel order, leads down toward the driver.
+ * Empty when the circuit has no servo plugs.
+ */
+function servoGroup(
+  items: MatItem[],
+  connections: Connection[],
+  partOf: Map<string, LibraryPart>,
+  at: { cx: number; top: number },
+): Placement[] {
+  const plugs = connections.filter((c) => c.bundle && c.channel !== undefined).sort((a, b) => a.channel! - b.channel!);
+  if (!plugs.length) return [];
+  const drvId = plugs[0].from.part;
+  const drvPart = partOf.get(drvId);
+  if (!drvPart || !items.some((i) => i.instanceId === drvId)) return [];
+  const make = (instanceId: string, part: LibraryPart, rot: Rot, x: number, y: number): Placement => {
+    const f = footprint(part, rot);
+    return {
+      instanceId,
+      partId: part.id,
+      pos: [x, y, 0],
+      rotZ: rot,
+      ...f,
+      board: false,
+      breadboard: false,
+      tilt: 0,
+      offset: [0, 0, 0],
+      matPose: { rotZ: rot, ...f },
+    };
+  };
+  const chPins = plugs.flatMap((c) => [c.from.pin, ...(c.bundle ?? []).map((b) => b.from.pin)]);
+  // Channel headers up (away from the board), the I2C header down toward it.
+  const dRot = rotToward(drvPart, chPins, [0, 1], drvPart.pins.filter((q) => /^(SDA|SCL)$/.test(q.id)).map((q) => q.id));
+  const df = footprint(drvPart, dRot);
+  const drv = make(drvId, drvPart, dRot, at.cx, at.top + GAP + df.d / 2);
+  const out: Placement[] = [drv];
+  // Servos: one row above the driver, centred on the used channel headers.
+  const servos = plugs
+    .map((c) => ({ c, part: partOf.get(c.to.part) }))
+    .filter((x): x is { c: Connection; part: LibraryPart } => !!x.part && items.some((i) => i.instanceId === x.c.to.part));
+  if (!servos.length) return out;
+  const rows = servos.map(({ c, part }) => {
+    const rot = rotToward(part, [c.to.pin, ...(c.bundle ?? []).map((b) => b.to.pin)], [0, -1]);
+    return { c, part, rot, f: footprint(part, rot) };
+  });
+  const dPins = pins3dFor(drvPart);
+  const headerXs = plugs.map((c) => dPins[c.from.pin]).filter(Boolean).map((q) => drv.pos[0] + rotXY(q.pos[0], q.pos[1], dRot)[0]);
+  const hx = headerXs.length ? (Math.min(...headerXs) + Math.max(...headerXs)) / 2 : drv.pos[0];
+  const total = rows.reduce((t, r) => t + r.f.w, 0) + SERVO_GAP * (rows.length - 1);
+  const y0 = drv.pos[1] + df.d / 2 + SERVO_GAP + GAP;
+  let x = hx - total / 2;
+  for (const r of rows) {
+    out.push(make(r.c.to.part, r.part, r.rot, x + r.f.w / 2, y0 + r.f.d / 2));
+    x += r.f.w + SERVO_GAP;
+  }
+  return out;
 }
 
 /** Footprint bounds of a set of placements and the breadboard, mm. */

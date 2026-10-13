@@ -76,8 +76,8 @@ export function WiringViewsProvider({
   children: ReactNode;
 }) {
   const connections = useMemo(
-    () => buildConnections(doc.components, doc.netlist.nets, getPart),
-    [doc.components, doc.netlist.nets, getPart],
+    () => buildConnections(doc.components, doc.netlist.nets, getPart, doc.spec),
+    [doc.components, doc.netlist.nets, getPart, doc.spec],
   );
   const byId = useMemo(() => new Map(connections.map((c) => [c.id, c])), [connections]);
   const [selectedId, setSelectedId] = useState<string | null>(initialSelected ?? null);

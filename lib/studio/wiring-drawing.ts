@@ -25,14 +25,16 @@
 import { esc } from "@/lib/prototyping/netlist";
 import {
   buildConnections,
+  instanceNames,
   partName,
   pinLabel,
   WIRE_HEX,
   WIRE_OUTLINE,
   type Connection,
+  type WireColour,
 } from "./connections";
 import { drawing2d, PITCH_MM, type Decor, type Drawing2D, type Edge } from "./drawing2d";
-import { isMcu, type GetPart, type Locale } from "./netlist";
+import { isMcu, isServoDriver, openByDesign, type GetPart, type Locale } from "./netlist";
 import type { LibraryPart, Net, StudioComponent } from "./schema";
 
 export type WiringDrawingOpts = { locale: Locale; connections?: Connection[] };
@@ -88,8 +90,14 @@ type Pt = { x: number; y: number };
 
 // ── Sizing a part ───────────────────────────────────────────────────────────
 
-function makeInst(c: StudioComponent, part: LibraryPart, name: string): Inst {
-  const d = drawing2d(part);
+function makeInst(c: StudioComponent, part: LibraryPart, name: string, wired: ReadonlySet<string>): Inst {
+  const full = drawing2d(part);
+  // A servo driver's open channels and OE are not drawn (16 channels × 3 pins would bury the used ones).
+  const shown = (id: string) => {
+    const pin = part.pins.find((p) => p.id === id);
+    return !pin || !openByDesign(part, pin) || wired.has(`${c.instanceId}.${id}`);
+  };
+  const d: Drawing2D = full.pins.every((p) => shown(p.id)) ? full : { ...full, pins: full.pins.filter((p) => shown(p.id)) };
   const axial = d.decor === "resistor";
   const labelOf = (pinId: string) => {
     const pin = part.pins.find((p) => p.id === pinId)!;
@@ -176,11 +184,15 @@ const straight = (a: Pt, b: Pt) => {
   return `M${f(a.x)} ${f(a.y)}C${f(a.x + dx)} ${f(a.y)} ${f(b.x - dx)} ${f(b.y)} ${f(b.x)} ${f(b.y)}`;
 };
 
-function wirePaths(d: string, c: Connection, extra = ""): string {
+function wirePaths(d: string, c: Connection, extra = "", strand?: WireColour): string {
   const id = esc(c.id);
+  const base = `fill="none" stroke-linecap="round" stroke-linejoin="round" pathLength="1"`;
+  if (strand) {
+    // The V+ / GND strand of a servo plug: same id as its signal wire, its own colour.
+    return `<path class="wire-strand" data-conn="${id}" data-colour="${strand}"${extra} d="${d}" stroke="${WIRE_HEX[strand]}" stroke-width="${WIRE_W - 1}" ${base}/>`;
+  }
   const hex = WIRE_HEX[c.wireColour];
   const outline = WIRE_OUTLINE[c.wireColour];
-  const base = `fill="none" stroke-linecap="round" stroke-linejoin="round" pathLength="1"`;
   let s = "";
   if (outline)
     s += `<path class="wire-casing" data-conn="${id}"${extra} d="${d}" stroke="${outline}" stroke-width="${WIRE_W + 3.4}" ${base}/>`;
@@ -266,6 +278,11 @@ export function renderWiringSVG(
   const { locale } = opts;
   const rtl = locale === "ar" ? ` direction="rtl"` : "";
   const conns = opts.connections ?? buildConnections(components, nets, getPart);
+  const ownNames = instanceNames(conns, locale);
+  const wired = new Set<string>();
+  for (const c of conns) {
+    for (const e of [c.from, c.to, ...(c.bundle ?? []).flatMap((b) => [b.from, b.to])]) wired.add(`${e.part}.${e.pin}`);
+  }
   const aria = esc(LABEL_TEXT[locale]);
   const open = (w: number, h: number) =>
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(w)} ${f(h)}" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${aria}" font-family="${SANS}" direction="ltr"><title>${aria}</title><rect x="0" y="0" width="${f(w)}" height="${f(h)}" rx="16" fill="${PAPER}"/>`;
@@ -283,8 +300,9 @@ export function renderWiringSVG(
   const list: Inst[] = withPart.map(({ c, part }) => {
     const n = (seen.get(part.id) ?? 0) + 1;
     seen.set(part.id, n);
+    const own = ownNames.get(c.instanceId);
     const base = partName(part, locale, c.label);
-    return makeInst(c, part, (total.get(part.id) ?? 1) > 1 ? `${base} ${n}` : base);
+    return makeInst(c, part, own ?? ((total.get(part.id) ?? 1) > 1 ? `${base} ${n}` : base), wired);
   });
   if (!list.length) {
     return `${open(320, 120)}<text x="160" y="64" text-anchor="middle" font-size="15" fill="${MUTED}"${rtl}>${esc(EMPTY_TEXT[locale])}</text></svg>`;
@@ -314,7 +332,15 @@ export function renderWiringSVG(
   const viaHostOf = new Map<string, string>(); // host → helper
   // Supply and ground wires to the board do not decide where a part sits: a pump that
   // only shares the ground rail with the board belongs behind its driver.
-  const railToHub = (c: Connection) => (c.role === "power" || c.role === "ground") && (c.from.part === hub.id || c.to.part === hub.id);
+  // Nor does the wall supply's feed to a servo driver: the driver sits by the board, its servos behind it.
+  const railToHub = (c: Connection) =>
+    (c.role === "power" || c.role === "ground") &&
+    (c.from.part === hub.id ||
+      c.to.part === hub.id ||
+      [c.from.part, c.to.part].some((id) => {
+        const p = byId.get(id)?.part;
+        return !!p && isServoDriver(p);
+      }));
   for (const c of conns) {
     if (c.viaPart && byId.has(c.viaPart)) {
       link(c.from.part, c.viaPart);
@@ -396,7 +422,9 @@ export function renderWiringSVG(
     const helperConn = i.axial ? conns.find((c) => c.viaPart === i.id) : undefined;
     const legA = helperConn ? legs.get(helperConn.id)?.a : undefined;
     const aEdge = legA ? i.byPin.get(legA)?.edge : undefined;
-    const facing = aEdge ?? i.d.dominant;
+    // A servo driver faces the board with its I2C side; its channel side faces its servos.
+    const i2cEdge = isServoDriver(i.part) ? i.pins.find((p) => /^(SDA|SCL)$/.test(p.id))?.edge : undefined;
+    const facing = aEdge ?? i2cEdge ?? i.d.dominant;
     applyFlip(i, facing !== need);
   }
 
@@ -530,7 +558,7 @@ export function renderWiringSVG(
     return y;
   };
   // First pass: collect geometry so the detour lanes can widen the box.
-  type Draw = { c: Connection; d: string; extra?: string };
+  type Draw = { c: Connection; d: string; extra?: string; strand?: WireColour };
   const draws: Draw[] = [];
   const needsDetour = (S_: Pt, dS: number, E: Pt, dE: number) => !(dS * (E.x - S_.x) > 24 && dE * (S_.x - E.x) > 24);
 
@@ -571,16 +599,31 @@ export function renderWiringSVG(
       }
     }
     segment(c, from, to);
+    // A servo plug's V+ and GND strands run beside its signal wire.
+    for (const b of c.bundle ?? []) {
+      const a = absPin(b.from.part, b.from.pin);
+      const z = absPin(b.to.part, b.to.pin);
+      if (!a || !z) continue;
+      const dS = dirOf(a.pin);
+      const dE = dirOf(z.pin);
+      const detour = needsDetour(a.at, dS, z.at, dE) ? detourFor(a.at, z.at) : null;
+      draws.push({ c, d: curve(a.at, dS, z.at, dE, detour), strand: b.role === "power" ? "red" : "black" });
+    }
   }
 
   // ── Which colour each pin dot takes ──
-  const dotColour = new Map<string, Connection>();
-  const mark = (ref: string, c: Connection) => {
+  const dotColour = new Map<string, Pick<Connection, "wireColour">>();
+  const mark = (ref: string, c: Pick<Connection, "wireColour">) => {
     if (!dotColour.has(ref)) dotColour.set(ref, c);
   };
   for (const c of conns) {
     mark(`${c.from.part}.${c.from.pin}`, c);
     mark(`${c.to.part}.${c.to.pin}`, c);
+    for (const b of c.bundle ?? []) {
+      const strand = { wireColour: (b.role === "power" ? "red" : "black") as WireColour };
+      mark(`${b.from.part}.${b.from.pin}`, strand);
+      mark(`${b.to.part}.${b.to.pin}`, strand);
+    }
     const lg = legs.get(c.id);
     if (c.viaPart && lg) {
       mark(`${c.viaPart}.${lg.a}`, c);
@@ -637,7 +680,7 @@ export function renderWiringSVG(
 
   // Wires (under the dots).
   out += `<g class="wires">`;
-  for (const w of draws) out += wirePaths(w.d, w.c, w.extra ?? "");
+  for (const w of draws) out += wirePaths(w.d, w.c, w.extra ?? "", w.strand);
   out += `</g>`;
 
   // Pin dots on top.

@@ -201,6 +201,10 @@ export function buildWires({ connections, layout, getPart, nets, lift, only }: W
     } else {
       const a = resolve(c.from.part, c.from.partId, c.from.pin);
       const b = resolve(c.to.part, c.to.partId, c.to.pin);
+      // A servo plug (Part E) is ONE cable here: its signal wire from the channel header to the
+      // servo stands for the 3-wire lead (its V+ / GND strands run under it; the 2D drawing,
+      // the schematic and the pin list show all three). Routing three wires out of one 3 × n
+      // header at the grid pitch would box the signal row in.
       if (a && b) push(a, b);
     }
   });

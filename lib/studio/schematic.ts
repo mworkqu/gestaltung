@@ -19,12 +19,13 @@
 
 import { esc } from "@/lib/prototyping/netlist";
 import { NET_COLOURS } from "./palette";
-import { buildConnections, netColourMap, WIRE_HEX, WIRE_OUTLINE, type Connection, type WireColour } from "./connections";
+import { buildConnections, instanceNames, netColourMap, WIRE_HEX, WIRE_OUTLINE, type Connection, type WireColour } from "./connections";
 import type { LibraryPart, Net, Pin, ProductSpec, StudioComponent } from "./schema";
 import {
   isMcu,
   isPowerRole,
   isPowerSource,
+  openByDesign,
   splitRef,
   symbolKind,
   type GetPart,
@@ -176,6 +177,7 @@ export function renderSchematicSVG(
   // Colours and ids come from the shared connections (red supply, black ground, one signal colour per net).
   const conns = opts.connections ?? buildConnections(components, nets, getPart);
   const shared = netColourMap(conns);
+  const ownNames = instanceNames(conns, locale);
   const connOfNet = new Map<string, string>(); // net → first connection id (the hook for click / hover)
   for (const c of conns) if (!connOfNet.has(c.net)) connOfNet.set(c.net, c.id);
   // The far half of a wire through a series helper is the same wire: same colour, same id.
@@ -288,12 +290,14 @@ export function renderSchematicSVG(
       return net ? isRailish(net.name) : pin.role === "gnd" || isPowerRole(pin.role) || isPowerSource(e.p);
     };
     const linked = (pin: Pin) => mcuPinsOfNet(netOf.get(`${inst}.${pin.id}`));
-    const inner = e.p.pins
+    // A servo driver's open channels and OE are left out (16 channels would bury the used ones).
+    const pinsShown = e.p.pins.filter((x) => !openByDesign(e.p, x) || netOf.has(`${inst}.${x.id}`));
+    const inner = pinsShown
       .filter((x) => !powerish(x))
       .map((pin, i) => ({ pin, i, k: Math.min(...linked(pin).map((r) => mcuPinIndex.get(r)!), Infinity) }))
       .sort((a, b) => a.k - b.k || a.i - b.i)
       .map((x) => x.pin);
-    const outer = e.p.pins.filter(powerish);
+    const outer = pinsShown.filter(powerish);
     let l = 0, r = 0;
     for (const pin of inner) for (const m of linked(pin)) {
       const s = sideOfMcuPin.get(m);
@@ -301,7 +305,7 @@ export function renderSchematicSVG(
       else if (s === "R") r++;
     }
     const colSide: "L" | "R" = l > r ? "L" : r > l ? "R" : DEFAULT_LEFT.has(e.p.category) ? "L" : "R";
-    const name = plainName(e.p, locale);
+    const name = ownNames.get(inst) ?? plainName(e.p, locale);
     const labW = (ps: Pin[]) => Math.max(0, ...ps.map((p) => textW(pinText(p), 11, true)));
     const w = Math.ceil(Math.max(BOX_MIN_W, textW(name, 14) + 28, textW(KIND_TEXT[e.p.category][locale], 11) + 28, labW(inner) + labW(outer) + 34));
     const rows = Math.max(inner.length, outer.length, 1);
@@ -632,7 +636,7 @@ export function renderSchematicSVG(
     const { e } = it;
     const inst = e.c.instanceId;
     let g = `<g data-part="${esc(inst)}"><rect x="${f(it.x)}" y="${f(it.y)}" width="${f(it.w)}" height="${f(it.h)}" rx="10" fill="${PAPER}" stroke="${LINE}" stroke-width="1.4"/>`;
-    g += `<text x="${f(it.x + it.w / 2)}" y="${f(it.y + 18)}" text-anchor="middle" font-size="14" font-weight="600" fill="${INK}"${rtl}>${esc(plainName(e.p, locale))}</text>`;
+    g += `<text x="${f(it.x + it.w / 2)}" y="${f(it.y + 18)}" text-anchor="middle" font-size="14" font-weight="600" fill="${INK}"${rtl}>${esc(ownNames.get(inst) ?? plainName(e.p, locale))}</text>`;
     g += `<text x="${f(it.x + it.w / 2)}" y="${f(it.y + 31)}" text-anchor="middle" font-size="11" fill="${MUTED}"${rtl}>${kindText(e.p)}</text>`;
     const innerX = it.col === "L" ? it.x + it.w : it.x;
     const outerX = it.col === "L" ? it.x : it.x + it.w;

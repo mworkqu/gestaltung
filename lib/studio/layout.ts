@@ -447,9 +447,19 @@ function assemble(groups: { L: Group; R: Group; F: Group; B: Group; C: Group }, 
   return { placed: out, W, D };
 }
 
+/**
+ * Part E: servos plugged into a servo driver move the product's arm links (a separate
+ * design job), so the case packs only the rest: the board, the driver and the supply.
+ */
+export function enclosedItems(items: LayoutInput[]): LayoutInput[] {
+  const driver = items.some((i) => i.part.tags.includes("servo_driver"));
+  if (!driver) return items;
+  return items.filter((i) => !(i.part.category === "actuator" && i.part.tags.includes("servo") && !i.part.tags.includes("servo_driver")));
+}
+
 export function layoutComponents(items: LayoutInput[], opts: LayoutOptions = {}): LayoutResult {
   const minC = Math.max(0, opts.clearance ?? LIMITS.clearance.min);
-  const blocks = makeBlocks(items);
+  const blocks = makeBlocks(enclosedItems(items));
   if (blocks.length === 0) {
     return { layout: [], bbox: { min: [0, 0, 0], max: [0, 0, 0] }, footprint: { w: 0, d: 0 }, height: 0 };
   }

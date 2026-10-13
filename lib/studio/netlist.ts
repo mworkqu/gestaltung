@@ -22,6 +22,7 @@ import type {
 } from "@/lib/prototyping/netlist";
 import type { LibraryPart, Net, Pin, PinRole, ProductSpec, StudioCheck, StudioComponent } from "./schema";
 import { studioChecks } from "./plain-checks";
+import { servoPlan, type ServoPlan } from "./servo-plan";
 
 export type GetPart = (id: string) => LibraryPart | undefined;
 export type Locale = "en" | "ar";
@@ -71,9 +72,24 @@ export const isButton = (p: LibraryPart) =>
 export const isInductive = (p: LibraryPart) =>
   tagged(p, ["motor", "solenoid", "pump", "relay", "relay_coil", "fan", "coil"]) &&
   !tagged(p, ["module", "driver", "servo", "stepper", "relay_module"]);
+/** A servo driver board (PCA9685): servos plug into its channels, it talks I2C to the board. */
+export const isServoDriver = (p: LibraryPart) => tagged(p, ["servo_driver", "pca9685"]);
+/** A driver that switches an inductive load (never the servo driver: servos are not inductive loads). */
 export const isDriver = (p: LibraryPart) =>
-  tagged(p, ["driver", "mosfet", "transistor", "relay_module", "h_bridge"]) ||
-  (tagged(p, ["relay"]) && tagged(p, ["module"]));
+  !isServoDriver(p) &&
+  (tagged(p, ["driver", "mosfet", "transistor", "relay_module", "h_bridge"]) ||
+    (tagged(p, ["relay"]) && tagged(p, ["module"])));
+/** Servo driver channel pins ("CH3_PWM", "CH3_V", "CH3_GND"): channel number, else null. */
+export function servoChannelOf(pinId: string): number | null {
+  const m = /^CH(\d+)_(PWM|V|GND)$/.exec(pinId);
+  return m ? Number(m[1]) : null;
+}
+/**
+ * Pins of a servo driver left open on purpose: OE (optional, pulled low on the board)
+ * and every channel no servo is plugged into. Never "unconnected", never a board pin.
+ */
+export const openByDesign = (p: LibraryPart, pin: Pin) =>
+  isServoDriver(p) && (pin.id === "OE" || servoChannelOf(pin.id) !== null);
 const wantsPwm = (p: LibraryPart) => tagged(p, ["pwm", "servo", "buzzer", "dimmable", "dimmer", "speaker"]);
 const isAnalog = (p: LibraryPart) => tagged(p, ["analog", "analogue"]);
 
@@ -529,13 +545,21 @@ export type BuildResult = {
  * `spec` is accepted for topology choices; the parts present decide today.
  */
 export function buildNetlist(components: StudioComponent[], spec: ProductSpec, getPart: GetPart): BuildResult {
-  void spec;
   const entries = entriesOf(components, getPart);
   const mcu = entries.find((e) => isMcu(e.p));
   const mcuLogic = mcu?.p.power.logicV ?? 3.3;
   const plan = planPower(entries, mcu);
   const nb = new NetBook();
   const unconnected: string[] = [];
+
+  // Servos on a servo driver (servoPlan, Part E): each servo's 3-wire plug goes on its
+  // channel (SIG → CH<n>_PWM, V+ → CH<n>_V, GND → CH<n>_GND); the driver's own power and
+  // I2C pins are wired like any part below (VCC logic on 3V3, V+ terminal on the 5 V rail
+  // the supply feeds, V− on GND). Its open channels and OE stay open on purpose.
+  const sp = servoPlan(components, spec, getPart);
+  const onDriver = new Set(sp?.driver ? sp.servos.filter((s) => s.channel !== null).map((s) => s.instanceId) : []);
+  /** Pins this pass leaves to the servo-driver wiring (or open on purpose). */
+  const servoSkip = (e: Entry, pin: Pin) => onDriver.has(e.c.instanceId) || openByDesign(e.p, pin);
 
   // Power nets in a fixed order.
   for (const s of plan.supply) for (const r of s.pins) nb.add(s.name, r);
@@ -579,7 +603,7 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
     const driven = driverOf.has(e.c.instanceId) ? loadTarget(e) : undefined;
     for (const pin of e.p.pins) {
       const r = ref(e.c.instanceId, pin.id);
-      if (pin === driven) continue;
+      if (pin === driven || servoSkip(e, pin)) continue;
       if (pin.role === "gnd") nb.add("GND", r);
       else if (isPowerRole(pin.role)) {
         const rail = railFor(pin, e.p, plan, mcuLogic);
@@ -589,7 +613,7 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
     }
   }
 
-  const peripherals = entries.filter((e) => isPeripheral(e) && !claimed.has(e.c.instanceId));
+  const peripherals = entries.filter((e) => isPeripheral(e) && !claimed.has(e.c.instanceId) && !onDriver.has(e.c.instanceId));
   const codes = netCodes(peripherals);
   const busy = {
     i2c: peripherals.some((e) => e.p.pins.some((x) => x.role === "i2c_sda" || x.role === "i2c_scl")),
@@ -630,7 +654,7 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
   for (const e of peripherals) {
     const inst = e.c.instanceId;
     const { code, numbered } = codes.get(inst)!;
-    const signals = e.p.pins.filter((x) => isSignalRole(x.role));
+    const signals = e.p.pins.filter((x) => isSignalRole(x.role) && !openByDesign(e.p, x));
     const nameFor = (pin: Pin) =>
       numbered && signals.length === 1 ? code : `${code}_${labelCode(pin.label.split(/[\s(/]/)[0] || pin.id)}`;
 
@@ -719,6 +743,33 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
     }
   }
 
+  // Servo plugs on the driver's channels, one 3-wire plug per servo (servo order = channel order).
+  const drv = sp?.driver ? entries.find((e) => e.c.instanceId === sp.driver) : undefined;
+  if (drv && sp) {
+    sp.servos.forEach((s, i) => {
+      if (s.channel === null) return;
+      const servo = entries.find((e) => e.c.instanceId === s.instanceId);
+      if (!servo) return;
+      const code = `SERVO${i + 1}`;
+      const plug: [string, PinRole, string][] = [
+        [code, "pwm", "PWM"],
+        [`${code}_V`, "5v", "V"],
+        [`${code}_GND`, "gnd", "GND"],
+      ];
+      for (const [net, role, suffix] of plug) {
+        const dp = drv.p.pins.find((x) => x.id === `CH${s.channel}_${suffix}`);
+        const sv = servo.p.pins.find((x) => x.role === role) ?? (role === "pwm" ? servo.p.pins.find((x) => isSignalRole(x.role)) : undefined);
+        if (!dp || !sv) {
+          if (sv) unconnected.push(ref(servo.c.instanceId, sv.id));
+          continue;
+        }
+        const name = nb.fresh(net);
+        nb.add(name, ref(drv.c.instanceId, dp.id));
+        nb.add(name, ref(servo.c.instanceId, sv.id));
+      }
+    });
+  }
+
   // Level shifters: one channel per MCU-side net; spare devices go direct (and are flagged by the checks).
   const shifters = entries.filter((e) => isShifter(e.p));
   const channels = shifters.flatMap((s) => shifterChannels(s.p).map((ch) => ({ s, ...ch })));
@@ -744,9 +795,10 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
   }
 
   // Anything a peripheral still has open that should have been wired.
-  for (const e of peripherals) {
+  for (const e of [...peripherals, ...entries.filter((x) => onDriver.has(x.c.instanceId))]) {
     for (const pin of e.p.pins) {
       const r = ref(e.c.instanceId, pin.id);
+      if (openByDesign(e.p, pin)) continue;
       if (!nb.netOf(r) && !unconnected.includes(r)) unconnected.push(r);
     }
   }
@@ -754,6 +806,21 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
 }
 
 // ── toLegacyNetlist ─────────────────────────────────────────────────────────
+
+/**
+ * The wall supply that feeds servos through a servo driver (Part E): its 5 V output pin
+ * and what it can give. Null without a driver, or when the servos run from the board.
+ */
+export function servoSupplyRail(
+  sp: ServoPlan | null,
+  entries: readonly { c: StudioComponent; p: LibraryPart }[],
+): { inst: string; ref: string; maxMa: number } | null {
+  if (!sp?.driver || !sp.supply || sp.poweredFrom !== "supply") return null;
+  const e = entries.find((x) => x.c.instanceId === sp.supply);
+  const out = e?.p.pins.find((x) => x.role === "5v");
+  if (!e || !out) return null;
+  return { inst: e.c.instanceId, ref: ref(e.c.instanceId, out.id), maxMa: sp.supplyMA ?? e.p.power.supplyMA ?? 0 };
+}
 
 const CHIP_NAMES: [RegExp, string][] = [
   [/esp32/i, "ESP32"],
@@ -808,6 +875,11 @@ export function toLegacyNetlist(components: StudioComponent[], nets: Net[], getP
       if (out) supplyRefs.add(ref(e.c.instanceId, out.id));
     }
   }
+  // Servos on a driver fed by a wall supply (Part E): the supply board drives the 5 V
+  // rail (the board takes its power from it), declared as a rail of supplyMA.
+  const sp = servoPlan(components, {}, getPart);
+  const supplyRail = servoSupplyRail(sp, entries);
+  if (supplyRail) supplyRefs.add(supplyRail.ref);
   const netHasSupply = (net: string | undefined) =>
     !!net && [...supplyRefs].some((r) => netOf.get(r) === net);
 
@@ -822,6 +894,8 @@ export function toLegacyNetlist(components: StudioComponent[], nets: Net[], getP
       let type: PinType;
       if (passive) type = "passive";
       else if (x.role === "gnd") type = "ground";
+      else if (supplyRail?.ref === r) type = "power_out";
+      else if (isServoDriver(e.p) && x.role === "5v" && servoChannelOf(x.id) !== null) type = "power_out"; // feeds its servo
       else if (isMcu(e.p)) {
         const net = netOf.get(r);
         if (x.role === "3v3" || x.role === "5v") type = netHasSupply(net) ? "power_in" : "power_out";
@@ -860,6 +934,10 @@ export function toLegacyNetlist(components: StudioComponent[], nets: Net[], getP
         rails.push({ name: net, sourceRef: inst, maxCurrentMa: is3 ? (e.p.power.logicV < 4 ? 500 : 50) : 450 });
       }
     }
+  }
+  if (supplyRail) {
+    const net = netOf.get(supplyRail.ref);
+    if (net && !rails.some((x) => x.name === net)) rails.push({ name: net, sourceRef: supplyRail.inst, maxCurrentMa: supplyRail.maxMa });
   }
   return {
     components: components2,

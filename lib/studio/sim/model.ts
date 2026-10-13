@@ -11,10 +11,15 @@
 //  * RULES = the rule table: input kind → trigger, threshold, ring colour, and
 //    per output kind how it follows (OUT_MODES, default "follow" = input
 //    active → output on). Unknown combinations fall back to "follow".
+//  * Joints (Part E): servos on a servo driver (a robot arm) are not driven by
+//     an input — each gets its own "joint" slider (0–180°) and turns to it. The
+//     panel shows one slider per servo up to JOINT_SLIDERS_MAX, else a joint
+//     picker + one slider.
 //
 // Pure and client-safe (no three.js, no React). Same input → same output.
 
 import type { LibraryPart, ProductSpec, StudioComponent } from "../schema";
+import { servoNames, servoPlan } from "../servo-plan";
 
 type GetPart = (id: string) => LibraryPart | undefined;
 
@@ -23,7 +28,7 @@ export const SIM_DT = 1 / SIM_HZ;
 
 export const INPUT_KINDS = [
   "soil", "temperature", "humidity", "motion", "distance", "light",
-  "button", "touch", "knob", "tilt", "time", "power",
+  "button", "touch", "knob", "tilt", "time", "power", "joint",
 ] as const;
 export type InputKind = (typeof INPUT_KINDS)[number];
 
@@ -48,7 +53,14 @@ export type SimControl = {
   initial: number;
   unit: Unit;
   threshold?: Threshold;
+  /** Joint controls (Part E): the servo instance it turns, its number (1-based) and its name. */
+  servo?: string;
+  n?: number;
+  name?: { en: string; ar: string };
 };
+
+/** Up to this many joints get one slider each; more → a joint picker + one slider. */
+export const JOINT_SLIDERS_MAX = 6;
 
 export type SimOutput = {
   /** Component instance id. */
@@ -114,10 +126,12 @@ export const RULES: Record<InputKind, InputRule> = {
   // Hour of the day; night from the threshold until 6:00 → on.
   time: { type: "slider", min: 0, max: 23, step: 1, initial: 12, unit: "h", threshold: { value: 19, min: 15, max: 23, step: 1 }, ring: "warm", out: {} },
   power: { type: "toggle", min: 0, max: 1, step: 1, initial: 0, unit: "", ring: "warm", out: {} },
+  // One per servo on a servo driver: the angle that servo turns to (it never drives anything else).
+  joint: { type: "slider", min: 0, max: 180, step: 1, initial: 90, unit: "°", ring: "green", out: {} },
 };
 
 /** Which input drives the outputs when there are several (first found wins). */
-const PRIORITY: InputKind[] = ["soil", "motion", "distance", "temperature", "light", "button", "touch", "knob", "tilt", "time", "humidity", "power"];
+const PRIORITY: InputKind[] = ["soil", "motion", "distance", "temperature", "light", "button", "touch", "knob", "tilt", "time", "humidity", "power", "joint"];
 
 // ── Parts → kinds ───────────────────────────────────────────────────────────
 
@@ -149,6 +163,8 @@ export function inputKindsFor(p: LibraryPart): InputKind[] {
 export function outputKindFor(p: LibraryPart): OutputKind | null {
   const b = builder(p);
   if (p.category === "mcu" || p.category === "power" || p.category === "sensor" || p.category === "input") return null;
+  // A servo driver board drives servos; it does not move itself.
+  if (has(p, "servo_driver", "pca9685")) return null;
   if (b === "ledRing" || has(p, "ws2812", "neopixel")) return "ring";
   if (b === "led" || (p.category === "output" && has(p, "led"))) return "led";
   if (has(p, "relay", "relay_module")) return "relay";
@@ -174,7 +190,10 @@ export type SimModel = {
   boards: string[];
 };
 
-export type SimDoc = { spec: Pick<ProductSpec, "inputs" | "outputs" | "features">; components: Pick<StudioComponent, "instanceId" | "partId">[] };
+export type SimDoc = {
+  spec: Pick<ProductSpec, "inputs" | "outputs" | "features"> & Partial<Pick<ProductSpec, "actuators">>;
+  components: Pick<StudioComponent, "instanceId" | "partId">[];
+};
 
 function control(id: string, kind: InputKind, part: string | null): SimControl {
   const r = RULES[kind];
@@ -221,11 +240,25 @@ export function simModel(doc: SimDoc, getPart: GetPart): SimModel {
   if (specInputs.includes("touch") && !kinds.has("touch") && !kinds.has("button")) controls.push(control("spec:touch", "touch", null));
   else if (specInputs.includes("button") && !kinds.has("button") && !kinds.has("touch")) controls.push(control("spec:button", "button", null));
   if (specInputs.includes("knob") && !kinds.has("knob")) controls.push(control("spec:knob", "knob", null));
+  // Servos on a servo driver: one joint slider each (they follow their slider, nothing else).
+  const plan = servoPlan(doc.components, doc.spec, getPart);
+  const joints: SimControl[] = [];
+  if (plan?.driver) {
+    const en = servoNames(doc.components, doc.spec, getPart, "en");
+    const ar = servoNames(doc.components, doc.spec, getPart, "ar");
+    plan.servos.forEach((s, i) => {
+      if (s.channel === null || !outputs.some((o) => o.id === s.instanceId)) return;
+      const name = en.get(s.instanceId) && ar.get(s.instanceId) ? { en: en.get(s.instanceId)!, ar: ar.get(s.instanceId)! } : undefined;
+      joints.push({ ...control(`${s.instanceId}:joint`, "joint", s.instanceId), servo: s.instanceId, n: i + 1, ...(name ? { name } : {}) });
+    });
+  }
+  const jointServos = new Set(joints.map((j) => j.servo));
   // Outputs but nothing to drive them: one plain on/off switch.
-  if (!controls.length && outputs.length) controls.push(control("spec:power", "power", null));
+  if (!controls.length && outputs.some((o) => !jointServos.has(o.id))) controls.push(control("spec:power", "power", null));
 
   controls.sort((a, b) => PRIORITY.indexOf(a.kind) - PRIORITY.indexOf(b.kind));
   const primary = controls[0] ?? null;
+  controls.push(...joints);
   const outKinds = new Set(outputs.map((o) => o.kind));
   const buttonMode: ButtonMode = outKinds.has("servo")
     ? "pulse"

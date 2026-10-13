@@ -58,6 +58,7 @@ export function wireProblems(
     if (!mine.length) out.push(`${c.id}: no segment`);
     const cn = connectionNets(c, nets);
     const pinsOf = new Set([`${c.from.part}.${c.from.pin}`, `${c.to.part}.${c.to.pin}`]);
+    for (const b of c.bundle ?? []) for (const e of [b.from, b.to]) pinsOf.add(`${e.part}.${e.pin}`);
     if (c.viaPart) for (const p of getPart(c.viaPartId ?? "")?.pins ?? []) pinsOf.add(`${c.viaPart}.${p.id}`);
     for (const s of mine) {
       if (s.colour !== c.wireColour) out.push(`${c.id}: colour ${s.colour}`);

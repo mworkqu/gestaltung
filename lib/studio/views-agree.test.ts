@@ -12,6 +12,7 @@ import { renderWiringSVG } from "./wiring-drawing";
 import { layoutMat } from "./wiring3d/layout";
 import { wireProblems } from "./wiring3d/verify";
 import { buildWires } from "./wiring3d/wires";
+import { ROBOT_ARM_PART_IDS } from "./__fixtures__/robot-arm";
 
 const comps = (ids: string[]): StudioComponent[] => ids.map((id, i) => ({ partId: id, instanceId: `${id}_${i + 1}`, label: id }));
 const golden = (key: string) => GOLDEN_IDEAS.find((g) => g.key === key)!.partIds;
@@ -21,6 +22,8 @@ const FIXTURES: Record<string, string[]> = {
   "desk lamp": golden("desk_lamp"),
   "cat feeder": golden("cat_feeder"),
   doorbell: golden("doorbell"),
+  // Part E: 6 servos on a PCA9685 servo driver, 5 V 5 A supply.
+  "robot arm": ROBOT_ARM_PART_IDS,
 };
 
 const reEsc = (s: string) => s.replace(/[-/\^$*+?.()|[\]{}]/g, "\$&");

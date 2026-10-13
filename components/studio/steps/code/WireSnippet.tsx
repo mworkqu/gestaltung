@@ -5,7 +5,7 @@
 // colour; a series resistor is a small zigzag in the middle. Drawn here (no 3D,
 // no shared drawing module) so the Code step stays light. Loaded on demand.
 
-import { partName, WIRE_HEX, WIRE_OUTLINE, type Connection } from "@/lib/studio/connections";
+import { endName, partName, WIRE_HEX, WIRE_OUTLINE, type Connection } from "@/lib/studio/connections";
 import type { GetPart, Locale } from "@/lib/studio/netlist";
 
 const W = 320;
@@ -37,7 +37,7 @@ export default function WireSnippet({ c, getPart, locale }: { c: Connection; get
   const rtl = locale === "ar";
   // The board end sits at the reading start: left in English, right in Arabic.
   const [left, right] = rtl ? [c.to, c.from] : [c.from, c.to];
-  const name = (e: Connection["from"]) => partName(getPart(e.partId), locale, e.part);
+  const name = (e: Connection["from"]) => endName(e, getPart, locale);
   const x1 = 8 + BOX_W;
   const x2 = W - 8 - BOX_W;
   const hex = WIRE_HEX[c.wireColour];

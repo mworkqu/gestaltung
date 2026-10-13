@@ -28,8 +28,9 @@ export default async function StudioFixturePage({
   // ?preset=plant starts on the Enclosure step with a wired plant idea (read here, so server and client agree).
   const preset = sp.preset === "plant" ? "plant" : null;
   // P5-16: ?product=1 turns on the product pipeline (mock endpoints in the worker); ?idea=<key> one of
-  // the five acceptance ideas (plant_waterer, desk_lamp, cat_feeder, doorbell, tv_remote); ?admin=1 Engineer view.
-  const ideas = ["plant_waterer", "desk_lamp", "cat_feeder", "doorbell", "tv_remote"] as const;
+  // the five acceptance ideas (plant_waterer, desk_lamp, cat_feeder, doorbell, tv_remote) + Part E's
+  // robot_arm (6 servos on a PCA9685, wired); ?admin=1 Engineer view.
+  const ideas = ["plant_waterer", "desk_lamp", "cat_feeder", "doorbell", "tv_remote", "robot_arm"] as const;
   const idea = ideas.find((k) => k === sp.idea) ?? null;
   return (
     <MessagesScope scope="studio">

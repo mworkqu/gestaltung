@@ -528,6 +528,39 @@ for (const locale of LOCALES) {
   });
 }
 
+// ── Part E: a robot arm (6 servos on a PCA9685 servo driver, 5 V 5 A supply) ──
+for (const locale of LOCALES) {
+  test(`robot arm: 6 servo rows, one joint slider each, servo driver pin block, no Wokwi [${locale}]`, async ({ page }) => {
+    test.setTimeout(180_000);
+    await open(page, locale, "robot_arm");
+    await draw(page, locale);
+    await openTab(page, "pins");
+    const rows = page.getByTestId("studio-pin-row");
+    await expect(rows).toHaveCount(14);
+    await expect(rows.filter({ hasText: /CH[0-5](?!\d)/ })).toHaveCount(6);
+    await expectNoHorizontalOverflow(page);
+    await startTry(page);
+    const joints = page.getByTestId("studio-sim-control-joint");
+    await expect(joints).toHaveCount(6);
+    await joints.first().fill("30");
+    await expect(page.getByTestId("studio-sim-panel")).toHaveAttribute("data-outputs", /^servo:30,servo:90/, { timeout: 8000 });
+    await expect(page.getByTestId("studio-sim-status")).toContainText(simMsg(locale, "cause", "jointStill"));
+    await expectNoHorizontalOverflow(page);
+
+    await goToCode(page, locale, "robot_arm");
+    await expect(page.locator('[data-testid="studio-code-line"][data-pin-const="PCA9685_ADDR"]').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[data-testid="studio-code-line"][data-pin-const="SERVO_BASE"]').first()).toBeVisible();
+    await expect(page.getByTestId("studio-wokwi")).toHaveCount(0);
+  });
+
+  test(`robot arm: the enclosure step says the arm links are a separate design job [${locale}]`, async ({ page }) => {
+    await open(page, locale, "robot_arm", "enclosure");
+    const all = JSON.parse(readFileSync(path.join(ROOT, "messages", `${locale}.json`), "utf8")) as { Studio: { product: { armLinks: string } } };
+    await expect(page.getByTestId("studio-arm-links-note")).toHaveText(all.Studio.product.armLinks);
+    await expectNoHorizontalOverflow(page);
+  });
+}
+
 test("Try it: reduced motion shows the states as words", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await open(page, "en", "plant_waterer");

@@ -8,6 +8,7 @@ import { useLocale } from "next-intl";
 
 import { mockProductApi, mockStudioApi } from "@/lib/studio/client/mock";
 import { GOLDEN_IDEAS, type GoldenIdea } from "@/lib/studio/product/__fixtures__/golden";
+import { ROBOT_ARM_PART_IDS, ROBOT_ARM_SPEC } from "@/lib/studio/__fixtures__/robot-arm";
 import type { StudioApi } from "@/lib/studio/client/api";
 import { getPart } from "@/lib/studio/library";
 import { buildWiring } from "@/lib/studio/netlist";
@@ -35,8 +36,8 @@ export function StudioFixture({
   preset?: "plant" | null;
   /** ?product=1: the P5-16 product pipeline (worker-side mock endpoints, no network). */
   product?: boolean;
-  /** ?idea=<golden key>: one of the five acceptance ideas, parts picked and wired. */
-  idea?: GoldenIdea["key"] | null;
+  /** ?idea=<golden key>: one of the five acceptance ideas, parts picked and wired (robot_arm: Part E's 6-axis arm). */
+  idea?: GoldenIdea["key"] | "robot_arm" | null;
   /** ?admin=1: the super_admin Engineer view. */
   admin?: boolean;
 }) {
@@ -47,7 +48,8 @@ export function StudioFixture({
   }, [stored, product]);
   // ?preset=plant (read by the page) opens on the Enclosure step with a plant idea already wired (W6 e2e).
   const initial = useMemo(() => {
-    const golden = idea ? GOLDEN_IDEAS.find((g) => g.key === idea) : null;
+    const golden =
+      idea === "robot_arm" ? { spec: ROBOT_ARM_SPEC, partIds: ROBOT_ARM_PART_IDS } : idea ? GOLDEN_IDEAS.find((g) => g.key === idea) : null;
     const doc = golden ? goldenDoc(golden, locale) : preset === "plant" ? plantDoc(locale) : null;
     return doc ? { ...FIXTURE_INITIAL, project: { ...FIXTURE_INITIAL.project, name: doc.spec.name }, doc } : FIXTURE_INITIAL;
   }, [locale, preset, idea]);
@@ -68,7 +70,7 @@ export function StudioFixture({
 }
 
 /** One of the five P5-16 acceptance ideas, parts picked and wired (the Enclosure step is next). */
-function goldenDoc(g: GoldenIdea, locale: "en" | "ar"): StudioDoc {
+function goldenDoc(g: Pick<GoldenIdea, "spec" | "partIds">, locale: "en" | "ar"): StudioDoc {
   const counts = new Map<string, number>();
   const picked = g.partIds
     .filter((id) => getPart(id))

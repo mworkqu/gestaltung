@@ -55,6 +55,8 @@ export type OutputState = {
   pixels?: number;
   /** Servo angle now (degrees) and where it is going. */
   angle?: number;
+  /** A joint servo (Part E): it follows its own slider, not the inputs. */
+  joint?: boolean;
   target?: number;
   /** Beeps per second (buzzer / speaker). */
   beepHz?: number;
@@ -63,7 +65,8 @@ export type OutputState = {
 export type Cause =
   | "soilDry" | "soilWet" | "hot" | "cool" | "humid" | "dryAir" | "motion" | "noMotion"
   | "near" | "far" | "dark" | "bright" | "switchedOn" | "switchedOff" | "bellPressed"
-  | "feeding" | "pressed" | "waiting" | "knob" | "tilted" | "level" | "night" | "day" | "none";
+  | "feeding" | "pressed" | "waiting" | "knob" | "tilted" | "level" | "night" | "day" | "none"
+  | "jointMoving" | "jointStill";
 
 export type SimState = {
   t: number;
@@ -106,7 +109,13 @@ export function initialState(model: SimModel, inputs: SimInputs = initialInputs(
     holdUntil: -1,
     latched: false,
     pulseStart: null,
-    servo: Object.fromEntries(model.outputs.filter((o) => o.kind === "servo").map((o) => [o.id, 0])),
+    // A joint servo starts where its slider is (nothing moves until the slider does).
+    servo: Object.fromEntries(
+      model.outputs.filter((o) => o.kind === "servo").map((o) => {
+        const j = model.controls.find((c) => c.kind === "joint" && c.servo === o.id);
+        return [o.id, j ? valueOf(j, inputs) : 0];
+      }),
+    ),
     active: false,
     level: 0,
     cause: "none",
@@ -236,6 +245,7 @@ export function step(model: SimModel, state: SimState, inputs: SimInputs, dt: nu
 
   const servo = { ...state.servo };
   let servoBusy = false;
+  let jointsMoving = false;
   const ringHex = RING_HEX[model.ring];
   const outputs: OutputState[] = model.outputs.map((o) => {
     const mode = outMode(kind, o.kind);
@@ -252,6 +262,17 @@ export function step(model: SimModel, state: SimState, inputs: SimInputs, dt: nu
       case "motor":
         return { id: o.id, kind: o.kind, on: active, level: active ? round1(lvl) : 0 };
       case "servo": {
+        const joint = model.controls.find((c) => c.kind === "joint" && c.servo === o.id);
+        if (joint) {
+          const target = valueOf(joint, inputs);
+          const cur = servo[o.id] ?? target;
+          const maxStep = SERVO_DEG_PER_S * Math.max(0, dt);
+          const next = Math.abs(target - cur) <= maxStep ? target : cur + Math.sign(target - cur) * maxStep;
+          servo[o.id] = round1(next);
+          if (servo[o.id] !== target) jointsMoving = true;
+          // "On" (its wire lit) only while it turns.
+          return { id: o.id, kind: o.kind, on: servo[o.id] !== target, level: 1, angle: servo[o.id], target, joint: true };
+        }
         let target = active ? 90 : 0;
         if (mode === "angle" && p) {
           const v = valueOf(p, inputs);
@@ -280,6 +301,8 @@ export function step(model: SimModel, state: SimState, inputs: SimInputs, dt: nu
   const held = !!p && (p.kind === "button" || p.kind === "touch") && valueOf(p, inputs) >= 0.5;
   if (pulseStart !== null && t - pulseStart >= PULSE_SECONDS && !servoBusy && !held) pulseStart = null;
   if (model.buttonMode === "pulse" && pulseStart === null && cause === "feeding") cause = "waiting";
+  // An arm with nothing else to react to: say what its joints do.
+  if (!p && model.controls.some((c) => c.kind === "joint")) cause = jointsMoving ? "jointMoving" : "jointStill";
 
   return { t, prev, changedAt, pressSeen, holdUntil, latched, pulseStart, servo, active, level: round1(level), cause, reading, outputs };
 }
@@ -350,7 +373,8 @@ export function effects(state: SimState): Effect[] {
   const seen = new Set<OutputKind>();
   const out: Effect[] = [];
   for (const o of state.outputs) {
-    if (o.kind === "screen" || seen.has(o.kind)) continue;
+    // Joint servos show their angle on their own slider.
+    if (o.kind === "screen" || o.joint || seen.has(o.kind)) continue;
     seen.add(o.kind);
     out.push({
       kind: o.kind,

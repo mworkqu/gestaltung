@@ -13,9 +13,9 @@ const CH = 16;
 const channelPins: Pin[] = [];
 for (let n = 0; n < CH; n++) {
   channelPins.push(
-    { id: `CH${n}_PWM`, label: `Servo ${n} signal`, role: "pwm", voltage: 5, side: "top" },
-    { id: `CH${n}_V`, label: `Servo ${n} V+`, role: "5v", voltage: 5, side: "top" },
-    { id: `CH${n}_GND`, label: `Servo ${n} GND`, role: "gnd", voltage: 0, side: "top" },
+    { id: `CH${n}_PWM`, label: `CH${n} PWM (servo signal)`, role: "pwm", voltage: 5, side: "top" },
+    { id: `CH${n}_V`, label: `CH${n} V+`, role: "5v", voltage: 5, side: "top" },
+    { id: `CH${n}_GND`, label: `CH${n} GND`, role: "gnd", voltage: 0, side: "top" },
   );
 }
 

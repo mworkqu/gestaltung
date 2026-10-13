@@ -12,6 +12,7 @@
 
 import { hardRules, powerBudget, sanityChecks, type Netlist as LegacyNetlist } from "@/lib/prototyping/netlist";
 import type { LibraryPart, Net, Pin, ProductSpec, StudioCheck, StudioComponent } from "./schema";
+import { servoPlan, servoPlanMA } from "./servo-plan";
 import {
   DEV_TO_MCU,
   MCU_TO_DEV,
@@ -28,6 +29,8 @@ import {
   isSeriesHelper,
   isShifter,
   isSignalRole,
+  openByDesign,
+  servoSupplyRail,
   splitRef,
   symbolKind,
   type GetPart,
@@ -178,6 +181,12 @@ export const CHECK_TEXT: Record<CheckKey, Record<Locale, string>> = {
   },
 };
 
+/** Part E reassurance (id "ok_servos"): "6 servos share the 5 A supply through the servo driver." */
+export const SERVO_SHARE_TEXT: Record<Locale, string> = {
+  en: "{n} servos share the {amps} A supply through the servo driver.",
+  ar: "تتشارك {n} محركات سيرفو مصدر الطاقة {amps} أمبير عبر لوحة تشغيل السيرفو.",
+};
+
 const THIS_PART: Record<Locale, string> = { en: "this part", ar: "هذه القطعة" };
 export const MAX_CHECK_CHARS = 90;
 
@@ -306,6 +315,7 @@ export function studioChecks(
     // Supply pins: connected to a voltage the part takes?
     for (const pin of e.p.pins.filter((x) => isPowerRole(x.role))) {
       const net = netOf.get(ref(pin));
+      if (!net && openByDesign(e.p, pin)) continue;
       if (!net) {
         if (mcu) {
           push("voltage", inst);
@@ -324,7 +334,7 @@ export function studioChecks(
     for (const pin of e.p.pins.filter((x) => isSignalRole(x.role))) {
       const net = netOf.get(ref(pin));
       if (!net) {
-        if (mcu && !symbolKind(e.p)) push("pins_out", inst);
+        if (mcu && !symbolKind(e.p) && !openByDesign(e.p, pin)) push("pins_out", inst);
         continue;
       }
       if (!mcu || pin.role === "adc") continue;
@@ -342,6 +352,26 @@ export function studioChecks(
     const e = byInst.get(f.ref);
     if (!e || isPowerSource(e.p) || isMcu(e.p)) continue;
     push("unpowered", f.ref);
+  }
+
+  // Servos on a servo driver (Part E): their realistic worst-case current (servo-plan.ts
+  // servoWorstCaseMA) plus everything else on the rail feeding the driver's V+ terminal must
+  // fit what that rail's source gives (the wall supply's supplyMA, else the board's rail).
+  const servos = servoPlan(components, spec, getPart);
+  let servoLine: string | null = null;
+  if (servos?.driver) {
+    const supplyRail = servoSupplyRail(servos, entries);
+    const vPlus = byInst.get(servos.driver)?.p.pins.find((x) => x.role === "5v" && !openByDesign(byInst.get(servos.driver!)!.p, x));
+    const railNet = vPlus ? netOf.get(`${servos.driver}.${vPlus.id}`)?.name : undefined;
+    const budget = railNet ? powerBudget(legacy).find((b) => b.rail.toLowerCase() === railNet.toLowerCase()) : undefined;
+    if (budget) {
+      const total = budget.drawMa + servoPlanMA(servos, getPart);
+      if (total > budget.maxMa) push("power_budget");
+      else if (supplyRail) {
+        const amps = String(Math.round((supplyRail.maxMa / 1000) * 10) / 10);
+        servoLine = SERVO_SHARE_TEXT[locale].replace("{n}", String(servos.servos.length)).replace("{amps}", amps);
+      }
+    }
   }
 
   // Power source vs the idea.
@@ -384,8 +414,10 @@ export function studioChecks(
   if (mcu && entries.length > 1 && !has("pins_out")) ok.push("ok_pins");
   if (nets.some((n) => n.name === "GND")) ok.push("ok_ground");
 
+  const okLines = ok.slice(0, servoLine ? 2 : 3).map((key) => ({ id: key, ok: true, plain: checkText(key, locale) }));
   return [
     ...issues,
-    ...ok.slice(0, 3).map((key) => ({ id: key, ok: true, plain: checkText(key, locale) })),
+    ...(servoLine && !has("power_budget") ? [{ id: "ok_servos", ok: true, plain: servoLine }] : []),
+    ...okLines,
   ];
 }

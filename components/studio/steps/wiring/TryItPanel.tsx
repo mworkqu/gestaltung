@@ -13,7 +13,9 @@
 // motion toggle, press-and-hold button …) with the threshold as a small
 // number next to the slider. Overlay at the canvas bottom from md up, a sheet
 // below the canvas on phones; 44 px targets; RTL mirrored. data-outputs
-// ("pump:on,ring:on") exposes the state for tests.
+// ("pump:on,ring:on") exposes the state for tests. Servos on a servo driver
+// (a robot arm, Part E) get one angle slider each up to JOINT_SLIDERS_MAX,
+// else a joint picker + one slider.
 //
 // Only imported by Wiring3DView (the lazy 3D chunk).
 
@@ -25,7 +27,7 @@ import type { Connection } from "@/lib/studio/connections";
 import type { Locale } from "@/lib/studio/netlist";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { LibraryPart, StudioDoc } from "@/lib/studio/schema";
-import { simModel, SIM_DT, type SimControl, type SimModel } from "@/lib/studio/sim/model";
+import { JOINT_SLIDERS_MAX, simModel, SIM_DT, type SimControl, type SimModel } from "@/lib/studio/sim/model";
 import {
   activeWires,
   effects,
@@ -301,6 +303,9 @@ export function TryItPanel({ sim, locale, reduced }: { sim: Sim; locale: Locale;
   const { model, inputs, state } = sim;
   const hasSound = model.outputs.some((o) => o.kind === "buzzer" || o.kind === "speaker");
   const pump = model.outputs.some((o) => o.kind === "pump");
+  const joints = model.controls.filter((c) => c.kind === "joint");
+  const others = model.controls.filter((c) => c.kind !== "joint");
+  const jointLabel = (c: SimControl) => c.name?.[locale] ?? t("control.joint", { n: String(c.n ?? 1) });
   return (
     <div
       role="group"
@@ -329,10 +334,24 @@ export function TryItPanel({ sim, locale, reduced }: { sim: Sim; locale: Locale;
       </div>
       {model.outputs.length === 0 && <p className="mt-2 text-sm text-body">{t("nothing")}</p>}
       <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
-        {model.controls.map((c) => (
+        {others.map((c) => (
           <Control key={c.id} c={c} sim={sim} t={t} value={inputs.values[c.id] ?? c.initial} threshold={inputs.thresholds[c.id]} pump={pump} />
         ))}
+        {joints.length > 0 && joints.length <= JOINT_SLIDERS_MAX &&
+          joints.map((c) => (
+            <Control
+              key={c.id}
+              c={c}
+              sim={sim}
+              t={t}
+              value={inputs.values[c.id] ?? c.initial}
+              threshold={undefined}
+              pump={pump}
+              label={jointLabel(c)}
+            />
+          ))}
       </div>
+      {joints.length > JOINT_SLIDERS_MAX && <JointPicker joints={joints} sim={sim} t={t} label={jointLabel} values={inputs.values} />}
       {reduced && (
         <ul className="mt-2 flex flex-wrap gap-1.5" data-testid="studio-sim-chips">
           {effects(state).map((e) => (
@@ -350,6 +369,45 @@ export function TryItPanel({ sim, locale, reduced }: { sim: Sim; locale: Locale;
   );
 }
 
+/** More joints than sliders fit: pick one, then one slider for it. */
+function JointPicker({
+  joints,
+  sim,
+  t,
+  label,
+  values,
+}: {
+  joints: SimControl[];
+  sim: Sim;
+  t: T;
+  label: (c: SimControl) => string;
+  values: Record<string, number>;
+}) {
+  const [picked, setPicked] = useState(joints[0]?.id ?? "");
+  const c = joints.find((j) => j.id === picked) ?? joints[0];
+  if (!c) return null;
+  return (
+    <div className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2" data-testid="studio-sim-joint-picker">
+      <label className="flex min-w-0 flex-col gap-1 text-sm font-semibold text-heading">
+        <span>{t("jointPick")}</span>
+        <select
+          value={c.id}
+          onChange={(e) => setPicked(e.target.value)}
+          data-testid="studio-sim-joint-select"
+          className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-semibold text-heading"
+        >
+          {joints.map((j) => (
+            <option key={j.id} value={j.id}>
+              {label(j)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Control c={c} sim={sim} t={t} value={values[c.id] ?? c.initial} threshold={undefined} pump={false} label={label(c)} />
+    </div>
+  );
+}
+
 function Control({
   c,
   sim,
@@ -357,6 +415,7 @@ function Control({
   value,
   threshold,
   pump,
+  label: labelOverride,
 }: {
   c: SimControl;
   sim: Sim;
@@ -364,8 +423,9 @@ function Control({
   value: number;
   threshold: number | undefined;
   pump: boolean;
+  label?: string;
 }) {
-  const label = t(`control.${c.kind}`);
+  const label = labelOverride ?? t(`control.${c.kind}`);
   const th = c.threshold;
   const thKey = c.kind === "soil" ? (pump ? "soilWater" : "soil") : c.kind;
   const thInput = th && c.kind !== "button" && c.kind !== "touch" && c.kind !== "knob" && c.kind !== "power" && (
@@ -409,6 +469,7 @@ function Control({
           aria-valuetext={valueText(t, c, value)}
           onChange={(e) => sim.setValue(c.id, Number(e.target.value))}
           data-testid={`studio-sim-control-${c.kind}`}
+          data-joint={c.n}
           className="h-11 w-full cursor-pointer"
           style={{ accentColor: accent.ink }}
         />

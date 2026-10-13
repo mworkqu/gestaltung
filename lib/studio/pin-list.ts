@@ -2,7 +2,7 @@
 // The Pin list tab, its Copy text and the "Wire it step by step" line all read
 // from here so they say the same thing.
 
-import { partName, WIRE_NAME, type Connection, type WireColour } from "./connections";
+import { endName, partName, WIRE_NAME, type Connection, type WireColour } from "./connections";
 import { connectionKey } from "./connections";
 import { isMcu, type GetPart, type Locale } from "./netlist";
 
@@ -26,6 +26,10 @@ const T = {
   ground: { en: "Ground. Use the black wire for every ground.", ar: "أرضي. استخدم السلك الأسود لكل توصيلات الأرضي." },
   power: { en: "Power. Use the red wire for every power line.", ar: "طاقة. استخدم السلك الأحمر لكل خطوط الطاقة." },
   via: { en: "Through the {name}", ar: "عبر {name}" },
+  plug: {
+    en: "3-wire plug on channel {ch}: signal, red V+ and black GND together.",
+    ar: "قابس بثلاثة أسلاك على القناة {ch}: الإشارة والأحمر V+ والأسود GND معًا.",
+  },
   head: {
     en: ["Done", "Board pin", "Goes to", "Part pin", "Wire colour", "Note"],
     ar: ["تم", "طرف اللوحة", "يتصل بـ", "طرف القطعة", "لون السلك", "ملاحظة"],
@@ -51,9 +55,10 @@ export function pinListRows(connections: Connection[], getPart: GetPart, locale:
     const swap = !fromIsBoard && toIsBoard;
     const a = swap ? c.to : c.from;
     const b = swap ? c.from : c.to;
-    const nameOf = (e: Connection["from"]) => partName(getPart(e.partId), locale, e.part);
+    const nameOf = (e: Connection["from"]) => endName(e, getPart, locale);
     let note = "";
-    if (c.viaPartId || c.viaPart) {
+    if (c.bundle && c.channel !== undefined) note = fill(T.plug[locale], { ch: String(c.channel) });
+    else if (c.viaPartId || c.viaPart) {
       note = fill(T.via[locale], { name: partName(getPart(c.viaPartId ?? ""), locale, c.viaPart ?? "") });
     } else if (c.role === "ground") note = T.ground[locale];
     else if (c.role === "power") note = T.power[locale];
@@ -85,7 +90,7 @@ export function pinListText(rows: PinListRow[], locale: Locale = "en", ticked?: 
 
 /** "Wire 3 of 8: yellow from D2 to LED +". i is 0-based. */
 export function guideLine(c: Connection, i: number, n: number, getPart: GetPart, locale: Locale): string {
-  const nameOf = (e: Connection["from"]) => `${partName(getPart(e.partId), locale, e.part)} ${e.label}`;
+  const nameOf = (e: Connection["from"]) => `${endName(e, getPart, locale)} ${e.label}`;
   const via = c.viaPartId || c.viaPart ? partName(getPart(c.viaPartId ?? ""), locale, c.viaPart ?? "") : "";
   return fill(via ? T.stepVia[locale] : T.step[locale], {
     i: String(i + 1),

@@ -29,19 +29,26 @@ function mockSketch(name: string, board: string, components: StudioComponent[], 
   let constants: ReturnType<typeof pinConstants> = [];
   try {
     const w = buildWiring(components, spec, getPart, locale);
-    constants = pinConstants(buildConnections(w.components, w.netlist.nets, getPart), getPart);
+    constants = pinConstants(buildConnections(w.components, w.netlist.nets, getPart, spec), getPart);
   } catch {
     /* no wiring: a sketch without pins */
   }
-  const outputs = constants.filter((c) => /LED|PUMP|MOTOR|RELAY|BUZZER|SERVO|SG90|RING|WS2812|SPEAKER/.test(c.name));
-  const inputs = constants.filter((c) => !outputs.includes(c) && !/^(I2C|SPI)_/.test(c.name));
+  // Part E: servos on the PCA9685 are driven by channel through Adafruit_PWMServoDriver.
+  const channels = constants.filter((c) => c.kind === "channel");
+  const addr = constants.find((c) => c.kind === "address");
+  const pins = constants.filter((c) => !c.kind || c.kind === "pin");
+  const outputs = pins.filter((c) => /LED|PUMP|MOTOR|RELAY|BUZZER|SERVO|SG90|RING|WS2812|SPEAKER/.test(c.name));
+  const inputs = pins.filter((c) => !outputs.includes(c) && !/^(I2C|SPI)_/.test(c.name));
   const analog = (c: (typeof constants)[number]) => /^A\d/.test(c.value) || /SOIL|LDR|LIGHT/.test(c.name);
   return [
     `// ${name} — starter sketch for the ${board}`,
+    ...(addr ? ["#include <Wire.h>", "#include <Adafruit_PWMServoDriver.h>"] : []),
     "",
     ...(constants.length ? [pinBlock(constants), ""] : []),
+    ...(addr ? [`Adafruit_PWMServoDriver pwm(${addr.name});`, "const int SERVO_MIN = 150;  // pulse for 0 degrees", "const int SERVO_MAX = 600;  // pulse for 180 degrees", ""] : []),
     "void setup() {",
     "  Serial.begin(115200);",
+    ...(addr ? ["  pwm.begin();", "  pwm.setPWMFreq(50);"] : []),
     ...inputs.map((c) => `  pinMode(${c.name}, INPUT);`),
     ...outputs.map((c) => `  pinMode(${c.name}, OUTPUT);`),
     "}",
@@ -49,6 +56,7 @@ function mockSketch(name: string, board: string, components: StudioComponent[], 
     "void loop() {",
     ...inputs.map((c) => `  Serial.println(${analog(c) ? "analogRead" : "digitalRead"}(${c.name}));`),
     ...outputs.map((c) => `  digitalWrite(${c.name}, !digitalRead(${c.name}));`),
+    ...channels.map((c) => `  pwm.setPWM(${c.name}, 0, (SERVO_MIN + SERVO_MAX) / 2);`),
     "  delay(500);",
     "}",
   ].join("\n");
