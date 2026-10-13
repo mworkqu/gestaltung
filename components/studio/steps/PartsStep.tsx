@@ -42,7 +42,8 @@ import { nextInstanceId } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
 import { Bar, linkCls, MainButton, Problem, Sheet, StepFrame } from "../ui";
-import { productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
+import { linePrice, productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
+import { groupComponents, groupHas, withQuantity } from "@/lib/studio/parts-group";
 import { usePickProgress } from "../use-pick-progress";
 import { PICK_STAGES } from "@/lib/studio/client/progress";
 import { problemKey } from "./problem";
@@ -215,14 +216,17 @@ export function PartsStep({
 
   const edit = (next: StudioComponent[]) => onComponents(next.filter((c) => !c.auto), null, true);
 
+  // Part D: a row stands for every identical part ("Servo × 3"): Swap swaps them all.
   function swap(target: StudioComponent, part: LibraryPart) {
-    edit(
-      doc.components.map((c) =>
-        c.instanceId === target.instanceId
-          ? { partId: part.id, instanceId: nextInstanceId(part.id, doc.components), label: part.name[locale], reason: part.blurb[locale] }
+    const next: StudioComponent[] = [];
+    for (const c of doc.components) {
+      next.push(
+        c.partId === target.partId && !c.auto
+          ? { partId: part.id, instanceId: nextInstanceId(part.id, [...doc.components, ...next]), label: part.name[locale], reason: part.blurb[locale] }
           : c,
-      ),
-    );
+      );
+    }
+    edit(next);
     setSwapFor(null);
   }
 
@@ -235,6 +239,7 @@ export function PartsStep({
   }
 
   const { lines, total } = storeLines(doc.components, products, getPart);
+  const groups = groupComponents(doc.components);
   const sel = doc.components.find((c) => c.instanceId === selected);
   const selPart = sel ? getPart(sel.partId) : undefined;
   const loading = busy && doc.components.length === 0;
@@ -314,13 +319,16 @@ export function PartsStep({
             </div>
           ) : (
             <ul ref={listRef} className="space-y-2.5" data-testid="studio-parts-list">
-              {doc.components.map((c) => {
+              {groups.map((g) => {
+                const c = g.first;
                 const part = getPart(c.partId);
                 const product = productFor(c.partId, products, getPart);
-                const isSel = selected === c.instanceId;
+                const isSel = groupHas(g, selected);
+                const baseName = product ? partName(product, locale) : part?.name[locale] ?? c.label;
+                const rowName = withQuantity(baseName, g.quantity);
                 return (
                   <li
-                    key={c.instanceId}
+                    key={g.key}
                     className={cn(
                       "tile relative flex items-start gap-3 p-3 transition-[box-shadow,border-color] motion-safe:transition-[box-shadow,border-color,transform]",
                       "hover:ring-1 motion-safe:hover:-translate-y-0.5 hover:shadow-neu",
@@ -331,6 +339,8 @@ export function PartsStep({
                     onPointerEnter={(e) => e.pointerType === "mouse" && setPopFor(c.instanceId)}
                     onPointerLeave={(e) => e.pointerType === "mouse" && setPopFor((p) => (p === c.instanceId ? null : p))}
                     data-testid="studio-part-row"
+                    data-part={c.partId}
+                    data-quantity={g.quantity}
                     data-selected={isSel ? "true" : undefined}
                   >
                     <button
@@ -355,7 +365,7 @@ export function PartsStep({
                         id={`part-pop-${c.instanceId}`}
                         part={part}
                         product={product}
-                        name={product ? partName(product, locale) : part?.name[locale] ?? c.label}
+                        name={rowName}
                         purpose={c.reason || part?.blurb[locale] || ""}
                         locale={locale}
                       />
@@ -367,13 +377,13 @@ export function PartsStep({
                       aria-pressed={isSel}
                     >
                       <span className="min-w-0 space-y-0.5">
-                        <span className="block text-sm font-bold text-heading">
-                          {product ? partName(product, locale) : part?.name[locale] ?? c.label}
+                        <span className="block text-sm font-bold text-heading" data-testid="studio-part-name">
+                          {rowName}
                         </span>
                         <span className="block text-[13px] leading-snug text-body">{c.reason || part?.blurb[locale]}</span>
                         <span className="block text-[13px] font-semibold" style={{ color: product ? accent.ink : undefined }}>
                           {product ? (
-                            formatPrice(Number(product.unit_price ?? 0) * Math.max(1, product.min_order_qty ?? 1), locale)
+                            formatPrice(linePrice(product, g.quantity), locale)
                           ) : productsLoading ? (
                             <Bar className="mt-1 h-3 w-16" />
                           ) : (
@@ -392,7 +402,8 @@ export function PartsStep({
                           <button
                             type="button"
                             className={cn(linkCls, "text-[13px] text-mutedtext hover:text-destructive")}
-                            onClick={() => edit(doc.components.filter((x) => x.instanceId !== c.instanceId))}
+                            // One at a time: "Servo × 3" → "Servo × 2".
+                            onClick={() => edit(doc.components.filter((x) => x.instanceId !== g.items[g.items.length - 1].instanceId))}
                             aria-label={`${t("remove")} ${part?.name[locale] ?? c.label}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
@@ -576,6 +587,15 @@ export function PartsPicturePane({
     [components, getPart],
   );
   const pairs = useMemo(() => shown.map(({ c, part }) => [c.instanceId, part] as [string, LibraryPart]), [shown]);
+  // The photo / icon grid shows identical parts once, with "× n" (the picture shows every one).
+  const tiles = useMemo(
+    () =>
+      groupComponents(components).flatMap((g) => {
+        const part = getPart(g.partId);
+        return part ? [{ g, part }] : [];
+      }),
+    [components, getPart],
+  );
   // The turntable of this parts list: frame 0 first, the others stream in after it.
   const [pic, setPic] = useState<{ key: string; handle: PartsSpinHandle } | null>(null);
   const [spin, setSpin] = useState<{ key: string; value: PartsSpin } | null>(null);
@@ -671,10 +691,11 @@ export function PartsPicturePane({
       ) : (
         <div className="relative h-full overflow-y-auto p-4" data-testid="studio-parts-grid">
           <ul className={cn("grid grid-cols-3 content-center gap-3 sm:grid-cols-4", drawing && "opacity-50")} aria-label={t("loader.partsGrid")}>
-            {shown.map(({ c, part }) => {
-              const on = selected === c.instanceId;
+            {tiles.map(({ g, part }) => {
+              const c = g.first;
+              const on = groupHas(g, selected);
               return (
-                <li key={c.instanceId}>
+                <li key={g.key}>
                   <button
                     type="button"
                     onClick={() => onSelect(on ? null : c.instanceId)}
@@ -683,7 +704,7 @@ export function PartsPicturePane({
                     style={{ "--tw-ring-color": accent.base } as React.CSSProperties}
                   >
                     <PartTile part={part} product={productFor(c.partId, products, getPart)} size={56} />
-                    <span className="line-clamp-2 text-xs font-semibold leading-tight text-heading">{nameOf(c, part)}</span>
+                    <span className="line-clamp-2 text-xs font-semibold leading-tight text-heading">{withQuantity(nameOf(c, part), g.quantity)}</span>
                   </button>
                 </li>
               );

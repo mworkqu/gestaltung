@@ -37,6 +37,8 @@ export type PartDraft = {
   vMax: string;
   logicV: string;
   mA: string;
+  /** Part D: supply capacity (power sources only); kept on save, not shown on the form. */
+  supplyMA?: string;
   clearance: string;
   helper: boolean;
   modelKind: "procedural" | "stl";
@@ -118,6 +120,7 @@ export function partToDraft(p: LibraryPart): PartDraft {
     vMax: s(p.power.vMax),
     logicV: s(p.power.logicV),
     mA: s(p.power.mA),
+    ...(p.power.supplyMA ? { supplyMA: s(p.power.supplyMA) } : {}),
     clearance: s(p.clearance),
     helper: !!p.helper,
     modelKind: p.model.kind,
@@ -212,6 +215,7 @@ export function draftToPart(d: PartDraft): DraftResult {
     logicV: (logic === "5" ? 5 : 3.3) as 3.3 | 5,
     mA: num("mA", d.mA, "nonnegative"),
   };
+  const supplyMA = d.supplyMA?.trim() ? Number(d.supplyMA) : NaN;
   const clearance = num("clearance", d.clearance, "nonnegative");
 
   let model: LibraryPart["model"];
@@ -251,7 +255,7 @@ export function draftToPart(d: PartDraft): DraftResult {
     mount,
     ports,
     pins,
-    power,
+    power: Number.isFinite(supplyMA) && supplyMA > 0 ? { ...power, supplyMA } : power,
     ...(requires?.length ? { requires } : {}),
     clearance,
     ...(d.helper ? { helper: true } : {}),

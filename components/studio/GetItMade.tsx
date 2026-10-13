@@ -24,6 +24,7 @@ import { track } from "@/lib/analytics";
 import { useStudioLibrary } from "./StudioLibraryProvider";
 import type { Locale, PrintFile, Profile, StudioApi } from "@/lib/studio/client/api";
 import type { StudioDoc } from "@/lib/studio/schema";
+import { groupComponents, withQuantity } from "@/lib/studio/parts-group";
 import { cn } from "@/lib/utils";
 
 /** Query flag on the sign-in return path: open the pop-up again on arrival. */
@@ -155,7 +156,10 @@ export function GetItMade({
     setFailed(false);
     setPhase("sending");
     const phoneE164 = normalizePhone(finalPhone);
-    const items = doc.components.filter((c) => !c.auto).map((c) => getPart(c.partId)?.name.en ?? c.label);
+    // Part D: identical parts once, with the count ("Strong metal-gear servo (MG996R) × 3").
+    const items = groupComponents(doc.components.filter((c) => !c.auto)).map((g) =>
+      withQuantity(getPart(g.partId)?.name.en ?? g.first.label, g.quantity),
+    );
     // An unlocked product: every printed body's STL goes with the request (best-effort, never blocks it).
     let files: string[] = [];
     if (productFiles) {

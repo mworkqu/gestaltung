@@ -6,7 +6,8 @@
 //
 // Price rule (an ESTIMATE, labelled so on the page; an engineer confirms the
 // real price on WhatsApp — never a promise):
-//   known  = the store price of every part we sell (quantity 1, pack price as listed)
+//   known  = the store price of every part we sell × how many of it (Part D: identical
+//            parts are one row with a quantity, "MG996R servo × 3"; pack price as listed)
 //   print  = base + rate per gram × printed grams
 //            (owner rule 2026-10-11: QAR 100 base + QAR 0.7 per gram of material)
 //   low    = print + known, rounded down to QAR 10
@@ -22,6 +23,7 @@
 
 import type { Locale } from "./client/api";
 import { MECH_NAMES } from "./mech/names";
+import { groupComponents, withQuantity } from "./parts-group";
 import type { LibraryPart, MechTemplate, StudioDoc } from "./schema";
 
 export const ESTIMATE_SPREAD = 1.5;
@@ -111,13 +113,16 @@ export type BreakdownPrinted = {
 };
 
 export type BreakdownComponent = {
+  /** The first instance id of the group. */
   id: string;
   name: string;
   name_ar: string;
   /** The store SKU we price it from, or null = "we source". */
   sku: string | null;
-  /** The listed store price, or null when we have no price (we source it). */
+  /** The listed store price of ONE, or null when we have no price (we source it). */
   price_qar: number | null;
+  /** Part D: how many of this part (identical parts are one row). Old snapshots: 1. */
+  quantity: number;
 };
 
 export type QuoteBreakdown = {
@@ -154,18 +159,20 @@ export function quoteBreakdown({
 }): QuoteBreakdown {
   const components: BreakdownComponent[] = [];
   let partsQar = 0;
-  for (const c of doc?.components ?? []) {
+  for (const g of groupComponents(doc?.components ?? [])) {
+    const c = g.first;
     const lib = getPart(c.partId);
     const sku = lib?.storeSkus?.[0] ?? null;
     const price = sku ? prices.get(sku) : undefined;
     const priced = typeof price === "number" && Number.isFinite(price) && price > 0;
-    if (priced) partsQar += price;
+    if (priced) partsQar += price * g.quantity;
     components.push({
       id: c.instanceId,
       name: lib?.name.en ?? c.label,
       name_ar: lib?.name.ar ?? c.label,
       sku: priced ? sku : null,
       price_qar: priced ? money(price) : null,
+      quantity: g.quantity,
     });
   }
 
@@ -302,6 +309,7 @@ export function parseQuoteCalc(value: unknown): QuoteCalc | null {
       name_ar: str(r.name_ar) ?? str(r.name) ?? "",
       sku: str(r.sku),
       price_qar: num(r.price_qar),
+      quantity: Math.max(1, Math.round(num(r.quantity) ?? 1)),
     };
   });
   const low = num(o.low);
@@ -350,7 +358,8 @@ export function parseFinalQuote(raw: unknown): number | null {
 
 // ── The client page summary ────────────────────────────────────────────────
 
-export type SummaryPart = { id: string; name: string; priced: boolean };
+/** `name` already carries the quantity ("MG996R servo × 3"). */
+export type SummaryPart = { id: string; name: string; priced: boolean; quantity: number };
 export type SummaryPrinted = { template: string; material: string; count: number; grams: number };
 
 export type RequestSummary = {
@@ -386,7 +395,12 @@ export function requestSummary({
   return {
     name: (doc?.spec.name || projectName || "").trim(),
     oneLine: (doc?.spec.oneLine ?? "").trim(),
-    parts: b.components.map((c) => ({ id: c.id, name: locale === "ar" ? c.name_ar : c.name, priced: c.price_qar !== null })),
+    parts: b.components.map((c) => ({
+      id: c.id,
+      name: withQuantity(locale === "ar" ? c.name_ar : c.name, c.quantity),
+      priced: c.price_qar !== null,
+      quantity: c.quantity,
+    })),
     printed: b.printed.map((r) => ({ template: r.template, material: r.material, count: r.count, grams: r.grams })),
     printedGrams: b.printedGrams,
     enclosure: e ? { template: e.template, colour: e.colour, finish: e.finish } : null,

@@ -168,3 +168,38 @@ describe("quoteBreakdown + snapshot (W2b)", () => {
     expect(parseFinalQuote("2000000")).toBeNull();
   });
 });
+
+describe("quantities (Part D): identical parts are one row, quantity × price", () => {
+  const servo = { ...getPart("mg996r_servo")!, storeSkus: ["VLT-MG"] };
+  const lookup = (id: string) => (id === "mg996r_servo" ? servo : getPart(id));
+  const armDoc = (): StudioDoc => ({
+    ...doc(),
+    components: [
+      { partId: "esp32_devkit", instanceId: "esp32_devkit_1", label: "ESP32" },
+      { partId: "mg996r_servo", instanceId: "mg996r_servo_1", label: "Servo" },
+      { partId: "mg996r_servo", instanceId: "mg996r_servo_2", label: "Servo" },
+      { partId: "mg996r_servo", instanceId: "mg996r_servo_3", label: "Servo" },
+      { partId: "sg90_servo", instanceId: "sg90_servo_1", label: "Small servo" },
+    ],
+  });
+
+  it("groups the breakdown and prices quantity × unit price", () => {
+    const b = quoteBreakdown({ doc: armDoc(), getPart: lookup, prices: new Map([["VLT-MG", 40]]) });
+    expect(b.components.map((c) => [c.id, c.quantity, c.price_qar])).toEqual([
+      ["esp32_devkit_1", 1, null],
+      ["mg996r_servo_1", 3, 40],
+      ["sg90_servo_1", 1, null],
+    ]);
+    expect(b.partsQar).toBe(120);
+  });
+
+  it("the client summary says 'MG996R … × 3'; old snapshots read as quantity 1", () => {
+    const s = requestSummary({ doc: armDoc(), projectName: "x", getPart: lookup, locale: "en", prices: new Map() });
+    expect(s.parts[1]).toMatchObject({ quantity: 3, name: `${servo.name.en} × 3` });
+    expect(s.parts[0].name).toBe(getPart("esp32_devkit")!.name.en);
+    const ar = requestSummary({ doc: armDoc(), projectName: "x", getPart: lookup, locale: "ar", prices: new Map() });
+    expect(ar.parts[1].name).toBe(`${servo.name.ar} × 3`);
+    const old = parseQuoteCalc({ base_qar: 100, per_gram_qar: 0.7, spread: 1.5, subtotal_qar: 145, components: [{ id: "a", name: "A", price_qar: 45 }] });
+    expect(old?.components[0].quantity).toBe(1);
+  });
+});

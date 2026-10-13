@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { ExternalLink } from "lucide-react";
 
 import type { QuoteCalc } from "@/lib/studio/request-summary";
+import { withQuantity } from "@/lib/studio/parts-group";
 
 function fmt(n: number, locale: string, digits = 2): string {
   return new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { minimumFractionDigits: 0, maximumFractionDigits: digits }).format(n);
@@ -95,11 +96,11 @@ export async function QuoteCalcCard({ calc, locale }: { calc: QuoteCalc; locale:
               <tbody>
                 {calc.components.map((c) => (
                   <tr key={c.id} className="border-t border-borderstrong/50">
-                    <td className="py-1.5 text-heading">{ar ? c.name_ar : c.name}</td>
+                    <td className="py-1.5 text-heading">{withQuantity(ar ? c.name_ar : c.name, c.quantity)}</td>
                     <td className="py-1.5 text-body" dir={c.sku ? "ltr" : undefined}>
                       {c.sku ?? t("weSource")}
                     </td>
-                    <td className="py-1.5 text-end tabular-nums text-heading">{c.price_qar === null ? "—" : t("qar", { n: q(c.price_qar) })}</td>
+                    <td className="py-1.5 text-end tabular-nums text-heading">{c.price_qar === null ? "—" : t("qar", { n: q(c.price_qar * c.quantity) })}</td>
                   </tr>
                 ))}
               </tbody>

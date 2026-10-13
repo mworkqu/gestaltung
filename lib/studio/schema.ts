@@ -226,6 +226,8 @@ export const LibraryPartSchema = z.object({
     vMax: z.number(),
     logicV: z.union([z.literal(3.3), z.literal(5)]),
     mA: z.number().nonnegative(),
+    /** Part D: power SOURCES only — the most current (mA) this supply can give (psu_5v_5a 5000). */
+    supplyMA: z.number().positive().optional(),
   }),
   requires: z.array(z.object({ id: z.string(), reason: z.string() })).optional(),
   clearance: z.number().nonnegative(),

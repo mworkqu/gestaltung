@@ -37,6 +37,7 @@ export const usbcPower5v: LibraryPart = {
     { id: "OUT_5V", label: "5V out (to your circuit)", role: "5v", voltage: 5, side: "right" },
     { id: "GND", label: "GND", role: "gnd", voltage: 0, side: "right" },
   ],
-  power: { vMin: 4.5, vMax: 5.5, logicV: 5, mA: 0 },
+  // supplyMA: USB-C at 5 V gives at most 3 A (with a charger that offers it).
+  power: { vMin: 4.5, vMax: 5.5, logicV: 5, mA: 0, supplyMA: 3000 },
   clearance: 1.5,
 };

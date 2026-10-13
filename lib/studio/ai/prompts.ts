@@ -170,7 +170,10 @@ export function specPrompt(opts: {
 // ---------------------------------------------------------------------------
 
 export const PICK_SYSTEM =
-  "Pick the smallest set of parts from THIS library that makes the product work. " +
+  "Pick the fewest parts from THIS library that make the product work; when spec.actuators gives a count, " +
+  "include exactly that many of the matching actuator (one entry per unit: 6 servos = 6 entries). " +
+  "Heavy or medium servo joints use the strong metal-gear servo, light ones the small servo; 3 or more servos go on the servo driver board " +
+  "and need a supply that can feed them all. " +
   "Exactly one mcu. Choose power parts that match spec.power. Only ids from the list. " +
   "Return {components:[{partId,label}], reasons:{partId:plainSentence}}. " +
   `Labels are short names for the user (at most ${LABEL_MAX} characters); ` +
@@ -182,7 +185,8 @@ export const PICK_RESPONSE_SCHEMA = {
   properties: {
     components: {
       type: "ARRAY",
-      maxItems: MAX_COMPONENTS,
+      // Identical parts repeat (6 servos = 6 entries); the server caps KINDS at MAX_COMPONENTS.
+      maxItems: MAX_COMPONENTS * 2,
       items: {
         type: "OBJECT",
         properties: { partId: str("An id from the library list"), label: str(`At most ${LABEL_MAX} characters`) },
@@ -202,9 +206,10 @@ export const PICK_RESPONSE_SCHEMA = {
   required: ["components"],
 };
 
-export function pickPrompt(opts: { spec: unknown; index: unknown[]; locale: "en" | "ar" }): string {
+export function pickPrompt(opts: { spec: unknown; index: unknown[]; locale: "en" | "ar"; actuators?: readonly unknown[] }): string {
   return [
     `Product:\n${JSON.stringify(opts.spec)}`,
+    ...(opts.actuators?.length ? [`Actuators (include exactly this many of each):\n${JSON.stringify(opts.actuators)}`] : []),
     `Library (the ONLY parts you may use):\n${JSON.stringify(opts.index)}`,
     `Write labels and reasons in ${opts.locale === "ar" ? "Arabic" : "English"}.`,
   ].join("\n\n");

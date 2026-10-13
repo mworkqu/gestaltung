@@ -1,8 +1,9 @@
 "use client";
 
-// Store products for the Studio's parts, and "Add all to cart". Quantity is
-// always 1 on this site: each product goes in once, raised to its minimum
-// order (packs). Parts without a store product are "We'll source this".
+// Store products for the Studio's parts, and "Add all to cart". Part D: each
+// product goes in once with the packs its parts need (6 servos = 6 pieces →
+// packsFor(6), raised to the minimum order). Parts without a store product are
+// "We'll source this".
 
 import { useCallback, useState } from "react";
 
@@ -13,6 +14,7 @@ import type { LibraryPart } from "@/lib/studio/schema";
 type GetPart = (id: string) => LibraryPart | undefined;
 import type { StudioComponent } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
+import { packsFor } from "@/lib/store/pack";
 
 /** The store product sold for a library part (first published SKU), if any. */
 export function productFor(
@@ -27,24 +29,30 @@ export function productFor(
   return null;
 }
 
-export const orderQty = (p: StoreCardPart) => Math.max(1, p.min_order_qty ?? 1);
+/** Store listings to buy for `need` pieces of a part (packs, at least the minimum order). */
+export const orderQty = (p: StoreCardPart, need = 1) => packsFor(need, p);
 
-/** Unique store products for the components, and the total of those. */
+/** Price of `need` pieces of a part: unit price × the listings it takes. */
+export const linePrice = (p: StoreCardPart, need = 1) => Number(p.unit_price ?? 0) * orderQty(p, need);
+
+export type StoreLine = { product: StoreCardPart; /** pieces the parts need */ need: number; /** listings to add */ qty: number };
+
+/** One line per store product (identical parts summed), and the total of those. */
 export function storeLines(
   components: StudioComponent[],
   products: Map<string, StoreCardPart>,
   getPart: GetPart = codeGetPart,
 ) {
-  const seen = new Set<string>();
-  const lines: StoreCardPart[] = [];
+  const byId = new Map<string, StoreLine>();
   for (const c of components) {
     const p = productFor(c.partId, products, getPart);
-    if (p && !seen.has(p.id)) {
-      seen.add(p.id);
-      lines.push(p);
-    }
+    if (!p) continue;
+    const line = byId.get(p.id);
+    if (line) line.need++;
+    else byId.set(p.id, { product: p, need: 1, qty: 1 });
   }
-  const total = lines.reduce((s, p) => s + Number(p.unit_price ?? 0) * orderQty(p), 0);
+  const lines = [...byId.values()].map((l) => ({ ...l, qty: orderQty(l.product, l.need) }));
+  const total = lines.reduce((s, l) => s + Number(l.product.unit_price ?? 0) * l.qty, 0);
   return { lines, total };
 }
 
@@ -52,13 +60,13 @@ export function useAddAllToCart(projectId: string | null) {
   const { addItem } = useCart();
   const [state, setState] = useState<"idle" | "adding" | "added" | "failed">("idle");
   const addAll = useCallback(
-    async (lines: StoreCardPart[]): Promise<boolean> => {
+    async (lines: StoreLine[]): Promise<boolean> => {
       if (!lines.length) return true;
       setState("adding");
       let ok = true;
-      for (const p of lines) {
+      for (const l of lines) {
         // One at a time: each add reloads the cart.
-        if (!(await addItem(p, orderQty(p), projectId))) ok = false;
+        if (!(await addItem(l.product, l.qty, projectId))) ok = false;
       }
       setState(ok ? "added" : "failed");
       return ok;

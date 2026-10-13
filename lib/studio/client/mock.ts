@@ -6,13 +6,14 @@
 // so the schematic, the 3D enclosure and the printed parts are real
 // (defaultMechParts); the firmware is a small canned sketch for the chosen board.
 
-import { getPart } from "@/lib/studio/library";
+import { getPart, libraryIndexForAI } from "@/lib/studio/library";
 import { isValidPhone } from "@/lib/phone";
 import { buildWiring } from "@/lib/studio/netlist";
 import { buildConnections, pinBlock, pinConstants } from "@/lib/studio/connections";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { specParts } from "@/lib/studio/ai/pick";
+import { applyActuatorRules } from "@/lib/studio/ai/actuator-rules";
 import { chatGuardTurn, guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
 import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/schema";
 import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
@@ -214,9 +215,23 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
         const part = getPart(id);
         if (part && !picked.some((c) => c.partId === id)) picked.splice(1, 0, { partId: id, instanceId: `${id}_1`, label: part.name[locale] });
       }
-      let components = picked;
+      // Part D: the same actuator rules as the server (servo count, driver, 5 A supply).
+      const index = libraryIndexForAI();
+      const slots = applyActuatorRules(
+        picked.map((c) => ({ partId: c.partId, label: c.label })),
+        { spec, byId: new Map(index.map((e) => [e.id, e])), log: [], name: (id) => getPart(id)?.name[locale] ?? id, pinsOf: (id) => getPart(id)?.pins },
+      );
+      const seen = new Map<string, number>();
+      const reasonOf = new Map(picked.map((c) => [c.partId, c.reason]));
+      const ruled: StudioComponent[] = slots.map((s) => {
+        const n = (seen.get(s.partId) ?? 0) + 1;
+        seen.set(s.partId, n);
+        const reason = reasonOf.get(s.partId);
+        return { partId: s.partId, instanceId: `${s.partId}_${n}`, label: s.label, ...(reason ? { reason } : {}) };
+      });
+      let components = ruled;
       try {
-        components = buildWiring(picked, spec, getPart, locale).components;
+        components = buildWiring(ruled, spec, getPart, locale).components;
       } catch {
         /* keep the picked list */
       }

@@ -11,7 +11,7 @@ import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context
 // POST /api/studio/pick — the parts list. Free (the parts list is the only free
 // AI step) but counted like a BOM run (bomRate: guests 5/day, users 30/day).
 // The model picks ids from the library; the server enforces one mcu, power
-// parts, ≤ 12 parts, then buildWiring() adds the helper parts the rules need
+// parts, the actuator rules (servo count, driver, supply), ≤ 12 kinds of part, then buildWiring() adds the helper parts the rules need
 // (resistors, level shifters). The netlist itself is the paid wiring step
 // (/api/studio/wiring) and is NOT returned here.
 
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
     index: libraryIndexForAI(),
     locale: body.locale,
     nameFor: (id, locale) => getPart(id)?.name[locale],
+    pinsOf: (id) => getPart(id)?.pins, // Part D: servo pin budget
     cache: pickCache, // W8: the same spec is not asked twice
   });
   if (!r.ok) return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });

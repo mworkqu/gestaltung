@@ -121,7 +121,7 @@ export type AIIndexEntry = {
   category: Category;
   tags: string[];
   name: string;
-  power: { vMin: number; vMax: number; mA: number };
+  power: { vMin: number; vMax: number; mA: number; supplyMA?: number };
   logicV: 3.3 | 5;
 };
 
@@ -131,7 +131,7 @@ function indexFor(parts: LibraryPart[]): AIIndexEntry[] {
     category: p.category,
     tags: p.tags,
     name: p.name.en,
-    power: { vMin: p.power.vMin, vMax: p.power.vMax, mA: p.power.mA },
+    power: { vMin: p.power.vMin, vMax: p.power.vMax, mA: p.power.mA, ...(p.power.supplyMA ? { supplyMA: p.power.supplyMA } : {}) },
     logicV: p.power.logicV,
   }));
 }

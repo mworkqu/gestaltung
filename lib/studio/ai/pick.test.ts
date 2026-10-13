@@ -65,14 +65,23 @@ describe("runPick", () => {
     expect(p.components.map((c) => c.partId)).toEqual(["esp32_devkit", "cell_18650", "tp4056_usbc"]);
   });
 
-  it("caps at 12 parts and cuts labels / reasons", () => {
+  it("identical parts are one slot (at most 8 of one part) and cuts labels / reasons", () => {
     const comps = Array.from({ length: 20 }, () => ({ partId: "led_5mm", label: "L".repeat(50) }));
     const p = enforcePick({ components: [{ partId: "esp32_devkit" }, ...comps], reasons: { led_5mm: "R".repeat(300) } }, opts());
-    expect(p.components).toHaveLength(12);
+    expect(p.components).toHaveLength(9);
     expect(p.components[0].partId).toBe("esp32_devkit");
     expect(p.components[1].label.length).toBe(30);
     expect(p.reasons.led_5mm.length).toBe(100);
-    expect(new Set(p.components.map((c) => c.instanceId)).size).toBe(12);
+    expect(new Set(p.components.map((c) => c.instanceId)).size).toBe(9);
+    expect(p.components.at(-1)?.instanceId).toBe("led_5mm_8");
+  });
+
+  it("caps at 12 KINDS of part", () => {
+    const many: PickIndexEntry[] = [...INDEX, ...Array.from({ length: 14 }, (_, i) => ({ id: `extra_${i}`, category: "sensor" }))];
+    const comps = many.filter((e) => e.category === "sensor").flatMap((e) => [{ partId: e.id }, { partId: e.id }]);
+    const p = enforcePick({ components: [{ partId: "esp32_devkit" }, ...comps] }, { ...opts(), index: many });
+    expect(new Set(p.components.map((c) => c.partId)).size).toBe(12);
+    expect(p.components).toHaveLength(1 + 11 * 2);
   });
 
   it("invalid twice → minimal default (mcu + power parts) with localized labels", async () => {

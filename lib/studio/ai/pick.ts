@@ -3,10 +3,13 @@
 // The model may only name ids from the library index it was given. The server
 // then enforces the rules the model cannot be trusted with: unknown ids are
 // dropped, exactly one mcu (none → esp32_devkit, several → the first), the
-// power parts that spec.power needs, at most 12 parts, short labels/reasons.
-// Two failed answers → a minimal default (the mcu + the power parts).
+// power parts that spec.power needs, the actuator rules (Part D, actuator-rules.ts:
+// servo count/size from spec.actuators, PCA9685 driver, 5 V 5 A supply), at most 12
+// KINDS of part (6 servos = 1 slot), short labels/reasons.
+// Two failed answers → a minimal default (the mcu + the power parts + the actuator rules).
 
-import type { ClampLog, ProductSpec, StudioComponent } from "../schema";
+import type { ClampLog, Pin, ProductSpec, StudioComponent } from "../schema";
+import { applyActuatorRules, capKinds, SUPPLY_BOARD_IDS } from "./actuator-rules";
 import { LABEL_MAX, MAX_COMPONENTS, PICK_RESPONSE_SCHEMA, PICK_SYSTEM, REASON_MAX, pickPrompt } from "./prompts";
 import { outcomeCached, pickKey, type AiCache } from "./cache";
 import { cut, isObj, type Outcome, type StudioCall } from "./types";
@@ -36,7 +39,7 @@ export const POWER_PARTS: Record<ProductSpec["power"], readonly string[]> = {
 const BATTERY_IDS = new Set(["cell_18650", "lipo_1000", "aa_holder_2"]);
 const NOT_A_CELL = ["charger", "converter", "regulator", "boost", "buck", "step-up", "stepdown"];
 /** Wall / USB supply boards that are a power source in their own right. */
-const SUPPLY_IDS = new Set(["usbc_power_5v"]);
+const SUPPLY_IDS = SUPPLY_BOARD_IDS;
 /** Li-ion charger: only makes sense with a rechargeable cell. */
 const CHARGER_IDS = new Set(["tp4056_usbc"]);
 /** Alkaline holders must not get a Li-ion charger. */
@@ -118,6 +121,8 @@ export function specParts(spec: ProductSpec): string[] {
 
 /** Optional localized display name (e.g. getPart(id)?.name[locale]). */
 export type NameFor = (id: string, locale: "en" | "ar") => string | undefined;
+/** Optional library pins per part id (e.g. getPart(id)?.pins): the actuator rules' pin budget. */
+export type PinsOf = (id: string) => readonly Pin[] | undefined;
 
 function nameOf(entry: PickIndexEntry, locale: "en" | "ar", nameFor?: NameFor): string {
   const own = nameFor?.(entry.id, locale);
@@ -134,7 +139,7 @@ function nameOf(entry: PickIndexEntry, locale: "en" | "ar", nameFor?: NameFor): 
 /** Model answer (any shape) → a rule-abiding parts list. Every change goes to `log`. */
 export function enforcePick(
   raw: unknown,
-  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor },
+  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf },
 ): Picked {
   const { index, log, locale } = opts;
   const name = (e: PickIndexEntry) => cut(nameOf(e, locale, opts.nameFor), LABEL_MAX);
@@ -199,10 +204,17 @@ export function enforcePick(
     log.push({ path: "components.spec", from: null, to: id });
   }
 
-  if (list.length > MAX_COMPONENTS) {
-    log.push({ path: "components", from: list.length, to: MAX_COMPONENTS });
-    list = list.slice(0, MAX_COMPONENTS);
-  }
+  // Part D: how many servos / pumps / motors, the servo driver and a supply strong enough.
+  list = applyActuatorRules(list, {
+    spec: opts.spec,
+    byId,
+    log,
+    name: (id) => name(byId.get(id) ?? { id, category: "" }),
+    pinsOf: opts.pinsOf,
+  });
+
+  // At most 12 kinds of part (identical parts are one slot), at most 8 of one part.
+  list = capKinds(list, MAX_COMPONENTS, log);
 
   const counts = new Map<string, number>();
   const components: StudioComponent[] = list.map((p) => {
@@ -229,7 +241,7 @@ export function enforcePick(
 
 export function validatePick(
   raw: unknown,
-  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor },
+  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf },
 ): { value: Picked | null; errors: string[] } {
   if (!isObj(raw) || !Array.isArray(raw.components)) return { value: null, errors: ["the answer must be {components:[{partId,label}], reasons}"] };
   const ids = new Set(opts.index.map((e) => e.id));
@@ -247,6 +259,7 @@ export async function runPick(opts: {
   index: readonly PickIndexEntry[];
   locale: "en" | "ar";
   nameFor?: NameFor;
+  pinsOf?: PinsOf;
   /** W8: the same spec (and language, and library) is answered without a model call. */
   cache?: AiCache | null;
 }): Promise<Outcome<Picked>> {
@@ -259,16 +272,17 @@ async function pickWithModel(opts: {
   index: readonly PickIndexEntry[];
   locale: "en" | "ar";
   nameFor?: NameFor;
+  pinsOf?: PinsOf;
 }): Promise<Outcome<Picked>> {
   const log: ClampLog = [];
   const r = await opts.call<Picked>({
     step: "pick",
     system: PICK_SYSTEM,
-    prompt: pickPrompt({ spec: opts.spec, index: [...opts.index], locale: opts.locale }),
+    prompt: pickPrompt({ spec: opts.spec, index: [...opts.index], locale: opts.locale, actuators: opts.spec.actuators }),
     schema: PICK_RESPONSE_SCHEMA,
     validate: (raw) => {
       const attempt: ClampLog = [];
-      const res = validatePick(raw, { spec: opts.spec, index: opts.index, locale: opts.locale, log: attempt, nameFor: opts.nameFor });
+      const res = validatePick(raw, { spec: opts.spec, index: opts.index, locale: opts.locale, log: attempt, nameFor: opts.nameFor, pinsOf: opts.pinsOf });
       if (res.value) log.splice(0, log.length, ...attempt);
       return res;
     },
@@ -277,6 +291,6 @@ async function pickWithModel(opts: {
   if (r.error === "paused" || r.error === "rate_limited") return { ok: false, error: r.error, clampLog: log, problems: r.problems };
   // invalid twice, or the provider is down: the minimal deterministic list.
   const fallback: ClampLog = [];
-  const value = enforcePick({ components: [] }, { spec: opts.spec, index: opts.index, locale: opts.locale, log: fallback, nameFor: opts.nameFor });
+  const value = enforcePick({ components: [] }, { spec: opts.spec, index: opts.index, locale: opts.locale, log: fallback, nameFor: opts.nameFor, pinsOf: opts.pinsOf });
   return { ok: true, value, source: "default", clampLog: fallback, problems: r.problems };
 }
