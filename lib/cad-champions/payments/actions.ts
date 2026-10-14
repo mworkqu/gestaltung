@@ -95,6 +95,7 @@ export async function submitProofAction(input: ProofInput): Promise<{ ok: true }
 export async function cancelReservationAction(input: { paymentId: string }): Promise<{ ok: boolean; error?: string }> {
   const cc = await getCcUser();
   if (!cc) return { ok: false, error: "signed_out" };
+  if (ccRateLimited("action", cc.user.id)) return { ok: false, error: "error" };
   const res = await cancelReservation(cc, String(input?.paymentId ?? ""));
   if (res.ok) revalidatePayment(input.paymentId);
   return res;

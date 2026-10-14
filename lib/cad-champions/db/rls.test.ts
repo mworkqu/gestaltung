@@ -468,6 +468,7 @@ describe("launch audit: full chain 0077-0085", () => {
   const PAY_B = "cc120000-0000-4000-8000-0000000000b1";
   let attA = "";
   let attB = "";
+  let taskId = "";
 
   async function who(uid: string | null | "service") {
     await f.exec("reset role");
@@ -482,7 +483,8 @@ describe("launch audit: full chain 0077-0085", () => {
     f = new PGlite();
     await f.exec(SUPABASE_STUB);
     for (const m of ["0077_cc_core.sql", "0078_cc_storage.sql", "0080_cc_diagnostic_seed.sql", "0081_cc_results.sql",
-                     "0082_cc_drawing_rubric.sql", "0083_cc_training_seed.sql", "0084_cc_payments.sql", "0085_cc_admin.sql"]) {
+                     "0082_cc_drawing_rubric.sql", "0083_cc_training_seed.sql", "0084_cc_payments.sql", "0085_cc_admin.sql",
+                     "0086_cc_security.sql"]) {
       await f.exec(migration(m));
     }
     await f.exec(`
@@ -507,17 +509,29 @@ describe("launch audit: full chain 0077-0085", () => {
         ('cc-payment-proofs', '${B}/${PAY_B}/1_b.png', '${B}'),
         ('cc-submissions', '${B}/att/task/1_b.step', '${B}'),
         ('cc-answer-files', 'diag/answer.step', null),
-        ('cc-lesson-files', 'paid-lesson/notes.pdf', null);
+        ('cc-lesson-files', 'paid-lesson/notes.pdf', null),
+        ('cc-task-files', 'draft-test/drawing.pdf', null);
     `);
     const test = (await q<{ id: string }>(
       `insert into public.cc_tests (slug, title_en, title_ar, type, is_published) values ('sec-test', 'T', 'ت', 'mock', true) returning id`))[0].id;
-    await f.query(
+    taskId = (await q<{ id: string }>(
       `insert into public.cc_test_tasks (test_id, skill_area_id, title_en, title_ar, expected_upload, grading_mode, reference_data, rubric, tolerances)
-       values ($1, 3, 'Part', 'قطعة', 'step', 'auto_step', '{"volume": 4242}', '[{"id": "r1", "answer": "x"}]', '{"volume_pct": 0.5}')`, [test]);
+       values ($1, 3, 'Part', 'قطعة', 'step', 'auto_step', '{"volume": 4242}', '[{"id": "r1", "answer": "x"}]', '{"volume_pct": 0.5}') returning id`, [test]))[0].id;
     attA = (await q<{ id: string }>(`insert into public.cc_attempts (user_id, test_id, status, share_enabled, share_token, band)
        values ($1, $2, 'graded', true, 'tok_aaaaaaaaaaaaaaaaaaaaaaa', 'developing') returning id`, [A, test]))[0].id;
     attB = (await q<{ id: string }>(`insert into public.cc_attempts (user_id, test_id, status) values ($1, $2, 'graded') returning id`, [B, test]))[0].id;
     await f.query(`insert into public.cc_grading_logs (kind, response) values ('step', '{"measured_volume": 4242}')`);
+    // Student B's private results, files and progress (student A must see none of it).
+    const ex = (await q<{ id: string; level_id: string }>("select id, level_id from public.cc_exercises limit 1"))[0];
+    const mod = (await q<{ id: string }>("select id from public.cc_modules limit 1"))[0];
+    await f.query(`insert into public.cc_submissions (attempt_id, user_id, storage_path, file_name, file_size) values ($1, $2, 'b/x.step', 'x.step', 10)`, [attB, B]);
+    await f.query(`insert into public.cc_task_results (attempt_id, task_id, user_id) values ($1, $2, $3)`, [attB, taskId, B]);
+    await f.query(`insert into public.cc_skill_scores (attempt_id, skill_area_id, user_id) values ($1, 3, $2)`, [attB, B]);
+    await f.query(`insert into public.cc_exercise_attempts (user_id, exercise_id) values ($1, $2)`, [B, ex.id]);
+    await f.query(`insert into public.cc_level_unlocks (user_id, level_id) values ($1, $2)`, [B, ex.level_id]);
+    await f.query(`insert into public.cc_certificates (user_id, module_id, code) values ($1, $2, 'CERTBBBB')`, [B, mod.id]);
+    await f.query(`insert into public.cc_lesson_questions (user_id, kind, body) values ($1, 'lesson', 'private question from B')`, [B]);
+    await f.query(`insert into public.cc_integrity_flags (attempt_id, user_id, kind) values ($1, $2, 'too_fast')`, [attB, B]);
   }, 120_000);
 
   afterAll(async () => {
@@ -631,13 +645,91 @@ describe("launch audit: full chain 0077-0085", () => {
     expect(await q("select name from storage.objects where bucket_id = 'cc-answer-files'")).toHaveLength(1);
   });
 
+  it("student A cannot read student B's submissions, results, scores, exercise attempts, unlocks, certificates, flags or private questions", async () => {
+    await who(A);
+    for (const t of ["cc_submissions", "cc_task_results", "cc_skill_scores", "cc_aspect_results", "cc_exercise_attempts",
+                     "cc_level_unlocks", "cc_certificates", "cc_lesson_progress", "cc_integrity_flags", "cc_lesson_questions",
+                     "cc_journey_progress", "cc_get_ready_steps"]) {
+      expect(await q(`select * from public.${t} where user_id = $1`, [B]), t).toHaveLength(0);
+    }
+    expect(await q("select id from public.cc_profiles where id = $1", [B])).toHaveLength(0);
+    expect(await q("update public.cc_task_results set status = 'final' where user_id = $1 returning id", [B])).toHaveLength(0);
+    expect(await q("delete from public.cc_submissions where user_id = $1 returning id", [B])).toHaveLength(0);
+    expect(await q("update public.cc_profiles set full_name = 'x' where id = $1 returning id", [B])).toHaveLength(0);
+    await who(B);
+    expect(await q("select id from public.cc_task_results")).toHaveLength(1);
+    expect(await q("select id from public.cc_integrity_flags")).toHaveLength(0);
+  });
+
+  it("students cannot write results, certificates, unlocks, submissions or exercise attempts for themselves", async () => {
+    await who(A);
+    const ex = (await q<{ id: string; level_id: string }>("select id, level_id from public.cc_exercises_public limit 1"))[0];
+    const mod = (await q<{ id: string }>("select id from public.cc_modules limit 1"))[0];
+    await expect(q("insert into public.cc_task_results (attempt_id, task_id, user_id, status) values ($1, $2, $3, 'final')", [attA, taskId, A])).rejects.toThrow(/row-level security/);
+    await expect(q("insert into public.cc_exercise_attempts (user_id, exercise_id) values ($1, $2)", [A, ex.id])).rejects.toThrow(/row-level security/);
+    await expect(q("insert into public.cc_level_unlocks (user_id, level_id) values ($1, $2)", [A, ex.level_id])).rejects.toThrow(/row-level security/);
+    await expect(q("insert into public.cc_certificates (user_id, module_id, code) values ($1, $2, 'FORGED01')", [A, mod.id])).rejects.toThrow(/row-level security/);
+    await expect(q("insert into public.cc_submissions (attempt_id, user_id, storage_path, file_name, file_size) values ($1, $2, 'a/y.step', 'y.step', 1)", [attA, A])).rejects.toThrow(/row-level security/);
+    expect(await q("update public.cc_attempts set status = 'graded', band = 'advanced' where id = $1 returning id", [attA])).toHaveLength(0);
+  });
+
+  it("students and instructors cannot write admin tables (coupons, plans, announcements, testimonials, overrides, flags, audit)", async () => {
+    for (const uid of [A, I]) {
+      await who(uid);
+      await expect(q("insert into public.cc_coupons (code, discount_type, discount_value) values ('MINE100', 'percent', 100)"), `coupon ${uid}`).rejects.toThrow(/row-level security/);
+      await expect(q("insert into public.cc_announcements (subject_en, subject_ar, body_en, body_ar) values ('s', 's', 'b', 'b')"), `ann ${uid}`).rejects.toThrow(/row-level security/);
+      await expect(q("insert into public.cc_testimonials (quote_en, name_en, is_published) values ('q', 'n', true)"), `testimonial ${uid}`).rejects.toThrow(/row-level security/);
+      await expect(q("insert into public.cc_content_overrides (key, locale, value) values ('msg:x.y', 'en', 'v')"), `override ${uid}`).rejects.toThrow(/row-level security/);
+      await expect(q("insert into public.cc_integrity_flags (attempt_id, kind) values ($1, 'other')", [attA]), `flag ${uid}`).rejects.toThrow(/row-level security/);
+      expect(await q("update public.cc_plans set price_qar = 1 returning id"), `plan ${uid}`).toHaveLength(0);
+      expect(await q("update public.cc_coupons set discount_value = 100 returning id"), `coupon upd ${uid}`).toHaveLength(0);
+      expect(await q("update public.cc_integrity_flags set resolved_at = now() returning id"), `flag upd ${uid}`).toHaveLength(0);
+      expect(await q("delete from public.cc_audit_log returning id"), `audit del ${uid}`).toHaveLength(0);
+    }
+  });
+
+  it("anon reads no private table, answer table or view", async () => {
+    await who(null);
+    for (const t of ["cc_test_tasks", "cc_exercises", "cc_task_aspects", "cc_task_aspects_public", "cc_submissions", "cc_task_results",
+                     "cc_grading_logs", "cc_integrity_flags", "cc_audit_log", "cc_announcements", "cc_lesson_questions", "cc_enrollments",
+                     "cc_lessons", "cc_profiles", "cc_certificates"]) {
+      await expect(q(`select * from public.${t}`), t).rejects.toThrow(/permission denied/);
+    }
+  });
+
+  it("public certificate check returns only name, module and date for an exact code", async () => {
+    await who(null);
+    const r = (await q<{ r: Record<string, unknown> }>("select public.cc_verify_certificate('certbbbb') as r"))[0].r;
+    expect(Object.keys(r).sort()).toEqual(["code", "full_name", "full_name_ar", "issued_at", "module_title_ar", "module_title_en"]);
+    expect((await q<{ r: unknown }>("select public.cc_verify_certificate('CERTB') as r"))[0].r).toBeNull();
+  });
+
+  // SR-L5: answered public FAQ questions expose the asker's user id (no name: profiles stay private).
+  it("documents SR-L5: a public answered FAQ row carries the asker's user_id", async () => {
+    await who(I);
+    await q("update public.cc_lesson_questions set status = 'answered', answer = 'a', public = true where user_id = $1", [B]);
+    await who(A);
+    expect(await q("select user_id from public.cc_lesson_questions where user_id = $1", [B])).toHaveLength(1);
+    expect(await q("select id from public.cc_profiles where id = $1", [B])).toHaveLength(0);
+    await who(I);
+    await q("update public.cc_lesson_questions set status = 'open', answer = null, public = false where user_id = $1", [B]);
+  });
+
   // ---- documented gaps (see SECURITY_REVIEW.md; fix SQL there) ----------------
 
-  // SR-M1: cc-lesson-files is readable (and listable) by every signed-in user,
-  // so paid lesson downloads bypass the enrollment check in training/access.ts.
-  it.skip("GAP SR-M1: a student without enrollment cannot read paid lesson files", async () => {
-    await who(A);
-    expect(await q("select name from storage.objects where bucket_id = 'cc-lesson-files'")).toHaveLength(0);
+  // SR-H1 (FIXED by 0086): paid lesson files and every test's task files were
+  // readable and listable by any signed-in user. Now staff-only; the app signs
+  // URLs with the service role after its own access check.
+  it("SR-H1: students cannot read or list lesson files or task files; staff can", async () => {
+    for (const uid of [A, B]) {
+      await who(uid);
+      expect(await q("select name from storage.objects where bucket_id = 'cc-lesson-files'")).toHaveLength(0);
+      expect(await q("select name from storage.objects where bucket_id = 'cc-task-files'")).toHaveLength(0);
+    }
+    await who(null);
+    await expect(q("select name from storage.objects")).rejects.toThrow(/permission denied/);
+    await who(I);
+    expect(await q("select name from storage.objects where bucket_id in ('cc-lesson-files', 'cc-task-files')")).toHaveLength(2);
   });
 
   // SR-M2: cc_validate_coupon is executable by `authenticated`, so coupon codes
@@ -676,7 +768,6 @@ describe("launch audit: full chain 0077-0085", () => {
   // The gaps above are real today: these prove it, so the skips cannot rot silently.
   it("documents current behaviour of the gaps (flip with the fixes)", async () => {
     await who(A);
-    expect(await q("select name from storage.objects where bucket_id = 'cc-lesson-files'")).toHaveLength(1);
     expect((await q<{ r: { ok: boolean } }>("select public.cc_validate_coupon('SECRET50', $1) as r", [PLAN]))[0].r.ok).toBe(true);
     expect(await q("select public.cc_has_active_enrollment($1)", [B])).toHaveLength(1);
     expect(await q("insert into public.cc_get_ready_steps (user_id, step_key) values ($1, 'practice_upload') returning step_key", [A])).toHaveLength(1);

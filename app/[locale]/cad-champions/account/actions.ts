@@ -11,6 +11,7 @@ import {
 } from "@/lib/cad-champions/db/types";
 import { CC_LOCALE_COOKIE_MAX_AGE, CC_LOCALE_COOKIE } from "@/lib/cad-champions/locale";
 import { isCcTrack } from "@/lib/cad-champions/profile/track";
+import { ccRateLimited } from "@/lib/cad-champions/rate-limits";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -121,6 +122,7 @@ export async function saveEmailPrefs(input: { weeklyProgressEmail: boolean; mark
 export async function requestAccountDeletion(): Promise<AccountResult> {
   const { user } = await currentUser();
   if (!user) return { ok: false, error: "session" };
+  if (ccRateLimited("action", user.id)) return { ok: false, error: "save" };
   const service = createServiceClient();
   if (!service) {
     console.error("[cc account] service client unavailable");

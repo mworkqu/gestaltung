@@ -47,7 +47,8 @@ export async function readObjectHead(bucket: string, path: string, bytes: number
       console.error("[cc-upload] head read failed:", res.status);
       return { ok: false, reason: "error" };
     }
-    const buf = new Uint8Array(await res.arrayBuffer());
+    // A 200 (Range ignored) would be the whole object: read only the first chunk.
+    const buf = await readFirstBytes(res, bytes);
     const range = res.headers.get("content-range"); // "bytes 0-63/12345"
     const total = range ? Number(range.split("/")[1]) : Number(res.headers.get("content-length") ?? buf.length);
     const size = Number.isFinite(total) ? total : buf.length;
@@ -56,6 +57,26 @@ export async function readObjectHead(bucket: string, path: string, bytes: number
     console.error("[cc-upload] head read failed:", e instanceof Error ? e.message : "unknown");
     return { ok: false, reason: "error" };
   }
+}
+
+/** First `limit` bytes of a response body; cancels the rest of the stream. */
+async function readFirstBytes(res: Response, limit: number): Promise<Uint8Array> {
+  if (!res.body) return new Uint8Array(await res.arrayBuffer()).subarray(0, limit);
+  const reader = res.body.getReader();
+  const out = new Uint8Array(limit);
+  let filled = 0;
+  try {
+    while (filled < limit) {
+      const { done, value } = await reader.read();
+      if (done || !value) break;
+      const take = Math.min(value.length, limit - filled);
+      out.set(value.subarray(0, take), filled);
+      filled += take;
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  return out.subarray(0, filled);
 }
 
 export type VerifyResult = UploadValidation | { ok: false; code: "missing" | "unavailable" };
@@ -71,5 +92,5 @@ export async function verifyUploadedObject(
   if (!head.ok) return { ok: false, code: head.reason === "missing" ? "missing" : "unavailable" };
   const meta = validateFileMeta({ name: path, size: head.size }, accept, maxBytes);
   if (!meta.ok) return meta;
-  return validateHeader(head.head, accept);
+  return validateHeader(head.head, accept, path);
 }

@@ -21,7 +21,8 @@ if (typeof window !== "undefined") throw new Error("lib/cad-champions/drawing/re
 type Service = NonNullable<ReturnType<typeof createServiceClient>>;
 
 const SUBMISSIONS_BUCKET = "cc-submissions";
-const SIGNED_SECONDS = 3600;
+// 10 minutes, like every other CC signed URL; the review page re-signs on load.
+const SIGNED_SECONDS = 600;
 const QUEUE_LIMIT = 500;
 
 const pick = (locale: Locale, en: string | null | undefined, ar: string | null | undefined) => ((locale === "ar" ? ar : en) || en || ar || "").trim();

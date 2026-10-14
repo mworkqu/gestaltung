@@ -148,11 +148,42 @@ export const ACCEPT_SIGNATURES: Record<Exclude<UploadAccept, "step">, readonly S
  * A file whose content does not match any accepted signature is refused as
  * "wrong_extension" (a renamed file), so callers keep their existing messages.
  */
-export function validateHeader(bytes: Uint8Array, accept: UploadAccept): UploadValidation {
+export function validateHeader(bytes: Uint8Array, accept: UploadAccept, name?: string): UploadValidation {
   if (bytes.length === 0) return { ok: false, code: "empty" };
   if (accept === "step") return isStepHeader(bytes) ? { ok: true } : { ok: false, code: "not_step" };
-  if (!ACCEPT_SIGNATURES[accept].some((sig) => hasSignature(bytes, sig))) return { ok: false, code: "wrong_extension" };
+  // With a name, the content must match THAT extension (a ".pdf" must be a PDF,
+  // a ".png" a PNG), not just any type the accept set allows.
+  const byExt = name ? EXTENSION_SIGNATURES[fileExtension(name)] : undefined;
+  const sigs = byExt ? ACCEPT_SIGNATURES[accept].filter((s) => byExt.includes(s)) : ACCEPT_SIGNATURES[accept];
+  if (!sigs.some((sig) => hasSignature(bytes, sig))) return { ok: false, code: "wrong_extension" };
   return { ok: true };
+}
+
+/** The signature(s) a file with this extension must carry (server-side content check). */
+const EXTENSION_SIGNATURES: Record<string, readonly Signature[]> = {
+  ".pdf": ["pdf"],
+  ".png": ["png"],
+  ".jpg": ["jpeg"],
+  ".jpeg": ["jpeg"],
+  ".webp": ["webp"],
+  ".mp4": ["mp4"],
+  ".webm": ["webm"],
+  ".zip": ["zip"],
+};
+
+/**
+ * File name for display and the database (not a storage key): drops path
+ * parts, control and bidi-override characters (e.g. U+202E, which can make
+ * "invoice<U+202E>fdp.exe" display as "invoiceexe.pdf"),
+ * trims and caps the length. Storage keys use safeFileName instead.
+ */
+export function cleanDisplayFileName(name: unknown, max = 200): string {
+  const base = String(name ?? "").split(/[\\/]/).pop() ?? "";
+  const clean = base
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+    .trim()
+    .slice(0, max);
+  return clean || "file";
 }
 
 /** Storage-safe file name: ASCII letters, digits, dot, dash, underscore; keeps the extension; max 100 chars. */

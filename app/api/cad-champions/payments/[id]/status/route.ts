@@ -1,5 +1,6 @@
 import { getCcUser } from "@/lib/cad-champions/auth/server";
 import { refreshPaymentStatus } from "@/lib/cad-champions/payments/server";
+import { ccRateLimited } from "@/lib/cad-champions/rate-limits";
 
 // Live status of one payment for the SkipCash return page ("Confirming your
 // payment..."), polled every few seconds. Owner only. For an unpaid SkipCash
@@ -14,6 +15,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const cc = await getCcUser();
   if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
+  if (ccRateLimited("poll", cc.user.id)) return Response.json({ error: "rate_limited" }, { status: 429, headers: { ...NO_STORE, "Retry-After": "30" } });
   const res = await refreshPaymentStatus(cc, id);
   if (!res) return Response.json({ error: "not_found" }, { status: 404, headers: NO_STORE });
   return Response.json(res, { headers: NO_STORE });

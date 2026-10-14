@@ -72,6 +72,14 @@ type UploadError = { code: UploadErrorCode | "server"; ext?: string; size?: numb
 
 type Pending = { fileName: string; size: number; progress: number };
 
+/**
+ * Replaces the Storage upload (test-only: the e2e fixtures under
+ * /cad-champions/{en,ar}/e2e-fixtures/* mount a provider that "stores" the
+ * file instantly in memory). Without a provider the box uploads to Supabase.
+ */
+export type UploadTransport = (input: { bucket: string; path: string; file: File; onProgress: (percent: number) => void }) => Promise<void>;
+export const UploadTransportContext = React.createContext<UploadTransport | null>(null);
+
 class UploadFailure extends Error {
   constructor(public readonly code: UploadErrorCode) {
     super(code);
@@ -102,6 +110,7 @@ export function UploadBox({
   const statusId = React.useId();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const tusRef = React.useRef<TusHandle | null>(null);
+  const transport = React.useContext(UploadTransportContext);
   const retryRef = React.useRef<(() => void) | null>(null);
 
   const [phase, setPhase] = React.useState<Phase>(current ? "uploaded" : "idle");
@@ -176,6 +185,17 @@ export function UploadBox({
     setPhase("uploading");
     setError(null);
     try {
+      if (transport) {
+        await transport({ bucket, path, file, onProgress: (percent) => setPending((p) => (p ? { ...p, progress: percent } : p)) });
+        retryRef.current = null;
+        setStored({ fileName: file.name, size: file.size });
+        setPending(null);
+        setPhase("uploaded");
+        await Promise.resolve(onUploaded({ path, fileName: file.name, size: file.size, sha256 })).catch((e: unknown) =>
+          console.error("[cc-upload] onUploaded failed:", e instanceof Error ? e.message : e)
+        );
+        return;
+      }
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
       const {

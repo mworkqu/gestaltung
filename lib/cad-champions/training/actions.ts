@@ -21,7 +21,7 @@ import { markJourney } from "../journey/server";
 import { ccPath, isCcLocale } from "../routes";
 import { ccRateLimited } from "../rate-limits";
 import { readObjectHead, verifyUploadedObject } from "../upload/server";
-import { DEFAULT_MAX_BYTES, isPathUnderPrefix, isStepHeader } from "../upload/validate";
+import { DEFAULT_MAX_BYTES, cleanDisplayFileName, isPathUnderPrefix, isStepHeader } from "../upload/validate";
 import { canRevealHint, canSeeSolution, canUseExercise, canWatchLesson, hintsAvailable } from "./access";
 import { QUESTION_IMAGE_MAX_BYTES, QUESTION_MAX, exercisePrefix, questionPrefix } from "./catalog";
 import { exercisePassed, exercisePercent, type ExerciseOutcome } from "./grading";
@@ -326,7 +326,7 @@ export async function gradeExerciseAction(input: {
       user_id: userId,
       exercise_id: ex.id,
       storage_path: path,
-      file_name: String(input?.fileName ?? path.split("/").pop() ?? "").slice(0, 200),
+      file_name: cleanDisplayFileName(input?.fileName ?? path.split("/").pop(), 200),
       file_size: Number.isFinite(Number(input?.size)) ? Math.max(0, Math.floor(Number(input.size))) : null,
       sha256: /^[0-9a-f]{64}$/.test(String(input?.sha256 ?? "")) ? input.sha256 : null,
     };
@@ -492,6 +492,7 @@ export type HintResult = { ok: true; n: number; text: string } | { ok: false; re
 export async function revealHintAction(input: { slug: string; n: number; locale: string }): Promise<HintResult> {
   const cc = await getCcUser();
   if (!cc?.profile && !cc?.isStaff) return { ok: false, reason: "signed_out" };
+  if (!cc.isStaff && ccRateLimited("action", cc.user.id)) return { ok: false, reason: "error" };
   const service = createServiceClient();
   if (!service) return { ok: false, reason: "error" };
   try {

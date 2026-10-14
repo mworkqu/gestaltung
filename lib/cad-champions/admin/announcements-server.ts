@@ -195,7 +195,8 @@ export async function sendTest(to: string | null | undefined, input: Partial<Rec
   const res = await sendEmailResult({ to: [to], subject: mail.subject, html: mail.html, text: mail.text });
   if (!res.ok) {
     console.error("[cc-admin] test announcement failed:", res.error);
-    return { ok: false, error: "error", detail: (res.error ?? "error").slice(0, 120) };
+    // The provider's text stays in the server log; the browser gets a fixed code.
+    return { ok: false, error: "error", detail: "send_failed" };
   }
   return { ok: true };
 }

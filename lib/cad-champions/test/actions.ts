@@ -13,7 +13,7 @@ import { ccRateLimited } from "../rate-limits";
 import type { CcAttachment, CcExpectedUpload } from "../db/types";
 import { checkPackage, failedManifest, PACKAGE_MAX_BYTES, parseExpectations, type PackageManifest } from "../upload/package-check";
 import { verifyUploadedObject } from "../upload/server";
-import { DEFAULT_MAX_BYTES, isPathUnderPrefix, type UploadAccept } from "../upload/validate";
+import { DEFAULT_MAX_BYTES, cleanDisplayFileName, isPathUnderPrefix, type UploadAccept } from "../upload/validate";
 import { readStoredZip } from "../upload/zip-remote";
 import {
   SUBMISSIONS_BUCKET,
@@ -54,6 +54,7 @@ export async function startAttemptAction(slug: string): Promise<StartResult> {
   const cc = await getCcUser();
   if (!cc) return { ok: false, reason: "signed_out" };
   if (!cc.profile) return { ok: false, reason: "no_profile" };
+  if (ccRateLimited("action", cc.user.id)) return { ok: false, reason: "unavailable" };
 
   const loaded = await loadTest(String(slug ?? ""));
   if (!loaded.ok) return { ok: false, reason: loaded.reason === "not_set_up" ? "not_set_up" : loaded.reason === "not_found" ? "not_found" : "error" };
@@ -192,7 +193,7 @@ export async function recordSubmissionAction(input: {
   }
 
   const sha256 = typeof input.sha256 === "string" && /^[0-9a-f]{64}$/.test(input.sha256) ? input.sha256 : null;
-  const fileName = String(input.fileName ?? "file").slice(0, 255) || "file";
+  const fileName = cleanDisplayFileName(input.fileName, 255);
   const size = Number.isFinite(input.size) && input.size >= 0 ? Math.floor(input.size) : 0;
   const uploadedAt = new Date(now).toISOString();
   const row = {
@@ -324,6 +325,7 @@ export async function createSignedDownload(taskId: string, path: string, mode: "
   const cc = await getCcUser();
   if (!cc) return { ok: false, reason: "signed_out" };
   if (!/^[0-9a-f-]{36}$/i.test(String(taskId ?? "")) || typeof path !== "string") return { ok: false, reason: "not_allowed" };
+  if (ccRateLimited("action", cc.user.id)) return { ok: false, reason: "unavailable" };
 
   // The public view enforces visibility (published tests, or staff).
   const supabase = await createClient();
@@ -382,6 +384,7 @@ export async function recordPhaseMarkerAction(attemptId: string, key: string): P
   const cc = await getCcUser();
   if (!cc) return { ok: false, reason: "signed_out" };
   if (key !== PART_COLLECTED_KEY) return { ok: false, reason: "not_allowed" };
+  if (!/^[0-9a-f-]{36}$/i.test(String(attemptId ?? ""))) return { ok: false, reason: "not_allowed" };
   const service = createServiceClient();
   if (!service) return { ok: false, reason: "unavailable" };
 

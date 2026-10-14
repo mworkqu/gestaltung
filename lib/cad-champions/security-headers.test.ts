@@ -1,11 +1,27 @@
 import { describe, expect, it } from "vitest";
 
-import { applyCcSecurityHeaders, CC_SECURITY_HEADERS } from "./security-headers";
+import { applyCcSecurityHeaders, ccFramingAllowed, CC_SECURITY_HEADERS } from "./security-headers";
 
 describe("CC security headers", () => {
-  it("blocks framing by other sites and keeps the CSP to frame-ancestors only", () => {
-    expect(CC_SECURITY_HEADERS["Content-Security-Policy"]).toBe("frame-ancestors 'self'");
-    expect(CC_SECURITY_HEADERS["X-Frame-Options"]).toBe("SAMEORIGIN");
+  it("blocks all framing and keeps the CSP to frame-ancestors only", () => {
+    expect(CC_SECURITY_HEADERS["Content-Security-Policy"]).toBe("frame-ancestors 'none'");
+    expect(CC_SECURITY_HEADERS["X-Frame-Options"]).toBe("DENY");
+    const h = applyCcSecurityHeaders(new Headers(), "/test/abc");
+    expect(h.get("content-security-policy")).toBe("frame-ancestors 'none'");
+    expect(h.get("x-frame-options")).toBe("DENY");
+  });
+
+  it("lets only the shared result page be framed (other headers stay)", () => {
+    expect(ccFramingAllowed("/results/share/tok_abc")).toBe(true);
+    expect(ccFramingAllowed("/results/share/tok_abc/")).toBe(true);
+    for (const p of [undefined, "/", "/results", "/results/abc", "/results/share", "/results/share/a/b", "/admin/results/share/x"]) {
+      expect(ccFramingAllowed(p), String(p)).toBe(false);
+    }
+    const h = applyCcSecurityHeaders(new Headers({ "X-Frame-Options": "DENY" }), "/results/share/tok_abc");
+    expect(h.get("x-frame-options")).toBeNull();
+    expect(h.get("content-security-policy")).toBeNull();
+    expect(h.get("x-content-type-options")).toBe("nosniff");
+    expect(h.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
   });
 
   it("sets referrer, nosniff and a camera/microphone/geolocation-off permissions policy", () => {

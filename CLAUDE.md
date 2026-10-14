@@ -1494,3 +1494,20 @@ Check Supabase → Table Editor to confirm which tables exist before running:
 - The Next.js project root is the subfolder "Gestaltung — a manufacturing marketplace and inventory platform
   for Qatar" (contains package.json + .git). The Claude Code working dir is its PARENT, so cd/Set-Location into
   the subfolder for npm/git, or pass an explicit path (e.g. `vercel --cwd <subfolder>`).
+
+## CAD CHAMPIONS (/cad-champions, branch cad-champions, 2026-10-14/15)
+- A training platform for the Mechanical Engineering CAD skills competition, built as a route section
+  inside this app. Public URLs /cad-champions/{en,ar}/… (middleware rewrites to app/[locale]/cad-champions).
+  English default, sticky per-user Arabic. Own tables (cc_* prefix, migrations 0077–0086), own UI kit
+  (components/cad-champions/ui), own messages (messages/cad-champions/{en,ar}/*.json merged under "CC").
+- Docs: docs/ARCHITECTURE.md (CC section), docs/COMPETITION_ALIGNMENT.md (overrides older task text),
+  docs/cad-champions/{AGENT_BRIEF,PROMPTS,GRADER,RESULTS,TRAINING,AUTH_EMAILS,SECURITY_REVIEW,QA,DEPLOY,LAUNCH}.md,
+  docs/CONTENT_TODO.md (every [TODO-MO] placeholder), docs/TEST_DATA_CLEANUP.md (CC test rows).
+- Status: Prompts 1–12 built; all CC checks green (tsc, lint + RTL check, i18n:check, vitest, Playwright
+  e2e/cad-champions 72/72 with the write guard, GitHub Actions .github/workflows/cad-champions.yml).
+  NOT merged to main — the owner merges after review. Previews build only for commits containing [deploy].
+- Owner-run migrations 0077–0086 are all RUN ✔ (2026-10-15). Still owner's: env vars (GRADER_URL/SECRET after
+  deploying /grader to Cloud Run, ANTHROPIC_API_KEY, BUNNY_*, FAWRAN_*), plan prices, content placeholders,
+  Arabic review via docs/cad-champions/strings.csv, policies approval, noindex removal at launch (DEPLOY.md §6).
+- Vercel Function Storage lesson: never add a top-level "sharp" dependency (it is "sharp-admin", API routes
+  only); run scripts/vercel-prune.ps1 after pushes. See memory project_vercel_function_storage.

@@ -29,6 +29,11 @@ export const CC_RATE_LIMITS = {
   upload: { limit: 60, windowMs: 10 * MIN },
   /** Staff AI translation of review comments (paid API). */
   translate: { limit: 30, windowMs: 10 * MIN },
+  /** Cheap student actions with a server-side cost: start a test, signed task
+   *  downloads, hint reveals, reservation cancel, account-deletion requests. */
+  action: { limit: 60, windowMs: 10 * MIN },
+  /** Payment status polling (may call the SkipCash API): a poll every ~3 s for 10 min fits. */
+  poll: { limit: 240, windowMs: 10 * MIN },
 } as const;
 
 export type CcRateBucket = keyof typeof CC_RATE_LIMITS;

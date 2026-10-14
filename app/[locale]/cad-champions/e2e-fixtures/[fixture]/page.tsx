@@ -8,19 +8,38 @@ import { GetReadyHub } from "@/components/cad-champions/get-ready/hub";
 import { AdminPaymentCard } from "@/components/cad-champions/payments/admin-payment-card";
 import { CheckoutClient } from "@/components/cad-champions/payments/checkout-client";
 import { FawranPay } from "@/components/cad-champions/payments/fawran-pay";
-import { FullResults } from "@/components/cad-champions/results/results-sections";
+import { Expired, FullResults } from "@/components/cad-champions/results/results-sections";
 import { ReviewWorkspace } from "@/components/cad-champions/review/review-workspace";
 import { TestIntro } from "@/components/cad-champions/test/intro-sections";
-import { StartPanel } from "@/components/cad-champions/test/start-panel";
+import { StartPanel, type StartPanelState } from "@/components/cad-champions/test/start-panel";
 import { SubmittedScreen } from "@/components/cad-champions/test/submitted-screen";
 import { TestWorkspace } from "@/components/cad-champions/test/workspace";
-import { Alert, PageHeader, StatusChip } from "@/components/cad-champions/ui";
+import { Alert, PageHeader, StatusChip, Stepper, type StepperStep } from "@/components/cad-champions/ui";
+import { ExerciseWorkspace } from "@/components/cad-champions/training/exercise-workspace";
 import { LessonPlayer } from "@/components/cad-champions/video/lesson-player";
 import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
-import { canWatchLesson } from "@/lib/cad-champions/training/access";
+import { journeySteps, nextStep } from "@/lib/cad-champions/journey/next-step";
+import { canSeeSolution, canWatchLesson, hintsAvailable } from "@/lib/cad-champions/training/access";
 import { isCcLocale } from "@/lib/cad-champions/routes";
 
-import { FIXTURES, FX, SAMPLE_COHORTS, SAMPLE_PAYMENT_CARD, SAMPLE_PLANS, SAMPLE_REVIEW, sampleFawran, sampleResults, sampleTasks, sampleTest } from "./fixture-data";
+import { FixtureUploads } from "./fixture-client";
+import {
+  DASHBOARD_STATES,
+  FIXTURES,
+  FX,
+  GET_READY_ALMOST_DONE,
+  RESULT_VARIANTS,
+  SAMPLE_COHORTS,
+  SAMPLE_PAYMENT_CARD,
+  SAMPLE_PLANS,
+  SAMPLE_REVIEW,
+  sampleFawran,
+  sampleResults,
+  sampleTasks,
+  sampleTest,
+  type DashboardState,
+  type ResultVariant,
+} from "./fixture-data";
 
 // TEST-ONLY (lib/e2e-fixtures.ts): the CAD Champions screens that need a
 // signed-in session, rendered with STATIC sample props so the read-only e2e
@@ -28,29 +47,94 @@ import { FIXTURES, FX, SAMPLE_COHORTS, SAMPLE_PAYMENT_CARD, SAMPLE_PLANS, SAMPLE
 // or touching the database. Public URL: /cad-champions/{en,ar}/e2e-fixtures/<name>
 // (the CC layout + CC messages apply; the path is not in CC_PROTECTED_PREFIXES).
 // Every server action a component calls is intercepted by the spec
-// (page.route on the Next-Action POST) — nothing here reaches a real action.
+// (e2e/cad-champions/cc.ts mocks the Next-Action POST; an unmocked one is
+// aborted and fails the test) — nothing here reaches a real action. Uploads
+// go through FixtureUploads (in memory, never Supabase Storage).
+// Query switches: dashboard ?state=new|ready|testing|results|enrolled,
+// get-ready ?keys=practice, test-intro ?gate=locked|ready|cooldown|continue,
+// workspace ?mode=per_task|module_package&left=<seconds>,
+// results ?variant=weak|medium|strong|provisional|expired, exercise ?attempts=N.
 // 404 unless E2E_FIXTURES=1 and not on Vercel.
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
-type Props = { params: Promise<{ locale: string; fixture: string }> };
+type Props = {
+  params: Promise<{ locale: string; fixture: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
 
-export default async function CcE2eFixturePage({ params }: Props) {
+type Query = Record<string, string | undefined>;
+
+export default async function CcE2eFixturePage({ params, searchParams }: Props) {
   if (!e2eFixturesEnabled()) notFound();
   const { locale, fixture } = await params;
   if (!isCcLocale(locale) || !(FIXTURES as readonly string[]).includes(fixture)) notFound();
   setRequestLocale(locale);
+  const raw = await searchParams;
+  const query: Query = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]));
 
   return (
-    <div className="container space-y-6 py-8 sm:py-12" data-testid={`cc-fixture-${fixture}`}>
-      {await body(fixture as (typeof FIXTURES)[number], locale)}
-    </div>
+    <FixtureUploads>
+      <div className="container space-y-6 py-8 sm:py-12" data-testid={`cc-fixture-${fixture}`}>
+        {await body(fixture as (typeof FIXTURES)[number], locale, query)}
+      </div>
+    </FixtureUploads>
   );
 }
 
-async function body(fixture: (typeof FIXTURES)[number], locale: "en" | "ar") {
+function startState(gate: string | undefined): StartPanelState {
+  switch (gate) {
+    case "locked":
+      return { kind: "locked", reason: "not_finished", remaining: 2 };
+    case "cooldown":
+      return { kind: "cooldown", retakeAt: Date.parse("2030-01-15T09:00:00Z"), days: 30 };
+    case "continue":
+      return { kind: "continue", secondsLeft: 42 * 60 };
+    default:
+      return { kind: "start", minutes: 90 };
+  }
+}
+
+async function body(fixture: (typeof FIXTURES)[number], locale: "en" | "ar", query: Query) {
   switch (fixture) {
+    case "dashboard": {
+      // The real dashboard cards read the database; this renders the same "next step" and
+      // tracker from the real pure helpers (lib/cad-champions/journey/next-step.ts).
+      const key = (query.state && query.state in DASHBOARD_STATES ? query.state : "new") as DashboardState;
+      const sample = DASHBOARD_STATES[key];
+      const t = await getTranslations({ locale, namespace: "CC.dashboard" });
+      const tPages = await getTranslations({ locale, namespace: "CC.pages" });
+      const step = nextStep(sample.journey, sample.profile, sample.attempt, locale);
+      const steps: StepperStep[] = journeySteps(sample.journey, sample.profile, sample.attempt).map((x) => ({
+        id: x.id,
+        label: t(`tracker.steps.${x.id}.label`),
+        description: t(`tracker.steps.${x.id}.desc`),
+        status: x.status,
+        lockedReason: x.lockedReasonKey ? t(`tracker.locked.${x.lockedReasonKey}`) : undefined,
+      }));
+      return (
+        <>
+          <PageHeader title={tPages("dashboard.title")} purpose={tPages("dashboard.purpose")} />
+          <section className="neu space-y-4 p-6 sm:p-8" aria-labelledby="cc-next-step-heading" data-testid="next-step" data-step={step.id}>
+            <h2 id="cc-next-step-heading" className="kicker">
+              {t("nextStep.kicker")}
+            </h2>
+            <p className="max-w-2xl text-xl font-bold text-heading sm:text-2xl">{t(`nextStep.reason.${step.reasonKey}`)}</p>
+            <a href={step.href} className="font-semibold text-accent">
+              {t(`nextStep.cta.${step.ctaKey}`)}
+            </a>
+          </section>
+          <section className="neu space-y-4 p-6 sm:p-8" aria-labelledby="cc-tracker-heading" data-testid="tracker">
+            <h2 id="cc-tracker-heading" className="text-xl font-extrabold text-heading">
+              {t("tracker.title")}
+            </h2>
+            <Stepper steps={steps} />
+          </section>
+        </>
+      );
+    }
+
     case "onboarding":
       return <OnboardingClient startScreen={0} initialTrack="inventor" />;
 
@@ -58,7 +142,7 @@ async function body(fixture: (typeof FIXTURES)[number], locale: "en" | "ar") {
       return (
         <GetReadyHub
           userId={FX.userId}
-          initialKeys={["welcome_video"]}
+          initialKeys={query.keys === "practice" ? GET_READY_ALMOST_DONE : ["welcome_video"]}
           loadState="ok"
           track="inventor"
           hasWindowsPc="yes"
@@ -75,29 +159,31 @@ async function body(fixture: (typeof FIXTURES)[number], locale: "en" | "ar") {
           locale={locale}
           test={test}
           tasks={sampleTasks("module_package")}
-          action={<StartPanel slug={test.slug} state={{ kind: "start", minutes: test.time_limit_minutes }} last={null} />}
+          action={<StartPanel slug={test.slug} state={startState(query.gate)} last={null} />}
         />
       );
     }
 
     case "workspace": {
       const now = Date.now();
+      const uploadMode = query.mode === "per_task" ? "per_task" : "module_package";
+      const left = query.left && Number.isFinite(Number(query.left)) ? Number(query.left) : 85 * 60;
       return (
         <TestWorkspace
           mode="live"
           testTitle="Sample diagnostic test"
-          uploadMode="module_package"
+          uploadMode={uploadMode}
           graceSeconds={120}
           timeLimitMinutes={90}
           attempt={{
             id: FX.attemptId,
             startedAt: new Date(now - 5 * 60_000).toISOString(),
-            deadlineAt: new Date(now + 85 * 60_000).toISOString(),
+            deadlineAt: new Date(now + left * 1000).toISOString(),
             inPerson: false,
             phaseMarkers: [],
           }}
           userId={FX.userId}
-          tasks={sampleTasks("module_package")}
+          tasks={sampleTasks(uploadMode)}
           briefs={{ [FX.task1]: <p>Model the bracket from the drawing.</p>, [FX.task2]: <p>Model the shaft from the drawing.</p> }}
           submissions={{}}
           packageFile={null}
@@ -121,8 +207,19 @@ async function body(fixture: (typeof FIXTURES)[number], locale: "en" | "ar") {
     case "results": {
       const tShort = await getTranslations({ locale, namespace: "CC.results.areaShort" });
       const names = Object.fromEntries([1, 2, 3, 4, 5, 6].map((id) => [id, tShort(String(id) as "1")]));
-      const v = sampleResults(locale, names);
+      const variant = ((RESULT_VARIANTS as readonly string[]).includes(query.variant ?? "") ? query.variant : "medium") as ResultVariant;
+      const v = sampleResults(locale, names, variant);
       const t = await getTranslations({ locale, namespace: "CC.results" });
+      if (v.status === "expired") {
+        return (
+          <>
+            <PageHeader title={v.test.title} purpose={t("page.purpose")} />
+            <div className="max-w-4xl space-y-6">
+              <Expired v={v} locale={locale} />
+            </div>
+          </>
+        );
+      }
       return (
         <>
           <PageHeader title={v.test.title} purpose={t("page.purpose")} />
@@ -177,6 +274,33 @@ async function body(fixture: (typeof FIXTURES)[number], locale: "en" | "ar") {
               </Alert>
             )}
           </section>
+        </>
+      );
+    }
+
+    case "exercise": {
+      // ?attempts=N failed graded attempts: hints open one per failed attempt (the real rule).
+      const attempts = Math.max(0, Math.min(10, Math.floor(Number(query.attempts ?? 0)) || 0));
+      return (
+        <>
+          <PageHeader title="Sample L1 exercise: bracket" purpose="Foundations · Level 1" />
+          <ExerciseWorkspace
+            slug="e2e-l1-bracket"
+            exerciseId={FX.exerciseId}
+            userId={FX.userId}
+            accept="step"
+            passMark={80}
+            hintCount={3}
+            hasSolution
+            initial={{
+              best: attempts > 0 ? 40 : null,
+              attempts,
+              failed: attempts,
+              passed: false,
+              hintsAvailable: hintsAvailable(attempts, 3),
+              solutionUnlocked: canSeeSolution({ hasVideo: true, passed: false, attempts }),
+            }}
+          />
         </>
       );
     }

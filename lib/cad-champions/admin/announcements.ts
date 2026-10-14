@@ -41,8 +41,9 @@ export function validateAnnouncement(input: Partial<Record<keyof AnnouncementDra
   const s = (v: unknown) => (typeof v === "string" ? v.replace(/\r\n/g, "\n").trim() : "");
   const value: AnnouncementDraft = {
     kind: input.kind === "essential" ? "essential" : "marketing",
-    subjectEn: s(input.subjectEn),
-    subjectAr: s(input.subjectAr),
+    // Subjects are one line (no CR/LF reaches the mail subject).
+    subjectEn: s(input.subjectEn).replace(/[\r\n]+/g, " "),
+    subjectAr: s(input.subjectAr).replace(/[\r\n]+/g, " "),
     bodyEn: s(input.bodyEn),
     bodyAr: s(input.bodyAr),
   };

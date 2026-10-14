@@ -4,6 +4,7 @@ import {
   DEFAULT_MAX_BYTES,
   acceptAttribute,
   buildObjectPath,
+  cleanDisplayFileName,
   chooseUploadMethod,
   contentTypeFor,
   fileExtension,
@@ -149,5 +150,25 @@ describe("file signatures (server-side magic-byte check)", () => {
     expect(validateHeader(PNG, "pdf")).toMatchObject({ ok: false });
     expect(validateHeader(enc("%PDF-1.7"), "zip")).toMatchObject({ ok: false });
     expect(validateHeader(ZIP, "video")).toMatchObject({ ok: false });
+  });
+});
+
+describe("security review: extension-matched signatures and display names", () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
+  const pdf = new TextEncoder().encode("%PDF-1.7\n");
+  it("a proof named .pdf must be a PDF and a .png must be a PNG", () => {
+    expect(validateHeader(pdf, "proof", "u/p/1_receipt.pdf")).toEqual({ ok: true });
+    expect(validateHeader(png, "proof", "u/p/1_receipt.png")).toEqual({ ok: true });
+    expect(validateHeader(png, "proof", "u/p/1_receipt.pdf")).toEqual({ ok: false, code: "wrong_extension" });
+    expect(validateHeader(pdf, "proof", "u/p/1_receipt.png")).toEqual({ ok: false, code: "wrong_extension" });
+    // Without a name the accept set still decides (client-side check).
+    expect(validateHeader(png, "proof")).toEqual({ ok: true });
+  });
+  it("cleanDisplayFileName drops path parts, control and bidi characters", () => {
+    expect(cleanDisplayFileName("a/b/invoice‮fdp.exe")).toBe("invoicefdp.exe");
+    expect(cleanDisplayFileName("..\\x\u0000y.step")).toBe("xy.step");
+    expect(cleanDisplayFileName("  ")).toBe("file");
+    expect(cleanDisplayFileName(undefined)).toBe("file");
+    expect(cleanDisplayFileName("a".repeat(300), 200)).toHaveLength(200);
   });
 });

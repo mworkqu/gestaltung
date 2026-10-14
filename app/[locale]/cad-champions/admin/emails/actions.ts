@@ -38,7 +38,8 @@ export async function sendTemplateTestAction(input: { id: string; locale: string
     const res = await sendEmailResult({ to: [to], subject: `[Test] ${mail.subject}`, html: mail.html, text: mail.text });
     if (!res.ok) {
       console.error("[cc-admin] email test failed:", def.id, res.error);
-      return { ok: false, error: "error", detail: (res.error ?? "error").slice(0, 120) };
+      // The provider's text stays in the server log; the browser gets a fixed code.
+      return { ok: false, error: "error", detail: "send_failed" };
     }
     return { ok: true, data: { email: to } };
   } catch (e) {

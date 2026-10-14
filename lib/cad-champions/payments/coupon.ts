@@ -63,8 +63,10 @@ export function computeTotals(input: {
   coupon?: { type: CcDiscountType; value: number } | null;
   addonPrice?: number | null;
 }): Totals {
-  const list = round2(Math.max(0, input.planPrice));
+  // A plan with no price yet (TODO-MO) must never produce NaN: treat it as 0.
+  const safe = (n: number | null | undefined) => (Number.isFinite(n) ? Math.max(0, n as number) : 0);
+  const list = round2(safe(input.planPrice));
   const discount = input.coupon ? discountAmount(input.coupon.type, input.coupon.value, list) : 0;
-  const addon = round2(Math.max(0, input.addonPrice ?? 0));
+  const addon = round2(safe(input.addonPrice));
   return { list, discount, addon, amount: round2(list - discount + addon) };
 }

@@ -15,6 +15,7 @@ import type { TaskView } from "@/lib/cad-champions/test/view";
 
 /** Fixture names: /cad-champions/{en,ar}/e2e-fixtures/<name>. */
 export const FIXTURES = [
+  "dashboard",
   "onboarding",
   "get-ready",
   "test-intro",
@@ -22,6 +23,7 @@ export const FIXTURES = [
   "submitted",
   "results",
   "lesson",
+  "exercise",
   "checkout",
   "fawran",
   "review",
@@ -38,6 +40,7 @@ export const FX = {
   planId: "00000000-0000-4000-8000-000000000f01",
   cohortId: "00000000-0000-4000-8000-000000000f11",
   reviewId: "00000000-0000-4000-8000-000000000e01",
+  exerciseId: "00000000-0000-4000-8000-000000000e11",
   slug: "e2e-sample-test",
 } as const;
 
@@ -113,9 +116,21 @@ export function sampleTasks(uploadMode: "per_task" | "module_package" = "module_
   ];
 }
 
+/** ?variant= on the results fixture. */
+export const RESULT_VARIANTS = ["weak", "medium", "strong", "provisional", "expired"] as const;
+export type ResultVariant = (typeof RESULT_VARIANTS)[number];
+
+const VARIANT_PERCENTS: Record<ResultVariant, Record<number, number | null>> = {
+  weak: { 1: null, 2: 20, 3: 15, 4: null, 5: null, 6: 10 },
+  medium: { 1: null, 2: 80, 3: 55, 4: null, 5: null, 6: 40 },
+  strong: { 1: null, 2: 96, 3: 92, 4: null, 5: null, 6: 88 },
+  provisional: { 1: null, 2: 80, 3: 55, 4: null, 5: null, 6: 40 },
+  expired: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null },
+};
+
 /** Results with real scoring helpers on sample percents (areas 2, 3, 6 assessed). */
-export function sampleResults(locale: Locale, areaNames: Record<number, string>): ResultsView {
-  const percents: Record<number, number | null> = { 1: null, 2: 80, 3: 55, 4: null, 5: null, 6: 40 };
+export function sampleResults(locale: Locale, areaNames: Record<number, string>, variant: ResultVariant = "medium"): ResultsView {
+  const percents = VARIANT_PERCENTS[variant];
   const scored = SKILL_AREA_IDS.map((id) => ({
     skillAreaId: id,
     weight: OFFICIAL_WEIGHTS[id],
@@ -126,8 +141,8 @@ export function sampleResults(locale: Locale, areaNames: Record<number, string>)
   return {
     attemptId: FX.attemptId,
     userId: FX.userId,
-    status: "graded",
-    outcome: "graded",
+    status: variant === "expired" ? "expired" : variant === "provisional" ? "provisional" : "graded",
+    outcome: variant === "provisional" ? "provisional" : "graded",
     startedAt: "2026-09-10T06:00:00Z",
     submittedAt: "2026-09-10T07:20:00Z",
     submitReason: "manual",
@@ -137,7 +152,7 @@ export function sampleResults(locale: Locale, areaNames: Record<number, string>)
     shareToken: null,
     timeUsedMinutes: 80,
     timeAllowedMinutes: 90,
-    retakeAt: null,
+    retakeAt: variant === "expired" ? Date.parse("2030-01-15T09:00:00Z") : null,
     test: { id: FX.testId, slug: FX.slug, title: locale === "ar" ? "Sample diagnostic test (AR)" : "Sample diagnostic test", titleEn: "Sample diagnostic test", titleAr: "Sample diagnostic test (AR)", type: "diagnostic" },
     studentName: "Sample Student",
     areas: scored.map((a) => ({
@@ -148,7 +163,7 @@ export function sampleResults(locale: Locale, areaNames: Record<number, string>)
       level: a.percent == null ? null : levelFor(a.percent),
       assessed: a.assessed,
     })),
-    modules: [{ code: "M3", name: "Assemblies and detail drawing", percent: 55, level: levelFor(55) }],
+    modules: [{ code: "M3", name: "Assemblies and detail drawing", percent: percents[3] ?? 0, level: levelFor(percents[3] ?? 0) }],
     tasks: [
       {
         id: FX.task1,
@@ -208,9 +223,59 @@ export function sampleResults(locale: Locale, areaNames: Record<number, string>)
       },
     ],
     path: recommendTrainingPath(scored),
-    anyManualCheck: false,
+    anyManualCheck: variant === "provisional",
   };
 }
+
+/** ?state= on the dashboard fixture: a student at each point of the journey. */
+export const DASHBOARD_STATES = {
+  new: { journey: null, profile: { full_name: "Sample Student", phone: null, date_of_birth: null }, attempt: null },
+  ready: {
+    journey: { profile_completed_at: "2026-09-01T08:00:00Z", get_ready_completed_at: "2026-09-02T08:00:00Z", practice_passed_at: "2026-09-02T08:30:00Z" },
+    profile: { full_name: "Sample Student", phone: "+97455555555", date_of_birth: "2008-05-01" },
+    attempt: null,
+  },
+  testing: {
+    journey: { profile_completed_at: "2026-09-01T08:00:00Z", get_ready_completed_at: "2026-09-02T08:00:00Z", practice_passed_at: "2026-09-02T08:30:00Z" },
+    profile: { full_name: "Sample Student", phone: "+97455555555", date_of_birth: "2008-05-01" },
+    attempt: { status: "in_progress" },
+  },
+  results: {
+    journey: {
+      profile_completed_at: "2026-09-01T08:00:00Z",
+      get_ready_completed_at: "2026-09-02T08:00:00Z",
+      practice_passed_at: "2026-09-02T08:30:00Z",
+      first_test_submitted_at: "2026-09-10T07:20:00Z",
+    },
+    profile: { full_name: "Sample Student", phone: "+97455555555", date_of_birth: "2008-05-01" },
+    attempt: { status: "graded", submitted_at: "2026-09-10T07:20:00Z" },
+  },
+  enrolled: {
+    journey: {
+      profile_completed_at: "2026-09-01T08:00:00Z",
+      get_ready_completed_at: "2026-09-02T08:00:00Z",
+      practice_passed_at: "2026-09-02T08:30:00Z",
+      first_test_submitted_at: "2026-09-10T07:20:00Z",
+      results_viewed_at: "2026-09-11T07:00:00Z",
+      sample_lesson_watched_at: "2026-09-12T07:00:00Z",
+      enrolled_at: "2026-09-20T07:00:00Z",
+    },
+    profile: { full_name: "Sample Student", phone: "+97455555555", date_of_birth: "2008-05-01" },
+    attempt: { status: "graded", submitted_at: "2026-09-10T07:20:00Z" },
+  },
+} as const;
+export type DashboardState = keyof typeof DASHBOARD_STATES;
+
+/** Get Ready keys with every required step done except the practice upload (?keys=practice). */
+export const GET_READY_ALMOST_DONE = [
+  "welcome_video",
+  "check_computer",
+  "install_software",
+  "essential_actions",
+  ...["units_mm", "material_density", "export_step", "export_pdf", "find_upload"].map((k) => `essential_actions__${k}`),
+  "test_day_checklist",
+  ...["time_90", "charged", "close_apps", "cad_ready", "know_exports", "upload_each", "work_alone"].map((k) => `test_day_checklist__${k}`),
+];
 
 export const SAMPLE_PLANS: CheckoutPlan[] = [
   {

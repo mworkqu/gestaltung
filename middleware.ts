@@ -121,6 +121,7 @@ async function applySiteV2(request: NextRequest, intl: NextResponse): Promise<Ne
 const CC_ROBOTS = "noindex, nofollow";
 
 async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kind: "none" }>): Promise<NextResponse> {
+  const rest = parseCcPath(request.nextUrl.pathname)?.rest ?? "/";
   if (cc.kind === "redirect") {
     const res = NextResponse.redirect(new URL(cc.to, request.url), cc.status);
     res.headers.set("X-Robots-Tag", CC_ROBOTS);
@@ -133,7 +134,6 @@ async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kin
   // without any Supabase auth cookie goes straight to sign-in, returning here
   // afterwards. Only a fast pre-check: the page itself verifies the session and
   // the role server-side (requireCcUser / requireCcStaff).
-  const rest = parseCcPath(request.nextUrl.pathname)?.rest ?? "/";
   if (isCcProtected(rest) && !hasSupabaseAuthCookie(request.cookies.getAll().map((c) => c.name))) {
     const target = ccSignInHref(cc.locale, request.nextUrl.pathname + request.nextUrl.search);
     const res = NextResponse.redirect(new URL(target, request.url), 307);
@@ -150,8 +150,9 @@ async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kin
   headers.set("X-NEXT-INTL-LOCALE", cc.locale);
   const res = NextResponse.rewrite(new URL(cc.to, request.url), { request: { headers } });
   res.headers.set("X-Robots-Tag", CC_ROBOTS);
-  // Prompt 12 Step A: CC-only security headers (lib/cad-champions/security-headers.ts).
-  applyCcSecurityHeaders(res.headers);
+  // Prompt 12 Step A: CC-only security headers (lib/cad-champions/security-headers.ts);
+  // only the public shared-result page may be framed.
+  applyCcSecurityHeaders(res.headers, rest);
   return updateSession(request, res);
 }
 
