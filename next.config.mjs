@@ -38,6 +38,17 @@ const nextConfig = {
   // by lib/store/load-sharp.ts; the includes above ship it with SHARP_ROUTES.
   // Native module: keep it out of the webpack bundle.
   serverExternalPackages: ["sharp-admin"],
+  // sharp's WebAssembly fallback (@img/sharp-wasm32, ~10 MB) and the other
+  // platforms' binaries are never used on Vercel (linux-x64 native is), so
+  // they are dropped from every function. Applied after the includes above.
+  outputFileTracingExcludes: {
+    "*": [
+      "./node_modules/@img/sharp-wasm32/**/*",
+      "./node_modules/@img/sharp-win32-*/**/*",
+      "./node_modules/@img/sharp-darwin-*/**/*",
+      "./node_modules/@img/sharp-libvips-darwin-*/**/*",
+    ],
+  },
 
   // Phase G caching: /<locale>/store without query params is a static (ISR)
   // page. With any listing param (lib/store/catalog.ts STORE_URL_PARAMS —
