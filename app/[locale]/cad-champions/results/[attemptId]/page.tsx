@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BookOpen, CheckCircle2, ChevronDown, Clock3, Download, FileX2, GraduationCap, MessageCircle, PlayCircle, SearchX, UserCheck } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ClipboardCheck, XCircle, ChevronDown, Clock3, Download, FileX2, GraduationCap, MessageCircle, PlayCircle, SearchX, UserCheck } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { GradingPoller } from "@/components/cad-champions/results/grading-poller";
@@ -374,6 +374,7 @@ const METHOD_TONE: Record<TaskCardView["method"], ChipTone> = { auto: "info", ch
 
 async function Tasks({ v, locale, isOwner }: { v: ResultsView; locale: Locale; isOwner: boolean }) {
   const t = await getTranslations({ locale, namespace: "CC.results.tasks" });
+  const ts = await getTranslations({ locale, namespace: "CC.review.student" });
   return (
     <section className="space-y-4" aria-labelledby="cc-tasks-title">
       <h2 id="cc-tasks-title" className="text-xl font-extrabold text-heading">
@@ -404,7 +405,16 @@ async function Tasks({ v, locale, isOwner }: { v: ResultsView; locale: Locale; i
           {!task.hasFile ? <p className="text-sm text-body">{t("noFile")}</p> : null}
           {task.checking ? <p className="text-sm text-body">{t("checking")}</p> : null}
           {task.manualCheck ? <p className="text-sm font-semibold text-ink">{t("manualCheck")}</p> : null}
-          {task.waitingTrainer ? <p className="text-sm text-body">{t("waitingTrainer")}</p> : null}
+          {task.checklistPending ? (
+            <span className="inline-flex items-center gap-1">
+              <StatusChip tone="info" icon={ClipboardCheck}>
+                {ts("checklistDone")}
+              </StatusChip>
+              <HelpTip label={ts("checklistHelpLabel")}>{ts("checklistHelp")}</HelpTip>
+            </span>
+          ) : task.waitingTrainer ? (
+            <p className="text-sm text-body">{t("waitingTrainer")}</p>
+          ) : null}
 
           {task.feedback ? (
             <div>
@@ -414,12 +424,35 @@ async function Tasks({ v, locale, isOwner }: { v: ResultsView; locale: Locale; i
           ) : null}
           {task.reviewerComment ? (
             <div>
-              <h4 className="text-sm font-bold text-ink">{t("reviewer")}</h4>
+              <h4 className="flex flex-wrap items-center gap-2 text-sm font-bold text-ink">
+                {t("reviewer")}
+                {task.commentMachineTranslated ? <StatusChip tone="neutral">{ts("machineTranslated")}</StatusChip> : null}
+              </h4>
               <p className="mt-1 whitespace-pre-line text-sm text-body">{task.reviewerComment}</p>
             </div>
           ) : null}
 
-          {task.hasFile && !task.checking ? (
+          {task.checklist ? (
+            <div>
+              <h4 className="text-sm font-bold text-ink">{ts("checklistTitle")}</h4>
+              <ul className="mt-2 space-y-2">
+                {task.checklist.map((c, i) => (
+                  <li key={i} className="tile flex items-start gap-2 text-sm">
+                    {c.passed === true ? (
+                      <CheckCircle2 aria-hidden="true" strokeWidth={1.75} className="mt-0.5 h-4 w-4 shrink-0 text-buy" />
+                    ) : (
+                      <XCircle aria-hidden="true" strokeWidth={1.75} className="mt-0.5 h-4 w-4 shrink-0 text-[#a1231f]" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="sr-only">{c.passed === true ? ts("passed") : ts("failed")}: </span>
+                      <span className="font-semibold text-ink">{c.description}</span>
+                      {c.hint ? <span className="mt-1 block text-body">{c.hint}</span> : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : task.hasFile && !task.checking && !task.checklistPending ? (
             task.failed.length > 0 ? (
               <div>
                 <h4 className="text-sm font-bold text-ink">{t("failedTitle")}</h4>
@@ -450,7 +483,10 @@ async function Tasks({ v, locale, isOwner }: { v: ResultsView; locale: Locale; i
                 {task.judgements.map((j, i) => (
                   <li key={i} className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-body">{j.description}</span>
-                    <span className="font-bold text-ink">{j.score == null ? t("judgementPending") : t("judgementScore", { score: String(j.score) })}</span>
+                    <span className="text-end">
+                      <span className="block font-bold text-ink">{j.score == null ? t("judgementPending") : t("judgementScore", { score: String(j.score) })}</span>
+                      {j.score != null && j.score >= 0 && j.score <= 3 ? <span className="block text-xs text-body">{ts(`scale.${j.score}`)}</span> : null}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -468,6 +504,26 @@ async function Tasks({ v, locale, isOwner }: { v: ResultsView; locale: Locale; i
                 </Link>
               }
             />
+          ) : null}
+
+          {task.question ? (
+            <div className="neu-inset space-y-2 p-4 text-sm">
+              <h4 className="font-bold text-ink">{ts("yourQuestion")}</h4>
+              <p dir="auto" className="whitespace-pre-line text-body">
+                {task.question.body}
+              </p>
+              <h4 className="font-bold text-ink">{ts("answer")}</h4>
+              {task.question.answer ? (
+                <>
+                  <p dir="auto" className="whitespace-pre-line text-ink">
+                    {task.question.answer}
+                  </p>
+                  {task.question.answeredAt ? <p className="text-xs text-body">{ts("answeredOn", { date: formatDate(task.question.answeredAt, locale) })}</p> : null}
+                </>
+              ) : (
+                <p className="text-body">{ts("answerPending")}</p>
+              )}
+            </div>
           ) : null}
 
           {isOwner && task.taskResultId && task.hasFile && !task.checking ? (

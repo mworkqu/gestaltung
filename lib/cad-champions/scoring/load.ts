@@ -55,6 +55,14 @@ export interface TaskCardView {
   reviewerComment: string | null;
   failed: { description: string; hint: string | null }[];
   judgements: { description: string; score: number | null }[];
+  /** Drawing checklist (ai_drawing) still waiting for the trainer: show the "Checklist done" chip, no item results yet. */
+  checklistPending: boolean;
+  /** Drawing checklist after the trainer finalized it: every measurement item with pass / fail. */
+  checklist: { description: string; hint: string | null; passed: boolean | null }[] | null;
+  /** The reviewer comment shown is a machine translation. */
+  commentMachineTranslated: boolean;
+  /** The latest "Question this result" for this task, with the trainer's answer. */
+  question: { body: string; answer: string | null; answeredAt: string | null; status: string } | null;
   error: { message: string; helpSlug: string } | null;
   taskResultId: string | null;
   queryOpen: boolean;
@@ -129,6 +137,7 @@ type ResultRow = TaskResultInput & {
   feedback_ar: string | null;
   reviewer_comment_en: string | null;
   reviewer_comment_ar: string | null;
+  details?: Record<string, unknown> | null;
 };
 type AspectRow = AspectInput & { description_en: string; description_ar: string; student_hint_en: string | null; student_hint_ar: string | null; position: number };
 type AspectResultRow = AspectResultInput & { task_result_id: string };
@@ -155,12 +164,17 @@ export async function loadResultsView(attemptId: string, locale: Locale): Promis
       service.from("cc_test_tasks").select("id,position,title_en,title_ar,skill_area_id,competition_module,max_points,grading_mode").eq("test_id", attempt.test_id).order("position"),
       service
         .from("cc_task_results")
-        .select("id,task_id,status,submission_id,final_score,manual_score,ai_score,auto_score,needs_manual_review,error_code,help_slug,feedback_en,feedback_ar,reviewer_comment_en,reviewer_comment_ar")
+        .select("id,task_id,status,submission_id,final_score,manual_score,ai_score,auto_score,needs_manual_review,error_code,help_slug,feedback_en,feedback_ar,reviewer_comment_en,reviewer_comment_ar,details")
         .eq("attempt_id", attemptId),
       service.from("cc_skill_areas").select("id,name_en,name_ar,weight_percent").order("id"),
       service.from("cc_competition_modules").select("code,name_en,name_ar"),
       service.from("cc_profiles").select("full_name,full_name_ar").eq("id", attempt.user_id).maybeSingle<{ full_name: string | null; full_name_ar: string | null }>(),
-      service.from("cc_lesson_questions").select("task_result_id,status").eq("attempt_id", attemptId).eq("kind", "grade_query"),
+      service
+        .from("cc_lesson_questions")
+        .select("task_result_id,status,body,answer,answered_at,created_at")
+        .eq("attempt_id", attemptId)
+        .eq("kind", "grade_query")
+        .order("created_at", { ascending: true }),
     ]);
     if (tasksRes.error) throw new Error(tasksRes.error.message);
     if (resultsRes.error) throw new Error(resultsRes.error.message);
@@ -195,11 +209,15 @@ export async function loadResultsView(attemptId: string, locale: Locale): Promis
     const scores = scoreAttempt({ tasks, aspects, aspectResults, results, weights });
     const resultByTask = new Map(results.map((r) => [r.task_id, r]));
     const arByAspect = new Map(aspectResults.map((r) => [r.aspect_id, r]));
-    const openQueries = new Set(
-      ((queriesRes.error ? [] : (queriesRes.data ?? [])) as { task_result_id: string | null; status: string }[])
-        .filter((q) => q.status === "open" && q.task_result_id)
-        .map((q) => q.task_result_id as string)
-    );
+    const queryRows = (queriesRes.error ? [] : (queriesRes.data ?? [])) as {
+      task_result_id: string | null;
+      status: string;
+      body?: string;
+      answer?: string | null;
+      answered_at?: string | null;
+    }[];
+    const openQueries = new Set(queryRows.filter((q) => q.status === "open" && q.task_result_id).map((q) => q.task_result_id as string));
+    const latestQuery = new Map(queryRows.filter((q) => q.task_result_id).map((q) => [q.task_result_id as string, q]));
 
     const taskViews: TaskCardView[] = tasks.map((t, i) => {
       const r = resultByTask.get(t.id);
@@ -208,11 +226,21 @@ export async function loadResultsView(attemptId: string, locale: Locale): Promis
       const own = aspects.filter((a) => a.task_id === t.id);
       const failed: TaskCardView["failed"] = [];
       const judgements: TaskCardView["judgements"] = [];
-      if (hasFile) {
+      const isChecklist = t.grading_mode === "ai_drawing";
+      const checklistFinal = isChecklist && hasFile && r?.status === "final";
+      const checklistPending = isChecklist && hasFile && !!r && r.status !== "final" && r.status !== "error";
+      const checklist: TaskCardView["checklist"] = checklistFinal ? [] : null;
+      if (hasFile && !checklistPending) {
         for (const a of own) {
           const ar = arByAspect.get(a.id);
           if (a.type === "judgement") {
             judgements.push({ description: pick(locale, a.description_en, a.description_ar), score: ar?.judgement_score ?? null });
+          } else if (checklist) {
+            checklist.push({
+              description: pick(locale, a.description_en, a.description_ar),
+              hint: ar?.passed === false ? pick(locale, a.student_hint_en, a.student_hint_ar) || null : null,
+              passed: ar?.passed ?? null,
+            });
           } else if (ar && ar.passed === false) {
             failed.push({ description: pick(locale, a.description_en, a.description_ar), hint: pick(locale, a.student_hint_en, a.student_hint_ar) || null });
           }
@@ -243,6 +271,13 @@ export async function loadResultsView(attemptId: string, locale: Locale): Promis
         reviewerComment: r ? pick(locale, r.reviewer_comment_en, r.reviewer_comment_ar) || null : null,
         failed,
         judgements,
+        checklistPending,
+        checklist,
+        commentMachineTranslated: !!r && r.details?.comment_machine_translated === locale && !!(locale === "ar" ? r.reviewer_comment_ar : r.reviewer_comment_en),
+        question: (() => {
+          const q = r ? latestQuery.get(r.id) : undefined;
+          return q ? { body: q.body ?? "", answer: q.answer ?? null, answeredAt: q.answered_at ?? null, status: q.status } : null;
+        })(),
         error: err ? { message: err.message, helpSlug: r?.help_slug || err.helpSlug } : null,
         taskResultId: r?.id ?? null,
         queryOpen: r ? openQueries.has(r.id) : false,

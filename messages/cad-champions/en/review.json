@@ -1,0 +1,341 @@
+{
+  "adminHome": {
+    "navLabel": "Trainer work",
+    "reviewTitle": "Drawing review queue",
+    "reviewText": "Confirm the automatic drawing checklist, score the judgement items from 0 to 3 and finalize the result.",
+    "reviewCta": "Open the review queue",
+    "questionsTitle": "Questions inbox",
+    "questionsText": "Answer students' questions about their results and about lessons. The student gets an email with your answer.",
+    "questionsCta": "Open the questions inbox"
+  },
+  "queue": {
+    "metaTitle": "Review queue",
+    "back": "Back to admin",
+    "title": "Drawing review queue",
+    "purpose": "Drawings and trainer tasks waiting for your decision, oldest first. Aim to clear each one within 24 hours.",
+    "helpLabel": "About the review queue",
+    "help": "Our system checks drawing standards automatically. You confirm or change each item, score the judgement items and finalize. The student's score is provisional until you do.",
+    "problem": {
+      "unavailable": {
+        "title": "The review queue is not available",
+        "body": "The server is missing its database key. Ask the site owner to check SUPABASE_SERVICE_ROLE_KEY."
+      },
+      "not_set_up": {
+        "title": "The review queue is being set up",
+        "body": "The database tables are not ready yet. Please try again after the CAD Champions migrations have run."
+      },
+      "error": {
+        "title": "We couldn't load the queue",
+        "body": "Something went wrong on our side. Reload the page in a minute."
+      }
+    },
+    "filterTest": "Test",
+    "allTests": "All tests",
+    "unclearOnly": "Unclear only",
+    "unclearHelpLabel": "What \"unclear only\" shows",
+    "unclearHelp": "Submissions where the AI was unsure about at least one item, or could not check the file at all.",
+    "apply": "Apply",
+    "clear": "Clear filters",
+    "empty": {
+      "title": "Nothing to review",
+      "body": "All drawings are reviewed. New submissions appear here as soon as students submit a test."
+    },
+    "emptyFiltered": {
+      "title": "No submissions match these filters",
+      "body": "Try another test, or clear the filters to see everything that is waiting."
+    },
+    "count": "{count} waiting",
+    "colStudent": "Student",
+    "colTest": "Test and task",
+    "colSubmitted": "Submitted",
+    "colAi": "AI check",
+    "colWaiting": "Waiting",
+    "open": "Review",
+    "unknownStudent": "Unnamed student",
+    "kind": {
+      "drawing": "Drawing",
+      "manual": "Trainer task",
+      "error": "Checked by hand"
+    },
+    "aiSummary": "{pass}/{total} pass",
+    "aiUnclear": "· {count} to check",
+    "skipped": {
+      "pending": "Not checked yet",
+      "ai_not_configured": "AI check off: no API key",
+      "no_ai_items": "No AI items on this task",
+      "file_missing": "File not found",
+      "no_pdf_in_package": "No PDF for this task in the package",
+      "not_pdf": "Not a PDF file",
+      "too_large": "PDF larger than 20 MB",
+      "too_many_pages": "PDF longer than 5 pages",
+      "invalid_output": "AI answer could not be read",
+      "timeout": "AI check timed out",
+      "api_error": "AI service error",
+      "refusal": "AI declined this file",
+      "error": "AI check failed"
+    },
+    "waitingUnderHour": "Under 1 h",
+    "waitingHours": "{hours} h",
+    "waitingDays": "{days} d {hours} h",
+    "overdue": "(waiting more than 24 hours)"
+  },
+  "screen": {
+    "metaTitle": "Review a submission",
+    "back": "Back to the queue",
+    "title": "Review: {task}",
+    "purpose": "Check the drawing, confirm or change each checklist item, score the judgement items from 0 to 3, then finalize. The student is emailed when the whole test is final.",
+    "position": "{n} of {total} waiting",
+    "problem": {
+      "not_found": {
+        "title": "This submission was not found",
+        "body": "It may have been removed. Go back to the queue and pick another one."
+      },
+      "unavailable": {
+        "title": "Reviews are not available",
+        "body": "The server is missing its database key. Ask the site owner to check SUPABASE_SERVICE_ROLE_KEY."
+      },
+      "not_set_up": {
+        "title": "Reviews are being set up",
+        "body": "The database tables are not ready yet. Please try again after the CAD Champions migrations have run."
+      },
+      "error": {
+        "title": "We couldn't load this submission",
+        "body": "Something went wrong on our side. Reload the page in a minute."
+      }
+    },
+    "student": "Student",
+    "test": "Test",
+    "submitted": "Submitted",
+    "aiTitle": "AI check",
+    "aiSummary": "{pass}/{total} pass, {flagged} to check",
+    "aiSkipped": {
+      "pending": "Not checked yet",
+      "ai_not_configured": "Off (no API key): check every item by hand",
+      "no_ai_items": "No AI items on this task",
+      "file_missing": "File not found: check by hand",
+      "no_pdf_in_package": "No PDF for this task in the package",
+      "not_pdf": "Not a PDF: check by hand",
+      "too_large": "PDF over 20 MB: check by hand",
+      "too_many_pages": "PDF over 5 pages: check by hand",
+      "invalid_output": "AI answer unreadable: check by hand",
+      "timeout": "Timed out: check by hand",
+      "api_error": "AI service error: check by hand",
+      "refusal": "AI declined: check by hand",
+      "error": "Failed: check by hand"
+    },
+    "aiNone": "Not used for this task",
+    "unknownStudent": "Unnamed student",
+    "finalizedTitle": "This result is already final",
+    "finalizedBody": "You can change your decisions and finalize again. The change is recorded in the audit log.",
+    "viewer": {
+      "title": "Drawing",
+      "helpLabel": "About the viewer",
+      "help": "The drawing opens in your browser's own PDF viewer. Use the zoom buttons or the page box here, or the viewer's own controls. Evidence page links jump to the page the AI mentions.",
+      "zoomOut": "Zoom out",
+      "zoomIn": "Zoom in",
+      "fitWidth": "Fit to width",
+      "page": "Page",
+      "go": "Go",
+      "openNew": "Open in a new tab",
+      "frameTitle": "Student drawing (PDF)",
+      "noPdfTitle": "No PDF to preview",
+      "noPdf": "This submission has no PDF we can show here. Download the file below and open it on your computer."
+    },
+    "files": {
+      "title": "Files",
+      "helpLabel": "About these files",
+      "help": "Native CAD files, renders and animations are stored for your judgement only. They are never opened or run on our server. Download them and open them in your own software.",
+      "none": "No files were uploaded for this task.",
+      "upload": "Uploaded file",
+      "package": "Whole results package (ZIP)",
+      "taskFiles": "Files for this task",
+      "unmatched": "Files that match no task"
+    },
+    "rubric": {
+      "title": "Checklist",
+      "helpLabel": "How to review",
+      "help": "Each item shows what the AI decided, how sure it was and what it saw. Tap Pass or Fail to confirm or change it. Score judgement items from 0 to 3. Items the AI was unsure about are marked in amber.",
+      "empty": "This task has no marking items. Add them in the test builder.",
+      "judgement": "Judgement · trainer scores 0 to 3",
+      "measurementAi": "Pass or fail · AI first pass",
+      "measurementTrainer": "Pass or fail · trainer check",
+      "points": "{points} points",
+      "ai": {
+        "pass": "AI: pass",
+        "fail": "AI: fail",
+        "unclear": "AI: unclear"
+      },
+      "confidence": "{value}% sure",
+      "noAi": "No AI result",
+      "evidence": "Evidence:",
+      "page": "Page {n}",
+      "decide": "Your decision for: {item}",
+      "pass": "Pass",
+      "fail": "Fail",
+      "scale": {
+        "0": "Below industry standard",
+        "1": "Meets industry standard",
+        "2": "Meets the standard and exceeds it in some respects",
+        "3": "Wholly exceeds the standard: excellent"
+      }
+    },
+    "comment": {
+      "title": "Comment for the student (optional)",
+      "hint": "Write in English or Arabic. You can add a machine translation to the other language and edit it before you finalize.",
+      "lang": "I'm writing in:",
+      "en": "English",
+      "ar": "Arabic",
+      "label": "Comment in {lang}",
+      "translate": "Translate to the other language",
+      "translating": "Translating…",
+      "translated": "Translation added. Check it before you finalize.",
+      "notConfigured": "Translation is off: no Anthropic API key is set.",
+      "translateError": "We couldn't translate this comment. Try again, or write the other language yourself.",
+      "writeFirst": "Write a comment first.",
+      "machine": "Machine-translated",
+      "machineHint": "Students see this text labelled as machine-translated."
+    },
+    "finalize": {
+      "title": "Finalize",
+      "remaining": "{count} items still need your decision.",
+      "ready": "Every item is decided. Finalize to save the score.",
+      "missing": "{count} items still need your decision. We moved you to the first one.",
+      "finalizing": "Finalizing…",
+      "button": "Finalize",
+      "again": "Finalize again",
+      "toast": "Review saved",
+      "toastGraded": "The test is now final and the student is emailed.",
+      "toastProvisional": "Other tasks of this test still wait for a trainer.",
+      "doneTitle": "Saved",
+      "doneEmailed": "The score is final and the student has been emailed.",
+      "doneGraded": "The score is final. The student sees it on their results page.",
+      "doneProvisional": "This task is final. The student is emailed once every task of the test is reviewed.",
+      "next": "Next submission",
+      "backToQueue": "Back to the queue",
+      "errors": {
+        "forbidden": "Only trainers and admins can finalize reviews.",
+        "not_found": "This submission no longer exists. Go back to the queue.",
+        "not_reviewable": "This task has no file to review.",
+        "incomplete": "Some items still need your decision.",
+        "too_long": "The comment is too long. Keep it under 2,000 characters.",
+        "unavailable": "The server is missing its database key. Ask the site owner.",
+        "error": "We couldn't save the review. Nothing was changed. Try again."
+      }
+    },
+    "keys": {
+      "title": "Keyboard shortcuts",
+      "jKey": "J",
+      "j": "Next item",
+      "kKey": "K",
+      "k": "Previous item",
+      "pKey": "P",
+      "p": "Pass",
+      "fKey": "F",
+      "f": "Fail",
+      "digitsKey": "0-3",
+      "digits": "Judgement score",
+      "enterKey": "Enter",
+      "enter": "Finalize",
+      "nKey": "N",
+      "n": "Next submission"
+    }
+  },
+  "questions": {
+    "metaTitle": "Questions inbox",
+    "back": "Back to admin",
+    "title": "Questions inbox",
+    "purpose": "Questions about results and lessons in one list. Your reply is emailed to the student and shown on their page.",
+    "helpLabel": "About the inbox",
+    "help": "Grade questions come from \"Question this result\" on the results page. Lesson questions come from the lesson pages. Answered lesson questions can be shown to every student.",
+    "problem": {
+      "unavailable": {
+        "title": "The inbox is not available",
+        "body": "The server is missing its database key. Ask the site owner to check SUPABASE_SERVICE_ROLE_KEY."
+      },
+      "not_set_up": {
+        "title": "The inbox is being set up",
+        "body": "The database tables are not ready yet. Please try again after the CAD Champions migrations have run."
+      },
+      "error": {
+        "title": "We couldn't load the questions",
+        "body": "Something went wrong on our side. Reload the page in a minute."
+      }
+    },
+    "filterStatus": "Status",
+    "filterKind": "Type",
+    "all": "All",
+    "status": {
+      "open": "Open",
+      "answered": "Answered"
+    },
+    "kind": {
+      "grade_query": "Result question",
+      "lesson": "Lesson question"
+    },
+    "apply": "Apply",
+    "clear": "Clear filters",
+    "empty": {
+      "title": "No questions yet",
+      "body": "When a student asks about a result or a lesson, the question appears here."
+    },
+    "emptyFiltered": {
+      "title": "No questions match these filters",
+      "body": "Clear the filters to see every question."
+    },
+    "count": "{open} open · {total} in total",
+    "unknownStudent": "Unnamed student",
+    "asked": "asked {when}",
+    "lang": {
+      "en": "written in English",
+      "ar": "written in Arabic"
+    },
+    "openResult": "Open the student's results",
+    "openTraining": "Open the training page",
+    "openReview": "Open the review screen",
+    "reply": {
+      "label": "Your answer",
+      "hint": "Answer in the student's language if you can. They get an email with your answer and a button to their page.",
+      "send": "Send answer",
+      "update": "Update answer",
+      "sending": "Sending…",
+      "sent": "Answer saved",
+      "sentEmail": "The student has been emailed.",
+      "sentNoEmail": "We couldn't email the student, but they see the answer on their page.",
+      "empty": "Write an answer first.",
+      "tooLong": "The answer is too long. Keep it under 4,000 characters.",
+      "error": "We couldn't save the answer. Try again.",
+      "cancel": "Cancel",
+      "edit": "Edit answer"
+    },
+    "answerTitle": "Your answer",
+    "answeredAt": "Answered {when}",
+    "public": {
+      "label": "Show to everyone",
+      "helpLabel": "About \"Show to everyone\"",
+      "help": "The question and your answer appear under the lesson for every student, without the student's name. Only answered lesson questions can be shown.",
+      "on": "Shown to every student",
+      "off": "Now private again",
+      "needsAnswer": "Answer the question before you show it to everyone.",
+      "error": "We couldn't change this setting. Try again."
+    }
+  },
+  "student": {
+    "checklistDone": "Checklist done - waiting for trainer",
+    "checklistHelpLabel": "What happens next",
+    "checklistHelp": "Our system checked the drawing standards automatically. A trainer will confirm and check your dimensions within 48 hours.",
+    "checklistTitle": "Drawing checklist",
+    "passed": "Passed",
+    "failed": "Not yet",
+    "machineTranslated": "Machine-translated",
+    "scale": {
+      "0": "Below industry standard",
+      "1": "Meets industry standard",
+      "2": "Meets the standard and exceeds it in some respects",
+      "3": "Wholly exceeds the standard: excellent"
+    },
+    "yourQuestion": "Your question",
+    "answer": "Trainer's answer",
+    "answerPending": "A trainer will answer soon. We'll email you.",
+    "answeredOn": "Answered on {date}"
+  }
+}

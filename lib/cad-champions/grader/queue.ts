@@ -7,7 +7,7 @@
 //   2. planGrading() (plan.ts) decides per task; tasks already graded are
 //      skipped, so calling it twice is safe
 //   3. writes placeholders: pending (to grade / trainer), ai_pending_review
-//      (drawings; Prompt 8 does the AI check), auto 0 points (no file)
+//      (drawings), auto 0 points (no file)
 //   4. grades STEP files: per_task -> /grade (max 4 at a time);
 //      module_package -> the ZIP's STEP files go to /grade-package
 //   5. writes cc_task_results (+ student-safe details), cc_aspect_results and
@@ -15,9 +15,13 @@
 //   6. grader not configured / still failing after the retry -> status
 //      error + needs_manual_review (the student sees "We're checking this
 //      file manually - no action needed.")
-//   7. every task has a result -> computeAttemptScores(attemptId) (Prompt 7)
+//   7. drawings (ai_drawing): the AI checklist check (drawing/ai-check.ts),
+//      after the STEP grading, max 2 at a time; the result stays
+//      ai_pending_review until a trainer finalizes it (admin/review)
+//   8. every task has a result -> computeAttemptScores(attemptId) (Prompt 7)
 
 import { computeAttemptScores } from "@/lib/cad-champions/scoring/server";
+import { checkDrawingTask } from "@/lib/cad-champions/drawing/ai-check";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { parseExpectations } from "../upload/package-check";
@@ -380,6 +384,16 @@ export async function enqueueGrading(attemptId: string): Promise<EnqueueResult> 
       await gradeFiles(ctx, files);
       const packageSub = subs.find((s) => s.task_id == null);
       if (pkg.length > 0 && packageSub) await gradePackage(ctx, pkg, packageSub, testRes.data?.package_expectations);
+    }
+
+    // Drawings: AI checklist check (Prompt 8), after the STEP grading.
+    const drawings = work.filter((a): a is Extract<TaskAction, { kind: "ai_placeholder" }> => a.kind === "ai_placeholder");
+    if (drawings.length > 0) {
+      await mapLimit(drawings, 2, async (a) => {
+        const resultId = ctx.resultIds.get(a.taskId);
+        if (!resultId) return;
+        await checkDrawingTask(service, { attemptId, userId: attempt.user_id, taskId: a.taskId, taskResultId: resultId, submissionId: a.submissionId });
+      });
     }
 
     // Completion: every task has a result -> scores (Prompt 7).

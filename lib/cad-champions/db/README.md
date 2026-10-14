@@ -9,6 +9,7 @@ Row types: `lib/cad-champions/db/types.ts`. RLS tests: `lib/cad-champions/db/rls
 3. `0079_cc_help_articles_seed.sql` (Help Center articles)
 4. `0080_cc_diagnostic_seed.sql` (tests `diagnostic-v1`, `diagnostic-timeout-check` (staff only), `practice-cube`, their tasks and marking aspects; raises `cc-submissions` to 300 MB and allows ZIP for module_package tests)
 5. `0081_cc_results.sql` (result-email columns on `cc_attempts`, `provisional_percent`, and `cc_shared_result(token)` for the public share page; see `docs/cad-champions/RESULTS.md`)
+6. `0082_cc_drawing_rubric.sql` (`cc_sync_rubric_aspects(task)` turns `cc_test_tasks.rubric` into `rubric:<id>` aspects; writes the default part drawing rubric (16 items, 25 points) to the diagnostic drawing task. Re-running resets that rubric to the default)
 
 Both files are safe to re-run. The tests apply each file twice to prove it.
 

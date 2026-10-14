@@ -836,6 +836,7 @@ export const CC_FUNCTIONS = {
   hasActiveEnrollment: "cc_has_active_enrollment", // (p_user uuid) -> boolean
   helpFeedback: "cc_help_feedback", // (p_slug text, p_helpful boolean) -> void; service_role only
   sharedResult: "cc_shared_result", // (p_token text) -> jsonb | null (0081; anon ok, shared attempts only)
+  syncRubricAspects: "cc_sync_rubric_aspects", // (p_task uuid) -> integer (0082; service_role only)
 } as const;
 
 export const CC_BUCKETS = {

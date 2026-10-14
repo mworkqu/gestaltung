@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { AdminReviewLinks } from "@/components/cad-champions/review/admin-links";
 import { PlaceholderPage, placeholderMetadata } from "@/components/cad-champions/shell/placeholder-page";
 import { requireCcStaff } from "@/lib/cad-champions/auth/server";
 import { ccPath, isCcLocale } from "@/lib/cad-champions/routes";
@@ -11,5 +12,10 @@ export default async function CcAdminPage({ params }: { params: Promise<{ locale
   const { locale } = await params;
   if (!isCcLocale(locale)) notFound();
   await requireCcStaff(locale, ccPath(locale, "/admin"));
-  return <PlaceholderPage params={params} page="admin" signedIn />;
+  return (
+    <>
+      <PlaceholderPage params={params} page="admin" signedIn />
+      <AdminReviewLinks locale={locale} />
+    </>
+  );
 }

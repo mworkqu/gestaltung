@@ -45,7 +45,16 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 | 7-3 | `[TODO-MO: choose a PDF renderer for Vercel — e.g. @sparticuz/chromium + puppeteer-core, or Browserless free tier]` (production serves the report as printable HTML) | Results page "Download my report" | `app/api/cad-champions/results/[attemptId]/report/route.ts`, `docs/cad-champions/RESULTS.md` | Prompt 7 |
 | 7-4 | Band meanings and "where unassessed areas are covered" lines (written by Claude; confirm the wording, e.g. "Reverse engineering is assessed in person at the studio") | Results page header + skill map | `messages/cad-champions/{en,ar}/results.json` → `band.*.meaning`, `skillMap.coverage.*` | Prompt 7 |
 
+## Prompt 8: AI drawing check and review
+| # | Placeholder | Page | File | Prompt |
+|---|---|---|---|---|
+| 8-1 | [TODO-MO: confirm prices] Anthropic price table used for the AI cost estimate (USD per million tokens) | Admin AI cost (cc_grading_logs.cost_estimate) | `lib/cad-champions/drawing/ai-prices.ts` | Prompt 8 |
+| 8-2 | [TODO-MO: confirm which "where required" items apply to the diagnostic drawing (limits and fits, surface texture, GD&T)] Until set, the AI answers "unclear" when they are absent and the trainer decides | Review screen, results checklist | rubric item `required` in `cc_test_tasks.rubric` (task 0104, migration 0082) | Prompt 8 |
+| 8-3 | [TODO-MO: confirm rubric points] Default part rubric: 25 points, judgement 2 points (8%) | Review screen, results | `lib/cad-champions/drawing/rubric.ts`, migration 0082 | Prompt 8 |
+| 8-4 | [TODO-MO: confirm 48h] "A trainer will confirm and check your dimensions within 48 hours." | Results task card (drawing) | `messages/cad-champions/{en,ar}/review.json` → `student.checklistHelp` | Prompt 8 |
+
 ## Settings to provide (not placeholders)
+- `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_MODEL`, default claude-sonnet-5-5): turns on the AI drawing check and comment translation. Without it every drawing goes straight to trainer review with the reason "AI check off".
 - `WHATSAPP_NUMBER`: digits only, for example 974XXXXXXXX. Until it is set, the "Need help?" sheet falls back to `NEXT_PUBLIC_WHATSAPP_NUMBER`. If neither is set, the WhatsApp row is hidden.
 - `SUPPORT_EMAIL`: defaults to info@gestaltung360.com.
 
