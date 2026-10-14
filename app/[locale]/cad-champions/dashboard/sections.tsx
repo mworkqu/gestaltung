@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 
 import { Countdown } from "@/components/cad-champions/dashboard/countdown";
 import { ProgressCard } from "@/components/cad-champions/results/progress-card";
+import { DashboardTrainingStats } from "@/components/cad-champions/training/stats";
 import { Alert, Button, EmptyState, HelpTip, StatusChip, Stepper, type ChipTone, type StepperStep } from "@/components/cad-champions/ui";
 import type { Locale } from "@/i18n/routing";
 import type { CcProfile } from "@/lib/cad-champions/db/types";
@@ -227,6 +228,8 @@ export async function TrainingCardSection({ userId, locale }: Pick<Common, "user
         </div>
         <StatusChip tone={enrollment ? "success" : "neutral"}>{enrollment ? t("activeStatus") : t("lockedStatus")}</StatusChip>
       </div>
+
+      <DashboardTrainingStats userId={userId} locale={locale} />
 
       {enrollment ? (
         <>

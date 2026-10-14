@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { VIDEO_SLOTS, getPlaybackUrl, hasRealPlayer, watchedFraction } from "./registry";
+import { VIDEO_SLOTS, getPlaybackUrl, hasRealPlayer, parseStoredVideo, watchedFraction } from "./registry";
 
 describe("video registry", () => {
   it("has unique keys and both titles", () => {
@@ -24,7 +24,7 @@ describe("video registry", () => {
 });
 
 describe("getPlaybackUrl", () => {
-  it("returns null for a placeholder or bunny (until Prompt 9)", () => {
+  it("returns null for a placeholder, and for bunny without a user + server signer", () => {
     expect(getPlaybackUrl({ provider: "placeholder", providerId: "" })).toBeNull();
     expect(getPlaybackUrl({ provider: "bunny", providerId: "abc" })).toBeNull();
     expect(getPlaybackUrl({ provider: "youtube", providerId: "" })).toBeNull();
@@ -37,6 +37,26 @@ describe("getPlaybackUrl", () => {
     expect(url).toContain("enablejsapi=1");
     expect(url).toContain("origin=https%3A%2F%2Fx.test");
     expect(hasRealPlayer({ provider: "youtube", providerId: "dQw4w9WgXcQ" })).toBe(true);
+  });
+});
+
+describe("bunny dispatch", () => {
+  const guid = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const signer = (id: string) => ({ url: `https://iframe.mediadelivery.net/embed/1/${id}?token=t&expires=1`, expires: 1 });
+
+  it("signs only with a user and a signer", () => {
+    expect(getPlaybackUrl({ provider: "bunny", providerId: guid }, { signBunny: signer })).toBeNull();
+    expect(getPlaybackUrl({ provider: "bunny", providerId: guid }, { user: { id: "u" } })).toBeNull();
+    expect(getPlaybackUrl({ provider: "bunny", providerId: guid }, { user: { id: "u" }, signBunny: signer })).toContain(`/embed/1/${guid}?token=`);
+    expect(getPlaybackUrl({ provider: "bunny", providerId: "not-a-guid" }, { user: { id: "u" }, signBunny: signer })).toBeNull();
+  });
+
+  it("parses stored ids", () => {
+    expect(parseStoredVideo(guid)).toEqual({ provider: "bunny", providerId: guid });
+    expect(parseStoredVideo("youtube:dQw4w9WgXcQ")).toEqual({ provider: "youtube", providerId: "dQw4w9WgXcQ" });
+    expect(parseStoredVideo("youtube:bad")).toEqual({ provider: "placeholder", providerId: "" });
+    expect(parseStoredVideo(null)).toEqual({ provider: "placeholder", providerId: "" });
+    expect(parseStoredVideo("  ")).toEqual({ provider: "placeholder", providerId: "" });
   });
 });
 

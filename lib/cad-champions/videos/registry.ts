@@ -1,6 +1,7 @@
 // CAD Champions intro / how-to video slots (Prompt 4 Step E). Pure data plus
 // the provider interface. Every slot starts as a placeholder; to publish a
-// video set `provider` and `providerId` here (Prompt 9 adds Bunny Stream).
+// video set `provider` and `providerId` here (YouTube id, or a Bunny Stream
+// GUID, served through GET /api/cad-champions/video/intro:<key>).
 // Each empty slot is listed in docs/CONTENT_TODO.md as
 // "[TODO-MO: record video: <title>]" (videos test keeps the two in sync).
 
@@ -108,23 +109,64 @@ export function videoTitle(slot: Pick<VideoSlotDef, "title_en" | "title_ar">, lo
 }
 
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+const BUNNY_GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Provider interface: the embed URL for a slot, or null when there is no real
- * video yet (placeholder, empty id, or Bunny before Prompt 9). YouTube uses
- * the privacy-enhanced youtube-nocookie.com domain; enablejsapi lets the
- * VideoSlot read playback progress for the 90%-watched rule.
+ * A stored video id (cc_lessons.video_*, cc_exercises.solution_video_id) as a
+ * VideoRef: "youtube:<11-char id>" = YouTube, a GUID = Bunny Stream, anything
+ * else (empty) = placeholder.
  */
-export function getPlaybackUrl(ref: VideoRef, opts: { origin?: string } = {}): string | null {
-  if (ref.provider === "youtube" && YOUTUBE_ID.test(ref.providerId)) {
-    const params = new URLSearchParams({ rel: "0", modestbranding: "1", enablejsapi: "1" });
-    if (opts.origin) params.set("origin", opts.origin);
-    return `https://www.youtube-nocookie.com/embed/${ref.providerId}?${params.toString()}`;
+export function parseStoredVideo(value: string | null | undefined): VideoRef {
+  const v = (value ?? "").trim();
+  if (v.toLowerCase().startsWith("youtube:")) {
+    const id = v.slice(8).trim();
+    return YOUTUBE_ID.test(id) ? { provider: "youtube", providerId: id } : { provider: "placeholder", providerId: "" };
   }
-  return null; // placeholder, missing id, or bunny (Prompt 9)
+  if (BUNNY_GUID.test(v)) return { provider: "bunny", providerId: v };
+  return { provider: "placeholder", providerId: "" };
 }
 
-/** True when the slot plays a real video (so "watched" can be measured). */
+/** Signs a Bunny video id (server only: lib/cad-champions/videos/bunny.ts signBunnyEmbed). */
+export type BunnySigner = (videoId: string) => { url: string; expires: number } | null;
+
+export interface PlaybackOptions {
+  /** Page origin, sent to YouTube for the JS API. */
+  origin?: string;
+  /**
+   * The signed-in viewer. Bunny links are only signed for a user whose access
+   * the caller has already checked (the video route); null = no Bunny URL.
+   */
+  user?: { id: string } | null;
+  /** Server-side signer; without it Bunny refs return null (client code). */
+  signBunny?: BunnySigner;
+}
+
+/**
+ * Provider interface getPlaybackUrl(videoRef, { user, ... }): the embed URL,
+ * or null when there is no real video (placeholder, empty id) or it cannot be
+ * signed here. Dispatches placeholder | youtube | bunny. YouTube uses the
+ * privacy-enhanced youtube-nocookie.com domain; enablejsapi lets the player
+ * read playback progress for the 90%-watched rule. Bunny needs a user and the
+ * server signer (2-hour token, lib/cad-champions/videos/bunny.ts).
+ */
+export function getPlaybackUrl(ref: VideoRef, opts: PlaybackOptions = {}): string | null {
+  switch (ref.provider) {
+    case "youtube": {
+      if (!YOUTUBE_ID.test(ref.providerId)) return null;
+      const params = new URLSearchParams({ rel: "0", modestbranding: "1", enablejsapi: "1" });
+      if (opts.origin) params.set("origin", opts.origin);
+      return `https://www.youtube-nocookie.com/embed/${ref.providerId}?${params.toString()}`;
+    }
+    case "bunny": {
+      if (!opts.user || !opts.signBunny || !BUNNY_GUID.test(ref.providerId)) return null;
+      return opts.signBunny(ref.providerId)?.url ?? null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** True when the slot plays a real video without signing (so "watched" can be measured on Get Ready). */
 export function hasRealPlayer(ref: VideoRef): boolean {
   return getPlaybackUrl(ref) !== null;
 }

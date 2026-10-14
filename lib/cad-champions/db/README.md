@@ -9,6 +9,8 @@ Row types: `lib/cad-champions/db/types.ts`. RLS tests: `lib/cad-champions/db/rls
 3. `0079_cc_help_articles_seed.sql` (Help Center articles)
 4. `0080_cc_diagnostic_seed.sql` (tests `diagnostic-v1`, `diagnostic-timeout-check` (staff only), `practice-cube`, their tasks and marking aspects; raises `cc-submissions` to 300 MB and allows ZIP for module_package tests)
 5. `0081_cc_results.sql` (result-email columns on `cc_attempts`, `provisional_percent`, and `cc_shared_result(token)` for the public share page; see `docs/cad-champions/RESULTS.md`)
+6. `0082_cc_drawing_rubric.sql` (Prompt 8)
+7. `0083_cc_training_seed.sql` (Prompt 9: `cc_lessons.skill_area_id` + `track_notes`, `cc_modules.competition_module`, `cc_student_xp`, `cc_badges`, `cc_verify_certificate(code)`, `cc_cohort_seats()`, column grants hiding lesson notes/videos/downloads from students, and the training seed; see `docs/cad-champions/TRAINING.md`)
 6. `0082_cc_drawing_rubric.sql` (`cc_sync_rubric_aspects(task)` turns `cc_test_tasks.rubric` into `rubric:<id>` aspects; writes the default part drawing rubric (16 items, 25 points) to the diagnostic drawing task. Re-running resets that rubric to the default)
 
 Both files are safe to re-run. The tests apply each file twice to prove it.
@@ -49,6 +51,8 @@ Site super_admins (`public.profiles.role = 'super_admin'`) are CC admins automat
 | `cc_lesson_questions` | Lesson questions and grade queries, with the trainer's answer and a "show to everyone" flag. |
 | `cc_level_unlocks` | Levels an admin unlocked by hand for a student. |
 | `cc_certificates` | Module completion certificates with a verification code. |
+| `cc_student_xp` | XP and weekly streak per student (0083; server-written). |
+| `cc_badges` | One badge per completed level (0083; server-written). |
 | `cc_plans` | Training plans: price QAR, days, what is included, in-person flag. |
 | `cc_coupons` | Coupon codes: percent or fixed, expiry, max uses, plans, institution (admin only). |
 | `cc_cohorts` | In-person cohorts: dates, location, seats, status. |
@@ -85,9 +89,9 @@ Never put answer STEP files in `cc-task-files`: every signed-in user can read it
 
 ## Notes for later prompts
 - Prices are readable by anon through RLS. The "prices only after a submitted diagnostic" rule (Prompt 10) is an app rule.
-- Lesson rows (notes included) are readable by every signed-in user. Prompt 9 must gate paid notes and videos on the server (`cc_has_active_enrollment`) or move notes behind a view.
+- Lesson rows are readable by every signed-in user, but since 0083 only the catalog columns: notes, common mistakes, downloads and video ids are read with the service role after the app's access check (`lib/cad-champions/training/access.ts`). Admin tools must read those columns with the service role too.
 - `cc_task_results.details` and `cc_exercise_attempts.details` must stay student-safe. Raw grader/AI output goes to `cc_grading_logs.response`.
-- Seat counts per cohort and the `/verify/[code]` certificate lookup need RPCs (not built yet).
+- Seat counts per cohort: `cc_cohort_seats()`; certificate check: `cc_verify_certificate(code)` (both 0083).
 
 ## Tests
 `npx vitest run lib/cad-champions/db` boots PGlite (Postgres in WASM, in-process, no network), creates a small Supabase stub (roles, `auth.uid()`, `public.is_super_admin()`, storage tables, `storage.foldername()`), applies both migrations unchanged, and checks the policies as student A/B, an instructor, a CC admin, a site super_admin and anon.

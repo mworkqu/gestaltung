@@ -53,10 +53,31 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 | 8-3 | [TODO-MO: confirm rubric points] Default part rubric: 25 points, judgement 2 points (8%) | Review screen, results | `lib/cad-champions/drawing/rubric.ts`, migration 0082 | Prompt 8 |
 | 8-4 | [TODO-MO: confirm 48h] "A trainer will confirm and check your dimensions within 48 hours." | Results task card (drawing) | `messages/cad-champions/{en,ar}/review.json` → `student.checklistHelp` | Prompt 8 |
 
+## Prompt 9: Training
+| # | Placeholder | Page | File | Prompt |
+|---|---|---|---|---|
+| 9-1 | `[TODO-MO: record video]` for every lesson (65 lessons; slots inventor/fusion/solidworks/neutral x en/ar). Store the Bunny video GUID (or `youtube:<id>`) in `cc_lessons.video_<track>_<lang>` | Every lesson page (`/cad-champions/{en,ar}/training/lessons/<slug>`) shows "Video coming soon" until set | `cc_lessons` (seeded by 0083) | Prompt 9 |
+| 9-2 | Written notes + common mistakes for every lesson except the 3 Orientation lessons (notes written by Claude: confirm them) | Lesson pages, "Notes" / "Common mistakes" | `cc_lessons.notes_en/ar`, `common_mistakes_en/ar` | Prompt 9 |
+| 9-3 | `[TODO-MO: drawing]` / `[TODO-MO: drawing + size table]` / `[TODO-MO: part files + drawing]` / `[TODO-MO: part file]` exercise briefs, attachments (`cc-task-files`) and `reference_data` (from the answer STEP files) for the 18 Foundations exercises; until `reference_data` is filled, uploads are saved as "waiting for checking" | Exercise pages (`/cad-champions/{en,ar}/training/exercises/<slug>`) | `cc_exercises` (0083), bucket `cc-task-files` | Prompt 9 |
+| 9-4 | Hints (2 per exercise, written by Claude) and solution videos (`cc_exercises.solution_video_id`) | Exercise pages, "Need a hint?" / "Solution video" | `cc_exercises.hints_en/ar`, `solution_video_id` | Prompt 9 |
+| 9-5 | `[TODO-MO: tasks and drawings]` for the 60-minute Foundations mini-project test `foundations-mini-project` (unpublished until its tasks exist) | Exercise "Competition practice: 60-minute mini-project" | `cc_tests` / `cc_test_tasks` (0083) | Prompt 9 |
+| 9-6 | Lesson durations and exercise time estimates are planning values: confirm | Module cards ("About 3 h left"), lesson / exercise chips | `cc_lessons.duration_minutes`, `cc_exercises.estimated_minutes` | Prompt 9 |
+| 9-7 | Track equivalents text for Fusion / SOLIDWORKS (e.g. "Use SOLIDWORKS weldments") and which tools are "Inventor only": confirm | Lesson pages for M1/M2/M3 track lessons when the student's track is Fusion or SOLIDWORKS | `cc_lessons.track_notes` (0083) | Prompt 9 |
+| 9-8 | Instrument photos (8 photo slots "Photo coming soon") | `/cad-champions/{en,ar}/training/instruments` | `app/[locale]/cad-champions/training/instruments/page.tsx` | Prompt 9 |
+| 9-9 | `[TODO-MO: kit contents and price]` ("Get a student measuring kit from Gestaltung360") | `/cad-champions/{en,ar}/training/instruments` | `messages/cad-champions/{en,ar}/training.json` → `instruments.kitText` | Prompt 9 |
+| 9-10 | `[TODO-MO: session schedule]` | `/cad-champions/{en,ar}/training/in-person` | `messages/cad-champions/{en,ar}/training.json` → `inPerson.schedule` | Prompt 9 |
+| 9-11 | `[TODO-MO: qualifier score threshold]` | `/cad-champions/{en,ar}/training/in-person` | `messages/cad-champions/{en,ar}/training.json` → `inPerson.qualify` | Prompt 9 |
+| 9-12 | Cohorts (name, dates, schedule, location, seats; status not draft) | `/cad-champions/{en,ar}/training/in-person` "Cohorts and seats" | `cc_cohorts` (admin, Prompt 10/11) | Prompt 9 |
+| 9-13 | `[TODO-MO: plans]` | `/cad-champions/{en,ar}/training/join` (Prompt 10 replaces this page) | `messages/cad-champions/{en,ar}/training.json` → `join.plans` | Prompt 9 |
+| 9-14 | `[TODO-MO: verify against Bunny docs]` the embed token scheme (SHA256(key + videoId + expires), `?token=&expires=`) | Lesson videos | `lib/cad-champions/videos/bunny.ts`, `docs/cad-champions/TRAINING.md` | Prompt 9 |
+| 9-15 | Certificate wording ("Certificate of training completion … not an official competition result"): confirm | `/cad-champions/{en,ar}/training/certificates/<code>`, `/verify/<code>` | `messages/cad-champions/{en,ar}/training.json` → `certificate.*`, `verify.*` | Prompt 9 |
+
 ## Settings to provide (not placeholders)
 - `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_MODEL`, default claude-sonnet-5-5): turns on the AI drawing check and comment translation. Without it every drawing goes straight to trainer review with the reason "AI check off".
 - `WHATSAPP_NUMBER`: digits only, for example 974XXXXXXXX. Until it is set, the "Need help?" sheet falls back to `NEXT_PUBLIC_WHATSAPP_NUMBER`. If neither is set, the WhatsApp row is hidden.
 - `SUPPORT_EMAIL`: defaults to info@gestaltung360.com.
+- `BUNNY_LIBRARY_ID`, `BUNNY_TOKEN_KEY` (optional `BUNNY_CDN_HOST`): turn on lesson videos from Bunny Stream (signed 2-hour embed links). Without them lessons show "Video coming soon".
+- Weekly progress email cron: add the schedule line from `docs/cad-champions/TRAINING.md` to `vercel.json` when the plan allows.
 
 ## Help articles (0079 seed)
 - Help articles: [TODO-MO: confirm studio computer access] in i-only-have-a-mac

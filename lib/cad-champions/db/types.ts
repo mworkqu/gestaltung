@@ -488,6 +488,8 @@ export interface CcModule {
   why_it_matters_en: string | null;
   why_it_matters_ar: string | null;
   icon: string | null;
+  /** Competition module a track module covers (0083). */
+  competition_module: CcCompetitionModuleCode | null;
   is_orientation: boolean;
   sort: number;
   is_published: boolean;
@@ -513,6 +515,8 @@ export interface CcLesson {
   id: Uuid;
   level_id: Uuid;
   competition_module: CcCompetitionModuleCode | null;
+  /** ONE skill area per lesson (0083). */
+  skill_area_id: CcSkillAreaId | null;
   slug: string;
   sort: number;
   title_en: string;
@@ -534,6 +538,8 @@ export interface CcLesson {
   common_mistakes_ar: string | null;
   downloads: Json;
   glossary_terms: string[];
+  /** Per-track note (0083): {"fusion": "inventor_only" | {en, ar}, "solidworks": ...}. */
+  track_notes: Json;
   is_free_preview: boolean;
   is_published: boolean;
   created_at: Timestamp;
@@ -648,6 +654,23 @@ export interface CcCertificate {
   code: string;
   pdf_path: string | null;
   issued_at: Timestamp;
+}
+
+/** Gamification (0083): one row per student, written by the server. */
+export interface CcStudentXp {
+  user_id: Uuid;
+  xp: number;
+  streak_weeks: number;
+  /** Monday (Asia/Qatar) of the last active week. */
+  last_active_week: DateString | null;
+  updated_at: Timestamp;
+}
+
+/** A badge per completed level (0083). */
+export interface CcBadge {
+  user_id: Uuid;
+  level_id: Uuid;
+  earned_at: Timestamp;
 }
 
 // ------------------------------------------------------------- payments
@@ -809,6 +832,8 @@ export interface CcTables {
   cc_lesson_questions: CcLessonQuestion;
   cc_level_unlocks: CcLevelUnlock;
   cc_certificates: CcCertificate;
+  cc_student_xp: CcStudentXp;
+  cc_badges: CcBadge;
   cc_plans: CcPlan;
   cc_coupons: CcCoupon;
   cc_cohorts: CcCohort;
@@ -836,6 +861,8 @@ export const CC_FUNCTIONS = {
   hasActiveEnrollment: "cc_has_active_enrollment", // (p_user uuid) -> boolean
   helpFeedback: "cc_help_feedback", // (p_slug text, p_helpful boolean) -> void; service_role only
   sharedResult: "cc_shared_result", // (p_token text) -> jsonb | null (0081; anon ok, shared attempts only)
+  verifyCertificate: "cc_verify_certificate", // (p_code text) -> jsonb | null (0083; anon ok)
+  cohortSeats: "cc_cohort_seats", // () -> {cohort_id, seats_taken}[] (0083)
   syncRubricAspects: "cc_sync_rubric_aspects", // (p_task uuid) -> integer (0082; service_role only)
 } as const;
 

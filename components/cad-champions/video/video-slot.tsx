@@ -36,7 +36,23 @@ export function VideoSlot({
   const t = useTranslations("CC.get-ready");
   const slot = getVideoSlot(videoKey);
   const title = videoTitle(slot, locale);
-  const src = getPlaybackUrl(slot);
+  const direct = getPlaybackUrl(slot);
+  // Bunny Stream slots need a signed link from the server (2 h, access-checked).
+  const [signed, setSigned] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (slot.provider !== "bunny" || !slot.providerId) return;
+    let alive = true;
+    fetch(`/api/cad-champions/video/${encodeURIComponent(`intro:${videoKey}`)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b: { embedUrl?: string } | null) => {
+        if (alive && b?.embedUrl) setSigned(b.embedUrl);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [slot.provider, slot.providerId, videoKey]);
+  const src = direct ?? signed;
   const frameRef = React.useRef<HTMLIFrameElement>(null);
   const firedRef = React.useRef(false);
   const durationRef = React.useRef(0);
