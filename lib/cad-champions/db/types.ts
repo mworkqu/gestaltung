@@ -674,17 +674,24 @@ export interface CcBadge {
 }
 
 // ------------------------------------------------------------- payments
+export const CC_PLAN_KINDS = ["online", "online_in_person", "kit"] as const;
+export type CcPlanKind = (typeof CC_PLAN_KINDS)[number];
+
 export interface CcPlan {
   id: Uuid;
   slug: string;
+  /** 0084. kit = optional add-on (measuring kit). */
+  kind: CcPlanKind;
   name_en: string;
   name_ar: string;
   who_for_en: string | null;
   who_for_ar: string | null;
   includes_en: string[];
   includes_ar: string[];
-  price_qar: number;
-  duration_days: number;
+  /** null = "Price coming soon" (checkout blocked) — 0084. */
+  price_qar: number | null;
+  /** null for the kit add-on — 0084. */
+  duration_days: number | null;
   includes_in_person: boolean;
   is_featured: boolean;
   is_active: boolean;
@@ -755,6 +762,14 @@ export interface CcPayment {
   created_at: Timestamp;
   updated_at: Timestamp;
   expires_at: Timestamp | null;
+  /** 0084 */
+  addon_plan_id: Uuid | null;
+  addon_qar: number;
+  proof_submitted_at: Timestamp | null;
+  paid_at: Timestamp | null;
+  terms_accepted_at: Timestamp | null;
+  provider_status: string | null;
+  status_changed_at: Timestamp | null;
 }
 
 export interface CcEnrollment {
@@ -767,6 +782,9 @@ export interface CcEnrollment {
   status: CcEnrollmentStatus;
   starts_at: Timestamp;
   ends_at: Timestamp;
+  /** 0084: expiry reminder emails sent. */
+  reminder_7d_sent_at: Timestamp | null;
+  reminder_1d_sent_at: Timestamp | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }

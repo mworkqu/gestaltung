@@ -72,11 +72,25 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 | 9-14 | `[TODO-MO: verify against Bunny docs]` the embed token scheme (SHA256(key + videoId + expires), `?token=&expires=`) | Lesson videos | `lib/cad-champions/videos/bunny.ts`, `docs/cad-champions/TRAINING.md` | Prompt 9 |
 | 9-15 | Certificate wording ("Certificate of training completion … not an official competition result"): confirm | `/cad-champions/{en,ar}/training/certificates/<code>`, `/verify/<code>` | `messages/cad-champions/{en,ar}/training.json` → `certificate.*`, `verify.*` | Prompt 9 |
 
+## Prompt 10: Payments and enrollment
+| # | Placeholder | Page | Where | Prompt |
+|---|---|---|---|---|
+| 10-1 | `[TODO-MO: price, days]` for the plans "online" and "online-in-person": seeded with `price_qar` and `duration_days` NULL, so the page shows "Price coming soon" and checkout is blocked. Set both, e.g. `update public.cc_plans set price_qar = …, duration_days = … where slug = 'online';` | `/cad-champions/{en,ar}/training/join`, checkout, results page offer | `cc_plans` (0084 seed) | Prompt 10 |
+| 10-2 | Plan "What's included" bullets and "who it's for" lines (written from docs/COMPETITION_ALIGNMENT.md: online tracks vs in-person M4, scanning, printing, full mocks): confirm | Plan cards | `cc_plans.includes_en/ar`, `who_for_en/ar` (0084 seed) | Prompt 10 |
+| 10-3 | `[TODO-MO: kit contents]` and the kit price for the optional add-on "Student measuring kit" (`measuring-kit`, price NULL = shown as "Price coming soon", not offered at checkout) | Join page add-on card, checkout add-on checkbox | `cc_plans` slug `measuring-kit` | Prompt 10 |
+| 10-4 | `[TODO-MO: confirm]` approval time "usually a few hours during working hours" | FAQ, Confirmation step, status page (proof_submitted) | `messages/cad-champions/{en,ar}/payments.json` → `faq.a2`, `checkout.confirmBody`, `statusPage.proof` | Prompt 10 |
+| 10-5 | `[TODO-MO: refund policy page]`: the link currently opens the CC Terms page | FAQ "Can I get a refund?", Terms checkbox at checkout | `payments.json` → `faq.refundLink`; `components/cad-champions/payments/checkout-client.tsx` | Prompt 10 |
+| 10-6 | `[TODO-MO]` receipt C.R. number and address: env `CC_RECEIPT_CR_NUMBER`, `CC_RECEIPT_ADDRESS_EN/AR` (fallback: lib/company.ts, C.R. 236988, Rafal Tower, Lusail) | Receipt PDF | `lib/cad-champions/payments/receipts.ts` | Prompt 10 |
+| 10-7 | `[TODO-MO: verify SkipCash field order/endpoints against dev.skipcash.app]`: read 2026-10-14; the GET status header format ("Authorization: <client id>") and the exact Amount text in the webhook signature are not spelled out there | SkipCash (off) | `lib/cad-champions/payments/skipcash.ts` | Prompt 10 |
+| 10-8 | Cohorts (name, dates, location, seats, status `open`) for the in-person plan; without an open cohort that plan can't be checked out | Checkout "Cohort" step | `cc_cohorts` | Prompt 10 |
+| 10-9 | Reject reason presets (5, EN + AR, written by Claude): confirm | `/cad-champions/{en,ar}/admin/payments` | `payments.json` → `admin.presets` | Prompt 10 |
+
 ## Settings to provide (not placeholders)
 - `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_MODEL`, default claude-sonnet-5-5): turns on the AI drawing check and comment translation. Without it every drawing goes straight to trainer review with the reason "AI check off".
 - `WHATSAPP_NUMBER`: digits only, for example 974XXXXXXXX. Until it is set, the "Need help?" sheet falls back to `NEXT_PUBLIC_WHATSAPP_NUMBER`. If neither is set, the WhatsApp row is hidden.
 - `SUPPORT_EMAIL`: defaults to info@gestaltung360.com.
 - `BUNNY_LIBRARY_ID`, `BUNNY_TOKEN_KEY` (optional `BUNNY_CDN_HOST`): turn on lesson videos from Bunny Stream (signed 2-hour embed links). Without them lessons show "Video coming soon".
+- Payments: `FAWRAN_*` (fallback lib/company.ts), `CC_RECEIPT_*`; SkipCash stays off until `SKIPCASH_ENABLED=true` and `SKIPCASH_CLIENT_ID/KEY_ID/KEY_SECRET/WEBHOOK_KEY` are set (webhook URL: `/api/cad-champions/payments/skipcash/webhook`). Payments cron `/api/cron/cc-payments-expire` (48 h expiry + 7 d / 1 d enrollment reminders) is NOT in `vercel.json`: add it hourly on Pro or daily on Hobby.
 - Weekly progress email cron: add the schedule line from `docs/cad-champions/TRAINING.md` to `vercel.json` when the plan allows.
 
 ## Help articles (0079 seed)

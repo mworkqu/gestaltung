@@ -413,8 +413,9 @@ export interface FreeLesson {
 
 export interface PlanOffer {
   name: string;
-  priceQar: number;
-  durationDays: number;
+  /** null = "Price coming soon" (0084 seeds plans without a price until the owner sets it). */
+  priceQar: number | null;
+  durationDays: number | null;
   includes: string[];
 }
 
@@ -445,22 +446,30 @@ export async function loadFreeLesson(skillAreaId: number | null, locale: Locale)
   }
 }
 
-/** The featured active plan (or the first active one); null before Prompt 10 adds plans. */
+/** The featured active training plan (or the first active one; never the kit add-on); null before 0084 adds plans. */
 export async function loadPlanOffer(locale: Locale): Promise<PlanOffer | null> {
   const service = createServiceClient();
   if (!service) return null;
   try {
     const { data, error } = await service
       .from("cc_plans")
-      .select("name_en,name_ar,price_qar,duration_days,includes_en,includes_ar,is_featured,sort")
+      .select("*")
       .eq("is_active", true)
       .order("is_featured", { ascending: false })
       .order("sort")
-      .limit(1);
+      .limit(5);
     if (error || !data || data.length === 0) return null;
-    const p = data[0] as { name_en: string; name_ar: string; price_qar: number | string; duration_days: number; includes_en: string[]; includes_ar: string[] };
+    type Row = { kind?: string; name_en: string; name_ar: string; price_qar: number | string | null; duration_days: number | null; includes_en: string[]; includes_ar: string[] };
+    const p = (data as Row[]).find((r) => r.kind !== "kit");
+    if (!p) return null;
     const includes = (locale === "ar" && p.includes_ar?.length ? p.includes_ar : p.includes_en) ?? [];
-    return { name: pick(locale, p.name_en, p.name_ar), priceQar: Number(p.price_qar), durationDays: p.duration_days, includes };
+    const price = p.price_qar == null ? null : Number(p.price_qar);
+    return {
+      name: pick(locale, p.name_en, p.name_ar),
+      priceQar: price != null && Number.isFinite(price) ? price : null,
+      durationDays: p.duration_days ?? null,
+      includes,
+    };
   } catch {
     return null;
   }

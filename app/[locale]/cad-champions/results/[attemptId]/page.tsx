@@ -614,10 +614,9 @@ async function TrainingPath({ v, locale }: { v: ResultsView; locale: Locale }) {
           )}
           {plan ? (
             <p className="text-sm text-body">
-              <span className="font-semibold text-ink">{t("offer.price")}: </span>
-              <Ltr>{formatQAR(plan.priceQar, locale)}</Ltr>
-              {" · "}
-              {t("offer.days", { days: String(plan.durationDays) })}
+              <span className="font-semibold text-ink">{plan.name} · {t("offer.price")}: </span>
+              {plan.priceQar != null ? <Ltr>{formatQAR(plan.priceQar, locale)}</Ltr> : t("offer.priceSoon")}
+              {plan.priceQar != null && plan.durationDays ? ` · ${t("offer.days", { days: String(plan.durationDays) })}` : null}
             </p>
           ) : null}
           <div className="mt-auto flex flex-wrap gap-3">

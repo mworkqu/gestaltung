@@ -1,9 +1,9 @@
 // Upload validation shared by the browser (UploadBox) and the server
 // (verifyUploadedObject). Pure: no DOM, no I/O. Tested in validate.test.ts.
 
-export type UploadAccept = "step" | "pdf" | "image" | "video" | "zip";
+export type UploadAccept = "step" | "pdf" | "image" | "video" | "zip" | "proof";
 
-export const UPLOAD_ACCEPTS: readonly UploadAccept[] = ["step", "pdf", "image", "video", "zip"];
+export const UPLOAD_ACCEPTS: readonly UploadAccept[] = ["step", "pdf", "image", "video", "zip", "proof"];
 
 /** 50 MB, the cc-submissions bucket limit. */
 export const DEFAULT_MAX_BYTES = 50 * 1024 * 1024;
@@ -26,6 +26,8 @@ export const ACCEPT_EXTENSIONS: Record<UploadAccept, readonly string[]> = {
   image: [".png", ".jpg", ".jpeg", ".webp"],
   video: [".mp4", ".webm"],
   zip: [".zip"],
+  /** Payment proof: a screenshot or a PDF (cc-payment-proofs, 10 MB). */
+  proof: [".png", ".jpg", ".jpeg", ".webp", ".pdf"],
 };
 
 const EXT_MIME: Record<string, string> = {

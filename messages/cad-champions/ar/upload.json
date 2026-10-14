@@ -12,7 +12,8 @@
     "pdf": "ملف PDF (.pdf)",
     "image": "صورة (.png أو .jpg أو .webp)",
     "video": "فيديو (.mp4 أو .webm)",
-    "zip": "ملف ZIP (.zip)"
+    "zip": "ملف ZIP (.zip)",
+    "proof": "لقطة شاشة (‎.png أو ‎.jpg أو ‎.webp) أو ملف PDF"
   },
   "state": {
     "checking": "جارٍ فحص ملفك…",

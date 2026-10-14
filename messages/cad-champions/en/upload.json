@@ -12,7 +12,8 @@
     "pdf": "PDF file (.pdf)",
     "image": "image (.png, .jpg or .webp)",
     "video": "video (.mp4 or .webm)",
-    "zip": "ZIP file (.zip)"
+    "zip": "ZIP file (.zip)",
+    "proof": "screenshot (.png, .jpg, .webp) or PDF"
   },
   "state": {
     "checking": "Checking your file…",

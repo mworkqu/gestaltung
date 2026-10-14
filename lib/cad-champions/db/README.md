@@ -11,6 +11,7 @@ Row types: `lib/cad-champions/db/types.ts`. RLS tests: `lib/cad-champions/db/rls
 5. `0081_cc_results.sql` (result-email columns on `cc_attempts`, `provisional_percent`, and `cc_shared_result(token)` for the public share page; see `docs/cad-champions/RESULTS.md`)
 6. `0082_cc_drawing_rubric.sql` (Prompt 8)
 7. `0083_cc_training_seed.sql` (Prompt 9: `cc_lessons.skill_area_id` + `track_notes`, `cc_modules.competition_module`, `cc_student_xp`, `cc_badges`, `cc_verify_certificate(code)`, `cc_cohort_seats()`, column grants hiding lesson notes/videos/downloads from students, and the training seed; see `docs/cad-champions/TRAINING.md`)
+8. `0084_cc_payments.sql` (Prompt 10: `cc_plans.kind` + nullable `price_qar` / `duration_days` ("Price coming soon"), payment columns (add-on, proof/paid/terms times, provider status), enrollment reminder stamps, cohorts readable by anyone, `cc_cohort_seats()` counts held seats, RPCs `cc_validate_coupon` (authenticated), `cc_create_payment` + `cc_payment_transition` (service_role only: the payment state machine, enrollment on paid, audit log), seed plans `online`, `online-in-person`, `measuring-kit` with price/days NULL [TODO-MO]; see `lib/cad-champions/payments/`)
 6. `0082_cc_drawing_rubric.sql` (`cc_sync_rubric_aspects(task)` turns `cc_test_tasks.rubric` into `rubric:<id>` aspects; writes the default part drawing rubric (16 items, 25 points) to the diagnostic drawing task. Re-running resets that rubric to the default)
 
 Both files are safe to re-run. The tests apply each file twice to prove it.
@@ -91,7 +92,8 @@ Never put answer STEP files in `cc-task-files`: every signed-in user can read it
 - Prices are readable by anon through RLS. The "prices only after a submitted diagnostic" rule (Prompt 10) is an app rule.
 - Lesson rows are readable by every signed-in user, but since 0083 only the catalog columns: notes, common mistakes, downloads and video ids are read with the service role after the app's access check (`lib/cad-champions/training/access.ts`). Admin tools must read those columns with the service role too.
 - `cc_task_results.details` and `cc_exercise_attempts.details` must stay student-safe. Raw grader/AI output goes to `cc_grading_logs.response`.
-- Seat counts per cohort: `cc_cohort_seats()`; certificate check: `cc_verify_certificate(code)` (both 0083).
+- Seat counts per cohort: `cc_cohort_seats()` (0083; since 0084 it also counts seats held by unpaid reservations); certificate check: `cc_verify_certificate(code)` (0083).
+- Payments: status changes ONLY through `cc_payment_transition(payment, to, actor, reason, reason_ar, patch)` (0084, service_role), which mirrors `lib/cad-champions/payments/state-machine.ts`, row-locks the payment (no double approval), and on `paid` assigns the receipt number, creates the enrollment, stamps `cc_journey_progress.enrolled_at` and counts the coupon use. Coupons are admin-only; students check a code with `cc_validate_coupon(code, plan_id)`.
 
 ## Tests
 `npx vitest run lib/cad-champions/db` boots PGlite (Postgres in WASM, in-process, no network), creates a small Supabase stub (roles, `auth.uid()`, `public.is_super_admin()`, storage tables, `storage.foldername()`), applies both migrations unchanged, and checks the policies as student A/B, an instructor, a CC admin, a site super_admin and anon.

@@ -13,6 +13,7 @@ import { journeySteps, nextStep } from "@/lib/cad-champions/journey/next-step";
 import { testCardState, type TestCardState } from "@/lib/cad-champions/journey/test-status";
 import { profileCompleteness } from "@/lib/cad-champions/profile/completeness";
 import { ageEligibleUntilYear } from "@/lib/cad-champions/profile/eligibility";
+import { canRenew } from "@/lib/cad-champions/payments/plans";
 import { ccPath } from "@/lib/cad-champions/routes";
 
 import { loadDashboardData, type DashboardData } from "./data";
@@ -212,6 +213,7 @@ export async function ProgressSection({ userId, locale }: Pick<Common, "userId" 
 
 export async function TrainingCardSection({ userId, locale }: Pick<Common, "userId" | "locale">) {
   const t = await getTranslations({ locale, namespace: "CC.dashboard.training" });
+  const tPay = await getTranslations({ locale, namespace: "CC.payments.dashboard" });
   const result = await loadDashboardData(userId);
   if (!result.ok) return <LoadError locale={locale} />;
   const { enrollment, journey } = result.data;
@@ -234,10 +236,20 @@ export async function TrainingCardSection({ userId, locale }: Pick<Common, "user
       {enrollment ? (
         <>
           <p className="text-sm text-body">{t("activeUntil", { date: formatDate(enrollment.ends_at, locale) })}</p>
-          <div>
+          {canRenew(enrollment.ends_at) ? <p className="text-sm text-body">{tPay("renewText")}</p> : null}
+          <div className="flex flex-wrap gap-3">
             <Button asChild>
               <Link href={ccPath(locale, "/training")}>{t("open")}</Link>
             </Button>
+            {canRenew(enrollment.ends_at) ? (
+              <Button asChild variant="secondary">
+                <Link href={ccPath(locale, "/training/join")}>{tPay("renew")}</Link>
+              </Button>
+            ) : (
+              <Button asChild variant="ghost">
+                <Link href={ccPath(locale, "/account/payments")}>{tPay("payments")}</Link>
+              </Button>
+            )}
           </div>
         </>
       ) : (
