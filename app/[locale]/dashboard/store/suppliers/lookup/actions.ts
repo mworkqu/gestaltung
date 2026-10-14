@@ -198,8 +198,10 @@ export async function addFromSupplier(
       const buf = await fetchImage(r.imageUrl, IMAGE_HOSTS);
       if (buf) {
         const img = await storeImage(supabase, buf, `supplier/${input.supplier}/${part.id}/${Date.now()}`);
-        await supabase.from("parts").update({ images: [img], image_url: img.web }).eq("id", part.id);
-        imageSaved = true;
+        if (img) {
+          await supabase.from("parts").update({ images: [img], image_url: img.web }).eq("id", part.id);
+          imageSaved = true;
+        }
       }
     } catch {
       // The product stands without a photo; the owner can add one in Quick add.

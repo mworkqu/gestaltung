@@ -3,16 +3,17 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
-// Routes whose server code imports sharp (via lib/store/store-image.ts or
-// directly). Keep in step with `grep -rl "from \"sharp\"\|store-image"`.
+// Routes whose server code imports sharp (lib/store/store-image-sharp.ts or
+// lib/store/load-sharp.ts): API route handlers ONLY. No page may reach sharp, or
+// every page bundle that shares a file with it grows by ~20 MB. Keep in step
+// with `grep -rlE "store-image-sharp|load-sharp" app lib`.
 const SHARP_FILES = ["./node_modules/sharp-admin/**/*", "./node_modules/@img/**/*"];
 const SHARP_ROUTES = [
-  "/[locale]/dashboard/store/[id]/edit",
-  "/[locale]/dashboard/store/suppliers/lookup",
   "/api/admin/drive-import",
   "/api/admin/sourcing-backup",
   "/api/admin/starter-parts",
   "/api/admin/store-cleanup",
+  "/api/admin/store-image",
 ];
 
 /** @type {import('next').NextConfig} */
@@ -29,7 +30,7 @@ const nextConfig = {
     "/[locale]/case-studies": ["./content/case-studies/**/*"],
     "/[locale]/case-studies/[slug]": ["./content/case-studies/**/*"],
     "/sitemap.xml": ["./content/case-studies/**/*"],
-    // sharp only where it is really used (lib/store/load-sharp.ts hides it from the tracer).
+    // sharp only where it is really used (lib/store/load-sharp.ts hides it from the tracer; API routes only).
     ...Object.fromEntries(SHARP_ROUTES.map((r) => [r, SHARP_FILES])),
   },
   // Vercel "Function Storage" (2026-10-14): a package named "sharp" is traced

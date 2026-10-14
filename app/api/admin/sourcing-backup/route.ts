@@ -6,7 +6,8 @@ import { digikeyPart, digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { mouserPart, mouserSearch } from "@/lib/sourcing/adapters/mouser";
 import { backupName, isComponent, modelCodes, pickBackup } from "@/lib/sourcing/backup";
 import { parametersToAttributes } from "@/lib/sourcing/spec-map";
-import { fetchImage, storeImage } from "@/lib/store/store-image";
+import { fetchImage } from "@/lib/store/store-image";
+import { storeImage } from "@/lib/store/store-image-sharp";
 import type { SupplierProduct } from "@/lib/sourcing/types";
 
 // DigiKey / Mouser backups and datasheets (owner, 2026-09-29). super_admin.

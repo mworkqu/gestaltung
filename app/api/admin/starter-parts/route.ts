@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { mouserSearch } from "@/lib/sourcing/adapters/mouser";
 import { parametersToAttributes } from "@/lib/sourcing/spec-map";
-import { fetchImage, storeImage } from "@/lib/store/store-image";
+import { fetchImage } from "@/lib/store/store-image";
+import { storeImage } from "@/lib/store/store-image-sharp";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 
 // One-off starter set (owner, 2026-09-28): standard components Voltaat doesn't
