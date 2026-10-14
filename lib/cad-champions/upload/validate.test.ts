@@ -77,7 +77,7 @@ describe("STEP header", () => {
   it("validateHeader maps to error codes", () => {
     expect(validateHeader(new Uint8Array(), "step")).toMatchObject({ code: "empty" });
     expect(validateHeader(enc("%PDF"), "step")).toMatchObject({ code: "not_step" });
-    expect(validateHeader(enc("%PDF"), "pdf")).toEqual({ ok: true });
+    expect(validateHeader(enc("%PDF-1.7"), "pdf")).toEqual({ ok: true });
   });
 });
 
@@ -111,5 +111,43 @@ describe("upload method and content type", () => {
     expect(contentTypeFor("a.stp", "step")).toBe("application/step");
     expect(contentTypeFor("a.pdf", "pdf")).toBe("application/pdf");
     expect(contentTypeFor("a.JPG", "image")).toBe("image/jpeg");
+  });
+});
+
+describe("file signatures (server-side magic-byte check)", () => {
+  const bytes = (...b: number[]) => new Uint8Array(b);
+  const PNG = bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d);
+  const JPEG = bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0x10);
+  const WEBP = new Uint8Array([...enc("RIFF"), 0, 0, 0, 0, ...enc("WEBPVP8 ")]);
+  const MP4 = new Uint8Array([0, 0, 0, 0x20, ...enc("ftypisom")]);
+  const WEBM = bytes(0x1a, 0x45, 0xdf, 0xa3, 0x9f);
+  const ZIP = bytes(0x50, 0x4b, 0x03, 0x04, 0x14, 0);
+  const HTML = enc("<html><script>alert(1)</script>");
+  const EXE = bytes(0x4d, 0x5a, 0x90, 0);
+
+  it("accepts real files of each kind", () => {
+    expect(validateHeader(PNG, "image")).toEqual({ ok: true });
+    expect(validateHeader(JPEG, "image")).toEqual({ ok: true });
+    expect(validateHeader(WEBP, "image")).toEqual({ ok: true });
+    expect(validateHeader(enc("%PDF-1.4"), "pdf")).toEqual({ ok: true });
+    expect(validateHeader(MP4, "video")).toEqual({ ok: true });
+    expect(validateHeader(WEBM, "video")).toEqual({ ok: true });
+    expect(validateHeader(ZIP, "zip")).toEqual({ ok: true });
+    expect(validateHeader(bytes(0x50, 0x4b, 0x05, 0x06), "zip")).toEqual({ ok: true });
+    for (const f of [PNG, JPEG, WEBP, enc("%PDF-1.7")]) expect(validateHeader(f, "proof")).toEqual({ ok: true });
+  });
+
+  it("allows a PDF header after a few leading bytes", () => {
+    expect(validateHeader(new Uint8Array([0x0d, 0x0a, ...enc("%PDF-1.5")]), "pdf")).toEqual({ ok: true });
+  });
+
+  it("refuses renamed files (HTML, EXE, a PNG sent as a PDF, a PDF sent as a ZIP)", () => {
+    for (const accept of ["pdf", "image", "video", "zip", "proof"] as const) {
+      expect(validateHeader(HTML, accept)).toMatchObject({ ok: false, code: "wrong_extension" });
+      expect(validateHeader(EXE, accept)).toMatchObject({ ok: false, code: "wrong_extension" });
+    }
+    expect(validateHeader(PNG, "pdf")).toMatchObject({ ok: false });
+    expect(validateHeader(enc("%PDF-1.7"), "zip")).toMatchObject({ ok: false });
+    expect(validateHeader(ZIP, "video")).toMatchObject({ ok: false });
   });
 });

@@ -95,10 +95,63 @@ export function isStepHeader(bytes: Uint8Array): boolean {
   return true;
 }
 
-/** Checks the first bytes of a file for its type (only STEP has a header rule). */
+type Signature = "pdf" | "png" | "jpeg" | "webp" | "mp4" | "webm" | "zip";
+
+function startsWith(bytes: Uint8Array, sig: readonly number[], offset = 0): boolean {
+  if (bytes.length < offset + sig.length) return false;
+  return sig.every((b, k) => bytes[offset + k] === b);
+}
+
+function ascii(text: string): number[] {
+  return Array.from(text, (c) => c.charCodeAt(0));
+}
+
+/** ISO base media boxes an MP4 may open with (ftyp normally; some encoders write free/wide/moov first). */
+const MP4_FIRST_BOXES = ["ftyp", "moov", "mdat", "free", "wide", "skip"].map(ascii);
+const PDF_MAGIC = ascii("%PDF-");
+
+/** True when the first bytes carry the file signature ("magic number") of `sig`. */
+export function hasSignature(bytes: Uint8Array, sig: Signature): boolean {
+  switch (sig) {
+    case "pdf": {
+      // The PDF header may follow a few junk bytes; look inside the bytes we read.
+      for (let i = 0; i + PDF_MAGIC.length <= bytes.length; i++) if (startsWith(bytes, PDF_MAGIC, i)) return true;
+      return false;
+    }
+    case "png":
+      return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    case "jpeg":
+      return startsWith(bytes, [0xff, 0xd8, 0xff]);
+    case "webp":
+      return startsWith(bytes, ascii("RIFF")) && startsWith(bytes, ascii("WEBP"), 8);
+    case "mp4":
+      return MP4_FIRST_BOXES.some((box) => startsWith(bytes, box, 4));
+    case "webm":
+      return startsWith(bytes, [0x1a, 0x45, 0xdf, 0xa3]);
+    case "zip":
+      // Local file header, empty archive, or spanned-archive marker.
+      return [[0x50, 0x4b, 0x03, 0x04], [0x50, 0x4b, 0x05, 0x06], [0x50, 0x4b, 0x07, 0x08]].some((m) => startsWith(bytes, m));
+  }
+}
+
+/** Signatures a file of each kind may carry (STEP is checked by isStepHeader). */
+export const ACCEPT_SIGNATURES: Record<Exclude<UploadAccept, "step">, readonly Signature[]> = {
+  pdf: ["pdf"],
+  image: ["png", "jpeg", "webp"],
+  video: ["mp4", "webm"],
+  zip: ["zip"],
+  proof: ["png", "jpeg", "webp", "pdf"],
+};
+
+/**
+ * Checks the first bytes of a file for its type (server side, after upload).
+ * A file whose content does not match any accepted signature is refused as
+ * "wrong_extension" (a renamed file), so callers keep their existing messages.
+ */
 export function validateHeader(bytes: Uint8Array, accept: UploadAccept): UploadValidation {
   if (bytes.length === 0) return { ok: false, code: "empty" };
-  if (accept === "step" && !isStepHeader(bytes)) return { ok: false, code: "not_step" };
+  if (accept === "step") return isStepHeader(bytes) ? { ok: true } : { ok: false, code: "not_step" };
+  if (!ACCEPT_SIGNATURES[accept].some((sig) => hasSignature(bytes, sig))) return { ok: false, code: "wrong_extension" };
   return { ok: true };
 }
 
