@@ -11,10 +11,14 @@ import {
   type OverrideLocale,
 } from "../content/overrides";
 import { GLOSSARY_IDS } from "../glossary";
+import { POLICIES_APPROVED_KEY } from "../policies/approval";
 import { isCcFaqId } from "../landing/faq";
 import { VIDEO_SLOTS, parseStoredVideo } from "../videos/registry";
 
 export const MAX_ENTRIES_PER_SAVE = 600;
+
+/** The on/off switches an admin may set ("flag:" keys). */
+export const CC_FLAG_KEYS = [POLICIES_APPROVED_KEY] as const;
 
 export interface OverrideEntry {
   key: string;
@@ -206,7 +210,7 @@ export function getReadyVideoSlots() {
   return VIDEO_SLOTS.filter((v) => v.page === "/get-ready");
 }
 
-export type KeyIssue = "bad_key" | "out_of_scope" | "unknown_message" | "unknown_video" | "bad_video" | "unknown_glossary" | "unknown_faq" | "unsafe_message";
+export type KeyIssue = "bad_key" | "unknown_flag" | "out_of_scope" | "unknown_message" | "unknown_video" | "bad_video" | "unknown_glossary" | "unknown_faq" | "unsafe_message";
 
 export interface CheckContext {
   /** CC message tree (the `CC` object) — the English one; en/ar have identical key sets. */
@@ -246,6 +250,14 @@ export function checkEntry(entry: OverrideEntry, ctx: CheckContext): KeyIssue | 
   if (key.startsWith(OVERRIDE_PREFIX.faq)) {
     const m = /^faq:(.+)\.hidden$/.exec(key);
     if (!m || !isCcFaqId(m[1])) return "unknown_faq";
+    for (const v of [entry.en, entry.ar]) {
+      const n = normaliseOverrideValue(v);
+      if (n !== null && n !== "1") return "bad_key";
+    }
+    return null;
+  }
+  if (key.startsWith(OVERRIDE_PREFIX.flag)) {
+    if (!(CC_FLAG_KEYS as readonly string[]).includes(key)) return "unknown_flag";
     for (const v of [entry.en, entry.ar]) {
       const n = normaliseOverrideValue(v);
       if (n !== null && n !== "1") return "bad_key";
@@ -296,7 +308,7 @@ export function inGlossaryScope(key: string): boolean {
 
 /** Landing editor: FAQ questions / answers and the hide flags. */
 export function inLandingScope(key: string): boolean {
-  return key.startsWith(`${OVERRIDE_PREFIX.msg}landing.faq.items.`) || key.startsWith(OVERRIDE_PREFIX.faq);
+  return key.startsWith(`${OVERRIDE_PREFIX.msg}landing.faq.items.`) || key.startsWith(OVERRIDE_PREFIX.faq) || inPoliciesScope(key);
 }
 
 /** The intro-video items (one id per slot, used for both languages). */
@@ -310,4 +322,9 @@ export function buildVideoItems(
     const d = describe(slot);
     return { key, label: d.label, hint: d.hint, kind: "video" as const, defaultEn: "", defaultAr: "", en: v, ar: v };
   });
+}
+
+/** Policy approval switch (shown on the landing editor page). */
+export function inPoliciesScope(key: string): boolean {
+  return key === POLICIES_APPROVED_KEY;
 }

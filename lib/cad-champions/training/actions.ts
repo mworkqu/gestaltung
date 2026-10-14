@@ -19,6 +19,7 @@ import { isReferenceComplete, studentDetails, type AspectLite, type GraderMode }
 import { gradeSubmissionNow, SUBMISSIONS_BUCKET } from "../grader/service";
 import { markJourney } from "../journey/server";
 import { ccPath, isCcLocale } from "../routes";
+import { ccRateLimited } from "../rate-limits";
 import { readObjectHead, verifyUploadedObject } from "../upload/server";
 import { DEFAULT_MAX_BYTES, isPathUnderPrefix, isStepHeader } from "../upload/validate";
 import { canRevealHint, canSeeSolution, canUseExercise, canWatchLesson, hintsAvailable } from "./access";
@@ -163,6 +164,7 @@ export async function askLessonQuestionAction(input: { slug: string; body: strin
   if (body.length > QUESTION_MAX) return { ok: false, error: "too_long" };
   const cc = await getCcUser();
   if (!cc?.profile) return { ok: false, error: "signed_out" };
+  if (ccRateLimited("question", cc.user.id)) return { ok: false, error: "error" };
   const service = createServiceClient();
   if (!service) return { ok: false, error: "error" };
   try {
@@ -306,6 +308,7 @@ export async function gradeExerciseAction(input: {
   const locale = loc(input?.locale);
   const cc = await getCcUser();
   if (!cc?.profile && !cc?.isStaff) return { ok: false, reason: "signed_out" };
+  if (!cc.isStaff && ccRateLimited("grade", cc.user.id)) return { ok: false, reason: "unavailable" };
   const service = createServiceClient();
   if (!service) return { ok: false, reason: "unavailable" };
   try {

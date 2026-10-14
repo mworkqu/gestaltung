@@ -241,10 +241,10 @@ export default async function CcAdminStudentsPage({ params, searchParams }: Prop
                     <td className="px-3 py-2 text-body">{r.studyLevel ? t(`studyLevels.${r.studyLevel}`) : "-"}</td>
                     <td className="px-3 py-2">{r.isMinor ? <StatusChip tone="warning">{t("minor")}</StatusChip> : <span className="text-mutedtext">{tc("no")}</span>}</td>
                     <td className="px-3 py-2 tabular-nums text-body">
-                      {formatNumber(r.getReadyPercent, locale)}%
+                      <Ltr>{formatNumber(r.getReadyPercent, locale)}%</Ltr>
                       {r.getReadyBypass ? <span className="block text-xs text-mutedtext">{t("bypassed")}</span> : null}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-body">{r.latestPercent == null ? "-" : `${formatNumber(Math.round(r.latestPercent), locale)}%`}</td>
+                    <td className="px-3 py-2 tabular-nums text-body">{r.latestPercent == null ? "-" : <Ltr>{`${formatNumber(Math.round(r.latestPercent), locale)}%`}</Ltr>}</td>
                     <td className="px-3 py-2 text-body">{r.latestBand ? t(`bands.${r.latestBand}`) : "-"}</td>
                     <td className="px-3 py-2 text-body">
                       {r.enrolledUntil && isEnrolled(r, now) ? t("enrolledUntil", { date: formatDate(r.enrolledUntil, locale) }) : <span className="text-mutedtext">{t("notEnrolled")}</span>}

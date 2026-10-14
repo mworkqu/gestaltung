@@ -332,11 +332,14 @@ export function TestWorkspace(props: WorkspaceProps) {
         <div className="flex min-w-0 items-center gap-2">
           <Clock aria-hidden="true" strokeWidth={1.75} className={cn("h-5 w-5 shrink-0", level === "critical" || level === "over" ? "text-[#a1231f]" : "text-accent")} />
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-body">{t("workspace.timerLabel")}</p>
+            <p id="cc-timer-label" className="text-xs font-semibold text-body">{t("workspace.timerLabel")}</p>
+            {/* aria-live stays off at every level: a ticking clock must not announce each second. The threshold
+                Alerts below (role status / alert) announce 15 min, 5 min and 1 min once each. */}
             <p
               className={cn("font-mono text-2xl font-extrabold tabular-nums", level === "critical" || level === "over" ? "text-[#a1231f]" : "text-heading")}
               role="timer"
-              aria-live={level === "critical" ? "assertive" : "off"}
+              aria-labelledby="cc-timer-label"
+              aria-live="off"
             >
               <Ltr>{timerText ?? t("workspace.untimed")}</Ltr>
             </p>
@@ -475,15 +478,32 @@ export function TestWorkspace(props: WorkspaceProps) {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[16rem_minmax(0,1fr)]">
           <nav aria-label={t("workspace.tasksNav")} className="min-w-0">
-            <ul className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0" role="tablist" aria-orientation="vertical">
+            <ul
+              className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0"
+              role="tablist"
+              aria-orientation="vertical"
+              onKeyDown={(e) => {
+                // Roving focus: arrows / Home / End move between task tabs (RTL flips left/right).
+                const rtl = locale === "ar";
+                const next = e.key === "ArrowDown" || e.key === (rtl ? "ArrowLeft" : "ArrowRight");
+                const prev = e.key === "ArrowUp" || e.key === (rtl ? "ArrowRight" : "ArrowLeft");
+                if (!next && !prev && e.key !== "Home" && e.key !== "End") return;
+                e.preventDefault();
+                const i = Math.max(0, tasks.findIndex((x) => x.id === active));
+                const target = e.key === "Home" ? 0 : e.key === "End" ? tasks.length - 1 : (i + (next ? 1 : -1) + tasks.length) % tasks.length;
+                setActive(tasks[target].id);
+                document.getElementById(`cc-task-tab-${tasks[target].id}`)?.focus();
+              }}
+            >
               {tasks.map((task) => {
                 const chip = chipFor(task);
                 const selected = task.id === active;
                 return (
-                  <li key={task.id} className="shrink-0 md:shrink">
+                  <li key={task.id} role="presentation" className="shrink-0 md:shrink">
                     <button
                       type="button"
                       role="tab"
+                      tabIndex={selected ? 0 : -1}
                       id={`cc-task-tab-${task.id}`}
                       aria-selected={selected}
                       aria-controls={`cc-task-panel-${task.id}`}

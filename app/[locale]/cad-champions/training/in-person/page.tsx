@@ -6,7 +6,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { SignedInExtras } from "@/components/cad-champions/shell/signed-in-extras";
 import { BackToTraining } from "@/components/cad-champions/training/page-bits";
-import { EmptyState, PageHeader, StatusChip, type ChipTone } from "@/components/cad-champions/ui";
+import { EmptyState, HelpTip, PageHeader, StatusChip, type ChipTone } from "@/components/cad-champions/ui";
 import type { Locale } from "@/i18n/routing";
 import { requireCcUser } from "@/lib/cad-champions/auth/server";
 import type { CcCohort } from "@/lib/cad-champions/db/types";
@@ -85,7 +85,10 @@ export default async function CcInPersonPage({ params }: Props) {
         </section>
 
         <section className={card} aria-labelledby="ip-m4">
-          {head(ShieldAlert, "ip-m4", t("m4Title"))}
+          <div className="flex items-center justify-between gap-2">
+            {head(ShieldAlert, "ip-m4", t("m4Title"))}
+            <HelpTip label={t("m4HelpLabel")}>{t("m4Help")}</HelpTip>
+          </div>
           <p className="text-sm text-body">{t("m4Text")}</p>
           <ul className="list-disc space-y-1 ps-5 text-sm text-body">
             {(["collect", "instruments", "noCopy", "computer"] as const).map((k) => (

@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { getCcUser } from "@/lib/cad-champions/auth/server";
+import { ccRateLimited } from "@/lib/cad-champions/rate-limits";
 import { ccPath } from "@/lib/cad-champions/routes";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -24,6 +25,7 @@ export async function askGradeQuery(input: { attemptId: string; taskResultId: st
   if (!UUID.test(input.attemptId ?? "") || !UUID.test(input.taskResultId ?? "")) return { ok: false, error: "not_found" };
   const cc = await getCcUser();
   if (!cc) return { ok: false, error: "signed_out" };
+  if (ccRateLimited("question", cc.user.id)) return { ok: false, error: "error" };
   const service = createServiceClient();
   if (!service) return { ok: false, error: "error" };
   try {

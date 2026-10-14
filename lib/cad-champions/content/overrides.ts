@@ -10,6 +10,7 @@
 //                                  ("youtube:<11 chars>" or a Bunny GUID)
 //   glossary:<id>.term|definition  a glossary entry
 //   faq:<id>.hidden                "1" hides a landing FAQ item (locale "en" row)
+//   flag:<name>                    an on/off switch, "1" = on (e.g. flag:policies.approved)
 
 export type OverrideLocale = "en" | "ar";
 
@@ -27,9 +28,10 @@ export const OVERRIDE_PREFIX = {
   video: "video:",
   glossary: "glossary:",
   faq: "faq:",
+  flag: "flag:",
 } as const;
 
-const KEY_RE = /^(msg|video|glossary|faq):[A-Za-z0-9_.-]{1,190}$/;
+const KEY_RE = /^(msg|video|glossary|faq|flag):[A-Za-z0-9_.-]{1,190}$/;
 
 export function isOverrideKey(key: unknown): key is string {
   return typeof key === "string" && KEY_RE.test(key);
@@ -38,6 +40,7 @@ export function isOverrideKey(key: unknown): key is string {
 export const msgKey = (dotted: string) => `${OVERRIDE_PREFIX.msg}${dotted}`;
 export const videoKey = (slot: string) => `${OVERRIDE_PREFIX.video}${slot}`;
 export const glossaryKey = (id: string, field: "term" | "definition") => `${OVERRIDE_PREFIX.glossary}${id}.${field}`;
+export const flagKey = (name: string) => `${OVERRIDE_PREFIX.flag}${name}`;
 export const faqHiddenKey = (id: string) => `${OVERRIDE_PREFIX.faq}${id}.hidden`;
 
 /** Rows of one locale -> map (empty values are ignored: empty = "use the default"). */

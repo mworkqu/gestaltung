@@ -10,6 +10,8 @@
     "retakeOn": "You can retake it on {date}",
     "loadErrorTitle": "We couldn't load your results",
     "loadError": "Please refresh the page in a minute. If it keeps happening, use Need help.",
+    "helpLabel": "About result statuses",
+    "help": "Provisional means the computer has checked your files and a trainer has not confirmed the score yet. Final means a trainer has confirmed it.",
     "status": {
       "submitted": "Handed in",
       "grading": "Checking",

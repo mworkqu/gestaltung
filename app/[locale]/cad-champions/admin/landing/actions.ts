@@ -7,7 +7,7 @@ import type { ActionResult } from "@/lib/cad-champions/admin/server";
 
 // Landing editor: FAQ copy + hide flags (cc_content_overrides) and testimonials (cc_testimonials).
 export async function saveLandingOverridesAction(entries: { key: string; en: string; ar: string }[]): Promise<ActionResult<{ saved: number }>> {
-  return saveOverrides(entries, { name: "landing", allow: inLandingScope, paths: ["/"] });
+  return saveOverrides(entries, { name: "landing", allow: inLandingScope, paths: ["/", "/privacy", "/terms", "/refunds"] });
 }
 
 export async function createTestimonialAction(input: unknown): Promise<ActionResult<{ id: string }>> {

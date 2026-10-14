@@ -12,6 +12,8 @@
     "lint": "eslint . && node scripts/cc-rtl-check.mjs",
     "i18n:check": "node scripts/cc-i18n-check.mjs",
     "cc:rtl-check": "node scripts/cc-rtl-check.mjs",
+    "cc:strings:export": "node scripts/cc-strings-export.mjs",
+    "cc:strings:import": "node scripts/cc-strings-import.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test"

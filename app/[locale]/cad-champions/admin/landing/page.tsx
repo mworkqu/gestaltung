@@ -11,6 +11,7 @@ import { loadOverrideMaps, loadRawMessages } from "@/lib/cad-champions/admin/ove
 import { listTestimonials } from "@/lib/cad-champions/admin/testimonials-server";
 import { requireCcAdmin } from "@/lib/cad-champions/auth/server";
 import { faqHiddenKey, msgKey } from "@/lib/cad-champions/content/overrides";
+import { POLICIES_APPROVED_KEY } from "@/lib/cad-champions/policies/approval";
 import { CC_FAQ } from "@/lib/cad-champions/landing/faq";
 import { ccPageMetadata } from "@/lib/cad-champions/metadata";
 import { ccPath, isCcLocale } from "@/lib/cad-champions/routes";
@@ -48,12 +49,14 @@ export default async function CcAdminLandingPage({ params }: Props) {
   const landingAr = ar.landing;
 
   let faq: ReactNode;
+  let policies: ReactNode;
   if (!maps.ok) {
     faq = (
       <Alert tone={maps.reason === "not_set_up" ? "info" : "error"} title={maps.reason === "not_set_up" ? tc("notSetUp.title") : tc(`errors.${maps.reason}`)}>
         {maps.reason === "not_set_up" ? tc("notSetUp.body") : null}
       </Alert>
     );
+    policies = faq;
   } else {
     const groups: OverrideGroup[] = CC_FAQ.map((item) => {
       const q = (l: typeof landingEn) => leafAt(l, item.questionKey) ?? "";
@@ -73,6 +76,25 @@ export default async function CcAdminLandingPage({ params }: Props) {
       };
     });
     faq = <OverridesEditor groups={groups} save={saveLandingOverridesAction} />;
+    const policyGroups: OverrideGroup[] = [
+      {
+        id: "policies",
+        title: t("policiesTitle"),
+        items: [
+          {
+            key: POLICIES_APPROVED_KEY,
+            label: t("policiesApproved"),
+            hint: t("policiesApprovedHint"),
+            kind: "flag",
+            defaultEn: "",
+            defaultAr: "",
+            en: maps.en.get(POLICIES_APPROVED_KEY) ?? "",
+            ar: maps.ar.get(POLICIES_APPROVED_KEY) ?? "",
+          },
+        ],
+      },
+    ];
+    policies = <OverridesEditor groups={policyGroups} save={saveLandingOverridesAction} />;
   }
 
   return (
@@ -84,6 +106,13 @@ export default async function CcAdminLandingPage({ params }: Props) {
         </h2>
         <p className="max-w-2xl text-sm text-body">{t("faqIntro")}</p>
         {faq}
+      </section>
+      <section aria-labelledby="landing-policies" className="space-y-3">
+        <h2 id="landing-policies" className="text-xl font-bold text-heading">
+          {t("policiesTitle")}
+        </h2>
+        <p className="max-w-2xl text-sm text-body">{t("policiesIntro")}</p>
+        {policies}
       </section>
       <section aria-labelledby="landing-testimonials" className="space-y-3">
         <h2 id="landing-testimonials" className="text-xl font-bold text-heading">

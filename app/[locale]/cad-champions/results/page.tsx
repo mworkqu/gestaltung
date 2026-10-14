@@ -5,7 +5,7 @@ import { ArrowRight, ClipboardList } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { SignedInExtras } from "@/components/cad-champions/shell/signed-in-extras";
-import { Alert, Button, EmptyState, PageHeader, StatusChip, type ChipTone } from "@/components/cad-champions/ui";
+import { Alert, Button, EmptyState, HelpTip, PageHeader, StatusChip, type ChipTone } from "@/components/cad-champions/ui";
 import { requireCcUser } from "@/lib/cad-champions/auth/server";
 import { formatDate, formatNumber } from "@/lib/cad-champions/format";
 import { Ltr } from "@/lib/cad-champions/ltr";
@@ -40,7 +40,7 @@ export default async function CcResultsPage({ params }: Props) {
 
   return (
     <div className="container space-y-6 py-8 sm:py-12">
-      <PageHeader title={t("title")} purpose={t("purpose")} />
+      <PageHeader title={t("title")} purpose={t("purpose")} help={<HelpTip label={t("helpLabel")}>{t("help")}</HelpTip>} />
       <div className="max-w-3xl">
         {!res.ok ? (
           <Alert tone="warning" title={t("loadErrorTitle")}>

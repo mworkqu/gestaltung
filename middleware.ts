@@ -7,6 +7,7 @@ import { hasSupabaseAuthCookie } from "./lib/supabase/auth-cookie";
 import { ccRoute, type CcRouteDecision } from "./lib/cad-champions/cc-routing";
 import { ccSignInHref, isCcProtected } from "./lib/cad-champions/auth/paths";
 import { CC_LOCALE_COOKIE, parseCcPath } from "./lib/cad-champions/routes";
+import { applyCcSecurityHeaders } from "./lib/cad-champions/security-headers";
 import {
   SITE_V2_PREVIEW_COOKIE,
   SITE_V2_PREVIEW_COOKIE_VALUE,
@@ -123,6 +124,7 @@ async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kin
   if (cc.kind === "redirect") {
     const res = NextResponse.redirect(new URL(cc.to, request.url), cc.status);
     res.headers.set("X-Robots-Tag", CC_ROBOTS);
+    applyCcSecurityHeaders(res.headers);
     // 307 depends on the visitor's cc_locale cookie: never cache it.
     if (cc.status === 307) res.headers.set("Cache-Control", "private, no-store");
     return res;
@@ -136,6 +138,7 @@ async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kin
     const target = ccSignInHref(cc.locale, request.nextUrl.pathname + request.nextUrl.search);
     const res = NextResponse.redirect(new URL(target, request.url), 307);
     res.headers.set("X-Robots-Tag", CC_ROBOTS);
+    applyCcSecurityHeaders(res.headers);
     res.headers.set("Cache-Control", "private, no-store");
     return res;
   }
@@ -147,6 +150,8 @@ async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kin
   headers.set("X-NEXT-INTL-LOCALE", cc.locale);
   const res = NextResponse.rewrite(new URL(cc.to, request.url), { request: { headers } });
   res.headers.set("X-Robots-Tag", CC_ROBOTS);
+  // Prompt 12 Step A: CC-only security headers (lib/cad-champions/security-headers.ts).
+  applyCcSecurityHeaders(res.headers);
   return updateSession(request, res);
 }
 

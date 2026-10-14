@@ -259,7 +259,7 @@ export default async function CcAdminStudentPage({ params }: Props) {
                 {d.payments.map((pay) => (
                   <li key={pay.id} className="tile flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                     <span className="font-semibold text-ink">{pick(locale, pay.planEn ?? "-", pay.planAr ?? pay.planEn ?? "-")}</span>
-                    <span className="tabular-nums text-body">{formatQAR(pay.amount_qar, locale)}</span>
+                    <Ltr className="tabular-nums text-body">{formatQAR(pay.amount_qar, locale)}</Ltr>
                     <Ltr className="text-mutedtext">{pay.reference_code}</Ltr>
                     <StatusChip tone={pay.status === "paid" ? "success" : pay.status === "proof_submitted" ? "warning" : "neutral"}>{tPay(pay.status)}</StatusChip>
                     <span className="text-mutedtext">{formatDate(pay.created_at, locale)}</span>

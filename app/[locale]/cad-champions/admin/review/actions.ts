@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCcUser } from "@/lib/cad-champions/auth/server";
+import { ccRateLimited } from "@/lib/cad-champions/rate-limits";
 import { finalizeReview, type FinalizeResult } from "@/lib/cad-champions/drawing/finalize";
 import type { Decision } from "@/lib/cad-champions/drawing/review";
 import { translateComment, type TranslateResult } from "@/lib/cad-champions/drawing/translate";
@@ -48,5 +49,6 @@ export async function finalizeReviewAction(input: {
 export async function translateCommentAction(input: { taskResultId: string; text: string; to: "en" | "ar" }): Promise<TranslateResult | { ok: false; reason: "forbidden" }> {
   const cc = await getCcUser();
   if (!cc?.isStaff) return { ok: false, reason: "forbidden" };
+  if (ccRateLimited("translate", cc.user.id)) return { ok: false, reason: "error" };
   return translateComment({ text: String(input.text ?? ""), to: input.to === "ar" ? "ar" : "en", taskResultId: /^[0-9a-f-]{36}$/i.test(input.taskResultId ?? "") ? input.taskResultId : null });
 }

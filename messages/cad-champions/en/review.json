@@ -160,6 +160,7 @@
       "measurementAi": "Pass or fail · AI first pass",
       "measurementTrainer": "Pass or fail · trainer check",
       "points": "{points} points",
+      "earned": "Points for this item: {points} of {max}",
       "ai": {
         "pass": "AI: pass",
         "fail": "AI: fail",
@@ -197,6 +198,8 @@
     },
     "finalize": {
       "title": "Finalize",
+      "confirmTitle": "Finalize this review?",
+      "confirmBody": "This saves the score and can email the student their result. You can finalize again later if you need to correct it.",
       "remaining": "{count} items still need your decision.",
       "ready": "Every item is decided. Finalize to save the score.",
       "missing": "{count} items still need your decision. We moved you to the first one.",

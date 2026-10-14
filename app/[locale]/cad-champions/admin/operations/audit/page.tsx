@@ -189,7 +189,7 @@ function AuditLine({ row, locale, t }: { row: AuditRow; locale: "en" | "ar"; t: 
           <ul className="space-y-1">
             {diff.map((d) => (
               <li key={d.key} className="text-xs">
-                <Ltr className="font-mono font-semibold text-ink">{d.key}</Ltr>: <Ltr className="break-words text-[#a1231f] line-through">{d.before ?? t("missing")}</Ltr> <span aria-hidden="true">→</span> <span className="sr-only">{t("after")}</span>
+                <Ltr className="font-mono font-semibold text-ink">{d.key}</Ltr>: <Ltr className="break-words text-[#a1231f] line-through">{d.before ?? t("missing")}</Ltr> <span aria-hidden="true" className="inline-block rtl:-scale-x-100">→</span> <span className="sr-only">{t("after")}</span>
                 <Ltr className="break-words text-buy">{d.after ?? t("missing")}</Ltr>
               </li>
             ))}

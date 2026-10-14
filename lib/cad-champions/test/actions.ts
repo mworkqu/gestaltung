@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 import { getCcUser } from "../auth/server";
+import { ccRateLimited } from "../rate-limits";
 import type { CcAttachment, CcExpectedUpload } from "../db/types";
 import { checkPackage, failedManifest, PACKAGE_MAX_BYTES, parseExpectations, type PackageManifest } from "../upload/package-check";
 import { verifyUploadedObject } from "../upload/server";
@@ -147,6 +148,7 @@ export async function recordSubmissionAction(input: {
   const cc = await getCcUser();
   if (!cc) return { ok: false, reason: "signed_out" };
   const userId = cc.user.id;
+  if (ccRateLimited("upload", userId)) return { ok: false, reason: "unavailable" };
   const attempt = await loadOwnAttempt(String(input?.attemptId ?? ""), userId);
   if (!attempt) return { ok: false, reason: "not_allowed" };
   const test = await testMeta(attempt.test_id);
@@ -278,6 +280,7 @@ export type PackageResult =
 export async function validatePackageAction(attemptId: string): Promise<PackageResult> {
   const cc = await getCcUser();
   if (!cc) return { ok: false, reason: "signed_out" };
+  if (ccRateLimited("upload", cc.user.id)) return { ok: false, reason: "unavailable" };
   const attempt = await loadOwnAttempt(String(attemptId ?? ""), cc.user.id);
   if (!attempt) return { ok: false, reason: "not_allowed" };
   const test = await testMeta(attempt.test_id);

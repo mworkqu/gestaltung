@@ -1,7 +1,7 @@
-import { PlaceholderPage, placeholderMetadata } from "@/components/cad-champions/shell/placeholder-page";
+import { PolicyPage, policyMetadata } from "@/components/cad-champions/shell/policy-page";
 
-export const generateMetadata = placeholderMetadata("terms", "/terms");
+export const generateMetadata = policyMetadata("terms");
 
 export default function CcTermsPage({ params }: { params: Promise<{ locale: string }> }) {
-  return <PlaceholderPage params={params} page="terms" body />;
+  return <PolicyPage params={params} id="terms" />;
 }

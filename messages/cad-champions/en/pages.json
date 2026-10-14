@@ -48,5 +48,14 @@
     "title": "Terms of use",
     "purpose": "The rules for using CAD Champions and taking part in its training.",
     "body": "[TODO-MO: terms of use text]"
+  },
+  "refunds": {
+    "title": "Refunds",
+    "purpose": "How refunds work for CAD Champions payments, and how to ask for one."
+  },
+  "policies": {
+    "draftTitle": "DRAFT: not yet approved",
+    "draftBody": "This page is a draft written for review. It is not final and may change. Text in square brackets is still missing.",
+    "unavailable": "This page could not be loaded. Please try again later or contact us."
   }
 }

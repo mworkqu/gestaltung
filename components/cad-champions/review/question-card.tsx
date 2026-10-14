@@ -83,7 +83,7 @@ export function QuestionCard({ q }: { q: QuestionView }) {
 
       <div className="flex flex-wrap gap-3 text-sm">
         <Link href={q.href} target="_blank" className="inline-flex min-h-11 items-center gap-1 font-semibold text-accent underline-offset-2 hover:underline">
-          <ExternalLink aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+          <ExternalLink aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 rtl:-scale-x-100" />
           {q.kind === "grade_query" ? t("openResult") : t("openTraining")}
         </Link>
         {q.reviewHref ? (

@@ -65,6 +65,11 @@ export async function CcFooter({ locale }: { locale: Locale }) {
                 {t("terms")}
               </Link>
             </li>
+            <li>
+              <Link href={ccPath(locale, "/refunds")} className={link}>
+                {t("refunds")}
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

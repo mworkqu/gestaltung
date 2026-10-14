@@ -243,7 +243,7 @@ export function PackagePanel({
                           <Ltr className="font-mono text-xs text-ink">{item.pattern}</Ltr>
                           {item.files.length > 0 ? (
                             <span className="text-xs text-body">
-                              → <Ltr>{item.files.map((f) => f.split("/").pop()).join(", ")}</Ltr>
+                              <span aria-hidden="true" className="inline-block rtl:-scale-x-100">→</span> <Ltr>{item.files.map((f) => f.split("/").pop()).join(", ")}</Ltr>
                             </span>
                           ) : null}
                         </li>

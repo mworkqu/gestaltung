@@ -110,3 +110,28 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 
 ## Admin panel (Prompt 11)
 - Admin: [TODO-MO: retention policy] — messages/cad-champions/{en,ar}/admin.json operations.deletions.retentionTodo (next to "Approve and delete") + lib/cad-champions/admin/deletion.ts — /admin/operations/deletions. Decide how long files, anonymised scores and payment records are kept, and whether the sign-in (auth) user must also be deleted (currently NOT deleted).
+
+## Policies (Prompt 12, Deliverable E)
+Rows 3, 4 and 10-5 above are superseded: privacy, terms and refunds are now drafted in content/cad-champions/{privacy,terms,refunds}.{en,ar}.md (DRAFT banner shows until Admin > Landing page > Legal pages > "Policies approved" is ticked, key flag:policies.approved). The checkout "refund policy" link now opens /refunds. Every item below appears in both languages unless noted.
+- Policies: [TODO-MO: company legal name] in privacy, terms (content/cad-champions/*.md) - /privacy, /terms
+- Policies: [TODO-MO: effective date] in privacy, terms, refunds - /privacy, /terms, /refunds
+- Policies: [TODO-MO: governing law] in privacy, terms, refunds
+- Policies: [TODO-MO: retention days] x3 in privacy (uploaded test files, payment proof images, deletion after approval) - /privacy; must match account.json deletion.retention
+- Policies: [TODO-MO: retention period] in privacy (payment records) - /privacy
+- Policies: [TODO-MO: confirm the analytics tools in use] in privacy section 1 - /privacy
+- Policies: [TODO-MO: list or confirm providers] in privacy section 2 - /privacy
+- Policies: [TODO-MO: confirm whether results are ever shared with schools or sponsors] in privacy section 2 - /privacy
+- Policies: [TODO-MO: confirm wording and name the provider if you want to] in privacy section 4 (AI provider) - /privacy
+- Policies: [TODO-MO: confirm with the provider's terms whether submitted files are used to train their models] in privacy section 4 - /privacy
+- Policies: [TODO-MO: confirm legal retention duties] in privacy section 7 - /privacy
+- Policies: [TODO-MO: confirm prices and what is included in each plan] in terms section 5 - /terms
+- Policies: [TODO-MO: confirm how quickly payments are approved] in terms section 5 - /terms
+- Policies: [TODO-MO: legal review of the limit of liability] in terms section 8 - /terms
+- Policies: [TODO-MO: refund policy: which cases are eligible ...] in refunds section 1 - /refunds
+- Policies: [TODO-MO: other eligible cases and conditions] in refunds section 1 - /refunds
+- Policies: [TODO-MO: refund window in days] in refunds section 2 - /refunds
+- Policies: [TODO-MO: conditions after the window, and whether training already used reduces the refund] in refunds section 2 - /refunds
+- Policies: [TODO-MO: refund amounts: full or partial, and whether any fee is kept] in refunds section 3 - /refunds
+- Policies: [TODO-MO: how fast we reply] in refunds section 5 - /refunds
+- Policies: [TODO-MO: how the refund is paid and how long it takes] in refunds section 5 - /refunds
+- Policies: [TODO-MO: confirm] (card refunds via the payment provider) in refunds section 6 - /refunds

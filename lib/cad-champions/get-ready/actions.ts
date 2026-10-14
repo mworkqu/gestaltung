@@ -10,6 +10,7 @@ import { gradeSubmission } from "../grader/client";
 import { graderErrorInfo, type GraderErrorCode } from "../grader/error-codes";
 import { markJourney } from "../journey/server";
 import { isCcLocale } from "../routes";
+import { ccRateLimited } from "../rate-limits";
 import { isPathUnderPrefix } from "../upload/validate";
 import { markStepDone, setSubItem } from "./server";
 import { MANUALLY_MARKABLE, getStepDef, isGetReadyStepKey } from "./steps";
@@ -51,6 +52,7 @@ export async function gradePracticeAction(path: string, locale: string): Promise
   if (!cc?.profile) return { ok: false, reason: "signed_out" };
   const userId = cc.user.id;
   if (!isPathUnderPrefix(path, practicePrefix(userId))) return { ok: false, reason: "not_allowed" };
+  if (ccRateLimited("grade", userId)) return { ok: false, reason: "unavailable" };
   const loc: Locale = isCcLocale(locale) ? locale : "en";
 
   const result = await gradeSubmission({ mode: "practice", bucket: PRACTICE_BUCKET, path });

@@ -7,7 +7,7 @@ import { formatReceiptNumber, getReceiptLetterhead, renderReceiptHtml, type Rece
 import { loadPayment } from "@/lib/cad-champions/payments/server";
 
 // GET /api/cad-champions/payments/<id>/receipt
-// Owner (or staff) only, paid/refunded payments only. Bilingual receipt as a
+// Owner (or a CC admin) only, paid/refunded payments only. Bilingual receipt as a
 // PDF with headless Chromium when installed (local), else the same page as
 // printable HTML (Vercel), like the certificate and the results report.
 
@@ -23,7 +23,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const cc = await getCcUser();
   if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
-  const loaded = await loadPayment(cc.user.id, id, cc.isStaff);
+  // Payments are admin business: instructors (staff) see only their own receipts.
+  const loaded = await loadPayment(cc.user.id, id, cc.isAdmin);
   if (!loaded.ok) return Response.json({ error: loaded.reason }, { status: 503, headers: NO_STORE });
   const p = loaded.value;
   if (!p || (p.status !== "paid" && p.status !== "refunded") || !p.receipt_number) {

@@ -361,6 +361,8 @@
       "computer": "يبقى حاسوبك متاحًا طوال الوقت."
     },
     "instrumentsLink": "اطّلع على الأدوات المسموحة",
+    "m4HelpLabel": "عن الوحدة 4",
+    "m4Help": "الوحدة 4 (M4) هي جزء الهندسة العكسية في المسابقة: تقيس قطعة حقيقية وتعيد بناءها في برنامج CAD.",
     "scheduleTitle": "الجدول",
     "schedule": "[TODO-MO: session schedule]",
     "locationTitle": "المكان",

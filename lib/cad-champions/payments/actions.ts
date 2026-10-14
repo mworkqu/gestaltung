@@ -12,6 +12,7 @@ import type { Locale } from "@/i18n/routing";
 import { getCcUser } from "../auth/server";
 import { CC_LOCALES } from "../db/types";
 import { ccPath, isCcLocale } from "../routes";
+import { ccRateLimited } from "../rate-limits";
 import {
   approvePayment,
   cancelReservation,
@@ -39,6 +40,7 @@ function revalidatePayment(paymentId?: string) {
 export async function validateCouponAction(input: { code: string; planId: string }): Promise<CouponCheck> {
   const cc = await getCcUser();
   if (!cc) return { ok: false, reason: "signed_out" };
+  if (ccRateLimited("coupon", cc.user.id)) return { ok: false, reason: "error" };
   const code = String(input?.code ?? "").slice(0, 40);
   if (!code.trim() || !isUuid(input?.planId)) return { ok: false, reason: "invalid" };
   return validateCouponForUser(code, input.planId);
@@ -55,6 +57,7 @@ export async function createCheckoutAction(input: {
 }): Promise<{ ok: true; paymentId: string; redirectUrl?: string } | { ok: false; error: CheckoutError | "signed_out" }> {
   const cc = await getCcUser();
   if (!cc) return { ok: false, error: "signed_out" };
+  if (ccRateLimited("checkout", cc.user.id)) return { ok: false, error: "error" };
   const locale: Locale = isCcLocale(input?.locale) ? input.locale : "en";
   const res = await createCheckout(
     cc,
@@ -75,6 +78,7 @@ export async function createCheckoutAction(input: {
 export async function submitProofAction(input: ProofInput): Promise<{ ok: true } | { ok: false; error: ProofError | "signed_out" }> {
   const cc = await getCcUser();
   if (!cc) return { ok: false, error: "signed_out" };
+  if (ccRateLimited("proof", cc.user.id)) return { ok: false, error: "error" };
   const res = await submitProof(cc, {
     paymentId: String(input?.paymentId ?? ""),
     proofPath: String(input?.proofPath ?? ""),

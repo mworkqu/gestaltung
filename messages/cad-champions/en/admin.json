@@ -659,6 +659,10 @@
     "faqIntro": "Open a question to change its text or hide it from the page.",
     "testimonialsTitle": "Testimonials",
     "testimonialsIntro": "Add only real quotes you have permission to use. Nothing shows on the page until you publish one.",
+    "policiesTitle": "Legal pages",
+    "policiesIntro": "The privacy, terms and refund pages show a DRAFT banner until you approve them here.",
+    "policiesApproved": "Policies approved",
+    "policiesApprovedHint": "Tick only after the owner and a legal reviewer approved the privacy, terms and refund texts and every missing [TODO-MO] item is filled. This removes the DRAFT banner.",
     "fields": {
       "question": "Question",
       "answer": "Answer",

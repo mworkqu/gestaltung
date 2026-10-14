@@ -394,7 +394,7 @@ export function CheckoutClient({
                   </Link>
                 ),
                 refund: (chunks) => (
-                  <Link href={ccPath(locale, "/terms")} target="_blank" className="font-semibold text-accent underline">
+                  <Link href={ccPath(locale, "/refunds")} target="_blank" className="font-semibold text-accent underline">
                     {chunks}
                   </Link>
                 ),

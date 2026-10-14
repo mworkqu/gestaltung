@@ -7,12 +7,13 @@ import { CheckCircle2, Download, ExternalLink, FileText, Keyboard, Languages, Mi
 import { useLocale, useTranslations } from "next-intl";
 
 import { finalizeReviewAction, translateCommentAction } from "@/app/[locale]/cad-champions/admin/review/actions";
-import { Alert, Button, HelpTip, StatusChip, useToast } from "@/components/cad-champions/ui";
+import { Alert, Button, ConfirmDialog, HelpTip, StatusChip, useToast } from "@/components/cad-champions/ui";
 import type { Locale } from "@/i18n/routing";
 import type { ReviewAspectView, ReviewItemView } from "@/lib/cad-champions/drawing/review-server";
 import { COMMENT_MAX, isDecided, prefill, type Decision } from "@/lib/cad-champions/drawing/review";
 import { AI_CONFIDENCE_MIN } from "@/lib/cad-champions/drawing/ai-schema";
 import { formatNumber } from "@/lib/cad-champions/format";
+import { aspectPoints } from "@/lib/cad-champions/scoring/core";
 import { Ltr } from "@/lib/cad-champions/ltr";
 import { ccPath } from "@/lib/cad-champions/routes";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ export function ReviewWorkspace({ view, aiAvailable }: { view: ReviewItemView; a
   const [finalizing, startFinalize] = React.useTransition();
   const [done, setDone] = React.useState<{ emailed: boolean; graded: boolean } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   const rowRefs = React.useRef<(HTMLLIElement | null)[]>([]);
   const undecided = view.aspects.filter((a) => !isDecided(a, decisions[a.id]));
@@ -82,6 +84,12 @@ export function ReviewWorkspace({ view, aiAvailable }: { view: ReviewItemView; a
     });
   }, [decisions, locale, main, other, otherMachine, router, t, toast, undecided, view.aspects, view.id, writeLang]);
 
+  // Finalizing saves the score and emails the student, so ask first. Missing decisions skip the dialog (finalize jumps to the first one).
+  const askFinalize = React.useCallback(() => {
+    if (undecided.length > 0) finalize();
+    else setConfirmOpen(true);
+  }, [finalize, undecided.length]);
+
   // Keyboard: J/K items, P/F pass/fail, 0-3 judgement, Enter finalize, N next submission.
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -103,7 +111,7 @@ export function ReviewWorkspace({ view, aiAvailable }: { view: ReviewItemView; a
         setDecisions((d) => ({ ...d, [a.id]: { aspectId: a.id, score: Number(key) } }));
       } else if (e.key === "Enter" && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLAnchorElement)) {
         e.preventDefault();
-        finalize();
+        askFinalize();
       } else if (key === "n" && nextHref) {
         e.preventDefault();
         router.push(nextHref);
@@ -111,7 +119,7 @@ export function ReviewWorkspace({ view, aiAvailable }: { view: ReviewItemView; a
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, finalize, nextHref, router, setPassed, view.aspects]);
+  }, [active, askFinalize, nextHref, router, setPassed, view.aspects]);
 
   React.useEffect(() => {
     rowRefs.current[active]?.scrollIntoView({ block: "nearest" });
@@ -261,9 +269,22 @@ export function ReviewWorkspace({ view, aiAvailable }: { view: ReviewItemView; a
           ) : null}
           <div className="flex flex-wrap gap-2">
             {!done ? (
-              <Button type="button" onClick={finalize} loading={finalizing} loadingText={t("finalize.finalizing")} disabled={!canFinalize} disabledReason={t("finalize.remaining", { count: formatNumber(undecided.length, locale) })}>
+              <Button type="button" onClick={askFinalize} loading={finalizing} loadingText={t("finalize.finalizing")} disabled={!canFinalize} disabledReason={t("finalize.remaining", { count: formatNumber(undecided.length, locale) })}>
                 {view.finalized ? t("finalize.again") : t("finalize.button")}
               </Button>
+            ) : null}
+            {!done ? (
+              <ConfirmDialog
+                open={confirmOpen}
+                onOpenChange={setConfirmOpen}
+                title={t("finalize.confirmTitle")}
+                consequence={t("finalize.confirmBody")}
+                confirmLabel={t("finalize.button")}
+                onConfirm={() => {
+                  setConfirmOpen(false);
+                  finalize();
+                }}
+              />
             ) : null}
             {nextHref ? (
               <Button asChild variant={done ? "primary" : "secondary"}>
@@ -387,6 +408,14 @@ function AspectRow({
               <span className="text-xs leading-snug">{t(`scale.${s}`)}</span>
             </button>
           ))}
+          {typeof decision?.score === "number" ? (
+            <p className="text-sm font-semibold text-ink sm:col-span-2" aria-live="polite">
+              {t("earned", {
+                points: formatNumber(aspectPoints({ type: "judgement", max_points: aspect.maxPoints, partial_rule: null }, { aspect_id: aspect.id, passed: null, judgement_score: decision.score }), locale),
+                max: formatNumber(aspect.maxPoints, locale),
+              })}
+            </p>
+          ) : null}
         </div>
       )}
     </>
@@ -433,7 +462,7 @@ function Viewer({ url, page, setPage, upload }: { url: string | null; page: numb
             <Minus aria-hidden="true" className="h-4 w-4" />
           </button>
           <span className="min-w-[3.5rem] text-center text-sm font-semibold text-ink" aria-live="polite">
-            {formatNumber(Math.round(zoom * 100), locale)}%
+            <Ltr>{formatNumber(Math.round(zoom * 100), locale)}%</Ltr>
           </span>
           <button type="button" aria-label={t("zoomIn")} disabled={idx >= ZOOM_STEPS.length - 1} onClick={() => setZoom(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, idx + 1)])} className="inline-flex h-11 w-11 items-center justify-center rounded-full hover:bg-panel disabled:opacity-50">
             <Plus aria-hidden="true" className="h-4 w-4" />
@@ -458,7 +487,7 @@ function Viewer({ url, page, setPage, upload }: { url: string | null; page: numb
             </button>
           </form>
           <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-sm font-semibold text-accent hover:bg-panel">
-            <ExternalLink aria-hidden="true" strokeWidth={1.75} className="h-4 w-4" />
+            <ExternalLink aria-hidden="true" strokeWidth={1.75} className="h-4 w-4 rtl:-scale-x-100" />
             {t("openNew")}
           </a>
         </div>

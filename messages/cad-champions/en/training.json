@@ -361,6 +361,8 @@
       "computer": "Your computer stays available the whole time."
     },
     "instrumentsLink": "See the allowed instruments",
+    "m4HelpLabel": "About Module 4",
+    "m4Help": "Module 4 (M4) is the reverse engineering part of the competition: you measure a real part and rebuild it in CAD.",
     "scheduleTitle": "Schedule",
     "schedule": "[TODO-MO: session schedule]",
     "locationTitle": "Location",

@@ -453,3 +453,237 @@ describe("storage", () => {
     expect(await rows("select name from storage.objects where bucket_id = 'cc-payment-proofs'")).toHaveLength(1);
   });
 });
+
+// ============================================================================
+// Prompt 12 Step A: launch RLS audit against the FULL CC chain (0077-0085).
+// Own PGlite instance so the 0077/0078-only checks above stay unchanged.
+// Cases that document a real gap are `it.skip` with a pointer to the finding
+// in docs/cad-champions/SECURITY_REVIEW.md (fix SQL there; migrations are not
+// edited by this review).
+// ============================================================================
+describe("launch audit: full chain 0077-0085", () => {
+  let f: PGlite;
+  const PLAN = "cc120000-0000-4000-8000-000000000001";
+  const PAY_A = "cc120000-0000-4000-8000-0000000000a1";
+  const PAY_B = "cc120000-0000-4000-8000-0000000000b1";
+  let attA = "";
+  let attB = "";
+
+  async function who(uid: string | null | "service") {
+    await f.exec("reset role");
+    await f.query("select set_config('request.jwt.claim.sub', $1, false)", [uid && uid !== "service" ? uid : ""]);
+    await f.exec(uid === "service" ? "set role service_role" : uid ? "set role authenticated" : "set role anon");
+  }
+  async function q<T = Record<string, unknown>>(sql: string, params: unknown[] = []) {
+    return (await f.query<T>(sql, params)).rows;
+  }
+
+  beforeAll(async () => {
+    f = new PGlite();
+    await f.exec(SUPABASE_STUB);
+    for (const m of ["0077_cc_core.sql", "0078_cc_storage.sql", "0080_cc_diagnostic_seed.sql", "0081_cc_results.sql",
+                     "0082_cc_drawing_rubric.sql", "0083_cc_training_seed.sql", "0084_cc_payments.sql", "0085_cc_admin.sql"]) {
+      await f.exec(migration(m));
+    }
+    await f.exec(`
+      insert into auth.users (id, email) values ('${A}', 'a@x.test'), ('${B}', 'b@x.test'), ('${I}', 'i@x.test'), ('${M}', 'm@x.test');
+      insert into public.cc_profiles (id, email, full_name, role) values
+        ('${A}', 'a@x.test', 'Alice Student', 'student'), ('${B}', 'b@x.test', 'Bob Student', 'student'),
+        ('${I}', 'i@x.test', 'Ian Trainer', 'instructor'), ('${M}', 'm@x.test', 'Mo Admin', 'admin');
+      insert into public.cc_plans (id, slug, name_en, name_ar, price_qar, duration_days, is_active)
+        values ('${PLAN}', 'sec-plan', 'Plan', 'خطة', 100, 30, true);
+      insert into public.cc_coupons (code, discount_type, discount_value) values ('SECRET50', 'percent', 50);
+      insert into public.cc_payments (id, user_id, plan_id, amount_qar, method, reference_code, status, proof_storage_path, payer_name)
+        values ('${PAY_A}', '${A}', '${PLAN}', 100, 'fawran', 'CAD-AAAA', 'proof_submitted', '${A}/${PAY_A}/1_a.png', 'Alice'),
+               ('${PAY_B}', '${B}', '${PLAN}', 100, 'fawran', 'CAD-BBBB', 'proof_submitted', '${B}/${PAY_B}/1_b.png', 'Bob');
+      insert into public.cc_student_notes (student_id, author_id, body) values ('${A}', '${I}', 'private trainer note');
+      insert into public.cc_audit_log (actor_id, action, entity_type) values ('${M}', 'payment.approve', 'cc_payments');
+      insert into public.cc_help_searches (query, locale) values ('step', 'en');
+      insert into public.cc_announcements (subject_en, subject_ar, body_en, body_ar) values ('s', 'ع', 'b', 'ن');
+      insert into public.cc_student_xp (user_id, xp) values ('${A}', 10), ('${B}', 20);
+      insert into public.cc_deletion_requests (user_id, reason) values ('${B}', 'bye');
+      insert into storage.objects (bucket_id, name, owner) values
+        ('cc-payment-proofs', '${A}/${PAY_A}/1_a.png', '${A}'),
+        ('cc-payment-proofs', '${B}/${PAY_B}/1_b.png', '${B}'),
+        ('cc-submissions', '${B}/att/task/1_b.step', '${B}'),
+        ('cc-answer-files', 'diag/answer.step', null),
+        ('cc-lesson-files', 'paid-lesson/notes.pdf', null);
+    `);
+    const test = (await q<{ id: string }>(
+      `insert into public.cc_tests (slug, title_en, title_ar, type, is_published) values ('sec-test', 'T', 'ت', 'mock', true) returning id`))[0].id;
+    await f.query(
+      `insert into public.cc_test_tasks (test_id, skill_area_id, title_en, title_ar, expected_upload, grading_mode, reference_data, rubric, tolerances)
+       values ($1, 3, 'Part', 'قطعة', 'step', 'auto_step', '{"volume": 4242}', '[{"id": "r1", "answer": "x"}]', '{"volume_pct": 0.5}')`, [test]);
+    attA = (await q<{ id: string }>(`insert into public.cc_attempts (user_id, test_id, status, share_enabled, share_token, band)
+       values ($1, $2, 'graded', true, 'tok_aaaaaaaaaaaaaaaaaaaaaaa', 'developing') returning id`, [A, test]))[0].id;
+    attB = (await q<{ id: string }>(`insert into public.cc_attempts (user_id, test_id, status) values ($1, $2, 'graded') returning id`, [B, test]))[0].id;
+    await f.query(`insert into public.cc_grading_logs (kind, response) values ('step', '{"measured_volume": 4242}')`);
+  }, 120_000);
+
+  afterAll(async () => {
+    await f?.close();
+  });
+
+  it("answers stay staff-only after every migration: task reference_data / rubric / tolerances", async () => {
+    await who(A);
+    expect(await q("select id from public.cc_test_tasks")).toHaveLength(0);
+    const cols = (await q<Record<string, unknown>>("select * from public.cc_test_tasks_public where title_en = 'Part'"))[0];
+    expect(cols).toBeDefined();
+    for (const k of ["reference_data", "rubric", "tolerances"]) expect(cols).not.toHaveProperty(k);
+    await who(I);
+    expect((await q<{ reference_data: unknown }>("select reference_data from public.cc_test_tasks where title_en = 'Part'"))[0].reference_data).toEqual({ volume: 4242 });
+  });
+
+  it("locked hints, exercise answers and solution videos stay staff-only (seeded 0083 exercises)", async () => {
+    await who(A);
+    expect(await q("select id from public.cc_exercises")).toHaveLength(0);
+    const ex = await q<Record<string, unknown>>("select * from public.cc_exercises_public limit 5");
+    expect(ex.length).toBeGreaterThan(0);
+    for (const row of ex) {
+      for (const k of ["hints_en", "hints_ar", "reference_data", "rubric", "tolerances", "solution_video_id"]) expect(row).not.toHaveProperty(k);
+    }
+  });
+
+  it("paid lesson columns (notes, videos, downloads) are not selectable with a student session", async () => {
+    await who(A);
+    expect((await q("select id, title_en from public.cc_lessons limit 1")).length).toBeGreaterThan(0);
+    for (const col of ["notes_en", "common_mistakes_en", "downloads", "video_inventor_en", "video_neutral_en"]) {
+      await expect(q(`select ${col} from public.cc_lessons limit 1`)).rejects.toThrow(/permission denied/);
+    }
+  });
+
+  it("grading logs (raw measured values), trainer notes, audit log, help searches, announcements: none reach a student", async () => {
+    await who(A);
+    for (const t of ["cc_grading_logs", "cc_student_notes", "cc_audit_log", "cc_help_searches", "cc_announcements",
+                     "cc_announcement_deliveries", "cc_coupons", "cc_integrity_flags"]) {
+      expect(await q(`select * from public.${t}`), t).toHaveLength(0);
+    }
+    await expect(q("insert into public.cc_audit_log (actor_id, action, entity_type) values ($1, 'x', 'y')", [A])).rejects.toThrow(/row-level security/);
+    await expect(q("insert into public.cc_student_notes (student_id, author_id, body) values ($1, $1, 'x')", [A])).rejects.toThrow(/row-level security/);
+  });
+
+  it("instructor reads trainer notes and grading logs but not the audit log, coupons or announcements", async () => {
+    await who(I);
+    expect(await q("select id from public.cc_student_notes")).toHaveLength(1);
+    expect(await q("select id from public.cc_grading_logs")).toHaveLength(1);
+    expect(await q("select id from public.cc_audit_log")).toHaveLength(0);
+    expect(await q("select id from public.cc_coupons")).toHaveLength(0);
+    expect(await q("select id from public.cc_announcements")).toHaveLength(0);
+    await expect(q("insert into public.cc_content_overrides (key, locale, value) values ('msg:x.y', 'en', 'v')")).rejects.toThrow(/row-level security/);
+  });
+
+  it("student A sees only own payments, attempts, xp and deletion requests; cannot write payments", async () => {
+    await who(A);
+    expect((await q<{ id: string }>("select id from public.cc_payments")).map((r) => r.id)).toEqual([PAY_A]);
+    expect((await q<{ id: string }>("select id from public.cc_attempts")).map((r) => r.id)).toEqual([attA]);
+    expect(await q("select user_id from public.cc_student_xp")).toEqual([{ user_id: A }]);
+    expect(await q("select id from public.cc_deletion_requests")).toHaveLength(0);
+    expect(await q("update public.cc_payments set status = 'paid' returning id")).toHaveLength(0);
+    expect(await q("update public.cc_attempts set total_score = 999 where id = $1 returning id", [attB])).toHaveLength(0);
+    await expect(q(`insert into public.cc_enrollments (user_id, ends_at) values ($1, now() + interval '1 year')`, [A])).rejects.toThrow(/row-level security/);
+    await expect(q("insert into public.cc_student_xp (user_id, xp) values ($1, 99999)", [A])).rejects.toThrow(/row-level security|duplicate key/);
+  });
+
+  it("server-only RPCs are not executable by students or anon", async () => {
+    for (const uid of [A, null]) {
+      await who(uid);
+      await expect(q("select public.cc_payment_transition($1, 'paid', null, null, null, null)", [PAY_A])).rejects.toThrow(/permission denied/);
+      await expect(q("select public.cc_anonymise_profile($1, $1, null)", [A])).rejects.toThrow(/permission denied/);
+      await expect(q("select public.cc_sync_rubric_aspects($1)", [PAY_A])).rejects.toThrow(/permission denied/);
+      await expect(q("select public.cc_help_feedback('x', true)")).rejects.toThrow(/permission denied/);
+    }
+  });
+
+  it("anon cannot validate coupons, read payments, attempts or the task view", async () => {
+    await who(null);
+    await expect(q("select public.cc_validate_coupon('SECRET50', $1)", [PLAN])).rejects.toThrow(/permission denied/);
+    for (const t of ["cc_payments", "cc_attempts", "cc_coupons", "cc_test_tasks_public", "cc_exercises_public", "cc_student_notes"]) {
+      await expect(q(`select * from public.${t}`), t).rejects.toThrow(/permission denied/);
+    }
+  });
+
+  it("a shared result exposes only first name, band and area scores", async () => {
+    await who(null);
+    const r = (await q<{ r: Record<string, unknown> }>("select public.cc_shared_result('tok_aaaaaaaaaaaaaaaaaaaaaaa') as r"))[0].r;
+    expect(Object.keys(r).sort()).toEqual(["areas", "band", "first_name", "first_name_ar"]);
+    expect(r.first_name).toBe("Alice");
+    expect((await q<{ r: unknown }>("select public.cc_shared_result('tok_bbbbbbbbbbbbbbbbbbbbbbb') as r"))[0].r).toBeNull();
+  });
+
+  it("storage: payment proofs are owner + admin only (instructors and student B cannot read A's)", async () => {
+    await who(B);
+    expect((await q<{ name: string }>("select name from storage.objects where bucket_id = 'cc-payment-proofs'")).map((r) => r.name)).toEqual([`${B}/${PAY_B}/1_b.png`]);
+    await expect(q("insert into storage.objects (bucket_id, name) values ('cc-payment-proofs', $1)", [`${A}/${PAY_A}/2_evil.png`])).rejects.toThrow(/row-level security/);
+    await who(I);
+    expect(await q("select name from storage.objects where bucket_id = 'cc-payment-proofs'")).toHaveLength(0);
+    await who(M);
+    expect(await q("select name from storage.objects where bucket_id = 'cc-payment-proofs'")).toHaveLength(2);
+  });
+
+  it("storage: answer files are staff-only; students cannot write task, lesson or answer buckets", async () => {
+    await who(A);
+    expect(await q("select name from storage.objects where bucket_id = 'cc-answer-files'")).toHaveLength(0);
+    expect(await q("select name from storage.objects where bucket_id = 'cc-submissions'")).toHaveLength(0);
+    for (const b of ["cc-task-files", "cc-lesson-files", "cc-answer-files"]) {
+      await expect(q("insert into storage.objects (bucket_id, name) values ($1, $2)", [b, `${A}/x.step`]), b).rejects.toThrow(/row-level security/);
+    }
+    await who(I);
+    expect(await q("select name from storage.objects where bucket_id = 'cc-answer-files'")).toHaveLength(1);
+  });
+
+  // ---- documented gaps (see SECURITY_REVIEW.md; fix SQL there) ----------------
+
+  // SR-M1: cc-lesson-files is readable (and listable) by every signed-in user,
+  // so paid lesson downloads bypass the enrollment check in training/access.ts.
+  it.skip("GAP SR-M1: a student without enrollment cannot read paid lesson files", async () => {
+    await who(A);
+    expect(await q("select name from storage.objects where bucket_id = 'cc-lesson-files'")).toHaveLength(0);
+  });
+
+  // SR-M2: cc_validate_coupon is executable by `authenticated`, so coupon codes
+  // can be brute-forced through PostgREST /rpc without the app's rate limit.
+  it.skip("GAP SR-M2: students cannot call cc_validate_coupon directly", async () => {
+    await who(A);
+    await expect(q("select public.cc_validate_coupon('SECRET50', $1)", [PLAN])).rejects.toThrow(/permission denied/);
+  });
+
+  // SR-L1: instructors read every payment row (payer name, bank, transfer reference).
+  it.skip("GAP SR-L1: instructors cannot read payment rows", async () => {
+    await who(I);
+    expect(await q("select id from public.cc_payments")).toHaveLength(0);
+  });
+
+  // SR-L2: cc_has_active_enrollment(p_user) answers for any user id.
+  it.skip("GAP SR-L2: a student cannot ask whether another student is enrolled", async () => {
+    await who(A);
+    await expect(q("select public.cc_has_active_enrollment($1)", [B])).rejects.toThrow(/permission denied/);
+  });
+
+  // SR-L3: a student can insert the grader-only Get Ready key directly.
+  it.skip("GAP SR-L3: a student cannot self-insert the practice_upload Get Ready step", async () => {
+    await who(A);
+    await expect(q("insert into public.cc_get_ready_steps (user_id, step_key) values ($1, 'practice_upload')", [A])).rejects.toThrow(/row-level security/);
+  });
+
+  // SR-L4: a grade query may point at another student's attempt.
+  it.skip("GAP SR-L4: a grade query can only reference the asker's own attempt", async () => {
+    await who(A);
+    await expect(
+      q("insert into public.cc_lesson_questions (user_id, kind, attempt_id, body) values ($1, 'grade_query', $2, 'why?')", [A, attB]),
+    ).rejects.toThrow(/row-level security/);
+  });
+
+  // The gaps above are real today: these prove it, so the skips cannot rot silently.
+  it("documents current behaviour of the gaps (flip with the fixes)", async () => {
+    await who(A);
+    expect(await q("select name from storage.objects where bucket_id = 'cc-lesson-files'")).toHaveLength(1);
+    expect((await q<{ r: { ok: boolean } }>("select public.cc_validate_coupon('SECRET50', $1) as r", [PLAN]))[0].r.ok).toBe(true);
+    expect(await q("select public.cc_has_active_enrollment($1)", [B])).toHaveLength(1);
+    expect(await q("insert into public.cc_get_ready_steps (user_id, step_key) values ($1, 'practice_upload') returning step_key", [A])).toHaveLength(1);
+    expect(
+      await q("insert into public.cc_lesson_questions (user_id, kind, attempt_id, body) values ($1, 'grade_query', $2, 'why?') returning id", [A, attB]),
+    ).toHaveLength(1);
+    await who(I);
+    expect(await q("select id from public.cc_payments")).toHaveLength(2);
+  });
+});
