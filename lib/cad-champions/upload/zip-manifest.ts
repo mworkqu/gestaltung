@@ -51,12 +51,15 @@ export function parseCentralDirectory(cd: Uint8Array, count: number): ZipEntryIn
   let p = 0;
   for (let n = 0; n < count; n++) {
     if (p + 46 > cd.length || v.getUint32(p, true) !== SIG_CENTRAL) break;
+    const flags = v.getUint16(p + 8, true);
+    const method = v.getUint16(p + 10, true);
     let compressedSize = v.getUint32(p + 20, true);
     let uncompressedSize = v.getUint32(p + 24, true);
     const nameLen = v.getUint16(p + 28, true);
     const extraLen = v.getUint16(p + 30, true);
     const commentLen = v.getUint16(p + 32, true);
     const externalAttrs = v.getUint32(p + 38, true);
+    let localHeaderOffset = v.getUint32(p + 42, true);
     if (p + 46 + nameLen + extraLen + commentLen > cd.length) break;
     const name = decoder.decode(cd.subarray(p + 46, p + 46 + nameLen));
 
@@ -72,7 +75,11 @@ export function parseCentralDirectory(cd: Uint8Array, count: number): ZipEntryIn
           uncompressedSize = u64(v, q);
           q += 8;
         }
-        if (compressedSize === U32_MAX && q + 8 <= e + 4 + len) compressedSize = u64(v, q);
+        if (compressedSize === U32_MAX && q + 8 <= e + 4 + len) {
+          compressedSize = u64(v, q);
+          q += 8;
+        }
+        if (localHeaderOffset === U32_MAX && q + 8 <= e + 4 + len) localHeaderOffset = u64(v, q);
         break;
       }
       e += 4 + len;
@@ -80,7 +87,7 @@ export function parseCentralDirectory(cd: Uint8Array, count: number): ZipEntryIn
 
     // MS-DOS directory attribute (0x10) or a trailing slash marks a folder.
     const isDirectory = /[\\/]$/.test(name) || (externalAttrs & 0x10) === 0x10;
-    out.push({ name, compressedSize, uncompressedSize, isDirectory });
+    out.push({ name, compressedSize, uncompressedSize, isDirectory, localHeaderOffset, method, encrypted: (flags & 0x1) === 0x1 });
     p += 46 + nameLen + extraLen + commentLen;
   }
   return out;

@@ -5,6 +5,7 @@
 // Everything degrades gracefully before migration 0077 / 0080 has run.
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -253,6 +254,23 @@ export async function requestMeta(): Promise<{ ip: string | null; userAgent: str
 }
 
 /**
+ * Grades after the response is sent (Next `after()`), so submitting returns
+ * at once. Outside a request scope (scripts, tests) it runs in the background.
+ */
+function queueGrading(attemptId: string): void {
+  const run = () =>
+    enqueueGrading(attemptId).then(
+      () => undefined,
+      (e) => console.error("[cc-test] grading failed:", e instanceof Error ? e.message : "unknown")
+    );
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
+}
+
+/**
  * Closes an in-progress attempt (manual / timeout / admin): sets
  * submitted_at, submit_reason, status 'submitted' (only while still
  * in_progress, so two closes never race), then queues grading and stamps the
@@ -283,7 +301,7 @@ export async function finalizeAttempt(
     return false;
   }
   if (!data || data.length === 0) return false;
-  await enqueueGrading(attempt.id);
+  queueGrading(attempt.id);
   if (testType !== "practice" && testType !== "exercise") await markJourney(attempt.user_id, "first_test_submitted_at");
   return true;
 }

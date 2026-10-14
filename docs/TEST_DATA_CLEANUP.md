@@ -64,3 +64,14 @@ No SQL is run until all phases are finished.
 
 ## CAD Champions test data (2026-10-14, Prompt 2 verification)
 - auth user + public.profiles + cc_profiles + cc_journey_progress for email `gestaltung.co+cctest1@gmail.com` ("Test Student CC", minor, guardian "Test Guardian"). Delete via Supabase Auth → Users (cascades to cc_ rows).
+
+## CAD Champions results seed (2026-10-14, scripts/cc-seed-results.mjs)
+Student gestaltung.co+cctest1@gmail.com. Deleting each cc_attempts row cascades to its submissions (fake paths, no files), task results, aspect results and skill scores.
+
+| Attempt | Id |
+|---|---|
+| weak | `9c0874d6-bb31-4db1-90f7-8ad30e735743` |
+| medium | `d3fbf83a-9e05-4b83-bbe5-ddac04793c44` |
+| strong | `f531ae30-fc18-48a8-b71f-42eddda3086b` |
+| provisional | `cf6f5d4e-ccd3-4173-b8cc-119678cd75f2` |
+| expired | `3ad4281d-6c34-4579-a212-70980a098cdf` |

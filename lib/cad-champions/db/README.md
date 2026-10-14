@@ -8,6 +8,7 @@ Row types: `lib/cad-champions/db/types.ts`. RLS tests: `lib/cad-champions/db/rls
 2. `0078_cc_storage.sql`
 3. `0079_cc_help_articles_seed.sql` (Help Center articles)
 4. `0080_cc_diagnostic_seed.sql` (tests `diagnostic-v1`, `diagnostic-timeout-check` (staff only), `practice-cube`, their tasks and marking aspects; raises `cc-submissions` to 300 MB and allows ZIP for module_package tests)
+5. `0081_cc_results.sql` (result-email columns on `cc_attempts`, `provisional_percent`, and `cc_shared_result(token)` for the public share page; see `docs/cad-champions/RESULTS.md`)
 
 Both files are safe to re-run. The tests apply each file twice to prove it.
 
@@ -28,7 +29,7 @@ Site super_admins (`public.profiles.role = 'super_admin'`) are CC admins automat
 | `cc_tests` | Tests (practice, diagnostic, exercise, mock, qualifier): time limit, cooldown, publish flag, `admin_only`, `upload_mode` (per_task / module_package) and `package_expectations`. |
 | `cc_test_tasks` | Tasks of a test, tagged with skill area and competition module. Holds `reference_data`, `rubric`, `tolerances` (answers): staff only. |
 | `cc_task_aspects` | Marking aspects of a task or an exercise: measurement (all-or-nothing unless `partial_rule`) or judgement (0-3), points, method, check key, hint. Staff only; students use the view. |
-| `cc_attempts` | One test attempt: timer, status, scores, band, IP/user agent, share link, `in_person` flag, `session_id`, `phase_markers`. |
+| `cc_attempts` | One test attempt: timer, status, scores, band, IP/user agent, share link, `in_person` flag, `session_id`, `phase_markers`; after 0081 also `results_email_sent_at`, `final_email_sent_at`, `provisional_percent`. |
 | `cc_submissions` | One uploaded file per attempt task, or one module package ZIP (`task_id` null) with its `package_manifest`. |
 | `cc_task_results` | Grade per task: auto / AI / manual / final score, status, feedback EN + AR, student-safe details. |
 | `cc_aspect_results` | Result per aspect: passed (measurement) or judgement score 0-3, points, feedback. Students read their own. |

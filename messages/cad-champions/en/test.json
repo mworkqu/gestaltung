@@ -325,8 +325,9 @@
       "checking": "Checking…",
       "done": "Done",
       "waiting_trainer": "Waiting for trainer",
-      "error": "Needs a look"
+      "error": "Checking manually"
     },
+    "manualNote": "We're checking this file manually - no action needed.",
     "pollErrorTitle": "Status not updated",
     "pollError": "We couldn't refresh the status. We'll keep trying."
   },

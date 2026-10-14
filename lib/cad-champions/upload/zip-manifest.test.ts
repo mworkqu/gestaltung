@@ -56,7 +56,8 @@ describe("readZipEntries", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.totalEntries).toBe(3);
-    expect(res.entries).toEqual([
+    expect(res.entries.every((e) => typeof e.localHeaderOffset === "number" && e.method === 0 && e.encrypted === false)).toBe(true);
+    expect(res.entries).toMatchObject([
       { name: "A07/DAY 01/Results/PDF files/", compressedSize: 0, uncompressedSize: 0, isDirectory: true },
       { name: "A07/DAY 01/Results/PDF files/Drawing_02.pdf", compressedSize: 14, uncompressedSize: 14, isDirectory: false },
       { name: "A07/DAY 01/Results/Parts and Assemblies/Part_03.step", compressedSize: 13, uncompressedSize: 13, isDirectory: false },

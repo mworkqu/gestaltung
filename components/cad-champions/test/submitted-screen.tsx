@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { CheckCircle2, CircleDashed, Clock3, FileX2, Loader2, OctagonAlert, UserCheck } from "lucide-react";
+import { CheckCircle2, CircleDashed, Clock3, FileSearch, FileX2, Loader2, UserCheck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { Alert, Button, StatusChip, type ChipTone } from "@/components/cad-champions/ui";
@@ -18,7 +18,8 @@ const TONE: Record<LiveTaskState, ChipTone> = {
   checking: "info",
   done: "success",
   waiting_trainer: "warning",
-  error: "danger",
+  /** Grader failed or not set up: a person checks the file. Not the student's fault. */
+  error: "info",
 };
 
 const ICON = {
@@ -26,7 +27,7 @@ const ICON = {
   checking: Loader2,
   done: CheckCircle2,
   waiting_trainer: UserCheck,
-  error: OctagonAlert,
+  error: FileSearch,
 } as const;
 
 /**
@@ -111,7 +112,7 @@ export function SubmittedScreen({
             <Link href={ccPath(locale, "/dashboard")}>{t("submitted.dashboard")}</Link>
           </Button>
           <Button asChild variant="secondary">
-            <Link href={ccPath(locale, "/results")}>{t("submitted.results")}</Link>
+            <Link href={ccPath(locale, `/results/${attemptId}`)}>{t("submitted.results")}</Link>
           </Button>
         </div>
       </section>
@@ -145,6 +146,11 @@ export function SubmittedScreen({
             );
           })}
         </ul>
+        {tasks.some((x) => states[x.id] === "error") ? (
+          <Alert tone="info" title={t("submitted.state.error")}>
+            {t("submitted.manualNote")}
+          </Alert>
+        ) : null}
       </section>
     </div>
   );

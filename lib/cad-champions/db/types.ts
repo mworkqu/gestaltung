@@ -289,6 +289,12 @@ export interface CcAttempt {
   in_person: boolean;
   session_id: Uuid | null;
   phase_markers: CcPhaseMarker[];
+  /** 0081: "Your results are ready" sent (absent before 0081 runs). */
+  results_email_sent_at?: Timestamp | null;
+  /** 0081: "Your final score is confirmed" sent. */
+  final_email_sent_at?: Timestamp | null;
+  /** 0081: percent shown in the provisional results email. */
+  provisional_percent?: number | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -829,6 +835,7 @@ export const CC_FUNCTIONS = {
   isMinor: "cc_is_minor", // (p_dob date) -> boolean
   hasActiveEnrollment: "cc_has_active_enrollment", // (p_user uuid) -> boolean
   helpFeedback: "cc_help_feedback", // (p_slug text, p_helpful boolean) -> void; service_role only
+  sharedResult: "cc_shared_result", // (p_token text) -> jsonb | null (0081; anon ok, shared attempts only)
 } as const;
 
 export const CC_BUCKETS = {

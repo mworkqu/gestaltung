@@ -10,7 +10,7 @@ import { requireCcUser } from "@/lib/cad-champions/auth/server";
 import { isOnboardingSkipped } from "@/lib/cad-champions/profile/onboarding";
 import { ccPath, isCcLocale } from "@/lib/cad-champions/routes";
 
-import { NextStepSection, ProfileCardSection, TestCardSection, TrackerSection, TrainingCardSection } from "./sections";
+import { NextStepSection, ProfileCardSection, ProgressSection, TestCardSection, TrackerSection, TrainingCardSection } from "./sections";
 
 export const generateMetadata = placeholderMetadata("dashboard", "/dashboard");
 
@@ -87,6 +87,10 @@ export default async function CcDashboardPage({ params, searchParams }: Props) {
             <ProfileCardSection profile={profile} locale={locale} />
           </Suspense>
         </div>
+
+        <Suspense fallback={<SkeletonCard />}>
+          <ProgressSection userId={user.id} locale={locale} />
+        </Suspense>
       </div>
 
       <SignedInExtras pageName={tPages("dashboard.title")} />

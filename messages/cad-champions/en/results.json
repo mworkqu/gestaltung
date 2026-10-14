@@ -1,0 +1,254 @@
+{
+  "list": {
+    "title": "Your results",
+    "purpose": "Every test you have handed in, newest first. Open one to see your score, skill map and what to practise next.",
+    "emptyTitle": "No results yet",
+    "emptyText": "Your results appear here after you hand in a test. The free skills test takes 90 minutes.",
+    "emptyCta": "Go to tests",
+    "open": "Open results",
+    "takenOn": "Taken on {date}",
+    "retakeOn": "You can retake it on {date}",
+    "loadErrorTitle": "We couldn't load your results",
+    "loadError": "Please refresh the page in a minute. If it keeps happening, use Need help.",
+    "status": {
+      "submitted": "Handed in",
+      "grading": "Checking",
+      "provisional": "Provisional",
+      "graded": "Final",
+      "expired": "No files"
+    }
+  },
+  "page": {
+    "metaTitle": "Your results",
+    "purpose": "Your score, your skill map and the training path we recommend.",
+    "back": "All results",
+    "notFoundTitle": "We couldn't find these results",
+    "notFoundText": "The link may be wrong, or these results belong to another account.",
+    "notSetUpTitle": "Results are being set up",
+    "notSetUpText": "We are still setting up results. Please check again soon.",
+    "errorTitle": "We couldn't load your results",
+    "errorText": "Please refresh the page in a minute. If it keeps happening, use Need help."
+  },
+  "header": {
+    "overall": "Overall score",
+    "bandLabel": "Your band",
+    "takenOn": "Taken on {date}",
+    "time": "Time used: {used} of {allowed} minutes",
+    "timeUntimed": "Time used: {used} minutes",
+    "provisional": "Provisional",
+    "provisionalHelpLabel": "Provisional score",
+    "provisionalHelp": "A trainer still needs to confirm your drawing. Your final score may change slightly. You'll get an email.",
+    "final": "Final",
+    "download": "Download my report",
+    "downloadEn": "Download in English",
+    "downloadAr": "Download in Arabic",
+    "reportNote": "The report is one page: your score, skill map, per-area table and top 3 recommendations."
+  },
+  "band": {
+    "beginner": {
+      "name": "Beginner",
+      "meaning": "You're at the start. The training builds your skills step by step from the basics."
+    },
+    "developing": {
+      "name": "Developing",
+      "meaning": "You have the basics. Focused practice on your weakest areas will move you up fast."
+    },
+    "competitive": {
+      "name": "Competitive",
+      "meaning": "You're solid in most areas. Sharpen your speed and accuracy to compete at a high level."
+    },
+    "competition_ready": {
+      "name": "Competition-ready",
+      "meaning": "You're working at competition level. Keep practising under real timing to stay sharp."
+    }
+  },
+  "howTo": {
+    "title": "How to read this page",
+    "b1": "Overall score: your marks across the skill areas this test covered, weighted the way the competition weights them.",
+    "b2": "Skill map: one point per skill area. Further from the centre is better; dashed lines are areas this test did not check.",
+    "b3": "Task feedback: what each task checked, what you missed in plain words, and where to read how to fix it."
+  },
+  "skillMap": {
+    "title": "Your skill map",
+    "purpose": "Your score in each of the six competition skill areas.",
+    "chartLabel": "Skill map: your percent in each skill area",
+    "notAssessed": "Not assessed in this test",
+    "notAssessedShort": "Not assessed",
+    "area": "Skill area",
+    "weight": "Weight",
+    "score": "Your score",
+    "level": "Level",
+    "levelValue": "L{level}",
+    "levelHelpLabel": "Levels L1 to L6",
+    "levelHelp": "L1 0-19 %, L2 20-39 %, L3 40-59 %, L4 60-74 %, L5 75-89 %, L6 90 % and above. Training levels follow the same ladder.",
+    "weightHelpLabel": "Weight",
+    "weightHelp": "How much of the competition's marks this area carries. Your overall score uses these weights.",
+    "coverage": {
+      "organisation": "Work organisation is checked in mock competitions, where you hand in a full results folder.",
+      "software": "Software skills are checked in mock competitions and in the Get Ready steps.",
+      "modelling": "3D modelling is checked in the free test and every mock competition.",
+      "rendering": "Rendering and animation are checked in the design-challenge mock (module 2).",
+      "reverse": "Reverse engineering is assessed in person at the studio, with a real part to measure.",
+      "drawing": "Technical drawing is checked in the free test and the mock competitions."
+    }
+  },
+  "areaShort": {
+    "1": "Work organisation",
+    "2": "Software",
+    "3": "3D modelling",
+    "4": "Rendering",
+    "5": "Reverse engineering",
+    "6": "Technical drawing"
+  },
+  "modules": {
+    "title": "Competition module readiness",
+    "purpose": "How ready you are for each competition day this test touched.",
+    "helpLabel": "Competition modules",
+    "help": "The competition has four standalone modules on four days. This shows your score on the parts of this test that belong to each one.",
+    "level": "Level L{level}"
+  },
+  "tasks": {
+    "title": "Task feedback",
+    "taskN": "Task {n}",
+    "score": "{earned} of {max} points",
+    "methodHelpLabel": "How this task was marked",
+    "method": {
+      "auto": "Auto-checked",
+      "checklist": "Checklist + trainer",
+      "trainer": "Trainer"
+    },
+    "methodHelp": {
+      "auto": "Our grader opened your STEP file and checked it against the answer. Each check is pass or fail.",
+      "checklist": "A checklist runs first, then a trainer confirms every item and scores presentation from 0 to 3.",
+      "trainer": "A trainer marks this task by hand."
+    },
+    "feedback": "Feedback",
+    "reviewer": "Trainer's note",
+    "failedTitle": "What to work on",
+    "allPassed": "Every check on this task passed.",
+    "judgementTitle": "Trainer scores",
+    "judgementScore": "{score} of 3",
+    "judgementPending": "Waiting for the trainer",
+    "scaleHelpLabel": "The 0 to 3 scale",
+    "scale": "0 below industry standard · 1 meets it · 2 meets it and exceeds it in places · 3 clearly exceeds it.",
+    "noFile": "No file was handed in for this task, so it scored 0.",
+    "checking": "We're still checking this file.",
+    "waitingTrainer": "A trainer will confirm this task. The score may change slightly.",
+    "manualCheck": "We're checking this file manually. Your score updates when we're done.",
+    "helpLink": "How to fix this",
+    "ask": {
+      "open": "Question this result",
+      "label": "What do you think is wrong with this result?",
+      "hint": "Tell us which check you disagree with and why. A trainer will look at your file again.",
+      "send": "Send question",
+      "sending": "Sending…",
+      "cancel": "Cancel",
+      "sent": "Question sent. We'll reply by email within 2 working days.",
+      "already": "You asked about this task. We'll reply by email within 2 working days.",
+      "errorEmpty": "Write a few words about what looks wrong.",
+      "errorTooLong": "Please keep it under 2,000 characters.",
+      "error": "We couldn't send your question. Please try again in a minute.",
+      "toast": "We'll reply by email within 2 working days."
+    }
+  },
+  "states": {
+    "gradingTitle": "We're still checking your files",
+    "gradingText": "Most files take a minute or two. This page updates by itself.",
+    "pollError": "We lost contact for a moment. We'll keep trying.",
+    "manualTitle": "We're checking a file manually",
+    "manualText": "One of your files couldn't be checked automatically, so a trainer is checking it by hand. Your score updates when we're done, and you'll get an email.",
+    "expiredTitle": "No files were submitted",
+    "expiredText": "The time ran out before any file was uploaded, so there is nothing to score.",
+    "retakeOn": "You can take the test again on {date}.",
+    "retakeNow": "You can take the test again now.",
+    "retake": "Go to tests",
+    "inProgressTitle": "This test is still running",
+    "inProgressText": "Hand in your files first. Your results appear here after that.",
+    "continue": "Continue the test"
+  },
+  "path": {
+    "title": "Your training path",
+    "purpose": "Where to start, ranked by how many marks you can still gain.",
+    "empty": "We'll suggest a path once your results are in.",
+    "reason": {
+      "first": "Start with {area}: it's {weight} % of the marks and you scored {percent} %.",
+      "next": "Then {area}: {weight} % of the marks, you scored {percent} %.",
+      "strong": "Keep {area} sharp: you scored {percent} % on {weight} % of the marks."
+    },
+    "rank": "Step {n}",
+    "freeLesson": {
+      "title": "Your free lesson",
+      "watch": "Watch free lesson",
+      "minutes": "{minutes} min",
+      "placeholderTitle": "3D modelling L1",
+      "placeholderText": "Coming with the training. Your first lesson shows how to turn a sketch into a solid part."
+    },
+    "offer": {
+      "title": "Join the training",
+      "todoPlan": "[TODO-MO: plan contents/price]",
+      "includes": "What the training includes",
+      "price": "Price",
+      "days": "{days} days of access",
+      "join": "Join the training",
+      "questions": "Questions? WhatsApp us",
+      "whatsappText": "Hi, I have a question about the CAD Champions training."
+    }
+  },
+  "share": {
+    "title": "Share your result",
+    "text": "Off by default. When on, anyone with the link sees only your first name, your band and your skill map. Never your tasks or files.",
+    "toggle": "Share link",
+    "on": "On",
+    "off": "Off",
+    "copy": "Copy link",
+    "copied": "Link copied.",
+    "savedOn": "Sharing is on. Anyone with the link can see your band and skill map.",
+    "savedOff": "Sharing is off. The old link no longer works.",
+    "error": "We couldn't change sharing. Please try again.",
+    "notReady": "You can share once your results are in."
+  },
+  "sharePage": {
+    "metaTitle": "Shared result",
+    "purpose": "A CAD Champions skill map, shared by the student.",
+    "heading": "{name}'s skill map",
+    "headingNoName": "A student's skill map",
+    "band": "Band",
+    "notFoundTitle": "This link is not active",
+    "notFoundText": "The student may have turned sharing off.",
+    "cta": "Take the free skills test"
+  },
+  "progress": {
+    "title": "Your progress",
+    "helpLabel": "About progress",
+    "help": "Your overall score on each test you handed in, oldest on the left.",
+    "chartLabel": "Overall score per attempt",
+    "delta": "{delta} points since your last test",
+    "deltaUp": "Up {delta} points since your last test",
+    "deltaDown": "Down {delta} points since your last test",
+    "deltaSame": "Same as your last test",
+    "single": "Take the test again later to see your progress.",
+    "emptyTitle": "No scores yet",
+    "emptyText": "Your progress shows here after your first test is scored.",
+    "retakeOn": "Retake unlocks on {date}",
+    "retake": "Retake the test",
+    "viewAll": "All results"
+  },
+  "report": {
+    "title": "CAD Champions skills report",
+    "name": "Name",
+    "date": "Date",
+    "test": "Test",
+    "overall": "Overall score",
+    "band": "Band",
+    "skillMap": "Skill map",
+    "area": "Skill area",
+    "weight": "Weight",
+    "score": "Score",
+    "level": "Level",
+    "top3": "Top 3 recommendations",
+    "provisional": "Provisional: a trainer still needs to confirm part of this result.",
+    "disclaimer": "CAD Champions is a training programme by Gestaltung360. It is not affiliated with or endorsed by any competition organiser. Scores are a training estimate, not an official competition result.",
+    "htmlNote": "This is the print version of your report. Open it in your browser and choose Print, then Save as PDF.",
+    "print": "Print or save as PDF"
+  }
+}

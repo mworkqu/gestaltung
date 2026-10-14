@@ -5,7 +5,7 @@ import { routing, type Locale } from "./routing";
 // and are merged under the "CC" namespace. Server-only: the client receives only
 // what a layout passes to NextIntlClientProvider, so the site's pages ship no CC text.
 const CC_MESSAGE_FILES = [
-  "shell", "pages", "errors", "ui", "gallery", "dashboard", "onboarding", "account", "auth", "landing", "get-ready", "help", "upload", "test",
+  "shell", "pages", "errors", "ui", "gallery", "dashboard", "onboarding", "account", "auth", "landing", "get-ready", "help", "upload", "test", "results",
 ] as const;
 
 async function loadCcMessages(locale: Locale) {

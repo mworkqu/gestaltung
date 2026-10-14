@@ -8,6 +8,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 // half of auto-submit: an attempt past deadline + grace is closed here.
 
 export const dynamic = "force-dynamic";
+// An auto-submit here grades in after() within this budget.
+export const maxDuration = 300;
 
 const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 

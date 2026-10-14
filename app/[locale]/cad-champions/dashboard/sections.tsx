@@ -3,6 +3,7 @@ import { ArrowRight, FlaskConical, GraduationCap, UserRound } from "lucide-react
 import { getTranslations } from "next-intl/server";
 
 import { Countdown } from "@/components/cad-champions/dashboard/countdown";
+import { ProgressCard } from "@/components/cad-champions/results/progress-card";
 import { Alert, Button, EmptyState, HelpTip, StatusChip, Stepper, type ChipTone, type StepperStep } from "@/components/cad-champions/ui";
 import type { Locale } from "@/i18n/routing";
 import type { CcProfile } from "@/lib/cad-champions/db/types";
@@ -197,6 +198,13 @@ export async function TestCardSection({ userId, profile, locale }: Common) {
       ) : null}
     </section>
   );
+}
+
+// ------------------------------------------------------------ progress card
+
+/** "Your progress" (Prompt 7 Step E), shown under the test card row. */
+export async function ProgressSection({ userId, locale }: Pick<Common, "userId" | "locale">) {
+  return <ProgressCard userId={userId} locale={locale} />;
 }
 
 // ------------------------------------------------------------ training card

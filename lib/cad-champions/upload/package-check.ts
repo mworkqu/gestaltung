@@ -194,6 +194,11 @@ export interface ZipEntryInfo {
   uncompressedSize: number;
   compressedSize: number;
   isDirectory: boolean;
+  /** Set by the central-directory reader (used to extract STEP files for the grader). */
+  localHeaderOffset?: number;
+  /** 0 = stored, 8 = deflate. */
+  method?: number;
+  encrypted?: boolean;
 }
 
 export type PackageError = "unsafe_path" | "too_many_files" | "too_large" | "empty" | "unreadable" | "not_zip";

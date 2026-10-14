@@ -16,7 +16,7 @@ import { HelpLink, SubHeading } from "./shared";
 type View =
   | { kind: "idle" }
   | { kind: "checking" }
-  | { kind: "passed" }
+  | { kind: "passed"; basicOnly?: boolean }
   | { kind: "failed"; message: string; helpSlug: string | null }
   | { kind: "unavailable"; path: string }
   | { kind: "error" };
@@ -42,7 +42,7 @@ export function StepPractice({
     try {
       const result = await gradePracticeAction(path, locale);
       onResult(result);
-      if (result.ok && result.outcome === "passed") setView({ kind: "passed" });
+      if (result.ok && result.outcome === "passed") setView({ kind: "passed", basicOnly: result.basicCheckOnly });
       else if (result.ok && result.outcome === "failed") setView({ kind: "failed", message: result.message, helpSlug: result.helpSlug });
       else if (!result.ok && result.reason === "unavailable") setView({ kind: "unavailable", path });
       else setView({ kind: "error" });
@@ -101,6 +101,7 @@ export function StepPractice({
           <div>
             <p className="text-base font-extrabold text-ink">{t("practice.passTitle")}</p>
             <p className="mt-1 text-sm text-body">{t("practice.passBody")}</p>
+            {view.basicOnly ? <p className="mt-1 text-xs text-body">{t("practice.basicCheckOnly")}</p> : null}
           </div>
         </div>
       ) : null}

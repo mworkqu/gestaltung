@@ -19,8 +19,8 @@ export type GetReadyActionResult =
   | { ok: false; reason: "signed_out" | "not_allowed" | "not_set_up" | "error" };
 
 export type PracticeResult =
-  | { ok: true; outcome: "passed"; keys: string[]; complete: boolean; justCompleted: boolean }
-  | { ok: true; outcome: "failed"; errorCode: GraderErrorCode; message: string; helpSlug: string | null }
+  | { ok: true; outcome: "passed"; keys: string[]; complete: boolean; justCompleted: boolean; basicCheckOnly: boolean }
+  | { ok: true; outcome: "failed"; errorCode: GraderErrorCode | null; message: string; helpSlug: string | null }
   | { ok: false; reason: "signed_out" | "not_allowed" | "unavailable" | "not_set_up" | "error" };
 
 /** The practice upload folder; UploadBox gets the same prefix. */
@@ -56,12 +56,24 @@ export async function gradePracticeAction(path: string, locale: string): Promise
   const result = await gradeSubmission({ mode: "practice", bucket: PRACTICE_BUCKET, path });
   if (result.status === "unavailable") return { ok: false, reason: "unavailable" };
   if (result.status === "failed") {
-    const info = graderErrorInfo(result.errorCode, loc);
-    return { ok: true, outcome: "failed", errorCode: result.errorCode, message: info.message, helpSlug: info.helpSlug ?? null };
+    if (result.errorCode) {
+      const info = graderErrorInfo(result.errorCode, loc);
+      return { ok: true, outcome: "failed", errorCode: result.errorCode, message: info.message, helpSlug: info.helpSlug ?? null };
+    }
+    // Read fine but did not match (e.g. volume off): the grader's own guidance, never the answer.
+    const message = (loc === "ar" ? result.feedbackAr : result.feedbackEn) || graderErrorInfo("", loc).message;
+    return { ok: true, outcome: "failed", errorCode: null, message, helpSlug: result.helpSlug ?? null };
   }
 
   await markJourney(userId, "practice_passed_at");
   const step = await markStepDone(userId, "practice_upload");
   if (!step.ok) return step;
-  return { ok: true, outcome: "passed", keys: step.keys, complete: step.complete, justCompleted: step.justCompleted };
+  return {
+    ok: true,
+    outcome: "passed",
+    keys: step.keys,
+    complete: step.complete,
+    justCompleted: step.justCompleted,
+    basicCheckOnly: result.referenceMissing === true,
+  };
 }

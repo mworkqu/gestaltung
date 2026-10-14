@@ -27,6 +27,10 @@ import { isPackageManifest } from "@/lib/cad-champions/upload/package-check";
 // screen (Step C). Every read here also runs the server-side auto-submit
 // check: an attempt past deadline + grace is closed with reason "timeout".
 
+// Grading runs in after() of the submit action (and of an auto-submit on
+// read), within this route's time budget.
+export const maxDuration = 300;
+
 type Props = { params: Promise<{ locale: string; slug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

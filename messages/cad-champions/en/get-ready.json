@@ -407,6 +407,7 @@
     "checking": "Checking your file…",
     "passTitle": "Practice passed",
     "passBody": "Your export and upload work. You are ready for the real files.",
+    "basicCheckOnly": "Basic check only: we confirmed this is a real STEP export. The full check of units, solids and volume starts once the practice answer is set up.",
     "failTitle": "Your file needs a fix",
     "failHelp": "See how to fix it",
     "tryAgain": "Fix the file and upload it again. There is no limit on tries.",
