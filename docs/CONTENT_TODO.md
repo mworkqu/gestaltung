@@ -30,6 +30,16 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 | 4-10 | `[TODO-MO: record video: Export a STEP file]` | Get Ready step 4, action 3 (`/cad-champions/{en,ar}/get-ready`) | `lib/cad-champions/videos/registry.ts` → slot `action_export_step` (set provider + providerId) | Prompt 4 |
 | 4-11 | `[TODO-MO: record video: Export a drawing as PDF]` | Get Ready step 4, action 4 (`/cad-champions/{en,ar}/get-ready`) | `lib/cad-champions/videos/registry.ts` → slot `action_export_pdf` (set provider + providerId) | Prompt 4 |
 | 4-12 | `[TODO-MO: record video: Find your exported files and upload them]` | Get Ready step 4, action 5 (`/cad-champions/{en,ar}/get-ready`) | `lib/cad-champions/videos/registry.ts` → slot `action_find_upload` (set provider + providerId) | Prompt 4 |
+| 5-1 | `[TODO-MO: Task 1 brief - the plate to model and what to watch for.]` | Free test, task 1 brief (`/cad-champions/{en,ar}/test/diagnostic-v1/attempt`) | `supabase/migrations/0080_cc_diagnostic_seed.sql` → `cc_test_tasks` `cc080000-…-000000000101` `brief_en` / `brief_ar` (edit in the DB or the admin test builder, Prompt 11) | Prompt 5 |
+| 5-2 | `[TODO-MO: Task 2 brief - the part with a hole, a pocket and fillets.]` | Free test, task 2 brief | `0080_cc_diagnostic_seed.sql` → task `…0102` brief | Prompt 5 |
+| 5-3 | `[TODO-MO: Task 3 brief - how the three parts fit together.]` | Free test, task 3 brief | `0080_cc_diagnostic_seed.sql` → task `…0103` brief | Prompt 5 |
+| 5-4 | `[TODO-MO: Task 4 brief - the detail drawing of part 2: sheet size, views, scale.]` | Free test, task 4 brief | `0080_cc_diagnostic_seed.sql` → task `…0104` brief | Prompt 5 |
+| 5-5 | Drawing PDFs: upload `diagnostic-v1/task-1/plate-drawing.pdf` and `diagnostic-v1/task-2/part-drawing.pdf` | Free test, "Files for this task" (Open / Download) on tasks 1 and 2 | Supabase Storage bucket `cc-task-files` (paths are in the tasks' `attachments`) | Prompt 5 |
+| 5-6 | The 3 given part files: upload `diagnostic-v1/task-3/part-1.step`, `part-2.step`, `part-3.step` | Free test, task 3 downloads | Bucket `cc-task-files` | Prompt 5 |
+| 5-7 | Reference STEP files (answers) for tasks 1–3, and `reference_data` built from them (volume, area, inertia, solids) + `tolerances` | Grading of tasks 1–3 (Prompt 6) | Bucket `cc-answer-files` (never `cc-task-files`); `cc_test_tasks.reference_data` / `tolerances` (left `{}` / empty by 0080) | Prompt 5 |
+| 5-8 | Points per task (default 25 each, 100 in total) and the aspect points (volume 10, area 5, inertia 7.5, solids 2.5; drawing rubric 21 measurement + 4 judgement) | Test intro summary table, results | `0080_cc_diagnostic_seed.sql` → `cc_test_tasks.max_points`, `cc_task_aspects.max_points` | Prompt 5 |
+| 5-9 | Drawing rubric items for task 4 (8 measurement items from COMPETITION_ALIGNMENT §E + 2 judgement items): confirm which items apply to this drawing | Task 4 marking (Prompt 8) | `0080_cc_diagnostic_seed.sql` → aspects `…1401`–`…1410` | Prompt 5 |
+| 5-10 | `[TODO-MO: confirm 48h]` (trainer confirms drawings within 48 hours) | "Test submitted" screen, What happens next (`/cad-champions/{en,ar}/test/<slug>/attempt` after submitting) | `messages/cad-champions/{en,ar}/test.json` → `submitted.next2` | Prompt 5 |
 
 ## Settings to provide (not placeholders)
 - `WHATSAPP_NUMBER`: digits only, for example 974XXXXXXXX. Until it is set, the "Need help?" sheet falls back to `NEXT_PUBLIC_WHATSAPP_NUMBER`. If neither is set, the WhatsApp row is hidden.
@@ -46,3 +56,6 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 - Help articles: [TODO-MO: retention days] in deleting-my-account
 - Help articles: [TODO-MO: privacy policy - review this summary against the full privacy policy] in privacy
 - Help articles: [TODO-MO: kit contents and price] in allowed-measuring-instruments
+
+## Storage setting (Prompt 5)
+- Supabase → Storage → Settings → global upload file size limit must be at least 300 MB for module_package ZIP uploads (migration 0080 raises the `cc-submissions` bucket to 300 MB; the project limit caps it).

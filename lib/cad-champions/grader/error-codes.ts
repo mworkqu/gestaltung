@@ -15,6 +15,8 @@ export const GRADER_ERROR_CODES = [
   "E_INVALID_GEOMETRY",
   "E_TOO_LARGE",
   "E_TIMEOUT",
+  "E_NO_FILE",
+  "E_DOWNLOAD_FAILED",
 ] as const;
 
 export type GraderErrorCode = (typeof GRADER_ERROR_CODES)[number];
@@ -72,6 +74,16 @@ const INFO: Record<GraderErrorCode, { helpSlug: string; en: string; ar: string }
     helpSlug: REJECTED,
     en: "Checking your file took too long, so we stopped. Try again in a minute. If it keeps happening, simplify the model and export again.",
     ar: "استغرق فحص ملفك وقتًا طويلًا فتوقفنا. حاول مرة أخرى بعد دقيقة. وإن تكرر ذلك، بسّط النموذج وصدّره مرة أخرى.",
+  },
+  E_NO_FILE: {
+    helpSlug: "results-folder-structure",
+    en: "We could not find a STEP file for this task in your package. Export the part as STEP (.step or .stp) into the Parts and Assemblies folder and upload the ZIP again.",
+    ar: "لم نجد ملف STEP لهذه المهمة داخل الحزمة. صدّر القطعة بصيغة STEP (.step أو .stp) في مجلد Parts and Assemblies ثم ارفع ملف ZIP مرة أخرى.",
+  },
+  E_DOWNLOAD_FAILED: {
+    helpSlug: REJECTED,
+    en: "We could not read your file from storage. This is usually temporary. Wait a minute and upload the file again; if it keeps happening, contact us.",
+    ar: "تعذّر علينا قراءة ملفك من التخزين. غالبًا تكون مشكلة مؤقتة. انتظر دقيقة وارفع الملف مرة أخرى، وإذا تكررت المشكلة تواصل معنا.",
   },
 };
 

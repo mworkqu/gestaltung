@@ -843,6 +843,6 @@ export const CC_BUCKET_LIMITS: Record<(typeof CC_BUCKETS)[keyof typeof CC_BUCKET
   "cc-task-files": 50 * 1024 * 1024,
   "cc-answer-files": 50 * 1024 * 1024,
   "cc-lesson-files": 50 * 1024 * 1024,
-  "cc-submissions": 50 * 1024 * 1024,
+  "cc-submissions": 50 * 1024 * 1024, // 0078 value; 0080 raises the bucket to 300 MB for module_package ZIPs (per-task files stay 50 MB in the app)
   "cc-payment-proofs": 10 * 1024 * 1024,
 };

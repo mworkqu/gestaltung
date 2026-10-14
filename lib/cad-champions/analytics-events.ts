@@ -12,6 +12,10 @@ export const CC_EVENTS = {
   landingFinalCta: "cc_landing_final_cta",
   landingFaqOpen: "cc_landing_faq_open",
   landingWhatsapp: "cc_landing_whatsapp",
+  // Test flow (Prompt 5)
+  testStarted: "cc_test_started",
+  testFileSaved: "cc_test_file_saved",
+  testSubmitted: "cc_test_submitted",
 } as const;
 
 export type CcEventName = (typeof CC_EVENTS)[keyof typeof CC_EVENTS];
@@ -27,4 +31,7 @@ export interface CcEventProps {
   cc_landing_final_cta: { signed_in: boolean };
   cc_landing_faq_open: { id: string };
   cc_landing_whatsapp: { where: "need" | "final" };
+  cc_test_started: { slug: string };
+  cc_test_file_saved: { replaced: boolean };
+  cc_test_submitted: { reason: "manual" | "timeout" };
 }

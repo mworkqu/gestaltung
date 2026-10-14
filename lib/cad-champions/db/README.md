@@ -6,6 +6,8 @@ Row types: `lib/cad-champions/db/types.ts`. RLS tests: `lib/cad-champions/db/rls
 ## Run order (owner, Supabase SQL editor)
 1. `0077_cc_core.sql` (after 0076)
 2. `0078_cc_storage.sql`
+3. `0079_cc_help_articles_seed.sql` (Help Center articles)
+4. `0080_cc_diagnostic_seed.sql` (tests `diagnostic-v1`, `diagnostic-timeout-check` (staff only), `practice-cube`, their tasks and marking aspects; raises `cc-submissions` to 300 MB and allows ZIP for module_package tests)
 
 Both files are safe to re-run. The tests apply each file twice to prove it.
 
@@ -62,7 +64,7 @@ Views: `cc_test_tasks_public`, `cc_exercises_public`, `cc_task_aspects_public` (
 | `cc-task-files` | free | signed-in users | admins | 50 MB |
 | `cc-answer-files` | free | staff | admins | 50 MB |
 | `cc-lesson-files` | free | signed-in users | admins | 50 MB |
-| `cc-submissions` | `{user_id}/{attempt_id}/{task_id}/{ts}_{name}` | owner + staff | owner inserts only (no overwrite/delete); admins all | 50 MB |
+| `cc-submissions` | `{user_id}/{attempt_id}/{task_id\|package}/{ts}_{name}` | owner + staff | owner inserts only (no overwrite/delete); admins all | 50 MB (300 MB after 0080, for the module_package ZIP; per-task files stay 50 MB in the app) |
 | `cc-payment-proofs` | `{user_id}/{payment_id}/{ts}_{name}` | owner + admins | owner inserts; admins all | 10 MB |
 
 Never put answer STEP files in `cc-task-files`: every signed-in user can read it. Use `cc-answer-files`.

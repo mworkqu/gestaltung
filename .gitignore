@@ -64,3 +64,8 @@ Claude outputs/
 services/**/__pycache__/
 services/**/.pytest_cache/
 services/**/.venv/
+
+# python caches (grader, CAD Champions Prompt 6)
+grader/.venv/
+grader/**/__pycache__/
+grader/**/.pytest_cache/
