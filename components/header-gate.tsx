@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "@/i18n/navigation";
+import { isCcPath } from "@/lib/cad-champions/cc-routing";
 
 // The signed-in "app" areas (dashboard, inventory) render their
 // own top bars, so the public marketing header is hidden there — only the
@@ -28,6 +29,7 @@ export function isPrintSheetPath(pathname: string): boolean {
 
 export function HeaderGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (isAppPath(pathname) || isPrintSheetPath(pathname)) return null;
+  // CAD Champions (/cad-champions/…) renders its own header (components/cad-champions/shell).
+  if (isAppPath(pathname) || isPrintSheetPath(pathname) || isCcPath(pathname)) return null;
   return <>{children}</>;
 }

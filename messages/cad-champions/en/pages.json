@@ -1,0 +1,52 @@
+{
+  "home": {
+    "title": "CAD Champions",
+    "purpose": "Train for CAD competitions with practice tasks, clear scores and help in English or Arabic."
+  },
+  "signIn": {
+    "title": "Sign in",
+    "purpose": "Sign in to continue your training and see your results."
+  },
+  "signUp": {
+    "title": "Create your account",
+    "purpose": "Create an account to save your progress and take your first test."
+  },
+  "dashboard": {
+    "title": "Your dashboard",
+    "purpose": "See where you are, what to do next and your latest results in one place."
+  },
+  "getReady": {
+    "title": "Get ready",
+    "purpose": "Check your computer, your CAD software and your files before a test, so nothing stops you halfway."
+  },
+  "test": {
+    "title": "Test",
+    "purpose": "Read the task, build the model and upload your files before the time runs out."
+  },
+  "results": {
+    "title": "Results",
+    "purpose": "See your score for each task and what to improve next time."
+  },
+  "training": {
+    "title": "Training",
+    "purpose": "Practise one skill at a time with short tasks and worked examples."
+  },
+  "help": {
+    "title": "Help Center",
+    "purpose": "Find answers about tasks, file formats and scoring, or ask our team."
+  },
+  "admin": {
+    "title": "Admin",
+    "purpose": "Manage participants, tasks and scores. Only staff can open this page."
+  },
+  "privacy": {
+    "title": "Privacy",
+    "purpose": "How we collect, use and protect your information in CAD Champions.",
+    "body": "[TODO-MO: privacy policy text]"
+  },
+  "terms": {
+    "title": "Terms of use",
+    "purpose": "The rules for using CAD Champions and taking part in its training.",
+    "body": "[TODO-MO: terms of use text]"
+  }
+}

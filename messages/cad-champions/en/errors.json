@@ -1,0 +1,20 @@
+{
+  "notFound": {
+    "kicker": "Error 404",
+    "title": "We can't find this page",
+    "body": "The link may be old or mistyped. Go to your dashboard, or ask us and we'll point you to the right place."
+  },
+  "serverError": {
+    "kicker": "Something went wrong",
+    "title": "This page didn't load",
+    "body": "A problem on our side stopped this page from loading. It's not something you did. Try again in a moment, and if it keeps happening, tell us."
+  },
+  "actions": {
+    "goToDashboard": "Go to dashboard",
+    "tryAgain": "Try again",
+    "needHelp": "Need help?",
+    "helpCenter": "Open the Help Center",
+    "whatsapp": "Chat on WhatsApp",
+    "email": "Send an email"
+  }
+}

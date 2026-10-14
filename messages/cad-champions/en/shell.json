@@ -1,0 +1,28 @@
+{
+  "brand": "CAD Champions",
+  "homeAria": "CAD Champions home",
+  "skipToContent": "Skip to content",
+  "headerNav": "Main",
+  "signIn": "Sign in",
+  "language": {
+    "switchTo": "عربي",
+    "switchTitle": "Switch to Arabic"
+  },
+  "meta": {
+    "description": "Training for CAD competitions: practice tasks, clear scores and help in English and Arabic."
+  },
+  "footer": {
+    "label": "Footer",
+    "byline": "Gestaltung360 by Gestaltung for Trading & Services",
+    "address": "Rafal Tower, Lusail, Qatar",
+    "addressTodo": "[TODO-MO: full address / PO box]",
+    "contactHeading": "Contact us",
+    "legalHeading": "Legal",
+    "whatsapp": "WhatsApp",
+    "email": "Email",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "disclaimer": "CAD Champions is an independent training program by Gestaltung360 and is not affiliated with or endorsed by WorldSkills International.",
+    "whatsappMessage": "Hi, I have a question about CAD Champions."
+  }
+}

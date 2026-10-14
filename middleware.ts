@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { routing } from "./i18n/routing";
 import { updateSession } from "./lib/supabase/middleware";
+import { ccRoute, type CcRouteDecision } from "./lib/cad-champions/cc-routing";
+import { CC_LOCALE_COOKIE } from "./lib/cad-champions/routes";
 import {
   SITE_V2_PREVIEW_COOKIE,
   SITE_V2_PREVIEW_COOKIE_VALUE,
@@ -107,7 +109,41 @@ async function applySiteV2(request: NextRequest, intl: NextResponse): Promise<Ne
   }
 }
 
+// ── CAD Champions (Prompt 1) ────────────────────────────────────────────────
+// Handles ONLY /cad-champions… and the internal /{en|ar}/cad-champions… form
+// (lib/cad-champions/cc-routing.ts decides); every other path returns "none"
+// and runs through the site code below exactly as before. next-intl never sees
+// a CC path (it would redirect /cad-champions to /en/cad-champions).
+// noindex on every CC response until Prompt 12.
+const CC_ROBOTS = "noindex, nofollow";
+
+async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kind: "none" }>): Promise<NextResponse> {
+  if (cc.kind === "redirect") {
+    const res = NextResponse.redirect(new URL(cc.to, request.url), cc.status);
+    res.headers.set("X-Robots-Tag", CC_ROBOTS);
+    // 307 depends on the visitor's cc_locale cookie: never cache it.
+    if (cc.status === 307) res.headers.set("Cache-Control", "private, no-store");
+    return res;
+  }
+  // Public /cad-champions/{locale}/rest -> internal /{locale}/cad-champions/rest,
+  // with next-intl's locale header (same as rewriteFrom), then the usual
+  // Supabase session refresh on that response.
+  const headers = new Headers(request.headers);
+  headers.set("X-NEXT-INTL-LOCALE", cc.locale);
+  const res = NextResponse.rewrite(new URL(cc.to, request.url), { request: { headers } });
+  res.headers.set("X-Robots-Tag", CC_ROBOTS);
+  return updateSession(request, res);
+}
+
 export default async function middleware(request: NextRequest) {
+  // 0) CAD Champions: its own branch, before anything of the site runs.
+  const cc = ccRoute(
+    request.nextUrl.pathname,
+    request.nextUrl.search,
+    request.cookies.get(CC_LOCALE_COOKIE)?.value,
+  );
+  if (cc.kind !== "none") return handleCc(request, cc);
+
   // 1) Run next-intl first so /[locale] routing + the EN/AR switcher decide the
   //    response (redirects, rewrites) exactly as before.
   const isLocalePrefixed = LOCALE_PREFIX.test(request.nextUrl.pathname);

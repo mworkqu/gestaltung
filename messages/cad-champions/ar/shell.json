@@ -1,0 +1,28 @@
+{
+  "brand": "أبطال التصميم بالحاسوب",
+  "homeAria": "الصفحة الرئيسية لأبطال التصميم بالحاسوب",
+  "skipToContent": "انتقل إلى المحتوى",
+  "headerNav": "القائمة الرئيسية",
+  "signIn": "تسجيل الدخول",
+  "language": {
+    "switchTo": "English",
+    "switchTitle": "التبديل إلى الإنجليزية"
+  },
+  "meta": {
+    "description": "تدريب على مسابقات التصميم بالحاسوب: مهام للتمرين ونتائج واضحة ومساعدة بالعربية والإنجليزية."
+  },
+  "footer": {
+    "label": "تذييل الصفحة",
+    "byline": "Gestaltung360 من جستالتونج للتجارة والخدمات",
+    "address": "برج رافال، لوسيل، قطر",
+    "addressTodo": "[TODO-MO: full address / PO box]",
+    "contactHeading": "تواصل معنا",
+    "legalHeading": "معلومات قانونية",
+    "whatsapp": "واتساب",
+    "email": "البريد الإلكتروني",
+    "privacy": "الخصوصية",
+    "terms": "الشروط",
+    "disclaimer": "أبطال التصميم بالحاسوب برنامج تدريبي مستقل من Gestaltung360، ولا يرتبط بمنظمة WorldSkills International ولا يحظى باعتمادها.",
+    "whatsappMessage": "مرحبًا، عندي سؤال عن أبطال التصميم بالحاسوب."
+  }
+}
