@@ -4,7 +4,7 @@ import { routing, type Locale } from "./routing";
 // CAD Champions strings live in their own files (messages/cad-champions/{locale}/*.json)
 // and are merged under the "CC" namespace. Server-only: the client receives only
 // what a layout passes to NextIntlClientProvider, so the site's pages ship no CC text.
-const CC_MESSAGE_FILES = ["shell", "pages", "errors", "ui", "gallery"] as const;
+const CC_MESSAGE_FILES = ["shell", "pages", "errors", "ui", "gallery", "dashboard", "onboarding", "account", "auth"] as const;
 
 async function loadCcMessages(locale: Locale) {
   const entries = await Promise.all(

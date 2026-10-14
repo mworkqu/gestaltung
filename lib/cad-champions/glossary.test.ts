@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { GLOSSARY, GLOSSARY_IDS, getGlossaryEntry } from "./glossary";
 
 describe("glossary", () => {
-  it("has 31 entries", () => {
-    expect(GLOSSARY_IDS).toHaveLength(31);
+  it("has 59 entries", () => {
+    expect(GLOSSARY_IDS).toHaveLength(59);
   });
 
   it("every entry has non-empty en and ar term and definition", () => {

@@ -3,8 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { routing } from "./i18n/routing";
 import { updateSession } from "./lib/supabase/middleware";
+import { hasSupabaseAuthCookie } from "./lib/supabase/auth-cookie";
 import { ccRoute, type CcRouteDecision } from "./lib/cad-champions/cc-routing";
-import { CC_LOCALE_COOKIE } from "./lib/cad-champions/routes";
+import { ccSignInHref, isCcProtected } from "./lib/cad-champions/auth/paths";
+import { CC_LOCALE_COOKIE, parseCcPath } from "./lib/cad-champions/routes";
 import {
   SITE_V2_PREVIEW_COOKIE,
   SITE_V2_PREVIEW_COOKIE_VALUE,
@@ -125,6 +127,19 @@ async function handleCc(request: NextRequest, cc: Exclude<CcRouteDecision, { kin
     if (cc.status === 307) res.headers.set("Cache-Control", "private, no-store");
     return res;
   }
+  // Prompt 2 Step F: a protected CC page (lib/cad-champions/auth/paths.ts)
+  // without any Supabase auth cookie goes straight to sign-in, returning here
+  // afterwards. Only a fast pre-check: the page itself verifies the session and
+  // the role server-side (requireCcUser / requireCcStaff).
+  const rest = parseCcPath(request.nextUrl.pathname)?.rest ?? "/";
+  if (isCcProtected(rest) && !hasSupabaseAuthCookie(request.cookies.getAll().map((c) => c.name))) {
+    const target = ccSignInHref(cc.locale, request.nextUrl.pathname + request.nextUrl.search);
+    const res = NextResponse.redirect(new URL(target, request.url), 307);
+    res.headers.set("X-Robots-Tag", CC_ROBOTS);
+    res.headers.set("Cache-Control", "private, no-store");
+    return res;
+  }
+
   // Public /cad-champions/{locale}/rest -> internal /{locale}/cad-champions/rest,
   // with next-intl's locale header (same as rewriteFrom), then the usual
   // Supabase session refresh on that response.

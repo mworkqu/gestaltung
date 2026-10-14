@@ -3,6 +3,8 @@
 CAD Champions (أبطال التصميم بالحاسوب) is a training platform for the Mechanical Engineering CAD skills competition. It lives inside the gestaltung360.com Next.js app as a route section. It must never change or restyle the rest of the site.
 
 ## Decisions (owner, 2026-10-14)
+
+**`docs/COMPETITION_ALIGNMENT.md` overrides any older task text where they conflict.** It aligns the platform with the official Mechanical Engineering CAD technical descriptions (PDFs in `docs/reference/`, never copied into the site). Three software tracks: Inventor (recommended, default), Fusion, SOLIDWORKS.
 | Topic | Decision |
 |---|---|
 | Integration | Option 1: a route section inside the existing app. One deploy, one login, one Supabase project. |

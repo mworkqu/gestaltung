@@ -1,0 +1,129 @@
+{
+  "title": "Account settings",
+  "purpose": "Change your details, language, training software and emails, or ask us to delete your account.",
+  "noProfileTitle": "We could not find your CAD Champions profile",
+  "noProfileText": "Your profile may still be being created. Try again in a minute, or tap Need help? and we will check it for you.",
+  "errors": {
+    "saveTitle": "We could not save that",
+    "saveBody": "Check your connection and try again. If it keeps happening, tap Need help?.",
+    "sessionTitle": "Please sign in again",
+    "sessionBody": "Your session ended for safety. Sign in and try again.",
+    "invalidTitle": "Please check what you entered",
+    "phoneInvalid": "This phone number does not look right. Use a Qatar number like 5555 1234, or add the country code for an international number."
+  },
+  "details": {
+    "title": "Your details",
+    "purpose": "We use these to personalise your training and to reach you if your test needs attention.",
+    "fullName": "Full name",
+    "fullNameAr": "Name in Arabic",
+    "fullNameHelp": "As you want it to appear on your certificates.",
+    "phone": "Phone",
+    "phoneHelp": "So we can reach you on WhatsApp if your test needs attention.",
+    "studyLevel": "Study level",
+    "cadSoftwareUsed": "CAD software you use",
+    "cadExperience": "CAD experience",
+    "computer": "Your computer",
+    "notSet": "Not set",
+    "save": "Save details",
+    "saving": "Saving…",
+    "saved": "Details saved",
+    "savedText": "Your profile is up to date."
+  },
+  "options": {
+    "studyLevel": {
+      "secondary": "Secondary school",
+      "diploma": "Diploma",
+      "bachelor": "Bachelor",
+      "graduate": "Graduate studies",
+      "working": "Working"
+    },
+    "cadSoftwareUsed": {
+      "inventor": "Autodesk Inventor",
+      "fusion": "Autodesk Fusion",
+      "solidworks": "SOLIDWORKS",
+      "other": "Another program",
+      "none": "None yet"
+    },
+    "cadExperience": {
+      "none": "No experience",
+      "lt_6m": "Less than 6 months",
+      "6_24m": "6 to 24 months",
+      "gt_2y": "More than 2 years"
+    },
+    "computer": {
+      "yes": "Windows PC",
+      "mac_only": "Mac only",
+      "no_computer": "No computer"
+    }
+  },
+  "language": {
+    "title": "Language",
+    "purpose": "The language of this site and of your emails.",
+    "helpLabel": "language",
+    "help": "We remember your choice on this device and in your account. You can change it any time.",
+    "groupLabel": "Language",
+    "en": "English",
+    "ar": "العربية",
+    "save": "Save language",
+    "saved": "Language saved"
+  },
+  "track": {
+    "title": "Training software",
+    "purpose": "Decides which videos and examples you see in training.",
+    "helpLabel": "training software",
+    "help": "Pick the program you will build your models in. Your test can be done in any software.",
+    "save": "Save software",
+    "saved": "Training software saved",
+    "savedText": "Your lessons will use this software."
+  },
+  "email": {
+    "title": "Email preferences",
+    "purpose": "Choose which emails you get from us. Account and security emails are always sent.",
+    "weeklyLabel": "Weekly progress email",
+    "weeklyHint": "A short summary of what you did and what to do next.",
+    "marketingLabel": "News and offers",
+    "marketingHint": "Occasional emails about new courses, events and competitions.",
+    "save": "Save preferences",
+    "saved": "Email preferences saved"
+  },
+  "password": {
+    "title": "Change password",
+    "purpose": "Use a password you do not use anywhere else.",
+    "newLabel": "New password",
+    "confirmLabel": "Repeat the new password",
+    "show": "Show password",
+    "hide": "Hide password",
+    "rulesLabel": "Password rules",
+    "ruleLength": "At least 8 characters",
+    "ruleNumber": "At least one number",
+    "ruleMatch": "Both passwords match",
+    "save": "Change password",
+    "saved": "Password changed",
+    "savedText": "Use your new password next time you sign in.",
+    "errorTitle": "We could not change your password",
+    "errorSame": "Choose a password that is different from your current one.",
+    "errorRecent": "For safety, please sign out, sign in again, then change your password.",
+    "errorGeneric": "Please try again. If it keeps happening, tap Need help?."
+  },
+  "deletion": {
+    "title": "Delete my account",
+    "purpose": "Ask us to remove your account and everything stored with it.",
+    "helpLabel": "account deletion",
+    "help": "An admin reviews every request, usually to make sure it really is you. You can cancel the request any time before it is approved.",
+    "whatGoes": "If you go ahead, we delete your profile, test uploads, results and training progress. This cannot be undone.",
+    "retention": "Deletion happens within [TODO-MO: retention days] days after an admin approves your request.",
+    "button": "Request account deletion",
+    "dialogTitle": "Request account deletion?",
+    "dialogBody": "We will delete your profile, test uploads, results and training progress within [TODO-MO: retention days] days after an admin approves. This cannot be undone. You can cancel the request until then.",
+    "dialogConfirm": "Yes, request deletion",
+    "requested": "Deletion requested",
+    "requestedText": "We will review your request and email you.",
+    "pendingTitle": "Your deletion request is waiting for review",
+    "pendingBody": "Requested on {date}. Nothing has been deleted yet. Changed your mind? You can cancel it.",
+    "cancelButton": "Cancel the request",
+    "cancelled": "Request cancelled",
+    "cancelledText": "Your account stays as it is.",
+    "errorTitle": "We could not update your deletion request",
+    "errorBody": "Please try again in a moment. If it keeps happening, tap Need help? and we will do it for you."
+  }
+}

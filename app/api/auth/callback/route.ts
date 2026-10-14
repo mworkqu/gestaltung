@@ -99,6 +99,14 @@ export async function GET(request: NextRequest) {
 
   if (provider) return signInError(origin, next, provider);
 
+  // CAD Champions links (next = /cad-champions/{en|ar}/…): back to the CC
+  // screens, not the site's. A reset link -> CC forgot-password, else CC sign-in.
+  const cc = /^\/cad-champions\/(en|ar)(\/|$|\?)/.exec(next);
+  if (cc) {
+    const page = next.includes("reset-password") ? "forgot-password" : "sign-in";
+    return NextResponse.redirect(`${origin}/cad-champions/${cc[1]}/${page}?expired=1`);
+  }
+
   // Expired or already-used link: send them back to request a fresh one.
   return NextResponse.redirect(`${origin}/${localeOf(next)}/forgot-password?expired=1`);
 }

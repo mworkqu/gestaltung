@@ -1,0 +1,148 @@
+{
+  "greeting": "Welcome back, {name}",
+  "greetingNoName": "Welcome back",
+  "loadError": {
+    "title": "We could not load this part of your dashboard",
+    "body": "This is on our side, not yours. Refresh the page in a minute. If it is still missing, tap Need help? and we will fix it."
+  },
+  "finishOnboarding": {
+    "title": "Finish your welcome tour",
+    "body": "Four short screens that explain how it works and set your training software.",
+    "cta": "Finish onboarding"
+  },
+  "nextStep": {
+    "kicker": "Your next step",
+    "helpLabel": "your next step",
+    "help": "One thing to do now, picked from how far you have come. When you finish it, the next one appears here.",
+    "reason": {
+      "complete_profile": "We need your name, phone and date of birth before you can start.",
+      "finish_get_ready": "Get Ready checks your computer and software so nothing stops you halfway through the test.",
+      "pass_practice": "A short practice upload shows that your files reach us correctly before the real test.",
+      "take_test": "The free test shows where you stand in each skill area, so your training starts in the right place.",
+      "take_test_resume": "Your test is in progress and the timer is still running.",
+      "take_test_expired": "Your last attempt ran out of time. You can start a new attempt when you are ready.",
+      "view_results": "Your results are ready. They show your level in each skill area.",
+      "view_results_grading": "Your files were received and are being graded. We will show your results as soon as they are ready.",
+      "watch_free_lesson": "A free lesson lets you see how the training works before you decide.",
+      "join_training": "Training builds the skills your results showed you need most.",
+      "continue_training": "Pick up your training where you stopped."
+    },
+    "cta": {
+      "complete_profile": "Complete your profile",
+      "finish_get_ready": "Continue Get Ready",
+      "pass_practice": "Do the practice upload",
+      "take_test": "Start the free test",
+      "take_test_resume": "Return to your test",
+      "take_test_expired": "Start a new attempt",
+      "view_results": "See my results",
+      "view_results_grading": "Check progress",
+      "watch_free_lesson": "Watch the free lesson",
+      "join_training": "See training options",
+      "continue_training": "Continue training"
+    }
+  },
+  "tracker": {
+    "title": "Your journey",
+    "helpLabel": "your journey",
+    "help": "Five steps from setting up to training. A locked step opens when the one before it is done.",
+    "steps": {
+      "get_ready": {
+        "label": "Get Ready",
+        "desc": "Computer, software, practice upload"
+      },
+      "free_test": {
+        "label": "Free test",
+        "desc": "Build and upload your files"
+      },
+      "results": {
+        "label": "Results",
+        "desc": "Your level in each skill area"
+      },
+      "free_lesson": {
+        "label": "Free lesson",
+        "desc": "Try the training"
+      },
+      "training": {
+        "label": "Training",
+        "desc": "Lessons and exercises"
+      }
+    },
+    "locked": {
+      "profile": "Opens after you complete your profile.",
+      "get_ready": "Opens after you finish Get Ready.",
+      "test": "Opens after you submit the test.",
+      "results": "Opens after you view your results."
+    }
+  },
+  "test": {
+    "title": "Free test",
+    "helpLabel": "the free test",
+    "help": "A diagnostic test with a timer. It is not pass or fail. It measures your skills so we can plan your training.",
+    "status": {
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "grading": "Being graded",
+      "ready": "Results ready",
+      "expired": "Time ran out",
+      "locked": "Locked"
+    },
+    "notStartedText": "You have not started the test yet.",
+    "lockedText": "Finish Get Ready first. It makes sure the test goes smoothly.",
+    "inProgressText": "Your timer is running. Upload your files before it reaches zero.",
+    "timeLeft": "Time left",
+    "endsAt": "Ends {time}",
+    "timeUp": "Time is up. We are closing your attempt.",
+    "gradingText": "We received your files and are grading them. Refresh this page later to see your results.",
+    "readyText": "Your results are ready.",
+    "expiredText": "Your last attempt ran out of time before it was submitted.",
+    "open": "Start the test",
+    "resume": "Return to the test",
+    "viewResults": "See my results",
+    "unavailableTitle": "The test is not open yet",
+    "unavailableText": "We are still preparing it. Check back soon, or tap Need help? to ask when it opens."
+  },
+  "training": {
+    "title": "Training",
+    "helpLabel": "training",
+    "help": "Lessons and exercises that start from your results. It opens when you join a plan.",
+    "lockedStatus": "Not joined yet",
+    "activeStatus": "Active",
+    "whatYouGet": "What you get",
+    "bullets": {
+      "one": "[TODO-MO: training contents]"
+    },
+    "unlocksAfter": "Opens after you view your results.",
+    "seeOptions": "See training options",
+    "activeUntil": "Your access is active until {date}.",
+    "open": "Open training"
+  },
+  "profile": {
+    "title": "Profile",
+    "helpLabel": "profile completeness",
+    "help": "The more we know about you, the better we can help. Only your name, phone and date of birth are needed to start.",
+    "percent": "{percent}% complete",
+    "progressLabel": "Profile completeness",
+    "missingIntro": "Still missing:",
+    "complete": "Your profile is complete. Thank you.",
+    "cta": "Update my details",
+    "emptyTitle": "Your profile is empty",
+    "emptyText": "Add a few details so we can personalise your training.",
+    "fields": {
+      "full_name": "Full name",
+      "full_name_ar": "Name in Arabic",
+      "phone": "Phone",
+      "date_of_birth": "Date of birth",
+      "institution": "School or university",
+      "study_level": "Study level",
+      "cad_software_used": "CAD software you use",
+      "cad_experience": "CAD experience",
+      "has_windows_pc": "Computer"
+    }
+  },
+  "eligibility": {
+    "line": "Competition age-eligible until {year}",
+    "helpLabel": "competition age eligibility",
+    "help": "The world competition is for competitors aged 22 or younger in the competition year. This is only an estimate from your date of birth. [TODO-MO: confirm the local Qatar rule] Check your local selection rules.",
+    "missing": "Add your date of birth to see the last year you can enter the competition."
+  }
+}

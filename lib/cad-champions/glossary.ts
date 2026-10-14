@@ -34,7 +34,35 @@ export type GlossaryId =
   | "animation"
   | "reverse-engineering"
   | "caliper"
-  | "3d-scan";
+  | "3d-scan"
+  | "sheet-metal"
+  | "flat-pattern"
+  | "bend-allowance"
+  | "frame-generator"
+  | "weldment"
+  | "weld-symbol"
+  | "bolted-connection"
+  | "tube-and-pipe"
+  | "cable-and-harness"
+  | "content-centre"
+  | "design-accelerator"
+  | "inventor-studio"
+  | "ipart"
+  | "physical-simulation"
+  | "exploded-view"
+  | "collapsing-animation"
+  | "nomenclature"
+  | "mbd"
+  | "3d-annotation"
+  | "limits-and-fits"
+  | "surface-texture-ra"
+  | "offset-centerline-caliper"
+  | "radius-gauge"
+  | "thread-pitch-gauge"
+  | "depth-gauge"
+  | "3d-pdf"
+  | "stl"
+  | "design-brief";
 
 export interface GlossaryText {
   term: string;
@@ -418,6 +446,342 @@ export const GLOSSARY: Record<GlossaryId, GlossaryEntry> = {
       term: "مسح ثلاثي الأبعاد",
       definition:
         "نسخة رقمية من جسم حقيقي يلتقطها ماسح على شكل ملايين النقاط أو شبكة. يمكن استخدامها مرجعًا لإعادة بناء القطعة في CAD.",
+    },
+  },
+  "sheet-metal": {
+    en: {
+      term: "Sheet metal",
+      definition:
+        "Thin, flat metal sheet that is cut and bent into parts such as brackets, covers and enclosures. Sheet-metal tools in CAD model the bends and can unfold the part.",
+    },
+    ar: {
+      term: "الصفائح المعدنية (Sheet metal)",
+      definition:
+        "ألواح معدنية رقيقة ومسطّحة تُقصّ وتُثنى لتصبح قطعًا مثل الحوامل والأغطية والعلب. أدوات الصفائح في CAD ترسم الثنيات ويمكنها فرد القطعة على مستوٍ واحد.",
+    },
+  },
+  "flat-pattern": {
+    en: {
+      term: "Flat pattern",
+      definition:
+        "The unfolded, flat shape of a bent sheet-metal part. It is what the laser or punch cuts before the part goes to the bending machine.",
+    },
+    ar: {
+      term: "الشكل المفرود (Flat pattern)",
+      definition:
+        "الشكل المسطّح لقطعة صفائح مثنية بعد فردها. هذا هو الشكل الذي يقصّه الليزر أو المثقب قبل أن تذهب القطعة إلى آلة الثني.",
+    },
+  },
+  "bend-allowance": {
+    en: {
+      term: "Bend allowance",
+      definition:
+        "The length of metal used up in a bend, measured along the middle of the sheet. You need it to work out how long the flat pattern must be so the bent part ends up the right size.",
+    },
+    ar: {
+      term: "سماحية الثني (Bend allowance)",
+      definition:
+        "طول المعدن الذي تستهلكه الثنية، ويُقاس على امتداد منتصف سماكة الصفيحة. تحتاجه لحساب طول الشكل المفرود المطلوب حتى تخرج القطعة المثنية بالمقاس الصحيح.",
+    },
+  },
+  "frame-generator": {
+    en: {
+      term: "Frame Generator",
+      definition:
+        "An Autodesk Inventor feature that builds a frame of steel or aluminium profiles from a simple skeleton of lines and cuts the ends for you. The closest idea in SOLIDWORKS is Structural Members, and in Fusion it is a profile sweep.",
+    },
+    ar: {
+      term: "Frame Generator",
+      definition:
+        "ميزة في Autodesk Inventor تبني هيكلًا من مقاطع الفولاذ أو الألمنيوم انطلاقًا من هيكل بسيط من الخطوط، وتقصّ الأطراف عنك. أقرب فكرة لها في SOLIDWORKS هي Structural Members، وفي Fusion هي سحب المقطع على مسار.",
+    },
+  },
+  weldment: {
+    en: {
+      term: "Weldment",
+      definition:
+        "An assembly of metal pieces joined permanently by welding and treated as one unit. In CAD it usually also carries the weld details and the cut list of the pieces.",
+    },
+    ar: {
+      term: "تجميعة ملحومة (Weldment)",
+      definition:
+        "تجميعة من قطع معدنية تُوصَل ببعضها بشكل دائم عن طريق اللحام وتُعامل كوحدة واحدة. في CAD تحمل عادةً تفاصيل اللحام وقائمة قصّ القطع.",
+    },
+  },
+  "weld-symbol": {
+    en: {
+      term: "Weld symbol",
+      definition:
+        "A standard mark on a drawing that tells the welder the type, size and position of a weld. It sits on a reference line with an arrow pointing to the joint.",
+    },
+    ar: {
+      term: "رمز اللحام (Weld symbol)",
+      definition:
+        "علامة قياسية على الرسم تخبر اللحّام بنوع اللحام وحجمه وموضعه. توضع على خط مرجعي وسهم يشير إلى الوصلة.",
+    },
+  },
+  "bolted-connection": {
+    en: {
+      term: "Bolted connection",
+      definition:
+        "A joint where parts are held together by a bolt, a nut and usually washers, which can be taken apart again. Inventor can generate one for you, and in other CAD you add the screws and nuts as parts.",
+    },
+    ar: {
+      term: "وصلة مسمارية (Bolted connection)",
+      definition:
+        "وصلة تُثبَّت فيها القطع بمسمار قلاووظ وصامولة وعادةً حلقات، ويمكن فكّها لاحقًا. يستطيع Inventor توليدها لك، وفي برامج CAD الأخرى تضيف المسامير والصواميل كقطع.",
+    },
+  },
+  "tube-and-pipe": {
+    en: {
+      term: "Tube & Pipe",
+      definition:
+        "An Autodesk Inventor feature for routing pipes, hoses and fittings through an assembly. SOLIDWORKS has a similar tool called Routing, and in Fusion you usually sweep a pipe along a path.",
+    },
+    ar: {
+      term: "Tube & Pipe",
+      definition:
+        "ميزة في Autodesk Inventor لتمرير الأنابيب والخراطيم والوصلات داخل التجميعة. في SOLIDWORKS أداة مشابهة اسمها Routing، وفي Fusion تسحب الأنبوب عادةً على مسار.",
+    },
+  },
+  "cable-and-harness": {
+    en: {
+      term: "Cable & Harness",
+      definition:
+        "An Autodesk Inventor feature for routing electrical wires and cables through an assembly and bundling them into a harness. SOLIDWORKS Routing has an electrical version of the same idea.",
+    },
+    ar: {
+      term: "Cable & Harness",
+      definition:
+        "ميزة في Autodesk Inventor لتمرير الأسلاك والكوابل الكهربائية داخل التجميعة وتجميعها في حزمة واحدة (harness). في SOLIDWORKS Routing نسخة كهربائية من الفكرة نفسها.",
+    },
+  },
+  "content-centre": {
+    en: {
+      term: "Content Centre",
+      definition:
+        "The built-in library of standard parts in Autodesk Inventor, such as screws, nuts, washers and bearings, which you insert at the size you need. SOLIDWORKS has Toolbox for the same job.",
+    },
+    ar: {
+      term: "Content Centre",
+      definition:
+        "مكتبة القطع القياسية المدمجة في Autodesk Inventor، مثل المسامير والصواميل والحلقات والمحامل، وتُدرجها بالمقاس الذي تحتاجه. في SOLIDWORKS تؤدي Toolbox الوظيفة نفسها.",
+    },
+  },
+  "design-accelerator": {
+    en: {
+      term: "Design Accelerator",
+      definition:
+        "A set of Autodesk Inventor generators that build common machine parts, such as gears, shafts and bolted joints, from a few inputs and check the calculations. SOLIDWORKS has no single match, but its Toolbox and add-ins cover parts of it.",
+    },
+    ar: {
+      term: "Design Accelerator",
+      definition:
+        "مجموعة مولّدات في Autodesk Inventor تبني أجزاء الآلات الشائعة، مثل التروس والأعمدة والوصلات المسمارية، من مدخلات قليلة وتتحقق من الحسابات. لا يوجد مقابل واحد لها في SOLIDWORKS، لكن Toolbox والإضافات تغطي جزءًا منها.",
+    },
+  },
+  "inventor-studio": {
+    en: {
+      term: "Inventor Studio",
+      definition:
+        "The Autodesk Inventor environment for making renders and animations of a model, with lights, cameras and moving parts. The closest idea in SOLIDWORKS is Visualize, and in Fusion it is the Render and Animation workspaces.",
+    },
+    ar: {
+      term: "Inventor Studio",
+      definition:
+        "بيئة في Autodesk Inventor لإنتاج صور تصيير ورسوم متحركة للنموذج، مع إضاءة وكاميرات وأجزاء متحركة. أقرب فكرة لها في SOLIDWORKS هي Visualize، وفي Fusion هي بيئتا Render وAnimation.",
+    },
+  },
+  ipart: {
+    en: {
+      term: "iPart",
+      definition:
+        "An Autodesk Inventor part that holds a table of sizes, so one file gives you a whole family of versions such as bolts of different lengths. SOLIDWORKS calls this a configuration, and Fusion calls it a configured design.",
+    },
+    ar: {
+      term: "iPart",
+      definition:
+        "قطعة في Autodesk Inventor تحمل جدولًا بالمقاسات، فيعطيك ملف واحد عائلة كاملة من النسخ مثل مسامير بأطوال مختلفة. يسمّي SOLIDWORKS هذا Configuration، ويسمّيه Fusion تصميمًا مهيَّأً (configured design).",
+    },
+  },
+  "physical-simulation": {
+    en: {
+      term: "Physical simulation",
+      definition:
+        "A test run in CAD that shows how a mechanism moves or how a part reacts to forces, before anything is built. It helps you catch collisions and weak spots early.",
+    },
+    ar: {
+      term: "المحاكاة الفيزيائية",
+      definition:
+        "تجربة داخل CAD تُظهر كيف تتحرك الآلية أو كيف تتصرف القطعة تحت القوى قبل تصنيع أي شيء. تساعدك على اكتشاف التصادمات ونقاط الضعف مبكرًا.",
+    },
+  },
+  "exploded-view": {
+    en: {
+      term: "Exploded view",
+      definition:
+        "A view of an assembly with the parts pulled apart along straight lines so you can see each one and how they fit together. It is common in assembly instructions.",
+    },
+    ar: {
+      term: "منظر مفكَّك (Exploded view)",
+      definition:
+        "منظر للتجميعة تُبعَّد فيه القطع عن بعضها على خطوط مستقيمة ليظهر كل جزء وكيف تتركّب معًا. شائع في تعليمات التركيب.",
+    },
+  },
+  "collapsing-animation": {
+    en: {
+      term: "Collapsing animation",
+      definition:
+        "An animation where an exploded assembly moves back together, so the parts slide into their final positions. It shows the assembly order step by step.",
+    },
+    ar: {
+      term: "رسم متحرك للتجميع",
+      definition:
+        "رسم متحرك تعود فيه التجميعة المفكَّكة لتتجمّع، فتنزلق القطع إلى أماكنها النهائية. يعرض ترتيب التركيب خطوة بخطوة.",
+    },
+  },
+  nomenclature: {
+    en: {
+      term: "Nomenclature",
+      definition:
+        "The agreed system of names and numbers for parts and drawings, so everyone calls the same part by the same name. It keeps files and parts lists clear and easy to find.",
+    },
+    ar: {
+      term: "التسمية والترقيم (Nomenclature)",
+      definition:
+        "نظام متفق عليه لأسماء وأرقام القطع والرسومات، ليُسمّي الجميع القطعة نفسها بالاسم نفسه. يُبقي الملفات وقوائم القطع واضحة وسهلة البحث.",
+    },
+  },
+  mbd: {
+    en: {
+      term: "MBD (model-based definition)",
+      definition:
+        "Putting dimensions, tolerances and notes directly on the 3D model instead of a 2D drawing, so the model alone defines the part.",
+    },
+    ar: {
+      term: "MBD (التعريف المعتمد على النموذج)",
+      definition:
+        "وضع الأبعاد والتفاوتات والملاحظات مباشرةً على النموذج ثلاثي الأبعاد بدل الرسم ثنائي الأبعاد، فيكفي النموذج وحده لتعريف القطعة.",
+    },
+  },
+  "3d-annotation": {
+    en: {
+      term: "3D annotation",
+      definition:
+        "A dimension, tolerance, note or symbol attached to the faces and edges of a 3D model. It is how MBD stores manufacturing information in the model.",
+    },
+    ar: {
+      term: "تعليق توضيحي ثلاثي الأبعاد",
+      definition:
+        "بُعد أو تفاوت أو ملاحظة أو رمز مرتبط بأوجه النموذج ثلاثي الأبعاد وحوافه. هكذا يخزّن MBD معلومات التصنيع داخل النموذج.",
+    },
+  },
+  "limits-and-fits": {
+    en: {
+      term: "Limits and fits",
+      definition:
+        "A system that sets how tight or loose a shaft sits in a hole, using tolerance codes such as H7/g6. It tells you if the parts slide, press together or stay fixed.",
+    },
+    ar: {
+      term: "الحدود والتوافقات (Limits and fits)",
+      definition:
+        "نظام يحدد مدى إحكام أو ارتخاء العمود داخل الثقب باستخدام رموز تفاوت مثل H7/g6. يخبرك هل ستنزلق القطعتان أو تُكبسان معًا أو تبقيان ثابتتين.",
+    },
+  },
+  "surface-texture-ra": {
+    en: {
+      term: "Surface texture (Ra)",
+      definition:
+        "How rough or smooth a surface is. Ra is the average height of its tiny bumps in micrometres, so a lower Ra means a smoother finish.",
+    },
+    ar: {
+      term: "خشونة السطح (Ra)",
+      definition:
+        "مدى خشونة السطح أو نعومته. Ra هو متوسط ارتفاع نتوءاته الصغيرة بالميكرومتر، وكلما قلّ Ra كان السطح أنعم.",
+    },
+  },
+  "offset-centerline-caliper": {
+    en: {
+      term: "Offset centerline caliper",
+      definition:
+        "A caliper with offset jaws that measures the distance from a hole or edge to the centre of another hole. It is useful for hole spacing and for steps that a normal caliper cannot reach.",
+    },
+    ar: {
+      term: "مقياس منزلق بفكّين مزاحين (Offset centerline caliper)",
+      definition:
+        "مقياس منزلق بفكّين مزاحين يقيس المسافة من ثقب أو حافة إلى مركز ثقب آخر. مفيد لقياس المسافات بين الثقوب والدرجات التي لا يصل إليها المقياس العادي.",
+    },
+  },
+  "radius-gauge": {
+    en: {
+      term: "Radius gauge",
+      definition:
+        "A set of thin blades with curved edges of known sizes. You hold the blade against a rounded corner until it fits with no gap to read the radius.",
+    },
+    ar: {
+      term: "مقياس نصف القطر (Radius gauge)",
+      definition:
+        "مجموعة شفرات رقيقة بحواف منحنية بمقاسات معروفة. تضع الشفرة على الزاوية المستديرة حتى تنطبق دون فراغ، فتقرأ نصف القطر.",
+    },
+  },
+  "thread-pitch-gauge": {
+    en: {
+      term: "Thread pitch gauge",
+      definition:
+        "A set of small blades with teeth that you match against a thread to find its pitch, the distance from one thread crest to the next, such as 1.5 mm.",
+    },
+    ar: {
+      term: "مقياس خطوة السنّ (Thread pitch gauge)",
+      definition:
+        "مجموعة شفرات صغيرة ذات أسنان تطابقها مع السنّ القلاووظ لمعرفة خطوته، أي المسافة من قمة سنّ إلى قمة السنّ التالي، مثل 1.5 mm.",
+    },
+  },
+  "depth-gauge": {
+    en: {
+      term: "Depth gauge",
+      definition:
+        "A tool that measures how deep a hole, slot or step is. A caliper's depth rod does the same job.",
+    },
+    ar: {
+      term: "مقياس العمق (Depth gauge)",
+      definition:
+        "أداة تقيس عمق الثقب أو المجرى أو الدرجة. وساق العمق في المقياس المنزلق تؤدي الوظيفة نفسها.",
+    },
+  },
+  "3d-pdf": {
+    en: {
+      term: "3D PDF",
+      definition:
+        "A PDF file that contains a 3D model you can rotate, zoom and section. It is handy for sharing a design with someone who has no CAD program.",
+    },
+    ar: {
+      term: "ملف PDF ثلاثي الأبعاد (3D PDF)",
+      definition:
+        "ملف PDF يحتوي على نموذج ثلاثي الأبعاد يمكنك تدويره وتكبيره وعمل مقطع فيه. مناسب لمشاركة التصميم مع من لا يملك برنامج CAD.",
+    },
+  },
+  stl: {
+    en: {
+      term: "STL file",
+      definition:
+        "A 3D file format (.stl) that describes a shape as a mesh of small triangles. It is the standard input for 3D printers, but it has no colours, units or dimensions.",
+    },
+    ar: {
+      term: "ملف STL",
+      definition:
+        "صيغة ملف ثلاثية الأبعاد (.stl) تصف الشكل كشبكة من مثلثات صغيرة. هي المدخل المعتاد للطابعات ثلاثية الأبعاد، لكنها لا تحمل ألوانًا ولا وحدات ولا أبعادًا.",
+    },
+  },
+  "design-brief": {
+    en: {
+      term: "Design brief",
+      definition:
+        "A short written description of what a product must do, who uses it and what limits apply, such as size, material or cost. You read it first and design to meet it.",
+    },
+    ar: {
+      term: "وصف التصميم (Design brief)",
+      definition:
+        "وصف مكتوب مختصر لما يجب أن يفعله المنتج ومن سيستخدمه والقيود المفروضة عليه، مثل الحجم والمادة والتكلفة. تقرؤه أولًا وتصمّم بحيث تحققه.",
     },
   },
 };

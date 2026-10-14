@@ -16,14 +16,18 @@ export const CC_LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 export type ResolveCcLocaleInput = {
   /** Raw value of the cc_locale cookie (anything, or missing). */
   cookie?: string | null;
-  // TODO(Prompt 2): add `profileLocale?: string | null` =
-  // cc_profiles.preferred_locale of the signed-in user and check it FIRST.
-  // The sign-in flow also writes the cc_locale cookie from the profile, so the
-  // middleware (which cannot query the database) stays correct via the cookie.
+  /**
+   * cc_profiles.preferred_locale of the signed-in user (anything, or missing).
+   * Checked FIRST. The middleware cannot query the database, so it passes only
+   * the cookie; the sign-in flow (auth/continue) writes the cookie from the
+   * profile, which keeps the middleware's choice in line with the profile.
+   */
+  profileLocale?: string | null;
 };
 
-/** The CC locale for a visitor: saved preference (Prompt 2) -> cookie -> "en". */
-export function resolveCcLocale({ cookie }: ResolveCcLocaleInput): Locale {
+/** The CC locale for a visitor: saved preference -> cookie -> "en". Pure. */
+export function resolveCcLocale({ cookie, profileLocale }: ResolveCcLocaleInput): Locale {
+  if (isCcLocale(profileLocale)) return profileLocale;
   if (isCcLocale(cookie)) return cookie;
   return CC_DEFAULT_LOCALE;
 }

@@ -1,0 +1,68 @@
+{
+  "title": "Welcome to CAD Champions",
+  "purpose": "Four short screens so you know how this works and which software to train in. It takes about a minute.",
+  "progress": "Screen {current} of {total}",
+  "back": "Back",
+  "next": "Next",
+  "skip": "Skip for now",
+  "skipHelp": "You can finish this later from your dashboard. Nothing is lost.",
+  "saving": "Saving…",
+  "goToGetReady": "Go to Get Ready",
+  "what": {
+    "title": "What CAD Champions is",
+    "body": "CAD Champions is training for the national CAD skills competition, made by Gestaltung360, a digital fabrication studio in Lusail.",
+    "point1Title": "A free test first",
+    "point1Text": "You take one test. It shows where you stand in six skill areas.",
+    "point2Title": "A path made for you",
+    "point2Text": "Your results decide what to practise first, so you do not waste time.",
+    "point3Title": "Built for the real competition",
+    "point3Text": "The tasks follow the same kind of work you will be asked to do on competition day."
+  },
+  "how": {
+    "title": "How it works",
+    "intro": "Four steps, in this order. Each one unlocks the next.",
+    "getReadyLabel": "Get Ready",
+    "getReadyText": "Check your computer and software, then do a short practice upload.",
+    "testLabel": "Free test",
+    "testText": "Build the parts in your CAD software and upload the files.",
+    "resultsLabel": "Your results",
+    "resultsText": "See your score and level in each skill area.",
+    "trainingLabel": "Training",
+    "trainingText": "Follow lessons and exercises that start where you are.",
+    "testHelpLabel": "the free test",
+    "testHelp": "A diagnostic test. It is not pass or fail. It only measures your skills so we can plan your training."
+  },
+  "before": {
+    "title": "Before the test",
+    "intro": "You do not need to prepare anything today. Here is what you will need when you take the test:",
+    "computerTitle": "A computer",
+    "computerText": "A Windows PC is best. Mac users can use Autodesk Fusion.",
+    "softwareTitle": "CAD software",
+    "softwareText": "Software that can save a <step>STEP file</step>, such as Inventor, Fusion or SOLIDWORKS.",
+    "timeTitle": "About 90 quiet minutes",
+    "timeText": "Once the timer starts, it keeps running. Pick a time when nobody will interrupt you.",
+    "guide": "The Get Ready page will guide you through all of this, step by step."
+  },
+  "software": {
+    "title": "Choose your training software",
+    "intro": "This decides which videos and examples you see in training.",
+    "switchNote": "You can switch later in settings. Your test can be done in any software.",
+    "recommended": "Recommended for the competition",
+    "selected": "Selected",
+    "inventorName": "Autodesk Inventor",
+    "inventorSuits": "Best choice for the competition. The tasks are built on Inventor.",
+    "fusionName": "Autodesk Fusion",
+    "fusionSuits": "For Mac users and schools that use Fusion. Also allowed at EuroSkills.",
+    "solidworksName": "SOLIDWORKS",
+    "solidworksSuits": "For students who already work in SOLIDWORKS.",
+    "solidworksNoteTitle": "A note about SOLIDWORKS",
+    "solidworksNote": "The competition uses Autodesk Inventor or Fusion. The SOLIDWORKS track builds the same skills, and we recommend switching to Inventor before competition mocks.",
+    "groupLabel": "Training software"
+  },
+  "errors": {
+    "saveTitle": "We could not save your choice",
+    "saveBody": "Check your connection and try again. If it keeps happening, tap Need help? and we will sort it out.",
+    "skipTitle": "We could not skip right now",
+    "skipBody": "Please try again in a moment."
+  }
+}

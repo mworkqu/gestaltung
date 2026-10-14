@@ -61,3 +61,6 @@ Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test 
 3. **One transaction of deletes.** A single `begin; ... commit;` removes the approved rows in dependency order (cart lines, then orders and their items, then projects through `delete_project()`, then the inquiry). The transaction ends by printing the remaining row counts, and it is rolled back if any count is not zero.
 
 No SQL is run until all phases are finished.
+
+## CAD Champions test data (2026-10-14, Prompt 2 verification)
+- auth user + public.profiles + cc_profiles + cc_journey_progress for email `gestaltung.co+cctest1@gmail.com` ("Test Student CC", minor, guardian "Test Guardian"). Delete via Supabase Auth → Users (cascades to cc_ rows).
