@@ -26,7 +26,7 @@ describe("glossary", () => {
   it("getGlossaryEntry returns the right locale and helpSlug", () => {
     expect(getGlossaryEntry("step-file", "en").term).toBe("STEP file");
     expect(getGlossaryEntry("step-file", "ar").term).toContain("STEP");
-    expect(getGlossaryEntry("step-file", "en").helpSlug).toBe("how-to-export-step");
+    expect(getGlossaryEntry("step-file", "en").helpSlug).toBe("export-step-inventor");
     expect(getGlossaryEntry("volume", "en").helpSlug).toBeUndefined();
   });
 

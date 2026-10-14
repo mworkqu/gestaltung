@@ -1,0 +1,68 @@
+{
+  "searchLabel": "ابحث في مركز المساعدة",
+  "searchPlaceholder": "اكتب سؤالًا أو كلمة، مثل «الوحدات»",
+  "searchButton": "بحث",
+  "categoriesHeading": "تصفّح حسب الموضوع",
+  "articleCount": "المقالات: {count}",
+  "allTopics": "كل المواضيع",
+  "resultsHeading": "نتائج البحث عن «{query}»",
+  "resultsCount": "تم العثور على {count}",
+  "noResultsTitle": "لم نجد أي مقال",
+  "noResultsBody": "لم نجد نتائج لـ «{query}». جرّب كلمة أقصر، أو اسأل فريقنا وسنساعدك.",
+  "noResultsAction": "عرض كل المواضيع",
+  "searchFailedTitle": "البحث لا يعمل الآن",
+  "searchFailedBody": "حاول مرة أخرى بعد دقيقة، أو راسل فريقنا.",
+  "setupTitle": "نجهّز المقالات الآن",
+  "setupBody": "مقالات مركز المساعدة ليست جاهزة بعد. يمكنك تصفّح المواضيع أدناه، أو مراسلة فريقنا للمساعدة.",
+  "emptyCategory": "لا توجد مقالات في هذا الموضوع بعد.",
+  "stillNeedTitle": "هل ما زلت تحتاج مساعدة؟",
+  "stillNeedBody": "راسل فريقنا. نرد عادةً بسرعة ويسعدنا مساعدتك.",
+  "whatsappCta": "تحدث معنا على واتساب",
+  "emailCta": "أرسل بريدًا إلكترونيًا",
+  "whatsappMessage": "مرحبًا، أحتاج مساعدة في: {topic}",
+  "emailSubject": "مساعدة كاد تشامبيونز: {topic}",
+  "backToHelp": "العودة إلى مركز المساعدة",
+  "topicLabel": "الموضوع",
+  "glossaryHeading": "كلمات وردت في هذا المقال",
+  "videoSlotTitle": "شرح بالفيديو",
+  "videoSlotBody": "سيتوفر فيديو قصير لهذا المقال قريبًا.",
+  "helpfulQuestion": "هل أفادك هذا المقال؟",
+  "helpfulYes": "نعم",
+  "helpfulNo": "لا",
+  "helpfulSending": "جارٍ الإرسال…",
+  "helpfulThanks": "شكرًا لك على رأيك.",
+  "helpfulThanksNo": "شكرًا لك. راسل فريقنا أدناه وسنساعدك.",
+  "helpfulError": "لم نتمكن من حفظ إجابتك. حاول مرة أخرى.",
+  "helpfulRate": "لقد صوّتّ عدة مرات. حاول لاحقًا.",
+  "relatedHeading": "مقالات ذات صلة",
+  "stillStuckTitle": "ما زلت عالقًا؟",
+  "stillStuckBody": "أخبرنا بما تراه وسنساعدك خطوة بخطوة.",
+  "articleSetupTitle": "هذا المقال غير متاح بعد",
+  "articleSetupBody": "نجهّز مركز المساعدة الآن. ارجع وحاول مرة أخرى قريبًا.",
+  "categories": {
+    "getting-started": {
+      "title": "البداية",
+      "description": "كيف يعمل الاختبار المجاني وما الذي تحتاجه قبل أن تبدأ."
+    },
+    "files-and-export": {
+      "title": "الملفات والتصدير",
+      "description": "تصدير ملفات STEP وPDF، وضبط الوحدات، وإصلاح الملفات المرفوضة."
+    },
+    "the-test": {
+      "title": "الاختبار",
+      "description": "قواعد المؤقت والتقييم، وما يعنيه مستواك في المهارة."
+    },
+    "training-and-payment": {
+      "title": "التدريب والدفع",
+      "description": "ما الذي يشمله التدريب وكيف تدفع."
+    },
+    "account": {
+      "title": "الحساب",
+      "description": "البريد الإلكتروني وكلمة المرور والخصوصية وحذف الحساب."
+    },
+    "competition": {
+      "title": "المسابقة",
+      "description": "كيف تعمل المسابقة الحقيقية وما الذي تستعد له."
+    }
+  }
+}

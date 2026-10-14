@@ -1,0 +1,50 @@
+{
+  "dropzone": {
+    "label": "Upload a file",
+    "title": "Drag your file here",
+    "or": "or",
+    "choose": "Choose file",
+    "accepts": "Accepted: {type}. Up to {max}.",
+    "dropHere": "Drop the file to upload it"
+  },
+  "types": {
+    "step": "STEP file (.step or .stp)",
+    "pdf": "PDF file (.pdf)",
+    "image": "image (.png, .jpg or .webp)",
+    "video": "video (.mp4 or .webm)",
+    "zip": "ZIP file (.zip)"
+  },
+  "state": {
+    "checking": "Checking your file…",
+    "uploading": "Uploading… {percent}%",
+    "uploaded": "Uploaded",
+    "failed": "Upload failed",
+    "retry": "Try again",
+    "replace": "Replace file",
+    "keepPrevious": "Your previous file stays until the new one finishes uploading.",
+    "previous": "Current file",
+    "progressLabel": "Upload progress for {name}",
+    "resuming": "Back online. Resuming your upload…"
+  },
+  "errors": {
+    "wrong_extension": "This task needs a {type}. You chose a {ext} file.",
+    "wrong_extension_none": "This task needs a {type}. Your file name has no file type at the end.",
+    "too_large": "Files must be under {max}. Yours is {size} - see 'My file is too large'.",
+    "not_step": "This file doesn't look like a STEP export. Export it again from your CAD software - see how.",
+    "empty": "This file is empty (0 bytes). Export it again and choose the new file.",
+    "interrupted": "Your connection dropped. We'll keep trying - don't close this page.",
+    "failed": "The upload didn't finish. Check your connection and try again.",
+    "signed_out": "You are signed out. Sign in again, then upload the file.",
+    "server": "We couldn't check the uploaded file. Try again in a minute."
+  },
+  "help": {
+    "tooLarge": "My file is too large",
+    "notStep": "How to export a STEP file",
+    "rejected": "My file was rejected - what now?"
+  },
+  "offline": {
+    "title": "You are offline",
+    "body": "Uploads continue by themselves when your connection is back. Don't close this page."
+  },
+  "leaveWarning": "An upload is still running. If you leave now, it stops."
+}

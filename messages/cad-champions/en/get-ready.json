@@ -1,0 +1,494 @@
+{
+  "header": {
+    "title": "Get ready for your test",
+    "purpose": "Complete these steps so nothing technical gets in your way during the timed test. Most students finish in about 45 minutes, plus time for installing software.",
+    "helpLabel": "About Get Ready",
+    "help": "Your progress saves after every step, so you can stop and come back later. The free test unlocks when every required step is done."
+  },
+  "progress": {
+    "label": "Your progress",
+    "percent": "{percent}% done",
+    "remaining": "{count, plural, =0 {All required steps are done} one {# required step left} other {# required steps left}}",
+    "aria": "Get Ready progress"
+  },
+  "list": {
+    "label": "The 7 Get Ready steps",
+    "stepNumber": "Step {n}",
+    "estimate": "About {minutes} min",
+    "required": "Required",
+    "optional": "Optional, recommended",
+    "done": "Done",
+    "notStarted": "Not started",
+    "inProgress": "In progress",
+    "open": "Open this step",
+    "close": "Close this step",
+    "auto": "This step finishes by itself.",
+    "markDone": "Mark as done",
+    "saving": "Saving…",
+    "helpLink": "Read the help article",
+    "videoLabel": "Video"
+  },
+  "toast": {
+    "stepDone": "Step done",
+    "stepDoneBody": "Saved. Your next step is open.",
+    "saveFailed": "We couldn't save that",
+    "saveFailedBody": "Check your connection and try again.",
+    "notSetUp": "Get Ready is still being set up",
+    "notSetUpBody": "We can't save progress yet. Please try again later.",
+    "signedOut": "You are signed out",
+    "signedOutBody": "Sign in again to save your progress.",
+    "allDone": "You're ready",
+    "allDoneBody": "Every required step is done. Your free test is unlocked."
+  },
+  "errors": {
+    "loadTitle": "We couldn't load your progress",
+    "loadBody": "You can still read every step. Your ticks may not save right now. Reload the page in a minute.",
+    "notSetUpTitle": "Get Ready is still being set up",
+    "notSetUpBody": "You can read every step now. Saving your progress will work once setup is finished."
+  },
+  "celebration": {
+    "title": "You're ready",
+    "body": "Every required step is done and your free test is unlocked. Find about 90 quiet minutes before you start, because the timer can't be paused.",
+    "cta": "You're ready - start your free test",
+    "bypassed": "A trainer has unlocked the test for you, so you can start it now. Finishing these steps still helps you on test day.",
+    "bypassedCta": "Start your free test",
+    "optionalLeft": "One optional step is left: the test-screen tour. It takes 5 minutes and is worth it."
+  },
+  "gate": {
+    "ready": "Get Ready is complete. You can start the test.",
+    "bypassed": "A trainer has unlocked the test for you.",
+    "not_finished": "Finish Get Ready first - {count, plural, one {# step left} other {# steps left}}",
+    "no_profile": "Complete your profile first, then Get Ready.",
+    "link": "Go to Get Ready"
+  },
+  "steps": {
+    "welcome_video": {
+      "title": "Watch the welcome video",
+      "purpose": "Learn what the competition is and how this free test works."
+    },
+    "check_computer": {
+      "title": "Check your computer",
+      "purpose": "Make sure your computer can run CAD software smoothly for 90 minutes."
+    },
+    "install_software": {
+      "title": "Install your CAD software",
+      "purpose": "Get a working, activated copy of your CAD software. Start today: student verification can take a few days."
+    },
+    "essential_actions": {
+      "title": "Learn the 5 essential actions",
+      "purpose": "Practise the five things every test task needs, from setting units to uploading your file."
+    },
+    "practice_upload": {
+      "title": "Do a practice upload",
+      "purpose": "Model a simple cube and upload it, so you know your export and upload work before the real test."
+    },
+    "try_test_screen": {
+      "title": "Try the test screen",
+      "purpose": "Take a 5-minute tour of the test screen, so nothing surprises you on test day."
+    },
+    "test_day_checklist": {
+      "title": "Test-day checklist",
+      "purpose": "Tick these off so you are ready for the timed test."
+    }
+  },
+  "video": {
+    "comingSoon": "Video coming soon",
+    "placeholderLabel": "Video placeholder: {title}",
+    "playerLabel": "Video: {title}"
+  },
+  "welcome": {
+    "takeawaysTitle": "Four things to remember",
+    "takeaways": {
+      "skills": "The test covers the 6 skill areas of mechanical CAD: work organisation, software and hardware, 3D modelling, rendering and animation, reverse engineering, and technical drawing.",
+      "duration": "The test takes about 90 minutes, and the timer can't be paused.",
+      "ownSoftware": "You work in your own CAD software on your own computer, then export and upload one file for each task.",
+      "results": "Results for 3D models come within minutes. Drawings are checked by a trainer."
+    },
+    "markWatched": "Mark as watched",
+    "autoNote": "This step finishes by itself when you have watched 90% of the video.",
+    "placeholderNote": "The video is being recorded. Read the four points below, then press Mark as watched.",
+    "watched": "Watched"
+  },
+  "computer": {
+    "tableCaption": "What your computer needs",
+    "columnItem": "Item",
+    "columns": {
+      "recommended": "Recommended",
+      "minimum": "Minimum"
+    },
+    "rows": {
+      "os": {
+        "label": "Operating system",
+        "recommended": "Windows 10 or 11, 64-bit",
+        "minimum": "Windows 10, 64-bit"
+      },
+      "ram": {
+        "label": "Memory (RAM)",
+        "recommended": "16 GB",
+        "minimum": "8 GB"
+      },
+      "graphics": {
+        "label": "Graphics",
+        "recommended": "Dedicated graphics card",
+        "minimum": "Built-in graphics"
+      },
+      "mouse": {
+        "label": "Mouse",
+        "recommended": "3-button mouse with a scroll wheel",
+        "minimum": "Any mouse (not only a touchpad)"
+      },
+      "screen": {
+        "label": "Screen",
+        "recommended": "1920 x 1080 or larger",
+        "minimum": "Any laptop screen"
+      },
+      "internet": {
+        "label": "Internet",
+        "recommended": "Stable connection",
+        "minimum": "Stable enough to upload files"
+      }
+    },
+    "macTitle": "On a Mac?",
+    "macText": "Inventor and SOLIDWORKS run only on Windows. On a Mac, use Autodesk Fusion.",
+    "findSpecsTitle": "How to find your RAM and Windows version",
+    "findSpecsHelp": "System information",
+    "findSpecsHelpText": "This page lists your Windows edition (for example Windows 11 Home), the system type (64-bit) and the installed RAM.",
+    "findSpecs": {
+      "s1": "Open Settings (press the Windows key + I).",
+      "s2": "Go to System, then About.",
+      "s3": "Read Installed RAM and System type under Device specifications, and the version under Windows specifications."
+    },
+    "illustration": "Picture: the Settings > System > About page [TODO-MO: screenshot of Settings > System > About]",
+    "noComputerTitle": "No computer? We can help.",
+    "noComputerText": "You told us you don't have a computer for CAD. Message us on WhatsApp and we will find a way for you to take the test. Studio computers: [TODO-MO: can students use studio computers?]",
+    "noComputerCta": "Message us on WhatsApp",
+    "noComputerWhatsapp": "Hi, I'm doing CAD Champions Get Ready and I don't have a computer for CAD. Can you help?",
+    "noComputerNoWhatsapp": "Use the Need help button at the bottom of the page to contact us.",
+    "macOnlyTitle": "You have a Mac",
+    "macOnlyText": "That's fine. Install Autodesk Fusion in the next step. It runs on macOS and is allowed for this test."
+  },
+  "software": {
+    "tabsLabel": "Choose your CAD software",
+    "yourTrack": "Your track",
+    "recommendedBadge": "Recommended for the competition",
+    "suitsTitle": "Who it suits",
+    "platformsTitle": "Windows or Mac",
+    "howToGetTitle": "How to get it",
+    "installTitle": "Install step by step",
+    "durationTitle": "How long it takes",
+    "troubleTitle": "If something goes wrong",
+    "schoolNote": "Your school may already have licences - ask your instructor.",
+    "autodeskTitle": "Free for students: the Autodesk Education plan",
+    "autodeskLink": "Go to autodesk.com/education",
+    "autodesk": {
+      "free": "Inventor and Fusion are free for eligible students and educators through the Autodesk Education plan.",
+      "year": "The licence lasts one year, and you can renew it.",
+      "verify": "You must verify that you are a student. Have your student ID or enrolment letter ready.",
+      "start": "Verification can take time, so start today."
+    },
+    "solidworksContact": "Contact us for help getting a SOLIDWORKS licence",
+    "solidworksWhatsapp": "Hi, I'm doing CAD Champions and I need help getting a SOLIDWORKS licence.",
+    "solidworksOffer": "[TODO-MO: confirm offer]",
+    "inventor": {
+      "name": "Inventor",
+      "suits": "Everyone aiming for the competition. The competition tasks are built in Autodesk Inventor, so this is the best track to train on.",
+      "platforms": "Windows only (64-bit).",
+      "howToGet": "Free with the Autodesk Education plan after you verify that you are a student.",
+      "duration": "Verification: from minutes to a few days. Download and install: about 1 to 2 hours, because the download is large.",
+      "install": {
+        "s1": "Go to autodesk.com/education and create an Autodesk account with your school email if you have one.",
+        "s2": "Ask for education access and upload your student ID or enrolment letter.",
+        "s3": "Wait for the email that confirms you are verified.",
+        "s4": "Sign in, find Inventor Professional on the education page and choose the newest version, your language and Windows 64-bit.",
+        "s5": "Run the installer and keep the default options.",
+        "s6": "Open Inventor and sign in with the same Autodesk account to activate it."
+      },
+      "trouble": {
+        "t1": "Verification still pending after a few days? Check your spam folder, then upload a clearer document.",
+        "t2": "Install stops or fails? Free at least 40 GB of disk space, restart, and run the installer again.",
+        "t3": "Inventor asks you to sign in again? Use the same account you verified with."
+      }
+    },
+    "fusion": {
+      "name": "Fusion",
+      "suits": "Mac users and schools that already use Fusion. It is also allowed at some competitions, but Inventor is the main competition software.",
+      "platforms": "Windows and Mac.",
+      "howToGet": "Free with the Autodesk Education plan after you verify that you are a student.",
+      "duration": "Verification: from minutes to a few days. Download and install: about 30 minutes.",
+      "install": {
+        "s1": "Go to autodesk.com/education and create an Autodesk account.",
+        "s2": "Ask for education access and upload your student ID or enrolment letter.",
+        "s3": "When you are verified, find Fusion on the education page and download it.",
+        "s4": "Run the installer. Fusion installs by itself and updates itself later.",
+        "s5": "Open Fusion and sign in with the same Autodesk account."
+      },
+      "trouble": {
+        "t1": "Fusion opens a free personal licence instead? Sign out and sign in with your verified education account.",
+        "t2": "Fusion needs the internet to sign in. Open it once at home before test day.",
+        "t3": "On a Mac, allow the installer in System Settings > Privacy & Security if macOS blocks it."
+      }
+    },
+    "solidworks": {
+      "name": "SOLIDWORKS",
+      "suits": "Students and schools already working in SOLIDWORKS. The competition uses Autodesk Inventor or Fusion; this track builds the same skills, and we recommend switching to Inventor before the competition mock tests.",
+      "platforms": "Windows only (64-bit).",
+      "howToGet": "Through your school or a reseller's student offer.",
+      "duration": "Depends on your school or reseller. Install: about 1 hour.",
+      "install": {
+        "s1": "Ask your instructor if your school has SOLIDWORKS student licences.",
+        "s2": "If not, ask a SOLIDWORKS reseller about student options.",
+        "s3": "Download the installer with the serial number you receive.",
+        "s4": "Run the installer, enter the serial number, and open SOLIDWORKS once to activate it."
+      },
+      "trouble": {
+        "t1": "No serial number yet? Ask us on WhatsApp and we will help you find a licence.",
+        "t2": "Activation fails? Check the date and time on your computer, then try again."
+      }
+    },
+    "other": {
+      "name": "Other",
+      "suits": "Students who already use another CAD program.",
+      "platforms": "Any computer that runs your software.",
+      "howToGet": "Any software is fine if it exports STEP files (AP214 or AP242) in millimetres.",
+      "duration": "No install needed if you already have it.",
+      "install": {
+        "s1": "Open your software and check that File > Export (or Save As) offers STEP.",
+        "s2": "Check that your model units can be set to millimetres.",
+        "s3": "Do the practice upload in step 5 to make sure your export works."
+      },
+      "trouble": {
+        "t1": "No STEP export? Use Fusion or Inventor for the test instead."
+      }
+    }
+  },
+  "actions": {
+    "intro": "Tick each action when you can do it in your software. The step finishes when all 5 are ticked.",
+    "progress": "{done} of {total} ticked",
+    "tickLabel": "I can do this",
+    "softwareLabel": "Show the steps for",
+    "mistakeTitle": "Common mistake",
+    "whyTitle": "Why it matters",
+    "phoneTip": "Need to upload from your phone? Send the file to yourself (by email or a cloud drive such as Google Drive or OneDrive), open it on your phone, then upload it from there.",
+    "densityHelp": "Density is mass per volume. The test gives it for each part, for example steel 7850 kg/m³ and aluminium 2700 kg/m³.",
+    "software": {
+      "inventor": "Inventor",
+      "fusion": "Fusion",
+      "solidworks": "SOLIDWORKS"
+    },
+    "items": {
+      "units_mm": {
+        "title": "Set units to millimetres",
+        "why": "The test and the grader work in millimetres. Wrong units make every size wrong.",
+        "mistake": "Modelling in an inch template. A 50 mm cube drawn as 50 inches is 1270 mm, so the grader sees a part 25 times too big.",
+        "steps": {
+          "inventor": {
+            "s1": "Start each new part from the Standard (mm).ipt template (File > New).",
+            "s2": "In an open part, go to Tools > Document Settings > Units.",
+            "s3": "Set Length to millimeter and click OK."
+          },
+          "fusion": {
+            "s1": "In the Browser on the left, open Document Settings.",
+            "s2": "Hover over Units and click the pencil (Change Active Units).",
+            "s3": "Choose Millimeter and click OK. To make it the default, set Preferences > Default Units > Design to mm."
+          },
+          "solidworks": {
+            "s1": "Go to Tools > Options and open the Document Properties tab.",
+            "s2": "Click Units and choose MMGS (millimeter, gram, second).",
+            "s3": "Click OK. You can also check the unit system at the bottom right of the window."
+          }
+        }
+      },
+      "material_density": {
+        "title": "Set the material and density",
+        "why": "The test gives the density for each part, and the grader uses it to check your part's mass. Example: steel 7850 kg/m³, aluminium 2700 kg/m³.",
+        "mistake": "Leaving the default (generic) material. Its density is not the one in the task, so your mass is wrong even when the shape is perfect.",
+        "steps": {
+          "inventor": {
+            "s1": "Right-click the part name in the model browser and open iProperties, then the Physical tab.",
+            "s2": "Choose the material the task names, for example Steel.",
+            "s3": "If the density is not the one in the task, open the Material Browser, copy the material and set its Density to the value given.",
+            "s4": "Back on the Physical tab, click Update and check that the mass makes sense."
+          },
+          "fusion": {
+            "s1": "Right-click the body in the Browser and choose Physical Material.",
+            "s2": "Drag the material the task names (for example Steel) onto the body.",
+            "s3": "If the density is not the one in the task, use Modify > Manage Materials to copy the material and edit its Density.",
+            "s4": "Right-click the body and choose Properties to check the mass and volume."
+          },
+          "solidworks": {
+            "s1": "In the FeatureManager tree, right-click Material and choose Edit Material.",
+            "s2": "Pick the material the task names, for example Plain Carbon Steel.",
+            "s3": "If the density is not the one in the task, copy the material to Custom Materials and set Mass density in kg/m^3.",
+            "s4": "Check the mass with Evaluate > Mass Properties."
+          }
+        }
+      },
+      "export_step": {
+        "title": "Export a STEP file",
+        "why": "STEP (AP214 or AP242) is the file the grader reads. Export one file per task and check that it ends in .step or .stp.",
+        "mistake": "Uploading the native file (.ipt, .f3d, .sldprt) or renaming a file to .step. Renaming does not convert the file - only Export does.",
+        "steps": {
+          "inventor": {
+            "s1": "Go to File > Export > CAD Format.",
+            "s2": "Set Save as type to STEP Files (*.stp, *.ste, *.step).",
+            "s3": "Click Options and choose Application Protocol 214 or 242.",
+            "s4": "Name the file after the task (for example Task1_Plate.step) and click Save."
+          },
+          "fusion": {
+            "s1": "Go to File > Export.",
+            "s2": "Set Type to STEP Files (*.stp) and tick Save to my computer.",
+            "s3": "Choose a folder, name the file after the task and click Export."
+          },
+          "solidworks": {
+            "s1": "Go to File > Save As.",
+            "s2": "Set Save as type to STEP AP214 or STEP AP242 (*.step; *.stp).",
+            "s3": "Name the file after the task and click Save."
+          }
+        }
+      },
+      "export_pdf": {
+        "title": "Export a drawing as PDF",
+        "why": "Drawings are uploaded as PDF. Use the correct sheet size and include all pages.",
+        "mistake": "Exporting only the current sheet, or shrinking an A3 drawing onto A4. Open the PDF and check every page and the sheet size before you upload.",
+        "steps": {
+          "inventor": {
+            "s1": "Open your drawing (.idw or .dwg).",
+            "s2": "Go to File > Export > Export to PDF and click Options.",
+            "s3": "Choose All Sheets, keep the sheet size of the drawing, then Save."
+          },
+          "fusion": {
+            "s1": "Open your drawing in the Drawing workspace.",
+            "s2": "Click Export PDF in the toolbar.",
+            "s3": "Choose all sheets, then export and save the PDF."
+          },
+          "solidworks": {
+            "s1": "Open your drawing (.slddrw).",
+            "s2": "Go to File > Save As and set Save as type to Adobe Portable Document Format (*.pdf).",
+            "s3": "Make sure all sheets are included, then Save."
+          }
+        }
+      },
+      "find_upload": {
+        "title": "Find your files and upload them",
+        "why": "During the timed test you must find each export fast and upload it straight away.",
+        "mistake": "Uploading an older export by mistake. Name every file with its task number, and keep only the latest export in your test folder.",
+        "steps": {
+          "inventor": {
+            "s1": "Inventor exports to your project folder unless you choose another. Look at the folder in the Export window before you click Save.",
+            "s2": "Make one folder for the test (for example on your Desktop) and export every file there.",
+            "s3": "On the upload box, click Choose file and open that folder."
+          },
+          "fusion": {
+            "s1": "Fusion keeps designs in the cloud. Export saves a copy to the folder you choose.",
+            "s2": "Make one folder for the test (for example on your Desktop) and choose it every time you export.",
+            "s3": "On the upload box, click Choose file and open that folder."
+          },
+          "solidworks": {
+            "s1": "Save As uses the part's own folder unless you choose another. Look at the folder before you click Save.",
+            "s2": "Make one folder for the test (for example on your Desktop) and save every export there.",
+            "s3": "On the upload box, click Choose file and open that folder."
+          }
+        }
+      }
+    }
+  },
+  "practice": {
+    "taskTitle": "Your practice task",
+    "task": "Model a 50 x 50 x 50 mm cube in steel (7850 kg/m³) and upload it as STEP.",
+    "untimed": "This practice has no timer, nothing counts, and you can try as many times as you like.",
+    "rulesTitle": "To pass, your file must be:",
+    "rules": {
+      "valid": "a valid STEP file (.step or .stp)",
+      "single": "one single solid",
+      "units": "in millimetres",
+      "volume": "the right volume, within 1%"
+    },
+    "stubNote": "For now we check that your file is a real STEP export. Full checks of units, solids and volume are coming soon.",
+    "checking": "Checking your file…",
+    "passTitle": "Practice passed",
+    "passBody": "Your export and upload work. You are ready for the real files.",
+    "failTitle": "Your file needs a fix",
+    "failHelp": "See how to fix it",
+    "tryAgain": "Fix the file and upload it again. There is no limit on tries.",
+    "unavailableTitle": "We couldn't check your file right now",
+    "unavailableBody": "Your file uploaded, but our checker is not available. Try again in a few minutes.",
+    "retryCheck": "Check again",
+    "errorTitle": "Something went wrong",
+    "errorBody": "We couldn't finish the check. Try uploading again."
+  },
+  "demo": {
+    "intro": "This is a practice copy of the test screen with a sample task. The timer is fake and nothing is saved.",
+    "start": "Start the tour",
+    "restart": "Start again",
+    "notSaved": "Demo - nothing is saved",
+    "timerLabel": "Time left",
+    "timeUp": "Time is up. In the real test your files are submitted for you.",
+    "tasksTitle": "Tasks",
+    "tasks": {
+      "t1": {
+        "title": "Task 1: Plate from a drawing",
+        "status": "File uploaded"
+      },
+      "t2": {
+        "title": "Task 2: Part with a hole and pocket",
+        "status": "Not started"
+      },
+      "t3": {
+        "title": "Task 3: Detail drawing",
+        "status": "Not started"
+      }
+    },
+    "briefTitle": "Task 2: Part with a hole and pocket",
+    "briefText": "Model the part from the drawing. Material: steel, 7850 kg/m³. Upload one STEP file in millimetres.",
+    "briefDownload": "Download the drawing (PDF)",
+    "briefToast": "In the real test, this downloads the task drawing.",
+    "uploadTitle": "Upload your file",
+    "uploadHint": "Drag your STEP file here, or choose it",
+    "uploadButton": "Choose file",
+    "uploadToast": "In the real test, this opens your files.",
+    "submit": "Submit test",
+    "submitToast": "In the real test, you confirm first. After that you can't change your files.",
+    "coachLabel": "Tip {n} of {total}",
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip the tour",
+    "finish": "Finish",
+    "coach": {
+      "timer": {
+        "title": "The timer",
+        "body": "It runs on our server. Closing the page does not pause it. You get warnings at 15, 5 and 1 minute."
+      },
+      "tasks": {
+        "title": "The task list",
+        "body": "Every task and its status. Pick a task to open it. A green check means its file is uploaded."
+      },
+      "brief": {
+        "title": "The brief and drawing",
+        "body": "Read the task here and download the drawing. The material and density are in the brief."
+      },
+      "upload": {
+        "title": "The upload box",
+        "body": "Upload one file per task as soon as you finish it. You can replace it until you submit."
+      },
+      "submit": {
+        "title": "Submit test",
+        "body": "Press it when every task has a file. When time runs out, the test is submitted for you."
+      }
+    },
+    "doneTitle": "Now you know the screen.",
+    "doneBody": "On test day, everything will be where you just saw it."
+  },
+  "checklist": {
+    "intro": "Tick every box. Ticking all of them finishes this step.",
+    "progress": "{done} of {total} ticked",
+    "items": {
+      "time_90": "I have about 90 uninterrupted minutes.",
+      "charged": "My laptop is charged and plugged in.",
+      "close_apps": "I closed other heavy apps.",
+      "cad_ready": "My CAD software opens and is activated.",
+      "know_exports": "I know where my exports save.",
+      "upload_each": "I will export and upload each task as soon as I finish it, not at the end.",
+      "work_alone": "I will not use help from other people."
+    }
+  }
+}

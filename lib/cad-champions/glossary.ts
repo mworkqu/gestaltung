@@ -88,7 +88,7 @@ export const GLOSSARY: Record<GlossaryId, GlossaryEntry> = {
       definition:
         "صيغة ملف ثلاثية الأبعاد محايدة (.step أو .stp، معيار ISO 10303) تنقل النموذج بين برامج CAD المختلفة دون أن يتغير شكله.",
     },
-    helpSlug: "how-to-export-step",
+    helpSlug: "export-step-inventor",
   },
   "step-ap214": {
     en: {

@@ -1,0 +1,68 @@
+{
+  "searchLabel": "Search the Help Center",
+  "searchPlaceholder": "Type a question or a word, like “units”",
+  "searchButton": "Search",
+  "categoriesHeading": "Browse by topic",
+  "articleCount": "{count} articles",
+  "allTopics": "All topics",
+  "resultsHeading": "Results for “{query}”",
+  "resultsCount": "{count} found",
+  "noResultsTitle": "No articles found",
+  "noResultsBody": "We could not find “{query}”. Try a shorter word, or ask our team and we will help you.",
+  "noResultsAction": "Show all topics",
+  "searchFailedTitle": "Search is not working right now",
+  "searchFailedBody": "Please try again in a minute, or message our team.",
+  "setupTitle": "Articles are being set up",
+  "setupBody": "The Help Center articles are not ready yet. You can still browse the topics below, or message our team for help.",
+  "emptyCategory": "No articles in this topic yet.",
+  "stillNeedTitle": "Still need help?",
+  "stillNeedBody": "Message our team. We usually reply quickly and we are happy to help.",
+  "whatsappCta": "Chat on WhatsApp",
+  "emailCta": "Send an email",
+  "whatsappMessage": "Hi, I need help with: {topic}",
+  "emailSubject": "CAD Champions help: {topic}",
+  "backToHelp": "Back to Help Center",
+  "topicLabel": "Topic",
+  "glossaryHeading": "Words used in this article",
+  "videoSlotTitle": "Video guide",
+  "videoSlotBody": "A short video for this article is coming soon.",
+  "helpfulQuestion": "Was this helpful?",
+  "helpfulYes": "Yes",
+  "helpfulNo": "No",
+  "helpfulSending": "Sending…",
+  "helpfulThanks": "Thank you for your feedback.",
+  "helpfulThanksNo": "Thank you. Please message our team below and we will help you.",
+  "helpfulError": "We could not save your answer. Please try again.",
+  "helpfulRate": "You have voted a few times already. Please try again later.",
+  "relatedHeading": "Related articles",
+  "stillStuckTitle": "Still stuck?",
+  "stillStuckBody": "Tell us what you see and we will help you step by step.",
+  "articleSetupTitle": "This article is not available yet",
+  "articleSetupBody": "The Help Center is being set up. Please go back and try again soon.",
+  "categories": {
+    "getting-started": {
+      "title": "Getting started",
+      "description": "How the free test works and what you need before you begin."
+    },
+    "files-and-export": {
+      "title": "Files and export",
+      "description": "Export STEP and PDF files, set units and fix rejected files."
+    },
+    "the-test": {
+      "title": "The test",
+      "description": "Timer rules, grading, and what your skill level means."
+    },
+    "training-and-payment": {
+      "title": "Training and payment",
+      "description": "What the training includes and how to pay."
+    },
+    "account": {
+      "title": "Account",
+      "description": "Email, password, privacy and deleting your account."
+    },
+    "competition": {
+      "title": "The competition",
+      "description": "How the real competition works and what to prepare."
+    }
+  }
+}

@@ -1,0 +1,273 @@
+{
+  "meta": {
+    "title": "CAD Champions: free CAD test and competition training in Qatar",
+    "description": "Take a free 90-minute CAD test, get an instant skill report, and train for the national Mechanical Engineering CAD skills competition with a studio in Lusail.",
+    "ogAlt": "CAD Champions: train for the national CAD skills competition"
+  },
+  "jsonLd": {
+    "courseName": "CAD Champions: Mechanical Engineering CAD training",
+    "courseDescription": "A free diagnostic CAD test with an automatic skill report, followed by online training in Autodesk Inventor, Fusion or SOLIDWORKS and in-person sessions in Lusail, Qatar.",
+    "orgName": "Gestaltung360",
+    "orgDescription": "Digital fabrication studio in Lusail, Qatar.",
+    "locality": "Lusail"
+  },
+  "hero": {
+    "kicker": "Mechanical Engineering CAD · Qatar",
+    "title": "Train for the national CAD skills competition",
+    "sub": "Free CAD test, instant skill report, and a training path made for you.",
+    "ctaSignedOut": "Take the free CAD test",
+    "ctaSignedIn": "Go to your next step",
+    "secondary": "How it works",
+    "note": "About 90 minutes · Inventor, Fusion or SOLIDWORKS · English and Arabic",
+    "visualLabel": "A pair of meshing gears on a shaft, drawn like a CAD model"
+  },
+  "trust": {
+    "by": "By Gestaltung360, a digital fabrication studio in Lusail",
+    "factsLabel": "About the studio",
+    "facts": {
+      "one": "[TODO-MO: years of experience]",
+      "two": "[TODO-MO: students trained]",
+      "three": "[TODO-MO: third fact]"
+    }
+  },
+  "how": {
+    "kicker": "How it works",
+    "title": "Five steps from sign-up to training",
+    "intro": "Each step unlocks the next. Your dashboard always shows the one thing to do now.",
+    "stepLabel": "Step {n}",
+    "steps": {
+      "account": {
+        "title": "Create a free account",
+        "text": "Sign up with your email in about two minutes."
+      },
+      "ready": {
+        "title": "Get ready",
+        "text": "Set up your software and try a practice upload, so test day has no surprises."
+      },
+      "test": {
+        "title": "Take the free test",
+        "text": "About 90 minutes of real competition-style tasks on your own computer."
+      },
+      "report": {
+        "title": "Get your skill report",
+        "text": "See your score in each skill area and what to work on first."
+      },
+      "train": {
+        "title": "Train and qualify",
+        "text": "Follow your training path and earn a place in the in-person sessions."
+      }
+    }
+  },
+  "need": {
+    "kicker": "Before you start",
+    "title": "What you need",
+    "intro": "Check these five things before you take the test.",
+    "items": {
+      "computer": "A Windows computer for Autodesk Inventor, or a Mac with Autodesk Fusion.",
+      "software": "CAD software that can save <term>STEP files</term>: Inventor, Fusion or SOLIDWORKS. Some offer free student licences, and the Get Ready page shows how.",
+      "mouse": "A mouse. A touchpad makes CAD work much slower.",
+      "time": "About 90 quiet minutes without interruptions.",
+      "internet": "An internet connection to upload your files."
+    },
+    "tracksTitle": "Pick your software track",
+    "tracksIntro": "You choose your track when you sign up, and you can change it later.",
+    "recommended": "Recommended for the competition",
+    "tracks": {
+      "inventor": {
+        "name": "Autodesk Inventor",
+        "text": "The software the competition is built on. Needs a Windows computer."
+      },
+      "fusion": {
+        "name": "Autodesk Fusion",
+        "text": "Our second track. A good choice for Mac users and schools that use Fusion."
+      },
+      "solidworks": {
+        "name": "SOLIDWORKS",
+        "text": "Already use SOLIDWORKS? You are welcome on our third track."
+      }
+    },
+    "solidworksNote": "The competition uses Autodesk Inventor or Fusion. The SOLIDWORKS track builds the same skills, and we recommend switching to Inventor before competition mocks.",
+    "help": "No computer or software yet? Contact us, we can help.",
+    "helpWhatsapp": "Message us on WhatsApp",
+    "helpEmail": "Email us",
+    "whatsappText": "Hi, I'd like to join CAD Champions but I don't have a computer or CAD software yet."
+  },
+  "skills": {
+    "kicker": "What the competition tests",
+    "title": "Six skill areas, weighted like the real marking",
+    "intro": "Every task in the test and the training is tagged with one of these areas, so your report shows exactly where you are strong.",
+    "weight": "{weight}% of the marks",
+    "weightAria": "{name}: {weight} percent of the marks",
+    "about": "These areas and weights follow the published Technical Description for Mechanical Engineering CAD, the skill that WorldSkills competitions use. We describe it here so you know what to expect.",
+    "disclaimer": "CAD Champions is an independent training program by Gestaltung360 and is not affiliated with or endorsed by WorldSkills International."
+  },
+  "modules": {
+    "kicker": "What the competition looks like",
+    "title": "Four modules on four days",
+    "intro": "The competition project is split into four separate modules. Each one has its own fixed time, and you hand in your files at the end of each day.",
+    "code": "Module {code}",
+    "hours": "{hours} hours",
+    "total": "{hours} hours of competition time in total",
+    "projection": "Drawings are given in <term>first-angle projection</term>. You should know both first and third angle, and you may answer in either.",
+    "alsoTested": "Also tested across the modules: 3D printing, 3D scanning, <term>model-based definition</term>, limits and fits, surface texture and GD&T."
+  },
+  "grading": {
+    "kicker": "How your test is graded",
+    "title": "Clear, checkable marking",
+    "body": "3D models are checked automatically by measuring their volume and <term>mass properties</term> against the correct answer. Drawings get an automatic checklist review, then a trainer confirms them. You get feedback on every task.",
+    "judgement": "A few items, such as how clear a drawing is, are judged by a trainer on a 0 to 3 scale, the way competition judges mark them.",
+    "flowLabel": "How a model becomes a score",
+    "flow": {
+      "model": {
+        "title": "Your model",
+        "text": "You upload a STEP file."
+      },
+      "measure": {
+        "title": "Measurements",
+        "text": "Volume, area and mass properties are compared with the answer."
+      },
+      "score": {
+        "title": "Your score",
+        "text": "Each check adds marks to its skill area."
+      }
+    }
+  },
+  "ladder": {
+    "kicker": "The training ladder",
+    "title": "Six levels of 3D modelling",
+    "caption": "Start at the level your test shows, and climb one step at a time. After the ladder come the four competition modules and full-length mock competitions.",
+    "level": "Level {n}",
+    "levels": {
+      "l1": {
+        "title": "Simple extrude",
+        "text": "Sketch a shape and give it thickness."
+      },
+      "l2": {
+        "title": "Holes and fillets",
+        "text": "Add holes, pockets, fillets and chamfers."
+      },
+      "l3": {
+        "title": "Revolve and sweep",
+        "text": "Revolve, sweep, loft, shell and patterns."
+      },
+      "l4": {
+        "title": "Parameters",
+        "text": "Drive parts with dimensions and build part families."
+      },
+      "l5": {
+        "title": "Assemblies",
+        "text": "Join parts with constraints and sub-assemblies."
+      },
+      "l6": {
+        "title": "Full timed project",
+        "text": "Model, assemble and draw a project against the clock."
+      }
+    }
+  },
+  "studio": {
+    "kicker": "Your trainer and studio",
+    "title": "Learn from a working fabrication studio",
+    "intro": "You train with the people who design and make real parts every day, in a studio full of the machines you model for.",
+    "trainerName": "[TODO-MO: trainer name]",
+    "trainerRole": "[TODO-MO: trainer role]",
+    "bio": "[TODO-MO: trainer bio]",
+    "photoTrainer": "Trainer photo coming soon",
+    "photoStudio": "Studio photo coming soon",
+    "equipmentTitle": "In the studio",
+    "equipment": {
+      "printers": "3D printers",
+      "scanner": "3D scanner",
+      "cnc": "CNC machining",
+      "laser": "Laser cutter"
+    }
+  },
+  "inPerson": {
+    "kicker": "In-person sessions",
+    "title": "Hands-on training in Lusail",
+    "whatTitle": "What happens",
+    "what": {
+      "measure": "Measure real parts with the allowed instruments.",
+      "scan": "3D scan parts and compare them with your models.",
+      "print": "3D print the parts you design.",
+      "mock": "Sit full-length, timed mock competitions under real rules."
+    },
+    "whereTitle": "Where",
+    "where": "Rafal Tower, Lusail, Qatar.",
+    "whoTitle": "Who qualifies",
+    "who": "The top students from the online qualifier."
+  },
+  "testimonials": {
+    "title": "What students say"
+  },
+  "faq": {
+    "kicker": "Questions",
+    "title": "Frequently asked questions",
+    "intro": "Can't find your answer? Message us and we'll help.",
+    "items": {
+      "free": {
+        "q": "Is the test really free?",
+        "a": "Yes. Your account, the Get Ready steps, the diagnostic test and your skill report cost nothing. You only pay if you decide to join the training."
+      },
+      "software": {
+        "q": "Which CAD software can I use?",
+        "a": "Any CAD software that can export STEP files (AP214 or AP242) in millimetres. Our training has three tracks: Autodesk Inventor (recommended for the competition), Autodesk Fusion and SOLIDWORKS."
+      },
+      "competitionSoftware": {
+        "q": "Which software does the competition use?",
+        "a": "The competition is built on Autodesk Inventor, and some editions also allow Autodesk Fusion. Competitors must use the software provided on the day. That is why Inventor is our recommended track. SOLIDWORKS users are welcome: the SOLIDWORKS track builds the same skills, and we recommend switching to Inventor before competition mocks."
+      },
+      "mac": {
+        "q": "I only have a Mac",
+        "a": "Use Autodesk Fusion, which runs on Mac. It is our second track and it saves STEP files for the test. Inventor needs Windows, so if you aim for the competition, plan to practise on a Windows computer later."
+      },
+      "noSoftware": {
+        "q": "I don't have CAD software yet",
+        "a": "Autodesk offers free education licences for Inventor and Fusion to eligible students. Checking your student status can take a few days, so start early. The Get Ready page walks you through it. No computer either? Message us and we'll help."
+      },
+      "duration": {
+        "q": "How long is the test and can I pause it?",
+        "a": "About 90 minutes. The timer runs on our server and cannot be paused, even if you close the page, so start when you have quiet time. Files that finish uploading within 60 seconds after time ends are still accepted."
+      },
+      "files": {
+        "q": "What files do I upload?",
+        "a": "3D models as STEP files (.step or .stp), one per task, and drawings as PDF files. Each task says exactly what it needs, and the Get Ready page lets you practise an upload first."
+      },
+      "results": {
+        "q": "How fast do I get results?",
+        "a": "3D models are checked automatically, so you see a first score as soon as you submit. A trainer then confirms your drawings, and we email you when your full report is ready."
+      },
+      "official": {
+        "q": "Is this the official competition?",
+        "a": "No. CAD Champions is independent training that prepares you for the Mechanical Engineering CAD competition. It does not run the competition or select national teams. CAD Champions is an independent training program by Gestaltung360 and is not affiliated with or endorsed by WorldSkills International."
+      },
+      "eligibility": {
+        "q": "Who can take part?",
+        "a": "Training is open to everyone. The world competition is for competitors aged 22 or younger in the competition year. Check your local selection rules. [TODO-MO: confirm the local Qatar rule]"
+      },
+      "price": {
+        "q": "How much is the training?",
+        "a": "You'll see prices after your test, with the training plan that fits your results. The test and your report stay free either way."
+      },
+      "payment": {
+        "q": "How do I pay?",
+        "a": "By Fawran bank transfer. You send the transfer from your bank app and upload a screenshot of it. We check it and confirm your place."
+      },
+      "privacy": {
+        "q": "Is my data private?",
+        "a": "Your files and results are visible only to you and our trainers. We use them to grade your work and plan your training. The privacy policy explains the details."
+      },
+      "under18": {
+        "q": "I'm under 18. Can I join?",
+        "a": "Yes, with a parent's or guardian's consent. When you sign up we ask for their name and phone number and their consent."
+      }
+    }
+  },
+  "final": {
+    "title": "Ready to see where you stand?",
+    "text": "Take the free test, get your skill report and start the training that fits you.",
+    "ctaSignedOut": "Take the free CAD test",
+    "ctaSignedIn": "Go to your next step",
+    "whatsapp": "Questions? Message us on WhatsApp",
+    "whatsappText": "Hi, I have a question about CAD Champions."
+  }
+}
