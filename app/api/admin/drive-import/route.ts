@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import { loadSharp } from "@/lib/store/load-sharp";
 
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
         const buf = Buffer.from(await res.arrayBuffer());
         if (buf.length > MAX_BYTES) return { name: f.name, error: "too_large" };
 
+        const sharp = await loadSharp();
         const base = sharp(buf, { failOn: "none" }).rotate();
         const [web, thumb] = await Promise.all([
           base.clone().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer(),

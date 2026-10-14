@@ -2,7 +2,7 @@
 // as a web version (≤ 1600 px WebP) and a thumbnail (400 px WebP). Used for
 // supplier API images so the store never hotlinks a supplier's site.
 
-import sharp from "sharp";
+import { loadSharp } from "@/lib/store/load-sharp";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ProductImage } from "@/lib/google/drive-picker";
@@ -16,6 +16,7 @@ export async function storeImage(
   driveFileId: string | null = null
 ): Promise<ProductImage> {
   if (buf.length > MAX_BYTES) throw new Error("too_large");
+  const sharp = await loadSharp();
   const base = sharp(buf, { failOn: "none" }).rotate();
   const [web, thumb] = await Promise.all([
     base.clone().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer(),

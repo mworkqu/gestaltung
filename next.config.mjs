@@ -3,6 +3,18 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
+// Routes whose server code imports sharp (via lib/store/store-image.ts or
+// directly). Keep in step with `grep -rl "from \"sharp\"\|store-image"`.
+const SHARP_FILES = ["./node_modules/sharp-admin/**/*", "./node_modules/@img/**/*"];
+const SHARP_ROUTES = [
+  "/[locale]/dashboard/store/[id]/edit",
+  "/[locale]/dashboard/store/suppliers/lookup",
+  "/api/admin/drive-import",
+  "/api/admin/sourcing-backup",
+  "/api/admin/starter-parts",
+  "/api/admin/store-cleanup",
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Pin the workspace root to this folder. Without it, Next picks the stray
@@ -17,7 +29,15 @@ const nextConfig = {
     "/[locale]/case-studies": ["./content/case-studies/**/*"],
     "/[locale]/case-studies/[slug]": ["./content/case-studies/**/*"],
     "/sitemap.xml": ["./content/case-studies/**/*"],
+    // sharp only where it is really used (lib/store/load-sharp.ts hides it from the tracer).
+    ...Object.fromEntries(SHARP_ROUTES.map((r) => [r, SHARP_FILES])),
   },
+  // Vercel "Function Storage" (2026-10-14): a package named "sharp" is traced
+  // into EVERY route by Next's image optimizer (~20 MB x 500 outputs = ~5 GB
+  // per deployment). It is installed as "sharp-admin" instead and imported only
+  // by lib/store/load-sharp.ts; the includes above ship it with SHARP_ROUTES.
+  // Native module: keep it out of the webpack bundle.
+  serverExternalPackages: ["sharp-admin"],
 
   // Phase G caching: /<locale>/store without query params is a static (ISR)
   // page. With any listing param (lib/store/catalog.ts STORE_URL_PARAMS —
