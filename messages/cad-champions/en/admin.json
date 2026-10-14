@@ -1,1 +1,2125 @@
-{}
+{
+  "common": {
+    "english": "English",
+    "arabic": "Arabic",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "edit": "Edit",
+    "add": "Add",
+    "create": "Create",
+    "creating": "Creating…",
+    "back": "Back",
+    "search": "Search",
+    "apply": "Apply",
+    "clear": "Clear",
+    "filters": "Filters",
+    "all": "All",
+    "yes": "Yes",
+    "no": "No",
+    "none": "None",
+    "open": "Open",
+    "view": "View",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "published": "Published",
+    "draft": "Draft",
+    "publish": "Publish",
+    "unpublish": "Unpublish",
+    "showPreview": "Show preview",
+    "hidePreview": "Hide preview",
+    "previewEmpty": "Nothing to preview yet.",
+    "previewVideo": "Video slot",
+    "pagination": "Pages",
+    "pageOf": "Page {page} of {pages}",
+    "totalRows": "{count} rows",
+    "previous": "Previous",
+    "next": "Next",
+    "defaultText": "Default text",
+    "useDefault": "Leave empty to use the default text.",
+    "lastUpdated": "Last updated {date}",
+    "errors": {
+      "forbidden": "Only an admin can do this. Ask an admin if you need access.",
+      "unavailable": "The server is not set up for this yet (missing service key). Try again later.",
+      "not_set_up": "This part is still being set up. Run the latest CAD Champions migration, then try again.",
+      "invalid": "Some fields are not valid. Check the highlighted fields and try again.",
+      "not_found": "We couldn't find this item. It may have been deleted. Reload the page.",
+      "conflict": "That value is already used. Choose another one.",
+      "error": "Something went wrong and nothing was saved. Try again in a moment."
+    },
+    "notSetUp": {
+      "title": "Being set up",
+      "body": "This section needs the latest CAD Champions migration. Once it runs, this page fills in."
+    }
+  },
+  "emails": {
+    "title": "Email templates",
+    "purpose": "See every email CAD Champions sends, exactly as a student gets it, and send a test to yourself.",
+    "help": "Each email is built from sample data, so names, amounts and links are made up. Open a preview to see the email and its plain-text version. Press Send test to me to get it in your own inbox. Tests go only to your address.",
+    "auth": {
+      "title": "Sign-up and password emails live in Supabase",
+      "body": "The confirm sign-up, magic link and reset password emails are not sent by this app. They are templates you paste into the Supabase dashboard (steps in docs/cad-champions/AUTH_EMAILS.md). The files are:"
+    },
+    "groups": {
+      "payments": "Payments and enrollment",
+      "questions": "Trainer answers",
+      "results": "Test results",
+      "training": "Training",
+      "announcements": "Announcements",
+      "owner": "Owner alerts"
+    },
+    "chips": {
+      "bilingual": "Arabic and English",
+      "singleLanguage": "Student's language only",
+      "ownerOnly": "Sent to the owner"
+    },
+    "templates": {
+      "payment_reserved": {
+        "title": "Place reserved",
+        "when": "Sent when a student reserves a plan. Has the Fawran transfer details and the 48-hour deadline."
+      },
+      "payment_proof_received": {
+        "title": "Transfer proof received",
+        "when": "Sent when a student uploads the confirmation of their transfer."
+      },
+      "payment_approved": {
+        "title": "Payment confirmed",
+        "when": "Sent when you approve a payment. Says what is unlocked and where to start."
+      },
+      "payment_rejected": {
+        "title": "Transfer not confirmed",
+        "when": "Sent when you reject a proof, with your reason."
+      },
+      "payment_expired": {
+        "title": "Reservation expired",
+        "when": "Sent when a reservation passes 48 hours without a transfer."
+      },
+      "payment_reminder_7d": {
+        "title": "Training ends in 7 days",
+        "when": "Reminder sent 7 days before an enrollment ends."
+      },
+      "payment_reminder_1d": {
+        "title": "Training ends tomorrow",
+        "when": "Reminder sent 1 day before an enrollment ends."
+      },
+      "payment_owner_alert": {
+        "title": "New payment proof (to you)",
+        "when": "Sent to the owner when a student uploads a proof, with a link to the payments queue."
+      },
+      "answer_grade_query": {
+        "title": "Trainer answered a result question",
+        "when": "Sent when a trainer answers a question about a test result."
+      },
+      "answer_lesson": {
+        "title": "Trainer answered a lesson question",
+        "when": "Sent when a trainer answers a question asked on a lesson."
+      },
+      "results_ready": {
+        "title": "Results ready",
+        "when": "Sent when a test is scored. Says the score may change if a trainer still has to confirm the drawing."
+      },
+      "results_final": {
+        "title": "Final score confirmed",
+        "when": "Sent after a trainer reviews the drawing, with the final score and any change."
+      },
+      "weekly_progress": {
+        "title": "Weekly progress",
+        "when": "Sent once a week to students who train. Has a link to stop these emails."
+      },
+      "announcement": {
+        "title": "Announcement (example)",
+        "when": "The layout of an email you send from Operations. Your own text goes in the body."
+      }
+    },
+    "actions": {
+      "sendTest": "Send test to me",
+      "sending": "Sending…",
+      "loading": "Loading the preview…",
+      "testSent": "Test sent to {email}. Check your inbox.",
+      "testFailed": "The test email could not be sent.",
+      "rateLimited": "You sent several tests in a row. Wait a minute and try again."
+    },
+    "errors": {
+      "noEmail": "Your account has no email address.",
+      "render": "This preview could not be built. Try again."
+    },
+    "view": {
+      "first": {
+        "en": "English first",
+        "ar": "Arabic first"
+      },
+      "tabs": "Preview format",
+      "html": "Email",
+      "text": "Plain text",
+      "subject": "Subject line",
+      "frameTitle": "Preview of the email",
+      "sampleNote": "Sample data: names, amounts and links are made up."
+    }
+  },
+  "exercises": {
+    "title": "Exercises",
+    "purpose": "Create and publish training exercises: brief, files, answer data, marking and hints.",
+    "helpLabel": "About exercises",
+    "help": "An exercise belongs to one level of a training module. Students upload one file and get feedback at once; hints unlock one per failed try.",
+    "new": "New exercise",
+    "backToList": "Back to all exercises",
+    "noModule": "Without a module",
+    "emptyTitle": "No exercises yet",
+    "emptyBody": "Create the first exercise from a drawing PDF and an answer STEP.",
+    "freeSampleChip": "Free sample",
+    "levelOption": "Level {n}: {title}",
+    "newTitle": "New exercise",
+    "newPurpose": "Fill in the basics and create it. Then add the drawing, the answer STEP and the marking.",
+    "newHelp": "Quick path: 1. Choose the level, titles and brief, then Create. 2. Upload the drawing PDF under Files for students and save. 3. Upload the answer STEP and save it as reference. 4. Add the 4 STEP checks. 5. Publish.",
+    "noLevelsTitle": "No training levels yet",
+    "noLevelsBody": "Exercises sit inside a level. Add modules and levels under Lessons first.",
+    "editTitle": "Edit exercise",
+    "editPurpose": "Edit the exercise, its answer data and marking. Publishing is blocked until nothing is missing.",
+    "editHelp": "Upload the answer STEP to build reference data, then use \"Grade a sample\" to check the tolerances before you publish.",
+    "fieldsTitle": "Exercise details",
+    "markingTitle": "Answer data and marking",
+    "markingPurpose": "What the student's file is checked against and how the points are given.",
+    "fields": {
+      "level": "Level"
+    },
+    "chooseLevel": "Choose a level",
+    "levelHint": "The training module and level this exercise belongs to.",
+    "slugHint": "Small letters, numbers and dashes. Used in the web address.",
+    "sortHint": "Lower numbers come first in the level.",
+    "passMarkHint": "Percent needed to pass.",
+    "videoHint": "Bunny video ID. Unlocks after a pass or 5 tries.",
+    "hintsTitle": "Hints",
+    "hintsHelpLabel": "About hints",
+    "hintsHelp": "Students get one more hint after each failed try, in this order.",
+    "hintsLabel": "Hints, one per line",
+    "hintsHint": "Up to 10. Explain the idea, never the answer.",
+    "freeSample": "Free sample",
+    "freeSampleHint": "Students without a plan can try it.",
+    "create": "Create exercise",
+    "created": "Exercise created",
+    "createdBody": "Now add the drawing, the answer STEP and the marking. It stays a draft until you publish it.",
+    "save": "Save exercise"
+  },
+  "getReady": {
+    "title": "Get Ready content",
+    "purpose": "Edit the text and intro videos students see on the Get Ready page. Leave a field empty to keep the default.",
+    "helpLabel": "About Get Ready content",
+    "help": "Each box shows the default text above it. What you type replaces the default for that language on the live page after you save. Empty box = default text. Keep any placeholders in curly brackets and any tags in angle brackets exactly as they are.",
+    "groups": {
+      "header": "Page header",
+      "progress": "Progress",
+      "list": "Step list",
+      "toast": "Notifications",
+      "errors": "Error messages",
+      "celebration": "Finished screen",
+      "gate": "Test gate",
+      "steps": "Step titles",
+      "video": "Video player",
+      "welcome": "Step 1: Welcome video",
+      "computer": "Step 2: Check your computer",
+      "software": "Step 3: Software tabs (Inventor, Fusion, SOLIDWORKS, other)",
+      "actions": "Step 4: Essential actions",
+      "practice": "Step 5: Practice upload",
+      "demo": "Step 6: Try the test screen",
+      "checklist": "Step 7: Test-day checklist"
+    },
+    "videos": {
+      "title": "Intro videos",
+      "subtitle": "One video id per slot, used for both languages",
+      "defaultNone": "Default: no video yet (placeholder shown).",
+      "defaultSet": "Default: {value}"
+    },
+    "editor": {
+      "search": "Search",
+      "searchPlaceholder": "Search texts, keys or defaults",
+      "expandAll": "Open all",
+      "collapseAll": "Close all",
+      "noResults": {
+        "title": "Nothing found",
+        "body": "Try a different word."
+      },
+      "groupCount": "{total} items",
+      "editedCount": "{count} edited",
+      "edited": "Edited",
+      "overrideField": "Your text",
+      "saveBar": "Save changes",
+      "problems": "Fix the highlighted fields before saving ({count}).",
+      "unsaved": "{count} unsaved changes",
+      "noChanges": "No changes to save.",
+      "saveChanges": "Save changes",
+      "videoPlaceholder": "youtube:abcdefghijk or a Bunny video id",
+      "videoHelp": "Paste youtube: plus the 11-character id, or a Bunny Stream video id. Empty uses the default.",
+      "badVideo": "Use youtube: followed by the 11-character id, or a Bunny video id (a GUID).",
+      "badMessage": "Keep the same curly-bracket placeholders and angle-bracket tags as the default text."
+    }
+  },
+  "glossary": {
+    "title": "Glossary",
+    "purpose": "Edit the words and short definitions students see when they tap a dotted term.",
+    "helpLabel": "About the glossary",
+    "help": "The default text comes from the code. What you type here replaces it for that language everywhere the term appears. Empty = default. Entries with a blue Edited tag already have your text.",
+    "fields": {
+      "term": "Term",
+      "definition": "Definition"
+    }
+  },
+  "health": {
+    "meta": {
+      "title": "Content health"
+    },
+    "title": "Content health",
+    "purpose": "Everything that is incomplete, with a direct link to fix it. Work through the list from the top.",
+    "helpLabel": "About content health",
+    "help": "The page checks text in both languages, lesson videos, grading set-up, unpublished help articles and TODO-MO placeholders. Fix an item, then reload the page to see it disappear.",
+    "summary": "{count} things to fix",
+    "checked": "Checked {time}",
+    "recheck": "Check again",
+    "allGood": {
+      "title": "Nothing to fix",
+      "body": "Every item we check is complete. Nice work."
+    },
+    "groupEmpty": "Nothing to fix here.",
+    "loadFailed": {
+      "title": "We could not run the check",
+      "body": "Reload the page in a minute. If it keeps happening, check the server logs."
+    },
+    "kinds": {
+      "missing_text": {
+        "title": "Missing English or Arabic text",
+        "hint": "One language is empty while the other has text. Students in the empty language see a blank space."
+      },
+      "lesson_no_video": {
+        "title": "Lessons without a video",
+        "hint": "No video is set for any software or language."
+      },
+      "no_reference_data": {
+        "title": "Auto-graded work without reference data",
+        "hint": "The grader has nothing to compare the student's file with. Upload the answer STEP and save it as the reference."
+      },
+      "no_rubric": {
+        "title": "Drawing work without a rubric",
+        "hint": "The AI drawing check needs a rubric with at least one item."
+      },
+      "no_rubric_aspects": {
+        "title": "Drawing rubrics that are not linked to marking",
+        "hint": "The rubric has items but no marking aspects came from it, so no points are awarded. Open the rubric editor and save it again."
+      },
+      "help_unpublished": {
+        "title": "Unpublished help articles",
+        "hint": "Students cannot find these articles until you publish them."
+      },
+      "todo_content": {
+        "title": "Placeholders in saved content",
+        "hint": "A TODO-MO note is still inside text that students can read."
+      },
+      "todo_message": {
+        "title": "Placeholders on public pages",
+        "hint": "A TODO-MO note is still inside page text. The owner has to supply the real information."
+      }
+    },
+    "entities": {
+      "test": "Test",
+      "task": "Test task",
+      "module": "Module",
+      "level": "Level",
+      "lesson": "Lesson",
+      "exercise": "Exercise",
+      "help": "Help article",
+      "plan": "Plan",
+      "cohort": "Cohort",
+      "message": "Page text"
+    },
+    "fields": {
+      "title": "Title",
+      "intro": "Introduction",
+      "rules": "Rules",
+      "brief": "Brief",
+      "material": "Material name",
+      "description": "Description",
+      "whyItMatters": "Why it matters",
+      "goal": "Goal",
+      "objectives": "Objectives",
+      "notes": "Notes",
+      "commonMistakes": "Common mistakes",
+      "hints": "Hints",
+      "name": "Name",
+      "whoFor": "Who it is for",
+      "includes": "What is included",
+      "body": "Article text",
+      "schedule": "Schedule",
+      "location": "Location"
+    },
+    "missing": {
+      "en": "{field}: English is missing",
+      "ar": "{field}: Arabic is missing"
+    },
+    "placeholderIn": {
+      "en": "{field}: placeholder in the English text",
+      "ar": "{field}: placeholder in the Arabic text"
+    },
+    "messagePlaceholder": {
+      "en": "English text",
+      "ar": "Arabic text"
+    },
+    "draft": "Draft",
+    "live": "Published",
+    "edit": "Edit",
+    "editMessages": "Edit page text",
+    "noEditor": "Change it in the message files, or ask the developer.",
+    "showList": "Show the list"
+  },
+  "help": {
+    "title": "Help Center",
+    "purpose": "Write and manage the help articles students read, see how helpful they are, and find out what people searched for and did not find.",
+    "helpLabel": "About this page",
+    "help": "Students only see published articles. The helpful percentage comes from the Was this helpful buttons at the bottom of each article. Searches with no results show what to write next.",
+    "new": "New article",
+    "backToList": "Back to the articles",
+    "categories": {
+      "getting-started": "Getting started",
+      "files-and-export": "Files and export",
+      "the-test": "The test",
+      "training-and-payment": "Training and payment",
+      "account": "Account",
+      "competition": "The competition"
+    },
+    "stats": {
+      "title": "Was this helpful?",
+      "none": "Nobody has voted yet. Votes appear here as students answer at the bottom of an article.",
+      "percent": "Found helpful",
+      "yes": "Yes votes",
+      "no": "No votes",
+      "articles": "Articles",
+      "note": "Counted over all time, across every article. Articles with a low percentage are the best ones to rewrite."
+    },
+    "list": {
+      "emptyTitle": "No articles yet",
+      "emptyBody": "Create the first article. It starts as a draft until you publish it.",
+      "caption": "Help articles with their helpful votes",
+      "category": "Category",
+      "article": "Article",
+      "status": "Status",
+      "yes": "Yes",
+      "no": "No",
+      "percent": "Helpful",
+      "noVotes": "No votes",
+      "updated": "Updated",
+      "actions": "Actions",
+      "nowPublished": "Article published",
+      "nowDraft": "Article back to draft",
+      "visibleNote": "The Help Center updates within a minute.",
+      "deleted": "Article deleted: {title}",
+      "publishNamed": "Publish {name}",
+      "unpublishNamed": "Unpublish {name}",
+      "deleteNamed": "Delete {name}",
+      "deleteTitle": "Delete the article {title}?",
+      "deleteConsequence": "The article disappears from the Help Center for good, and links to it stop working. This cannot be undone. Unpublish it instead if you only want to hide it."
+    },
+    "noResults": {
+      "title": "Searches with no results",
+      "purpose": "What people searched for in the last {days} days and found nothing. The most searched come first. These are the articles worth writing.",
+      "emptyTitle": "Nothing missing",
+      "emptyBody": "Every search in the last 30 days found at least one article, or nobody has searched yet.",
+      "query": "Search",
+      "count": "Times",
+      "last": "Last searched"
+    },
+    "form": {
+      "pageTitle": "Edit article",
+      "purposeNew": "Write a new help article in English and Arabic.",
+      "purposeEdit": "Edit the article in English and Arabic. Saving updates the Help Center within a minute.",
+      "help": "Write in Markdown. Headings, lists, bold text, links, tables and quotes are supported. The preview shows how the article will look.",
+      "savedBody": "The Help Center updates within a minute.",
+      "created": "Article created",
+      "createdBody": "You can keep editing it here.",
+      "needsBody": "An article needs both an English and an Arabic body before it can be published.",
+      "basics": "Settings",
+      "category": "Category",
+      "slug": "Address (slug)",
+      "slugHint": "Lowercase letters, numbers and dashes. It is the end of the article link, so changing it breaks old links.",
+      "sort": "Order",
+      "sortHint": "Smaller numbers come first inside a category.",
+      "published": "Published",
+      "publishedHint": "Visible in the Help Center and in search.",
+      "titles": "Titles",
+      "title": "Title",
+      "body": "Article text",
+      "bodyHint": "Both languages are needed to publish.",
+      "related": "Related content",
+      "glossary": "Related glossary terms",
+      "relatedSlugs": "Related articles",
+      "relatedSlugsHint": "Addresses of other articles, separated by commas or new lines. Up to 8.",
+      "existingSlugs": "Existing article addresses ({count})",
+      "video": "Video",
+      "videoHint": "Optional. A Bunny video ID or youtube: followed by the 11-character YouTube ID.",
+      "noVotes": "No helpful votes on this article yet.",
+      "votes": "{yes} yes and {no} no. {percent}% found it helpful."
+    }
+  },
+  "home": {
+    "title": "Today",
+    "purpose": "What is waiting for you right now. Open a card to deal with it.",
+    "helpLabel": "About this page",
+    "help": "Counts refresh every time you open the page. Instructors see drawings and questions; admins see everything.",
+    "nothing": "Nothing waiting - nice.",
+    "unknown": "We couldn't count this right now. Open the section to check.",
+    "oldestUnderHour": "Oldest has waited under an hour.",
+    "oldestHours": "Oldest has waited {hours} h.",
+    "oldestDays": "Oldest has waited {days} days.",
+    "oldestSince": "Oldest since {date}.",
+    "cards": {
+      "drawings": {
+        "title": "Drawings to review",
+        "unit": "waiting",
+        "text": "Drawings and manual tasks that need a trainer's decision.",
+        "cta": "Open the review queue"
+      },
+      "questions": {
+        "title": "Student questions",
+        "unit": "open",
+        "text": "Lesson questions and grade queries without an answer.",
+        "cta": "Answer questions"
+      },
+      "payments": {
+        "title": "Payments to approve",
+        "unit": "waiting",
+        "text": "Fawran transfers with a proof uploaded.",
+        "cta": "Check payments"
+      },
+      "deletions": {
+        "title": "Account deletion requests",
+        "unit": "pending",
+        "text": "Students who asked us to delete their account.",
+        "cta": "Review requests"
+      },
+      "integrity": {
+        "title": "Integrity flags",
+        "unit": "open",
+        "text": "Quiet flags such as the same file twice or a very fast test.",
+        "cta": "See flagged students"
+      },
+      "health": {
+        "title": "Content health",
+        "unit": "issues",
+        "text": "Missing text, videos, reference data or rubrics.",
+        "cta": "Fix content"
+      }
+    }
+  },
+  "insights": {
+    "meta": {
+      "title": "Insights"
+    },
+    "title": "Insights",
+    "purpose": "See how students move through CAD Champions, where they get stuck and how well grading works. This is your evidence for the organizers.",
+    "helpLabel": "About Insights",
+    "help": "Weeks start on Monday (Qatar time). Counts cover students who signed up on the chosen dates. Nothing on this page shows a student's contact details.",
+    "range": {
+      "label": "Date range",
+      "from": "From",
+      "to": "To",
+      "apply": "Show",
+      "reset": "Last 12 weeks",
+      "showing": "Showing sign-ups from {from} to {to}.",
+      "pilotReport": "Pilot report",
+      "pilotHelp": "An anonymous summary you can print or save as PDF. It has no names, emails or phone numbers."
+    },
+    "partial": {
+      "title": "Some sections could not be loaded",
+      "body": "The rest of the page is fine. Try again in a minute; if it keeps happening, check the server logs."
+    },
+    "notSet": "Not available",
+    "empty": "No data for these dates yet.",
+    "funnel": {
+      "title": "Sign-up funnel by week",
+      "purpose": "Students grouped by the week they signed up. Each step counts the students who reached it.",
+      "chartTitle": "Students reaching each step",
+      "weekHeading": "Sign-up week",
+      "allWeeks": "All weeks",
+      "dropped": "{pct} % dropped",
+      "ofSignups": "{pct} % of sign-ups",
+      "weeksTitle": "Week by week",
+      "steps": {
+        "signed_up": "Signed up",
+        "get_ready": "Get Ready done",
+        "practice": "Practice passed",
+        "test": "Test submitted",
+        "results": "Results viewed",
+        "free_lesson": "Free lesson watched",
+        "paid": "Paid"
+      },
+      "stepHelp": "Steps are not forced in order: a student may watch the free lesson before taking a test. Drop-off compares each step with the one before it."
+    },
+    "stops": {
+      "title": "Where students stop in Get Ready",
+      "purpose": "For students who have not finished Get Ready: the first required step they have not done.",
+      "stuck": "{count} students have not finished Get Ready.",
+      "empty": "Nobody is stuck in Get Ready for these dates.",
+      "steps": {
+        "welcome_video": "Welcome video",
+        "check_computer": "Check your computer",
+        "install_software": "Install the software",
+        "essential_actions": "Essential actions",
+        "practice_upload": "Practice upload",
+        "try_test_screen": "Try the test screen",
+        "test_day_checklist": "Test-day checklist"
+      }
+    },
+    "skills": {
+      "title": "Skills",
+      "purpose": "Average score per skill area across diagnostic attempts. The weakest skill is highlighted.",
+      "attempts": "From {count} diagnostic attempts.",
+      "weakest": "Weakest skill: {name}",
+      "empty": "No graded diagnostic attempts for these dates yet.",
+      "chartTitle": "Average score per skill area"
+    },
+    "modules": {
+      "title": "Readiness per competition module",
+      "purpose": "How ready students are for each of the four competition modules (M1 to M4), from points earned out of points available.",
+      "attempts": "From {count} graded attempts.",
+      "points": "{earned} of {max} points",
+      "empty": "No graded attempts with module marks for these dates yet.",
+      "chartTitle": "Average readiness per competition module"
+    },
+    "improvement": {
+      "title": "Improvement",
+      "purpose": "Students with two or more graded attempts: first score compared with the latest.",
+      "empty": "No student has two graded attempts for these dates yet.",
+      "students": "Students with 2+ attempts",
+      "improved": "Scored higher the latest time",
+      "first": "Average first score",
+      "latest": "Average latest score",
+      "gain": "Average gain (percentage points)"
+    },
+    "people": {
+      "title": "Who took part",
+      "purpose": "Students who signed up on these dates, by study level and by institution.",
+      "levels": "Students per study level",
+      "institutions": "Students per institution",
+      "unknown": "Not given: {count}",
+      "empty": "No sign-ups for these dates.",
+      "levelNames": {
+        "secondary": "Secondary school",
+        "diploma": "Diploma",
+        "bachelor": "Bachelor",
+        "graduate": "Graduate",
+        "working": "Working"
+      }
+    },
+    "grading": {
+      "title": "Grading health",
+      "purpose": "How the automatic grader, the AI drawing check and the trainers are doing.",
+      "autoGraded": "Auto-graded files",
+      "autoGradedHelp": "Grader runs that finished without an error.",
+      "avgTime": "Average grading time",
+      "failedRuns": "Grader runs with an error",
+      "aiChecks": "AI checks this month",
+      "aiCost": "AI cost this month",
+      "aiSince": "Since {date}. The cost is an estimate in US dollars.",
+      "backlog": "Waiting for review now",
+      "backlogOpen": "Open the review queue",
+      "avgReview": "Average review time",
+      "reviewed": "Based on {count} reviewed tasks.",
+      "errorsTitle": "Grader errors by code",
+      "errorsPurpose": "The codes students hit most. Each links to the Help Center article that explains the fix, so you know which articles matter most.",
+      "errorsEmpty": "No grader errors for these dates.",
+      "colCode": "Error code",
+      "colCount": "Times",
+      "colRate": "Share of grader runs",
+      "colHelp": "Help article",
+      "helpArticle": "Open article",
+      "noArticle": "No article yet",
+      "seconds": "{value} s",
+      "minutes": "{value} min",
+      "hours": "{value} h"
+    },
+    "report": {
+      "title": "CAD Champions pilot report",
+      "subtitle": "An anonymous summary of how the training pilot is going. It contains no names, emails or phone numbers.",
+      "generated": "Created",
+      "kpiStudents": "Students signed up",
+      "kpiGetReady": "Finished Get Ready",
+      "kpiTests": "Submitted a test",
+      "kpiPaid": "Enrolled",
+      "institutionsNote": "Institutions are shown as counts only, never by name.",
+      "institution": "Institution {n}",
+      "htmlNote": "This page is ready to print. Use Print and choose Save as PDF.",
+      "print": "Print"
+    }
+  },
+  "landing": {
+    "title": "Landing page",
+    "purpose": "Edit the FAQ and the testimonials on the public CAD Champions page.",
+    "helpLabel": "About the landing page editor",
+    "help": "FAQ: change the question or answer in either language, or hide an item. Testimonials: the section appears on the page only while at least one is published.",
+    "faqTitle": "Questions and answers",
+    "faqIntro": "Open a question to change its text or hide it from the page.",
+    "testimonialsTitle": "Testimonials",
+    "testimonialsIntro": "Add only real quotes you have permission to use. Nothing shows on the page until you publish one.",
+    "fields": {
+      "question": "Question",
+      "answer": "Answer",
+      "hide": "Hide this item",
+      "hideHint": "Hidden items disappear from the FAQ list and from the page data."
+    },
+    "testimonials": {
+      "sectionShown": "Shown on the page ({count} published)",
+      "sectionHidden": "Section hidden: nothing published",
+      "add": "Add a testimonial",
+      "newTitle": "New testimonial",
+      "editTitle": "Edit testimonial",
+      "created": "Added as a draft. Publish it when ready.",
+      "publishedNow": "Published.",
+      "unpublished": "Unpublished.",
+      "deleted": "Deleted.",
+      "deleteTitle": "Delete this testimonial?",
+      "deleteConsequence": "The quote from {name} is removed for good. This cannot be undone.",
+      "needBoth": "Quote and name are needed in English and Arabic.",
+      "empty": {
+        "title": "No testimonials yet",
+        "body": "Add one to show a section on the landing page."
+      },
+      "fields": {
+        "quote": "Quote",
+        "name": "Name",
+        "role": "Role (optional)",
+        "roleHint": "For example the school or university."
+      }
+    }
+  },
+  "lessons": {
+    "title": "Lessons and levels",
+    "purpose": "The whole training course in one tree: modules, levels and lessons, with what is published. Open a module, level or lesson to edit it.",
+    "helpLabel": "About this page",
+    "help": "Students only see published modules, levels and lessons. A lesson also needs its level and module to be published. Switch Free preview on to let people who have not enrolled watch that lesson.",
+    "backToTree": "Back to the course tree",
+    "tree": {
+      "emptyTitle": "No course yet",
+      "emptyBody": "The training course has not been added to the database yet. Run the training seed migration, then reload this page.",
+      "noModules": "This course has no modules yet.",
+      "noLevels": "This module has no levels yet.",
+      "noLessons": "No lessons in this level yet.",
+      "orientation": "Orientation",
+      "lessonsCount": "{published} of {total} lessons published",
+      "level": "Level {number}",
+      "editModule": "Edit module",
+      "editLevel": "Edit level and lessons"
+    },
+    "list": {
+      "title": "Lessons in this level",
+      "videos": "{count} of {total} videos",
+      "minutes": "{count} min",
+      "deleted": "Lesson deleted: {title}",
+      "emptyTitle": "No lessons yet",
+      "emptyBody": "Add the first lesson for this level. It starts as a draft, so students do not see it until you publish it.",
+      "addLesson": "Add a lesson",
+      "newLesson": "New lesson",
+      "newHint": "After you create it, you land on the lesson page to add videos, notes and files.",
+      "created": "Lesson created",
+      "createdBody": "It is a draft. Fill it in, then publish it.",
+      "deleteNamed": "Delete {name}",
+      "deleteTitle": "Delete the lesson {title}?",
+      "deleteConsequence": "The lesson, its videos, notes and files list are removed for good, and so is every student progress record on it. This cannot be undone. Unpublish it instead if you only want to hide it.",
+      "exercisesNote": "This level also has {count} exercises. They are edited on the exercises page."
+    },
+    "toggles": {
+      "nowPublished": "Published",
+      "nowDraft": "Back to draft",
+      "studentsNote": "Students see the change within a minute.",
+      "publishNamed": "Publish {name}",
+      "unpublishNamed": "Unpublish {name}",
+      "freeOn": "Free preview is on",
+      "freeOff": "Free preview is off",
+      "freeNote": "People who have not enrolled can now watch this lesson.",
+      "freePreview": "Free preview",
+      "notFree": "Not free",
+      "freeOnNamed": "Turn on free preview for {name}",
+      "freeOffNamed": "Turn off free preview for {name}"
+    },
+    "areas": {
+      "1": "Work organization and standards",
+      "2": "Software and hardware",
+      "3": "3D modelling",
+      "4": "Rendering and animation",
+      "5": "Reverse engineering",
+      "6": "Technical drawing"
+    },
+    "competitionModules": {
+      "M1": "Fabrication",
+      "M2": "Design challenge",
+      "M3": "Assemblies and drawings",
+      "M4": "Reverse engineering"
+    },
+    "tracks": {
+      "inventor": "Inventor",
+      "fusion": "Fusion",
+      "solidworks": "SOLIDWORKS",
+      "neutral": "Software neutral"
+    },
+    "module": {
+      "title": "Edit module",
+      "purpose": "Titles, description and settings of one training module.",
+      "help": "The module address (slug) cannot change because student links and the training pages use it.",
+      "savedBody": "Students see the change within a minute.",
+      "basics": "Settings",
+      "slug": "Address (slug)",
+      "skillAreaHint": "Leave empty for the orientation module.",
+      "icon": "Icon name",
+      "iconHint": "A Lucide icon name, for example Box.",
+      "sortHint": "Smaller numbers come first.",
+      "orientation": "Orientation module",
+      "orientationHint": "Always open to everyone, enrolled or not.",
+      "publishedHint": "Students can only see published modules.",
+      "texts": "Texts",
+      "description": "Description",
+      "whyItMatters": "Why it matters",
+      "whyItMattersHint": "One or two sentences that tell a student why this module is worth their time."
+    },
+    "level": {
+      "title": "Edit level",
+      "purpose": "Titles, goal and unlock rule of one level, and its lessons.",
+      "help": "The unlock rule decides when a student can open the level. Previous level passed uses the pass mark you set here.",
+      "savedBody": "Students see the change within a minute.",
+      "basics": "Settings",
+      "number": "Level number",
+      "numberHint": "0 to 6. Each number can be used once per module.",
+      "unlock": "Unlock rule",
+      "unlockHint": "When can a student open this level?",
+      "unlockOpen": "Always open",
+      "unlockPrevious": "Previous level passed",
+      "unlockKeep": "Keep the stored custom rule",
+      "passMark": "Pass mark (%)",
+      "passMarkHint": "The best score needed on the previous level.",
+      "ruleStored": "Stored rule:",
+      "publishedHint": "Students can only see published levels.",
+      "willPublish": "Saving will publish this level. The change is written to the audit log.",
+      "willUnpublish": "Saving will hide this level from students. The change is written to the audit log.",
+      "texts": "Texts",
+      "goal": "Goal",
+      "goalHint": "Complete the sentence: by the end of this level you can..."
+    },
+    "lesson": {
+      "pageTitle": "Edit lesson",
+      "purpose": "Everything about one lesson: text, videos for each software track, notes, files and settings.",
+      "help": "Videos, notes and files are only shown to enrolled students, free-preview viewers and staff. Save before you preview a video, because the preview plays the saved value.",
+      "savedBody": "Students see the change within a minute.",
+      "backToLevel": "Back to the level",
+      "basics": "Settings",
+      "slug": "Address (slug)",
+      "slugHint": "Lowercase letters, numbers and dashes. Changing it changes the lesson link.",
+      "sort": "Order",
+      "sortHint": "Smaller numbers come first. Use the arrows on the level page to reorder.",
+      "duration": "Duration (minutes)",
+      "durationHint": "Optional.",
+      "skillArea": "Skill area",
+      "competitionModule": "Competition module",
+      "freePreview": "Free preview",
+      "freePreviewHint": "People who have not enrolled can watch this lesson.",
+      "published": "Published",
+      "publishedHint": "Students can only see published lessons.",
+      "freeNotPublished": "Free preview only works once the lesson is published.",
+      "titles": "Titles and objectives",
+      "title": "Title",
+      "objectives": "Objectives",
+      "objectivesHint": "One objective per line.",
+      "notes": "Notes",
+      "notesHint": "Markdown. The preview shows exactly how students will read it.",
+      "commonMistakes": "Common mistakes",
+      "videos": "Videos",
+      "videosHint": "One video per software track and language. Use the Software neutral pair for lessons that do not depend on a program. Paste a Bunny video ID or youtube: followed by the 11-character YouTube ID.",
+      "downloads": "Downloads",
+      "downloadsHint": "Files students can download with the lesson.",
+      "glossary": "Glossary terms",
+      "glossaryHint": "Terms the lesson explains. Students see them as tooltips.",
+      "trackNotes": "Notes for other software",
+      "trackNotesHint": "For lessons that teach an Inventor-only tool. Say what Fusion and SOLIDWORKS students should do instead."
+    },
+    "video": {
+      "placeholder": "Bunny video ID or youtube:ID",
+      "empty": "No video for this slot.",
+      "invalid": "Not a valid ID. Use a Bunny video ID, or youtube: followed by 11 characters.",
+      "youtube": "Looks like a YouTube video.",
+      "bunny": "Looks like a Bunny video.",
+      "preview": "Preview",
+      "loading": "Loading preview...",
+      "saveFirst": "Save the lesson first. The preview plays the saved ID.",
+      "nothingToPreview": "Enter and save a valid video ID to preview it.",
+      "errors": {
+        "signed_out": "You are signed out. Sign in again to preview.",
+        "forbidden": "This account cannot play the video.",
+        "not_found": "The lesson was not found. Save it and try again.",
+        "no_video": "The saved value does not point to a playable video.",
+        "not_configured": "Video playback is not set up on the server yet (Bunny keys are missing).",
+        "error": "The preview could not load. Try again in a moment."
+      }
+    },
+    "downloads": {
+      "empty": "No downloads yet.",
+      "remove": "Remove",
+      "label": "Label students see",
+      "full": "A lesson can have up to {max} downloads.",
+      "type": "File type",
+      "types": {
+        "pdf": "PDF",
+        "zip": "ZIP",
+        "step": "STEP model",
+        "image": "Image"
+      },
+      "upload": "Upload a file",
+      "saveHint": "The file is uploaded now but only attached to the lesson when you press Save."
+    },
+    "glossary": {
+      "none": "No terms selected.",
+      "selected": "Selected terms",
+      "remove": "Remove {term}",
+      "search": "Search terms",
+      "noMatch": "No term matches your search."
+    },
+    "trackNotes": {
+      "none": "No special note",
+      "inventorOnly": "Inventor only",
+      "equivalent": "Equivalent tool note",
+      "text": "What to do instead",
+      "textHint": "Both languages are required.",
+      "bothRequired": "Write the note in English and Arabic."
+    }
+  },
+  "nav": {
+    "title": "Admin",
+    "label": "Admin sections",
+    "menu": "Admin menu",
+    "groups": {
+      "content": "Content"
+    },
+    "today": "Today",
+    "review": "Review",
+    "questions": "Questions",
+    "students": "Students",
+    "tests": "Tests",
+    "exercises": "Exercises",
+    "lessons": "Lessons",
+    "getReady": "Get Ready",
+    "help": "Help Center",
+    "glossary": "Glossary",
+    "landing": "Landing",
+    "plans": "Plans & cohorts",
+    "emails": "Emails",
+    "health": "Content health",
+    "payments": "Payments",
+    "insights": "Insights",
+    "operations": "Operations"
+  },
+  "operations": {
+    "tabs": {
+      "label": "Operations sections",
+      "announcements": "Announcements",
+      "audit": "Audit log",
+      "deletions": "Deletion requests"
+    },
+    "announcements": {
+      "title": "Announcements",
+      "purpose": "Send one email to a group of students, in Arabic and English. Check the preview, send yourself a test, then send.",
+      "help": "Pick who gets the email with the same filters as the Students page. A marketing email goes only to students who agreed to news. An essential email (about their account, schedule or safety) goes to everyone who matches. Students with a deletion request or no email address are always skipped.",
+      "compose": {
+        "heading": "New announcement",
+        "help": "Write the subject and the message in both languages. Use a blank line between paragraphs, \"- \" for a list, **bold** for emphasis and [text](https://link) for a link.",
+        "kind": "Type of email",
+        "kinds": {
+          "marketing": "Marketing",
+          "essential": "Essential"
+        },
+        "kindHelp": {
+          "marketing": "News, offers and new cohorts. Only students who agreed to receive news get it.",
+          "essential": "Account, schedule or safety information. Sent even without marketing consent. Do not use it for offers."
+        },
+        "subject": "Subject",
+        "body": "Message",
+        "bodyHint": "Plain text. Blank line = new paragraph. \"- \" starts a list item. **bold**. [text](https://link).",
+        "recipients": "Who gets it",
+        "recipientsHint": "Same filters as the Students page. Leave all empty to include every student.",
+        "filters": {
+          "q": "Name, email or phone contains",
+          "institution": "Institution",
+          "any": "Any",
+          "band": "Latest level",
+          "bandNone": "No result yet",
+          "bands": {
+            "beginner": "Beginner",
+            "developing": "Developing",
+            "competitive": "Competitive",
+            "competition_ready": "Competition-ready"
+          },
+          "enrolled": "Enrolled",
+          "stuck": "Stuck in Get Ready",
+          "stuckHint": "Not finished 7 days after signing up.",
+          "flagged": "Has open integrity flags"
+        }
+      },
+      "count": {
+        "loading": "Counting students…",
+        "none": "No student matches these filters.",
+        "line": "{count} students will get this email.",
+        "skipped": "Skipped: {noEmail} without a valid email, {deletion} with a deletion request, {noConsent} without marketing consent."
+      },
+      "preview": {
+        "heading": "Preview",
+        "subject": "Subject line",
+        "tabs": {
+          "html": "Email",
+          "text": "Plain text"
+        },
+        "frameTitle": "Preview of the announcement email",
+        "note": "Arabic comes first, then English. The email has no personal details, so everyone gets the same message."
+      },
+      "actions": {
+        "test": "Send test to me",
+        "testing": "Sending test…",
+        "testHint": "The test goes to {email} only. It does not count as a send.",
+        "testSent": "Test sent to {email}. Check your inbox.",
+        "testFailed": "The test email could not be sent.",
+        "fillAll": "Fill in the subject and message in English and Arabic first.",
+        "noEmail": "Your account has no email address.",
+        "send": "Send to {count} students",
+        "sending": "Sending…",
+        "confirmTitle": "Send to {count} students?",
+        "confirmBodyMarketing": "This emails {count} students who agreed to receive news. It cannot be undone once the emails are sent. You can stop and continue later.",
+        "confirmBodyEssential": "This emails {count} students, including those who did not agree to marketing, so use it only for account, schedule or safety information. It cannot be undone once the emails are sent.",
+        "confirmAction": "Send now"
+      },
+      "progress": {
+        "title": "Sending",
+        "line": "{sent} sent · {failed} failed · {pending} left",
+        "stop": "Stop after this batch",
+        "noKey": "Email sending is not set up (no sending key). Nothing was sent. Add the key, then press Continue sending in the history below.",
+        "error": "Sending stopped because of an error. Press Continue sending in the history below to try again.",
+        "paused": "Paused. Press Continue sending in the history below to send the rest.",
+        "done": "Finished: {sent} sent, {failed} failed.",
+        "doneToast": "Done. {sent} emails sent."
+      },
+      "errors": {
+        "noRecipients": "No student matches these filters, so nothing can be sent."
+      },
+      "history": {
+        "heading": "Past announcements",
+        "empty": {
+          "title": "No announcements yet",
+          "body": "When you send one, it appears here with how many emails were sent and how many failed."
+        },
+        "cols": {
+          "subject": "Subject",
+          "kind": "Type",
+          "status": "Status",
+          "recipients": "Recipients",
+          "sent": "Sent",
+          "failed": "Failed",
+          "created": "Created",
+          "actions": "Actions"
+        },
+        "kind": {
+          "marketing": "Marketing",
+          "essential": "Essential"
+        },
+        "status": {
+          "draft": "Draft",
+          "sending": "Sending",
+          "sent": "Sent",
+          "failed": "Failed"
+        },
+        "continue": "Continue sending",
+        "retry": "Retry {count} failed",
+        "retrying": "Retrying…"
+      }
+    },
+    "audit": {
+      "title": "Audit log",
+      "purpose": "See who changed what and when: prices, approvals, deletions and other admin actions.",
+      "help": "Every important admin action leaves a row here. Filter by the start of the action name (for example payment.), the type of record, the person, or a date range in Qatar time. A changed value shows as old value, then new value.",
+      "filters": {
+        "action": "Action starts with",
+        "actionHint": "For example payment. or plan.",
+        "entity": "Record type",
+        "actor": "Done by",
+        "actorAny": "Anyone",
+        "from": "From date",
+        "to": "To date"
+      },
+      "cols": {
+        "when": "When",
+        "who": "Who",
+        "action": "Action",
+        "entity": "Record",
+        "changes": "What changed"
+      },
+      "empty": {
+        "title": "Nothing in the log",
+        "body": "Actions such as approving a payment or changing a price will appear here.",
+        "filtered": "No log rows match these filters. Try a wider date range or clear the filters."
+      },
+      "system": "System",
+      "missing": "not set",
+      "before": "Before",
+      "after": "After",
+      "noChanges": "No fields changed.",
+      "raw": "Show raw JSON"
+    },
+    "deletions": {
+      "title": "Deletion requests",
+      "purpose": "Students can ask us to delete their account. Approve or reject each request here.",
+      "help": "Approving blanks the student's name, email, phone, birth date and guardian details, deletes their private notes, question text and payment details, and deletes their uploaded files. Scores stay, with no name, for statistics. Rejecting keeps the account and tells you why in the log.",
+      "gap": {
+        "title": "The sign-in account is not deleted",
+        "body": "Approving anonymises the student's data and deletes their files, but the sign-in account itself (the Supabase login) stays. If the student asked for it to be removed completely, delete that login in Supabase after approving."
+      },
+      "pending": {
+        "heading": "Waiting for you",
+        "empty": {
+          "title": "No pending requests",
+          "body": "When a student asks to delete their account, the request appears here."
+        }
+      },
+      "processed": {
+        "heading": "Already processed",
+        "empty": "No processed requests yet.",
+        "retryFiles": "Delete remaining files",
+        "retrying": "Deleting files…"
+      },
+      "requested": "Requested {date}",
+      "reason": "Reason given",
+      "noReason": "No reason given.",
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "approve": {
+        "note": "Note for the log (optional)",
+        "noteHint": "Saved with the approval.",
+        "button": "Approve and delete",
+        "confirmTitle": "Delete {name}'s data?",
+        "confirmBody": "This blanks their personal details, deletes their notes and uploaded files (drawings and payment proofs) and cannot be undone. Their scores stay without a name. The sign-in account is not deleted.",
+        "confirmAction": "Approve and delete"
+      },
+      "retentionTodo": "[TODO-MO: retention policy]",
+      "reject": {
+        "button": "Reject",
+        "note": "Why are you rejecting? (required)",
+        "noteHint": "Saved in the log. The student's account stays as it is.",
+        "noteRequired": "Write a short reason before rejecting.",
+        "working": "Rejecting…",
+        "confirm": "Reject request"
+      },
+      "result": {
+        "approved": "Account anonymised. {deleted} files deleted.",
+        "partial": "Account anonymised. {deleted} files deleted, but some files remain. Press Delete remaining files to try again.",
+        "filesRetried": "{deleted} more files deleted.",
+        "rejected": "Request rejected. The account stays."
+      },
+      "processedAt": "Processed {date}",
+      "adminNote": "Note"
+    }
+  },
+  "plans": {
+    "title": "Plans, coupons and cohorts",
+    "purpose": "Set what students can buy, what it costs, which discount codes work and when each in-person cohort runs.",
+    "help": "Plans are the training packages on the join and checkout pages. A plan with no price shows \"Price coming soon\" and cannot be bought. Every price change is saved in the audit log with the old and new price. Coupons give a percent or fixed discount on the plan. Cohorts are the in-person groups; seats taken include paid students and reservations still being paid.",
+    "fieldErrors": {
+      "title": "Check these fields",
+      "codes": {
+        "required": "required",
+        "slug": "use lowercase letters, numbers and single dashes, for example spring-2027",
+        "kind": "choose a type",
+        "number": "must be a number",
+        "range": "is outside the allowed range",
+        "same_count": "needs the same number of lines in English and Arabic",
+        "percent_max": "a percent discount cannot be above 100",
+        "type": "choose percent or fixed",
+        "code": "use 3 to 32 letters, numbers, dashes or underscores",
+        "date": "is not a real date",
+        "unknown": "contains a plan that does not exist",
+        "taken": "is already used. Choose another.",
+        "before_start": "cannot be before the start date",
+        "status": "choose a status",
+        "below_taken": "cannot be lower than the seats already taken"
+      }
+    },
+    "fields": {
+      "slug": "Short name (URL)",
+      "slugHint": "Letters, numbers and dashes. Cannot be changed later.",
+      "slugLocked": "Cannot be changed.",
+      "kind": "Type",
+      "name": "Name",
+      "whoFor": "Who it is for",
+      "includes": "What is included",
+      "includesHint": "One item per line. English and Arabic need the same number of lines.",
+      "price": "Price (QAR)",
+      "priceHint": "Leave empty to show \"Price coming soon\" and block checkout.",
+      "duration": "Access length (days)",
+      "durationHint": "How long a student keeps access after paying.",
+      "durationKit": "A kit has no access length.",
+      "sort": "Order",
+      "sortHint": "Lower numbers show first.",
+      "inPerson": "Includes in-person sessions",
+      "inPersonHint": "Students must pick a cohort.",
+      "featured": "Highlight this plan",
+      "active": "Show on the site",
+      "activeHint": "Turn off to hide the plan.",
+      "code": "Code",
+      "codeHint": "Letters, numbers, dashes. Saved in capitals.",
+      "discountType": "Discount type",
+      "discountValue": "Discount",
+      "valuePercentHint": "Percent, 1 to 100.",
+      "valueFixedHint": "Amount in QAR taken off the plan price.",
+      "expires": "Last day",
+      "expiresHint": "Works through the end of this day (Qatar time). Leave empty for no end.",
+      "maxUses": "Maximum uses",
+      "maxUsesHint": "Leave empty for no limit.",
+      "institution": "Only for this institution",
+      "institutionHint": "Leave empty for any student.",
+      "plans": "Works on these plans",
+      "plansHint": "Tick none to allow every plan.",
+      "status": "Status",
+      "seatsTotal": "Seats",
+      "seatsHint": "Total places in the cohort.",
+      "startsOn": "Starts",
+      "endsOn": "Ends",
+      "schedule": "Schedule",
+      "location": "Location",
+      "labels": {
+        "slug": "Short name",
+        "kind": "Type",
+        "name_en": "English name",
+        "name_ar": "Arabic name",
+        "price_qar": "Price",
+        "duration_days": "Access length",
+        "sort": "Order",
+        "includes_en": "English list",
+        "includes_ar": "Arabic list",
+        "code": "Code",
+        "discount_type": "Discount type",
+        "discount_value": "Discount",
+        "expires_at": "Last day",
+        "max_uses": "Maximum uses",
+        "plan_ids": "Plans",
+        "starts_on": "Start date",
+        "ends_on": "End date",
+        "seats_total": "Seats",
+        "status": "Status"
+      }
+    },
+    "plans": {
+      "heading": "Plans and prices",
+      "intro": "These are the packages students can buy. Changing a price affects new reservations only; existing ones keep the price they were given.",
+      "add": "Add a plan",
+      "saved": "Plan saved. The join and checkout pages are updated.",
+      "newTitle": "New plan",
+      "editTitle": "Edit {name}",
+      "kinds": {
+        "online": "Online training",
+        "online_in_person": "Online plus in-person",
+        "kit": "Measuring kit (add-on)"
+      },
+      "kindHelp": {
+        "online": "Online lessons and exercises only.",
+        "online_in_person": "Online plus a seat in an in-person cohort.",
+        "kit": "An optional add-on students can add at checkout."
+      },
+      "empty": {
+        "title": "No plans yet",
+        "body": "Add the first plan so students have something to buy."
+      },
+      "cols": {
+        "name": "Name",
+        "kind": "Type",
+        "price": "Price",
+        "duration": "Access",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "priceSoon": "Price coming soon",
+      "days": "{count} days",
+      "active": "Shown",
+      "inactive": "Hidden",
+      "featured": "Highlighted",
+      "inPerson": "In person",
+      "confirmPrice": {
+        "title": "Change the price?",
+        "body": "{plan}: from {from} to {to}. New reservations use the new price. Reservations already made keep theirs. The change is saved in the audit log.",
+        "action": "Change price"
+      }
+    },
+    "coupons": {
+      "heading": "Coupons",
+      "intro": "A student types a code at checkout to get a discount on the plan. You cannot change how many times a code was used.",
+      "add": "Add a coupon",
+      "saved": "Coupon saved.",
+      "newTitle": "New coupon",
+      "editTitle": "Edit {code}",
+      "types": {
+        "percent": "Percent (%)",
+        "fixed": "Fixed amount (QAR)"
+      },
+      "usedReadOnly": "Used {used} times so far. This number is set by payments and cannot be edited.",
+      "activeHint": "Turn off to stop the code working without deleting it.",
+      "empty": {
+        "title": "No coupons yet",
+        "body": "Add a code to give a discount to a student or an institution."
+      },
+      "cols": {
+        "code": "Code",
+        "discount": "Discount",
+        "expires": "Last day",
+        "uses": "Uses",
+        "plans": "Plans",
+        "status": "Status"
+      },
+      "noExpiry": "No end date",
+      "usesUnlimited": "{used} used",
+      "usesOf": "{used} of {max}",
+      "allPlans": "All plans",
+      "status": {
+        "active": "Working",
+        "inactive": "Turned off",
+        "expired": "Expired",
+        "used_up": "Used up"
+      }
+    },
+    "cohorts": {
+      "heading": "Cohorts",
+      "intro": "In-person groups. Students of an in-person plan pick one at checkout. A seat counts as taken when a student has paid or has a reservation still waiting for payment.",
+      "add": "Add a cohort",
+      "saved": "Cohort saved.",
+      "newTitle": "New cohort",
+      "editTitle": "Edit {name}",
+      "statusHint": "Only open cohorts can be picked. Draft cohorts are hidden.",
+      "seatsTaken": "{taken} seats taken or held now. You cannot go below that.",
+      "empty": {
+        "title": "No cohorts yet",
+        "body": "Add a cohort when you plan an in-person group."
+      },
+      "cols": {
+        "name": "Name",
+        "dates": "Dates",
+        "seats": "Seats",
+        "status": "Status"
+      },
+      "noDates": "Dates not set",
+      "seatsLine": "{taken} of {total} taken ({left} left)",
+      "status": {
+        "draft": "Draft",
+        "open": "Open",
+        "full": "Full",
+        "closed": "Closed",
+        "completed": "Completed"
+      }
+    }
+  },
+  "students": {
+    "title": "Students",
+    "purpose": "Everyone who signed up for CAD Champions: progress, latest result, enrollment and anything that needs a look.",
+    "helpLabel": "About the Students pages",
+    "help": "Filter and sort the list, then open a student for their profile, journey, attempts, payments, questions, integrity flags and private trainer notes.",
+    "helpCsv": "Export CSV downloads the rows that match your filters. Email and phone are included only for students who agreed to marketing emails.",
+    "tableLabel": "Student list",
+    "searchPlaceholder": "Name, email, phone or institution",
+    "sortBy": "Sort by {column}",
+    "exportCsv": "Export CSV",
+    "inPersonLink": "In-person session",
+    "noName": "No name yet",
+    "minor": "Under 18",
+    "bypassed": "Bypassed",
+    "enrolledUntil": "Until {date}",
+    "notEnrolled": "Not enrolled",
+    "never": "Never",
+    "openFlags": "{count} open flags",
+    "deletionRequested": "Deletion requested",
+    "cols": {
+      "name": "Name",
+      "institution": "Institution",
+      "studyLevel": "Study level",
+      "minor": "Minor",
+      "getReady": "Get Ready",
+      "latest": "Latest test",
+      "band": "Band",
+      "enrollment": "Enrollment",
+      "lastActive": "Last active"
+    },
+    "filters": {
+      "institution": "Institution",
+      "band": "Band",
+      "noResult": "No result yet",
+      "enrolled": "Enrolled",
+      "stuck": "Stuck in Get Ready for more than 7 days",
+      "flagged": "Has open integrity flags"
+    },
+    "empty": {
+      "title": "No students yet",
+      "body": "Students appear here after they sign up and finish their profile."
+    },
+    "noMatch": {
+      "title": "No students match these filters",
+      "body": "Change or clear the filters to see more students."
+    },
+    "loadError": {
+      "title": "We couldn't load the students",
+      "body": "Something went wrong on our side. Reload the page in a moment."
+    },
+    "studyLevels": {
+      "secondary": "Secondary school",
+      "diploma": "Diploma",
+      "bachelor": "Bachelor",
+      "graduate": "Postgraduate",
+      "working": "Working"
+    },
+    "bands": {
+      "beginner": "Beginner",
+      "developing": "Developing",
+      "competitive": "Competitive",
+      "competition_ready": "Competition ready"
+    },
+    "software": {
+      "inventor": "Inventor",
+      "fusion": "Fusion",
+      "solidworks": "SOLIDWORKS",
+      "other": "Other",
+      "none": "None"
+    },
+    "experience": {
+      "none": "None",
+      "lt_6m": "Less than 6 months",
+      "6_24m": "6 to 24 months",
+      "gt_2y": "More than 2 years"
+    },
+    "computer": {
+      "yes": "Has a Windows PC",
+      "mac_only": "Mac only",
+      "no_computer": "No computer"
+    },
+    "roles": {
+      "student": "Student",
+      "instructor": "Instructor",
+      "admin": "Admin"
+    },
+    "verification": {
+      "confirmed": "Email confirmed",
+      "unconfirmed": "Email not confirmed yet",
+      "no_email": "No email on the account",
+      "unknown": "Unknown"
+    },
+    "attemptStatus": {
+      "in_progress": "In progress",
+      "submitted": "Submitted",
+      "grading": "Grading",
+      "provisional": "Provisional",
+      "graded": "Graded",
+      "expired": "Expired"
+    },
+    "resultStatus": {
+      "pending": "Waiting",
+      "auto": "Checked",
+      "ai_pending_review": "Waiting for review",
+      "final": "Final",
+      "error": "Error"
+    },
+    "enrollmentSource": {
+      "payment": "Payment",
+      "admin": "Added by admin"
+    },
+    "enrollmentStatus": {
+      "active": "Active",
+      "expired": "Ended",
+      "cancelled": "Cancelled"
+    },
+    "steps": {
+      "welcome_video": "Welcome video",
+      "check_computer": "Check your computer",
+      "install_software": "Install the software",
+      "essential_actions": "Essential actions",
+      "practice_upload": "Practice upload",
+      "try_test_screen": "Try the test screen",
+      "test_day_checklist": "Test day checklist"
+    },
+    "detail": {
+      "metaTitle": "Student",
+      "purpose": "Everything about this student in one place. Notes on this page are private to trainers.",
+      "help": "Read the profile and journey first. Results open the student's own results page. Admin actions are at the bottom and are written to the audit log.",
+      "profile": "Profile",
+      "journey": "Journey",
+      "attempts": "Test attempts",
+      "exercises": "Exercise progress",
+      "payments": "Payments and enrollment",
+      "questions": "Questions",
+      "flags": "Integrity flags",
+      "notes": "Private trainer notes",
+      "actions": "Actions"
+    },
+    "profile": {
+      "nameEn": "Name (English)",
+      "nameAr": "Name (Arabic)",
+      "email": "Email",
+      "phone": "Phone",
+      "institution": "Institution",
+      "studyLevel": "Study level",
+      "dob": "Date of birth",
+      "minor": "Minor",
+      "guardianName": "Guardian name",
+      "guardianPhone": "Guardian phone",
+      "guardianConsent": "Guardian consent",
+      "consentAt": "Given {date}",
+      "track": "Training track",
+      "cadUsed": "CAD software used before",
+      "experience": "CAD experience",
+      "computer": "Computer",
+      "locale": "Language",
+      "marketing": "Marketing emails",
+      "weekly": "Weekly progress email",
+      "role": "Role",
+      "getReadyBypass": "Get Ready bypass",
+      "enrollment": "Enrollment",
+      "verification": "Email verification",
+      "created": "Signed up",
+      "lastActive": "Last active",
+      "deletion": "Deletion requested"
+    },
+    "journey": {
+      "emptyTitle": "No journey steps yet",
+      "emptyBody": "Dates appear here as the student moves through sign-up, Get Ready, tests and training.",
+      "signed_up": "Signed up",
+      "step": "Get Ready step done: {step}",
+      "profile_completed_at": "Profile completed",
+      "get_ready_completed_at": "Get Ready finished",
+      "practice_passed_at": "Practice upload passed",
+      "first_test_submitted_at": "First test submitted",
+      "results_viewed_at": "Results viewed",
+      "sample_lesson_watched_at": "Free lesson watched",
+      "enrolled_at": "Enrolled"
+    },
+    "attempts": {
+      "emptyTitle": "No test attempts yet",
+      "emptyBody": "Attempts appear here once the student starts a test.",
+      "test": "Test",
+      "started": "Started",
+      "status": "Status",
+      "percent": "Score",
+      "band": "Band",
+      "result": "Result",
+      "inPerson": "In person",
+      "viewResult": "View result"
+    },
+    "exercises": {
+      "emptyTitle": "No exercises tried yet",
+      "emptyBody": "Each exercise the student uploads appears here with their best score.",
+      "exercise": "Exercise",
+      "tries": "Tries",
+      "best": "Best score",
+      "passed": "Passed",
+      "last": "Last try"
+    },
+    "payments": {
+      "emptyTitle": "No payments or enrollments",
+      "emptyBody": "Payments appear here when the student checks out. You can also add days with Extend enrollment below.",
+      "enrollments": "Enrollments",
+      "open": "Open payments"
+    },
+    "questions": {
+      "emptyTitle": "No questions yet",
+      "emptyBody": "Lesson questions and grade queries from this student appear here.",
+      "open": "Open the questions inbox",
+      "status": {
+        "open": "Open",
+        "answered": "Answered"
+      },
+      "kind": {
+        "lesson": "Lesson question",
+        "grade_query": "Grade query"
+      }
+    },
+    "flags": {
+      "helpLabel": "About integrity flags",
+      "help": "Quiet checks we run on uploads, such as the same file as another student or an upload within a minute of the start. A flag is a reason to look, not proof. Students never see them.",
+      "emptyTitle": "No integrity flags",
+      "emptyBody": "Nothing unusual was found in this student's uploads.",
+      "open": "Open",
+      "resolvedOn": "Resolved {date}",
+      "attempt": "Open the attempt",
+      "resolve": "Mark resolved",
+      "confirmTitle": "Mark this flag as resolved?",
+      "confirmBody": "The flag stays in the history with your name and today's date. It no longer counts as open.",
+      "resolved": "Flag resolved",
+      "resolvedBody": "It no longer counts on the admin home.",
+      "resolveFailed": "Couldn't resolve the flag",
+      "kind": {
+        "duplicate_sha256": "Same file as another student",
+        "too_fast": "Uploaded too fast",
+        "ip_change": "Network changed",
+        "other": "Other"
+      }
+    },
+    "notes": {
+      "add": "Add a note",
+      "placeholder": "What did you notice? What should the next trainer know?",
+      "private": "Only trainers and admins can see notes.",
+      "addButton": "Save note",
+      "saved": "Note saved",
+      "savedBody": "Other trainers will see it on this page.",
+      "failed": "Couldn't save the note",
+      "emptyTitle": "No notes yet",
+      "emptyBody": "Write the first note above.",
+      "unknownAuthor": "Unknown trainer"
+    },
+    "actions": {
+      "helpLabel": "About these actions",
+      "help": "Only admins see these. Each one is written to the audit log with your name.",
+      "failed": "That didn't work",
+      "unlockTitle": "Unlock a level",
+      "unlockText": "Opens one training level for this student, even if they haven't passed the level before it.",
+      "noLevels": "There are no training levels yet.",
+      "level": "Level",
+      "chooseLevel": "Choose a level",
+      "unlockedTag": "unlocked",
+      "unlockButton": "Unlock level",
+      "unlockConfirmTitle": "Unlock this level?",
+      "unlockConfirmBody": "{level} opens for this student right away. There is no button to lock it again.",
+      "unlocked": "Level unlocked",
+      "unlockedBody": "{level} is open for the student now.",
+      "alreadyUnlocked": "This level is already unlocked.",
+      "bypassTitle": "Get Ready bypass",
+      "bypassStateOn": "On: the student may start tests without finishing Get Ready.",
+      "bypassStateOff": "Off: the student must finish Get Ready before the diagnostic test.",
+      "bypassTurnOn": "Turn bypass on",
+      "bypassTurnOff": "Turn bypass off",
+      "bypassOnConfirm": "The student can start tests without finishing Get Ready. Use this for students who already know the upload steps.",
+      "bypassOffConfirm": "The student must finish Get Ready again before starting a test, unless it is already done.",
+      "bypassOn": "Bypass is on",
+      "bypassOnBody": "The student can start the test now.",
+      "bypassOff": "Bypass is off",
+      "bypassOffBody": "Get Ready is required again.",
+      "extendTitle": "Extend enrollment",
+      "extendText": "Adds days to the student's active enrollment. With no active enrollment, it creates one from today.",
+      "days": "Days to add",
+      "daysHint": "A whole number from {min} to {max}.",
+      "extendButton": "Extend enrollment",
+      "createButton": "Create enrollment",
+      "extendConfirmBody": "Adds {days} days. The enrollment now ends {from} and will end {to}.",
+      "createConfirmBody": "Creates an admin enrollment for {days} days, from today until {to}. No payment is recorded.",
+      "enrollmentExtended": "Enrollment extended",
+      "enrollmentCreated": "Enrollment created",
+      "enrollmentEnds": "It ends {date}. The student keeps training access until then.",
+      "verifyTitle": "Verification email",
+      "verifyStateConfirmed": "The email is already confirmed. Nothing to send.",
+      "verifyStateUnconfirmed": "The student hasn't confirmed their email yet.",
+      "verifyStateUnknown": "We couldn't check the email status. You can still try to send it.",
+      "verifyNoEmail": "This account has no email address.",
+      "verifyNote": "The link confirms the email. If they open it on another device, they may need to sign in once with their password.",
+      "verifyButton": "Resend verification email",
+      "verifySending": "Sending…",
+      "verifySent": "Verification email sent",
+      "verifySentBody": "Ask the student to check their inbox and spam folder.",
+      "verifyAlready": "The email is already confirmed. Nothing was sent.",
+      "verifyRateLimited": "Too many emails were sent to this address. Try again in about an hour."
+    },
+    "inPerson": {
+      "title": "In-person session",
+      "purpose": "Start a package test for a group in the studio. Everyone's timer starts at the same moment.",
+      "helpLabel": "About in-person sessions",
+      "help": "Choose a test that uses one results ZIP (published or admin-only), tick the students in the room and start. Each student gets a normal attempt marked in person. Students with a test in progress, in the retake wait, or without Get Ready done are skipped and listed. Integrity checks still run but expect shared studio networks.",
+      "test": "Test",
+      "testHint": "Only tests that take one results ZIP are listed.",
+      "chooseTest": "Choose a test",
+      "adminOnly": "admin only",
+      "noTestsTitle": "No package tests yet",
+      "noTests": "Publish or mark as admin-only a test that uses one results ZIP, then come back.",
+      "noTasks": "This test has no tasks yet, so it can't start. Add tasks first.",
+      "m4Title": "M4: physical part collected",
+      "m4Body": "This test has a reverse engineering task. At 2:00 each student's timer shows \"Physical part collected\" and records the time. When you collect the parts, press \"Record part collected\" below so the time is saved for everyone.",
+      "pickTitle": "Who is in the room?",
+      "pickText": "Tick each student taking the test now. You can search by name, email or institution.",
+      "pickLabel": "Students",
+      "pickVisible": "Select all shown ({count})",
+      "picked": "{count} selected",
+      "pickFirst": "Select at least one student.",
+      "getReadyNotDone": "Get Ready not done",
+      "startButton": "Start the timer",
+      "confirmTitle": "Start the test now?",
+      "confirmBody": "{count} students start \"{test}\" now. Their {minutes}-minute timer starts at once and can't be paused.",
+      "confirmBodyUntimed": "{count} students start \"{test}\" now. This test has no time limit.",
+      "startedMany": "Started for {count} students",
+      "startedManyBody": "They can open the test on their screens now.",
+      "notStarted": "Nobody was started",
+      "noneStarted": "Check the reasons in the list on this page.",
+      "failed": "Couldn't start the session",
+      "resultTitle": "{started} started, {skipped} skipped",
+      "resultDeadline": "Time is up at {date}.",
+      "sessionsTitle": "Sessions in the last 7 days",
+      "noSessionsTitle": "No sessions yet",
+      "noSessionsBody": "Sessions you start for this test appear here with each student's status.",
+      "sessionStarted": "Started {date} · {count} students",
+      "deadline": "Time is up",
+      "untimed": "No time limit",
+      "partCollected": "Part collected",
+      "notYet": "Not yet",
+      "partButton": "Record part collected",
+      "partConfirmTitle": "Record that the parts are collected?",
+      "partConfirmBody": "Saves the current time as \"Physical part collected\" for {count} running attempts. This can't be changed later.",
+      "partRecorded": "Recorded for {count} students",
+      "partRecordedBody": "The time is saved on each attempt.",
+      "partFailed": "Couldn't record {count} attempts",
+      "oneTitle": "Start an in-person test",
+      "oneText": "Starts a package test for this student only, marked in person. The timer starts right away.",
+      "startOne": "Start now",
+      "confirmOneTitle": "Start the test for this student?",
+      "confirmOneBody": "\"{test}\" starts now for this student and the timer can't be paused.",
+      "startedOne": "Test started",
+      "startedOneBody": "The student can open it on their screen now.",
+      "skip": {
+        "not_found": "not a student account",
+        "in_progress": "already has this test in progress",
+        "cooldown": "is still in the retake wait",
+        "get_ready": "hasn't finished Get Ready (turn on the bypass on their page if needed)",
+        "error": "couldn't be started, try again"
+      },
+      "detail": {
+        "no_students": "Select at least one student.",
+        "too_many": "Select 40 students or fewer.",
+        "not_package": "This test doesn't use one results ZIP.",
+        "no_tasks": "This test has no tasks yet."
+      }
+    }
+  },
+  "tests": {
+    "title": "Tests",
+    "purpose": "Build and publish tests: tasks, files, points, answer data and marking.",
+    "helpLabel": "About tests",
+    "help": "A test is a set of tasks students do in one sitting. Students see only published tests. Mock tests and the qualifier usually take one ZIP of the Results folder (module package).",
+    "new": "New test",
+    "backToList": "Back to all tests",
+    "list": {
+      "caption": "All tests with their tasks, points and marking split",
+      "colTest": "Test",
+      "colStatus": "Status",
+      "colTasks": "Tasks",
+      "colPoints": "Points",
+      "colSplit": "Measurement / judgement",
+      "staffOnly": "Staff only",
+      "emptyTitle": "No tests yet",
+      "emptyBody": "Create the first test, then add its tasks and marking."
+    },
+    "create": {
+      "title": "New test",
+      "purpose": "Give the test a name and a type. You add tasks, timing and rules on the next page.",
+      "helpLabel": "About new tests",
+      "help": "The slug is the test's web address and cannot change later. Use small letters, numbers and dashes, for example mock-m1-2027.",
+      "slugHint": "Small letters, numbers and dashes. It cannot be changed later.",
+      "typeHint": "Diagnostic and practice tests use one file per task; mocks and the qualifier usually use a module package.",
+      "submit": "Create test",
+      "done": "Test created",
+      "doneBody": "Now add its tasks. It stays a draft until you publish it."
+    },
+    "editor": {
+      "metaTitle": "Edit test",
+      "purpose": "Edit the test, its tasks and marking. Publishing is blocked until nothing is missing.",
+      "helpLabel": "How to build a test",
+      "help": "1. Set the timing and rules. 2. Add tasks with their files and points. 3. For STEP tasks, upload the answer file to build reference data. 4. Add marking aspects. 5. Publish.",
+      "slug": "Web address:",
+      "preview": "Preview as student",
+      "inPerson": "Run in person",
+      "publishTitle": "Publish",
+      "splitTitle": "Measurement and judgement",
+      "splitHelpLabel": "About the marking split",
+      "splitHelp": "Measurement aspects are right or wrong. Judgement aspects are scored 0-3 by a trainer. Competitions give most marks to measurement, so keep judgement at 20% or less.",
+      "settingsTitle": "Test details",
+      "tasksTitle": "Tasks",
+      "tasksPurpose": "Students see the tasks in this order. Open a task to edit it and its marking."
+    },
+    "settings": {
+      "save": "Save test details",
+      "savedBody": "Students see the change the next time they open the test.",
+      "timeHint": "Minutes. Leave empty for no time limit.",
+      "graceHint": "Seconds after the time runs out to finish uploading.",
+      "cooldownHint": "Days before a student may take it again. 0 = no wait.",
+      "uploadModeHelpLabel": "About upload modes",
+      "uploadModeHelp": "One file per task: each task has its own upload. Module package: one ZIP of the competition Results folder for the whole test, checked against the expected files below.",
+      "adminOnlyHint": "Only staff can see and take it, even when published.",
+      "introHint": "Shown before the test starts. Markdown: # heading, - list, **bold**.",
+      "rulesHint": "The rules students must agree to before starting."
+    },
+    "types": {
+      "practice": "Practice",
+      "diagnostic": "Diagnostic",
+      "exercise": "Exercise",
+      "mock": "Mock competition",
+      "qualifier": "Qualifier"
+    },
+    "uploadModes": {
+      "per_task": "One file per task",
+      "per_taskHint": "Diagnostic, practice and exercises.",
+      "module_package": "Module package (one ZIP)",
+      "module_packageHint": "Mock competitions and the qualifier: the Results folder as one ZIP."
+    },
+    "gradingModes": {
+      "auto_step": "Auto-checked STEP",
+      "ai_drawing": "Drawing (AI first pass)",
+      "manual": "Trainer only"
+    },
+    "graderModes": {
+      "part": "Single part",
+      "assembly": "Assembly",
+      "practice": "Practice (partial credit)"
+    },
+    "uploads": {
+      "step": "STEP file",
+      "pdf": "PDF",
+      "image": "Image",
+      "video": "Video",
+      "none": "No upload"
+    },
+    "tolerances": {
+      "volume": "Volume %",
+      "area": "Surface area %",
+      "moment": "Principal moments %",
+      "assembly_match": "Assembly part match %",
+      "practice_volume": "Practice volume %"
+    },
+    "fields": {
+      "title": "Title",
+      "slug": "Slug",
+      "type": "Type",
+      "time_limit_minutes": "Time limit (minutes)",
+      "grace_seconds": "Grace time (seconds)",
+      "retake_cooldown_days": "Wait before retake (days)",
+      "upload_mode": "Upload mode",
+      "admin_only": "Staff only",
+      "intro": "Introduction",
+      "rules": "Rules",
+      "skill_area_id": "Skill area",
+      "competition_module": "Competition module",
+      "brief": "Brief",
+      "expected_upload": "Student uploads",
+      "max_points": "Points",
+      "grading_mode": "Grading",
+      "grader_mode": "Grader mode",
+      "density_kg_m3": "Density (kg/m³)",
+      "material": "Material name",
+      "tolerances": "Tolerances",
+      "level_id": "Level",
+      "sort": "Order",
+      "pass_mark": "Pass mark (%)",
+      "estimated_minutes": "Estimated minutes",
+      "solution_video_id": "Solution video ID",
+      "description_en": "Description (English)",
+      "description_ar": "Description (Arabic)",
+      "skill_area": "Skill area",
+      "module": "Competition module",
+      "points": "Points",
+      "method": "Marked by",
+      "judgement_method": "Judgement aspects are marked by the trainer",
+      "partial_rule": "Partial marks rule (JSON)",
+      "check_key": "Check",
+      "auto_check_key": "An auto-checked aspect needs a STEP check",
+      "unknown_folder": "the folder is not one of the eight Results folders",
+      "no_folder": "start with a Results folder, for example Parts and Assemblies/",
+      "no_name": "add a file name after the folder",
+      "unsafe": "the path is not allowed",
+      "bad_chars": "the name has characters that are not allowed",
+      "too_long": "the pattern is too long",
+      "duplicate": "the pattern is listed twice",
+      "too_many": "too many patterns (20 at most)",
+      "unknown_task": "this task no longer exists",
+      "empty": "empty pattern",
+      "title_en": "Title (English)",
+      "title_ar": "Title (Arabic)"
+    },
+    "task": {
+      "save": "Save task",
+      "create": "Add task",
+      "created": "Task added",
+      "createdBody": "Now add its files, answer data and marking.",
+      "skillHint": "One of the 6 official skill areas.",
+      "moduleHint": "Leave as none if the task is not tied to M1-M4.",
+      "noModule": "No module",
+      "briefHint": "What the student must do. Markdown: # heading, - list, **bold**.",
+      "pointsHint": "The marking aspects must add up to this.",
+      "graderModeHint": "Single part, assembly, or practice with partial credit.",
+      "graderDefault": "Default",
+      "densityHint": "Used for the mass check. Steel = 7850.",
+      "tolerancesHelpLabel": "About tolerances",
+      "tolerancesHelp": "How far a student's model may differ from the answer and still pass, in percent. Empty = the grader's default, shown in grey.",
+      "tolerancesHint": "Tune these with \"Grade a sample\" before you publish."
+    },
+    "tasks": {
+      "add": "Add a task",
+      "newTitle": "New task",
+      "emptyTitle": "No tasks yet",
+      "emptyBody": "Add the first task. Students see tasks in this order.",
+      "noReference": "No answer data",
+      "pointsMismatch": "Points don't add up",
+      "aspectCount": "{count, plural, =0 {No aspects} one {# aspect} other {# aspects}}",
+      "deleteTitle": "Delete this task?",
+      "deleteBody": "The task, its files list and its marking aspects are removed. This cannot be undone. A task that students already answered cannot be deleted.",
+      "deleted": "Task deleted"
+    },
+    "attachments": {
+      "title": "Files for students",
+      "helpLabel": "About task files",
+      "help": "Brief PDFs, drawings, images and given part files. Every signed-in student can download them, so never put an answer file here.",
+      "empty": "No files yet.",
+      "label": "Label",
+      "kind": "Kind",
+      "kinds": {
+        "drawing": "Drawing",
+        "image": "Image",
+        "model": "Given part file",
+        "file": "Other file"
+      },
+      "typeLabel": "File type to upload",
+      "accept": {
+        "pdf": "PDF",
+        "image": "Image",
+        "step": "STEP"
+      },
+      "uploadLabel": "Add a file",
+      "remove": "Remove {name}",
+      "removeShort": "Remove",
+      "saveReminder": "Save the task to keep file changes.",
+      "saveFirst": "Save the task first, then add its files."
+    },
+    "aspects": {
+      "title": "Marking aspects",
+      "helpLabel": "About marking aspects",
+      "help": "Each aspect is one thing that earns points. Measurement: full points or zero (unless a partial rule is set). Judgement: the trainer scores 0-3 and the points follow.",
+      "add": "Add aspect",
+      "addStandard": "Add the 4 STEP checks",
+      "standardDone": "STEP checks added. Adjust their points if needed.",
+      "description": "Description",
+      "types": {
+        "measurement": "Measurement",
+        "judgement": "Judgement (0-3)"
+      },
+      "methods": {
+        "auto_step": "STEP grader",
+        "ai_drawing": "AI, then trainer",
+        "trainer": "Trainer"
+      },
+      "checkKeys": {
+        "volume": "Volume",
+        "area": "Surface area",
+        "inertia": "Principal moments",
+        "solids": "Solid count",
+        "parts_count": "Parts count (assembly)",
+        "assembly_position": "Part positions (assembly)"
+      },
+      "checkKeyCustom": "Other (type it)",
+      "checkKeyHint": "Which grader check marks it. part:<name> = one named part of an assembly.",
+      "partial": "Allow partial marks",
+      "partialHint": "Off = all or nothing (the competition rule). On = the grader's points count.",
+      "partialRuleHint": "Any JSON object turns partial marks on. Students never see it.",
+      "partialShort": "Partial marks",
+      "judgementNote": "The trainer scores this 0-3: 0 below industry standard, 1 meets it, 2 meets and partly exceeds, 3 wholly exceeds.",
+      "hint": "Hint for the student",
+      "hintHint": "Shown when the aspect is not passed. Explain the rule, never the answer.",
+      "pointsShort": "{points} pts",
+      "fromRubric": "From the rubric",
+      "rubricNote": "Aspects marked \"From the rubric\" follow the rubric. Edit them in the rubric editor above.",
+      "sumOk": "Aspects add up to {sum} of {max} points.",
+      "sumMismatch": "Aspects add up to {sum}, but the task is worth {max} points. Make them equal before publishing.",
+      "emptyTitle": "No marking aspects yet",
+      "emptyBody": "Add the things this task is marked on.",
+      "emptyAuto": "Add the 4 STEP checks in one click, or add aspects one by one.",
+      "deleteTitle": "Delete this aspect?",
+      "deleteBody": "Its points leave the task. This cannot be undone. An aspect that already has student results cannot be deleted.",
+      "deleted": "Aspect deleted"
+    },
+    "reference": {
+      "title": "Reference data from the answer file",
+      "helpLabel": "About reference data",
+      "help": "Upload the answer STEP. The grader measures it (volume, surface area, mass, principal moments) and those numbers become the answer. The file goes to a staff-only folder.",
+      "statusComplete": "Answer data saved",
+      "statusMissing": "No answer data yet",
+      "current": "Saved answer data",
+      "parts": "Parts",
+      "uploadLabel": "Upload the answer STEP",
+      "reading": "Measuring the answer file…",
+      "extracted": "Measured. Check the numbers, then save them as the answer.",
+      "failedTitle": "We couldn't measure this file",
+      "volume": "Volume",
+      "area": "Surface area",
+      "mass": "Mass",
+      "density": "Density used",
+      "solids": "Solids",
+      "moments": "Principal moments",
+      "warnings": "Grader warnings",
+      "nameParts": "Name each part",
+      "namePartsHint": "Names help trainers and become checks like part:Base. Letters, numbers, spaces, dots, dashes. Empty = keep the name shown.",
+      "partName": "Name for part {n}",
+      "save": "Save as reference",
+      "saved": "Answer data saved",
+      "savedBody": "Student files are now checked against these numbers. Try \"Grade a sample\" next.",
+      "replaceNote": "Saving replaces the answer data saved before.",
+      "notConfiguredTitle": "The STEP grader is not set up",
+      "notConfiguredBody": "Reference data needs the grader service (GRADER_URL and GRADER_SECRET). Until it is set up, students' STEP files get a basic check only."
+    },
+    "sample": {
+      "title": "Grade a sample",
+      "helpLabel": "About grading a sample",
+      "help": "Upload any STEP to see the score and the feedback a student would get with the saved answer data and tolerances. Nothing is saved and the file is deleted afterwards.",
+      "uploadLabel": "Upload a sample STEP",
+      "grading": "Grading the sample…",
+      "failedTitle": "We couldn't grade this sample",
+      "notConfigured": "The STEP grader is not set up, so samples cannot be graded yet.",
+      "needReference": "Save the answer data first, then grade a sample.",
+      "passed": "Passed",
+      "notPassed": "Not passed",
+      "practiceScore": "Practice score {score}%",
+      "mode": "Mode: {mode}",
+      "errorCode": "Error code:",
+      "feedbackEn": "Student feedback (English)",
+      "feedbackAr": "Student feedback (Arabic)",
+      "aspects": "Aspects",
+      "checks": "Grader checks",
+      "warnings": "Warnings:",
+      "nothingSaved": "This was a sample only: nothing was saved."
+    },
+    "rubric": {
+      "title": "Drawing rubric",
+      "helpLabel": "About the rubric",
+      "help": "Each item becomes a marking aspect. AI items get an AI first pass that a trainer confirms; trainer items are checked by the trainer only. First and third angle projection are both accepted.",
+      "kind": "Drawing type",
+      "kinds": {
+        "part": "Part drawing",
+        "assembly": "Assembly drawing"
+      },
+      "loadDefault": "Load default rubric",
+      "defaultTitle": "Replace the rubric?",
+      "defaultBody": "The current items are replaced by the default rubric for this drawing type. Nothing is saved until you press Save rubric.",
+      "total": "Rubric total: {total} of {max} task points.",
+      "emptyTitle": "No rubric items yet",
+      "emptyBody": "Load the default rubric or add items one by one.",
+      "untitled": "New item",
+      "remove": "Remove item",
+      "text": "What is checked",
+      "hint": "Hint for the student",
+      "hintHint": "Explain the rule, never the answer.",
+      "checkType": "Checked by",
+      "checkTypes": {
+        "ai": "AI, then trainer",
+        "manual": "Trainer only"
+      },
+      "applies": "Applies to",
+      "appliesTo": {
+        "both": "Parts and assemblies",
+        "part": "Parts only",
+        "assembly": "Assemblies only"
+      },
+      "required": "Where required",
+      "requiredHint": "For items like GD&T or surface texture.",
+      "requiredOptions": {
+        "always": "Always checked",
+        "yes": "Required in this task",
+        "no": "Not required here",
+        "unknown": "Trainer decides"
+      },
+      "id": "Item ID",
+      "idHint": "Small letters, numbers and _ . Used as rubric:<id>. Cannot change after saving.",
+      "aiGuidance": "Extra guidance for the AI (English)",
+      "aiGuidanceHint": "Only the AI reads this. Students never see it.",
+      "idProblem": "Each item needs a different ID made of small letters, numbers and _.",
+      "textProblem": "Every item needs English and Arabic text and points.",
+      "fixFirst": "Fix the items marked above first.",
+      "addItem": "Add item",
+      "save": "Save rubric",
+      "saved": "Rubric saved",
+      "savedBody": "Its marking aspects were updated to match.",
+      "unsaved": "You have unsaved rubric changes."
+    },
+    "package": {
+      "title": "Module package: expected files",
+      "intro": "Students upload one ZIP of their Results folder. After upload we check the required folders and, per task, the expected files by name pattern.",
+      "requiredFolders": "Required folders",
+      "foldersHelpLabel": "About the Results folders",
+      "foldersHelp": "The eight folders of the competition Results structure. A missing required folder shows a warning to the student.",
+      "patterns": "Expected files (one pattern per line)",
+      "patternsHint": "Folder / file name. * = any text, ? = one character. Example: Parts and Assemblies/Part_03.*",
+      "useSuggestion": "Use",
+      "requireStep": "Needs a STEP file",
+      "requireStepHint": "Warn when only native CAD files (.ipt, .iam, .f3d) are found, because those cannot be auto-checked.",
+      "noTasksTitle": "No tasks yet",
+      "noTasksBody": "Add tasks first, then say which files each task expects.",
+      "fixFirst": "Fix the patterns listed above first.",
+      "save": "Save expected files",
+      "saved": "Expected files saved",
+      "savedBody": "New uploads are checked against them."
+    },
+    "split": {
+      "none": "No marking aspects yet.",
+      "aria": "Measurement {measurement}%, judgement {judgement}%",
+      "short": "{measurement}% / {judgement}%",
+      "measurement": "Measurement",
+      "judgement": "Judgement",
+      "points": "{points} points ({percent}%)",
+      "warnTitle": "Judgement is above {limit}%",
+      "warnBody": "Competitions give most marks to measurement (about 93% at EuroSkills). Consider turning some judgement into measurement aspects. This does not block publishing."
+    },
+    "publish": {
+      "blockedReason": "Fix the items listed below first.",
+      "blockedTitle": "{count, plural, one {# thing to fix before publishing} other {# things to fix before publishing}}",
+      "ready": "Nothing is missing. You can publish.",
+      "warningsTitle": "Worth a look (does not block publishing)",
+      "testPublished": "Test published",
+      "testPublishedBody": "Students can now see and start it.",
+      "testUnpublished": "Test unpublished",
+      "testUnpublishedBody": "Students can no longer start it. Attempts already made stay.",
+      "testUnpublishTitle": "Unpublish this test?",
+      "testUnpublishBody": "Students can no longer start it. Their past attempts and results stay.",
+      "exercisePublished": "Exercise published",
+      "exercisePublishedBody": "Students on this level can now try it.",
+      "exerciseUnpublished": "Exercise unpublished",
+      "exerciseUnpublishedBody": "Students no longer see it. Past attempts stay.",
+      "exerciseUnpublishTitle": "Unpublish this exercise?",
+      "exerciseUnpublishBody": "Students no longer see it. Their past attempts stay."
+    },
+    "issues": {
+      "taskPrefix": "Task {n}:",
+      "no_tasks": "The test has no tasks.",
+      "title_en": "The English title is missing.",
+      "title_ar": "The Arabic title is missing.",
+      "task_title_en": "the English title is missing.",
+      "task_title_ar": "the Arabic title is missing.",
+      "task_brief_en": "the English brief is missing.",
+      "task_brief_ar": "the Arabic brief is missing.",
+      "task_no_points": "it is worth 0 points.",
+      "task_no_reference": "it is auto-checked but has no answer data. Upload the answer STEP.",
+      "task_no_rubric": "it is a drawing task without a rubric or aspects.",
+      "aspects_points_mismatch": "its aspects add up to {sum}, but it is worth {max} points.",
+      "no_expectations": "Module package test without expected files. Add them below.",
+      "task_no_expectation": "no expected files in the module package.",
+      "bad_expectation": "this expected file pattern is not valid:",
+      "judgement_high": "Judgement is {percent}% of the points (more than 20%).",
+      "task_no_aspects": "no marking aspects, so the grader's own score is used.",
+      "no_level": "The exercise has no level.",
+      "pass_mark": "The pass mark must be between 0 and 100."
+    },
+    "errors": {
+      "checkFields": "Check these fields: {fields}.",
+      "graderCode": "The grader could not read the file ({code}). Check that it is a valid STEP export, then try again.",
+      "has_results": "Students already have results for this, so it cannot be deleted. Unpublish instead.",
+      "blocked": "Publishing is blocked. Fix the items in the list first.",
+      "grader_not_configured": "The STEP grader is not set up yet (GRADER_URL and GRADER_SECRET).",
+      "grader_failed": "The grader did not answer. Try again in a minute.",
+      "file_missing": "We couldn't find the uploaded file. Upload it again.",
+      "incomplete": "The measured data is incomplete (volume, area and moments are needed). Try another export.",
+      "part_names": "Part names must be different and use letters, numbers, spaces, dots or dashes.",
+      "path": "The file is not in the right folder. Upload it again from this page.",
+      "texts": "Every rubric item needs English and Arabic text.",
+      "items": "Some rubric items are not valid. Check their IDs and points.",
+      "skill_area": "Choose a skill area and save it first.",
+      "sync": "The rubric was saved, but its aspects could not be updated. Run migration 0082, then save again.",
+      "reference_missing": "Save complete answer data first.",
+      "download_failed": "The grader could not download the sample. Upload it again.",
+      "grader_error": "The grader returned an error. Try again in a minute.",
+      "not_configured": "The STEP grader is not set up yet.",
+      "unavailable": "This is not available right now. Try again later."
+    }
+  }
+}

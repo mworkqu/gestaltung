@@ -6,10 +6,13 @@ import { getMessages, getTranslations, setRequestLocale } from "next-intl/server
 import { IBM_Plex_Sans } from "next/font/google";
 
 import { CcDeniedToast } from "@/components/cad-champions/auth/denied-toast";
+import { CcContentOverridesProvider } from "@/components/cad-champions/content/content-overrides";
 import { CcFooter } from "@/components/cad-champions/shell/cc-footer";
 import { CcHeader } from "@/components/cad-champions/shell/cc-header";
 import { ToastProvider } from "@/components/cad-champions/ui";
 import { getCcUser } from "@/lib/cad-champions/auth/server";
+import { applyMessageOverrides, clientOverrides } from "@/lib/cad-champions/content/overrides";
+import { loadContentOverrides } from "@/lib/cad-champions/content/overrides-server";
 import { ccLayoutMetadata } from "@/lib/cad-champions/metadata";
 import { isCcLocale } from "@/lib/cad-champions/routes";
 import { pickMessages } from "@/lib/i18n/pick-messages";
@@ -59,7 +62,13 @@ export default async function CadChampionsLayout({ children, params }: Params & 
   // CC client components only read "CC.*" (lib/cad-champions/messages.test.ts).
   const all = await getMessages();
   // "Turnstile": the site's bot-check widget is reused on the CC auth forms.
-  const messages = { ...pickMessages(all, [...BASE_MESSAGES, "Turnstile"]), CC: all.CC };
+  // Admin-edited copy (cc_content_overrides, 0085) replaces message-file
+  // leaves for this locale; the message files stay the fallback.
+  const overrides = await loadContentOverrides(locale);
+  const messages = {
+    ...pickMessages(all, [...BASE_MESSAGES, "Turnstile"]),
+    CC: applyMessageOverrides((all.CC ?? {}) as Record<string, unknown>, overrides),
+  };
   const t = await getTranslations({ locale, namespace: "CC.shell" });
   // Prompt 2: the header shows "Sign in" or the account menu. Reading the
   // session makes CC pages dynamic (they are noindex and per-user anyway).
@@ -81,6 +90,7 @@ export default async function CadChampionsLayout({ children, params }: Params & 
         )}
         style={{ fontFamily: FONT_STACK[locale] }}
       >
+        <CcContentOverridesProvider value={clientOverrides(overrides)}>
         <ToastProvider>
           <a
             href="#cc-main"
@@ -97,6 +107,7 @@ export default async function CadChampionsLayout({ children, params }: Params & 
           </div>
           <CcFooter locale={locale} />
         </ToastProvider>
+        </CcContentOverridesProvider>
       </div>
     </NextIntlClientProvider>
   );

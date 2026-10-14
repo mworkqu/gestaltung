@@ -7,15 +7,19 @@ import { useLocale, useTranslations } from "next-intl";
 import type { Locale } from "@/i18n/routing";
 import { getGlossaryEntry, type GlossaryId } from "@/lib/cad-champions/glossary";
 
+import { useGlossaryOverride } from "../content/content-overrides";
 import { HelpPopoverContent } from "./help-popover";
 
 /** Inline glossary term: dotted underline, popover with the definition. */
 export function Term({ id, children }: { id: GlossaryId; children?: React.ReactNode }) {
   const t = useTranslations("CC.ui");
   const locale = useLocale() as Locale;
-  const entry = getGlossaryEntry(id, locale) as
+  const base = getGlossaryEntry(id, locale) as
     | { term: string; definition: string; helpSlug?: string }
     | undefined;
+  // Admin-edited definition (cc_content_overrides, 0085) wins; the file is the fallback.
+  const edit = useGlossaryOverride(id);
+  const entry = base ? { ...base, term: edit?.term || base.term, definition: edit?.definition || base.definition } : undefined;
   if (!entry) return <>{children ?? id}</>;
   return (
     <Popover.Root>

@@ -8,12 +8,13 @@ import type { Locale } from "@/i18n/routing";
 import {
   WATCHED_THRESHOLD,
   getPlaybackUrl,
-  getVideoSlot,
   videoTitle,
   watchedFraction,
   type VideoKey,
 } from "@/lib/cad-champions/videos/registry";
 import { cn } from "@/lib/utils";
+
+import { useVideoSlot } from "./use-video-slot";
 
 const YT_ORIGIN = "https://www.youtube-nocookie.com";
 
@@ -34,7 +35,8 @@ export function VideoSlot({
 }) {
   const locale = useLocale() as Locale;
   const t = useTranslations("CC.get-ready");
-  const slot = getVideoSlot(videoKey);
+  // Admin-edited video id (cc_content_overrides) wins over the registry.
+  const slot = useVideoSlot(videoKey);
   const title = videoTitle(slot, locale);
   const direct = getPlaybackUrl(slot);
   // Bunny Stream slots need a signed link from the server (2 h, access-checked).

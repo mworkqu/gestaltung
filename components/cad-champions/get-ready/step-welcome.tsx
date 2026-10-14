@@ -5,15 +5,15 @@ import { CheckCircle2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/cad-champions/ui";
+import { useVideoSlot } from "@/components/cad-champions/video/use-video-slot";
 import { VideoSlot } from "@/components/cad-champions/video/video-slot";
 import { WELCOME_TAKEAWAYS, WELCOME_VIDEO } from "@/lib/cad-champions/get-ready/content";
-import { getVideoSlot, hasRealPlayer } from "@/lib/cad-champions/videos/registry";
 
 import { SubHeading } from "./shared";
 
 export function StepWelcome({ done, saving, onDone }: { done: boolean; saving: boolean; onDone: () => void }) {
   const t = useTranslations("CC.get-ready");
-  const realPlayer = hasRealPlayer(getVideoSlot(WELCOME_VIDEO));
+  const realPlayer = useVideoSlot(WELCOME_VIDEO).realPlayer;
   const onWatched = React.useCallback(() => {
     if (!done) onDone();
   }, [done, onDone]);

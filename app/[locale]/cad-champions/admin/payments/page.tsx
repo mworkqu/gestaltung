@@ -5,7 +5,6 @@ import { ArrowLeft, Inbox } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { AdminPaymentCard, type AdminPaymentCardData } from "@/components/cad-champions/payments/admin-payment-card";
-import { SignedInExtras } from "@/components/cad-champions/shell/signed-in-extras";
 import { Alert, EmptyState, HelpTip, PageHeader } from "@/components/cad-champions/ui";
 import { requireCcAdmin } from "@/lib/cad-champions/auth/server";
 import { formatDateTime, formatQAR } from "@/lib/cad-champions/format";
@@ -107,7 +106,6 @@ export default async function CcAdminPaymentsPage({ params, searchParams }: Prop
           ))}
         </div>
       )}
-      <SignedInExtras pageName={t("title")} />
     </div>
   );
 }

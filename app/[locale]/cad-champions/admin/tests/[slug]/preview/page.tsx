@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Eye } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { SignedInExtras } from "@/components/cad-champions/shell/signed-in-extras";
 import { TestIntro } from "@/components/cad-champions/test/intro-sections";
 import { TestLoadProblem, renderBriefs } from "@/components/cad-champions/test/server-parts";
 import { TestWorkspace } from "@/components/cad-champions/test/workspace";
@@ -97,7 +96,6 @@ export default async function CcAdminTestPreviewPage({ params }: Props) {
         />
       </section>
 
-      <SignedInExtras pageName={t("preview.metaTitle")} />
     </div>
   );
 }

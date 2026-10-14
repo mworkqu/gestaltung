@@ -820,6 +820,63 @@ export interface CcStudentNote {
   created_at: Timestamp;
 }
 
+// ------------------------------------------------------------- admin (0085)
+export interface CcContentOverride {
+  /** msg:<file>.<path> | video:<slot> | glossary:<id>.term|definition | faq:<id>.hidden */
+  key: string;
+  locale: CcLocale;
+  value: string;
+  updated_by: Uuid | null;
+  updated_at: Timestamp;
+}
+
+export interface CcTestimonial {
+  id: Uuid;
+  quote_en: string;
+  quote_ar: string;
+  name_en: string;
+  name_ar: string;
+  role_en: string | null;
+  role_ar: string | null;
+  sort: number;
+  is_published: boolean;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export const CC_ANNOUNCEMENT_KINDS = ["marketing", "essential"] as const;
+export type CcAnnouncementKind = (typeof CC_ANNOUNCEMENT_KINDS)[number];
+
+export const CC_ANNOUNCEMENT_STATUSES = ["draft", "sending", "sent", "failed"] as const;
+export type CcAnnouncementStatus = (typeof CC_ANNOUNCEMENT_STATUSES)[number];
+
+export interface CcAnnouncement {
+  id: Uuid;
+  kind: CcAnnouncementKind;
+  subject_en: string;
+  subject_ar: string;
+  body_en: string;
+  body_ar: string;
+  filters: Json;
+  status: CcAnnouncementStatus;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  created_by: Uuid | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  sent_at: Timestamp | null;
+}
+
+export interface CcAnnouncementDelivery {
+  announcement_id: Uuid;
+  user_id: Uuid;
+  status: "pending" | "sent" | "failed" | "skipped";
+  error: string | null;
+  sent_at: Timestamp | null;
+  created_at: Timestamp;
+}
+
 // ------------------------------------------------------------- registry
 /** Every cc_ table -> its row type. */
 export interface CcTables {
@@ -860,6 +917,10 @@ export interface CcTables {
   cc_audit_log: CcAuditLog;
   cc_deletion_requests: CcDeletionRequest;
   cc_student_notes: CcStudentNote;
+  cc_content_overrides: CcContentOverride;
+  cc_testimonials: CcTestimonial;
+  cc_announcements: CcAnnouncement;
+  cc_announcement_deliveries: CcAnnouncementDelivery;
 }
 
 export type CcTableName = keyof CcTables;
@@ -882,6 +943,7 @@ export const CC_FUNCTIONS = {
   verifyCertificate: "cc_verify_certificate", // (p_code text) -> jsonb | null (0083; anon ok)
   cohortSeats: "cc_cohort_seats", // () -> {cohort_id, seats_taken}[] (0083)
   syncRubricAspects: "cc_sync_rubric_aspects", // (p_task uuid) -> integer (0082; service_role only)
+  anonymiseProfile: "cc_anonymise_profile", // (p_user uuid, p_actor uuid, p_note text) -> jsonb (0085; service_role only)
 } as const;
 
 export const CC_BUCKETS = {

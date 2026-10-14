@@ -5,7 +5,6 @@ import { ArrowLeft } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { ReviewWorkspace } from "@/components/cad-champions/review/review-workspace";
-import { SignedInExtras } from "@/components/cad-champions/shell/signed-in-extras";
 import { Alert, PageHeader, StatusChip } from "@/components/cad-champions/ui";
 import { requireCcStaff } from "@/lib/cad-champions/auth/server";
 import { aiConfigured } from "@/lib/cad-champions/drawing/ai-check";
@@ -51,7 +50,6 @@ export default async function CcAdminReviewItemPage({ params }: Props) {
         <Alert tone={loaded.reason === "not_found" ? "warning" : loaded.reason === "not_set_up" ? "info" : "error"} title={t(`problem.${loaded.reason}.title`)}>
           {t(`problem.${loaded.reason}.body`)}
         </Alert>
-        <SignedInExtras pageName="admin-review-item" />
       </div>
     );
   }
@@ -91,7 +89,6 @@ export default async function CcAdminReviewItemPage({ params }: Props) {
       </dl>
       {v.finalized ? <Alert tone="info" title={t("finalizedTitle")}>{t("finalizedBody")}</Alert> : null}
       <ReviewWorkspace view={v} aiAvailable={aiConfigured()} />
-      <SignedInExtras pageName="admin-review-item" />
     </div>
   );
 }

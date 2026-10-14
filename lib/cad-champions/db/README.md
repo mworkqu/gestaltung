@@ -12,6 +12,7 @@ Row types: `lib/cad-champions/db/types.ts`. RLS tests: `lib/cad-champions/db/rls
 6. `0082_cc_drawing_rubric.sql` (Prompt 8)
 7. `0083_cc_training_seed.sql` (Prompt 9: `cc_lessons.skill_area_id` + `track_notes`, `cc_modules.competition_module`, `cc_student_xp`, `cc_badges`, `cc_verify_certificate(code)`, `cc_cohort_seats()`, column grants hiding lesson notes/videos/downloads from students, and the training seed; see `docs/cad-champions/TRAINING.md`)
 8. `0084_cc_payments.sql` (Prompt 10: `cc_plans.kind` + nullable `price_qar` / `duration_days` ("Price coming soon"), payment columns (add-on, proof/paid/terms times, provider status), enrollment reminder stamps, cohorts readable by anyone, `cc_cohort_seats()` counts held seats, RPCs `cc_validate_coupon` (authenticated), `cc_create_payment` + `cc_payment_transition` (service_role only: the payment state machine, enrollment on paid, audit log), seed plans `online`, `online-in-person`, `measuring-kit` with price/days NULL [TODO-MO]; see `lib/cad-champions/payments/`)
+9. `0085_cc_admin.sql` (Prompt 11: `cc_content_overrides` (admin-edited copy over the message files: Get Ready texts + video ids, landing FAQ, glossary; anyone reads), `cc_testimonials` (landing; anyone reads published), `cc_announcements` + `cc_announcement_deliveries` (announcement email log, one delivery row per recipient = no double send), `cc_anonymise_profile(user, actor, note)` (service_role; approves a deletion request), indexes for insights)
 6. `0082_cc_drawing_rubric.sql` (`cc_sync_rubric_aspects(task)` turns `cc_test_tasks.rubric` into `rubric:<id>` aspects; writes the default part drawing rubric (16 items, 25 points) to the diagnostic drawing task. Re-running resets that rubric to the default)
 
 Both files are safe to re-run. The tests apply each file twice to prove it.
@@ -62,6 +63,10 @@ Site super_admins (`public.profiles.role = 'super_admin'`) are CC admins automat
 | `cc_audit_log` | Who did what and when, before/after (admin only). |
 | `cc_deletion_requests` | Account deletion requests and their status. |
 | `cc_student_notes` | Private trainer notes about a student (staff only). |
+| `cc_content_overrides` | 0085. Admin-edited copy per key + locale (`msg:`, `video:`, `glossary:`, `faq:` keys). Anyone reads; admins write. The message files are the fallback. |
+| `cc_testimonials` | 0085. Landing testimonials EN + AR; anyone reads published ones; admins write. |
+| `cc_announcements` | 0085. Announcement emails (marketing / essential), filters, counts, status. Admin only. |
+| `cc_announcement_deliveries` | 0085. One row per announcement recipient (sent / failed / skipped) so batches never double-send. Admin only. |
 
 Views: `cc_test_tasks_public`, `cc_exercises_public`, `cc_task_aspects_public` (no `partial_rule`). Sequence: `cc_receipt_number_seq`.
 

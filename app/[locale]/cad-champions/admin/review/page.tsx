@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardCheck, Inbox } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { SignedInExtras } from "@/components/cad-champions/shell/signed-in-extras";
 import { Alert, EmptyState, HelpTip, PageHeader, StatusChip } from "@/components/cad-champions/ui";
 import type { Locale } from "@/i18n/routing";
 import { requireCcStaff } from "@/lib/cad-champions/auth/server";
@@ -104,7 +103,6 @@ export default async function CcAdminReviewQueuePage({ params, searchParams }: P
           )}
         </>
       )}
-      <SignedInExtras pageName="admin-review" />
     </div>
   );
 }

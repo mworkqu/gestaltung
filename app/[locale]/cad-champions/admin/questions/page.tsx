@@ -5,7 +5,6 @@ import { ArrowLeft, Inbox, MessageCircleQuestion } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { QuestionCard } from "@/components/cad-champions/review/question-card";
-import { SignedInExtras } from "@/components/cad-champions/shell/signed-in-extras";
 import { Alert, EmptyState, HelpTip, PageHeader } from "@/components/cad-champions/ui";
 import { requireCcStaff } from "@/lib/cad-champions/auth/server";
 import { formatNumber } from "@/lib/cad-champions/format";
@@ -99,7 +98,6 @@ export default async function CcAdminQuestionsPage({ params, searchParams }: Pro
           )}
         </>
       )}
-      <SignedInExtras pageName="admin-questions" />
     </div>
   );
 }

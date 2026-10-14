@@ -3,6 +3,9 @@ import { canSeeSolution, canUseExercise, canWatchLesson } from "@/lib/cad-champi
 import { getAccessContext, type Db } from "@/lib/cad-champions/training/server";
 import { isSlotKey } from "@/lib/cad-champions/training/video-pick";
 import { bunnyConfig, signBunnyEmbed } from "@/lib/cad-champions/videos/bunny";
+import { loadContentOverrides } from "@/lib/cad-champions/content/overrides-server";
+import { videoKey } from "@/lib/cad-champions/content/overrides";
+import { resolveSlotRef } from "@/lib/cad-champions/videos/slot-override";
 import { VIDEO_SLOTS, getPlaybackUrl, parseStoredVideo, type VideoRef } from "@/lib/cad-champions/videos/registry";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -84,7 +87,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ ref: st
   let resolved: Resolved;
   if (kind === "intro") {
     const slot = VIDEO_SLOTS.find((v) => v.key === a);
-    resolved = slot ? { ok: true, ref: { provider: slot.provider, providerId: slot.providerId } } : { ok: false, status: 404, error: "not_found" };
+    // Admin-edited id (cc_content_overrides, stored for both locales) wins over the registry.
+    const ov = slot ? ((await loadContentOverrides("en")).get(videoKey(slot.key)) ?? (await loadContentOverrides("ar")).get(videoKey(slot.key)) ?? null) : null;
+    resolved = slot ? { ok: true, ref: resolveSlotRef(slot, ov) } : { ok: false, status: 404, error: "not_found" };
   } else {
     const service = createServiceClient();
     if (!service) return json({ error: "not_configured" }, 503);

@@ -41,7 +41,11 @@ import { ScrollLink, TrackLink } from "@/components/cad-champions/landing/track-
 import { Term } from "@/components/cad-champions/ui";
 import type { Locale } from "@/i18n/routing";
 import { ccSignUpHref } from "@/lib/cad-champions/auth/paths";
+import { loadPublishedTestimonials } from "@/lib/cad-champions/admin/testimonials-server";
+import { publicTestimonials } from "@/lib/cad-champions/admin/testimonials";
 import { getCcUser } from "@/lib/cad-champions/auth/server";
+import { faqHiddenKey, getOverride, msgKey } from "@/lib/cad-champions/content/overrides";
+import { loadContentOverrides } from "@/lib/cad-champions/content/overrides-server";
 import { formatNumber } from "@/lib/cad-champions/format";
 import { getLandingData } from "@/lib/cad-champions/landing/data";
 import { visibleFaq } from "@/lib/cad-champions/landing/faq";
@@ -123,9 +127,6 @@ const EQUIPMENT: { key: string; icon: LucideIcon }[] = [
 ];
 const IN_PERSON = ["measure", "scan", "print", "mock"] as const;
 
-/** Testimonials (section 10): hidden until an admin adds at least one (later prompt). */
-const TESTIMONIALS: readonly { id: string; quote: string; name: string }[] = [];
-
 function SectionHead({ id, kicker, title, intro }: { id: string; kicker: string; title: string; intro?: ReactNode }) {
   return (
     <div className="space-y-2">
@@ -153,7 +154,15 @@ export default async function CcLandingPage({ params }: Params) {
   setRequestLocale(locale);
 
   const t = await getTranslations({ locale, namespace: "CC.landing" });
-  const [cc, data] = await Promise.all([getCcUser(), getLandingData()]);
+  const [cc, data, overrides, overridesEn, testimonialRows] = await Promise.all([
+    getCcUser(),
+    getLandingData(),
+    loadContentOverrides(locale),
+    loadContentOverrides("en"),
+    loadPublishedTestimonials(),
+  ]);
+  // Section 10: shown only while at least one testimonial is published (admin: Landing).
+  const testimonials = publicTestimonials(testimonialRows, locale);
 
   const signedIn = Boolean(cc);
   const ctaHref = signedIn ? ccPath(locale, "/dashboard") : ccSignUpHref(locale, ccPath(locale, "/dashboard"));
@@ -162,7 +171,14 @@ export default async function CcLandingPage({ params }: Params) {
   const finalWhatsapp = buildWhatsAppUrl(contact.whatsappNumber, t("final.whatsappText"));
   const n = (v: number) => formatNumber(v, locale);
 
-  const faq = visibleFaq().map((item) => ({ id: item.id, question: t(item.questionKey), answer: t(item.answerKey) }));
+  // Admin-edited FAQ copy (cc_content_overrides, 0085) wins; hidden items are dropped.
+  const faq = visibleFaq()
+    .filter((item) => overrides.get(faqHiddenKey(item.id)) !== "1" && overridesEn.get(faqHiddenKey(item.id)) !== "1")
+    .map((item) => ({
+      id: item.id,
+      question: getOverride(overrides, msgKey(`landing.${item.questionKey}`), t(item.questionKey)),
+      answer: getOverride(overrides, msgKey(`landing.${item.answerKey}`), t(item.answerKey)),
+    }));
   const url = `${SITE_URL}${ccPath(locale, "/")}`;
   const jsonLd = buildLandingJsonLd({
     locale,
@@ -517,17 +533,20 @@ export default async function CcLandingPage({ params }: Params) {
         </div>
       </section>
 
-      {/* 10. Testimonials: hidden until at least one exists (admin, later prompt). */}
-      {TESTIMONIALS.length > 0 ? (
+      {/* 10. Testimonials: hidden until at least one is published (admin: Landing). */}
+      {testimonials.length > 0 ? (
         <section aria-labelledby="cc-testimonials" className="neu space-y-4 p-5 sm:p-8">
           <h2 id="cc-testimonials" className="title-section">
             {t("testimonials.title")}
           </h2>
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {TESTIMONIALS.map((q) => (
+            {testimonials.map((q) => (
               <li key={q.id} className="tile">
                 <blockquote className="text-sm text-body">{q.quote}</blockquote>
-                <p className="mt-2 text-xs font-semibold text-mutedtext">{q.name}</p>
+                <p className="mt-2 text-xs font-semibold text-mutedtext">
+                  {q.name}
+                  {q.role ? ` · ${q.role}` : ""}
+                </p>
               </li>
             ))}
           </ul>

@@ -107,3 +107,6 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 
 ## Storage setting (Prompt 5)
 - Supabase → Storage → Settings → global upload file size limit must be at least 300 MB for module_package ZIP uploads (migration 0080 raises the `cc-submissions` bucket to 300 MB; the project limit caps it).
+
+## Admin panel (Prompt 11)
+- Admin: [TODO-MO: retention policy] — messages/cad-champions/{en,ar}/admin.json operations.deletions.retentionTodo (next to "Approve and delete") + lib/cad-champions/admin/deletion.ts — /admin/operations/deletions. Decide how long files, anonymised scores and payment records are kept, and whether the sign-in (auth) user must also be deleted (currently NOT deleted).
