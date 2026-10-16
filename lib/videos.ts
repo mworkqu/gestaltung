@@ -74,7 +74,7 @@ export const VIDEOS: readonly FeatureVideoEntry[] = [
   entry("store-to-door", ["/", "/how-it-works"], 40, "2026-10-10"),
   // Arabic home only (YouTube cut, scripts/record-videos/youtube.mjs): Arabic
   // voice-over, music and captions in the picture; idea → parts → wiring → 3D.
-  entry("idea-to-product-ar", ["/"], 132, "2026-10-13T09:00:00Z", { sound: true, burntInCaptions: true }),
+  entry("idea-to-product-ar", ["/"], 132, "2026-10-16T09:00:00Z", { sound: true, burntInCaptions: true }),
 ];
 
 /** The "See it work" clip on the home page: the Arabic site has its own voiced cut. */
