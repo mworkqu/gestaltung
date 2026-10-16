@@ -87,6 +87,8 @@ export function VideosYoutube({
     return t.has(key) ? t(key) : t("error_google");
   });
   const [pending, start] = useTransition();
+  // One upload at a time: each one takes the daily quota and runs for a minute or more.
+  const [uploading, setUploading] = useState<string | null>(null);
   const connected = connection.state === "connected";
   const quota = connection.state === "connected" || connection.state === "disconnected" ? connection.quota : null;
 
@@ -173,7 +175,16 @@ export function VideosYoutube({
         </h2>
         <div className="space-y-4">
           {clips.map((c) => (
-            <ClipRow key={c.slug} clip={c} locale={locale} connected={connected} quota={quota} uploadCost={uploadCost} />
+            <ClipRow
+              key={c.slug}
+              clip={c}
+              locale={locale}
+              connected={connected}
+              quota={quota}
+              uploadCost={uploadCost}
+              otherUploading={uploading !== null && uploading !== c.slug}
+              onUploading={(on) => setUploading(on ? c.slug : null)}
+            />
           ))}
         </div>
       </section>
@@ -187,12 +198,16 @@ function ClipRow({
   connected,
   quota,
   uploadCost,
+  otherUploading,
+  onUploading,
 }: {
   clip: ClipView;
   locale: string;
   connected: boolean;
   quota: QuotaView | null;
   uploadCost: number;
+  otherUploading: boolean;
+  onUploading: (on: boolean) => void;
 }) {
   const t = useTranslations("VideosYoutube");
   const router = useRouter();
@@ -208,7 +223,7 @@ function ClipRow({
   const [posterOk, setPosterOk] = useState(true);
 
   const tags = splitTags(tagsText);
-  const canUpload = connected && !!quota && quota.remaining >= uploadCost && !busy && clip.sizeBytes !== null;
+  const canUpload = connected && !!quota && quota.remaining >= uploadCost && !busy && !otherUploading && clip.sizeBytes !== null;
   const id = `clip-${clip.slug}`;
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium" });
 
@@ -232,6 +247,7 @@ function ClipRow({
     }
     setErrors([]);
     setBusy(true);
+    onUploading(true);
     setResult(null);
     try {
       const res = await fetch("/api/admin/youtube/upload", {
@@ -256,6 +272,7 @@ function ClipRow({
       setResult({ ok: false, text: t("uploadErr_generic"), warnings: [] });
     } finally {
       setBusy(false);
+      onUploading(false);
     }
   };
 

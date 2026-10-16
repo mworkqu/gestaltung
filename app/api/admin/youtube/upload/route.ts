@@ -9,6 +9,7 @@ import {
   readYoutubeIntegration,
   recordQuota,
   saveYoutubeRow,
+  updateYoutubeMeta,
   TokenRevokedError,
   youtubeConfig,
 } from "@/lib/integrations/youtube-server";
@@ -283,15 +284,14 @@ export async function POST(request: Request) {
     }
   }
 
-  state = {
-    ...state,
+  // Merged into the latest stored record, so a parallel upload's record survives.
+  state = await updateYoutubeMeta(db, state, (m) => ({
+    ...m,
     uploads: {
-      ...state.uploads,
+      ...m.uploads,
       [slug]: { video_id: videoId, uploaded_at: new Date().toISOString(), privacy: actualPrivacy, warnings },
     },
-  };
-  const saveErr = await saveYoutubeRow(db, state);
-  if (saveErr) console.error("[youtube] upload record save failed:", saveErr);
+  }));
 
   revalidatePath("/en/dashboard/store/youtube");
   revalidatePath("/ar/dashboard/store/youtube");
