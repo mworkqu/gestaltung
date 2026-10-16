@@ -104,8 +104,12 @@ ev(outroStart + 0.6, total, "Site", SITE, "960,660");
 // Spoken lines as captions (not over the cards, which already show text).
 const vtt = [];
 for (const v of voice) {
-  if (v.start < INTRO || v.start >= outroStart) continue;
-  const end = Math.min(v.start + v.len + 0.5, outroStart);
+  // The title card has its own text; on the end card a line is captioned
+  // unless it just repeats the card's title.
+  if (v.start < INTRO) continue;
+  const onOutro = v.start >= outroStart;
+  if (onOutro && v.text.includes(plan.outro.title)) continue;
+  const end = onOutro ? total : Math.min(v.start + v.len + 0.5, outroStart);
   ass.push(`Dialogue: 0,${ts(v.start)},${ts(end)},Cap,,0,0,0,,{\\fad(150,150)}${esc(v.text)}`);
   vtt.push({ start: v.start, end, text: v.text });
 }

@@ -1,0 +1,56 @@
+{
+  "lang": "ar",
+  "sources": [
+    "studio-3d-ar/raw.webm"
+  ],
+  "crop": [
+    [
+      1600,
+      900
+    ]
+  ],
+  "intro": {
+    "seconds": 2.5,
+    "title": "اللوحة تحتاج إلى علبة"
+  },
+  "outro": {
+    "seconds": 4,
+    "title": "ابدأ مشروعك اليوم"
+  },
+  "segments": [
+    {
+      "src": 0,
+      "from": 66.5,
+      "to": 80,
+      "speed": 1.2,
+      "vo": 1,
+      "at": 1
+    },
+    {
+      "src": 0,
+      "from": 80,
+      "to": 90,
+      "speed": 1.2,
+      "vo": 2,
+      "at": 0.3
+    },
+    {
+      "src": 0,
+      "from": 90,
+      "to": 143,
+      "speed": 4
+    },
+    {
+      "src": 0,
+      "from": 143,
+      "to": 152,
+      "speed": 1,
+      "vo": 3,
+      "at": 0.5
+    }
+  ],
+  "voOutro": {
+    "vo": 4,
+    "at": 0.4
+  }
+}

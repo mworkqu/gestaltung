@@ -391,6 +391,154 @@ const CLIPS = {
     mark("end");
   },
 
+  // Arabic versions of the three site clips (YouTube, 2026-10-17). Same rules
+  // as the English ones: guest only, nothing submitted or ordered; store-to-door
+  // adds ONE guest cart line and stops on the checkout page.
+  async "file-to-part-ar"() {
+    const stl = fs.readFileSync(path.join(dir, "bracket.stl"), "utf8");
+    await goto("/ar/design");
+    await declineCookies();
+    await wait(1200);
+    mark("design");
+    await wait(1500);
+    const zone = page.getByRole("button", { name: /أفلت ملفك/ }).first();
+    await scrollToEl(zone, 200);
+    await wait(600);
+    await moveTo(zone);
+    const dt = await page.evaluateHandle((text) => {
+      const d = new DataTransfer();
+      d.items.add(new File([text], "bracket.stl", { type: "model/stl" }));
+      return d;
+    }, stl);
+    await zone.dispatchEvent("dragenter", { dataTransfer: dt });
+    await zone.dispatchEvent("dragover", { dataTransfer: dt });
+    await wait(1600);
+    mark("dragover");
+    await zone.dispatchEvent("drop", { dataTransfer: dt });
+    mark("drop");
+    await page.waitForURL(/\/design\/quote/, { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1800);
+    mark("quote");
+    await debug("quote");
+    await moveTo(page.getByText("bracket.stl").first()).catch(() => {});
+    await wait(2200);
+    await smoothScroll(360);
+    await wait(2200);
+    mark("form");
+    await goto("/ar/how-it-works#make");
+    await wait(1500);
+    mark("how");
+    await debug("how");
+    for (const step of ["مهندسنا يسعّر لك الطريقة", "تُصنع في استوديو لوسيل لدينا", "تصلك القطعة"]) {
+      const el = page.getByText(step, { exact: true }).first();
+      if (await el.count()) { await scrollToEl(el, 300).catch(() => {}); await moveTo(el).catch(() => {}); await wait(1500); }
+    }
+    mark("steps");
+    await goto("/ar/design");
+    await wait(1000);
+    const ways = page.getByText("أربع طرق لتصنيع قطعتك").first();
+    await scrollToEl(ways, 160).catch(() => {});
+    await wait(1000);
+    mark("ways");
+    await debug("ways");
+    for (const m of ["طباعة ثلاثية الأبعاد", "تشغيل", "القص بالليزر", "EDM"]) {
+      const el = page.getByText(m).first();
+      if (await el.count()) { await moveTo(el).catch(() => {}); await wait(1100); }
+    }
+    await wait(2000);
+    mark("end");
+  },
+
+  async "sketch-to-drawing-ar"() {
+    await goto("/ar/design/drawing");
+    await declineCookies();
+    await wait(1200);
+    mark("drawing");
+    await wait(2200);
+    const tiers = page.getByText("فئات بسيطة وواضحة.").first();
+    await scrollToEl(tiers, 190).catch(() => {});
+    await wait(1000);
+    mark("tiers");
+    await debug("tiers");
+    await shot("tiers");
+    await smoothScroll(220);
+    await wait(2500);
+    await smoothScroll(-2400, { step: 14 });
+    await wait(700);
+    const cta = page.getByRole("link", { name: "ابدأ طلب رسم" }).first();
+    await click(cta);
+    await page.waitForURL(/for=drawing/, { timeout: 30000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1400);
+    mark("form");
+    await debug("form");
+    await typeInto(page.getByPlaceholder("مثال: ساعة غوص"), "حامل رف");
+    await wait(600);
+    mark("name");
+    await typeInto(page.locator("textarea").first(), "حامل جداري على شكل L، بمقاس 80 × 60 مم، من الألمنيوم بسماكة 4 مم، مع فتحتين للبراغي.");
+    await wait(1600);
+    mark("described");
+    await debug("described");
+    await wait(2500);
+    mark("end");
+  },
+
+  async "store-to-door-ar"() {
+    await goto("/ar/store?q=" + encodeURIComponent("رطوبة التربة"));
+    await declineCookies();
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1500);
+    mark("results");
+    await debug("results");
+    const product = page.locator('a[href*="/store/VLT-"]').filter({ hasText: /رطوبة|Soil/i }).first();
+    await moveTo(product);
+    await wait(700);
+    await click(product);
+    await page.waitForURL(/\/store\/VLT-/, { timeout: 30000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1200);
+    mark("product");
+    await debug("product");
+    await shot("product");
+    await moveTo(page.getByText(/يصل بحلول/).first()).catch(() => {});
+    await wait(2200);
+    mark("arrives");
+    await moveTo(page.getByText(/متوفر لدى|نوفّر|المصدر/).first()).catch(() => {});
+    await wait(1600);
+    await smoothScroll(520);
+    await wait(1800);
+    mark("specs");
+    await smoothScroll(-520);
+    await wait(600);
+    const add = page.getByRole("button", { name: "أضف إلى السلة" }).first();
+    await click(add);
+    mark("added");
+    await wait(2200);
+    await goto("/ar/store/cart");
+    await wait(1500);
+    mark("cart");
+    await debug("cart");
+    await wait(1600);
+    const checkout = page.getByRole("link", { name: /إتمام الطلب/ }).or(page.getByRole("button", { name: /إتمام الطلب/ }));
+    await click(checkout.first());
+    await page.waitForURL(/\/store\/checkout/, { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1400);
+    mark("checkout");
+    await debug("checkout");
+    const pay = page.getByText("الدفع عند الاستلام").first();
+    if (await pay.count()) { await scrollToEl(pay, 220).catch(() => {}); await wait(600); await moveTo(pay).catch(() => {}); }
+    await wait(1500);
+    mark("payment");
+    for (const name of ["فوران", "تحويل بنكي"]) {
+      const el = page.getByText(name, { exact: true }).first();
+      if (await el.count()) { await moveTo(el).catch(() => {}); await wait(1300); }
+    }
+    await wait(2500);
+    mark("end");
+  },
+
   // Second take of idea-to-kit, in the SAME guest session and project
   // (--state <outRoot>/idea-to-kit/state.json): the electronics steps a guest
   // can take without a credit (board, power, component list — the circuit is
