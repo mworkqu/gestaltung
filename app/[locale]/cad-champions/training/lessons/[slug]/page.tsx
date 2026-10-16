@@ -103,14 +103,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 type Question = Pick<CcLessonQuestion, "id" | "body" | "answer" | "status" | "created_at" | "image_path" | "user_id" | "public">;
 
-async function loadQuestions(userId: string, lessonId: string): Promise<{ own: (Question & { imageUrl: string | null })[]; faq: Question[] }> {
+/** A public answered FAQ: only what the page shows, never who asked (SR-L5). */
+type FaqItem = Pick<CcLessonQuestion, "id" | "body" | "answer">;
+
+async function loadQuestions(userId: string, lessonId: string): Promise<{ own: (Question & { imageUrl: string | null })[]; faq: FaqItem[] }> {
   try {
     const db = await createClient();
+    const service = createServiceClient();
+    // Students read only their own questions (0087, SR-L5). Public FAQs are read
+    // here on the server with the service role, selecting id, body and answer only.
+    const faqDb = service ?? db;
     const [own, faq] = await Promise.all([
       db.from("cc_lesson_questions").select("id,body,answer,status,created_at,image_path,user_id,public").eq("lesson_id", lessonId).eq("user_id", userId).eq("kind", "lesson").order("created_at", { ascending: false }).limit(20),
-      db.from("cc_lesson_questions").select("id,body,answer,status,created_at,image_path,user_id,public").eq("lesson_id", lessonId).eq("kind", "lesson").eq("public", true).eq("status", "answered").neq("user_id", userId).order("answered_at", { ascending: false }).limit(20),
+      faqDb.from("cc_lesson_questions").select("id,body,answer").eq("lesson_id", lessonId).eq("kind", "lesson").eq("public", true).eq("status", "answered").neq("user_id", userId).order("answered_at", { ascending: false }).limit(20),
     ]);
-    const service = createServiceClient();
     const ownRows = await Promise.all(
       ((own.data ?? []) as Question[]).map(async (q) => {
         let imageUrl: string | null = null;
@@ -121,7 +127,7 @@ async function loadQuestions(userId: string, lessonId: string): Promise<{ own: (
         return { ...q, imageUrl };
       })
     );
-    return { own: ownRows, faq: (faq.data ?? []) as Question[] };
+    return { own: ownRows, faq: (faq.data ?? []) as FaqItem[] };
   } catch {
     return { own: [], faq: [] };
   }

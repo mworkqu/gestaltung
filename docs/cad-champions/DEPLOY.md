@@ -73,6 +73,10 @@ Open Supabase, SQL Editor, paste each file, run. Each file says "RUN AFTER" in i
 | 7 | `0083_cc_training_seed.sql` | 0082 | Training schema additions and seed |
 | 8 | `0084_cc_payments.sql` | 0083 | Plans, checkout, payments, enrollment |
 | 9 | `0085_cc_admin.sql` | 0084 | Admin panel tables |
+| 10 | `0086_cc_security.sql` | 0085 | Security fix SR-H1: lesson and task files staff-only |
+| 11 | `0087_cc_security_2.sql` | 0086 | Security fixes SR-M1, SR-M7, SR-L1 to SR-L5 (coupon throttle, storage quota, tighter RLS) |
+
+**Re-running an older file:** re-running `0077` or `0078` puts back their original, looser policies, and re-running `0077` also re-grants paid lesson columns. Re-running `0084` puts back the coupon check without its throttle. After any re-run of 0077, 0078 or 0084, run `0083`, then `0086`, then `0087` again (SR-L6).
 
 If you already ran some of them, run only the ones after the last you ran. Further CC migrations written after this file was made will appear in `supabase/migrations/` with a higher number; read their headers.
 

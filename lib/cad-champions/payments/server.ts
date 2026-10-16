@@ -176,7 +176,7 @@ export async function loadActiveEnrollment(userId: string): Promise<EnrollmentVi
 
 export type CouponCheck =
   | { ok: true; code: string; discountQar: number; amountQar: number }
-  | { ok: false; reason: CouponRejectReason | "signed_out" | "not_set_up" | "error" };
+  | { ok: false; reason: CouponRejectReason | "too_many" | "signed_out" | "not_set_up" | "error" };
 
 /** Instant check in checkout, via the SECURITY DEFINER RPC (the coupon table stays admin-only). */
 export async function validateCouponForUser(code: string, planId: string): Promise<CouponCheck> {
@@ -187,7 +187,7 @@ export async function validateCouponForUser(code: string, planId: string): Promi
     if (error) return { ok: false, reason: isMissingSchema(error.code) ? "not_set_up" : "error" };
     const r = (data ?? {}) as { ok?: boolean; reason?: string; code?: string; discount_qar?: number | string; amount_qar?: number | string };
     if (!r.ok) {
-      const reason = (["invalid", "expired", "used_up", "wrong_plan", "wrong_institution", "signed_out"] as const).find((x) => x === r.reason) ?? "invalid";
+      const reason = (["invalid", "expired", "used_up", "wrong_plan", "wrong_institution", "too_many", "signed_out"] as const).find((x) => x === r.reason) ?? "invalid";
       return { ok: false, reason };
     }
     return { ok: true, code: String(r.code ?? ""), discountQar: Number(r.discount_qar ?? 0), amountQar: Number(r.amount_qar ?? 0) };

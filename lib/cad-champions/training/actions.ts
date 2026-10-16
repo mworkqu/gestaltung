@@ -20,6 +20,7 @@ import { gradeSubmissionNow, SUBMISSIONS_BUCKET } from "../grader/service";
 import { markJourney } from "../journey/server";
 import { ccPath, isCcLocale } from "../routes";
 import { ccRateLimited } from "../rate-limits";
+import { enforceStorageQuota } from "../upload/quota-server";
 import { readObjectHead, verifyUploadedObject } from "../upload/server";
 import { DEFAULT_MAX_BYTES, cleanDisplayFileName, isPathUnderPrefix, isStepHeader } from "../upload/validate";
 import { canRevealHint, canSeeSolution, canUseExercise, canWatchLesson, hintsAvailable } from "./access";
@@ -153,7 +154,7 @@ export async function setTrackAction(track: string): Promise<{ ok: boolean }> {
 
 // ─── lesson questions ────────────────────────────────────────────────────
 
-export type AskLessonResult = { ok: true } | { ok: false; error: "empty" | "too_long" | "signed_out" | "not_found" | "forbidden" | "too_many" | "bad_image" | "error" };
+export type AskLessonResult = { ok: true } | { ok: false; error: "empty" | "too_long" | "signed_out" | "not_found" | "forbidden" | "too_many" | "bad_image" | "over_quota" | "error" };
 
 const MAX_OPEN_PER_LESSON = 3;
 
@@ -186,6 +187,8 @@ export async function askLessonQuestionAction(input: { slug: string; body: strin
       if (!isPathUnderPrefix(input.imagePath, questionPrefix(cc.user.id))) return { ok: false, error: "bad_image" };
       const check = await verifyUploadedObject(SUBMISSIONS_BUCKET, input.imagePath, "image", QUESTION_IMAGE_MAX_BYTES);
       if (!check.ok) return { ok: false, error: "bad_image" };
+      const quota = await enforceStorageQuota(cc.user.id, SUBMISSIONS_BUCKET, input.imagePath);
+      if (!quota.ok) return { ok: false, error: "over_quota" };
       imagePath = input.imagePath;
     }
 
@@ -294,7 +297,7 @@ export type GradeExerciseResult =
       newBadges: number;
       certificateCode: string | null;
     }
-  | { ok: false; reason: "signed_out" | "not_found" | "forbidden" | "locked" | "bad_file" | "unavailable" | "error" };
+  | { ok: false; reason: "signed_out" | "not_found" | "forbidden" | "locked" | "bad_file" | "over_quota" | "unavailable" | "error" };
 
 /** Grades one uploaded exercise file now ("Checking your file..." -> result). Unlimited attempts; best score kept. */
 export async function gradeExerciseAction(input: {
@@ -319,6 +322,8 @@ export async function gradeExerciseAction(input: {
     const userId = cc.user.id;
     const path = String(input?.path ?? "");
     if (!isPathUnderPrefix(path, exercisePrefix(userId, ex.id))) return { ok: false, reason: "forbidden" };
+    const quota = await enforceStorageQuota(userId, SUBMISSIONS_BUCKET, path);
+    if (!quota.ok) return { ok: false, reason: "over_quota" };
 
     const passMark = Number(ex.pass_mark) || 80;
     const before = await attemptStats(service, userId, ex.id);
@@ -327,7 +332,8 @@ export async function gradeExerciseAction(input: {
       exercise_id: ex.id,
       storage_path: path,
       file_name: cleanDisplayFileName(input?.fileName ?? path.split("/").pop(), 200),
-      file_size: Number.isFinite(Number(input?.size)) ? Math.max(0, Math.floor(Number(input.size))) : null,
+      // SR-L10: replaced by the stored object's real size once it has been read below.
+      file_size: null as number | null,
       sha256: /^[0-9a-f]{64}$/.test(String(input?.sha256 ?? "")) ? input.sha256 : null,
     };
 
@@ -362,6 +368,7 @@ export async function gradeExerciseAction(input: {
       const accept = ex.expected_upload === "pdf" ? "pdf" : ex.expected_upload === "image" ? "image" : ex.expected_upload === "video" ? "video" : "pdf";
       const check = await verifyUploadedObject(SUBMISSIONS_BUCKET, path, accept, DEFAULT_MAX_BYTES);
       if (!check.ok) return check.code === "unavailable" ? { ok: false, reason: "unavailable" } : { ok: false, reason: "bad_file" };
+      base.file_size = check.size;
       const attemptId = await insertAttempt({ status: ex.grading_mode === "ai_drawing" ? "ai_pending_review" : "pending" });
       await recordActivity(service, userId);
       return result("review", { attemptId });
@@ -370,6 +377,7 @@ export async function gradeExerciseAction(input: {
     // STEP: cheap header check first.
     const head = await readObjectHead(SUBMISSIONS_BUCKET, path);
     if (!head.ok) return head.reason === "missing" ? { ok: false, reason: "bad_file" } : { ok: false, reason: "unavailable" };
+    base.file_size = head.size;
     const headCode = head.size <= 0 ? "E_EMPTY" : head.size > DEFAULT_MAX_BYTES ? "E_TOO_LARGE" : !isStepHeader(head.head) ? "E_NOT_STEP" : null;
     if (headCode) {
       const info = graderErrorInfo(headCode, locale);

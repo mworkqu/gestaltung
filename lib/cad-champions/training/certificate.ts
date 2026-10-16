@@ -1,7 +1,9 @@
 // Module completion certificates (Prompt 9 Step E). PURE, tested.
 // The code is public (printed on the certificate, checked at /verify/[code]),
-// so it is random and long enough not to be guessed: "CC-" + 8 characters
-// from an alphabet without look-alikes (no 0/O, 1/I/L).
+// so it is random and long enough not to be guessed: "CC-" + 12 characters
+// from an alphabet without look-alikes (no 0/O, 1/I/L), about 59 bits
+// (SECURITY_REVIEW.md SR-L16). Codes issued before that have 8 characters and
+// stay valid.
 //
 // buildCertificateHtml() returns a self-contained A4 landscape page (inline
 // CSS, IBM Plex Sans Arabic from Google Fonts, dir="rtl" for Arabic). The
@@ -9,16 +11,27 @@
 // (local), else serves it as printable HTML (Vercel), like the results report.
 
 const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const CODE_CHARS = 12;
+/** Bytes at or above this would bias the modulo (256 is not a multiple of 31), so they are skipped. */
+const UNBIASED_LIMIT = 256 - (256 % ALPHABET.length);
 
-/** "CC-XXXX-XXXX". `random` returns bytes (crypto.getRandomValues / randomBytes). */
+/** "CC-XXXX-XXXX-XXXX". `random` returns bytes (crypto.getRandomValues / randomBytes). */
 export function generateCertificateCode(random: (n: number) => Uint8Array): string {
-  const bytes = random(8);
   let s = "";
-  for (let i = 0; i < 8; i++) s += ALPHABET[bytes[i] % ALPHABET.length];
-  return `CC-${s.slice(0, 4)}-${s.slice(4)}`;
+  for (let round = 0; s.length < CODE_CHARS && round < 16; round++) {
+    for (const b of random(CODE_CHARS * 2)) {
+      if (b >= UNBIASED_LIMIT) continue; // rejection sampling: no modulo bias
+      s += ALPHABET[b % ALPHABET.length];
+      if (s.length === CODE_CHARS) break;
+    }
+  }
+  // Only a broken random source gets here; never return a short code.
+  while (s.length < CODE_CHARS) s += ALPHABET[random(1)[0] % ALPHABET.length];
+  return `CC-${s.slice(0, 4)}-${s.slice(4, 8)}-${s.slice(8, 12)}`;
 }
 
-const CODE_RE = /^CC-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+/** New 12-character codes, and the older 8-character ones. */
+const CODE_RE = /^CC-[A-Z0-9]{4}-[A-Z0-9]{4}(?:-[A-Z0-9]{4})?$/;
 
 /** Normalises user input ("cc-abcd-2345 ") to the stored form, or null. */
 export function normaliseCertificateCode(input: unknown): string | null {

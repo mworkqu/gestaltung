@@ -190,11 +190,23 @@ describe("gamification", () => {
 describe("certificates", () => {
   it("makes readable codes and normalises input", () => {
     const code = generateCertificateCode((n) => new Uint8Array(n).map((_, i) => i * 37));
-    expect(code).toMatch(/^CC-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    expect(code).toMatch(/^CC-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
     expect(code).not.toMatch(/[01OIL]/);
     expect(normaliseCertificateCode(" cc-abcd-2345 ")).toBe("CC-ABCD-2345");
+    expect(normaliseCertificateCode(" cc-abcd-2345-wxyz ")).toBe("CC-ABCD-2345-WXYZ");
     expect(normaliseCertificateCode("CC-ABCD")).toBeNull();
     expect(normaliseCertificateCode(42)).toBeNull();
+  });
+
+  it("SR-L16: skips biased bytes (rejection sampling) and survives a broken source", () => {
+    // 248..255 would bias the modulo: a source of only those bytes then 0s must never use them.
+    let calls = 0;
+    const code = generateCertificateCode((n) => {
+      calls++;
+      return new Uint8Array(n).fill(calls === 1 ? 250 : 0);
+    });
+    expect(code).toBe("CC-AAAA-AAAA-AAAA");
+    expect(generateCertificateCode((n) => new Uint8Array(n).fill(255))).toMatch(/^CC-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
   });
 
   it("builds an escaped printable page in both directions", () => {

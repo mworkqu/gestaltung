@@ -3,10 +3,13 @@
 // Reads and writes go through the student's own RLS client: students may
 // select / insert / update / delete their own rows (0077 policies). The
 // caller passes the id of the signed-in user (getCcUser().user.id); RLS
-// rejects any other id anyway. When every required step is done the journey
+// rejects any other id anyway. Exception: the grader-only key
+// "practice_upload" is written with the service role, because migration 0087
+// (SR-L3) stops students inserting it themselves. When every required step is done the journey
 // stamp get_ready_completed_at is written (service role, idempotent).
 
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 import { markJourney } from "../journey/server";
 import {
@@ -48,8 +51,13 @@ export async function readGetReadySteps(userId: string): Promise<GetReadyRead> {
   }
 }
 
+/** Keys only the server may write (the grader passed the practice file). */
+const SERVER_ONLY_KEYS: readonly string[] = ["practice_upload"];
+
 async function upsertKeys(userId: string, keys: string[]): Promise<{ ok: true } | { ok: false; reason: "not_set_up" | "error" }> {
-  const supabase = await createClient();
+  const serverOnly = keys.some((k) => SERVER_ONLY_KEYS.includes(k));
+  const supabase = serverOnly ? createServiceClient() : await createClient();
+  if (!supabase) return { ok: false, reason: "error" };
   const { error } = await supabase
     .from("cc_get_ready_steps")
     .upsert(

@@ -229,6 +229,7 @@
       "not_allowed": "This file can't be added to this task. Reload the page and upload it again.",
       "closed": "The test is closed, so files can no longer be added.",
       "invalid_file": "We checked the stored file and it isn't the right type. Export it again and upload the new file.",
+      "over_quota": "Your upload space is full (2 GB). Message us on WhatsApp and we'll help you make room.",
       "unavailable": "Our server couldn't check the file right now. Press Save again in a moment.",
       "error": "Something went wrong while saving. Press Save again."
     },
@@ -290,7 +291,8 @@
       "wrong_type": "<b>{file}</b> is a <b>{ext}</b> file, which doesn't belong in <b>{folder}</b>.",
       "no_step": "{task}: no STEP file found for <b>{label}</b> - only the <b>{exts}</b>. We can't auto-check native files; export STEP too.",
       "missing_file": "{task}: no file found for <b>{label}</b>.",
-      "outside_results": "<b>{file}</b> is outside the Results folders, so judges would miss it."
+      "outside_results": "<b>{file}</b> is outside the Results folders, so judges would miss it.",
+      "encrypted_entry": "<b>{file}</b> is password-protected, so we can't open or check it. Zip it again without a password."
     },
     "tasksTitle": "Expected files per task",
     "item": {

@@ -231,7 +231,9 @@ export type PackageWarning =
   | { code: "wrong_type"; folder: string; file: string; ext: string }
   | { code: "no_step"; taskId: string; label: string; exts: string[] }
   | { code: "missing_file"; taskId: string; label: string }
-  | { code: "outside_results"; file: string };
+  | { code: "outside_results"; file: string }
+  /** SR-L12: a password-protected entry; the grader skips it, so judges and checks would miss it. */
+  | { code: "encrypted_entry"; file: string };
 
 export type ExpectedItemStatus = "found" | "native_only" | "missing";
 
@@ -310,6 +312,7 @@ export function checkPackage(entries: readonly ZipEntryInfo[], expectations: Pac
     if (isJunkEntry(safe.segments)) continue;
     const isDir = e.isDirectory || /[\\/]$/.test(e.name);
     const p = place(safe.segments, isDir);
+    if (!isDir && e.encrypted) warnings.push({ code: "encrypted_entry", file: p.path });
     if (root == null && p.rootSegments) root = p.rootSegments.join("/") || null;
     if (p.folder) present.set(p.folder, (present.get(p.folder) ?? 0) + (isDir ? 0 : 1));
     if (!isDir) files.push(p);

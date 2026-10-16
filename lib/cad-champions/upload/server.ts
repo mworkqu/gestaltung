@@ -79,7 +79,10 @@ async function readFirstBytes(res: Response, limit: number): Promise<Uint8Array>
   return out.subarray(0, filled);
 }
 
-export type VerifyResult = UploadValidation | { ok: false; code: "missing" | "unavailable" };
+export type VerifyResult =
+  | { ok: true; /** Real stored size in bytes (store this, never the client's number: SR-L10). */ size: number }
+  | Extract<UploadValidation, { ok: false }>
+  | { ok: false; code: "missing" | "unavailable" };
 
 /** Re-runs the UploadBox checks (extension, size, empty, STEP header) on a stored object. */
 export async function verifyUploadedObject(
@@ -92,5 +95,6 @@ export async function verifyUploadedObject(
   if (!head.ok) return { ok: false, code: head.reason === "missing" ? "missing" : "unavailable" };
   const meta = validateFileMeta({ name: path, size: head.size }, accept, maxBytes);
   if (!meta.ok) return meta;
-  return validateHeader(head.head, accept, path);
+  const header = validateHeader(head.head, accept, path);
+  return header.ok ? { ok: true, size: head.size } : header;
 }

@@ -12,6 +12,7 @@ import { getCcUser } from "../auth/server";
 import { ccRateLimited } from "../rate-limits";
 import type { CcAttachment, CcExpectedUpload } from "../db/types";
 import { checkPackage, failedManifest, PACKAGE_MAX_BYTES, parseExpectations, type PackageManifest } from "../upload/package-check";
+import { enforceStorageQuota } from "../upload/quota-server";
 import { verifyUploadedObject } from "../upload/server";
 import { DEFAULT_MAX_BYTES, cleanDisplayFileName, isPathUnderPrefix, type UploadAccept } from "../upload/validate";
 import { readStoredZip } from "../upload/zip-remote";
@@ -111,7 +112,7 @@ export async function startAttemptAction(slug: string): Promise<StartResult> {
 
 export type RecordResult =
   | { ok: true; uploadedAt: string; replacedCount: number }
-  | { ok: false; reason: "signed_out" | "not_allowed" | "closed" | "invalid_file" | "unavailable" | "error" };
+  | { ok: false; reason: "signed_out" | "not_allowed" | "closed" | "invalid_file" | "over_quota" | "unavailable" | "error" };
 
 const ACCEPT_FOR: Record<CcExpectedUpload, UploadAccept | null> = {
   step: "step",
@@ -191,10 +192,13 @@ export async function recordSubmissionAction(input: {
     if (verified.code === "unavailable") return { ok: false, reason: "unavailable" };
     return { ok: false, reason: "invalid_file" };
   }
+  const quota = await enforceStorageQuota(userId, SUBMISSIONS_BUCKET, input.path);
+  if (!quota.ok) return { ok: false, reason: "over_quota" };
 
   const sha256 = typeof input.sha256 === "string" && /^[0-9a-f]{64}$/.test(input.sha256) ? input.sha256 : null;
   const fileName = cleanDisplayFileName(input.fileName, 255);
-  const size = Number.isFinite(input.size) && input.size >= 0 ? Math.floor(input.size) : 0;
+  // SR-L10: the stored object's real size, not the number the browser sent.
+  const size = verified.size;
   const uploadedAt = new Date(now).toISOString();
   const row = {
     storage_path: input.path,
@@ -320,6 +324,11 @@ export async function validatePackageAction(attemptId: string): Promise<PackageR
 
 export type DownloadResult = { ok: true; url: string } | { ok: false; reason: "signed_out" | "not_allowed" | "missing" | "unavailable" };
 
+/** SR-M4 switch: task files only after the timed attempt has started (default off = current behaviour). */
+function taskFilesAfterStart(): boolean {
+  return process.env.CC_TASK_FILES_AFTER_START === "1";
+}
+
 /** A 10-minute signed URL for one of a task's files (open in the browser or download). */
 export async function createSignedDownload(taskId: string, path: string, mode: "open" | "download"): Promise<DownloadResult> {
   const cc = await getCcUser();
@@ -331,14 +340,28 @@ export async function createSignedDownload(taskId: string, path: string, mode: "
   const supabase = await createClient();
   const { data: task } = await supabase
     .from("cc_test_tasks_public")
-    .select("id,attachments")
+    .select("id,test_id,attachments")
     .eq("id", taskId)
-    .maybeSingle<{ id: string; attachments: CcAttachment[] | null }>();
+    .maybeSingle<{ id: string; test_id: string; attachments: CcAttachment[] | null }>();
   const files = Array.isArray(task?.attachments) ? task.attachments : [];
-  if (!files.some((a) => a && a.path === path)) return { ok: false, reason: "not_allowed" };
+  if (!task || !files.some((a) => a && a.path === path)) return { ok: false, reason: "not_allowed" };
 
   const service = createServiceClient();
   if (!service) return { ok: false, reason: "unavailable" };
+
+  // SR-M4 (owner decision, OFF by default): with CC_TASK_FILES_AFTER_START=1 a
+  // student gets task files only while their own attempt on that test is running.
+  if (taskFilesAfterStart() && !cc.isStaff) {
+    const { data: running } = await service
+      .from("cc_attempts")
+      .select("id")
+      .eq("user_id", cc.user.id)
+      .eq("test_id", task.test_id)
+      .eq("status", "in_progress")
+      .limit(1)
+      .maybeSingle();
+    if (!running) return { ok: false, reason: "not_allowed" };
+  }
   const name = path.split("/").pop() || "file";
   const { data, error } = await service.storage
     .from(TASK_FILES_BUCKET)

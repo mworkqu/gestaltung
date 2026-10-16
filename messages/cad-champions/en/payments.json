@@ -150,7 +150,8 @@
       "wrong_institution": "This code is for students of another school.",
       "signed_out": "Sign in again to use a code.",
       "not_set_up": "Coupons aren't available yet.",
-      "error": "We couldn't check the code. Try again."
+      "error": "We couldn't check the code. Try again.",
+      "too_many": "Too many tries. Wait 10 minutes, then try again."
     }
   },
   "pay": {

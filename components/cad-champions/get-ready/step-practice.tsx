@@ -19,6 +19,7 @@ type View =
   | { kind: "passed"; basicOnly?: boolean }
   | { kind: "failed"; message: string; helpSlug: string | null }
   | { kind: "unavailable"; path: string }
+  | { kind: "over_quota" }
   | { kind: "error" };
 
 export function StepPractice({
@@ -45,6 +46,7 @@ export function StepPractice({
       if (result.ok && result.outcome === "passed") setView({ kind: "passed", basicOnly: result.basicCheckOnly });
       else if (result.ok && result.outcome === "failed") setView({ kind: "failed", message: result.message, helpSlug: result.helpSlug });
       else if (!result.ok && result.reason === "unavailable") setView({ kind: "unavailable", path });
+      else if (!result.ok && result.reason === "over_quota") setView({ kind: "over_quota" });
       else setView({ kind: "error" });
     } catch (e) {
       console.error("[cc-get-ready] practice grade failed:", e instanceof Error ? e.message : e);
@@ -125,6 +127,12 @@ export function StepPractice({
           }
         >
           {t("practice.unavailableBody")}
+        </Alert>
+      ) : null}
+
+      {view.kind === "over_quota" ? (
+        <Alert tone="error" title={t("practice.quotaTitle")}>
+          {t("practice.quotaBody")}
         </Alert>
       ) : null}
 

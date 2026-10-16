@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { BadgeCheck, SearchX } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
@@ -7,8 +8,10 @@ import { Alert, EmptyState, PageHeader } from "@/components/cad-champions/ui";
 import { formatDate } from "@/lib/cad-champions/format";
 import { Ltr } from "@/lib/cad-champions/ltr";
 import { CC_ROBOTS } from "@/lib/cad-champions/metadata";
+import { ccRateLimited } from "@/lib/cad-champions/rate-limits";
 import { isCcLocale } from "@/lib/cad-champions/routes";
 import { verifyCertificate } from "@/lib/cad-champions/training/certificate-server";
+import { clientIp } from "@/lib/rate-limit";
 
 // Public certificate check (no sign-in, noindex). Reads ONLY the name, the
 // module and the date through cc_verify_certificate(code) (0083).
@@ -29,13 +32,17 @@ export default async function CcVerifyPage({ params }: Props) {
   if (!isCcLocale(locale)) notFound();
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "CC.training.verify" });
-  const result = await verifyCertificate(code, locale);
+  // SR-L16: an IP limit so the page can't be used to walk the code space.
+  const limited = ccRateLimited("verify", `ip:${clientIp(await headers())}`);
+  const result = limited ? "limited" : await verifyCertificate(code, locale);
 
   return (
     <div className="container page-stack">
       <PageHeader title={t("title")} purpose={t("purpose")} />
       <div className="max-w-2xl">
-        {result === "unavailable" ? (
+        {result === "limited" ? (
+          <Alert tone="warning" title={t("tooMany")} />
+        ) : result === "unavailable" ? (
           <Alert tone="warning" title={t("unavailable")} />
         ) : !result ? (
           <EmptyState icon={SearchX} title={t("invalidTitle")} description={t("invalidText")} />

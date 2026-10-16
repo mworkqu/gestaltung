@@ -79,7 +79,7 @@ export function ExerciseWorkspace({
       if (!r.ok) {
         if (r.reason === "unavailable") setView({ kind: "unavailable", file });
         else {
-          const key = r.reason === "forbidden" || r.reason === "locked" || r.reason === "bad_file" ? r.reason : "error";
+          const key = r.reason === "forbidden" || r.reason === "locked" || r.reason === "bad_file" || r.reason === "over_quota" ? r.reason : "error";
           setView({ kind: "error", message: t(`errors.${key}`) });
         }
         return;

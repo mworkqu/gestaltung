@@ -11,6 +11,7 @@ import { graderErrorInfo, type GraderErrorCode } from "../grader/error-codes";
 import { markJourney } from "../journey/server";
 import { isCcLocale } from "../routes";
 import { ccRateLimited } from "../rate-limits";
+import { enforceStorageQuota } from "../upload/quota-server";
 import { isPathUnderPrefix } from "../upload/validate";
 import { markStepDone, setSubItem } from "./server";
 import { MANUALLY_MARKABLE, getStepDef, isGetReadyStepKey } from "./steps";
@@ -22,7 +23,7 @@ export type GetReadyActionResult =
 export type PracticeResult =
   | { ok: true; outcome: "passed"; keys: string[]; complete: boolean; justCompleted: boolean; basicCheckOnly: boolean }
   | { ok: true; outcome: "failed"; errorCode: GraderErrorCode | null; message: string; helpSlug: string | null }
-  | { ok: false; reason: "signed_out" | "not_allowed" | "unavailable" | "not_set_up" | "error" };
+  | { ok: false; reason: "signed_out" | "not_allowed" | "unavailable" | "over_quota" | "not_set_up" | "error" };
 
 /** The practice upload folder; UploadBox gets the same prefix. */
 const practicePrefix = (userId: string) => `${userId}/practice/`;
@@ -53,6 +54,8 @@ export async function gradePracticeAction(path: string, locale: string): Promise
   const userId = cc.user.id;
   if (!isPathUnderPrefix(path, practicePrefix(userId))) return { ok: false, reason: "not_allowed" };
   if (ccRateLimited("grade", userId)) return { ok: false, reason: "unavailable" };
+  const quota = await enforceStorageQuota(userId, PRACTICE_BUCKET, path);
+  if (!quota.ok) return { ok: false, reason: "over_quota" };
   const loc: Locale = isCcLocale(locale) ? locale : "en";
 
   const result = await gradeSubmission({ mode: "practice", bucket: PRACTICE_BUCKET, path });

@@ -55,7 +55,9 @@ def download(url: str, *, max_bytes: int = MAX_BYTES, timeout_s: float = DOWNLOA
     chunks: list[bytes] = []
     size = 0
     try:
-        with httpx.stream("GET", url, timeout=httpx.Timeout(timeout_s), follow_redirects=True) as r:
+        # SR-L18: never follow redirects (Supabase signed URLs answer 200 directly), so a
+        # redirect can never lead the grader past GRADER_ALLOWED_URL_PREFIXES.
+        with httpx.stream("GET", url, timeout=httpx.Timeout(timeout_s), follow_redirects=False) as r:
             if r.status_code != 200:
                 raise GraderError("E_DOWNLOAD_FAILED", reason=f"http_{r.status_code}")
             declared = r.headers.get("content-length")

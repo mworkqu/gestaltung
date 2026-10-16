@@ -188,6 +188,7 @@
       "too_long": "Please keep it under 2000 characters.",
       "too_many": "You already have 3 open questions on this lesson. Wait for an answer first.",
       "bad_image": "The screenshot could not be used. Upload a PNG, JPG or WEBP up to 5 MB.",
+      "over_quota": "Your upload space is full (2 GB), so the screenshot wasn't added. Send the question without it, or message us on WhatsApp.",
       "forbidden": "Join the training to ask about this lesson.",
       "error": "We could not send your question. Try again in a minute."
     },
@@ -229,6 +230,7 @@
       "forbidden": "Join the training to use this exercise.",
       "locked": "This exercise opens when you finish the level before it.",
       "bad_file": "We could not read that file. Upload it again.",
+      "over_quota": "Your upload space is full (2 GB). Message us on WhatsApp and we'll help you make room.",
       "error": "Something went wrong. Try again."
     },
     "checksTitle": "What we checked",
@@ -428,7 +430,8 @@
     "code": "Code",
     "disclaimer": "This is a certificate of training completion from Gestaltung360, not an official competition result.",
     "invalidTitle": "We could not find this certificate",
-    "invalidText": "Check the code on the certificate. It looks like CC-ABCD-2345.",
-    "unavailable": "We could not check certificates right now. Try again later."
+    "invalidText": "Check the code on the certificate. It looks like CC-ABCD-2345-WXYZ (older certificates: CC-ABCD-2345).",
+    "unavailable": "We could not check certificates right now. Try again later.",
+    "tooMany": "Too many checks from your network. Wait a few minutes, then try again."
   }
 }

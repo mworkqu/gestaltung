@@ -4,14 +4,26 @@ Date: 2026-10-15. Branch `cad-champions`. Scope: everything under `app/[locale]/
 
 Each finding is marked **FIXED** (changed in this pass, tests green) or **RECOMMENDED** (owner decision, main-site file, RLS change below High, or a change that needs new UI copy). Paths are relative to the repo root.
 
+**Follow-up pass (2026-10-16):** every RECOMMENDED item that could be done in code or SQL is now FIXED, in migration `0087_cc_security_2.sql` (RUN AFTER 0086) and the files named under each item. The rest wait for the owner and say what is needed.
+
+## What the owner still decides
+
+1. **Run migration 0087** (`supabase/migrations/0087_cc_security_2.sql`, after 0086). Until then the coupon throttle, the tighter data rules and the database storage limit are not live; the app-side parts already work.
+2. **Rate limits in Supabase and the bot check (SR-M2).** In the Supabase dashboard, lower the sign-in, code-check and email limits, and switch on the Turnstile bot check only after its keys work (`docs/TURNSTILE.md`). Today only Supabase's own defaults stop password guessing and email flooding.
+3. **Must a lesson be watched to count? (SR-M3).** Today a student can mark a lesson done without watching it, and that counts toward module certificates. Decide whether a certificate should mean "watched" or "passed the exercises".
+4. **Can students see test tasks before the timer starts? (SR-M4).** Today a student can open the task drawings of a published test before pressing Start. That is a fairness question on timed tests. A switch is ready: set `CC_TASK_FILES_AFTER_START=1` in Vercel and task files open only while the student's own attempt is running. The task text itself is still visible before the start.
+5. **Full Content-Security-Policy (SR-M8).** Needs a test week in report-only mode with the 3D hero and the lesson videos before it is enforced.
+6. **Should shared result links expire? (SR-L17).** Optional. Today they work until the student turns sharing off.
+7. **Use coupon codes of 8 or more random characters.** The throttle slows guessing; long codes make it hopeless.
+
 ## Summary
 
 | Severity | Count | Fixed | Recommended |
 |---|---|---|---|
 | Critical | 0 | 0 | 0 |
 | High | 1 | 1 (migration 0086, owner must run it) | 0 |
-| Medium | 8 | 2 | 6 |
-| Low | 22 | 8 | 13 (+1 accepted by design) |
+| Medium | 8 | 4 (SR-M1, SR-M7 in the follow-up) | 4 (owner: SR-M2, SR-M3, SR-M4, SR-M8) |
+| Low | 22 | 18 (10 in the follow-up; SR-L10 partly) | 3 (SR-L17 owner, SR-L19 and SR-L21 info) (+1 accepted by design) |
 
 What I checked and found sound:
 - **Answer data.** `reference_data`, `rubric` and `tolerances` on tasks and exercises, locked hints, solution video ids, `partial_rule` on aspects, and raw grader output (`cc_grading_logs`) are all unreachable for students and anon.
@@ -51,7 +63,7 @@ None.
 
 ## Medium
 
-### SR-M1: coupon codes can be guessed through PostgREST, bypassing the app's rate limit. RECOMMENDED
+### SR-M1: coupon codes can be guessed through PostgREST, bypassing the app's rate limit. FIXED (0087 / `lib/cad-champions/payments/actions.ts`)
 - **Where:** `0084_cc_payments.sql:213` grants `cc_validate_coupon(text, uuid)` to `authenticated`. The app limits `validateCouponAction` to 10 per 10 minutes (`lib/cad-champions/payments/actions.ts:43`), but `POST /rest/v1/rpc/cc_validate_coupon` with the user's JWT is unlimited.
 - **Impact:** a student can brute-force short coupon codes, such as a 100 % institution code.
 - **Fix:** the function relies on `auth.uid()`, so the grant can't simply be revoked. Add a throttle inside the function (migration 0087):
@@ -67,21 +79,27 @@ None.
   ```
 
   Also tell the owner to use coupon codes of 8 or more random characters.
+- **Applied (0087):** exactly that table and throttle. One change: the throttled answer is `reason: 'too_many'` (not `invalid`), so a student who hit the limit sees "Too many tries. Wait 10 minutes, then try again." (`CC.payments.coupon.errors.too_many`, en + ar) instead of being told a valid code does not exist. The function is now `volatile` (it writes the attempt row) and prunes the caller's rows older than a day.
+- **App side:** `validateCouponAction` returns `too_many` when the in-app limit trips, and `createCheckoutAction` counts a checkout that carries a code against the same `coupon` bucket (checkout reads `cc_coupons` with the service role, so it was a second guessing path).
+- **Test:** `rls.test.ts`, "SR-M1: cc_validate_coupon answers too_many after 10 checks in 10 minutes, per user; the attempts table is private".
 
-### SR-M2: rate limits are per server instance, and sign-in, OTP, resend and password reset have none server-side. RECOMMENDED
+### SR-M2: rate limits are per server instance, and sign-in, OTP, resend and password reset have none server-side. RECOMMENDED (needs owner: Supabase dashboard limits + Turnstile)
 - **Where:** `lib/rate-limit.ts` (in-memory). The CC buckets are in `lib/cad-champions/rate-limits.ts`. Sign-in, OTP, resend and reset call Supabase from the browser: `components/cad-champions/auth/sign-in-form.tsx:91,124,153`, `check-email.tsx:46` and `password-reset.tsx:55`.
 - **Impact:** on Vercel each warm instance keeps its own window, so limits are a brake, not a quota. Credential stuffing and email-bombing are limited only by Supabase Auth's own rate limits.
 - **Fix, with no new paid service:**
   1. Supabase → Authentication → Rate Limits: set sign-in/sign-up, token verification and email sending to the lowest values that fit, for example 30 sign-ins per 5 minutes per IP and 4 emails per hour.
   2. Turn on Supabase Attack Protection → CAPTCHA (Turnstile) only after the site keys and switch are live, in the order given in `docs/TURNSTILE.md`.
   3. For exact limits on the CC actions that matter (sign-up, proof, coupon), add a Postgres counter, either the SR-M1 table pattern or an `ai_rate_limits`-style RPC, instead of Redis.
+- **Needs owner:** steps 1 and 2 are Supabase dashboard settings. The coupon part of step 3 is done (SR-M1).
 
 ### SR-M3: lesson progress is trusted from the browser. RECOMMENDED (owner decision)
+- **Needs owner:** decide whether a certificate means "watched" or "passed the exercises"; behaviour unchanged until then.
 - **Where:** `lib/cad-champions/training/actions.ts:117-131`. `saveLessonProgressAction` takes `second` and `duration` from the client, and `markLessonCompleteAction` completes a lesson outright.
 - **Impact:** watched percent, XP, streaks, badges and, through `refreshModuleRewards`, module certificates can be earned without watching. Certificates are public through `/verify/[code]`.
 - **Fix:** if a certificate should mean "watched", stamp `first_seen_at` on the first progress ping (server clock) and refuse completion until `now() - first_seen_at >= 0.5 * duration_minutes`. Gate certificates on passed exercises rather than lesson completion.
 
 ### SR-M4: test task briefs and attachments can be read before the timed attempt starts. RECOMMENDED (owner decision)
+- **Needs owner:** decide whether files open before Start. Switch ready, default off: `CC_TASK_FILES_AFTER_START=1` makes `createSignedDownload` (`lib/cad-champions/test/actions.ts`) require the caller's own `in_progress` attempt on that test (staff exempt), exactly the check proposed below. Briefs in `cc_test_tasks_public` are not changed.
 - **Where:** `0077_cc_core.sql:1070-1080`. The `cc_test_tasks_public` view shows every task of every published test to any signed-in user. `lib/cad-champions/test/actions.ts:323` `createSignedDownload` signs a task file for anyone who can see the view.
 - **Impact:** a student can read the diagnostic or mock tasks and drawings before starting the clock. That is a fairness issue on timed tests, not a data leak.
 - **Fix:** in `createSignedDownload`, require an `in_progress` attempt of the caller on that task's test, or staff:
@@ -107,12 +125,19 @@ None.
 - **Impact:** a `.pdf` payment proof that was really a PNG, or the reverse, was accepted. That made polyglot and mislabelled files reach the admin PDF viewer.
 - **Fix:** `validateHeader(bytes, accept, name?)` now requires the signature of that extension (`.pdf` → `%PDF-`, `.png` → PNG, and so on). `verifyUploadedObject` passes the stored path. Covered by tests in `validate.test.ts`.
 
-### SR-M7: no per-user storage quota on direct uploads. RECOMMENDED
+### SR-M7: no per-user storage quota on direct uploads. FIXED (0087 / `lib/cad-champions/upload/quota*.ts`)
 - **Where:** `0078_cc_storage.sql:103-109,126-132`. Insert-own policies pin only the first folder segment.
 - **Impact:** a student can fill their own folder with many maximum-size objects (50 MB, or 300 MB for ZIPs). Nothing is overwritten, because there is no update or delete policy and the app uses `upsert:false`. The cost is storage.
 - **Fix:** add a weekly cron that deletes objects in `cc-submissions` and `cc-payment-proofs` older than 7 days that no `cc_submissions`, `cc_exercise_attempts`, `cc_lesson_questions` or `cc_payments` row references. Optionally add an insert policy check `(select count(*) from storage.objects o where o.bucket_id = bucket_id and o.owner = auth.uid() and o.created_at > now() - interval '1 day') < 200`.
+- **Applied (follow-up):** a per-student quota instead of the cleanup cron.
+  - Quota: 2 GiB per student in `cc-submissions` (test files, package ZIPs, Get Ready practice files, exercise files, question screenshots), counted from `storage.objects.metadata->>'size'` by `public.cc_storage_used_bytes(user)` (0087, service role only).
+  - Database: the own-folder insert policies of `cc-submissions` and `cc-payment-proofs` now also call `public.cc_storage_upload_allowed(bucket)` (0087, SECURITY DEFINER): refused at 2 GiB stored in `cc-submissions`, or at 200 new objects in 24 hours across both buckets. Staff are not limited. Payment proofs are never blocked by the byte quota, only by the daily count.
+  - App: `enforceStorageQuota()` (`lib/cad-champions/upload/quota-server.ts`) runs after the file passed its checks in `recordSubmissionAction`, `gradeExerciseAction`, `gradePracticeAction` and `askLessonQuestionAction`. Over the quota it removes the just-uploaded object and returns `over_quota`, shown in en + ar (`CC.test.workspace.saveFailed.over_quota`, `CC.training.ask.errors.over_quota`, `CC.training.exercise.errors.over_quota`, `CC.get-ready.practice.quotaTitle/quotaBody`). Before 0087 runs, or if the check fails, uploads are allowed (never lose work).
+  - Numbers live in `lib/cad-champions/upload/quota.ts`; `quota.test.ts` checks the migration uses the same ones.
+- **Tests:** `rls.test.ts`, the three "SR-M7: …" cases (byte count is service-role only; over 2 GiB blocked while proofs still work; 200 a day blocked, staff not).
 
 ### SR-M8: a full Content-Security-Policy is not applied yet. RECOMMENDED (needs testing with the 3D hero and the Bunny iframe)
+- **Needs owner:** a report-only test week on the live site before enforcing; not applied in the follow-up by instruction.
 - **Current state:**
   - The CC branch now sends `frame-ancestors` (see SR-L20) and `Referrer-Policy`, `X-Content-Type-Options` and `Permissions-Policy`.
   - Vercel already sends `Strict-Transport-Security: max-age=63072000` (checked live on gestaltung360.com).
@@ -143,7 +168,7 @@ None.
 
 ## Low
 
-### SR-L1: instructors read every payment row. RECOMMENDED (SQL)
+### SR-L1: instructors read every payment row. FIXED (0087)
 - **Where:** `0077_cc_core.sql:1305-1313`, where `cc_payments_select` uses `cc_is_staff()`.
 - **Impact:** instructors see payer name, bank and transfer reference.
 - **Fix:**
@@ -154,18 +179,23 @@ None.
     using (user_id = (select auth.uid()) or public.cc_is_admin());
   ```
 
-- **Test:** un-skip "GAP SR-L1" in `rls.test.ts`.
+- **Applied:** as above. The admin pages read payments with the service role after `adminGuard`, so nothing in the app changes.
+- **Test:** `rls.test.ts`, "SR-L1: instructors cannot read payment rows; CC admins and the owner can".
 
-### SR-L2: `cc_has_active_enrollment(p_user)` answers for any user id. RECOMMENDED (SQL)
+### SR-L2: `cc_has_active_enrollment(p_user)` answers for any user id. FIXED (0087)
 - **Where:** `0077_cc_core.sql:975-989`.
 - **Fix:** add `and (p_user = (select auth.uid()) or (select auth.uid()) is null or public.cc_is_staff())` to its `where`. The service role has a null `auth.uid()`, and anon has no grant.
+- **Applied, with one correction:** anon DID have execute (0077 granted to `authenticated` but never revoked PUBLIC's default), and with no session anon would have counted as the service role. 0087 also revokes execute from `public, anon`.
+- **Test:** `rls.test.ts`, "SR-L2: a student cannot learn whether another student is enrolled; self, staff and the service role can".
 
-### SR-L3: a student can insert the grader-only Get Ready key `practice_upload` directly. RECOMMENDED (SQL)
+### SR-L3: a student can insert the grader-only Get Ready key `practice_upload` directly. FIXED (0087 / `lib/cad-champions/get-ready/server.ts`)
 - **Where:** `0077_cc_core.sql:1197-1200`.
 - **Fix:** `with check (user_id = (select auth.uid()) and step_key <> 'practice_upload')` on `cc_get_ready_steps_insert_own` and `_update_own`.
 - **Before applying:** first confirm that `lib/cad-champions/get-ready/server.ts` `upsertKeys` writes with the service role.
+- **Applied:** it did NOT (it used the student's session), so `upsertKeys` now writes `practice_upload` with the service role (only after `gradePracticeAction` saw a pass); every other key still goes through the student's RLS session.
+- **Test:** `rls.test.ts`, "SR-L3: a student cannot self-insert or rename a row to practice_upload; other keys and the service role still work".
 
-### SR-L4: a grade query can reference another student's attempt, and `image_path` is unconstrained. RECOMMENDED (SQL)
+### SR-L4: a grade query can reference another student's attempt, and `image_path` is unconstrained. FIXED (0087)
 - **Where:** `0077_cc_core.sql:1367-1371`.
 - **Fix:**
 
@@ -175,14 +205,18 @@ None.
   and (image_path is null or image_path like (select auth.uid())::text || '/%')
   ```
 
-### SR-L5: public answered FAQ rows expose the asker's `user_id`. RECOMMENDED
+- **Test:** `rls.test.ts`, "SR-L4: a grade query can only reference the asker's own attempt and own image folder".
+
+### SR-L5: public answered FAQ rows expose the asker's `user_id`. FIXED (0087 / lesson page)
 - **Where:** `0077_cc_core.sql:1360-1365`. No name is exposed, because profiles stay private.
 - **Fix:** serve public FAQs through a view without `user_id`, `attempt_id` and `image_path`, or through column grants.
-- **Test:** documented in `rls.test.ts` ("documents SR-L5").
+- **Applied:** the select policy no longer has the "public answered FAQ" branch (students read only their own questions; staff read all). The lesson page (`app/[locale]/cad-champions/training/lessons/[slug]/page.tsx`) reads public FAQs on the server with the service role and selects only `id, body, answer`. No view needed.
+- **Test:** `rls.test.ts`, "SR-L5: a student cannot read another student's public answered FAQ row (or its user_id); staff and the asker can".
 
-### SR-L6: lesson paid-column privacy depends on migration order. RECOMMENDED (runbook)
+### SR-L6: lesson paid-column privacy depends on migration order. FIXED (`docs/cad-champions/DEPLOY.md` §2.1)
 - **Where:** `0083_cc_training_seed.sql:104-113`. Re-running 0077 re-grants table-wide select on `cc_lessons`.
 - **Fix:** add "re-run 0083 and 0086 after any re-run of 0077 or 0078" to `docs/cad-champions/DEPLOY.md`.
+- **Applied:** DEPLOY.md §2.1 now lists 0086 and 0087 and says: after any re-run of 0077, 0078 or 0084 (0084 restores the unthrottled coupon check), run 0083, 0086 and 0087 again. The 0087 header says the same.
 
 ### SR-L7: `checkUploadAction` had no limiter and trusted the client's `maxBytes` up to 300 MB. FIXED
 - **Where:** `lib/cad-champions/upload/actions.ts`.
@@ -209,18 +243,21 @@ None.
 - **Impact:** a name using U+202E could spoof admin lists, and `review-server.ts` passes it as a `download` name.
 - **Fix:** the new `cleanDisplayFileName()` in `lib/cad-champions/upload/validate.ts` drops path parts, C0 and C1 controls, LRM/RLM, and U+202A–202E / U+2066–2069, then caps the length. It is covered by tests. Storage keys already used `safeFileName`, which is ASCII only.
 
-### SR-L10: the client-sent `sha256` and `size` are stored unverified. RECOMMENDED
+### SR-L10: the client-sent `sha256` and `size` are stored unverified. FIXED for `size` (`lib/cad-champions/upload/server.ts`); `sha256` open
 - **Where:** `test/actions.ts` around line 194 and `training/actions.ts` around line 330.
 - **Impact:** both are informational. The real size check uses the stored object, and the duplicate-file integrity flag compares `sha256`, so a student can dodge that flag.
 - **Fix:** return `size` from `verifyUploadedObject` and store that. For the integrity flag, hash server-side in the grader, which already downloads STEP files.
+- **Applied:** `verifyUploadedObject` returns the stored object's real size; `recordSubmissionAction` and `gradeExerciseAction` store it as `file_size` and ignore the browser's number.
+- **Still open (grader change, no owner decision):** hashing in the grader for the duplicate-file flag needs a grader API change and redeploy of the Cloud Run service; left for the next grader release. The flag stays informational until then.
 
 ### SR-L11: `readObjectHead` could download a whole object if Storage ignored `Range`. FIXED
 - **Where:** `lib/cad-champions/upload/server.ts:50`.
 - **Fix:** it now reads at most the first 64 bytes from the body stream and cancels the rest.
 
-### SR-L12: encrypted ZIP entries are accepted by the package check without a warning. RECOMMENDED
+### SR-L12: encrypted ZIP entries are accepted by the package check without a warning. FIXED (`lib/cad-champions/upload/package-check.ts`)
 - **Where:** `lib/cad-champions/upload/package-check.ts`. The grader skips them (`grader/zip-extract.ts:17`, `grader/plan.ts:120`).
 - **Fix:** add an `encrypted_entry` warning. This needs new en and ar strings, so it is left for the QA pass.
+- **Applied:** `checkPackage` adds `{ code: "encrypted_entry", file }` for each password-protected file; the package panel shows `CC.test.package.warnings.encrypted_entry` (en + ar). Test in `package-check.test.ts`.
 
 ### SR-L13: announcement subjects kept inner CR/LF. FIXED
 - **Where:** `lib/cad-champions/admin/announcements.ts` (`validateAnnouncement`).
@@ -234,20 +271,24 @@ None.
 - **Where:** `test/actions.ts:381`.
 - **Fix:** it now runs a UUID check before the query.
 
-### SR-L16: certificate codes are short and the verify page is unthrottled. RECOMMENDED
+### SR-L16: certificate codes are short and the verify page is unthrottled. FIXED (`lib/cad-champions/training/certificate.ts`, verify page)
 - **Where:** `lib/cad-champions/training/certificate.ts:15-20`. Codes are 8 characters from a 31-character alphabet, about 39.7 bits, with a slight modulo bias. `/verify/[code]` returns the holder's name.
 - **Fix:** use 12 characters with rejection sampling (`if (b >= 248) continue`), and add an IP limiter (`createRateLimiter` + `clientIp`) on the verify page. Existing codes stay valid.
+- **Applied:** new codes are `CC-XXXX-XXXX-XXXX` (about 59 bits, no modulo bias); `normaliseCertificateCode` accepts both lengths. `/verify/[code]` is limited to 30 checks per IP per 10 minutes (`verify` bucket in `lib/cad-champions/rate-limits.ts`) and then shows `CC.training.verify.tooMany` (en + ar). Tests in `training.test.ts`.
 
 ### SR-L17: share tokens never expire. RECOMMENDED (optional)
+- **Needs owner:** decide whether shared result links should expire, and after how long.
 - **Context:** tokens are 192 bits (`randomBytes(24)`), revocable (turning sharing off nulls the token), and the shared payload is first name, band and area scores only (`0081_cc_results.sql:36-62`).
 - **Optional fix:** add `share_expires_at` and check `now() < share_expires_at` in `cc_shared_result`.
 
-### SR-L18: the grader follows redirects and accepts any `https://` URL when `GRADER_ALLOWED_URL_PREFIXES` is unset. RECOMMENDED
+### SR-L18: the grader follows redirects and accepts any `https://` URL when `GRADER_ALLOWED_URL_PREFIXES` is unset. FIXED (`grader/app/measure.py`, takes effect on the next grader deploy)
 - **Where:** `grader/app/measure.py:40-58`.
 - **Context:** `GRADER_SECRET` is required and compared with `hmac.compare_digest`, and the service answers 503 when it is unset. The deploy command in `docs/cad-champions/DEPLOY.md:114` sets the prefix.
 - **Fix:** keep that prefix in production. Use `follow_redirects=False` (Supabase signed URLs do not redirect), or re-check `_allowed_url` on the final URL.
+- **Applied:** `download()` uses `follow_redirects=False`; a redirect now fails as `E_DOWNLOAD_FAILED` (`http_30x`). Python tests were not run here (no pytest on this machine); the change is one argument.
 
 ### SR-L19: `GET /api/cad-champions/attempts/[id]/status` changes state. RECOMMENDED (info)
+- **Open (info, no action needed):** owner or staff only and idempotent; revisit only if the route is reworked.
 - **Context:** it calls `closeIfExpired`. It is owner or staff only and idempotent, so the risk is minimal. Move the close to the cron or a POST if it is ever reworked.
 
 ### SR-L20: CC pages allowed same-origin framing. FIXED
@@ -258,6 +299,7 @@ None.
 - Covered by `lib/cad-champions/security-headers.test.ts`.
 
 ### SR-L21: the SkipCash webhook has no timestamp or nonce. RECOMMENDED (info)
+- **Open (info, no action needed):** replays cannot move a paid payment backwards; SkipCash is disabled.
 - **Context:**
   - The HMAC is checked in constant time, and the route refuses to run with no key set.
   - Bodies over 20 KB are refused.
@@ -284,7 +326,7 @@ None.
   - Anon reads no private table, answer table or view.
   - `cc_verify_certificate` returns only code, name, module and date.
   - SR-L5 is documented.
-- **Remaining skipped `GAP` tests:** SR-M1 (coupon RPC), SR-L1, SR-L2, SR-L3 and SR-L4. Their current behaviour is pinned by "documents current behaviour of the gaps", so the skips can't rot silently. Flip each one when its SQL lands.
+- **Follow-up (0087):** the skipped `GAP` tests and "documents current behaviour of the gaps" are replaced by passing cases for SR-M1, SR-M7 (three), SR-L1, SR-L2, SR-L3, SR-L4 and SR-L5. The chain now runs 0077–0087, with 0087 applied twice to prove it is re-runnable. No skipped tests remain.
 
 ### 2. Server checks
 - **Coverage:** all 31 `"use server"` files and 11 CC route handlers were read.
@@ -313,13 +355,14 @@ None.
 | Endpoint | Status |
 |---|---|
 | Sign-up | Present: IP, 8 per 10 min (`sign-up/actions.ts:42`) |
+| Certificate check (`/verify/[code]`) | FIXED: `verify`, 30 per IP per 10 min (SR-L16) |
 | Sign-in, OTP, resend, password reset | Supabase Auth only. See SR-M2 |
 | Uploads (record, package, check) | Present: `upload` (check: FIXED SR-L7) |
 | Grading (exercise, practice) | Present: `grade` |
 | AI drawing checks | Not user-triggerable. They run once per finalised attempt and are bounded by the retake cooldown |
 | Payment proof | Present: `proof` |
 | Checkout | Present: `checkout` |
-| Coupon | Present: `coupon` in the app. The RPC is open (SR-M1) |
+| Coupon | Present: `coupon` in the app (also counted on checkout with a code) and inside `cc_validate_coupon` (0087, SR-M1) |
 | Questions and grade queries | Present: `question`, plus 3 open per lesson |
 | Help feedback | Present: IP, 20 per 10 min |
 | Translate (staff AI) | Present: `translate` |
@@ -350,7 +393,19 @@ All limiters are per instance (SR-M2).
 
 ---
 
-## Files changed in this pass
+## Files changed in the follow-up pass (2026-10-16)
+- `supabase/migrations/0087_cc_security_2.sql`: **new, owner runs it after 0086** (SR-M1, SR-M7, SR-L1 to SR-L5).
+- `lib/cad-champions/db/rls.test.ts`: `metadata` on the storage stub, chain through 0087 (twice), gap tests replaced by passing cases.
+- `lib/cad-champions/upload/quota.ts`, `quota-server.ts`, `quota.test.ts` (new); `lib/cad-champions/upload/server.ts` (real size, SR-L10); `lib/cad-champions/upload/package-check.ts` + test (SR-L12).
+- `lib/cad-champions/test/actions.ts` (quota, real size, SR-M4 switch), `lib/cad-champions/training/actions.ts` (quota, real size), `lib/cad-champions/get-ready/actions.ts` (quota), `lib/cad-champions/get-ready/server.ts` (service-role write of `practice_upload`, SR-L3).
+- `lib/cad-champions/payments/actions.ts`, `lib/cad-champions/payments/server.ts` (`too_many`, SR-M1).
+- `lib/cad-champions/training/certificate.ts` + `training.test.ts`, `lib/cad-champions/rate-limits.ts`, `app/[locale]/cad-champions/verify/[code]/page.tsx` (SR-L16).
+- `app/[locale]/cad-champions/training/lessons/[slug]/page.tsx` (SR-L5).
+- `components/cad-champions/test/package-panel.tsx`, `components/cad-champions/training/exercise-workspace.tsx`, `components/cad-champions/get-ready/step-practice.tsx` (new messages).
+- `messages/cad-champions/{en,ar}/{payments,test,training,get-ready}.json` (new strings, both languages).
+- `grader/app/measure.py` (SR-L18), `docs/cad-champions/DEPLOY.md` (SR-L6), `.env.example` (`CC_TASK_FILES_AFTER_START`, main-site shared file).
+
+## Files changed in the first pass
 - `supabase/migrations/0086_cc_security.sql`: **new, owner runs it after 0085** (SR-H1).
 - `lib/cad-champions/security-headers.ts` and `.test.ts`, plus the `middleware.ts` CC branch (`applyCcSecurityHeaders(res.headers, rest)`): SR-L20.
 - `lib/cad-champions/upload/validate.ts` and `.test.ts`, and `lib/cad-champions/upload/server.ts`: SR-M6, SR-L9, SR-L11.
@@ -362,6 +417,9 @@ All limiters are per instance (SR-M2).
 - `scripts/cc-secret-scan.mjs`: finished, with the `"use client"` source check added.
 
 ## Verification
+Follow-up pass (2026-10-16): `npx tsc --noEmit -p .` clean; `npm run lint` clean; `npm run i18n:check` OK; `npx vitest run lib/cad-champions`: 90 files, 1030 passed, 0 skipped.
+
+First pass:
 - `npx tsc --noEmit -p .`: clean.
 - `npm run lint` (eslint + CC RTL check): clean.
 - `npx vitest run lib/cad-champions`: 89 files, 1019 passed, 5 skipped (the documented gaps).

@@ -34,6 +34,8 @@ export const CC_RATE_LIMITS = {
   action: { limit: 60, windowMs: 10 * MIN },
   /** Payment status polling (may call the SkipCash API): a poll every ~3 s for 10 min fits. */
   poll: { limit: 240, windowMs: 10 * MIN },
+  /** Public certificate checks, keyed by IP (SR-L16: stops walking the code space). */
+  verify: { limit: 30, windowMs: 10 * MIN },
 } as const;
 
 export type CcRateBucket = keyof typeof CC_RATE_LIMITS;

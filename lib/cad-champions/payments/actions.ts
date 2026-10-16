@@ -40,7 +40,8 @@ function revalidatePayment(paymentId?: string) {
 export async function validateCouponAction(input: { code: string; planId: string }): Promise<CouponCheck> {
   const cc = await getCcUser();
   if (!cc) return { ok: false, reason: "signed_out" };
-  if (ccRateLimited("coupon", cc.user.id)) return { ok: false, reason: "error" };
+  // SR-M1: the app limit; cc_validate_coupon (0087) enforces the same 10 per 10 minutes in the database.
+  if (ccRateLimited("coupon", cc.user.id)) return { ok: false, reason: "too_many" };
   const code = String(input?.code ?? "").slice(0, 40);
   if (!code.trim() || !isUuid(input?.planId)) return { ok: false, reason: "invalid" };
   return validateCouponForUser(code, input.planId);
@@ -58,6 +59,8 @@ export async function createCheckoutAction(input: {
   const cc = await getCcUser();
   if (!cc) return { ok: false, error: "signed_out" };
   if (ccRateLimited("checkout", cc.user.id)) return { ok: false, error: "error" };
+  // SR-M1: a checkout with a code is also a coupon guess (the server reads cc_coupons directly).
+  if (input?.couponCode && ccRateLimited("coupon", cc.user.id)) return { ok: false, error: "error" };
   const locale: Locale = isCcLocale(input?.locale) ? input.locale : "en";
   const res = await createCheckout(
     cc,

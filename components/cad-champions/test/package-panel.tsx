@@ -129,6 +129,8 @@ export function PackagePanel({
         return t.rich("package.warnings.missing_file", { label: w.label, task: taskTitle(w.taskId), b: (c) => <Ltr>{c}</Ltr> });
       case "outside_results":
         return t.rich("package.warnings.outside_results", { file: w.file, b: (c) => <Ltr>{c}</Ltr> });
+      case "encrypted_entry":
+        return t.rich("package.warnings.encrypted_entry", { file: w.file, b: (c) => <Ltr>{c}</Ltr> });
     }
   }
 

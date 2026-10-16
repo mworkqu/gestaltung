@@ -141,6 +141,12 @@ describe("checkPackage", () => {
     expect(m.warnings).toContainEqual({ code: "outside_results", file: `${ROOT}/Misc/a.step` });
   });
 
+  it("warns about password-protected entries (SR-L12)", () => {
+    const m = checkPackage([...allFolders, { ...f(`${ROOT}/PDF files/secret.pdf`), encrypted: true }, f(`${ROOT}/PDF files/a.pdf`)], parseExpectations({}));
+    expect(m.warnings).toContainEqual({ code: "encrypted_entry", file: `${ROOT}/PDF files/secret.pdf` });
+    expect(m.warnings.filter((w) => w.code === "encrypted_entry")).toHaveLength(1);
+  });
+
   it("ignores OS junk", () => {
     const m = checkPackage([...allFolders, f("__MACOSX/._x"), f(`${ROOT}/PDF files/.DS_Store`), f(`${ROOT}/PDF files/a.pdf`)], parseExpectations({}));
     expect(m.fileCount).toBe(1);

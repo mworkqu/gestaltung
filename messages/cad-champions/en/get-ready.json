@@ -415,7 +415,9 @@
     "unavailableBody": "Your file uploaded, but our checker is not available. Try again in a few minutes.",
     "retryCheck": "Check again",
     "errorTitle": "Something went wrong",
-    "errorBody": "We couldn't finish the check. Try uploading again."
+    "errorBody": "We couldn't finish the check. Try uploading again.",
+    "quotaTitle": "Your upload space is full",
+    "quotaBody": "You have used all 2 GB of your upload space. Message us on WhatsApp and we'll help you make room."
   },
   "demo": {
     "intro": "This is a practice copy of the test screen with a sample task. The timer is fake and nothing is saved.",

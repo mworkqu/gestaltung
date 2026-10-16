@@ -53,7 +53,8 @@ create table storage.objects (
   bucket_id text references storage.buckets (id),
   name text not null,
   owner uuid default auth.uid(),
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  metadata jsonb
 );
 alter table storage.objects enable row level security;
 grant select on storage.buckets to anon, authenticated;
@@ -457,11 +458,11 @@ describe("storage", () => {
 // ============================================================================
 // Prompt 12 Step A: launch RLS audit against the FULL CC chain (0077-0085).
 // Own PGlite instance so the 0077/0078-only checks above stay unchanged.
-// Cases that document a real gap are `it.skip` with a pointer to the finding
-// in docs/cad-champions/SECURITY_REVIEW.md (fix SQL there; migrations are not
-// edited by this review).
+// Cases named "SR-…" prove a finding in docs/cad-champions/SECURITY_REVIEW.md is closed
+// (0086 closed SR-H1; 0087 closed SR-M1, SR-M7 and SR-L1 to SR-L5).
+//
 // ============================================================================
-describe("launch audit: full chain 0077-0085", () => {
+describe("launch audit: full chain 0077-0087", () => {
   let f: PGlite;
   const PLAN = "cc120000-0000-4000-8000-000000000001";
   const PAY_A = "cc120000-0000-4000-8000-0000000000a1";
@@ -484,7 +485,7 @@ describe("launch audit: full chain 0077-0085", () => {
     await f.exec(SUPABASE_STUB);
     for (const m of ["0077_cc_core.sql", "0078_cc_storage.sql", "0080_cc_diagnostic_seed.sql", "0081_cc_results.sql",
                      "0082_cc_drawing_rubric.sql", "0083_cc_training_seed.sql", "0084_cc_payments.sql", "0085_cc_admin.sql",
-                     "0086_cc_security.sql"]) {
+                     "0086_cc_security.sql", "0087_cc_security_2.sql", "0087_cc_security_2.sql"]) {
       await f.exec(migration(m));
     }
     await f.exec(`
@@ -704,14 +705,19 @@ describe("launch audit: full chain 0077-0085", () => {
     expect((await q<{ r: unknown }>("select public.cc_verify_certificate('CERTB') as r"))[0].r).toBeNull();
   });
 
-  // SR-L5: answered public FAQ questions expose the asker's user id (no name: profiles stay private).
-  it("documents SR-L5: a public answered FAQ row carries the asker's user_id", async () => {
+  // SR-L5 (FIXED by 0087): answered public FAQ rows exposed the asker's user_id.
+  // Students now read only their own questions; the lesson page reads public
+  // FAQs server-side (service role, id/body/answer only).
+  it("SR-L5: a student cannot read another student's public answered FAQ row (or its user_id); staff and the asker can", async () => {
     await who(I);
     await q("update public.cc_lesson_questions set status = 'answered', answer = 'a', public = true where user_id = $1", [B]);
     await who(A);
-    expect(await q("select user_id from public.cc_lesson_questions where user_id = $1", [B])).toHaveLength(1);
-    expect(await q("select id from public.cc_profiles where id = $1", [B])).toHaveLength(0);
+    expect(await q("select user_id from public.cc_lesson_questions where user_id = $1", [B])).toHaveLength(0);
+    expect(await q("select id from public.cc_lesson_questions where public")).toHaveLength(0);
+    await who(B);
+    expect(await q("select id from public.cc_lesson_questions where public")).toHaveLength(1);
     await who(I);
+    expect(await q("select id from public.cc_lesson_questions where public")).toHaveLength(1);
     await q("update public.cc_lesson_questions set status = 'open', answer = null, public = false where user_id = $1", [B]);
   });
 
@@ -732,49 +738,126 @@ describe("launch audit: full chain 0077-0085", () => {
     expect(await q("select name from storage.objects where bucket_id in ('cc-lesson-files', 'cc-task-files')")).toHaveLength(2);
   });
 
-  // SR-M2: cc_validate_coupon is executable by `authenticated`, so coupon codes
-  // can be brute-forced through PostgREST /rpc without the app's rate limit.
-  it.skip("GAP SR-M2: students cannot call cc_validate_coupon directly", async () => {
+  // SR-M1 (FIXED by 0087): coupon codes could be guessed through /rpc/cc_validate_coupon
+  // without the app's limit. The function now allows 10 checks per user per 10 minutes.
+  it("SR-M1: cc_validate_coupon answers too_many after 10 checks in 10 minutes, per user; the attempts table is private", async () => {
     await who(A);
+    for (let i = 0; i < 10; i++) {
+      const code = i % 2 ? "SECRET50" : `GUESS${i}`;
+      const r = (await q<{ r: { ok: boolean; reason?: string } }>("select public.cc_validate_coupon($1, $2) as r", [code, PLAN]))[0].r;
+      expect(r.reason ?? "ok", `check ${i}`).not.toBe("too_many");
+    }
+    const blocked = (await q<{ r: { ok: boolean; reason?: string } }>("select public.cc_validate_coupon('SECRET50', $1) as r", [PLAN]))[0].r;
+    expect(blocked).toEqual({ ok: false, reason: "too_many" });
+    await expect(q("select * from public.cc_coupon_attempts")).rejects.toThrow(/permission denied/);
+    await expect(q("delete from public.cc_coupon_attempts")).rejects.toThrow(/permission denied/);
+    await who(B);
+    expect((await q<{ r: { ok: boolean } }>("select public.cc_validate_coupon('SECRET50', $1) as r", [PLAN]))[0].r.ok).toBe(true);
+    await who(null);
     await expect(q("select public.cc_validate_coupon('SECRET50', $1)", [PLAN])).rejects.toThrow(/permission denied/);
   });
 
-  // SR-L1: instructors read every payment row (payer name, bank, transfer reference).
-  it.skip("GAP SR-L1: instructors cannot read payment rows", async () => {
+  // SR-L1 (FIXED by 0087): instructors read every payment row (payer name, bank, transfer reference).
+  it("SR-L1: instructors cannot read payment rows; CC admins and the owner can", async () => {
     await who(I);
     expect(await q("select id from public.cc_payments")).toHaveLength(0);
+    await who(M);
+    expect(await q("select id from public.cc_payments")).toHaveLength(2);
+    await who(B);
+    expect((await q<{ id: string }>("select id from public.cc_payments")).map((r) => r.id)).toEqual([PAY_B]);
   });
 
-  // SR-L2: cc_has_active_enrollment(p_user) answers for any user id.
-  it.skip("GAP SR-L2: a student cannot ask whether another student is enrolled", async () => {
+  // SR-L2 (FIXED by 0087): cc_has_active_enrollment(p_user) answered for any user id.
+  it("SR-L2: a student cannot learn whether another student is enrolled; self, staff and the service role can", async () => {
+    await f.exec("reset role");
+    await f.query("insert into public.cc_enrollments (user_id, source, ends_at) values ($1, 'admin', now() + interval '30 days')", [B]);
+    const enrolled = async () => (await q<{ e: boolean }>("select public.cc_has_active_enrollment($1) as e", [B]))[0].e;
     await who(A);
+    expect(await enrolled()).toBe(false);
+    await who(B);
+    expect(await enrolled()).toBe(true);
+    await who(I);
+    expect(await enrolled()).toBe(true);
+    await who("service");
+    expect(await enrolled()).toBe(true);
+    await who(null);
     await expect(q("select public.cc_has_active_enrollment($1)", [B])).rejects.toThrow(/permission denied/);
+    await f.exec("reset role");
+    await f.query("delete from public.cc_enrollments where user_id = $1", [B]);
   });
 
-  // SR-L3: a student can insert the grader-only Get Ready key directly.
-  it.skip("GAP SR-L3: a student cannot self-insert the practice_upload Get Ready step", async () => {
+  // SR-L3 (FIXED by 0087): a student could insert the grader-only Get Ready key directly.
+  it("SR-L3: a student cannot self-insert or rename a row to practice_upload; other keys and the service role still work", async () => {
     await who(A);
     await expect(q("insert into public.cc_get_ready_steps (user_id, step_key) values ($1, 'practice_upload')", [A])).rejects.toThrow(/row-level security/);
+    expect(await q("insert into public.cc_get_ready_steps (user_id, step_key) values ($1, 'software') returning step_key", [A])).toHaveLength(1);
+    await expect(q("update public.cc_get_ready_steps set step_key = 'practice_upload' where user_id = $1 and step_key = 'software'", [A])).rejects.toThrow(/row-level security/);
+    await who("service");
+    expect(await q("insert into public.cc_get_ready_steps (user_id, step_key) values ($1, 'practice_upload') returning step_key", [A])).toHaveLength(1);
+    await who(A);
+    expect((await q<{ step_key: string }>("select step_key from public.cc_get_ready_steps where user_id = $1 order by step_key", [A])).map((r) => r.step_key)).toEqual(["practice_upload", "software"]);
   });
 
-  // SR-L4: a grade query may point at another student's attempt.
-  it.skip("GAP SR-L4: a grade query can only reference the asker's own attempt", async () => {
+  // SR-L4 (FIXED by 0087): a grade query could reference another student's attempt; image_path was unconstrained.
+  it("SR-L4: a grade query can only reference the asker's own attempt and own image folder", async () => {
     await who(A);
     await expect(
       q("insert into public.cc_lesson_questions (user_id, kind, attempt_id, body) values ($1, 'grade_query', $2, 'why?')", [A, attB]),
     ).rejects.toThrow(/row-level security/);
+    await expect(
+      q("insert into public.cc_lesson_questions (user_id, kind, body, image_path) values ($1, 'lesson', 'look', $2)", [A, `${B}/questions/x.png`]),
+    ).rejects.toThrow(/row-level security/);
+    expect(
+      await q("insert into public.cc_lesson_questions (user_id, kind, attempt_id, body) values ($1, 'grade_query', $2, 'why?') returning id", [A, attA]),
+    ).toHaveLength(1);
+    expect(
+      await q("insert into public.cc_lesson_questions (user_id, kind, body, image_path) values ($1, 'lesson', 'look', $2) returning id", [A, `${A}/questions/x.png`]),
+    ).toHaveLength(1);
   });
 
-  // The gaps above are real today: these prove it, so the skips cannot rot silently.
-  it("documents current behaviour of the gaps (flip with the fixes)", async () => {
+  // SR-M7 (FIXED by 0087): no per-user storage quota on direct uploads.
+  it("SR-M7: cc_storage_used_bytes is service-role only and counts the user's cc-submissions bytes", async () => {
+    await f.exec("reset role");
+    await f.query(
+      `insert into storage.objects (bucket_id, name, owner, metadata) values
+         ('cc-submissions', $1, $2, '{"size": 1000}'), ('cc-submissions', $3, $2, '{"size": 234}'),
+         ('cc-payment-proofs', $4, $2, '{"size": 99999}')`,
+      [`${A}/quota/a.step`, A, `${A}/practice/b.step`, `${A}/pay/c.png`],
+    );
     await who(A);
-    expect((await q<{ r: { ok: boolean } }>("select public.cc_validate_coupon('SECRET50', $1) as r", [PLAN]))[0].r.ok).toBe(true);
-    expect(await q("select public.cc_has_active_enrollment($1)", [B])).toHaveLength(1);
-    expect(await q("insert into public.cc_get_ready_steps (user_id, step_key) values ($1, 'practice_upload') returning step_key", [A])).toHaveLength(1);
-    expect(
-      await q("insert into public.cc_lesson_questions (user_id, kind, attempt_id, body) values ($1, 'grade_query', $2, 'why?') returning id", [A, attB]),
-    ).toHaveLength(1);
-    await who(I);
-    expect(await q("select id from public.cc_payments")).toHaveLength(2);
+    await expect(q("select public.cc_storage_used_bytes($1)", [A])).rejects.toThrow(/permission denied/);
+    await who("service");
+    expect(Number((await q<{ n: string }>("select public.cc_storage_used_bytes($1) as n", [A]))[0].n)).toBe(1234);
+    expect(Number((await q<{ n: string }>("select public.cc_storage_used_bytes($1) as n", [B]))[0].n)).toBe(0);
+  });
+
+  it("SR-M7: a student over 2 GiB cannot add files to cc-submissions (payment proofs still work)", async () => {
+    await f.exec("reset role");
+    await f.query(`insert into storage.objects (bucket_id, name, owner, metadata) values ('cc-submissions', $1, $2, '{"size": 2147483648}')`, [`${A}/quota/big.zip`, A]);
+    await who(A);
+    await expect(q("insert into storage.objects (bucket_id, name) values ('cc-submissions', $1)", [`${A}/quota/one-more.step`])).rejects.toThrow(/row-level security/);
+    expect(await q("insert into storage.objects (bucket_id, name) values ('cc-payment-proofs', $1) returning id", [`${A}/pay/proof.png`])).toHaveLength(1);
+    await f.exec("reset role");
+    await f.query("delete from storage.objects where name = $1", [`${A}/quota/big.zip`]);
+    await who(A);
+    expect(await q("insert into storage.objects (bucket_id, name) values ('cc-submissions', $1) returning id", [`${A}/quota/one-more.step`])).toHaveLength(1);
+  });
+
+  it("SR-M7: a student who created 200 objects in 24 hours cannot add more, in either bucket; staff are not limited", async () => {
+    await f.exec("reset role");
+    await f.query(
+      `insert into storage.objects (bucket_id, name, owner, metadata)
+       select 'cc-submissions', $1 || '/burst/' || g || '.step', $2::uuid, '{"size": 10}' from generate_series(1, 200) g`,
+      [B, B],
+    );
+    await who(B);
+    await expect(q("insert into storage.objects (bucket_id, name) values ('cc-submissions', $1)", [`${B}/burst/201.step`])).rejects.toThrow(/row-level security/);
+    await expect(q("insert into storage.objects (bucket_id, name) values ('cc-payment-proofs', $1)", [`${B}/pay/2.png`])).rejects.toThrow(/row-level security/);
+    await f.exec("reset role");
+    await f.query("update storage.objects set created_at = now() - interval '25 hours' where name like $1", [`${B}/burst/%`]);
+    await who(B);
+    expect(await q("insert into storage.objects (bucket_id, name) values ('cc-submissions', $1) returning id", [`${B}/burst/201.step`])).toHaveLength(1);
+    await who(M);
+    expect(await q("insert into storage.objects (bucket_id, name) values ('cc-submissions', $1) returning id", [`${M}/x.step`])).toHaveLength(1);
   });
 });
