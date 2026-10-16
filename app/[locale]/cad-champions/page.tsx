@@ -154,6 +154,12 @@ export default async function CcLandingPage({ params }: Params) {
   setRequestLocale(locale);
 
   const t = await getTranslations({ locale, namespace: "CC.landing" });
+
+  // A "[TODO-MO" placeholder or an empty name means no trainer has been hired yet (owner, 2026-10-16).
+
+  const trainerName = t("studio.trainerName");
+
+  const hasTrainer = trainerName.trim().length > 0 && !trainerName.includes("[TODO-MO");
   const [cc, data, overrides, overridesEn, testimonialRows] = await Promise.all([
     getCcUser(),
     getLandingData(),
@@ -461,7 +467,10 @@ export default async function CcLandingPage({ params }: Params) {
       {/* 8. Trainer and studio */}
       <section aria-labelledby="cc-studio" className="neu space-y-6 p-5 sm:p-8">
         <SectionHead id="cc-studio" kicker={t("studio.kicker")} title={t("studio.title")} intro={t("studio.intro")} />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className={cn("grid grid-cols-1 gap-4", hasTrainer && "md:grid-cols-2")}>
+          {/* Trainer card: hidden until a trainer is hired (owner, 2026-10-16). Set
+              studio.trainerName in Admin -> Landing to show it again. */}
+          {hasTrainer && (
           <div className="tile flex flex-col gap-4 sm:flex-row">
             <div
               role="img"
@@ -477,6 +486,7 @@ export default async function CcLandingPage({ params }: Params) {
               <p className="text-sm leading-relaxed text-body">{t("studio.bio")}</p>
             </div>
           </div>
+          )}
           <div className="tile flex flex-col gap-4">
             <div
               role="img"
