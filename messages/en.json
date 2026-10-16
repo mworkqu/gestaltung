@@ -2674,7 +2674,7 @@
     "runNow": "Run now",
     "running": "Running… about 30 seconds",
     "rules": "Runs daily at 06:00 Qatar time. Follows Voltaat's robots.txt, one request every 5 seconds, identifies itself as Gestaltung with our contact email, and runs at most once a day. If Voltaat blocks it, it stops, keeps the last prices and emails you.",
-    "run_ok": "Done: {checked} checked, {changed} changed, {missing} couldn't be followed.",
+    "run_ok": "Done: {checked} checked, {changed} changed, {dropped} now \"order on request\" (no longer on Voltaat), {missing} couldn't be followed.",
     "run_skipped": "Already ran in the last 20 hours. It runs once a day.",
     "run_disabled": "The sync is switched off.",
     "run_blocked": "Voltaat blocked the request ({error}). Stopped; prices unchanged; you've been emailed.",

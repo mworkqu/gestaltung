@@ -91,6 +91,7 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
     let checked = 0;
     let changedOffers = 0;
     const missing: { partName: string; sku: string }[] = [];
+    const dropped: { partName: string; sku: string }[] = [];
     const changes: Change[] = [];
     let status: "ok" | "blocked" | "failed" = "ok";
     let error: string | null = null;
@@ -114,7 +115,14 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
         continue;
       }
       if (!r) {
-        missing.push({ partName: o.part?.name ?? "", sku: o.supplier_sku });
+        // The supplier no longer lists this part → "order on request" (offer inactive, so the
+        // product loses its delivery date). Owner rule 2026-10-16. Re-link it from the
+        // supplier lookup page if it comes back.
+        await db
+          .from("supplier_offers")
+          .update({ active: false, availability: "unavailable", last_checked_at: new Date().toISOString() })
+          .eq("id", o.id);
+        dropped.push({ partName: o.part?.name ?? "", sku: o.supplier_sku });
         continue;
       }
       checked++;
@@ -137,13 +145,16 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
           checked,
           changed: changedOffers,
           missing: missing.length,
-          changes: [...changes, ...missing.map((m) => ({ ...m, missing: true }))],
+          changes: [...changes, ...dropped.map((d) => ({ ...d, dropped: true })), ...missing.map((m) => ({ ...m, missing: true }))],
           finished_at: new Date().toISOString(),
         })
         .eq("id", run.id);
     }
     allChanges.push(...changes.map((c) => ({ ...c, supplier: code })));
-    summary[code] = { status, requests, checked, changed: changedOffers, missing: missing.length, error };
+    allChanges.push(
+      ...dropped.map((d) => ({ partName: d.partName, sku: d.sku, field: "listing", from: "listed", to: "order on request", supplier: code }))
+    );
+    summary[code] = { status, requests, checked, changed: changedOffers, dropped: dropped.length, missing: missing.length, error };
     if (status === "blocked") {
       await sendEmail({
         to: [OWNER_EMAIL],

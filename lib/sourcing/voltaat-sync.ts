@@ -8,6 +8,11 @@
 // A 403/429 stops everything, keeps the last known prices and emails the
 // owner. Every run is logged in supplier_sync_runs, and when anything moved
 // the owner gets the change report.
+//
+// A mapped product that Voltaat no longer lists is marked "order on request"
+// (offer inactive → lead_time_class null) the first time it goes missing and
+// reported once; it is not nagged about again. If it comes back, the normal
+// change path re-activates it.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -20,7 +25,9 @@ import {
   robotsAllows,
   VOLTAAT_IN_STOCK_DAYS,
   VoltaatClient,
+  type DroppedOffer,
   type MappedOffer,
+  type MissingOffer,
   type OfferChange,
 } from "@/lib/sourcing/adapters/voltaat";
 
@@ -30,7 +37,10 @@ export type SyncSummary = {
   requests: number;
   checked: number;
   changed: number;
+  /** Mapped products whose link/option can't be followed (owner to re-map). */
   missing: number;
+  /** Products newly marked "order on request" this run because Voltaat dropped them. */
+  dropped: number;
   error?: string;
 };
 
@@ -42,7 +52,7 @@ export async function voltaatSyncEnabled(db: SupabaseClient): Promise<boolean> {
 }
 
 export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manual"): Promise<SyncSummary> {
-  const empty = { requests: 0, checked: 0, changed: 0, missing: 0 };
+  const empty = { requests: 0, checked: 0, changed: 0, missing: 0, dropped: 0 };
 
   if (!(await voltaatSyncEnabled(db))) {
     await db.from("supplier_sync_runs").insert({ supplier_code: "voltaat", trigger, status: "disabled", finished_at: new Date().toISOString() });
@@ -80,7 +90,7 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
     const { data: sup } = await db.from("suppliers").select("id").eq("code", "voltaat").single();
     const { data: rows } = await db
       .from("supplier_offers")
-      .select("id, part_id, supplier_sku, supplier_url, retail_price, availability, lead_time_days, part:parts!supplier_offers_part_id_fkey(name, unit_price)")
+      .select("id, part_id, supplier_sku, supplier_url, retail_price, availability, lead_time_days, active, part:parts!supplier_offers_part_id_fkey(name, unit_price)")
       .eq("supplier_id", sup!.id)
       .not("supplier_url", "is", null);
     type Row = Omit<MappedOffer, "part_name" | "our_price"> & { part: { name: string; unit_price: number } | null };
@@ -120,9 +130,18 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
         })
         .eq("id", c.offerId);
     }
-    const unchangedIds = offers
-      .filter((o) => !plan.changes.some((c) => c.offerId === o.id) && !plan.missing.some((m) => m.offerId === o.id))
-      .map((o) => o.id);
+    // Dropped from Voltaat's list → "order on request": the offer goes inactive, so the
+    // 0028 trigger clears the product's lead_time_class. Price and link are kept, so a
+    // product that comes back is picked up by the change path above and re-activated.
+    const newlyDropped = plan.dropped.filter((d) => !d.alreadyOnRequest);
+    for (const d of newlyDropped) {
+      await db
+        .from("supplier_offers")
+        .update({ active: false, availability: "unavailable", last_checked_at: now })
+        .eq("id", d.offerId);
+    }
+    const touched = new Set([...plan.changes.map((c) => c.offerId), ...plan.missing.map((m) => m.offerId), ...newlyDropped.map((d) => d.offerId)]);
+    const unchangedIds = offers.filter((o) => !touched.has(o.id)).map((o) => o.id);
     for (let i = 0; i < unchangedIds.length; i += 200) {
       await db.from("supplier_offers").update({ last_checked_at: now }).in("id", unchangedIds.slice(i, i + 200));
     }
@@ -135,15 +154,28 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
     const priceNow = new Map((after ?? []).map((p) => [p.id as string, Number(p.unit_price)]));
     const changes = plan.changes.map((c) => ({ ...c, newOurPrice: priceNow.get(c.partId) ?? null }));
 
+    const stillOnRequest = plan.dropped.length - newlyDropped.length;
     await finish({
       status: "ok",
       checked: plan.checked,
       changed: changes.length,
       missing: plan.missing.length,
-      changes: [...changes, ...plan.missing.map((m) => ({ ...m, missing: true }))],
+      changes: [
+        ...changes,
+        ...newlyDropped.map((d) => ({ offerId: d.offerId, partId: d.partId, partName: d.partName, dropped: true })),
+        ...plan.missing.map((m) => ({ ...m, missing: true })),
+      ],
     });
-    if (changes.length || plan.missing.length) await report(changes, plan.missing);
-    return { status: "ok", runId, requests: client.requests, checked: plan.checked, changed: changes.length, missing: plan.missing.length };
+    if (changes.length || newlyDropped.length || plan.missing.length) await report(changes, newlyDropped, stillOnRequest, plan.missing);
+    return {
+      status: "ok",
+      runId,
+      requests: client.requests,
+      checked: plan.checked,
+      changed: changes.length,
+      missing: plan.missing.length,
+      dropped: newlyDropped.length,
+    };
   } catch (e) {
     if (e instanceof BlockedError) {
       await finish({ status: "blocked", error: e.message });
@@ -172,7 +204,9 @@ async function alert(text: string) {
 
 async function report(
   changes: (OfferChange & { newOurPrice: number | null })[],
-  missing: { partName: string; reason: string }[]
+  dropped: DroppedOffer[],
+  stillOnRequest: number,
+  missing: MissingOffer[]
 ) {
   const q = (n: number | null) => (n === null ? "—" : `QAR ${n.toFixed(2)}`);
   const table = dataTable(
@@ -187,17 +221,27 @@ async function report(
       ];
     })
   );
-  const miss = missing.length
-    ? `${missing.length} mapped product(s) couldn't be followed: ${missing
+  const paragraphs: string[] = [];
+  if (dropped.length)
+    paragraphs.push(
+      `${dropped.length} product(s) are no longer on Voltaat's list and now show "order on request": ${dropped
+        .slice(0, 20)
+        .map((d) => d.partName)
+        .join(", ")}${dropped.length > 20 ? ", …" : ""}. If one comes back on Voltaat it switches back on its own.`
+    );
+  if (stillOnRequest) paragraphs.push(`${stillOnRequest} other product(s) stay "order on request" (still off Voltaat's list).`);
+  if (missing.length)
+    paragraphs.push(
+      `${missing.length} mapped product(s) couldn't be followed — re-map them on Dashboard → Suppliers → Voltaat sync: ${missing
         .slice(0, 20)
         .map((m) => `${m.partName} (${m.reason.replace(/_/g, " ")})`)
         .join(", ")}`
-    : "";
+    );
   const mail = renderOwnerEmail({
     title: `Voltaat prices: ${changes.length} change(s) today`,
     bodyHtml: table.html,
     bodyText: table.text,
-    paragraphs: miss ? [miss] : [],
+    paragraphs,
   });
   await sendEmail({
     to: [OWNER_EMAIL],

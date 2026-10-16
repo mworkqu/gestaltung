@@ -80,14 +80,35 @@ describe("planChanges", () => {
     ]);
   });
   it("lists offers it can't follow instead of guessing", () => {
-    const { missing } = planChanges(
+    const { missing, dropped } = planChanges(
       [
         { ...base, id: "a", supplier_url: null },
-        { ...base, id: "b", supplier_url: "https://www.voltaat.com/products/gone" },
         { ...base, id: "c", supplier_sku: null },
       ],
       cat
     );
-    expect(missing.map((m) => m.reason)).toEqual(["no_handle", "not_in_catalogue", "variant_unclear"]);
+    expect(missing.map((m) => m.reason)).toEqual(["no_handle", "variant_unclear"]);
+    expect(dropped).toEqual([]);
+  });
+  it("marks products Voltaat no longer lists as dropped (→ order on request), once", () => {
+    const gone = "https://www.voltaat.com/products/gone";
+    const { missing, dropped, checked } = planChanges(
+      [
+        { ...base, id: "b", supplier_url: gone },
+        { ...base, id: "d", supplier_url: gone, active: false },
+      ],
+      cat
+    );
+    expect(checked).toBe(0);
+    expect(missing).toEqual([]);
+    expect(dropped).toEqual([
+      { offerId: "b", partId: "p1", partName: "Servo SG90", alreadyOnRequest: false },
+      { offerId: "d", partId: "p1", partName: "Servo SG90", alreadyOnRequest: true },
+    ]);
+  });
+  it("re-activates a dropped product that is back in the catalogue", () => {
+    const { changes, dropped } = planChanges([{ ...base, id: "e", active: false, availability: "unavailable" }], cat);
+    expect(dropped).toEqual([]);
+    expect(changes).toEqual([expect.objectContaining({ offerId: "e", oldAvailability: "unavailable", newAvailability: "in_stock" })]);
   });
 });
