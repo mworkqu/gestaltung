@@ -125,7 +125,21 @@ export type MappedOffer = {
   retail_price: number | null;
   availability: string;
   lead_time_days: number | null;
+  /** false once the product is "order on request" (dropped from Voltaat's list or out of stock). */
+  active?: boolean;
 };
+
+/** A mapped product Voltaat no longer lists: it becomes "order on request" (offer inactive). */
+export type DroppedOffer = {
+  offerId: string;
+  partId: string;
+  partName: string;
+  /** true when the offer was already inactive, so this is not news. */
+  alreadyOnRequest: boolean;
+};
+
+/** A mapped product whose link or option we can't follow (needs the owner to re-map it). */
+export type MissingOffer = { offerId: string; partName: string; reason: "no_handle" | "variant_unclear" };
 
 export type OfferChange = {
   offerId: string;
@@ -145,9 +159,10 @@ export const VOLTAAT_IN_STOCK_DAYS = 1;
 export function planChanges(
   offers: MappedOffer[],
   catalogue: Map<string, VoltaatProduct>
-): { changes: OfferChange[]; checked: number; missing: { offerId: string; partName: string; reason: "no_handle" | "not_in_catalogue" | "variant_unclear" }[] } {
+): { changes: OfferChange[]; checked: number; missing: MissingOffer[]; dropped: DroppedOffer[] } {
   const changes: OfferChange[] = [];
-  const missing: { offerId: string; partName: string; reason: "no_handle" | "not_in_catalogue" | "variant_unclear" }[] = [];
+  const missing: MissingOffer[] = [];
+  const dropped: DroppedOffer[] = [];
   let checked = 0;
   for (const o of offers) {
     const handle = handleFromUrl(o.supplier_url);
@@ -157,7 +172,8 @@ export function planChanges(
     }
     const p = catalogue.get(handle);
     if (!p) {
-      missing.push({ offerId: o.id, partName: o.part_name, reason: "not_in_catalogue" });
+      // Removed from Voltaat's list → "order on request" (owner rule 2026-10-16), not a daily nag.
+      dropped.push({ offerId: o.id, partId: o.part_id, partName: o.part_name, alreadyOnRequest: o.active === false });
       continue;
     }
     const v = pickVariant(p, o);
@@ -181,7 +197,7 @@ export function planChanges(
       });
     }
   }
-  return { changes, checked, missing };
+  return { changes, checked, missing, dropped };
 }
 
 // ── Network (server only) ───────────────────────────────────────────────────

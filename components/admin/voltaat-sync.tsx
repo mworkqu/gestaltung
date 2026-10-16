@@ -52,9 +52,15 @@ export function VoltaatControls({ locale, enabled }: { locale: string; enabled: 
     setRunning(true);
     setMsg(null);
     const res = await fetch("/api/admin/voltaat-sync", { method: "POST" }).catch(() => null);
-    const d = res?.ok ? ((await res.json()) as { status: string; checked: number; changed: number; missing: number; error?: string }) : null;
+    const d = res?.ok
+      ? ((await res.json()) as { status: string; checked: number; changed: number; missing: number; dropped?: number; error?: string })
+      : null;
     setRunning(false);
-    setMsg(d ? t(`run_${d.status}`, { checked: d.checked, changed: d.changed, missing: d.missing, error: d.error ?? "" }) : t("run_failed", { error: "network", checked: 0, changed: 0, missing: 0 }));
+    setMsg(
+      d
+        ? t(`run_${d.status}`, { checked: d.checked, changed: d.changed, missing: d.missing, dropped: d.dropped ?? 0, error: d.error ?? "" })
+        : t("run_failed", { error: "network", checked: 0, changed: 0, missing: 0, dropped: 0 })
+    );
     router.refresh();
   };
 
