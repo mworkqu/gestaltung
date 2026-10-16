@@ -14,13 +14,14 @@ import { TestIntro } from "@/components/cad-champions/test/intro-sections";
 import { StartPanel, type StartPanelState } from "@/components/cad-champions/test/start-panel";
 import { SubmittedScreen } from "@/components/cad-champions/test/submitted-screen";
 import { TestWorkspace } from "@/components/cad-champions/test/workspace";
-import { Alert, PageHeader, StatusChip, Stepper, type StepperStep } from "@/components/cad-champions/ui";
+import { Alert, NeedHelpButton, PageHeader, StatusChip, Stepper, type StepperStep } from "@/components/cad-champions/ui";
 import { ExerciseWorkspace } from "@/components/cad-champions/training/exercise-workspace";
 import { LessonPlayer } from "@/components/cad-champions/video/lesson-player";
 import { e2eFixturesEnabled } from "@/lib/e2e-fixtures";
 import { journeySteps, nextStep } from "@/lib/cad-champions/journey/next-step";
 import { canSeeSolution, canWatchLesson, hintsAvailable } from "@/lib/cad-champions/training/access";
 import { isCcLocale } from "@/lib/cad-champions/routes";
+import { getCcContact } from "@/lib/cad-champions/site-contact";
 
 import { FixtureUploads } from "./fixture-client";
 import {
@@ -53,7 +54,8 @@ import {
 // Query switches: dashboard ?state=new|ready|testing|results|enrolled,
 // get-ready ?keys=practice, test-intro ?gate=locked|ready|cooldown|continue,
 // workspace ?mode=per_task|module_package&left=<seconds>,
-// results ?variant=weak|medium|strong|provisional|expired, exercise ?attempts=N.
+// results ?variant=weak|medium|strong|provisional|expired&offer=video, exercise ?attempts=N,
+// any fixture ?help=1 (Need help button; the walkthrough video, scripts/record-videos/cc).
 // 404 unless E2E_FIXTURES=1 and not on Vercel.
 
 export const dynamic = "force-dynamic";
@@ -79,8 +81,33 @@ export default async function CcE2eFixturePage({ params, searchParams }: Props) 
       <div className="container space-y-6 py-8 sm:py-12" data-testid={`cc-fixture-${fixture}`}>
         {await body(fixture as (typeof FIXTURES)[number], locale, query)}
       </div>
+      {/* ?help=1: the signed-in "Need help?" button (normally only with a CC session). */}
+      {query.help === "1" ? <NeedHelpButton pageName={fixture} {...needHelpContact()} /> : null}
     </FixtureUploads>
   );
+}
+
+/**
+ * ?offer=video on the results fixture: the walkthrough video (scripts/record-videos/cc)
+ * shows the training card with NO price (prices are never shown in public videos)
+ * and the sample text in the page language.
+ */
+function videoOffer(locale: "en" | "ar") {
+  const ar = locale === "ar";
+  return {
+    lesson: { slug: "e2e-free-lesson", title: ar ? "قيود الرسم في 10 دقائق" : "Sketch constraints in 10 minutes", minutes: 10 },
+    plan: {
+      name: ar ? "التدريب عبر الإنترنت" : "Online training",
+      priceQar: null,
+      durationDays: null,
+      includes: ar ? ["دروس لكل مستوى من المستويات الستة", "تمارين تدريبية مع تصحيح"] : ["Lessons for each of the six levels", "Practice exercises with marking"],
+    },
+  };
+}
+
+function needHelpContact() {
+  const { whatsappNumber, supportEmail } = getCcContact();
+  return { whatsappNumber, supportEmail };
 }
 
 function startState(gate: string | undefined): StartPanelState {
@@ -228,7 +255,7 @@ async function body(fixture: (typeof FIXTURES)[number], locale: "en" | "ar", que
               v={v}
               locale={locale}
               isOwner={false}
-              offer={{
+              offer={query.offer === "video" ? videoOffer(locale) : {
                 lesson: { slug: "e2e-free-lesson", title: "Sketch constraints in 10 minutes", minutes: 10 },
                 plan: { name: "Online training (sample)", priceQar: 500, durationDays: 90, includes: ["All lessons", "Graded exercises"] },
               }}

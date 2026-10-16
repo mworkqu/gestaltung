@@ -21,7 +21,6 @@ Each `[TODO-MO: …]` placeholder below needs real content from Mo. Remove the l
 | 4-1 | `[TODO-MO: can students use studio computers?]` | Get Ready step 2 "Check your computer": alert shown when the profile says "no computer" (`/cad-champions/{en,ar}/get-ready`) | `messages/cad-champions/{en,ar}/get-ready.json` → `computer.noComputerText` | Prompt 4 |
 | 4-2 | `[TODO-MO: confirm offer]` ("Contact us for help getting a SOLIDWORKS licence") | Get Ready step 3, SOLIDWORKS tab | `messages/cad-champions/{en,ar}/get-ready.json` → `software.solidworksOffer` | Prompt 4 |
 | 4-3 | `[TODO-MO: screenshot of Settings > System > About]` | Get Ready step 2, illustration box under "How to find your RAM and Windows version" | `messages/cad-champions/{en,ar}/get-ready.json` → `computer.illustration`; box in `components/cad-champions/get-ready/step-computer.tsx` | Prompt 4 |
-| 4-4 | `[TODO-MO: record video: What is the competition and what is this test?]` | Get Ready step 1 (`/cad-champions/{en,ar}/get-ready`) | `lib/cad-champions/videos/registry.ts` → slot `get_ready_welcome` (set provider + providerId) | Prompt 4 |
 | 4-5 | `[TODO-MO: record video: Install Autodesk Inventor with a free education licence]` | Get Ready step 3, Inventor tab (`/cad-champions/{en,ar}/get-ready`) | `lib/cad-champions/videos/registry.ts` → slot `install_inventor` (set provider + providerId) | Prompt 4 |
 | 4-6 | `[TODO-MO: record video: Install Autodesk Fusion with a free education licence]` | Get Ready step 3, Fusion tab (`/cad-champions/{en,ar}/get-ready`) | `lib/cad-champions/videos/registry.ts` → slot `install_fusion` (set provider + providerId) | Prompt 4 |
 | 4-7 | `[TODO-MO: record video: Getting SOLIDWORKS as a student]` | Get Ready step 3, SOLIDWORKS tab (`/cad-champions/{en,ar}/get-ready`) | `lib/cad-champions/videos/registry.ts` → slot `install_solidworks` (set provider + providerId) | Prompt 4 |
@@ -135,3 +134,7 @@ Rows 3, 4 and 10-5 above are superseded: privacy, terms and refunds are now draf
 - Policies: [TODO-MO: how fast we reply] in refunds section 5 - /refunds
 - Policies: [TODO-MO: how the refund is paid and how long it takes] in refunds section 5 - /refunds
 - Policies: [TODO-MO: confirm] (card refunds via the payment provider) in refunds section 6 - /refunds
+
+## Done
+
+- 4-4 welcome video (Get Ready step 1): DONE 2026-10-16. The CAD Champions walkthrough (EN + AR, captions, voice-over) is self-hosted in the `videos` bucket (`cc-intro-en`, `cc-intro-ar`) and set as slot `get_ready_welcome` (`file:cc-intro`); it also plays on the landing page. Re-record steps: header of `scripts/record-videos/cc/record.mjs`.

@@ -98,7 +98,7 @@ export function validateVideoId(raw: unknown): VideoIdCheck {
 /** What the player will make of a stored value (matches the video route). */
 export function videoProviderOf(value: string | null | undefined): "youtube" | "bunny" | "none" {
   const p = parseStoredVideo(value).provider;
-  return p === "placeholder" ? "none" : p;
+  return p === "youtube" || p === "bunny" ? p : "none";
 }
 
 export const VIDEO_TRACK_ORDER = ["inventor", "fusion", "solidworks", "neutral"] as const;

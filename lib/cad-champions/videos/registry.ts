@@ -1,18 +1,62 @@
 // CAD Champions intro / how-to video slots (Prompt 4 Step E). Pure data plus
 // the provider interface. Every slot starts as a placeholder; to publish a
-// video set `provider` and `providerId` here (YouTube id, or a Bunny Stream
-// GUID, served through GET /api/cad-champions/video/intro:<key>).
+// video set `provider` and `providerId` here (YouTube id, a Bunny Stream
+// GUID served through GET /api/cad-champions/video/intro:<key>, or a "file"
+// clip self-hosted in the public `videos` bucket, see FILE_VIDEOS).
 // Each empty slot is listed in docs/CONTENT_TODO.md as
 // "[TODO-MO: record video: <title>]" (videos test keeps the two in sync).
 
 import type { Locale } from "@/i18n/routing";
+import { videoBase } from "@/lib/videos";
 
-export type VideoProvider = "placeholder" | "youtube" | "bunny";
+export type VideoProvider = "placeholder" | "youtube" | "bunny" | "file";
 
 export interface VideoRef {
   provider: VideoProvider;
-  /** YouTube video id (11 chars) or Bunny video GUID; "" while not recorded. */
+  /**
+   * YouTube video id (11 chars), Bunny video GUID, or a FILE_VIDEOS key
+   * (provider "file"); "" while not recorded.
+   */
   providerId: string;
+}
+
+/**
+ * Self-hosted clips in the public Supabase bucket `videos` (same layout as the
+ * site's feature videos, lib/videos.ts), one cut per language:
+ *   videos/<id>-<locale>/<id>-<locale>.{mp4,webm,jpg,en.vtt,ar.vtt}
+ * `version` = upload date; it is added as ?v= to every URL (the bucket serves
+ * a one-year cache), so a re-upload must bump it. Made with
+ * scripts/record-videos/cc (tts.py -> record.mjs -> edit.mjs, steps in the
+ * record.mjs header) and uploaded with scripts/upload-video.mjs.
+ */
+export const FILE_VIDEOS = {
+  "cc-intro": { version: "2026-10-16", durationSeconds: { en: 179, ar: 235 } },
+} as const satisfies Record<string, { version: string; durationSeconds: Record<Locale, number> }>;
+
+export type FileVideoId = keyof typeof FILE_VIDEOS;
+
+export function isFileVideoId(id: string): id is FileVideoId {
+  return Object.prototype.hasOwnProperty.call(FILE_VIDEOS, id);
+}
+
+export interface FileVideoSources {
+  mp4: string;
+  webm: string;
+  poster: string;
+  captions: Record<Locale, string>;
+}
+
+/**
+ * URLs of a self-hosted clip for one page language (the Arabic cut on /ar,
+ * the English cut on /en); both caption files are offered on both cuts.
+ * `supabaseUrl` = NEXT_PUBLIC_SUPABASE_URL. null for an unknown id or no URL.
+ */
+export function fileVideoSources(id: string, locale: Locale, supabaseUrl: string | undefined): FileVideoSources | null {
+  if (!isFileVideoId(id) || !supabaseUrl) return null;
+  const slug = `${id}-${locale}`;
+  const v = `?v=${FILE_VIDEOS[id].version}`;
+  const file = (ext: string) => `${videoBase(supabaseUrl)}/${slug}/${slug}.${ext}${v}`;
+  return { mp4: file("mp4"), webm: file("webm"), poster: file("jpg"), captions: { en: file("en.vtt"), ar: file("ar.vtt") } };
 }
 
 export interface VideoSlotDef extends VideoRef {
@@ -29,8 +73,10 @@ export const VIDEO_SLOTS = [
     title_en: "What is the competition and what is this test?",
     title_ar: "ما هي المسابقة وما هو هذا الاختبار؟",
     page: "/get-ready",
-    provider: "placeholder",
-    providerId: "",
+    // The CAD Champions walkthrough (also on the landing page); an admin
+    // override (youtube:<id>, a Bunny GUID or file:<id>) still replaces it.
+    provider: "file",
+    providerId: "cc-intro",
   },
   {
     key: "install_inventor",
@@ -126,6 +172,20 @@ export function parseStoredVideo(value: string | null | undefined): VideoRef {
   return { provider: "placeholder", providerId: "" };
 }
 
+/**
+ * An admin-stored value for an intro SLOT (cc_content_overrides "video:<key>"):
+ * everything parseStoredVideo accepts, plus "file:<FILE_VIDEOS key>". Lessons
+ * and help articles keep using parseStoredVideo (no self-hosted files there).
+ */
+export function parseSlotVideo(value: string | null | undefined): VideoRef {
+  const v = (value ?? "").trim();
+  if (v.toLowerCase().startsWith("file:")) {
+    const id = v.slice(5).trim();
+    return isFileVideoId(id) ? { provider: "file", providerId: id } : { provider: "placeholder", providerId: "" };
+  }
+  return parseStoredVideo(v);
+}
+
 /** Signs a Bunny video id (server only: lib/cad-champions/videos/bunny.ts signBunnyEmbed). */
 export type BunnySigner = (videoId: string) => { url: string; expires: number } | null;
 
@@ -147,7 +207,8 @@ export interface PlaybackOptions {
  * signed here. Dispatches placeholder | youtube | bunny. YouTube uses the
  * privacy-enhanced youtube-nocookie.com domain; enablejsapi lets the player
  * read playback progress for the 90%-watched rule. Bunny needs a user and the
- * server signer (2-hour token, lib/cad-champions/videos/bunny.ts).
+ * server signer (2-hour token, lib/cad-champions/videos/bunny.ts). "file"
+ * clips have no embed URL: they play in a <video> (fileVideoSources).
  */
 export function getPlaybackUrl(ref: VideoRef, opts: PlaybackOptions = {}): string | null {
   switch (ref.provider) {
@@ -168,6 +229,7 @@ export function getPlaybackUrl(ref: VideoRef, opts: PlaybackOptions = {}): strin
 
 /** True when the slot plays a real video without signing (so "watched" can be measured on Get Ready). */
 export function hasRealPlayer(ref: VideoRef): boolean {
+  if (ref.provider === "file") return isFileVideoId(ref.providerId);
   return getPlaybackUrl(ref) !== null;
 }
 

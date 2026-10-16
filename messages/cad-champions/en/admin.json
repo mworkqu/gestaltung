@@ -250,9 +250,9 @@
       "unsaved": "{count} unsaved changes",
       "noChanges": "No changes to save.",
       "saveChanges": "Save changes",
-      "videoPlaceholder": "youtube:abcdefghijk or a Bunny video id",
-      "videoHelp": "Paste youtube: plus the 11-character id, or a Bunny Stream video id. Empty uses the default.",
-      "badVideo": "Use youtube: followed by the 11-character id, or a Bunny video id (a GUID).",
+      "videoPlaceholder": "youtube:abcdefghijk, a Bunny video id or file:cc-intro",
+      "videoHelp": "Paste youtube: plus the 11-character id, a Bunny Stream video id, or file:cc-intro for our own walkthrough video. Empty uses the default.",
+      "badVideo": "Use youtube: followed by the 11-character id, a Bunny video id (a GUID), or file:cc-intro.",
       "badMessage": "Keep the same curly-bracket placeholders and angle-bracket tags as the default text."
     }
   },

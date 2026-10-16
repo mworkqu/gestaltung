@@ -13,7 +13,7 @@ import {
 import { GLOSSARY_IDS } from "../glossary";
 import { POLICIES_APPROVED_KEY } from "../policies/approval";
 import { isCcFaqId } from "../landing/faq";
-import { VIDEO_SLOTS, parseStoredVideo } from "../videos/registry";
+import { VIDEO_SLOTS, parseSlotVideo } from "../videos/registry";
 
 export const MAX_ENTRIES_PER_SAVE = 600;
 
@@ -196,9 +196,9 @@ export function leafAt(tree: unknown, dotted: string): string | null {
   return typeof node === "string" ? node : null;
 }
 
-/** Stored intro-video value: YouTube id or Bunny GUID only (parseStoredVideo decides). */
+/** Stored intro-video value: YouTube id, Bunny GUID or file:<self-hosted id> (parseSlotVideo decides). */
 export function isValidVideoValue(value: string): boolean {
-  return parseStoredVideo(value).provider !== "placeholder";
+  return parseSlotVideo(value).provider !== "placeholder";
 }
 
 export function isKnownVideoSlot(slotKey: string): boolean {

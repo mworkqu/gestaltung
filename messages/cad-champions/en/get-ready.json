@@ -94,7 +94,8 @@
   "video": {
     "comingSoon": "Video coming soon",
     "placeholderLabel": "Video placeholder: {title}",
-    "playerLabel": "Video: {title}"
+    "playerLabel": "Video: {title}",
+    "play": "Play the video"
   },
   "welcome": {
     "takeawaysTitle": "Four things to remember",

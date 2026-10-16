@@ -14,6 +14,7 @@ import {
 } from "@/lib/cad-champions/videos/registry";
 import { cn } from "@/lib/utils";
 
+import { FilePlayer } from "./file-player";
 import { useVideoSlot } from "./use-video-slot";
 
 const YT_ORIGIN = "https://www.youtube-nocookie.com";
@@ -22,7 +23,8 @@ const YT_ORIGIN = "https://www.youtube-nocookie.com";
  * A 16:9 video slot from the registry. Placeholder slots show the title on a
  * calm panel; YouTube slots embed a privacy-enhanced, lazy iframe and call
  * `onWatched` once 90% has been played (read through the YouTube iframe
- * postMessage API; no YouTube script is loaded).
+ * postMessage API; no YouTube script is loaded). "file" slots play the
+ * self-hosted clip in the page language (FilePlayer, same 90% rule).
  */
 export function VideoSlot({
   videoKey,
@@ -54,7 +56,7 @@ export function VideoSlot({
       alive = false;
     };
   }, [slot.provider, slot.providerId, videoKey]);
-  const src = direct ?? signed;
+  const src = slot.provider === "file" ? null : (direct ?? signed);
   const frameRef = React.useRef<HTMLIFrameElement>(null);
   const firedRef = React.useRef(false);
   const durationRef = React.useRef(0);
@@ -86,6 +88,19 @@ export function VideoSlot({
 
   function startListening() {
     frameRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: videoKey, channel: "widget" }), YT_ORIGIN);
+  }
+
+  if (slot.provider === "file") {
+    return (
+      <FilePlayer
+        id={slot.providerId}
+        locale={locale}
+        title={title}
+        playLabel={t("video.play")}
+        onWatched={onWatched}
+        className={className}
+      />
+    );
   }
 
   return (

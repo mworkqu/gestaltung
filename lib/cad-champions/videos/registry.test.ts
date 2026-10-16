@@ -2,7 +2,18 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { VIDEO_SLOTS, getPlaybackUrl, hasRealPlayer, parseStoredVideo, watchedFraction } from "./registry";
+import {
+  FILE_VIDEOS,
+  VIDEO_SLOTS,
+  fileVideoSources,
+  getPlaybackUrl,
+  getVideoSlot,
+  hasRealPlayer,
+  parseSlotVideo,
+  parseStoredVideo,
+  watchedFraction,
+} from "./registry";
+import { resolveSlotRef } from "./slot-override";
 
 describe("video registry", () => {
   it("has unique keys and both titles", () => {
@@ -66,5 +77,43 @@ describe("watchedFraction", () => {
     expect(watchedFraction(60, 50)).toBe(1);
     expect(watchedFraction(1, 0)).toBe(0);
     expect(watchedFraction("x", 50)).toBe(0);
+  });
+});
+
+describe("file provider (self-hosted clips)", () => {
+  const base = "https://x.supabase.co";
+
+  it("the welcome slot plays the walkthrough", () => {
+    const slot = getVideoSlot("get_ready_welcome");
+    expect(slot).toMatchObject({ provider: "file", providerId: "cc-intro" });
+    expect(hasRealPlayer(slot)).toBe(true);
+    expect(getPlaybackUrl(slot)).toBeNull(); // no embed URL: it plays in a <video>
+  });
+
+  it("builds the per-language URLs with the version", () => {
+    const v = FILE_VIDEOS["cc-intro"].version;
+    const ar = fileVideoSources("cc-intro", "ar", `${base}/`)!;
+    expect(ar.mp4).toBe(`${base}/storage/v1/object/public/videos/cc-intro-ar/cc-intro-ar.mp4?v=${v}`);
+    expect(ar.poster).toContain("/cc-intro-ar/cc-intro-ar.jpg?v=");
+    expect(ar.captions.en).toContain("/cc-intro-ar/cc-intro-ar.en.vtt?v=");
+    expect(fileVideoSources("cc-intro", "en", base)!.webm).toContain("/cc-intro-en/cc-intro-en.webm?v=");
+    expect(fileVideoSources("nope", "en", base)).toBeNull();
+    expect(fileVideoSources("cc-intro", "en", undefined)).toBeNull();
+  });
+
+  it("slot overrides accept file:<id>; lessons do not", () => {
+    expect(parseSlotVideo("file:cc-intro")).toEqual({ provider: "file", providerId: "cc-intro" });
+    expect(parseSlotVideo("FILE: cc-intro")).toEqual({ provider: "file", providerId: "cc-intro" });
+    expect(parseSlotVideo("file:unknown")).toEqual({ provider: "placeholder", providerId: "" });
+    expect(parseSlotVideo("youtube:dQw4w9WgXcQ")).toEqual({ provider: "youtube", providerId: "dQw4w9WgXcQ" });
+    expect(parseStoredVideo("file:cc-intro")).toEqual({ provider: "placeholder", providerId: "" });
+    expect(hasRealPlayer({ provider: "file", providerId: "unknown" })).toBe(false);
+  });
+
+  it("an admin override still replaces the walkthrough", () => {
+    const slot = getVideoSlot("get_ready_welcome");
+    expect(resolveSlotRef(slot, "youtube:dQw4w9WgXcQ")).toEqual({ provider: "youtube", providerId: "dQw4w9WgXcQ" });
+    expect(resolveSlotRef(slot, "")).toEqual({ provider: "file", providerId: "cc-intro" });
+    expect(resolveSlotRef(slot, "junk")).toEqual({ provider: "file", providerId: "cc-intro" });
   });
 });

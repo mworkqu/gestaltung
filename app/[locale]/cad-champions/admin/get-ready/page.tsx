@@ -56,7 +56,7 @@ export default async function CcAdminGetReadyPage({ params }: Props) {
 
   const videoItems = buildVideoItems(maps, (slot) => {
     const reg = getVideoSlot(slot.key as VideoKey);
-    const base = reg.provider === "placeholder" ? t("videos.defaultNone") : t("videos.defaultSet", { value: reg.provider === "youtube" ? `youtube:${reg.providerId}` : reg.providerId });
+    const base = reg.provider === "placeholder" ? t("videos.defaultNone") : t("videos.defaultSet", { value: reg.provider === "youtube" || reg.provider === "file" ? `${reg.provider}:${reg.providerId}` : reg.providerId });
     return { label: locale === "ar" ? slot.title_ar : slot.title_en, hint: base };
   });
   const groups: OverrideGroup[] = [

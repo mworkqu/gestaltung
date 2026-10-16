@@ -250,9 +250,9 @@
       "unsaved": "{count} تغييرات غير محفوظة",
       "noChanges": "لا توجد تغييرات للحفظ.",
       "saveChanges": "حفظ التغييرات",
-      "videoPlaceholder": "youtube:abcdefghijk أو معرّف فيديو Bunny",
-      "videoHelp": "الصق youtube: ثم المعرّف المكوّن من 11 حرفًا، أو معرّف فيديو Bunny Stream. الفارغ يعني الافتراضي.",
-      "badVideo": "استخدم youtube: متبوعًا بالمعرّف المكوّن من 11 حرفًا، أو معرّف فيديو Bunny (GUID).",
+      "videoPlaceholder": "youtube:abcdefghijk أو معرّف فيديو Bunny أو file:cc-intro",
+      "videoHelp": "الصق youtube: ثم المعرّف المكوّن من 11 حرفًا، أو معرّف فيديو Bunny Stream، أو file:cc-intro لفيديو الجولة الخاص بنا. الفارغ يعني الافتراضي.",
+      "badVideo": "استخدم youtube: متبوعًا بالمعرّف المكوّن من 11 حرفًا، أو معرّف فيديو Bunny (GUID)، أو file:cc-intro.",
       "badMessage": "أبقِ العناصر داخل الأقواس المعقوفة والوسوم داخل الأقواس الزاويّة كما في النص الافتراضي."
     }
   },

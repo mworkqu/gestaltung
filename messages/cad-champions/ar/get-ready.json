@@ -94,7 +94,8 @@
   "video": {
     "comingSoon": "الفيديو قريبًا",
     "placeholderLabel": "مكان فيديو: {title}",
-    "playerLabel": "فيديو: {title}"
+    "playerLabel": "فيديو: {title}",
+    "play": "شغّل الفيديو"
   },
   "welcome": {
     "takeawaysTitle": "أربعة أمور تذكّرها",

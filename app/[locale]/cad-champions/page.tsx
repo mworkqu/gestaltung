@@ -39,6 +39,7 @@ import { FaqAccordion } from "@/components/cad-champions/landing/faq-accordion";
 import { HeroVisual } from "@/components/cad-champions/landing/hero-visual";
 import { ScrollLink, TrackLink } from "@/components/cad-champions/landing/track-link";
 import { Term } from "@/components/cad-champions/ui";
+import { FilePlayer } from "@/components/cad-champions/video/file-player";
 import type { Locale } from "@/i18n/routing";
 import { ccSignUpHref } from "@/lib/cad-champions/auth/paths";
 import { loadPublishedTestimonials } from "@/lib/cad-champions/admin/testimonials-server";
@@ -233,6 +234,13 @@ export default async function CcLandingPage({ params }: Params) {
         <div className="mx-auto w-full max-w-[22rem] sm:max-w-md lg:max-w-none">
           <HeroVisual label={t("hero.visualLabel")} />
         </div>
+      </section>
+
+      {/* 1b. Walkthrough video (self-hosted, poster first, plays on click; the
+          get_ready_welcome clip, registry FILE_VIDEOS "cc-intro"). */}
+      <section id="cc-intro-video" aria-labelledby="cc-video" className="neu grid grid-cols-1 items-center gap-6 p-5 sm:p-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:gap-10">
+        <SectionHead id="cc-video" kicker={t("video.kicker")} title={t("video.title")} intro={t("video.intro")} />
+        <FilePlayer id="cc-intro" locale={locale} title={t("video.title")} playLabel={t("video.play")} />
       </section>
 
       {/* 2. Trust strip */}

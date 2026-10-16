@@ -269,5 +269,11 @@
     "ctaSignedIn": "Go to your next step",
     "whatsapp": "Questions? Message us on WhatsApp",
     "whatsappText": "Hi, I have a question about CAD Champions."
+  },
+  "video": {
+    "kicker": "Watch first",
+    "title": "See how it works in 3 minutes",
+    "intro": "A short walkthrough: create your account, get ready, take the free test and read your results. Captions are on.",
+    "play": "Play the walkthrough"
   }
 }

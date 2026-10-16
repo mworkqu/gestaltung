@@ -13,6 +13,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 const SLUGS = ["idea-to-kit", "file-to-part", "sketch-to-drawing", "wiring-check", "cad-model", "store-to-door", "idea-to-product-ar"]; // = VIDEO_SLUGS in lib/videos.ts
+// CAD Champions walkthrough, one cut per language (FILE_VIDEOS in lib/cad-champions/videos/registry.ts).
+SLUGS.push("cc-intro-en", "cc-intro-ar");
 // Keep in step with lib/videos.ts (VIDEO_FILES / VIDEO_CONTENT_TYPES).
 const FILES = [
   ["mp4", "video/mp4"],
