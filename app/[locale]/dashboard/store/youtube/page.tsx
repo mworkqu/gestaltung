@@ -8,6 +8,7 @@ import { SITE_URL } from "@/lib/seo";
 import { videoBase, VIDEOS, type VideoSlug } from "@/lib/videos";
 import { toDraft, YOUTUBE_KEY } from "@/lib/youtube";
 import { defaultUploadMeta, quotaSummary, UPLOAD_COST, YT_DAILY_QUOTA } from "@/lib/youtube-upload";
+import { RETIRE_GRACE_HOURS } from "@/lib/youtube-retire";
 
 // Videos & YouTube (D6, was "YouTube links" P4-05). super_admin only (the store
 // layout redirects everyone else). Top: the six feature clips from the public
@@ -106,6 +107,8 @@ export default async function YoutubePage({
         flash={flash}
         uploadCost={UPLOAD_COST}
         dailyQuota={YT_DAILY_QUOTA}
+        retire={meta ? [...meta.retire].reverse() : null}
+        graceHours={RETIRE_GRACE_HOURS}
       />
       <YoutubeEditor locale={locale} initial={toDraft(data?.value)} />
     </div>

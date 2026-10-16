@@ -7,16 +7,24 @@
 // with "Upload to YouTube" (POST /api/admin/youtube/upload, server-side
 // resumable upload). Connect = GET /api/admin/youtube/connect (Google OAuth);
 // Disconnect = disconnectYoutube() server action. No token ever reaches here.
+// "Replaced videos" = the retire log (lib/youtube-retire.ts): outdated videos
+// deleted from YouTube and the site's links after the grace period.
 
 import { Hint } from "@/components/ui/hint";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, Copy, Download, ExternalLink, Film, Link2, Loader2, Unlink, Upload } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Film, Link2, Loader2, Plus, Trash2, Undo2, Unlink, Upload } from "lucide-react";
 
-import { disconnectYoutube } from "@/app/[locale]/dashboard/store/youtube/actions";
+import {
+  cancelRetireAction,
+  deleteRetireNowAction,
+  disconnectYoutube,
+  queueRetireAction,
+} from "@/app/[locale]/dashboard/store/youtube/actions";
 import { formatFileSize } from "@/lib/format-bytes";
-import { videoUrl } from "@/lib/youtube";
+import { extractVideoId, videoUrl } from "@/lib/youtube";
+import { RETIRE_TITLE_MAX, type RetireEntry, type RetireStatus } from "@/lib/youtube-retire";
 import {
   PRIVACY,
   splitTags,
@@ -71,6 +79,8 @@ export function VideosYoutube({
   flash,
   uploadCost,
   dailyQuota,
+  retire,
+  graceHours,
 }: {
   locale: string;
   clips: ClipView[];
@@ -78,6 +88,9 @@ export function VideosYoutube({
   flash: string | null;
   uploadCost: number;
   dailyQuota: number;
+  /** The retire log, newest first; null when the integration could not be read. */
+  retire: RetireEntry[] | null;
+  graceHours: number;
 }) {
   const t = useTranslations("VideosYoutube");
   const router = useRouter();
@@ -168,6 +181,8 @@ export function VideosYoutube({
           </p>
         )}
       </section>
+
+      {retire && <RetireLog locale={locale} entries={retire} graceHours={graceHours} />}
 
       <section className="neu space-y-4 p-6" aria-labelledby="yt-clips-heading">
         <h2 id="yt-clips-heading" className="text-lg font-bold text-heading">
@@ -466,5 +481,213 @@ function ClipRow({
         </div>
       )}
     </article>
+  );
+}
+
+const PILL: Record<RetireStatus, string> = {
+  queued: "bg-cobalt/15 text-cobalt",
+  deleted: "bg-panel text-mutedtext",
+  failed: "bg-red-500/10 text-red-700",
+  cancelled: "bg-surface text-mutedtext",
+};
+
+/** The retire log: outdated videos deleted from YouTube and the site after the grace period. */
+function RetireLog({ locale, entries, graceHours }: { locale: string; entries: RetireEntry[]; graceHours: number }) {
+  const t = useTranslations("VideosYoutube");
+  const router = useRouter();
+  const [link, setLink] = useState("");
+  const [title, setTitle] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Qatar",
+  });
+  const fmt = (d: string | undefined) => (d ? dateFmt.format(new Date(d)) : "");
+
+  const add = () => {
+    if (!extractVideoId(link)) {
+      setMsg({ ok: false, text: t("retireErr_bad_id") });
+      return;
+    }
+    start(async () => {
+      const r = await queueRetireAction({ link, title });
+      if (r.ok) {
+        setLink("");
+        setTitle("");
+        setMsg({ ok: true, text: t("retireAdded", { hours: String(graceHours) }) });
+        router.refresh();
+      } else {
+        const key = `retireErr_${r.error}`;
+        setMsg({ ok: false, text: t.has(key) ? t(key) : t("retireErr_db") });
+      }
+    });
+  };
+
+  const cancel = (id: string) => {
+    setBusy(id);
+    start(async () => {
+      const r = await cancelRetireAction(id);
+      setBusy(null);
+      setMsg(r.ok ? { ok: true, text: t("retireCancelled") } : { ok: false, text: t("retireErr_db") });
+      if (r.ok) router.refresh();
+    });
+  };
+
+  const deleteNow = (id: string) => {
+    if (!window.confirm(t("retireDeleteConfirm"))) return;
+    setBusy(id);
+    start(async () => {
+      const r = await deleteRetireNowAction(id);
+      setBusy(null);
+      if (!r.ok) setMsg({ ok: false, text: t("retireErr_forbidden") });
+      else if (r.summary.deleted) setMsg({ ok: true, text: t("retireDeletedNow") });
+      else {
+        const { stopped, failed, skipped } = r.summary;
+        const key = `retireStop_${stopped ?? (failed ? "failed" : skipped ? "current" : "none")}`;
+        setMsg({ ok: false, text: t.has(key) ? t(key) : t("retireStop_failed") });
+      }
+      router.refresh();
+    });
+  };
+
+  return (
+    <section className="neu space-y-4 p-6" aria-labelledby="yt-retire-heading">
+      <div className="flex items-center gap-2">
+        <h2 id="yt-retire-heading" className="text-lg font-bold text-heading">
+          {t("retireHeading")}
+        </h2>
+        <QHint label={t("retireHintAria")} text={t("retireHint")} />
+      </div>
+      <p className="text-sm text-body">{t("retireIntro", { hours: String(graceHours) })}</p>
+
+      <form
+        className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_2fr_auto] md:items-end"
+        onSubmit={(e) => {
+          e.preventDefault();
+          add();
+        }}
+      >
+        <div className="space-y-1">
+          <label htmlFor="yt-retire-link" className="block text-xs font-medium text-body">
+            {t("retireFieldLink")}
+          </label>
+          <input
+            id="yt-retire-link"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            dir="ltr"
+            placeholder="https://youtu.be/…"
+            className={input}
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="yt-retire-title" className="block text-xs font-medium text-body">
+            {t("retireFieldTitle")}
+          </label>
+          <input
+            id="yt-retire-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={RETIRE_TITLE_MAX}
+            dir="auto"
+            className={input}
+          />
+        </div>
+        <button type="submit" disabled={pending || !link.trim()} className={primaryBtn}>
+          {pending && !busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+          {t("retireAdd")}
+        </button>
+      </form>
+
+      {msg && (
+        <p className={`text-sm ${msg.ok ? "text-heading" : "text-destructive"}`} aria-live="polite">
+          {msg.text}
+        </p>
+      )}
+
+      {entries.length === 0 ? (
+        <p className="text-sm text-mutedtext">{t("retireEmpty")}</p>
+      ) : (
+        <ul className="space-y-2">
+          {entries.map((e) => (
+            <li key={e.video_id} className="tile flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={`https://youtu.be/${e.video_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-w-0 items-center gap-1 font-medium text-cobalt hover:text-cobalt-hover max-md:min-h-11"
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+                    {e.title ? (
+                      <span className="truncate" dir="auto">
+                        {e.title}
+                      </span>
+                    ) : (
+                      <span dir="ltr" className="font-mono text-xs">
+                        {e.video_id}
+                      </span>
+                    )}
+                  </a>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${PILL[e.status]}`}>
+                    {t(`retireStatus_${e.status}`)}
+                  </span>
+                </div>
+                <p className="text-xs text-mutedtext">
+                  {t(`retireReason_${e.reason}`)}
+                  {e.replaced_by && (
+                    <>
+                      {" · "}
+                      <a
+                        href={`https://youtu.be/${e.replaced_by}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-cobalt hover:text-cobalt-hover"
+                      >
+                        {t("retireNewVideo")}
+                      </a>
+                    </>
+                  )}
+                  {" · "}
+                  {e.status === "deleted"
+                    ? t("retireDeletedOn", { date: fmt(e.deleted_at) })
+                    : e.status === "cancelled"
+                      ? t("retireKept")
+                      : t("retireDeletesOn", { date: fmt(e.delete_after) })}
+                </p>
+                {e.status === "failed" && e.error && (
+                  <p className="text-xs text-destructive">
+                    {t("retireFailedNote")}{" "}
+                    <span dir="ltr" className="font-mono">
+                      {e.error}
+                    </span>
+                  </p>
+                )}
+              </div>
+              {(e.status === "queued" || e.status === "failed") && (
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => cancel(e.video_id)} disabled={pending} className={softBtn}>
+                    <Undo2 className="h-4 w-4" aria-hidden />
+                    {t("retireCancel")}
+                  </button>
+                  <button type="button" onClick={() => deleteNow(e.video_id)} disabled={pending} className={softBtn}>
+                    {busy === e.video_id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    ) : (
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    )}
+                    {t("retireDeleteNow")}
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

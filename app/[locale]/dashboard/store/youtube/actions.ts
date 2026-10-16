@@ -5,9 +5,11 @@ import { revalidatePath } from "next/cache";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateStorefront } from "@/lib/cache/storefront";
-import { validateYoutube, YOUTUBE_KEY, type YoutubeDraft, type YoutubeError } from "@/lib/youtube";
+import { extractVideoId, validateYoutube, YOUTUBE_KEY, type YoutubeDraft, type YoutubeError } from "@/lib/youtube";
 import { decryptSecret } from "@/lib/integrations/crypto";
-import { readYoutubeIntegration, saveYoutubeRow, youtubeConfig } from "@/lib/integrations/youtube-server";
+import { runRetirements, type RetireSummary } from "@/lib/integrations/youtube-retire";
+import { readYoutubeIntegration, saveYoutubeRow, updateYoutubeMeta, youtubeConfig } from "@/lib/integrations/youtube-server";
+import { cancelRetire, queueRetire, type QueueOutcome } from "@/lib/youtube-retire";
 import { GOOGLE_REVOKE_URL } from "@/lib/youtube-upload";
 
 // YouTube links (P4-05): store_settings.youtube. super_admin only — checked here
@@ -67,4 +69,61 @@ export async function disconnectYoutube(locale: string): Promise<DisconnectResul
 
   revalidatePath(`/${locale === "ar" ? "ar" : "en"}/dashboard/store/youtube`);
   return { ok: true };
+}
+
+// ── Videos & YouTube: the retire log (lib/youtube-retire.ts) ─────────────────
+// super_admin only. Add a video by link / id (deleted from YouTube and the site
+// RETIRE_GRACE_HOURS later by the daily cron), cancel one, or delete one now.
+// Writes go through updateYoutubeMeta (latest metadata, never a stale copy).
+export type RetireActionResult =
+  | { ok: true }
+  | { ok: false; error: "forbidden" | "migration" | "db" | Exclude<QueueOutcome, "queued"> };
+
+const revalidateYoutubePages = () => {
+  revalidatePath("/en/dashboard/store/youtube");
+  revalidatePath("/ar/dashboard/store/youtube");
+};
+
+export async function queueRetireAction(input: { link: string; title?: string }): Promise<RetireActionResult> {
+  const session = await getSessionContext();
+  if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
+
+  const id = extractVideoId(input?.link);
+  if (!id) return { ok: false, error: "bad_id" };
+  const read = await readYoutubeIntegration();
+  if (read.state === "no_table") return { ok: false, error: "migration" };
+  if (read.state !== "ok") return { ok: false, error: "db" };
+
+  let outcome = "queued" as QueueOutcome;
+  await updateYoutubeMeta(read.db, read.meta, (m) => {
+    const r = queueRetire(m, { video_id: id, title: typeof input.title === "string" ? input.title : "", reason: "manual" }, new Date());
+    outcome = r.outcome;
+    return r.meta;
+  });
+  if (outcome !== "queued") return { ok: false, error: outcome };
+  revalidateYoutubePages();
+  return { ok: true };
+}
+
+export async function cancelRetireAction(videoId: string): Promise<RetireActionResult> {
+  const session = await getSessionContext();
+  if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
+
+  const read = await readYoutubeIntegration();
+  if (read.state === "no_table") return { ok: false, error: "migration" };
+  if (read.state !== "ok") return { ok: false, error: "db" };
+  await updateYoutubeMeta(read.db, read.meta, (m) => cancelRetire(m, String(videoId)));
+  revalidateYoutubePages();
+  return { ok: true };
+}
+
+export type DeleteNowResult = { ok: true; summary: RetireSummary } | { ok: false; error: "forbidden" };
+
+export async function deleteRetireNowAction(videoId: string): Promise<DeleteNowResult> {
+  const session = await getSessionContext();
+  if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
+
+  const summary = await runRetirements({ onlyIds: [String(videoId)] });
+  revalidateYoutubePages();
+  return { ok: true, summary };
 }

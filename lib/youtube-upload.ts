@@ -20,6 +20,7 @@
 // No env, no I/O, no React: unit-tested in lib/youtube-upload.test.ts.
 
 import { parseYoutube, TITLE_MAX, YOUTUBE_MAX, type Youtube, type YoutubeVideo } from "@/lib/youtube";
+import { parseRetireList, type RetireEntry } from "@/lib/youtube-retire";
 
 // ── OAuth ────────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export function hasAllScopes(scope: string | null | undefined): boolean {
 // ── Quota ────────────────────────────────────────────────────────────────────
 
 export const YT_DAILY_QUOTA = 10_000;
-export const YT_COST = { insert: 1600, caption: 400, thumbnail: 50, channel: 1 } as const;
+export const YT_COST = { insert: 1600, caption: 400, thumbnail: 50, channel: 1, delete: 50 } as const;
 export const UPLOAD_COST = YT_COST.insert + 2 * YT_COST.caption + YT_COST.thumbnail;
 
 const PACIFIC = "America/Los_Angeles";
@@ -125,6 +126,8 @@ export type YoutubeMeta = {
   channel_title: string;
   quota: QuotaState | null;
   uploads: Record<string, UploadRecord>;
+  /** Retire log: outdated videos to delete (lib/youtube-retire.ts). */
+  retire: RetireEntry[];
 };
 
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -132,7 +135,7 @@ const s = (v: unknown, max = 200) => (typeof v === "string" ? v.slice(0, max) : 
 
 /** Lenient read of integrations.metadata for the youtube row; never throws. */
 export function parseYoutubeMeta(raw: unknown): YoutubeMeta {
-  const out: YoutubeMeta = { channel_id: "", channel_title: "", quota: null, uploads: {} };
+  const out: YoutubeMeta = { channel_id: "", channel_title: "", quota: null, uploads: {}, retire: [] };
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
   const r = raw as Record<string, unknown>;
   out.channel_id = s(r.channel_id);
@@ -155,6 +158,7 @@ export function parseYoutubeMeta(raw: unknown): YoutubeMeta {
       };
     }
   }
+  out.retire = parseRetireList(r.retire);
   return out;
 }
 
