@@ -120,12 +120,20 @@ export const getStoreFacets = unstable_cache(
 );
 
 /**
- * One page of the /store list for a parsed URL state. The key is the state
- * itself (parseStoreParams already normalised it) plus the locale (sorting by
- * name differs per locale).
+ * One page of the /store list for a parsed URL state. Browse states (no search
+ * text) are cached: the key is the state itself (parseStoreParams already
+ * normalised it) plus the locale (sorting by name differs per locale), and the
+ * key space is small. A state with a query is read live: every distinct query
+ * (bots, the instant-search box typing) would otherwise write its own cache
+ * entry and rarely be read twice (ISR-write allowance, 2026-10-16).
  */
-export const getStoreListing = unstable_cache(
-  async (state: StoreState, locale: string): Promise<{ parts: StoreCardPart[]; total: number }> => {
+export function getStoreListing(state: StoreState, locale: string): Promise<{ parts: StoreCardPart[]; total: number }> {
+  return state.q ? storeListing(state, locale) : cachedStoreListing(state, locale);
+}
+
+const cachedStoreListing = unstable_cache(storeListing, ["store:listing"], CACHE);
+
+async function storeListing(state: StoreState, locale: string): Promise<{ parts: StoreCardPart[]; total: number }> {
     const supabase = createPublicClient();
     if (!supabase) return { parts: [], total: 0 };
     const store = await hasStoreCategory();
@@ -167,10 +175,7 @@ export const getStoreListing = unstable_cache(
     const { data, count } = await query.range(from, from + STORE_PAGE_SIZE - 1);
     const parts = ((data ?? []) as unknown as CardRow[]).map(toCard);
     return { parts, total: count ?? parts.length };
-  },
-  ["store:listing"],
-  CACHE,
-);
+}
 
 /**
  * The homepage's featured row: in-stock products with a photo, one per
@@ -230,8 +235,9 @@ export const getMergedRedirectSku = unstable_cache(
 
 /**
  * order_delivery_quote for one product (the same computation checkout
- * records). Dates move daily; the 5-minute lifetime and both tags (offers move
- * the lead time, settings move tier days and prices) keep it current.
+ * records). Dates move daily: the daily cron purge re-renders it each morning,
+ * and both tags (offers move the lead time, settings move tier days and prices)
+ * keep it current between purges.
  */
 export const getProductDeliveryQuote = unstable_cache(
   async (partId: string, quantity: number): Promise<DeliveryQuote | null> => {

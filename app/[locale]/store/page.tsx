@@ -10,7 +10,7 @@ import { StoreListing } from "./store-listing";
 // would make every request dynamic. A URL with ?q / ?category / ?material /
 // ?stock / ?sort / ?page is rewritten (next.config.mjs) to ./search/page.tsx,
 // which renders the same listing dynamically from cached data.
-export const revalidate = 300;
+export const revalidate = 86400; // = STOREFRONT_REVALIDATE (lib/cache/storefront.ts); the daily sync purges by tag
 
 export const generateMetadata = metaFor("store");
 

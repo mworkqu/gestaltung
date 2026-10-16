@@ -32,7 +32,7 @@ import { VIDEOS, videoBase, videoJsonLd } from "@/lib/videos";
 // ISR (Phase G): static per locale, re-rendered at most every 5 minutes, or at
 // once when an admin edit calls revalidateStorefront() (tag "parts"). Nothing
 // per-visitor is rendered here (auth, cart and credits are client components).
-export const revalidate = 300;
+export const revalidate = 86400; // = STOREFRONT_REVALIDATE (lib/cache/storefront.ts); the daily sync purges by tag
 
 // Store-first metadata (overrides the sitewide default, which mentions the
 // inventory platform — never surfaced on the store landing).

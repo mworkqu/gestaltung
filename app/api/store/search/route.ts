@@ -5,8 +5,9 @@ import { handleStoreSearch, SUGGEST_RATE, suggestState } from "@/lib/store/searc
 // GET /api/store/search?q=&locale= — instant store search for the home and
 // store search boxes (W7). Top 6 products, public card fields only
 // (lib/store/search-suggest.ts toSuggestion), EN + AR names. Data from the
-// cached cookie-free catalogue read (unstable_cache, tag "parts"); responses
-// are CDN-cached for 60 s per query; per-IP rate limit per instance.
+// cookie-free catalogue read (live per query — queried listings are not cached,
+// see getStoreListing); responses are CDN-cached for 60 s per query; per-IP
+// rate limit per instance.
 
 const rate = createRateLimiter(SUGGEST_RATE);
 
