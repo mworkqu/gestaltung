@@ -14,7 +14,7 @@ import { StoreListing } from "../../store/store-listing";
 // ones; only the title block is replaced by this hero. Static / ISR like v1:
 // it never reads searchParams (a filtered URL is rewritten to the dynamic
 // search route by next.config.mjs, which renders the v1 listing).
-export const revalidate = 300;
+export const revalidate = 86400; // = STOREFRONT_REVALIDATE (lib/cache/storefront.ts); the daily sync purges by tag
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

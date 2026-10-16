@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 // (auth, cart and credits are client components); the site flag is resolved in
 // middleware, never with cookies() or headers() in this page. The trust block
 // is rendered site-wide above the footer by the locale layout, not here.
-export const revalidate = 300;
+export const revalidate = 86400; // = STOREFRONT_REVALIDATE (lib/cache/storefront.ts); the daily sync purges by tag
 
 // Same title and description as v1; canonical and hreflang point at the public
 // path "/"; noindex until the site_v2 flag is on (lib/site-v2-server.ts).

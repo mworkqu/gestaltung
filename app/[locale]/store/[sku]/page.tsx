@@ -50,7 +50,7 @@ import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 // when an admin edit calls revalidateStorefront(). Everything here is
 // cookie-free (cached anon reads in lib/store/public-catalog.ts); per-visitor
 // bits (cart, add to project) are client components.
-export const revalidate = 300;
+export const revalidate = 86400; // = STOREFRONT_REVALIDATE (lib/cache/storefront.ts); the daily sync purges by tag
 
 // No product is built at deploy time; each one is cached on first request.
 export function generateStaticParams() {

@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 // cookies / headers. It stays reachable all year: outside its dates the hero
 // says when it is back instead of 404ing, so shared links keep working. An id
 // that is not in store_settings.occasions is a 404.
-export const revalidate = 300;
+export const revalidate = 86400; // = STOREFRONT_REVALIDATE (lib/cache/storefront.ts); the daily sync purges by tag
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
