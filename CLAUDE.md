@@ -1474,6 +1474,7 @@ Check Supabase → Table Editor to confirm which tables exist before running:
   export's raw responses and event log are empty until it runs)
 
 ## PERMANENT NOTES
+- STOREFRONT CACHE EXPIRY = 24 h since 2026-10-16 (was 5 min; it blew the Hobby ISR-write allowance). Wherever older notes say "or wait 5 min", read "or wait for the daily 06:00 Qatar purge": any Dashboard → Store save or cron sync still purges at once. Store listings WITH a search query are not cached at all (lib/store/public-catalog.ts getStoreListing).
 - EMAILS (P5-07, 2026-10-10): every email goes through lib/email/brand-layout.ts renderBrandedEmail() (logo, cobalt, neu card, RTL for ar, text part; no raw URLs/ids in visible text). Owner alerts: lib/email/lead-email.ts (renderLeadEmail / renderOwnerEmail, English). Admin Messages & requests card reads lib/admin/lead-parse.ts. Phones: stored +974XXXXXXXX, shown with formatPhoneDisplay (+974 XXXX XXXX); sizes via lib/format-bytes.ts formatFileSize. Order confirmation / delay emails stay bilingual (the delay cron has no customer locale).
 - Analytics: GA4 Measurement ID G-QXVQ4H05Y7. Env var NEXT_PUBLIC_GA_MEASUREMENT_ID must be set in
   Vercel (Production / Preview / Development). Custom domain www.gestaltung360.com (point DNS at Vercel
