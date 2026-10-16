@@ -46,6 +46,10 @@ Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test 
 
 - Projects `838c44f8-3ec8-4627-9521-130f2806ce37` and `e5946e41-b746-49c0-b73a-cbbf59af24dc` (Studio "ساقي النباتات التلقائي"), created by guests on /ar by `scripts/record-videos/record.mjs idea-to-kit-ar` (two takes). Nothing was ordered or sent.
 
+## Arabic site-clip recordings (2026-10-17)
+
+- One guest cart line (soil moisture sensor) from `scripts/record-videos/record.mjs store-to-door-ar`; an anonymous guest user owns it. Nothing was ordered. The quote and drawing-request takes were never submitted.
+
 ## Already deleted
 
 - Crash-repro project `6b5907f2-c957-43f9-bce8-42e73beeff33` "TEST crash repro — delete" (created 2026-10-09): already deleted by the owner. No action.
