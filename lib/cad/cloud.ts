@@ -76,13 +76,13 @@ function credentials(): Record<string, unknown> {
 }
 
 type TokenSource = { fetchIdToken: (audience: string) => Promise<string> };
-let source: { audience: string; client: Promise<TokenSource> } | null = null;
-let cached: { key: string; token: string; expires: number } | null = null;
+const sources = new Map<string, Promise<TokenSource>>();
+const cachedTokens = new Map<string, { token: string; expires: number }>();
 
 /** Test hook: forget the cached client and token. */
 export function resetCloudAuth() {
-  source = null;
-  cached = null;
+  sources.clear();
+  cachedTokens.clear();
 }
 
 function tokenExpiry(token: string): number {
@@ -188,15 +188,17 @@ async function keylessIdToken(audience: string, opts: AuthOpts): Promise<string>
 
 /** Legacy: the service-account key via google-auth-library. */
 async function keyIdToken(audience: string): Promise<string> {
-  if (!source || source.audience !== audience) {
+  let client = sources.get(audience);
+  if (!client) {
     const auth = new GoogleAuth({ credentials: credentials() });
-    const client = auth.getIdTokenClient(audience).then((c) => c.idTokenProvider as TokenSource);
-    source = { audience, client };
-    client.catch(() => {
-      if (source?.client === client) source = null;
+    const created = auth.getIdTokenClient(audience).then((c) => c.idTokenProvider as TokenSource);
+    client = created;
+    sources.set(audience, created);
+    created.catch(() => {
+      if (sources.get(audience) === created) sources.delete(audience);
     });
   }
-  return (await source.client).fetchIdToken(audience);
+  return (await client).fetchIdToken(audience);
 }
 
 /** A Google ID token for the worker (audience = the service URL). Throws when none can be had. */
@@ -204,10 +206,20 @@ export async function idToken(audience: string, opts: AuthOpts = {}): Promise<st
   const mode = cloudAuthMode();
   if (!mode) throw new Error("google auth: not configured");
   const key = `${mode}|${audience}`;
-  if (cached && cached.key === key && cached.expires - TOKEN_EARLY_MS > Date.now()) return cached.token;
+  const hit = cachedTokens.get(key);
+  if (hit && hit.expires - TOKEN_EARLY_MS > Date.now()) return hit.token;
   const token = mode === "keyless" ? await keylessIdToken(audience, opts) : await keyIdToken(audience);
-  cached = { key, token, expires: tokenExpiry(token) };
+  cachedTokens.set(key, { token, expires: tokenExpiry(token) });
   return token;
+}
+
+/** An ID token for any audience (e.g. the CAD Champions grader); null when no Google credentials are configured. Throws on a token failure. */
+export async function googleIdTokenFor(
+  audience: string,
+  opts: { oidcToken?: string | null } = {}
+): Promise<string | null> {
+  if (!cloudAuthMode()) return null;
+  return idToken(audience, { oidcToken: opts.oidcToken });
 }
 
 const Num = z.number().finite();

@@ -42,6 +42,14 @@ def test_missing_and_wrong_secret(client, pdf):
     assert client.post("/grade-package", json=pkg_body).status_code == 401
 
 
+def test_secret_checked_before_body_validation(client):
+    # An empty / invalid body without the secret must be 401, not 422.
+    for path in ("/grade", "/reference", "/grade-package"):
+        assert client.post(path, json={}).status_code == 401
+        assert client.post(path, json={}, headers={"X-Grader-Secret": "nope"}).status_code == 401
+        assert client.post(path, json={}, headers=AUTH).status_code == 422
+
+
 def test_no_secret_configured_fails_closed(monkeypatch, pdf):
     monkeypatch.delenv("GRADER_SECRET", raising=False)
     c = TestClient(main.app)

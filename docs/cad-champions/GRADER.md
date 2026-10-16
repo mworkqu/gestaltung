@@ -11,10 +11,12 @@ The auto-grader is its own Python service in `/grader` (FastAPI + CadQuery), dep
 
 | Name | Value |
 |---|---|
-| `GRADER_URL` | The Cloud Run URL printed by `gcloud run deploy cad-grader ...` (no trailing slash). |
+| `GRADER_URL` | `https://cad-grader-1005108288584.me-central1.run.app` (the Cloud Run URL, no trailing slash). |
 | `GRADER_SECRET` | The same string stored in Secret Manager as `GRADER_SECRET`. Sent as header `X-Grader-Secret`. |
 
-Neither may be `NEXT_PUBLIC_*`. Without them STEP tasks go to manual review (see below) and the practice upload does a header-only check.
+Neither may be `NEXT_PUBLIC_*`.
+
+**Cloud Run auth.** The service is not public (org policy forbids `allUsers`). `http.ts` sends `Authorization: Bearer <Google ID token>` (audience = the service origin) next to `X-Grader-Secret`. The token comes from `googleIdTokenFor` in `lib/cad/cloud.ts` (keyless via Vercel OIDC and Workload Identity Federation, using the same `GCP_WIF_PROVIDER` / `GCP_CAD_SA_EMAIL` as the CAD worker, or `GCP_CAD_SA_KEY`; cached per audience). With no Google env (local dev) only the secret is sent. The service account `vercel-cad-caller@gestaltung-cad.iam.gserviceaccount.com` holds `roles/run.invoker` on `cad-grader`. A 401/403 (Cloud Run HTML or the grader's JSON) or a token failure becomes the call failure kind `not_authorized`, which the queue treats like "grader unavailable": manual review. The grader itself checks the secret before validating the body (no secret = 401, never 422). Deploy command and IAM steps: `DEPLOY.md` section 3. Without them STEP tasks go to manual review (see below) and the practice upload does a header-only check.
 
 ## Site-side flow (Step D)
 

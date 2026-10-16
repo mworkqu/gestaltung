@@ -112,14 +112,28 @@ Backups depend on your Supabase plan. Check: Supabase dashboard, Database, Backu
 Full steps are in `grader/README.md` (section "Deploy") and `docs/cad-champions/GRADER.md`. Summary:
 
 1. The production secret: create a long random string, store it in Google Secret Manager as `GRADER_SECRET`, and put the same string in Vercel as `GRADER_SECRET`. Rotate by adding a new secret version, redeploying, then updating Vercel.
-2. Deploy command (PowerShell, from the repo root):
+2. Deploy command actually used (PowerShell, from the repo root). The org policy forbids public (`allUsers`) invocation, so there is no `--allow-unauthenticated`:
 
 ```powershell
-gcloud run deploy cad-grader --source ./grader --region me-central1 --memory 2Gi --cpu 1 --concurrency 2 --min-instances 0 --max-instances 3 --timeout 120 --allow-unauthenticated --set-secrets GRADER_SECRET=GRADER_SECRET:latest --set-env-vars GRADER_ALLOWED_URL_PREFIXES=https://jgwuafubtmpaonsznfyw.supabase.co/storage/v1/object/sign/
+gcloud run deploy cad-grader --source ./grader --region me-central1 --memory 2Gi --cpu 1 --concurrency 2 --min-instances 0 --max-instances 3 --timeout 120 --set-env-vars GRADER_SECRET=<the secret>
 ```
 
-3. Copy the printed service URL into Vercel as `GRADER_URL` (no trailing slash), redeploy the site.
-4. Check: open `<GRADER_URL>/health`; it must return `{"ok": true, ...}`. Then run one practice upload in Get Ready.
+   Live service: `https://cad-grader-1005108288584.me-central1.run.app` (project `gestaltung-cad`, region `me-central1`). (Secret Manager with `--set-secrets GRADER_SECRET=GRADER_SECRET:latest` also works if you prefer it to a plain env var.)
+   Cloud Build runs as the default compute service account; it needed these roles: `roles/storage.objectViewer`, `roles/logging.logWriter`, `roles/artifactregistry.writer`.
+3. Let the site call it. The service is IAM-protected; the site mints a Google ID token keylessly from Vercel's OIDC token (Workload Identity Federation), exactly like the CAD worker (`lib/cad/cloud.ts`, `googleIdTokenFor`). Grant the caller service account the invoker role once:
+
+```powershell
+gcloud run services add-iam-policy-binding cad-grader --region=me-central1 --member=serviceAccount:vercel-cad-caller@gestaltung-cad.iam.gserviceaccount.com --role=roles/run.invoker
+```
+
+4. Vercel env: `GCP_WIF_PROVIDER` and `GCP_CAD_SA_EMAIL` are already set (shared with the CAD worker); `GRADER_URL=https://cad-grader-1005108288584.me-central1.run.app` and `GRADER_SECRET` are set. Redeploy the site after changing them.
+5. Manual health check (needs your own gcloud login, a plain browser gets 403):
+
+```powershell
+curl.exe -H "Authorization: Bearer $(gcloud auth print-identity-token)" https://cad-grader-1005108288584.me-central1.run.app/health
+```
+
+   It must return `{"ok": true, ...}`. Then run one practice upload in Get Ready. A 401/403 from Cloud Run shows up on the site as `not_authorized` and the submission goes to manual review.
 
 ### Minimum instances and cost
 

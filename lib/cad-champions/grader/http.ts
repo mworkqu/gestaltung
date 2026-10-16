@@ -1,10 +1,16 @@
 // HTTP client for the STEP grader service (/grader, Cloud Run) — SERVER ONLY.
 // Env: GRADER_URL (no trailing slash) and GRADER_SECRET (header X-Grader-Secret).
 // 120 s timeout per call; one retry on a network error or a 5xx answer.
+// Cloud Run is IAM-protected (no public invocation): when Google credentials are
+// configured (same keyless WIF setup as the CAD worker) each attempt also sends
+// Authorization: Bearer <ID token, audience = the service origin>. Without them
+// (local dev) only the secret is sent. 401/403 from Cloud Run => "not_authorized".
 // Responses are validated with zod. The raw JSON (with `details`) is returned
 // for cc_grading_logs only; never pass it to a student.
 
 import { z } from "zod";
+
+import { googleIdTokenFor } from "@/lib/cad/cloud";
 
 if (typeof window !== "undefined") throw new Error("lib/cad-champions/grader/http.ts is server-only");
 
@@ -95,7 +101,7 @@ export function graderConfigured(env: GraderEnv = readEnv()): boolean {
 
 // ------------------------------------------------------------------ call
 
-export type GraderFailureKind = "not_configured" | "network" | "timeout" | "http" | "invalid_response";
+export type GraderFailureKind = "not_configured" | "network" | "timeout" | "http" | "invalid_response" | "not_authorized";
 
 export type GraderCallResult<T> =
   | { ok: true; data: T; raw: unknown; status: number; durationMs: number; tries: number }
@@ -115,20 +121,38 @@ export interface CallDeps {
   env?: GraderEnv;
   timeoutMs?: number;
   retryDelayMs?: number;
+  /** Test hook; default = googleIdTokenFor (null when no Google credentials are configured). */
+  idToken?: (audience: string) => Promise<string | null>;
 }
 
 type Attempt =
   | { kind: "response"; status: number; raw: unknown }
   | { kind: "network"; error: string }
-  | { kind: "timeout"; error: string };
+  | { kind: "timeout"; error: string }
+  | { kind: "auth"; error: string };
 
-async function once(fetchImpl: typeof fetch, url: string, secret: string, body: unknown, timeoutMs: number): Promise<Attempt> {
+async function once(
+  fetchImpl: typeof fetch,
+  url: string,
+  secret: string,
+  body: unknown,
+  timeoutMs: number,
+  getToken: (audience: string) => Promise<string | null>
+): Promise<Attempt> {
+  const headers: Record<string, string> = { "Content-Type": "application/json", "X-Grader-Secret": secret };
+  try {
+    const idToken = await getToken(new URL(url).origin);
+    if (idToken) headers.Authorization = `Bearer ${idToken}`;
+  } catch (e) {
+    // The message of a token failure never contains a token or key.
+    return { kind: "auth", error: `could not get a Google ID token: ${e instanceof Error ? e.message.slice(0, 150) : "failed"}` };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetchImpl(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Grader-Secret": secret },
+      headers,
       body: JSON.stringify(body),
       cache: "no-store",
       signal: controller.signal,
@@ -168,12 +192,13 @@ export async function callGrader<P extends GraderPath>(path: P, body: unknown, d
   const secret = env.secret!.trim();
   const timeoutMs = deps.timeoutMs ?? GRADER_TIMEOUT_MS;
   const retryDelay = deps.retryDelayMs ?? RETRY_DELAY_MS;
+  const getToken = deps.idToken ?? ((audience: string) => googleIdTokenFor(audience));
 
   let tries = 0;
   let last: Attempt | null = null;
   while (tries < 2) {
     tries++;
-    last = await once(fetchImpl, url, secret, body, timeoutMs);
+    last = await once(fetchImpl, url, secret, body, timeoutMs, getToken);
     const retryable = last.kind === "network" || (last.kind === "response" && last.status >= 500);
     if (!retryable || tries >= 2) break;
     if (retryDelay > 0) await new Promise((r) => setTimeout(r, retryDelay));
@@ -181,7 +206,12 @@ export async function callGrader<P extends GraderPath>(path: P, body: unknown, d
   const durationMs = Date.now() - started;
   const a = last!;
   if (a.kind === "timeout") return { ok: false, kind: "timeout", error: a.error, durationMs, tries };
+  if (a.kind === "auth") return { ok: false, kind: "not_authorized", error: a.error, durationMs, tries };
   if (a.kind === "network") return { ok: false, kind: "network", error: a.error, durationMs, tries };
+  if (a.status === 401 || a.status === 403) {
+    // Cloud Run IAM refusal (HTML body) or the grader's own secret check (JSON).
+    return { ok: false, kind: "not_authorized", status: a.status, error: `not authorized (HTTP ${a.status})`, raw: a.raw, durationMs, tries };
+  }
   if (a.status < 200 || a.status >= 300) {
     return { ok: false, kind: "http", status: a.status, error: errorFrom(a.raw, a.status), raw: a.raw, durationMs, tries };
   }

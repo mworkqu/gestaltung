@@ -18,7 +18,7 @@ import time
 from importlib import metadata
 from typing import Any, Literal
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -205,14 +205,20 @@ class GradePackageResponse(BaseModel):
 # ---------------------------------------------------------------- helpers
 
 
-def _secret_problem(request: Request) -> JSONResponse | None:
+class SecretRefused(Exception):
+    def __init__(self, status_code: int, error: str):
+        self.status_code = status_code
+        self.error = error
+
+
+def require_secret(request: Request) -> None:
+    """FastAPI dependency: runs before request-body validation, so no secret = 401, never 422."""
     secret = os.environ.get("GRADER_SECRET", "")
     if not secret:
-        return JSONResponse(status_code=503, content={"error": "grader_not_configured"})
+        raise SecretRefused(503, "grader_not_configured")
     given = request.headers.get("x-grader-secret", "")
     if not hmac.compare_digest(given.encode("utf-8"), secret.encode("utf-8")):
-        return JSONResponse(status_code=401, content={"error": "unauthorised"})
-    return None
+        raise SecretRefused(401, "unauthorised")
 
 
 def _local_files_allowed() -> bool:
@@ -259,6 +265,11 @@ def _grade(measurement: dict, *, reference: ReferenceData, mode: str, scoring: s
 # ---------------------------------------------------------------- routes
 
 
+@app.exception_handler(SecretRefused)
+async def _secret_refused(_request: Request, exc: SecretRefused) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"error": exc.error})
+
+
 @app.exception_handler(RequestValidationError)
 async def _bad_request(_request: Request, exc: RequestValidationError) -> JSONResponse:
     first = exc.errors()[0] if exc.errors() else {}
@@ -272,9 +283,9 @@ def health() -> dict:
     return {"ok": version is not None, "cadquery": version or "not installed", "service": "cad-grader"}
 
 
-@app.post("/grade", response_model=GradeResponse)
+@app.post("/grade", response_model=GradeResponse, dependencies=[Depends(require_secret)])
 def grade(body: GradeRequest, request: Request):
-    problem = _secret_problem(request) or _check_source(body)
+    problem = _check_source(body)
     if problem:
         return problem
     started = time.monotonic()
@@ -295,9 +306,9 @@ def grade(body: GradeRequest, request: Request):
     return result
 
 
-@app.post("/reference")
+@app.post("/reference", dependencies=[Depends(require_secret)])
 def reference(body: ReferenceRequest, request: Request):
-    problem = _secret_problem(request) or _check_source(body)
+    problem = _check_source(body)
     if problem:
         return problem
     started = time.monotonic()
@@ -318,11 +329,8 @@ def reference(body: ReferenceRequest, request: Request):
             "timing_ms": timing}
 
 
-@app.post("/grade-package", response_model=GradePackageResponse)
+@app.post("/grade-package", response_model=GradePackageResponse, dependencies=[Depends(require_secret)])
 def grade_package(body: GradePackageRequest, request: Request):
-    problem = _secret_problem(request)
-    if problem:
-        return problem
     for f in body.files:
         p = _check_source(f)
         if p:
