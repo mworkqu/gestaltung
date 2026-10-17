@@ -61,6 +61,7 @@ describe("admin nav groups", () => {
         "/dashboard/store/youtube",
         "/dashboard/usage",
         "/dashboard/notifications",
+        "/dashboard/contact",
         "/inventory",
       ],
     ]);

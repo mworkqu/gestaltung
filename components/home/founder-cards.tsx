@@ -3,7 +3,7 @@ import { ArrowRight, MessageCircle, PackageCheck, Rocket } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { ChoiceHead } from "@/components/marketing/v2";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
 
 // "Built for hardware founders" (W7): each outcome card is one link with a
@@ -18,6 +18,7 @@ export async function FounderCards({ locale, variant = "tile" }: { locale: strin
   const card = cn(cardBase, variant === "tile" ? "tile" : "neu border border-transparent p-5");
   const t = await getTranslations("StoreLanding");
   const th = await getTranslations("HomeHero");
+  const phone = await getContactPhone();
   const isRtl = locale === "ar";
   const arrow = (
     <span
@@ -38,7 +39,7 @@ export async function FounderCards({ locale, variant = "tile" }: { locale: strin
         <ChoiceHead icon={<PackageCheck className="h-4 w-4" />} title={t("founders2Title")} text={t("founders2Text")} />
         {arrow}
       </Link>
-      <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer" className={card}>
+      <a href={phone.whatsappUrl} target="_blank" rel="noopener noreferrer" className={card}>
         <ChoiceHead icon={<MessageCircle className="h-4 w-4" />} title={t("founders3Title")} text={t("founders3Text")} />
         <span className="sr-only">{th("opensWhatsapp")}</span>
         {arrow}

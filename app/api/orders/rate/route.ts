@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { escapeHtml } from "@/lib/email";
 import { commentFormHtml, renderRatingPage } from "@/lib/orders/rating-page";
 import { parseScore, ratingSecret, verifyRatingToken } from "@/lib/orders/rating";
@@ -50,6 +51,7 @@ function page(locale: Locale, valid: Valid | null): Response {
 }
 
 export async function GET(request: Request) {
+  await getContactPhone(); // footer link of the rating page (sync peek)
   const url = new URL(request.url);
   const locale: Locale = url.searchParams.get("l") === "ar" ? "ar" : "en";
   const order = url.searchParams.get("order");

@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { GMark } from "@/components/g-mark";
 import { FeatureVideoSection } from "@/components/feature-video-section";
 import { YoutubeLinks } from "@/components/marketing/youtube-links";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
@@ -39,6 +39,7 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
 
   const t = await getTranslations("HowItWorks");
   const tHero = await getTranslations("Hero");
+  const phone = await getContactPhone();
   const isRtl = locale === "ar";
 
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
@@ -144,7 +145,7 @@ export default async function HowItWorksPage({ params }: { params: Promise<{ loc
         <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div aria-hidden className="bg-blueprint-grid pointer-events-none absolute inset-0 opacity-[0.04]" />
           <Button asChild size="lg" variant="secondary" className="relative h-auto whitespace-normal rounded-full px-7 py-3 text-start">
-            <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer">
+            <a href={phone.whatsappUrl} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="h-4 w-4 shrink-0" />
               {t("helpCta")}
             </a>

@@ -16,14 +16,16 @@ export const PAYMENT_DETAILS = {
   fawranAlias: "CR-236988",
 } as const;
 
-// The company WhatsApp line (owner, 2026-10-03). Shown as a wa.me link where we
-// confirm payments and delivery.
+// DEFAULT contact number only (owner, 2026-10-03). The live number is the
+// store_settings.contact_phone row the owner edits in Dashboard → Settings →
+// Contact info; read it through lib/contact-phone(-server).ts, never from here.
+// These two constants stay as the fallback when no row exists.
 export const COMPANY_WHATSAPP = {
   display: "+974 6656 7410",
   url: "https://wa.me/97466567410",
 } as const;
 
-// Same number as the WhatsApp line: the phone link for tel: (owner, 2026-10-03).
+// Same number as the WhatsApp line (default; see above).
 export const COMPANY_PHONE = {
   display: "+974 6656 7410",
   tel: "tel:+97466567410",

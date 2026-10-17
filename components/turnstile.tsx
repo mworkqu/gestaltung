@@ -16,7 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Loader2, RotateCcw } from "lucide-react";
 
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { useContactPhone } from "@/components/contact-phone-provider";
 import { TURNSTILE_FIELD, TURNSTILE_SCRIPT } from "@/lib/turnstile";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +80,7 @@ export function turnstileActive(enabled: boolean): boolean {
 
 export function Turnstile({ enabled, onToken, resetKey = 0, action, className }: TurnstileProps) {
   const t = useTranslations("Turnstile");
+  const phone = useContactPhone();
   const locale = useLocale();
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const on = enabled && !!siteKey;
@@ -182,7 +183,7 @@ export function Turnstile({ enabled, onToken, resetKey = 0, action, className }:
             {t.rich("failed", {
               wa: (chunks) => (
                 <a
-                  href={COMPANY_WHATSAPP.url}
+                  href={phone.whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold underline underline-offset-2"

@@ -22,7 +22,7 @@ import { TrackClick } from "@/components/analytics/track-click";
 import { CreditsOverview } from "@/components/credits/credits-overview";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { InvitePrice } from "@/components/pricing/invite-price";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { CAD_GENERATIONS, ORDER_DELIVERED_CREDITS, PROJECT_LIMIT } from "@/lib/credits/constants";
 import { metaFor } from "@/lib/meta";
 import type { Plan } from "@/lib/pricing/defaults";
@@ -47,6 +47,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   setRequestLocale(locale);
 
   const t = await getTranslations("Pricing");
+  const phone = await getContactPhone();
   const [pricing, services] = await Promise.all([getPricingPlans(), getServicePrices()]);
   const isRtl = locale === "ar";
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
@@ -61,7 +62,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   const mobile = planOrderMobile(pricing.plans);
   const desktop = planOrderDesktop(pricing.plans);
 
-  const whatsappFor = (text: string) => `${COMPANY_WHATSAPP.url}?text=${encodeURIComponent(text)}`;
+  const whatsappFor = (text: string) => `${phone.whatsappUrl}?text=${encodeURIComponent(text)}`;
 
   /** The rows under the price, in the order of the plan table (doc 01 §4.3). */
   const rowsFor = (plan: Plan): { label: string; value: string }[] => {

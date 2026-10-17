@@ -1,7 +1,7 @@
 // Pure helpers for the notification emails: links and cron auth.
 
 import { timingSafeEqual } from "node:crypto";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { peekContactPhone } from "@/lib/contact-phone-server";
 import { ratingUrls } from "@/lib/orders/rating";
 
 export type NotificationLinks = {
@@ -55,7 +55,7 @@ export function buildLinks(opts: {
     ...(oid ? { orderUrl: `${loc}/orders/${oid}` } : {}),
     ...(rating.length ? { ratingUrls: rating } : {}),
     unsubscribeUrl: opts.transactional ? "" : unsubscribeUrl(base, opts.token, opts.kind, opts.locale),
-    whatsappUrl: COMPANY_WHATSAPP.url,
+    whatsappUrl: peekContactPhone().whatsappUrl,
   };
 }
 

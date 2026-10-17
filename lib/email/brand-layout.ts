@@ -10,7 +10,8 @@
 // links live in href only (the plain-text part must carry them, it has no
 // buttons).
 
-import { COMPANY, COMPANY_WHATSAPP } from "@/lib/company";
+import { COMPANY } from "@/lib/company";
+import { peekContactPhone } from "@/lib/contact-phone-server";
 
 export type EmailLocale = "en" | "ar";
 
@@ -198,7 +199,7 @@ export function renderBrandedEmail(doc: BrandEmailDoc): { html: string; text: st
     ...buttons.flatMap((b) => [`${b.label}: ${b.url}`]),
     ...(buttons.length ? [""] : []),
     ...(doc.afterText ? [doc.afterText, ""] : []),
-    ...(help ? [`${c.help}: ${COMPANY_WHATSAPP.display} ${COMPANY_WHATSAPP.url}`, ""] : []),
+    ...(help ? [`${c.help}: ${peekContactPhone().display} ${peekContactPhone().whatsappUrl}`, ""] : []),
     "--",
     ...(footer.reason ? [footer.reason] : []),
     ...(footer.unsubscribe?.url ? [`${footer.unsubscribe.label}: ${footer.unsubscribe.url}`] : []),
@@ -214,7 +215,7 @@ export function renderBrandedEmail(doc: BrandEmailDoc): { html: string; text: st
 
   const footerLines = [
     help
-      ? `<p style="margin:0 0 8px;font-size:12px;color:${BRAND.muted}">${e(c.help)}: <a href="${e(COMPANY_WHATSAPP.url)}" dir="ltr" style="color:${BRAND.cobalt};text-decoration:none;unicode-bidi:embed">&#x2066;${e(COMPANY_WHATSAPP.display)}&#x2069;</a></p>`
+      ? `<p style="margin:0 0 8px;font-size:12px;color:${BRAND.muted}">${e(c.help)}: <a href="${e(peekContactPhone().whatsappUrl)}" dir="ltr" style="color:${BRAND.cobalt};text-decoration:none;unicode-bidi:embed">&#x2066;${e(peekContactPhone().display)}&#x2069;</a></p>`
       : "",
     footer.reason ? `<p style="margin:0 0 6px;font-size:12px;line-height:1.5;color:${BRAND.muted}">${e(footer.reason)}</p>` : "",
     footer.unsubscribe?.url

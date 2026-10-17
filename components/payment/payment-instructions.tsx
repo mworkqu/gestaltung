@@ -10,7 +10,8 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Banknote, Check, Copy, Landmark, Smartphone } from "lucide-react";
 
-import { COMPANY, COMPANY_WHATSAPP, PAYMENT_DETAILS, type PaymentMethod } from "@/lib/company";
+import { COMPANY, PAYMENT_DETAILS, type PaymentMethod } from "@/lib/company";
+import { useContactPhone } from "@/components/contact-phone-provider";
 import { cn } from "@/lib/utils";
 
 export const METHOD_ICON = { cash_on_delivery: Banknote, fawran: Smartphone, bank_transfer: Landmark } as const;
@@ -60,6 +61,7 @@ export function PaymentInstructions({
   brief?: boolean;
 }) {
   const t = useTranslations("PayMethods");
+  const phone = useContactPhone();
   const Icon = METHOD_ICON[method];
   return (
     <div className={cn("space-y-2 rounded-xl bg-panel p-4 text-sm shadow-neu-inset", className)}>
@@ -113,13 +115,13 @@ export function PaymentInstructions({
         <p className="text-[11px] text-mutedtext">
           {t("confirmNote")}{" "}
           <a
-            href={COMPANY_WHATSAPP.url}
+            href={phone.whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             dir="ltr"
             className="inline-block font-semibold text-cobalt hover:underline"
           >
-            {COMPANY_WHATSAPP.display}
+            {phone.display}
           </a>
         </p>
       )}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { MessageCircle } from "lucide-react";
 
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import "./globals.css";
 
 // Root fallback: reached only when no locale is known (e.g. an invalid locale
@@ -12,6 +12,7 @@ import "./globals.css";
 export default async function RootNotFound() {
   const en = await getTranslations({ locale: "en", namespace: "NotFound" });
   const ar = await getTranslations({ locale: "ar", namespace: "NotFound" });
+  const phone = await getContactPhone();
 
   return (
     <html lang="en">
@@ -38,14 +39,14 @@ export default async function RootNotFound() {
               </Link>
             </div>
             <a
-              href={COMPANY_WHATSAPP.url}
+              href={phone.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               dir="ltr"
               className="inline-flex min-h-11 items-center justify-center gap-2 text-sm font-semibold text-heading underline underline-offset-2"
             >
               <MessageCircle className="h-4 w-4 text-cobalt" aria-hidden />
-              {COMPANY_WHATSAPP.display}
+              {phone.display}
             </a>
           </section>
         </main>

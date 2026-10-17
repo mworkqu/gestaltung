@@ -4,7 +4,7 @@ import { ArrowRight, Building2, FlaskConical, GraduationCap, MessageCircle, Prin
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Ltr } from "@/components/ltr-isolate";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { metaFor } from "@/lib/meta";
 import { formatQar } from "@/lib/pricing/plans";
 import { getServicePrices } from "@/lib/store/public-catalog";
@@ -22,10 +22,11 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
   setRequestLocale(locale);
 
   const [t, services] = await Promise.all([getTranslations("Institutions"), getServicePrices()]);
+  const phone = await getContactPhone();
   const price = formatQar(services.pilot_from);
   const isRtl = locale === "ar";
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
-  const whatsapp = `${COMPANY_WHATSAPP.url}?text=${encodeURIComponent(t("whatsappText"))}`;
+  const whatsapp = `${phone.whatsappUrl}?text=${encodeURIComponent(t("whatsappText"))}`;
 
   const audiences: { key: "for1" | "for2" | "for3"; icon: LucideIcon }[] = [
     { key: "for1", icon: GraduationCap },
@@ -146,7 +147,7 @@ export default async function InstitutionsPage({ params }: { params: Promise<{ l
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("invoiceText")}</p>
           <p className="text-sm leading-relaxed text-body sm:text-base">{t("contactLine")}</p>
           <p className="text-sm text-mutedtext">
-            <Ltr>{COMPANY_WHATSAPP.display}</Ltr>
+            <Ltr>{phone.display}</Ltr>
           </p>
         </div>
         <div className="flex w-full shrink-0 flex-col gap-1 sm:w-auto sm:items-end">

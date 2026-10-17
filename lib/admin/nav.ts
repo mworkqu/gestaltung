@@ -21,6 +21,7 @@ export type NavIcon =
   | "videos"
   | "usage"
   | "notifications"
+  | "contact"
   | "inventory";
 
 /** "Something to do" counts shown next to a nav item. */

@@ -312,7 +312,24 @@
     "whatsappCta": "Message us about this order",
     "whatsappText": "Hi, I have a question about order #{id}."
   },
+  "ContactInfo": {
+    "title": "Contact info",
+    "intro": "The phone number shown on the website, in WhatsApp links and in emails. Change it here once; every page follows.",
+    "phoneTitle": "Phone / WhatsApp number",
+    "phoneHelp": "One number for calls and WhatsApp. Type it with the country code, e.g. +974 6656 7410; it is stored as +97466567410.",
+    "phoneLabel": "New number",
+    "willBeStored": "Will be saved as",
+    "save": "Save number",
+    "saved": "Saved. The website now shows the new number.",
+    "invalid": "That does not look like a phone number we can dial. Use the country code, e.g. +974 6656 7410.",
+    "failed": "Could not save. Try again.",
+    "otherTitle": "Other contact details",
+    "email": "Email",
+    "address": "Address",
+    "otherNote": "Email and address are fixed in the code for now; ask to change them."
+  },
   "DashboardNav": {
+    "contactInfo": "Contact info",
     "home": "Home",
     "numbers": "Numbers and funnel",
     "stockToBuy": "What to buy",

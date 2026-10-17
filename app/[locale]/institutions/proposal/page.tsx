@@ -5,7 +5,8 @@ import { Link } from "@/i18n/navigation";
 import { LogoMark } from "@/components/logo-mark";
 import { Ltr } from "@/components/ltr-isolate";
 import { PrintButton } from "@/components/print-button";
-import { COMPANY, COMPANY_ADDRESS, COMPANY_WHATSAPP } from "@/lib/company";
+import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { metaFor } from "@/lib/meta";
 import { formatQar } from "@/lib/pricing/plans";
 import { getServicePrices } from "@/lib/store/public-catalog";
@@ -35,6 +36,7 @@ const PRINT_CSS = `
 export default async function PilotProposalPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const phone = await getContactPhone();
 
   const [t, p, tBrand, services] = await Promise.all([
     getTranslations("Institutions"),
@@ -171,7 +173,7 @@ export default async function PilotProposalPage({ params }: { params: Promise<{ 
             <div className="min-w-0">
               <dt className="text-xs text-mutedtext">{p("whatsapp")}</dt>
               <dd>
-                <Ltr>{COMPANY_WHATSAPP.display}</Ltr>
+                <Ltr>{phone.display}</Ltr>
                 <span className="text-mutedtext"> · {p("hours")}</span>
               </dd>
             </div>
