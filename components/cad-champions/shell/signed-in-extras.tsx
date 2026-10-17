@@ -8,6 +8,6 @@ import { getCcContact } from "@/lib/cad-champions/site-contact";
 // next to the page's own requireCcUser call).
 export async function SignedInExtras({ pageName }: { pageName: string }) {
   if (!(await getCcUser())) return null;
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   return <NeedHelpButton pageName={pageName} whatsappNumber={whatsappNumber} supportEmail={supportEmail} />;
 }

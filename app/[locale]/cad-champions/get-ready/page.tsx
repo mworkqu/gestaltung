@@ -22,7 +22,7 @@ export default async function CcGetReadyPage({ params }: { params: Promise<{ loc
   const t = await getTranslations({ locale, namespace: "CC.get-ready" });
 
   const read = await readGetReadySteps(user.id);
-  const { whatsappNumber } = getCcContact();
+  const { whatsappNumber } = await getCcContact();
 
   return (
     <div className="container py-8 sm:py-12">

@@ -83,7 +83,7 @@ export default async function CcPaymentStatusPage({ params }: Props) {
   const steps: StepperStep[] = PAYMENT_STEP_IDS.map((s) => ({ id: s, label: tSteps(s), status: states[s] }));
   const payHref = `${ccPath(locale, "/training/join/checkout")}?payment=${p.id}`;
   const reason = locale === "ar" ? (p.reject_reason_ar ?? p.reject_reason) : (p.reject_reason ?? p.reject_reason_ar);
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   const wa = buildWhatsAppUrl(whatsappNumber, t("whatsappText", { code: p.reference_code }));
 
   const bankText = (v: string | null) => {

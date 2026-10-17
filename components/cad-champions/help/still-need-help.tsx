@@ -22,7 +22,7 @@ export async function StillNeedHelp({
   body?: string;
 }) {
   const t = await getTranslations({ locale, namespace: "CC.help" });
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   const whatsapp = buildWhatsAppUrl(whatsappNumber, t("whatsappMessage", { topic }));
   const mail = `mailto:${supportEmail}?subject=${encodeURIComponent(t("emailSubject", { topic }))}`;
   return (

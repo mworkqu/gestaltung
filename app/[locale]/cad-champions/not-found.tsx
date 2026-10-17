@@ -13,7 +13,7 @@ export default async function CcNotFound() {
   const locale = isCcLocale(raw) ? raw : "en";
   const t = await getTranslations({ locale, namespace: "CC.errors" });
   const tShell = await getTranslations({ locale, namespace: "CC.shell.footer" });
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   const whatsappUrl = buildWhatsAppUrl(whatsappNumber, tShell("whatsappMessage"));
 
   const helpLink =

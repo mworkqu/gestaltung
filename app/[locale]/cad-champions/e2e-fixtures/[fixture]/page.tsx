@@ -82,7 +82,7 @@ export default async function CcE2eFixturePage({ params, searchParams }: Props) 
         {await body(fixture as (typeof FIXTURES)[number], locale, query)}
       </div>
       {/* ?help=1: the signed-in "Need help?" button (normally only with a CC session). */}
-      {query.help === "1" ? <NeedHelpButton pageName={fixture} {...needHelpContact()} /> : null}
+      {query.help === "1" ? <NeedHelpButton pageName={fixture} {...(await needHelpContact())} /> : null}
     </FixtureUploads>
   );
 }
@@ -105,8 +105,8 @@ function videoOffer(locale: "en" | "ar") {
   };
 }
 
-function needHelpContact() {
-  const { whatsappNumber, supportEmail } = getCcContact();
+async function needHelpContact() {
+  const { whatsappNumber, supportEmail } = await getCcContact();
   return { whatsappNumber, supportEmail };
 }
 

@@ -452,7 +452,7 @@ async function TrainingPath({ v, locale, offer }: { v: ResultsView; locale: Loca
   const tShort = await getTranslations({ locale, namespace: "CC.results.areaShort" });
   const top = v.path[0]?.skillAreaId ?? null;
   const [lesson, plan] = offer ? [offer.lesson, offer.plan] : await Promise.all([loadFreeLesson(top, locale), loadPlanOffer(locale)]);
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   const wa = buildWhatsAppUrl(whatsappNumber, t("offer.whatsappText"));
 
   return (

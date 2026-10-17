@@ -11,7 +11,7 @@ import { buildWhatsAppUrl, getCcContact } from "@/lib/cad-champions/site-contact
 // the trademark disclaimer (the only place "WorldSkills" may appear).
 export async function CcFooter({ locale }: { locale: Locale }) {
   const t = await getTranslations({ locale, namespace: "CC.shell.footer" });
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   const whatsappUrl = buildWhatsAppUrl(whatsappNumber, t("whatsappMessage"));
 
   const link =

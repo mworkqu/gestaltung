@@ -42,8 +42,8 @@ Required means: CC does not work, or a part of it is switched off, without it. "
 | 28 | `CC_RECEIPT_CR_NUMBER` | Optional | No | Your C.R. number | Falls back to `lib/company.ts` (236988) |
 | 29 | `CC_RECEIPT_ADDRESS_EN` | Optional | No | Address line printed on receipts | Falls back to `lib/company.ts` |
 | 30 | `CC_RECEIPT_ADDRESS_AR` | Optional | No | Same, Arabic | Falls back to `lib/company.ts` |
-| 31 | `WHATSAPP_NUMBER` | Recommended | No | Digits only with country code, e.g. `974XXXXXXXX` | Falls back to `NEXT_PUBLIC_WHATSAPP_NUMBER`; if neither is set the WhatsApp row in "Need help?" is hidden |
-| 32 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | Already set for the main site | Yes | Same number | See above |
+| 31 | `WHATSAPP_NUMBER` | Not used any more | No | — | The WhatsApp number is the site-wide contact number set in Dashboard → Settings → Contact info (`store_settings.contact_phone`); CC reads the same value |
+| 32 | `NEXT_PUBLIC_WHATSAPP_NUMBER` | Not used any more | Yes | — | See 31 |
 | 33 | `SUPPORT_EMAIL` | Optional | No | Support address shown in "Need help?" | Default info@gestaltung360.com |
 | 34 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Optional | Yes | Cloudflare Turnstile widget (free, in your own Cloudflare account); see `docs/TURNSTILE.md` | Bot check off on sign-in, sign-up and password reset |
 | 35 | `TURNSTILE_SECRET_KEY` | Optional | No | Same widget | Same |

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
+
+import { DEFAULT_CONTACT_PHONE } from "@/lib/contact-phone";
 import { buildWhatsAppUrl, getCcContact } from "./site-contact";
 
 describe("buildWhatsAppUrl", () => {
@@ -19,16 +21,14 @@ describe("getCcContact", () => {
   afterEach(() => {
     process.env = { ...saved };
   });
-  it("defaults", () => {
-    delete process.env.WHATSAPP_NUMBER;
-    delete process.env.NEXT_PUBLIC_WHATSAPP_NUMBER;
+  it("uses the site-wide contact number (default without a database) and the default email", async () => {
     delete process.env.SUPPORT_EMAIL;
-    expect(getCcContact()).toEqual({ whatsappNumber: null, supportEmail: "info@gestaltung360.com" });
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    expect(await getCcContact()).toEqual({ whatsappNumber: DEFAULT_CONTACT_PHONE.e164, supportEmail: "info@gestaltung360.com" });
   });
-  it("prefers server env over public env", () => {
-    process.env.WHATSAPP_NUMBER = "111";
-    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER = "222";
+  it("takes the support email from SUPPORT_EMAIL", async () => {
     process.env.SUPPORT_EMAIL = "a@b.c";
-    expect(getCcContact()).toEqual({ whatsappNumber: "111", supportEmail: "a@b.c" });
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    expect((await getCcContact()).supportEmail).toBe("a@b.c");
   });
 });

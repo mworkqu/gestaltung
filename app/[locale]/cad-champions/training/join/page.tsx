@@ -49,7 +49,7 @@ export default async function CcTrainingJoinPage({ params }: Props) {
   const [catalog, showPrices, enrollment, payments] = await Promise.all([loadCatalog(), priceGate(cc), loadActiveEnrollment(cc.user.id), loadMyPayments(cc.user.id)]);
   const open = payments.ok ? payments.value.find((p) => OPEN_STATUSES.includes(p.status)) : undefined;
   const renewable = enrollment ? canRenew(enrollment.ends_at) : true;
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   const wa = buildWhatsAppUrl(whatsappNumber, t("whatsappText"));
 
   const faq: [string, string][] = [

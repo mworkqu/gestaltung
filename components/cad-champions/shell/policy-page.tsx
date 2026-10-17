@@ -34,7 +34,7 @@ export async function PolicyPage({ params, id }: Params & { id: PolicyId }) {
   if (!isCcLocale(locale)) notFound();
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: "CC.pages" });
-  const markdown = loadPolicy(id, locale, getCcContact().supportEmail);
+  const markdown = loadPolicy(id, locale, (await getCcContact()).supportEmail);
   const approved = arePoliciesApproved(await loadContentOverrides("en"));
 
   return (

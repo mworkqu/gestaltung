@@ -31,7 +31,7 @@ export default async function CcInstrumentsPage({ params }: Props) {
   setRequestLocale(locale);
   await requireCcUser(locale, ccPath(locale, "/training/instruments"));
   const t = await getTranslations({ locale, namespace: "CC.training.instruments" });
-  const { whatsappNumber, supportEmail } = getCcContact();
+  const { whatsappNumber, supportEmail } = await getCcContact();
   const wa = buildWhatsAppUrl(whatsappNumber, t("kitTitle"));
 
   return (

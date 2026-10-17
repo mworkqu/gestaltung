@@ -173,7 +173,7 @@ export default async function CcLandingPage({ params }: Params) {
 
   const signedIn = Boolean(cc);
   const ctaHref = signedIn ? ccPath(locale, "/dashboard") : ccSignUpHref(locale, ccPath(locale, "/dashboard"));
-  const contact = getCcContact();
+  const contact = await getCcContact();
   const needWhatsapp = buildWhatsAppUrl(contact.whatsappNumber, t("need.whatsappText"));
   const finalWhatsapp = buildWhatsAppUrl(contact.whatsappNumber, t("final.whatsappText"));
   const n = (v: number) => formatNumber(v, locale);
