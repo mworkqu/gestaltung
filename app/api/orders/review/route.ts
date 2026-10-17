@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { escapeHtml } from "@/lib/email";
 import { commentFormHtml, RATING_PAGE_HEADERS, renderRatingPage, type RatingLocale } from "@/lib/orders/rating-page";
 import { parseScore, ratingSecret, verifyRatingToken } from "@/lib/orders/rating";
@@ -102,6 +103,7 @@ async function readCapped(request: Request): Promise<string | null> {
 }
 
 export async function POST(request: Request) {
+  await getContactPhone(); // footer link of the rating page (sync peek)
   const raw = await readCapped(request);
   if (raw === null) return page("en", { kind: "tooBig" });
   const body = parseReviewBody(request.headers.get("content-type"), raw);

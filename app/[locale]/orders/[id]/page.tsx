@@ -6,7 +6,8 @@ import { Link } from "@/i18n/navigation";
 import { pageMetadata } from "@/lib/seo";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/parts/format";
-import { COMPANY_WHATSAPP, isPaymentMethod } from "@/lib/company";
+import { isPaymentMethod } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { buildTimeline, needsPayment, orderShort, type HistoryRow } from "@/lib/orders/status";
 import { isUuid } from "@/lib/notifications/links";
 import { MessagesScope } from "@/components/i18n/messages-scope";
@@ -47,6 +48,7 @@ type ItemRow = { id: string; part_name: string; quantity: number; unit_price_qar
 export default async function OrderPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
   setRequestLocale(locale);
+  const phone = await getContactPhone();
 
   const supabase = await createClient();
   const {
@@ -85,7 +87,7 @@ export default async function OrderPage({ params }: { params: Promise<{ locale: 
   }).format(new Date(order.created_at));
   const method = order.payment_method;
   const payMethod = isPaymentMethod(method) && needsPayment(order.status, method) ? method : null;
-  const waHref = `${COMPANY_WHATSAPP.url}?text=${encodeURIComponent(t("whatsappText", { id: ref }))}`;
+  const waHref = `${phone.whatsappUrl}?text=${encodeURIComponent(t("whatsappText", { id: ref }))}`;
   const hasShipping = order.shipping_qar !== undefined && order.shipping_qar !== null;
   const shipping = Number(order.shipping_qar ?? 0);
   const credit = Number(order.credit_discount_qar ?? 0);

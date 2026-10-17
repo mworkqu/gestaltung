@@ -4,7 +4,7 @@
 // this shell so the styling and headers stay in one place.
 
 import { escapeHtml } from "@/lib/email";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { peekContactPhone } from "@/lib/contact-phone-server";
 import { REVIEW_COMMENT_MAX } from "@/lib/reviews/comment";
 
 export type RatingLocale = "en" | "ar";
@@ -73,7 +73,7 @@ export function renderRatingPage(opts: {
   const block = (l: RatingLocale) => {
     const c = SHELL_COPY[l];
     const dir = l === "ar" ? "rtl" : "ltr";
-    return `<section lang="${l}" dir="${dir}">${opts.section(l, l === locale)}<p class="muted"><a href="${escapeHtml(COMPANY_WHATSAPP.url)}">${escapeHtml(c.help)}</a> · <a href="/${l}">${escapeHtml(c.home)}</a></p></section>`;
+    return `<section lang="${l}" dir="${dir}">${opts.section(l, l === locale)}<p class="muted"><a href="${escapeHtml(peekContactPhone().whatsappUrl)}">${escapeHtml(c.help)}</a> · <a href="/${l}">${escapeHtml(c.home)}</a></p></section>`;
   };
   const html = `<!doctype html>
 <html lang="${locale}" dir="${locale === "ar" ? "rtl" : "ltr"}">

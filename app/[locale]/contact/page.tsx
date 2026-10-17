@@ -2,7 +2,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MapPin, Mail, Building2, MessageCircle, Phone, BadgeCheck } from "lucide-react";
 
 import { ContactForm } from "@/components/contact-form";
-import { COMPANY, COMPANY_ADDRESS, COMPANY_PHONE, COMPANY_WHATSAPP } from "@/lib/company";
+import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
 import { MessagesScope } from "@/components/i18n/messages-scope";
@@ -20,6 +21,7 @@ export default async function ContactPage({
 
   const t = await getTranslations("Contact");
   const tCompany = await getTranslations("Company");
+  const phone = await getContactPhone();
   // Cached public read (tag "store-settings"): the page stays static / ISR.
   const turnstileEnabled = await turnstileEnabledForPages();
   const isRtl = locale === "ar";
@@ -80,13 +82,13 @@ export default async function ContactPage({
               <span className="flex min-w-0 flex-col">
                 <span className="text-[11px] text-mutedtext">{t("whatsappLine")}</span>
                 <a
-                  href={COMPANY_WHATSAPP.url}
+                  href={phone.whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   dir="ltr"
                   className={cn(linkCls, "justify-start")}
                 >
-                  {COMPANY_WHATSAPP.display}
+                  {phone.display}
                 </a>
               </span>
             </li>
@@ -96,8 +98,8 @@ export default async function ContactPage({
               </span>
               <span className="flex min-w-0 flex-col">
                 <span className="text-[11px] text-mutedtext">{t("phoneLabel")}</span>
-                <a href={COMPANY_PHONE.tel} dir="ltr" className={cn(linkCls, "justify-start")}>
-                  {COMPANY_PHONE.display}
+                <a href={phone.tel} dir="ltr" className={cn(linkCls, "justify-start")}>
+                  {phone.display}
                 </a>
               </span>
             </li>

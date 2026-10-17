@@ -3,7 +3,7 @@ import { Building2, Wrench, Handshake, MessageCircle } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
 
@@ -18,6 +18,7 @@ export default async function AboutPage({
   setRequestLocale(locale);
 
   const t = await getTranslations("About");
+  const phone = await getContactPhone();
   const isRtl = locale === "ar";
 
   // English gets the monospace / uppercase Swiss treatment; Arabic stays clean.
@@ -83,10 +84,10 @@ export default async function AboutPage({
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <Button asChild size="lg" className="h-auto max-w-full whitespace-normal rounded-full py-2.5 text-center">
-            <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer">
+            <a href={phone.whatsappUrl} target="_blank" rel="noopener noreferrer">
               <MessageCircle />
               {t("ctaWhatsapp")}
-              <span dir="ltr">{COMPANY_WHATSAPP.display}</span>
+              <span dir="ltr">{phone.display}</span>
             </a>
           </Button>
           <Link

@@ -19,6 +19,8 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { GuestClaimNotice } from "@/components/auth/guest-claim-notice";
 import { CookieNotice } from "@/components/cookie-notice";
 import { CartProvider } from "@/components/parts/cart-provider";
+import { ContactPhoneProvider } from "@/components/contact-phone-provider";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import "../globals.css";
 
 // Fonts (Phase G). Usage audit: the site uses weights 400, 500, 600, 700 and 800
@@ -98,6 +100,7 @@ export default async function LocaleLayout({
   // gtag.js after the visitor presses Accept. Nothing from Google is in the page
   // or requested before that. Unset locally / in previews = never loads.
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+  const phone = await getContactPhone();
 
   return (
     <html
@@ -107,6 +110,7 @@ export default async function LocaleLayout({
     >
       <body className="min-h-screen bg-background font-sans text-body">
         <NextIntlClientProvider locale={locale} messages={messages}>
+          <ContactPhoneProvider phone={phone}>
           <AuthProvider>
             <CartProvider>
               <div className="flex min-h-screen flex-col">
@@ -124,6 +128,7 @@ export default async function LocaleLayout({
               </div>
             </CartProvider>
           </AuthProvider>
+          </ContactPhoneProvider>
           <CookieNotice gaId={gaId} />
           {/* W1: "Try again" when moving a guest's work to the account failed. */}
           <GuestClaimNotice />

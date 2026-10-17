@@ -2,7 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { MessageCircle, Search } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
 
 // Branded 404 for everything under a locale: unknown URLs (via the
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 export default async function LocaleNotFound() {
   const locale = await getLocale();
   const t = await getTranslations("NotFound");
+  const phone = await getContactPhone();
   const isRtl = locale === "ar";
 
   const linkBtn =
@@ -67,13 +68,13 @@ export default async function LocaleNotFound() {
           <MessageCircle className="h-4 w-4 text-cobalt" aria-hidden />
           <span>{t("whatsappPrompt")}</span>
           <a
-            href={COMPANY_WHATSAPP.url}
+            href={phone.whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
             dir="ltr"
             className="inline-flex min-h-11 items-center font-semibold text-heading underline underline-offset-2 hover:text-cobalt"
           >
-            {COMPANY_WHATSAPP.display}
+            {phone.display}
           </a>
         </p>
       </section>

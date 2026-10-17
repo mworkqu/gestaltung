@@ -9,11 +9,13 @@ import {
   readYoutubeIntegration,
   recordQuota,
   saveYoutubeRow,
+  updateYoutubeMeta,
   TokenRevokedError,
   youtubeConfig,
 } from "@/lib/integrations/youtube-server";
 import { videoBase, videoEntry, type VideoSlug } from "@/lib/videos";
 import { YOUTUBE_KEY } from "@/lib/youtube";
+import { queueRetire } from "@/lib/youtube-retire";
 import {
   CHUNK_BYTES,
   contentRange,
@@ -40,6 +42,9 @@ import {
 // 4. Saves the video id into store_settings.youtube (the format the site reads)
 //    when "Show on the website" is ticked, then revalidates the storefront.
 // Steps 2–4 never undo the upload: a failure is reported as a warning.
+// 5. When this replaces the clip's earlier upload, that video goes on the retire
+//    log (lib/youtube-retire.ts): deleted from YouTube and the site 48 h later
+//    by the daily cron unless the owner cancels.
 //
 // LIMIT: the whole request must finish within maxDuration (300 s here; Vercel
 // Hobby with Fluid compute allows up to 300 s, Pro up to 800 s). The clips are
@@ -283,15 +288,20 @@ export async function POST(request: Request) {
     }
   }
 
-  state = {
-    ...state,
-    uploads: {
-      ...state.uploads,
-      [slug]: { video_id: videoId, uploaded_at: new Date().toISOString(), privacy: actualPrivacy, warnings },
-    },
-  };
-  const saveErr = await saveYoutubeRow(db, state);
-  if (saveErr) console.error("[youtube] upload record save failed:", saveErr);
+  // Merged into the latest stored record, so a parallel upload's record survives.
+  // The replaced video is queued in the same write (after the record, so it is
+  // no longer a current upload).
+  state = await updateYoutubeMeta(db, state, (m) => {
+    const next: YoutubeMeta = {
+      ...m,
+      uploads: {
+        ...m.uploads,
+        [slug]: { video_id: videoId, uploaded_at: new Date().toISOString(), privacy: actualPrivacy, warnings },
+      },
+    };
+    if (!previous || previous === videoId) return next;
+    return queueRetire(next, { video_id: previous, title: meta.title, reason: "replaced", replaced_by: videoId }, new Date()).meta;
+  });
 
   revalidatePath("/en/dashboard/store/youtube");
   revalidatePath("/ar/dashboard/store/youtube");

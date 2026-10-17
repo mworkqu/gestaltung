@@ -11,7 +11,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { Warn } from "@/components/prototyping/ui";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { useContactPhone } from "@/components/contact-phone-provider";
 import { CREDIT_QAR } from "@/lib/credits/constants";
 import { formatQar } from "@/lib/pricing/plans";
 import { usePriceQuote } from "@/lib/pricing/use-price-quote";
@@ -29,6 +29,7 @@ export function AccessNote({
   projectName?: string | null;
 }) {
   const t = useTranslations("Credits");
+  const phone = useContactPhone();
   // Price experiment (display only): the invited price when this person has one, else the listed price.
   const invited = usePriceQuote();
   if (reason === "sign_in")
@@ -54,7 +55,7 @@ export function AccessNote({
         <span className="mt-0.5 block">{t("buyCreditsText", { price: invited !== null ? formatQar(invited) : CREDIT_QAR })}</span>
         <span className="mt-1 flex flex-wrap items-center gap-x-4">
           <a
-            href={`${COMPANY_WHATSAPP.url}?text=${encodeURIComponent(text)}`}
+            href={`${phone.whatsappUrl}?text=${encodeURIComponent(text)}`}
             target="_blank"
             rel="noopener noreferrer"
             className={linkCls}

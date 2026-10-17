@@ -2,7 +2,8 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { ArrowRight, Building2, ClipboardCheck, Database, Lock, MessageCircle, type LucideIcon } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { COMPANY, COMPANY_ADDRESS, COMPANY_WHATSAPP } from "@/lib/company";
+import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { getTrustedBy } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ const linkCls =
 export async function TrustItemCards({ full = false }: { full?: boolean }) {
   const locale = await getLocale();
   const t = await getTranslations("Trust");
+  const phone = await getContactPhone();
   const isRtl = locale === "ar";
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
 
@@ -74,8 +76,8 @@ export async function TrustItemCards({ full = false }: { full?: boolean }) {
       );
     if (id === "contact")
       return (
-        <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer" className={linkCls}>
-          {t.rich("contactLink", { number: COMPANY_WHATSAPP.display, n: (chunks) => <span dir="ltr">{chunks}</span> })}
+        <a href={phone.whatsappUrl} target="_blank" rel="noopener noreferrer" className={linkCls}>
+          {t.rich("contactLink", { number: phone.display, n: (chunks) => <span dir="ltr">{chunks}</span> })}
         </a>
       );
     return null;

@@ -9,6 +9,7 @@
 // right after an admin status change, by the orders server action (after()).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getContactPhone } from "@/lib/contact-phone-server";
 
 import { sendEmailResult } from "@/lib/email";
 import { renderNotification, NOTIFICATION_KINDS, type NotificationKind } from "@/lib/email/templates";
@@ -56,6 +57,8 @@ export async function drainOutbox(db: SupabaseClient, siteUrl: string, limit = 5
     summary.reasons[reason] = (summary.reasons[reason] ?? 0) + 1;
   };
 
+  // The contact number for the email footers (sync shells read peekContactPhone()).
+  await getContactPhone();
   for (const row of rows) {
     try {
       const verdict = decide(row, settings, {

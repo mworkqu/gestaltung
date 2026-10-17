@@ -2,7 +2,8 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { Banknote, Landmark, Mail, MapPin, MessageCircle, Zap, type LucideIcon } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { COMPANY, COMPANY_ADDRESS, COMPANY_WHATSAPP } from "@/lib/company";
+import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import type { PaymentMethod } from "@/lib/company";
 import { LEGAL_KEYS, LEGAL_SLUGS } from "@/lib/legal/content";
 
@@ -21,6 +22,7 @@ export async function Footer() {
   const tNav = await getTranslations("Nav");
   const tLegal = await getTranslations("Legal");
   const tPay = await getTranslations("PayMethods");
+  const phone = await getContactPhone();
 
   const infoLinks = [
     { href: "/how-it-works", label: tNav("howItWorks") },
@@ -54,13 +56,13 @@ export async function Footer() {
           <div className="space-y-1">
             <h2 className={heading}>{t("contactTitle")}</h2>
             <a
-              href={COMPANY_WHATSAPP.url}
+              href={phone.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
               className={`${linkCls} gap-2`}
             >
               <MessageCircle className="h-4 w-4 shrink-0 text-cobalt" aria-hidden />
-              <span dir="ltr">{COMPANY_WHATSAPP.display}</span>
+              <span dir="ltr">{phone.display}</span>
             </a>
             <a href={`mailto:${EMAIL}`} className={`${linkCls} gap-2`}>
               <Mail className="h-4 w-4 shrink-0 text-cobalt" aria-hidden />

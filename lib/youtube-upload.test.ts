@@ -75,7 +75,7 @@ describe("quota", () => {
 
 describe("parseYoutubeMeta", () => {
   it("is lenient and drops bad uploads", () => {
-    expect(parseYoutubeMeta(null)).toEqual({ channel_id: "", channel_title: "", quota: null, uploads: {} });
+    expect(parseYoutubeMeta(null)).toEqual({ channel_id: "", channel_title: "", quota: null, uploads: {}, retire: [] });
     const m = parseYoutubeMeta({
       channel_title: "Gestaltung",
       quota: { day: "2026-10-11", used: 5 },

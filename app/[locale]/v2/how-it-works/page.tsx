@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { FeatureVideoSection } from "@/components/feature-video-section";
 import { YoutubeLinks } from "@/components/marketing/youtube-links";
 import { BlueprintDecor, V2_TITLE } from "@/components/marketing/v2";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { v2PageMetadata } from "@/lib/site-v2-server";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +39,7 @@ export default async function HowItWorksV2({ params }: { params: Promise<{ local
 
   const t = await getTranslations("HowItWorks");
   const ts = await getTranslations("SiteV2");
+  const phone = await getContactPhone();
   const isRtl = locale === "ar";
   const arrow = cn("h-4 w-4", isRtl && "-scale-x-100");
 
@@ -162,7 +163,7 @@ export default async function HowItWorksV2({ params }: { params: Promise<{ local
             variant="secondary"
             className="relative h-auto whitespace-normal rounded-full px-7 py-3 text-start"
           >
-            <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer">
+            <a href={phone.whatsappUrl} target="_blank" rel="noopener noreferrer">
               <MessageCircle className="h-4 w-4 shrink-0" />
               {t("helpCta")}
             </a>

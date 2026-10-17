@@ -86,12 +86,28 @@ export async function saveYoutubeRow(
   return error ? error.message : null;
 }
 
+/**
+ * Read-modify-write of the youtube row's metadata against the LATEST stored
+ * value, not a copy taken minutes earlier: uploads run for a minute or more,
+ * and two at once used to overwrite each other's quota and upload records
+ * (2026-10-16: five videos uploaded, one recorded). `fallback` is used only
+ * when the row can't be read.
+ */
+export async function updateYoutubeMeta(
+  db: SupabaseClient,
+  fallback: YoutubeMeta,
+  change: (meta: YoutubeMeta) => YoutubeMeta,
+): Promise<YoutubeMeta> {
+  const { data, error } = await db.from("integrations").select("metadata").eq("provider", YT_INTEGRATION).maybeSingle();
+  const next = change(error || !data ? fallback : parseYoutubeMeta((data as { metadata: unknown }).metadata));
+  const err = await saveYoutubeRow(db, next);
+  if (err) console.error("[youtube] metadata save failed:", err);
+  return next;
+}
+
 /** Count `units` of YouTube API quota against today (Pacific day). Best-effort. */
 export async function recordQuota(db: SupabaseClient, meta: YoutubeMeta, units: number): Promise<YoutubeMeta> {
-  const next = { ...meta, quota: addQuota(meta.quota, units, new Date()) };
-  const err = await saveYoutubeRow(db, next);
-  if (err) console.error("[youtube] quota save failed:", err);
-  return next;
+  return updateYoutubeMeta(db, meta, (m) => ({ ...m, quota: addQuota(m.quota, units, new Date()) }));
 }
 
 export class TokenRevokedError extends Error {

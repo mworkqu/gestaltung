@@ -15,7 +15,7 @@ import { OccasionBanner } from "@/components/store/occasion-banner";
 import { emptyState, hasActiveFilters, storeQuery, STORE_PAGE_SIZE, type StoreState } from "@/lib/store/catalog";
 import { getStoreFacets, getStoreListing } from "@/lib/store/public-catalog";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { arabicCountForm } from "@/lib/text/count";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,7 @@ export async function StoreListing({
   hideHeader?: boolean;
 }) {
   const t = await getTranslations("Parts");
+  const phone = await getContactPhone();
 
   // Filter options (every listed category/material) and one page of cards,
   // plus the Standard-tier delivery settings for every card's "Arrives by".
@@ -50,7 +51,7 @@ export async function StoreListing({
   const href = (patch: Parameters<typeof storeQuery>[1]) => ({ pathname: "/store" as const, query: storeQuery(state, patch) });
   const empty = emptyState(state, total, parts.length);
 
-  const waHref = (text: string) => `${COMPANY_WHATSAPP.url}?text=${encodeURIComponent(text)}`;
+  const waHref = (text: string) => `${phone.whatsappUrl}?text=${encodeURIComponent(text)}`;
   const whatsapp = (text: string) => (
     <div className="flex flex-col items-center gap-1">
       <Button asChild variant="outline" className="rounded-full">
@@ -59,7 +60,7 @@ export async function StoreListing({
           {t("emptyCta")}
         </a>
       </Button>
-      <span dir="ltr" className="text-xs tabular-nums text-mutedtext">{COMPANY_WHATSAPP.display}</span>
+      <span dir="ltr" className="text-xs tabular-nums text-mutedtext">{phone.display}</span>
     </div>
   );
   const pill =

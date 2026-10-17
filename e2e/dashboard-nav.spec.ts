@@ -34,6 +34,7 @@ const OLD_URLS = [
   "/dashboard/store/suppliers/voltaat",
   "/dashboard/usage",
   "/dashboard/notifications",
+  "/dashboard/contact",
   "/inventory",
 ];
 

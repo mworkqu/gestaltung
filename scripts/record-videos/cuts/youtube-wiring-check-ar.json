@@ -1,0 +1,50 @@
+{
+  "lang": "ar",
+  "sources": [
+    "studio-3d-ar/raw.webm"
+  ],
+  "crop": [
+    [
+      1600,
+      900
+    ]
+  ],
+  "intro": {
+    "seconds": 2.5,
+    "title": "من قائمة القطع إلى الدائرة"
+  },
+  "outro": {
+    "seconds": 4,
+    "title": "ابدأ مشروعك اليوم"
+  },
+  "segments": [
+    {
+      "src": 0,
+      "from": 0.5,
+      "to": 21,
+      "speed": 1.6,
+      "vo": 1,
+      "at": 0.8
+    },
+    {
+      "src": 0,
+      "from": 22,
+      "to": 60,
+      "speed": 2.5,
+      "vo": 2,
+      "at": 1
+    },
+    {
+      "src": 0,
+      "from": 61,
+      "to": 66,
+      "speed": 1,
+      "vo": 3,
+      "at": 0.3
+    }
+  ],
+  "voOutro": {
+    "vo": 4,
+    "at": 0.4
+  }
+}

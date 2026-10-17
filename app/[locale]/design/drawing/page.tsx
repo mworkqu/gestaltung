@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FeatureVideoSection } from "@/components/feature-video-section";
 import { cn } from "@/lib/utils";
 import { metaFor } from "@/lib/meta";
-import { COMPANY_WHATSAPP } from "@/lib/company";
+import { getContactPhone } from "@/lib/contact-phone-server";
 import { getServicePrices } from "@/lib/store/public-catalog";
 import { formatQar } from "@/lib/pricing/plans";
 
@@ -22,6 +22,7 @@ export default async function CadAssistancePage({
 
   const t = await getTranslations("CadAssistance");
   const tPricing = await getTranslations("Pricing");
+  const phone = await getContactPhone();
   // Tier prices are data (store_settings.service_prices, 0051), shared with /pricing.
   const prices = await getServicePrices();
   const isRtl = locale === "ar";
@@ -57,7 +58,7 @@ export default async function CadAssistancePage({
         <Link href={{ pathname: "/projects/new", query: { for: "drawing" } }}>{t("ctaProject")}</Link>
       </Button>
       <Button asChild size="lg" variant="outline" className="rounded-full px-6">
-        <a href={COMPANY_WHATSAPP.url} target="_blank" rel="noopener noreferrer">
+        <a href={phone.whatsappUrl} target="_blank" rel="noopener noreferrer">
           <MessageCircle className="h-4 w-4" />
           {t("ctaWhatsApp")}
         </a>

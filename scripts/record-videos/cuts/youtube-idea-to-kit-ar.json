@@ -1,0 +1,60 @@
+{
+  "lang": "ar",
+  "sources": [
+    "idea-to-kit-ar/raw.webm"
+  ],
+  "crop": [
+    [
+      1600,
+      900
+    ]
+  ],
+  "intro": {
+    "seconds": 2.5,
+    "title": "من جملة واحدة إلى قائمة قطع"
+  },
+  "outro": {
+    "seconds": 4,
+    "title": "ابدأ مشروعك اليوم"
+  },
+  "segments": [
+    {
+      "src": 0,
+      "from": 22,
+      "to": 38.5,
+      "speed": 1.1,
+      "vo": 1,
+      "at": 0.8
+    },
+    {
+      "src": 0,
+      "from": 38.5,
+      "to": 42.5,
+      "speed": 2
+    },
+    {
+      "src": 0,
+      "from": 42.5,
+      "to": 52,
+      "speed": 1,
+      "vo": 2,
+      "at": 1.5
+    },
+    {
+      "src": 0,
+      "from": 52,
+      "to": 62.5,
+      "speed": 2.5
+    },
+    {
+      "src": 0,
+      "from": 62.5,
+      "to": 76,
+      "speed": 1,
+      "vo": 3,
+      "at": 0.5,
+      "vo2": 4,
+      "at2": 8.5
+    }
+  ]
+}

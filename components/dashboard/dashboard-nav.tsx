@@ -23,13 +23,14 @@ import {
   Package,
   PackagePlus,
   PackageSearch,
+  Phone,
   Star,
   Tag,
   Truck,
+  type LucideIcon,
   Video,
   Warehouse,
   Wrench,
-  type LucideIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -56,6 +57,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   videos: Video,
   usage: Gauge,
   notifications: Bell,
+  contact: Phone,
   inventory: Warehouse,
 };
 
