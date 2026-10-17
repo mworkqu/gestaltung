@@ -12,9 +12,9 @@ import { formatPrice } from "@/lib/parts/format";
 import { LAST_ORDER_KEY } from "@/lib/parts/constants";
 import { formatDeliveryDate } from "@/lib/store/delivery";
 import { IsolatedTitle } from "@/components/ltr-isolate";
+import { useContactPhone } from "@/components/contact-phone-provider";
+import { whatsappLink } from "@/lib/contact-phone";
 
-const WHATSAPP_DIGITS =
-  process.env.NEXT_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, "") || null;
 
 type OrderSnapshot = {
   id: string;
@@ -43,6 +43,7 @@ type OrderSnapshot = {
 export default function CheckoutSuccessPage() {
   const t = useTranslations("Checkout");
   const tD = useTranslations("Delivery");
+  const phone = useContactPhone();
   const locale = useLocale();
   const [order, setOrder] = useState<OrderSnapshot | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -70,9 +71,7 @@ export default function CheckoutSuccessPage() {
     count: itemCount,
     total: order ? order.total.toFixed(2) : "0.00",
   });
-  const waHref = WHATSAPP_DIGITS
-    ? `https://wa.me/${WHATSAPP_DIGITS}?text=${encodeURIComponent(waText)}`
-    : `https://wa.me/?text=${encodeURIComponent(waText)}`;
+  const waHref = whatsappLink(phone, waText);
 
   return (
     <div className="container py-12">
