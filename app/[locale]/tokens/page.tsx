@@ -7,6 +7,7 @@ import { TokenShop } from "@/components/tokens/token-shop";
 import { getAuthUser } from "@/lib/auth/get-session";
 import { signInHref } from "@/lib/auth/next-path";
 import { MAKER_PASS, TOKEN_PACKS, TOKEN_PRICE_QAR } from "@/lib/billing/config";
+import { REWARDS_DEFAULT } from "@/lib/credits/cad-cost";
 import { pageMetadata } from "@/lib/seo";
 import { IDEATION, TIERS } from "@/lib/studio/tiers";
 import { createClient } from "@/lib/supabase/server";
@@ -122,6 +123,11 @@ export default async function TokensPage({ params }: { params: Promise<{ locale:
               <li>{t("costIdea", { n: String(IDEATION.newIdeaCost) })}</li>
               <li>{t("costEdits", { every: String(IDEATION.turnsPerToken) })}</li>
               <li>{t("costTiers", { maker: mult("maker"), engineer: mult("engineer") })}</li>
+            </ul>
+            <h2 className="pt-2 text-base font-bold text-heading">{t("earnTitle")}</h2>
+            <ul className="space-y-1.5 text-sm text-body">
+              <li>{t("earnOrder", { n: String(REWARDS_DEFAULT.order_idea_tokens) })}</li>
+              <li>{t("earnPrint", { n: String(REWARDS_DEFAULT.print_cad_credits) })}</li>
             </ul>
             <h2 className="pt-2 text-base font-bold text-heading">{t("packsTitle")}</h2>
             <p className="text-xs text-mutedtext">{t("packEach", { each: String(TOKEN_PRICE_QAR) })}</p>

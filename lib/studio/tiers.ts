@@ -25,14 +25,27 @@ export type Tier = {
   maxMovers: number;
   maxControllers: number;
   multiplier: number;
+  /** Bigger builds get a stronger model and a deeper electronics check on every chat turn (owner, 2026-10-18). */
+  deep: boolean;
 };
 
 /** Smallest first. The last tier has no limits. */
 export const TIERS: readonly Tier[] = [
-  { id: "explorer", maxControllers: 1, maxSensors: 3, maxMovers: 2, multiplier: 1 },
-  { id: "maker", maxControllers: 1, maxSensors: 6, maxMovers: 4, multiplier: 2 },
-  { id: "engineer", maxControllers: Infinity, maxSensors: Infinity, maxMovers: Infinity, multiplier: 3 },
+  { id: "explorer", maxControllers: 1, maxSensors: 3, maxMovers: 2, multiplier: 1, deep: false },
+  { id: "maker", maxControllers: 1, maxSensors: 6, maxMovers: 4, multiplier: 2, deep: true },
+  { id: "engineer", maxControllers: Infinity, maxSensors: Infinity, maxMovers: Infinity, multiplier: 3, deep: true },
 ];
+
+/**
+ * The model a tier's chat turns use. Explorers: the default (GEMINI_MODEL). Makers and
+ * Engineers: a stronger one — TIER_MODEL_MAKER / TIER_MODEL_ENGINEER, else
+ * GEMINI_FALLBACK_MODEL's default "gemini-3.5-flash". Server-only (reads env).
+ */
+export function tierModel(tier: Tier): string | undefined {
+  if (!tier.deep) return undefined;
+  const env = tier.id === "engineer" ? process.env.TIER_MODEL_ENGINEER : process.env.TIER_MODEL_MAKER;
+  return env?.trim() || process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-3.5-flash";
+}
 
 const envInt = (name: string, fallback: number, min: number) => {
   const n = Number(process.env[name]?.trim());

@@ -3083,7 +3083,7 @@
     "cadPlaceholder": "e.g. An enclosure for an Arduino Uno with a snap-fit lid and a USB cut-out",
     "cadButton": "Make 3D model",
     "cadDialogTitle": "Confirm 3D model",
-    "cadDialogBody": "This model is {tier}: 1 CAD session (QAR {qar}). Refunded as a discount if you buy the parts or print with us within {days} days.",
+    "cadDialogBody": "This model is {tier}: {n, plural, one {1 CAD credit} other {# CAD credits}} (QAR {qar} each). One credit comes back as a discount if you buy the parts or print with us within {days} days.",
     "cadDialogIncluded": "This model is {tier}. It uses your current CAD session ({n} versions left), at no extra cost.",
     "cadDialogAdmin": "This model is {tier}. Admin: no charge.",
     "cadStub": "Saved as a {tier} model. 3D generation arrives in the next update. Nothing was charged.",
@@ -4232,13 +4232,13 @@
     "checksHeading": "What we checked",
     "checkOkSr": "Checked:",
     "checkFixedSr": "Fixed for you:",
-    "drawItCredit": "Draw it (1 credit)",
+    "drawItCredit": "Draw it ({n, plural, one {1 credit} other {# credits}})",
     "drawItFree": "Draw it (free)",
     "drawItIncluded": "Draw it (included)",
     "drawingIt": "Shaping your enclosure…",
     "viewerEnclosure": "3D view of your enclosure",
     "anotherLook": "Try another look",
-    "anotherLookCredit": "Try another look (1 credit)",
+    "anotherLookCredit": "Try another look ({n, plural, one {1 credit} other {# credits}})",
     "looksLeft": "{n, plural, one {# more look included} other {# more looks included}}",
     "colour": "Colour",
     "finish": "Finish",
@@ -4365,7 +4365,7 @@
       "pictureAlt": "{name}, design {n}",
       "whyLabel": "Why this design:",
       "tryAnother": "Try another",
-      "createCad": "Create my CAD (1 credit)",
+      "createCad": "Create my CAD ({n, plural, one {1 credit} other {# credits}})",
       "createCadIncluded": "Create my CAD (included)",
       "createCadNoCost": "Create my CAD",
       "opening": "Opening your CAD…",
@@ -4934,7 +4934,10 @@
     "reason_date_unreadable": "the date can't be read",
     "reason_no_reference": "no transfer reference is visible",
     "reason_duplicate": "this receipt was already used",
-    "reason_model_unavailable": "our checker is busy right now"
+    "reason_model_unavailable": "our checker is busy right now",
+    "earnTitle": "Earn tokens back",
+    "earnOrder": "Every delivered parts order gives you {n} ideation tokens back.",
+    "earnPrint": "Every finished print order gives you {n} CAD credit."
   },
   "AdminPayments": {
     "kicker": "Admin · Payments",
@@ -4988,5 +4991,15 @@
     "started": "Started",
     "passBalance": "Pass tokens",
     "expireNow": "Expire now"
+  },
+  "PrintReward": {
+    "title": "Printed order reward",
+    "text": "When this print order is done, give the project owner their reward ({n} CAD credit by default, set in the rewards setting). Once per request.",
+    "button": "Order done: grant reward",
+    "result_granted": "Reward granted.",
+    "result_already": "Already granted for this request.",
+    "result_no_owner": "No account owns this project.",
+    "result_run_0090": "Run migration 0090 first.",
+    "result_failed": "Could not grant the reward."
   }
 }

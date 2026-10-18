@@ -67,6 +67,7 @@ export function studioCall(supabase: SupabaseClient, projectId: string): StudioC
       temperature: STUDIO_TEMPERATURE,
       timeoutMs: req.timeoutMs ?? 45_000,
       ...(req.images?.length ? { images: req.images } : {}),
+      ...(req.model ? { model: req.model } : {}),
     });
 }
 

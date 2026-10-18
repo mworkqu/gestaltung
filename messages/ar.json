@@ -3083,7 +3083,7 @@
     "cadPlaceholder": "مثال: علبة لـ Arduino Uno بغطاء يُثبَّت بالضغط وفتحة USB",
     "cadButton": "إنشاء نموذج ثلاثي الأبعاد",
     "cadDialogTitle": "تأكيد النموذج ثلاثي الأبعاد",
-    "cadDialogBody": "هذا النموذج {tier}: جلسة CAD واحدة ({qar} ر.ق). تُستردّ كخصم إذا اشتريت القطع أو طبعت معنا خلال {days} يومًا.",
+    "cadDialogBody": "هذا النموذج {tier}: {n, plural, one {رصيد تصميم واحد} two {رصيدا تصميم} few {# أرصدة تصميم} many {# رصيد تصميم} other {# رصيد تصميم}} ({qar} ر.ق لكل رصيد). يعود رصيد واحد كخصم إذا اشتريت القطع أو طبعت معنا خلال {days} يوماً.",
     "cadDialogIncluded": "هذا النموذج {tier}. يستخدم جلسة CAD الحالية (متبقٍ {n} نسخ) دون تكلفة إضافية.",
     "cadDialogAdmin": "هذا النموذج {tier}. مسؤول: دون رسوم.",
     "cadStub": "حُفظ كنموذج {tier}. إنشاء النماذج ثلاثية الأبعاد يصل في التحديث القادم. لم يُخصم أي رصيد.",
@@ -4232,13 +4232,13 @@
     "checksHeading": "ما تحققنا منه",
     "checkOkSr": "تم التحقق:",
     "checkFixedSr": "أصلحناه لك:",
-    "drawItCredit": "ارسمه (رصيد واحد)",
+    "drawItCredit": "ارسمه ({n, plural, one {رصيد واحد} two {رصيدان} few {# أرصدة} many {# رصيداً} other {# رصيد}})",
     "drawItFree": "ارسمه (مجانًا)",
     "drawItIncluded": "ارسمه (مشمول)",
     "drawingIt": "نشكّل الغلاف…",
     "viewerEnclosure": "عرض ثلاثي الأبعاد للغلاف",
     "anotherLook": "جرّب مظهرًا آخر",
-    "anotherLookCredit": "جرّب مظهرًا آخر (رصيد واحد)",
+    "anotherLookCredit": "جرّب مظهرًا آخر ({n, plural, one {رصيد واحد} two {رصيدان} few {# أرصدة} many {# رصيداً} other {# رصيد}})",
     "looksLeft": "{form, select, one {مظهر إضافي واحد مشمول} two {مظهران إضافيان مشمولان} few {{count} مظاهر إضافية مشمولة} other {{count} مظهرًا إضافيًا مشمولًا}}",
     "colour": "اللون",
     "finish": "اللمسة",
@@ -4365,7 +4365,7 @@
       "pictureAlt": "{name}، التصميم {n}",
       "whyLabel": "لماذا هذا التصميم:",
       "tryAnother": "جرّب تصميمًا آخر",
-      "createCad": "أنشئ ملف CAD (رصيد واحد)",
+      "createCad": "أنشئ ملف CAD ({n, plural, one {رصيد واحد} two {رصيدان} few {# أرصدة} many {# رصيداً} other {# رصيد}})",
       "createCadIncluded": "أنشئ ملف CAD (مشمول)",
       "createCadNoCost": "أنشئ ملف CAD",
       "opening": "نفتح ملف CAD…",
@@ -4934,7 +4934,10 @@
     "reason_date_unreadable": "لا يمكن قراءة التاريخ",
     "reason_no_reference": "لا يظهر رقم مرجع التحويل",
     "reason_duplicate": "استُخدم هذا الإيصال من قبل",
-    "reason_model_unavailable": "أداة التحقق مشغولة الآن"
+    "reason_model_unavailable": "أداة التحقق مشغولة الآن",
+    "earnTitle": "استرجع رموزاً",
+    "earnOrder": "كل طلب قطع يُسلَّم يعيد لك {n} من رموز الأفكار.",
+    "earnPrint": "كل طلب طباعة مكتمل يمنحك {n} رصيد تصميم."
   },
   "AdminPayments": {
     "kicker": "الإدارة · المدفوعات",
@@ -4988,5 +4991,15 @@
     "started": "بدأت",
     "passBalance": "رموز البطاقة",
     "expireNow": "إنهاء الآن"
+  },
+  "PrintReward": {
+    "title": "مكافأة طلب الطباعة",
+    "text": "عند إنجاز طلب الطباعة هذا، امنح صاحب المشروع مكافأته ({n} رصيد تصميم افتراضياً، يُضبط في إعداد المكافآت). مرة واحدة لكل طلب.",
+    "button": "تم الطلب: امنح المكافأة",
+    "result_granted": "مُنحت المكافأة.",
+    "result_already": "مُنحت المكافأة لهذا الطلب من قبل.",
+    "result_no_owner": "لا يوجد حساب يملك هذا المشروع.",
+    "result_run_0090": "شغّل الترحيل 0090 أولاً.",
+    "result_failed": "تعذّر منح المكافأة."
   }
 }

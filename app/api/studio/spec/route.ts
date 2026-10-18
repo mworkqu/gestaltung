@@ -3,7 +3,7 @@ import { runSpecChat, cleanMessages, ruleTurn, IDEA_MAX } from "@/lib/studio/ai/
 import { callErrorStatus, SpecBody } from "@/lib/studio/server/http";
 import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context";
 import { ideaCharge, ideaStatus, tokenInfo } from "@/lib/studio/server/tokens";
-import { tierOf, turnCost } from "@/lib/studio/tiers";
+import { tierModel, tierOf, turnCost } from "@/lib/studio/tiers";
 
 // POST /api/studio/spec — one idea-chat turn. Answers {question, choices} or
 // {spec}. Same limits as /api/brief-chat (a session, guests count; last 16
@@ -51,6 +51,9 @@ export async function POST(request: Request) {
     locale: body.locale,
     current,
     cache: specCache, // W8: the same chat + card is not asked twice
+    // Makers / Engineers: a stronger model and a deeper electronics check (costs are logged per call).
+    model: tierModel(before),
+    deep: before.deep,
   });
   if (!r.ok) return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });
   logClamp("spec", project.id, r.clampLog, r.source, r.problems);

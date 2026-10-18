@@ -1,3 +1,4 @@
+import { studioCadTier } from "@/lib/credits/cad-cost";
 import { canUse } from "@/lib/credits/server";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { applyShapePick, defaultEnclosureFor, rankShapes } from "@/lib/studio/enclosure/shape-pick";
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
   const { data: id, error: beginError } = await supabase.rpc("cad_begin", {
     p_project: project.id,
     p_request: `${REQUEST_PREFIX} ${body.spec.name}`.slice(0, 200),
-    p_tier: "simple",
+    // 0090: CAD credits scale with how many parts the case holds (lib/credits/cad-cost.ts).
+    p_tier: studioCadTier(body.components.length),
     p_parent: parentId,
   });
   if (beginError) {

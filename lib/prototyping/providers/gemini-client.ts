@@ -36,11 +36,14 @@ export async function callGemini(opts: {
   timeoutMs?: number;
   /** Inline images sent after the prompt text (Studio vision check, P5-16). Base64, no data: prefix. */
   images?: readonly { mimeType: "image/png" | "image/jpeg"; data: string }[];
+  /** A different first model (bigger Studio builds use a stronger one, lib/studio/tiers.ts). */
+  model?: string;
 }): Promise<GeminiResult> {
   const key = process.env.GEMINI_API_KEY?.trim();
   if (!key) throw new ProviderError("missing_key");
   const started = Date.now();
-  let model = GEMINI_MODEL;
+  const first = opts.model?.trim() || GEMINI_MODEL;
+  let model = first;
   const fail = (reason: ConstructorParameters<typeof ProviderError>[0], detail: string, usage?: TokenUsage, rawText?: string) =>
     Object.assign(new ProviderError(reason, detail), { usage, rawText, latencyMs: Date.now() - started, model });
 
@@ -61,7 +64,7 @@ export async function callGemini(opts: {
 
   // Two tries on the chosen model, then the fallback model. A 503 costs no
   // tokens, so riding out a burst spends nothing.
-  const models = [GEMINI_MODEL, GEMINI_MODEL, ...(GEMINI_FALLBACK_MODEL ? [GEMINI_FALLBACK_MODEL] : [])];
+  const models = [first, first, ...(GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== first ? [GEMINI_FALLBACK_MODEL] : [])];
   let res: Response | null = null;
   for (const [i, m] of models.entries()) {
     const last = i === models.length - 1;

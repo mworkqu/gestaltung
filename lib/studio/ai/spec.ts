@@ -175,6 +175,9 @@ export async function runSpecChat(opts: {
   current?: ProductSpec | null;
   /** W8: answers a repeated chat + card without a model call. */
   cache?: AiCache | null;
+  /** Makers / Engineers builds: a stronger model + the deeper electronics check (lib/studio/tiers.ts). */
+  model?: string;
+  deep?: boolean;
 }): Promise<Outcome<SpecTurn>> {
   const ctx = { idea: opts.idea, messages: opts.messages, locale: opts.locale };
   const current = opts.current ?? null;
@@ -182,12 +185,13 @@ export async function runSpecChat(opts: {
   const rules = ruleTurn(opts.idea, opts.messages, opts.locale, current);
   if (rules) return { ok: true, value: rules, source: "rules", clampLog: [], problems: [] };
 
-  const key = specKey({ idea: opts.idea, messages: opts.messages, locale: opts.locale, current });
+  // The deep check changes the answer, so it is part of the cache key.
+  const key = specKey({ idea: opts.idea, messages: opts.messages, locale: opts.locale, current }) + (opts.deep ? ":deep" : "");
   return outcomeCached(opts.cache, key, () => modelTurn(opts, ctx, current));
 }
 
 async function modelTurn(
-  opts: { call: StudioCall; idea: string; messages: ChatMessage[]; locale: "en" | "ar" },
+  opts: { call: StudioCall; idea: string; messages: ChatMessage[]; locale: "en" | "ar"; model?: string; deep?: boolean },
   ctx: { idea: string; messages: ChatMessage[]; locale: "en" | "ar" },
   current: ProductSpec | null,
 ): Promise<Outcome<SpecTurn>> {
@@ -196,7 +200,8 @@ async function modelTurn(
   const r = await opts.call<SpecTurn>({
     step: "spec",
     system: SPEC_SYSTEM,
-    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, forceSpec: mode === "force", current }),
+    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, forceSpec: mode === "force", current, deep: opts.deep }),
+    ...(opts.model ? { model: opts.model } : {}),
     // 2026-10-18: once the card exists the whole understanding + spec come back on every turn.
     schema: mode === "refine" ? REFINE_RESPONSE_SCHEMA : SPEC_RESPONSE_SCHEMA,
     validate: (raw) => {

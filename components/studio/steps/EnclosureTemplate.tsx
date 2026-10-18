@@ -29,6 +29,7 @@ import type * as THREE from "three";
 import { Download, Eye, Layers, Loader2, Sparkles } from "lucide-react";
 
 import { AccessNote } from "@/components/credits/access-note";
+import { cadCost, studioCadTier } from "@/lib/credits/cad-cost";
 import { StudioViewer, type ViewerApi } from "@/components/studio/viewer/ViewerLazy";
 import type { ViewerExtraObject } from "@/components/studio/viewer/types";
 import { track } from "@/lib/analytics";
@@ -311,14 +312,16 @@ export function EnclosureTemplateFlow({ ctx, doc, beforeServer, onEnclosure, onN
   }
 
   const enclosure = doc.enclosure;
+  // 0090: a new CAD session costs 1–3 CAD credits by complexity (the parts the case holds).
+  const credits = cadCost(studioCadTier(doc.components.length));
   const drawLabel =
-    access?.cost === "none" ? t("drawItFree") : access?.cost === "included" ? t("drawItIncluded") : t("drawItCredit");
+    access?.cost === "none" ? t("drawItFree") : access?.cost === "included" ? t("drawItIncluded") : t("drawItCredit", { n: credits });
   const anotherLabel =
     looksLeft !== null && looksLeft > 0
       ? t("anotherLook")
       : access?.cost === "none"
         ? t("anotherLook")
-        : t("anotherLookCredit");
+        : t("anotherLookCredit", { n: credits });
 
   return (
     <StepFrame

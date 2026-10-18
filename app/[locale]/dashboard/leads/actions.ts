@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
@@ -94,4 +95,21 @@ export async function saveQuoteRule(input: { locale: string; base_qar: string; p
   const locale = input.locale === "ar" ? "ar" : "en";
   revalidatePath(`/${locale}/dashboard/leads`);
   return { ok: true, rule: checked.rule };
+}
+
+// ── 0090: printed-STL order completed → CAD credits to the project's owner ──
+// Idempotent per lead (admin_reward_print). The result comes back in ?reward=.
+export async function rewardPrint(formData: FormData) {
+  const locale = safeLocale(formData);
+  const id = String(formData.get("id") ?? "");
+  const project = String(formData.get("project") ?? "");
+  if (!UUID.test(id)) return;
+  const session = await getSessionContext();
+  if (!session || session.profile.role !== "super_admin") return;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("admin_reward_print", { p_lead: id, p_project: UUID.test(project) ? project : null });
+  const result = error ? (/no_owner/.test(error.message) ? "no_owner" : /could not find the function|PGRST202/i.test(error.message) ? "run_0090" : "failed") : Number(data) > 0 ? "granted" : "already";
+  revalidatePath(`/${locale}/dashboard/leads/${id}`);
+  redirect(`/${locale}/dashboard/leads/${id}?reward=${result}`);
 }

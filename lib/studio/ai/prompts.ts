@@ -190,11 +190,20 @@ export const REFINE_RESPONSE_SCHEMA = {
 
 export type ChatMessage = { role: "user" | "assistant"; text: string; choices?: string[] };
 
+/** Bigger builds (Makers / Engineers): richer electronics before the parts are listed. */
+export const DEEP_CHECK =
+  "This is a bigger build: before you answer, check the electronics part by part. " +
+  "Every servo group of 3 or more needs a servo driver board and a supply that can feed them all; every DC motor or pump needs a driver " +
+  "(motor driver board or MOSFET module); a 3.3 V board driving 5 V parts needs a level shifter; batteries need a charger or holder and a switch. " +
+  "List those helper parts in the understanding's outputs or sensors where they fit, and explain them in howItWorks.";
+
 export function specPrompt(opts: {
   idea: string;
   messages: ChatMessage[];
   locale: "en" | "ar";
   forceSpec: boolean;
+  /** Makers / Engineers builds: a deeper electronics check on every turn (lib/studio/tiers.ts). */
+  deep?: boolean;
   /** The card as it stands: the last user message is a change request on top of it (W3 refinement). */
   current?: ProductSpec | null;
 }): string {
@@ -227,12 +236,14 @@ export function specPrompt(opts: {
         "Copy the wording of everything that did not change exactly, so only real changes show. " +
         "A message that names a reference product to copy ('big robotic arm like a UR10') IS a change: rebuild for the desktop " +
         "version with that product's joint/motor count and a scaleNote when the real thing is far bigger.",
+      ...(opts.deep ? [DEEP_CHECK] : []),
       `Language for the reply, names, understanding and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
     ].join("\n\n");
   }
   return [
     `Idea:\n${opts.idea || "(see the conversation)"}`,
     `Conversation so far:\n${history}`,
+    ...(opts.deep ? [DEEP_CHECK] : []),
     `Language for any question, reply and the spec text: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
     opts.forceSpec ? "Return the spec now." : "Ask the next question, or return the spec if you know enough.",
   ].join("\n\n");

@@ -25,6 +25,8 @@ export type StudioCallRequest<T> = {
   images?: readonly { mimeType: "image/png" | "image/jpeg"; data: string }[];
   /** Overrides the 45 s default (the product designer writes long JSON). */
   timeoutMs?: number;
+  /** A stronger first model (Makers / Engineers builds, lib/studio/tiers.ts). */
+  model?: string;
 };
 
 export type StudioCall = <T>(req: StudioCallRequest<T>) => Promise<CallResult<T>>;

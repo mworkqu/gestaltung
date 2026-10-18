@@ -40,6 +40,8 @@ export async function validatedCall<T>(opts: {
   caller?: ModelCaller;
   /** Inline images for a vision call (Studio product check). */
   images?: Parameters<ModelCaller>[0]["images"];
+  /** First model to ask (default GEMINI_MODEL). */
+  model?: string;
 }): Promise<CallResult<T>> {
   const { supabase, projectId, feature, step } = opts;
   const caller = opts.caller ?? callGemini;
@@ -86,6 +88,7 @@ export async function validatedCall<T>(opts: {
         temperature: opts.temperature ?? 0.1,
         timeoutMs: opts.timeoutMs ?? 90_000,
         ...(opts.images?.length ? { images: opts.images } : {}),
+        ...(opts.model ? { model: opts.model } : {}),
       });
       ({ usage, latencyMs } = r);
       rawText = r.rawText;

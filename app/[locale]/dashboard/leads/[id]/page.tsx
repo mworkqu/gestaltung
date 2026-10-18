@@ -6,7 +6,8 @@ import { QuoteCalcCard } from "@/components/admin/quote-calc-card";
 import { QuoteForm } from "@/components/admin/quote-form";
 import { ProductPicture } from "@/components/projects/product-picture";
 import { Link } from "@/i18n/navigation";
-import { leadKind } from "@/lib/admin/lead-kind";
+import { leadKind, leadProjectId } from "@/lib/admin/lead-kind";
+import { REWARDS_DEFAULT } from "@/lib/credits/cad-cost";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
@@ -15,7 +16,7 @@ import { projectPreviewUrl } from "@/lib/studio/server/preview-url";
 import { createClient } from "@/lib/supabase/server";
 import type { Inquiry } from "@/lib/supabase/types";
 
-import { saveLeadQuote } from "../actions";
+import { rewardPrint, saveLeadQuote } from "../actions";
 
 // W2b (2026-10-11): one enquiry in full. For a Studio "Get it made" request:
 // "How we calculated" (the snapshot stored with the lead) and "Your quote
@@ -27,8 +28,15 @@ export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function LeadDetailPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
+export default async function LeadDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ reward?: string }>;
+}) {
   const { locale, id } = await params;
+  const { reward } = await searchParams;
   setRequestLocale(locale);
   if (!UUID.test(id)) notFound();
 
@@ -51,6 +59,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ loc
   const parsed = parseLeadMessage(lead.message);
   const wa = toWhatsAppDigits(lead.phone);
   const final = lead.final_quote_qar === null || lead.final_quote_qar === undefined ? null : Number(lead.final_quote_qar);
+  // 0090: a print request can reward its project's owner with CAD credits once the order is done.
+  const isPrint = (lead.message ?? "").toLowerCase().startsWith("print request:");
+  const rewardProject = lead.project_id ?? leadProjectId(lead.message);
+  const tr = await getTranslations("PrintReward");
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
 
   return (
@@ -102,6 +114,25 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ loc
           </p>
         )}
       </section>
+
+      {isPrint && rewardProject && (
+        <section className="neu space-y-3 p-5 sm:p-6" data-testid="lead-print-reward">
+          <h2 className="text-base font-bold text-heading">{tr("title")}</h2>
+          <p className="text-sm text-mutedtext">{tr("text", { n: String(REWARDS_DEFAULT.print_cad_credits) })}</p>
+          <form action={rewardPrint} className="flex flex-wrap items-center gap-3">
+            <input type="hidden" name="id" value={lead.id} />
+            <input type="hidden" name="project" value={rewardProject} />
+            <input type="hidden" name="locale" value={locale} />
+            <button
+              type="submit"
+              className="inline-flex min-h-11 items-center rounded-full bg-cobalt px-5 text-sm font-semibold text-white hover:bg-cobalt-hover"
+            >
+              {tr("button")}
+            </button>
+            {reward && <span className="text-sm font-medium text-heading">{tr(`result_${reward === "granted" || reward === "already" || reward === "no_owner" || reward === "run_0090" ? reward : "failed"}`)}</span>}
+          </form>
+        </section>
+      )}
 
       {!migrated ? (
         <p className="neu p-5 text-sm font-semibold text-heading" data-testid="lead-run-migration">
