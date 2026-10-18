@@ -14,6 +14,9 @@ import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/public";
 import { SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
 import { CONTACT_PHONE_KEY, contactPhoneFromSetting, DEFAULT_CONTACT_PHONE, type ContactPhone } from "@/lib/contact-phone";
+import { peekContactPhone, registerContactPhoneLoader, setCurrentContactPhone } from "@/lib/contact-phone-current";
+
+export { peekContactPhone };
 
 const readContactPhoneValue = unstable_cache(
   async (): Promise<unknown> => {
@@ -33,20 +36,19 @@ export const getContactPhone = cache(async (): Promise<ContactPhone> => {
   try {
     const phone = contactPhoneFromSetting(await readContactPhoneValue());
     last = phone;
+    setCurrentContactPhone(phone);
     return phone;
   } catch {
     return last ?? DEFAULT_CONTACT_PHONE;
   }
 });
 
-/** Sync best effort: last loaded value, else the default (and a load is started). */
-export function peekContactPhone(): ContactPhone {
-  if (last) return last;
-  if (!loading) {
-    loading = getContactPhone().finally(() => {
-      loading = null;
-    });
-    loading.catch(() => undefined);
-  }
-  return DEFAULT_CONTACT_PHONE;
-}
+// peekContactPhone (re-exported from lib/contact-phone-current) starts this
+// load when nothing has been read yet on this server instance.
+registerContactPhoneLoader(() => {
+  if (loading) return;
+  loading = getContactPhone().finally(() => {
+    loading = null;
+  });
+  loading.catch(() => undefined);
+});
