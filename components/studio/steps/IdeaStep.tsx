@@ -29,7 +29,7 @@
 // existing consent line shows and is recorded on the first send.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Check, ChevronDown, Coins, Minus, Plus, Send, TrendingUp } from "lucide-react";
 
 import { ChatConsent } from "@/components/prototyping/chat-thread";
@@ -343,7 +343,7 @@ export function IdeaStep({
           {outOfTokens && (
             <Problem>
               {t("tokens.empty")}{" "}
-              <Link href="/contact" className="font-semibold underline underline-offset-2">
+              <Link href="/tokens" className="font-semibold underline underline-offset-2">
                 {t("tokens.contact")}
               </Link>
             </Problem>
@@ -380,6 +380,7 @@ export function IdeaStep({
 /** "Ideation tokens: 4" + the rule (new idea 1, edits 1 per N messages, × tier). Hidden before 0088 runs. */
 function TokenLine({ tokens }: { tokens: TokenInfo | null }) {
   const t = useTranslations("Studio");
+  const locale = useLocale();
   if (!tokens) return null;
   const low = !tokens.admin && (tokens.balance ?? 0) <= 1;
   return (
@@ -389,7 +390,21 @@ function TokenLine({ tokens }: { tokens: TokenInfo | null }) {
         <span className={cn(low && "text-destructive")}>
           {tokens.admin ? t("tokens.admin") : t("tokens.balance", { n: String(tokens.balance ?? 0) })}
         </span>
+        {!tokens.admin && (
+          <Link href="/tokens" className="ms-auto text-xs font-semibold text-cobalt underline-offset-2 hover:underline" data-testid="studio-get-tokens">
+            {t("tokens.get")}
+          </Link>
+        )}
       </p>
+      {tokens.passUntil && (
+        <p className="text-[11px] font-semibold text-heading" data-testid="studio-pass">
+          {t("tokens.pass", {
+            date: new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { day: "numeric", month: "short" }).format(
+              new Date(tokens.passUntil),
+            ),
+          })}
+        </p>
+      )}
       <p className="text-[11px] leading-snug text-mutedtext">
         {t("tokens.rule", {
           idea: String(IDEATION.newIdeaCost * tokens.multiplier),

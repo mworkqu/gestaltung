@@ -4,7 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { modelPrice } from "@/lib/ai/prices";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { needsMigration, usdFormatter } from "./format";
+import { QAR_PER_USD, needsMigration, qarFormatter, usdFormatter, type RevenueRow } from "./format";
 
 // Per-user AI cost overview (owner, 2026-10-18): who uses the AI, how many
 // ideation tokens they spent and what the calls cost us at the provider's
@@ -45,6 +45,8 @@ type UserAgg = {
   tout: number;
   cost: number;
   last: string | null;
+  revenue: number;
+  passUntil: string | null;
 };
 
 export default async function AiCostsPage({
@@ -63,12 +65,18 @@ export default async function AiCostsPage({
   const loc = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
   const num = new Intl.NumberFormat(loc);
   const usd = usdFormatter(locale);
+  const qar = qarFormatter(locale);
+  const dayFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
   const timeFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Qatar" });
   const query = (typeof q === "string" ? q : "").trim().slice(0, 80);
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("admin_ai_cost_users", { p_query: query || null });
   const migrationMissing = needsMigration(error);
+  // Revenue + pass per user (migration 0089). Failing here only hides those columns' data.
+  const { data: revData } = await supabase.rpc("admin_revenue_users");
+  const revenueBy = new Map(((revData ?? []) as RevenueRow[]).map((r) => [r.user_id, r]));
+  const nowIso = new Date().toISOString();
 
   const byUser = new Map<string, UserAgg>();
   for (const r of (migrationMissing || error ? [] : (data ?? [])) as RpcRow[]) {
@@ -85,6 +93,8 @@ export default async function AiCostsPage({
       tout: 0,
       cost: 0,
       last: null,
+      revenue: Number(revenueBy.get(r.user_id)?.revenue_qar ?? 0),
+      passUntil: (() => { const p = revenueBy.get(r.user_id)?.pass_until; return p && p > nowIso ? p : null; })(),
     };
     u.calls += Number(r.calls ?? 0);
     u.tin += Number(r.tokens_in ?? 0);
@@ -101,6 +111,10 @@ export default async function AiCostsPage({
     (s, u) => ({ calls: s.calls + u.calls, tin: s.tin + u.tin, tout: s.tout + u.tout, cost: s.cost + u.cost, idea: s.idea + u.ideaUsed }),
     { calls: 0, tin: 0, tout: 0, cost: 0, idea: 0 },
   );
+  // Revenue totals cover every payer, not only the users in this (maybe filtered) list.
+  const allRev = [...revenueBy.values()];
+  const totalRevenue = query ? users.reduce((s, u) => s + u.revenue, 0) : allRev.reduce((s, r) => s + Number(r.revenue_qar ?? 0), 0);
+  const activePasses = (query ? users.filter((u) => u.passUntil).map((u) => u.passUntil) : allRev.map((r) => r.pass_until)).filter((d) => d && d > nowIso).length;
 
   const stats: { label: string; value: string }[] = [
     { label: t("users"), value: num.format(users.length) },
@@ -109,6 +123,8 @@ export default async function AiCostsPage({
     { label: t("tokensOut"), value: num.format(total.tout) },
     { label: t("totalCost"), value: usd(total.cost) },
     { label: t("ideaUsed"), value: num.format(total.idea) },
+    { label: t("totalRevenue"), value: qar(totalRevenue) },
+    { label: t("activePasses"), value: num.format(activePasses) },
   ];
 
   return (
@@ -144,7 +160,7 @@ export default async function AiCostsPage({
           </form>
 
           <section className="neu p-6">
-            <dl className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+            <dl className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
               {stats.map((s) => (
                 <div key={s.label}>
                   <dt className="text-[10px] uppercase tracking-wider text-faint">{s.label}</dt>
@@ -153,6 +169,7 @@ export default async function AiCostsPage({
               ))}
             </dl>
             <p className="mt-4 text-[12px] text-mutedtext">{t("priceNote")}</p>
+            <p className="mt-1 text-[12px] text-mutedtext">{t("qarNote", { value: qar(total.cost * QAR_PER_USD), rate: QAR_PER_USD })}</p>
           </section>
 
           <section className="neu space-y-3 p-6">
@@ -161,7 +178,7 @@ export default async function AiCostsPage({
               <p className="text-sm text-mutedtext">{t("noUsers")}</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-sm">
+                <table className="w-full min-w-[1100px] text-sm">
                   <thead>
                     <tr className="text-[10px] uppercase tracking-wider text-faint">
                       <th className="pb-2 text-start font-medium">{t("user")}</th>
@@ -172,6 +189,8 @@ export default async function AiCostsPage({
                       <th className="pb-2 text-end font-medium">{t("tokensIn")}</th>
                       <th className="pb-2 text-end font-medium">{t("tokensOut")}</th>
                       <th className="pb-2 text-end font-medium">{t("cost")}</th>
+                      <th className="pb-2 text-end font-medium">{t("revenue")}</th>
+                      <th className="pb-2 text-end font-medium">{t("pass")}</th>
                       <th className="pb-2 text-end font-medium">{t("lastCall")}</th>
                     </tr>
                   </thead>
@@ -189,7 +208,11 @@ export default async function AiCostsPage({
                         <td className="py-2 text-end font-mono tabular-nums">{num.format(u.calls)}</td>
                         <td className="py-2 text-end font-mono tabular-nums">{num.format(u.tin)}</td>
                         <td className="py-2 text-end font-mono tabular-nums">{num.format(u.tout)}</td>
-                        <td className="py-2 text-end font-mono font-semibold tabular-nums text-heading">{usd(u.cost)}</td>
+                        <td className="py-2 text-end font-mono font-semibold tabular-nums text-heading">{usd(u.cost)}
+                          <span className="block text-[10px] font-normal text-faint">{qar(u.cost * QAR_PER_USD)}</span>
+                        </td>
+                        <td className="py-2 text-end font-mono tabular-nums text-heading">{u.revenue > 0 ? qar(u.revenue) : "—"}</td>
+                        <td className="py-2 text-end text-[12px] text-mutedtext">{u.passUntil ? dayFmt.format(new Date(u.passUntil)) : "—"}</td>
                         <td className="py-2 text-end text-[12px] text-mutedtext">{u.last ? timeFmt.format(new Date(u.last)) : "—"}</td>
                       </tr>
                     ))}

@@ -22,6 +22,8 @@ export type IdeaStatus = {
   edit_turns: number;
   tokens_used: number;
   tier: TierId;
+  /** 0089: the Maker Pass end date when active. */
+  pass_until?: string | null;
 };
 
 export async function ideaStatus(supabase: SupabaseClient, projectId: string | null): Promise<IdeaStatus | null> {
@@ -64,6 +66,8 @@ export type TokenInfo = {
   nextChargeIn: number;
   /** Set on the turn the build moved to another tier. */
   tierChange?: "up" | "down";
+  /** Maker Pass end date (ISO) when active. */
+  passUntil?: string | null;
 };
 
 export function tokenInfo(opts: {
@@ -86,6 +90,7 @@ export function tokenInfo(opts: {
     multiplier: tier.multiplier,
     turnsPerToken: IDEATION.turnsPerToken,
     nextChargeIn: turnsUntilCharge(editTurns),
+    passUntil: opts.status?.pass_until ?? null,
     ...(change ? { tierChange: change } : {}),
   };
 }

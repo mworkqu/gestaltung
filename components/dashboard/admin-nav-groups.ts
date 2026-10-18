@@ -45,6 +45,7 @@ export function adminNavGroups(t: (key: string) => string): NavGroup[] {
         { href: "/dashboard/store/youtube", label: t("videosNav"), icon: "videos" },
         { href: "/dashboard/usage", label: t("aiUsage"), icon: "usage" },
         { href: "/dashboard/ai-costs", label: t("aiCosts"), icon: "usage" },
+        { href: "/dashboard/payments", label: t("payments"), icon: "credits" },
         { href: "/dashboard/notifications", label: t("notifications"), icon: "notifications" },
         { href: "/dashboard/contact", label: t("contactInfo"), icon: "contact" },
         { href: "/inventory", label: t("inventory"), icon: "inventory" },

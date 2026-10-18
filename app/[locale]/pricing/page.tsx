@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Box,
   CircuitBoard,
+  Coins,
   FolderKanban,
   Gift,
   GraduationCap,
@@ -12,6 +13,7 @@ import {
   Rocket,
   RotateCcw,
   ShoppingBag,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,7 +26,9 @@ import { MessagesScope } from "@/components/i18n/messages-scope";
 import { InvitePrice } from "@/components/pricing/invite-price";
 import { getContactPhone } from "@/lib/contact-phone-server";
 import { CAD_GENERATIONS, ORDER_DELIVERED_CREDITS, PROJECT_LIMIT } from "@/lib/credits/constants";
+import { MAKER_PASS, TOKEN_PRICE_QAR } from "@/lib/billing/config";
 import { metaFor } from "@/lib/meta";
+import { IDEATION } from "@/lib/studio/tiers";
 import type { Plan } from "@/lib/pricing/defaults";
 import { formatPerOutput, formatQar, isContactPlan, planOrderDesktop, planOrderMobile } from "@/lib/pricing/plans";
 import { getPricingPlans, getServicePrices } from "@/lib/store/public-catalog";
@@ -354,6 +358,41 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         <p className="neu-inset px-5 py-4 text-sm font-semibold leading-relaxed text-heading sm:text-base">
           {t("lossLine", { price })}
         </p>
+      </section>
+
+      {/* Ideation tokens (2026-10-18): pay-per-use first, the optional Maker Pass beside it. */}
+      <section id="tokens" aria-labelledby="tokens-heading" className="neu animate-fade-up delay-2 scroll-mt-24 space-y-5 card-pad">
+        <div className="max-w-2xl space-y-2">
+          <span className="kicker text-cobalt">{t("tokensKicker")}</span>
+          <h2 id="tokens-heading" className="text-balance title-section">
+            {t("tokensTitle")}
+          </h2>
+          <p className="text-sm leading-relaxed text-body sm:text-base">
+            {t("tokensIntro", { welcome: String(IDEATION.welcomeTokens), idea: String(IDEATION.newIdeaCost), every: String(IDEATION.turnsPerToken) })}
+          </p>
+        </div>
+        <ul className="grid gap-5 md:grid-cols-2">
+          <li className="min-w-0 tile">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
+              <Coins className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+            </span>
+            <p className="mt-4 text-sm leading-relaxed text-heading">{t("tokensPayg", { each: String(TOKEN_PRICE_QAR) })}</p>
+          </li>
+          <li className="min-w-0 tile ring-2 ring-cobalt/50">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
+              <Sparkles className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+            </span>
+            <p className="mt-4 text-sm font-semibold leading-relaxed text-heading">
+              {t("tokensPass", { qar: String(MAKER_PASS.qar), tokens: String(MAKER_PASS.monthlyTokens) })}
+            </p>
+          </li>
+        </ul>
+        <Button asChild>
+          <Link href="/tokens">
+            {t("tokensCta")}
+            <ArrowRight className={cn("ms-1", arrow)} aria-hidden />
+          </Link>
+        </Button>
       </section>
 
       {/* Services, from (P1-07) */}

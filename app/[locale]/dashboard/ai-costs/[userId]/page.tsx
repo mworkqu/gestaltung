@@ -4,7 +4,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { UUID_RE, needsMigration, rowCost, usdFormatter, type CallRow } from "../format";
+import { QAR_PER_USD, UUID_RE, needsMigration, qarFormatter, rowCost, usdFormatter, type CallRow, type RevenueRow } from "../format";
 
 // One user's AI cost: projects (with ideation tokens used), per-model totals
 // and the latest calls. Costs are the stored ai_usage.cost_usd, or the paid
@@ -43,11 +43,12 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
   const loc = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
   const num = new Intl.NumberFormat(loc);
   const usd = usdFormatter(locale);
+  const qar = qarFormatter(locale);
   const dayFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
   const timeFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Qatar" });
 
   const supabase = await createClient();
-  const [usageRes, projectsRes, sessionsRes, ledgerRes, profileRes] = await Promise.all([
+  const [usageRes, projectsRes, sessionsRes, ledgerRes, profileRes, revenueRes, paymentsRes] = await Promise.all([
     supabase
       .from("ai_usage")
       .select("created_at, project_id, feature, step, model, prompt_tokens, completion_tokens, total_tokens, audio_seconds, outcome, cost_usd")
@@ -56,8 +57,15 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
       .limit(20000),
     supabase.from("projects").select("id, name, created_at").eq("user_id", userId).order("created_at", { ascending: false }),
     supabase.from("idea_sessions").select("project_id, edit_turns, tier").eq("user_id", userId),
-    supabase.from("credits_ledger").select("delta, reason").eq("user_id", userId).eq("kind", "idea"),
+    supabase.from("credits_ledger").select("delta, reason").eq("user_id", userId).in("kind", ["idea", "idea_pass"]),
     supabase.from("profiles").select("email, full_name").eq("id", userId).maybeSingle(),
+    supabase.rpc("admin_revenue_users"),
+    supabase
+      .from("payments")
+      .select("id, created_at, product, amount_qar, status, auto_approved, is_test")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
   const missing = [usageRes.error, sessionsRes.error, ledgerRes.error].some((e) => needsMigration(e));
@@ -119,6 +127,10 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
     .sort((a, b) => b.agg.cost - a.agg.cost || b.idea - a.idea);
   const noProject = perProject.get(null);
 
+  const rev = ((revenueRes.data ?? []) as RevenueRow[]).find((r) => r.user_id === userId);
+  const payments = (paymentsRes.data ?? []) as { id: string; created_at: string; product: string; amount_qar: number | string; status: string; auto_approved: boolean; is_test: boolean }[];
+  const passActive = !!rev?.pass_until && rev.pass_until > new Date().toISOString();
+
   const profile = profileRes.data as { email: string | null; full_name: string | null } | null;
   const title = profile?.email ?? `${t("guest")} ${userId.slice(0, 8)}`;
   const tierLabel = (tier: string | undefined) => (tier === "explorer" || tier === "maker" || tier === "engineer" ? t(`tier_${tier}`) : "—");
@@ -131,6 +143,10 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
     { label: t("totalCost"), value: cost(all) },
     { label: t("ideaUsed"), value: num.format(ideaTotal) },
     { label: t("ideaBalance"), value: num.format(balance) },
+    { label: t("revenue"), value: qar(Number(rev?.revenue_qar ?? 0)) },
+    { label: t("pass"), value: passActive && rev?.pass_until ? dayFmt.format(new Date(rev.pass_until)) : "—" },
+    { label: t("passBalance"), value: num.format(Number(rev?.pass_balance ?? 0)) },
+    { label: t("boughtBalance"), value: num.format(Number(rev?.idea_balance ?? 0)) },
   ];
 
   const th = "pb-2 font-medium";
@@ -150,7 +166,7 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
       </div>
 
       <section className="neu p-6">
-        <dl className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <dl className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
           {stats.map((s) => (
             <div key={s.label}>
               <dt className="text-[10px] uppercase tracking-wider text-faint">{s.label}</dt>
@@ -159,6 +175,39 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
           ))}
         </dl>
         <p className="mt-4 text-[12px] text-mutedtext">{t("priceNote")}</p>
+        <p className="mt-1 text-[12px] text-mutedtext">{t("qarNote", { value: qar(all.cost * QAR_PER_USD), rate: QAR_PER_USD })}</p>
+      </section>
+
+      <section className="neu space-y-3 p-6">
+        <h2 className="text-base font-bold text-heading">{t("paymentsTitle")}</h2>
+        {payments.length === 0 ? (
+          <p className="text-sm text-mutedtext">{t("noPayments")}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-faint">
+                  <th className={cn(th, "text-start")}>{t("time")}</th>
+                  <th className={cn(th, "text-start")}>{t("product")}</th>
+                  <th className={cn(th, "text-end")}>{t("amount")}</th>
+                  <th className={cn(th, "text-end")}>{t("status")}</th>
+                  <th className={cn(th, "text-end")}>{t("auto")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-borderstrong/40">
+                {payments.map((p) => (
+                  <tr key={p.id}>
+                    <td className="whitespace-nowrap py-1.5 text-[12px] text-mutedtext">{timeFmt.format(new Date(p.created_at))}</td>
+                    <td className="py-1.5 font-mono text-[12px] text-heading" dir="ltr">{p.product}{p.is_test ? " (test)" : ""}</td>
+                    <td className={tdn}>{qar(Number(p.amount_qar))}</td>
+                    <td className="py-1.5 text-end text-[12px] text-body">{p.status}</td>
+                    <td className="py-1.5 text-end text-[12px] text-mutedtext">{p.auto_approved ? "✓" : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="neu space-y-3 p-6">

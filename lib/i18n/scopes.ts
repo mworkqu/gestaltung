@@ -57,6 +57,8 @@ export const MESSAGE_SCOPES = {
   ],
   auth: ["Auth", "GuestClaim", "Phone.invalid", "Turnstile"],
   projects: ["Projects", "Turnstile"],
+  // /tokens: the pack / Maker Pass checkout with the Fawran proof upload (TokenShop).
+  tokens: ["Tokens"],
   // /orders/[id]: only PaymentInstructions is a client component; the rest of
   // the Orders namespace is read on the server.
   orders: ["PayMethods"],

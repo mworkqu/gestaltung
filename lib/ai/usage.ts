@@ -16,7 +16,7 @@ import { callCostUsd } from "./prices";
 
 // "studio" (Design Studio, 0068): until 0068 runs the ai_usage check constraint
 // rejects it — logUsage only warns, so the user's call is never affected.
-export type Feature = "analyse" | "netlist" | "transcribe" | "electronics" | "firmware" | "cad" | "studio";
+export type Feature = "analyse" | "netlist" | "transcribe" | "electronics" | "firmware" | "cad" | "studio" | "billing";
 
 export type UsageRow = {
   provider: ProviderId;

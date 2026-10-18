@@ -12,7 +12,7 @@ import { logUsage, quota } from "@/lib/ai/usage";
 import { callGemini, geminiConfigured } from "./providers/gemini-client";
 import { ProviderError, type TokenUsage } from "./providers/types";
 
-export type CallFeature = "netlist" | "electronics" | "cad" | "studio";
+export type CallFeature = "netlist" | "electronics" | "cad" | "studio" | "billing";
 
 /** The provider call; tests inject a fake (then the key check is skipped). */
 export type ModelCaller = typeof callGemini;
@@ -23,7 +23,8 @@ export type CallResult<T> =
 
 export async function validatedCall<T>(opts: {
   supabase: SupabaseClient;
-  projectId: string;
+  /** null = not tied to a project (billing: the Fawran proof check). */
+  projectId: string | null;
   feature: CallFeature;
   system: string;
   prompt: string;
@@ -49,6 +50,7 @@ export async function validatedCall<T>(opts: {
   }
 
   const record = async (row: { model: string | null; attempt: number; rawText: string | null; raw: unknown; parsed: unknown; outcome: "ok" | "invalid" | "error"; errors: string[] }) => {
+    if (!projectId) return; // analysis_runs rows belong to a project
     const { error } = await supabase.from("analysis_runs").insert({
       project_id: projectId,
       feature,
