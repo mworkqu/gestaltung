@@ -354,12 +354,12 @@ function StudioShellInner({
   }, [api, skus]);
 
   // ── Step results ─────────────────────────────────────────────────────────
-  const onIdeaConfirmed = useCallback(
-    (spec: ProductSpec, answers: Record<string, string>) => {
+  /** The doc for a card: the same card keeps everything; a changed card redoes the parts and after. */
+  const docForCard = useCallback((spec: ProductSpec, answers: Record<string, string>): StudioDoc => {
       const prev = latest.current;
       const base = prev ?? emptyStudioDoc(spec);
       const same = prev ? sameSpec(prev.spec, spec) : false;
-      const nextDoc: StudioDoc = same
+      return same
         ? { ...base, answers: { ...passedAnswers(base.answers), ...answers } }
         : {
             ...base,
@@ -376,11 +376,27 @@ function StudioShellInner({
             firmware: undefined,
             product: undefined,
           };
-      commit(nextDoc);
+  }, []);
+
+  const onIdeaConfirmed = useCallback(
+    (spec: ProductSpec, answers: Record<string, string>) => {
+      commit(docForCard(spec, answers));
       void api.rename(spec.name);
       go(FLOW.indexOf("parts"));
     },
-    [api, commit, go],
+    [api, commit, go, docForCard],
+  );
+
+  // 2026-10-18 (owner): a card the chat changed is saved at once, not only on the main
+  // button — so the Parts step (reached from the progress line too) always picks for the
+  // card on screen. Same rule as confirming: a changed card clears the old parts.
+  const onIdeaDraft = useCallback(
+    (spec: ProductSpec, answers: Record<string, string>) => {
+      const prev = latest.current;
+      if (prev && sameSpec(prev.spec, spec)) return;
+      commit(docForCard(spec, answers));
+    },
+    [commit, docForCard],
   );
 
   const onComponents = useCallback(
@@ -632,6 +648,7 @@ function StudioShellInner({
             brief={loaded.project.brief}
             onConsented={() => setConsented(true)}
             onConfirm={onIdeaConfirmed}
+            onDraft={onIdeaDraft}
           />
         )}
         {step === "parts" && doc && (

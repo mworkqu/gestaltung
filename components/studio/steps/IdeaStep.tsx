@@ -62,6 +62,7 @@ export function IdeaStep({
   brief,
   onConsented,
   onConfirm,
+  onDraft,
 }: {
   ctx: StudioCtx;
   doc: StudioDoc | null;
@@ -71,6 +72,8 @@ export function IdeaStep({
   brief: string | null;
   onConsented: () => void;
   onConfirm: (spec: ProductSpec, answers: Record<string, string>) => void;
+  /** Saves a card the chat changed right away (the parts then follow it). */
+  onDraft?: (spec: ProductSpec, answers: Record<string, string>) => void;
 }) {
   const t = useTranslations("Studio");
   const saved = useMemo(() => historyFrom(doc?.answers), [doc?.answers]);
@@ -162,6 +165,16 @@ export function IdeaStep({
     }
   }
 
+  // Every card change (a chat turn, the count stepper) is saved at once.
+  const [partsCleared, setPartsCleared] = useState(false);
+  useEffect(() => {
+    if (!spec || !onDraft || busy) return;
+    if (doc && sameSpec(spec, doc.spec)) return;
+    if ((doc?.components.length ?? 0) > 0) setPartsCleared(true);
+    onDraft(spec, answersFrom(idea || spec.oneLine || spec.name, messages));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the card itself
+  }, [spec, busy]);
+
   // The token line: balance + tier (grants the welcome tokens on first sight).
   useEffect(() => {
     let live = true;
@@ -206,7 +219,8 @@ export function IdeaStep({
 
   // One main button: "Update my parts" only when parts were picked for a card that has since changed.
   const changed = Boolean(spec && doc && !sameSpec(spec, doc.spec));
-  const redoParts = changed && (doc?.components.length ?? 0) > 0;
+  // A chat change that cleared parts picked earlier: the button says "Update my parts".
+  const redoParts = (changed && (doc?.components.length ?? 0) > 0) || partsCleared;
   const confirm = () => spec && onConfirm(spec, answersFrom(idea || spec.oneLine || spec.name, messages));
 
   const label = spec ? t("ideaCard.refinePlaceholder") : idea ? t("yourAnswer") : t("ideaPlaceholder");

@@ -46,7 +46,7 @@ import { Bar, linkCls, MainButton, Problem, Sheet, StepFrame } from "../ui";
 import { linePrice, orderQty, productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
 import { packSizeOf } from "@/lib/store/pack";
 import { colourName, styledPart } from "@/lib/studio/variants";
-import { applyCardColours } from "@/lib/studio/card-parts";
+import { applyCardColours, cardCoverage } from "@/lib/studio/card-parts";
 import { groupComponents, groupHas, withQuantity } from "@/lib/studio/parts-group";
 import { usePickProgress } from "../use-pick-progress";
 import { PICK_STAGES } from "@/lib/studio/client/progress";
@@ -195,7 +195,11 @@ export function PartsStep({
   }
 
   useEffect(() => {
-    if (started.current || doc.components.length > 0) return;
+    if (started.current) return;
+    // No parts yet, or parts picked before the card gained something it shows (a project
+    // saved before 2026-10-18: "3 LEDs" on the card, none in the list) → pick for the card.
+    const stale = doc.components.length > 0 && cardCoverage(doc.spec, doc.components, (id) => !!getPart(id)).length > 0;
+    if (doc.components.length > 0 && !stale) return;
     started.current = true;
     void pick();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on entry
