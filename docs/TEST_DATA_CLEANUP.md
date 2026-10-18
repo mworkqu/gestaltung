@@ -54,6 +54,8 @@ Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test 
 
 - Studio LED-colour / layout check project `21202d7b-e035-4766-bdb9-a1942b71bf1e` "Smart Plant Monitor" (created 2026-10-18 from a local dev server against the live database, guest session). Also its guest user's `credits_ledger` rows (5 welcome ideation tokens + the "New idea" spend), its `idea_sessions` row and the `ai_usage` rows of that project (spec + pick calls).
 
+- Live-site re-test project `6803a44d-b025-4873-967d-cc26891ac834` "Smart Plant Monitor" (created 2026-10-18 on gestaltung360.com, guest session), with its guest user's ideation-token ledger rows, `idea_sessions` row and `ai_usage` rows.
+
 ## Already deleted
 
 - Crash-repro project `6b5907f2-c957-43f9-bce8-42e73beeff33` "TEST crash repro — delete" (created 2026-10-09): already deleted by the owner. No action.
