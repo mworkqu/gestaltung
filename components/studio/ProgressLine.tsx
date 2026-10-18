@@ -30,13 +30,15 @@ export function ProgressLine({
   const t = useTranslations("Studio");
   const top = useStickyTop();
   return (
-    <>
     <nav
       aria-label={t("progressLabel")}
-      className="sticky z-30 -mx-2 bg-gradient-to-b from-[#eef2f7] from-70% to-[#eef2f7]/0 px-2 pb-2 pt-2"
+      // Phones: sticky under the header. Desktop (lg): in the page flow, so the bar never sits on
+      // top of a step's first card (owner 2026-10-18: header + bar hid half the first part card).
+      className="sticky z-30 -mx-2 bg-gradient-to-b from-[#eef2f7] from-70% to-[#eef2f7]/0 px-2 pb-2 pt-2 lg:static lg:bg-none"
       style={{ top }}
     >
-      <ol className="neu flex items-start justify-between overflow-x-auto px-2 py-2 sm:gap-1 sm:px-5 sm:py-2.5">
+      <div className="neu px-2 py-2 sm:px-5 sm:py-2.5">
+      <ol className="flex items-start justify-between overflow-x-auto sm:gap-1">
         {FLOW.map((step, i) => {
           const accent = STEP_ACCENT[step];
           const isCurrent = i === current;
@@ -81,10 +83,10 @@ export function ProgressLine({
           );
         })}
       </ol>
+      {/* "Saved ✓" lives inside the bar's own box: it can never sit on top of a step's content. */}
+      {status && <div className="flex min-h-5 justify-end border-t border-white/60 pt-1.5">{status}</div>}
+      </div>
     </nav>
-    {/* In the page flow, not in the sticky bar: it can never sit on top of a step's content. */}
-    {status && <div className="flex min-h-6 justify-end px-3 sm:px-5">{status}</div>}
-    </>
   );
 }
 

@@ -13,7 +13,7 @@ import { applyActuatorRules, capKinds, SUPPLY_BOARD_IDS } from "./actuator-rules
 import { LABEL_MAX, MAX_COMPONENTS, PICK_RESPONSE_SCHEMA, PICK_SYSTEM, REASON_MAX, pickPrompt } from "./prompts";
 import { outcomeCached, pickKey, type AiCache } from "./cache";
 import { cut, isObj, type Outcome, type StudioCall } from "./types";
-import { cardItems } from "../card-parts";
+import { applyCardColours, cardItems, offCard } from "../card-parts";
 
 /** What libraryIndexForAI() gives the model (only id + category are relied on here). */
 export type PickIndexEntry = {
@@ -210,6 +210,13 @@ export function enforcePick(
     log.push({ path: "components.spec", from: null, to: id });
   }
 
+  // Not on the card: a sensor or output the card never names is dropped (the card decides).
+  {
+    const before = list.length;
+    list = list.filter((p) => !offCard(opts.spec, p.partId));
+    if (list.length !== before) log.push({ path: "components.offCard", from: before, to: list.length });
+  }
+
   // Everything on the card (2026-10-18): each sensor, output and mover becomes a part, with
   // its count ("3 LEDs" → 3 LEDs; the wiring adds a resistor each). Servo counts and the
   // servo mix stay with the actuator rules below.
@@ -254,11 +261,15 @@ export function enforcePick(
   list = capKinds(list, MAX_COMPONENTS, log);
 
   const counts = new Map<string, number>();
-  const components: StudioComponent[] = list.map((p) => {
-    const n = (counts.get(p.partId) ?? 0) + 1;
-    counts.set(p.partId, n);
-    return { partId: p.partId, instanceId: `${p.partId}_${n}`, label: p.label };
-  });
+  // The card's colours ("green, yellow and red LEDs") go on the instances (lib/studio/variants.ts).
+  const components: StudioComponent[] = applyCardColours(
+    opts.spec,
+    list.map((p) => {
+      const n = (counts.get(p.partId) ?? 0) + 1;
+      counts.set(p.partId, n);
+      return { partId: p.partId, instanceId: `${p.partId}_${n}`, label: p.label } as StudioComponent;
+    }),
+  );
 
   // Reasons: {partId: sentence} or [{partId, reason}] — only for parts kept.
   const reasons: Record<string, string> = {};

@@ -15,20 +15,30 @@ export type PartGroup = {
   items: StudioComponent[];
   quantity: number;
   first: StudioComponent;
+  /** The colour shared by the group (a green LED and a red LED are two lines). */
+  variant?: string;
 };
 
 export function groupComponents(components: readonly StudioComponent[]): PartGroup[] {
   const byKey = new Map<string, PartGroup>();
   const out: PartGroup[] = [];
   for (const c of components) {
-    const k = `${c.partId}|${c.auto ? "auto" : "chosen"}`;
+    const k = `${c.partId}|${c.auto ? "auto" : "chosen"}|${c.variant ?? ""}`;
     const g = byKey.get(k);
     if (g) {
       g.items.push(c);
       g.quantity++;
       continue;
     }
-    const fresh: PartGroup = { key: c.instanceId, partId: c.partId, auto: Boolean(c.auto), items: [c], quantity: 1, first: c };
+    const fresh: PartGroup = {
+      key: c.instanceId,
+      partId: c.partId,
+      auto: Boolean(c.auto),
+      items: [c],
+      quantity: 1,
+      first: c,
+      ...(c.variant ? { variant: c.variant } : {}),
+    };
     byKey.set(k, fresh);
     out.push(fresh);
   }

@@ -43,7 +43,10 @@ import { nextInstanceId } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
 import { Bar, linkCls, MainButton, Problem, Sheet, StepFrame } from "../ui";
-import { linePrice, productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
+import { linePrice, orderQty, productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
+import { packSizeOf } from "@/lib/store/pack";
+import { colourName, styledPart } from "@/lib/studio/variants";
+import { applyCardColours } from "@/lib/studio/card-parts";
 import { groupComponents, groupHas, withQuantity } from "@/lib/studio/parts-group";
 import { usePickProgress } from "../use-pick-progress";
 import { PICK_STAGES } from "@/lib/studio/client/progress";
@@ -217,6 +220,15 @@ export function PartsStep({
 
   const edit = (next: StudioComponent[]) => onComponents(next.filter((c) => !c.auto), null, true);
 
+  // The card's colours on parts picked before colours were kept (2026-10-18): "green, yellow and
+  // red LEDs" → each LED gets its colour once. Colour only: the circuit and layout stay.
+  useEffect(() => {
+    if (!doc.components.length) return;
+    const coloured = applyCardColours(doc.spec, doc.components);
+    if (coloured.some((c, i) => c.variant !== doc.components[i].variant)) onComponents(coloured, null, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the parts and the card
+  }, [doc.components, doc.spec]);
+
   // Part D: a row stands for every identical part ("Servo × 3"): Swap swaps them all.
   function swap(target: StudioComponent, part: LibraryPart) {
     const next: StudioComponent[] = [];
@@ -242,7 +254,7 @@ export function PartsStep({
   const { lines, total } = storeLines(doc.components, products, getPart);
   const groups = groupComponents(doc.components);
   // Parts with no store price ("We'll source this"): never silently left out of the total.
-  const onRequest = productsLoading ? 0 : groups.filter((g) => !productFor(g.partId, products, getPart)).length;
+  const onRequest = productsLoading ? 0 : groups.filter((g) => !productFor(g.partId, products, getPart, g.variant)).length;
   const sel = doc.components.find((c) => c.instanceId === selected);
   const selPart = sel ? getPart(sel.partId) : undefined;
   const loading = busy && doc.components.length === 0;
@@ -293,7 +305,7 @@ export function PartsStep({
           </div>
           {sel && selPart && (
             <div className="tile flex items-start gap-3 border-0 p-4 motion-safe:animate-rise" style={{ background: accent.soft }} aria-live="polite">
-              <PartTile part={selPart} product={productFor(sel.partId, products, getPart)} size={44} />
+              <PartTile part={selPart} product={productFor(sel.partId, products, getPart, sel.variant)} size={44} />
               <div className="min-w-0">
                 <p className="text-sm font-bold text-heading">{selPart.name[locale]}</p>
                 <p className="text-sm text-body">{selPart.blurb[locale]}</p>
@@ -325,10 +337,14 @@ export function PartsStep({
               {groups.map((g) => {
                 const c = g.first;
                 const part = getPart(c.partId);
-                const product = productFor(c.partId, products, getPart);
+                const product = productFor(c.partId, products, getPart, g.variant);
                 const isSel = groupHas(g, selected);
-                const baseName = product ? partName(product, locale) : part?.name[locale] ?? c.label;
-                const rowName = withQuantity(baseName, g.quantity);
+                const colour = colourName(g.variant, locale);
+                const baseName = product ? partName(product, locale) : `${colour ? `${colour} · ` : ""}${part?.name[locale] ?? c.label}`;
+                // A pack listing ("(5 Pack)") never gets "× 3" on its name: the line says "Need 3 · 1 pack of 5".
+                const pack = product ? packSizeOf(product) : 1;
+                const rowName = pack > 1 ? baseName : withQuantity(baseName, g.quantity);
+                const packs = product ? orderQty(product, g.quantity) : 0;
                 return (
                   <li
                     key={g.key}
@@ -386,11 +402,28 @@ export function PartsStep({
                         <span className="block text-[13px] leading-snug text-body">{c.reason || part?.blurb[locale]}</span>
                         <span className="block text-[13px] font-semibold" style={{ color: product ? accent.ink : undefined }}>
                           {product ? (
-                            formatPrice(linePrice(product, g.quantity), locale)
+                            <>
+                              {pack > 1 && (
+                                <span className="font-medium text-body" data-testid="studio-part-packs">
+                                  {t("partNeedPacks", {
+                                    need: String(g.quantity),
+                                    count: String(packs),
+                                    form: arabicCountForm(packs),
+                                    size: String(pack),
+                                  })}
+                                  {" · "}
+                                </span>
+                              )}
+                              {formatPrice(linePrice(product, g.quantity), locale)}
+                              {c.auto && <span className="font-medium text-mutedtext">{` · ${t("addedForYou")}`}</span>}
+                            </>
                           ) : productsLoading ? (
                             <Bar className="mt-1 h-3 w-16" />
                           ) : (
-                            <span className="text-mutedtext">{c.auto ? t("addedForYou") : t("sourceIt")}</span>
+                            // Every line: a price, or "We'll source this" (priced on request, counted in the total line).
+                            <span className="text-mutedtext" data-testid="studio-part-on-request">
+                              {c.auto ? `${t("addedForYou")} · ${t("sourceIt")}` : t("sourceIt")}
+                            </span>
                           )}
                         </span>
                       </span>
@@ -595,7 +628,8 @@ export function PartsPicturePane({
     () =>
       components.flatMap((c) => {
         const part = getPart(c.partId);
-        return part ? [{ c, part }] : [];
+        // Coloured parts are drawn in their colour (a green LED is green on the plate).
+        return part ? [{ c, part: styledPart(part, c.variant) }] : [];
       }),
     [components, getPart],
   );
@@ -613,7 +647,10 @@ export function PartsPicturePane({
   const [pic, setPic] = useState<{ key: string; handle: PartsSpinHandle } | null>(null);
   const [spin, setSpin] = useState<{ key: string; value: PartsSpin } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const key = size && pairs.length ? `${pairs.map(([id, p]) => `${id}:${p.id}`).join("|")}#${size.w}x${size.h}` : "";
+  const key =
+    size && pairs.length
+      ? `${shown.map(({ c, part }) => `${c.instanceId}:${part.id}:${c.variant ?? ""}`).join("|")}#${size.w}x${size.h}`
+      : "";
 
   useEffect(() => {
     if (!supported || !key || !size) return;
@@ -652,8 +689,9 @@ export function PartsPicturePane({
     onPicture?.(readyUrl);
   }, [onPicture, readyUrl]);
   const nameOf = (c: StudioComponent, part: LibraryPart) => {
-    const product = productFor(c.partId, products, getPart);
-    return product ? partName(product, locale) : part.name[locale];
+    const product = productFor(c.partId, products, getPart, c.variant);
+    const colour = colourName(c.variant, locale);
+    return product ? partName(product, locale) : `${colour ? `${colour} · ` : ""}${part.name[locale]}`;
   };
 
   return (
@@ -717,7 +755,7 @@ export function PartsPicturePane({
                     className={cn("flex w-full flex-col items-center gap-1.5 rounded-2xl p-1.5 text-center", on && "ring-2")}
                     style={{ "--tw-ring-color": accent.base } as React.CSSProperties}
                   >
-                    <PartTile part={part} product={productFor(c.partId, products, getPart)} size={56} />
+                    <PartTile part={part} product={productFor(c.partId, products, getPart, c.variant)} size={56} />
                     <span className="line-clamp-2 text-xs font-semibold leading-tight text-heading">{withQuantity(nameOf(c, part), g.quantity)}</span>
                   </button>
                 </li>

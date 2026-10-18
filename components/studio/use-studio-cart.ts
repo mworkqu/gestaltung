@@ -15,14 +15,17 @@ type GetPart = (id: string) => LibraryPart | undefined;
 import type { StudioComponent } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { packsFor } from "@/lib/store/pack";
+import { skusFor } from "@/lib/studio/variants";
 
 /** The store product sold for a library part (first published SKU), if any. */
 export function productFor(
   partId: string,
   products: Map<string, StoreCardPart>,
   getPart: GetPart = codeGetPart,
+  /** The component's colour: its own listing first (a green LED → the green LED pack). */
+  variant?: string | null,
 ): StoreCardPart | null {
-  for (const sku of getPart(partId)?.storeSkus ?? []) {
+  for (const sku of skusFor(getPart(partId), variant)) {
     const p = products.get(sku);
     if (p) return p;
   }
@@ -45,7 +48,7 @@ export function storeLines(
 ) {
   const byId = new Map<string, StoreLine>();
   for (const c of components) {
-    const p = productFor(c.partId, products, getPart);
+    const p = productFor(c.partId, products, getPart, c.variant);
     if (!p) continue;
     const line = byId.get(p.id);
     if (line) line.need++;

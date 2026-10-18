@@ -64,3 +64,27 @@ describe("card items ⊆ parts", () => {
     expect(wired.some((c) => c.partId === "motor_driver")).toBe(true);
   });
 });
+
+describe("LED colours from the card", () => {
+  it("green, yellow and red LEDs × 3 → one of each, each its own store listing", async () => {
+    const { skusFor, VARIANT_SKUS } = await import("./variants");
+    const picked = pick(plant, { components: [{ partId: "arduino_uno" }] });
+    const leds = picked.components.filter((c) => c.partId === "led_5mm");
+    expect(leds.map((c) => c.variant)).toEqual(["green", "yellow", "red"]);
+    expect(skusFor(getPart("led_5mm"), "green")[0]).toBe(VARIANT_SKUS.led_5mm.green);
+    // The wiring keeps the colours.
+    const wired = buildWiring(picked.components, plant, getPart, "en").components;
+    expect(wired.filter((c) => c.partId === "led_5mm").map((c) => c.variant)).toEqual(["green", "yellow", "red"]);
+  });
+});
+
+describe("the card decides the sensors and outputs", () => {
+  it("drops an LED ring the card never mentions, keeps the board, pump and power", () => {
+    const picked = pick(plant, {
+      components: [{ partId: "arduino_uno" }, { partId: "ws2812_ring" }, { partId: "pump_5v" }, { partId: "usbc_power_5v" }],
+    });
+    const ids = picked.components.map((c) => c.partId);
+    expect(ids).not.toContain("ws2812_ring");
+    expect(ids).toEqual(expect.arrayContaining(["arduino_uno", "pump_5v", "usbc_power_5v", "led_5mm", "soil_moisture_cap"]));
+  });
+});

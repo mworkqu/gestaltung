@@ -13,6 +13,7 @@
 //    done steps are tappable in the progress line, future ones are not.
 //  * ?step= deep-links to any reachable step; the URL follows the current step.
 
+import { skusFor } from "@/lib/studio/variants";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -330,7 +331,7 @@ function StudioShellInner({
 
   // ── Store products for the parts (shared by Parts and Make) ──────────────
   const skus = useMemo(
-    () => (doc?.components ?? []).flatMap((c) => getPart(c.partId)?.storeSkus ?? []).sort().join(","),
+    () => [...new Set((doc?.components ?? []).flatMap((c) => skusFor(getPart(c.partId), c.variant)))].sort().join(","),
     [doc?.components, getPart],
   );
   const [products, setProducts] = useState<Map<string, StoreCardPart>>(new Map());

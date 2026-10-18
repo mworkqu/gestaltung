@@ -4660,7 +4660,8 @@
     },
     "engineeringView": "العرض الهندسي",
     "partsOnRequestPlus": "+ {form, select, one {قطعة واحدة يُحدَّد سعرها عند الطلب} two {قطعتان يُحدَّد سعرهما عند الطلب} few {{count} قطع يُحدَّد سعرها عند الطلب} other {{count} قطعة يُحدَّد سعرها عند الطلب}}",
-    "partsOnRequestOnly": "{form, select, one {قطعة واحدة يُحدَّد سعرها عند الطلب} two {قطعتان يُحدَّد سعرهما عند الطلب} few {{count} قطع يُحدَّد سعرها عند الطلب} other {{count} قطعة يُحدَّد سعرها عند الطلب}}"
+    "partsOnRequestOnly": "{form, select, one {قطعة واحدة يُحدَّد سعرها عند الطلب} two {قطعتان يُحدَّد سعرهما عند الطلب} few {{count} قطع يُحدَّد سعرها عند الطلب} other {{count} قطعة يُحدَّد سعرها عند الطلب}}",
+    "partNeedPacks": "مطلوب {need} · {form, select, one {عبوة واحدة} two {عبوتان} few {{count} عبوات} other {{count} عبوة}} من {size}"
   },
   "StudioLibrary": {
     "pageTitle": "قطع الاستوديو",

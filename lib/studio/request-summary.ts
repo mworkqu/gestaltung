@@ -21,6 +21,7 @@
 // shows its range; /api/store-lead stores it (quoteCalcSnapshot) with the lead
 // so the owner sees exactly how the number was made in the admin.
 
+import { skusFor } from "./variants";
 import type { Locale } from "./client/api";
 import { MECH_NAMES } from "./mech/names";
 import { groupComponents, withQuantity } from "./parts-group";
@@ -162,7 +163,7 @@ export function quoteBreakdown({
   for (const g of groupComponents(doc?.components ?? [])) {
     const c = g.first;
     const lib = getPart(c.partId);
-    const sku = lib?.storeSkus?.[0] ?? null;
+    const sku = skusFor(lib, c.variant)[0] ?? null;
     const price = sku ? prices.get(sku) : undefined;
     const priced = typeof price === "number" && Number.isFinite(price) && price > 0;
     if (priced) partsQar += price * g.quantity;

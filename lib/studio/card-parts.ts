@@ -9,6 +9,7 @@
 // unknown name) are left out of the check rather than guessed.
 
 import type { ProductSpec, StudioComponent } from "./schema";
+import { coloursIn, type PartColour } from "./variants";
 
 export type CardItem = {
   /** Stable key, e.g. "led", "soil". */
@@ -16,6 +17,8 @@ export type CardItem = {
   /** Library ids that satisfy it; the first one present in the library is added. */
   ids: readonly string[];
   count: number;
+  /** Colours named on the card, in order ("Green, yellow, and red LEDs" → green, yellow, red). */
+  colours?: PartColour[];
 };
 
 type Rule = { key: string; re: RegExp; ids: readonly string[] };
@@ -64,9 +67,15 @@ export const isLight = (name: string) => {
 
 export function cardItems(spec: ProductSpec): CardItem[] {
   const items = new Map<string, CardItem>();
-  const put = (key: string, ids: readonly string[], count: number) => {
+  const put = (key: string, ids: readonly string[], count: number, colours: PartColour[] = []) => {
     const cur = items.get(key);
-    items.set(key, { key, ids, count: Math.max(cur?.count ?? 0, Math.max(1, Math.round(count))) });
+    const all = [...(cur?.colours ?? []), ...colours];
+    items.set(key, {
+      key,
+      ids,
+      count: Math.max(cur?.count ?? 0, Math.max(1, Math.round(count))),
+      ...(all.length ? { colours: all } : {}),
+    });
   };
   const u = spec.understanding;
   for (const s of u?.sensors ?? []) {
@@ -75,7 +84,7 @@ export function cardItems(spec: ProductSpec): CardItem[] {
   }
   for (const o of u?.outputs ?? []) {
     const r = ruleFor(OUTPUT_RULES, o.name) ?? ruleFor(OUTPUT_RULES, `${o.name} ${o.purpose ?? ""}`);
-    if (r) put(r.key, r.ids, o.count);
+    if (r) put(r.key, r.ids, o.count, r.key === "led" ? coloursIn(`${o.name} ${o.purpose ?? ""}`) : []);
   }
   for (const a of u?.actuators ?? []) {
     const ids = MOVER_IDS[a.kind];
@@ -99,6 +108,44 @@ export function cardItems(spec: ProductSpec): CardItem[] {
     if (key && !items.has(key)) put(key, SENSOR_RULES.find((x) => x.key === key)!.ids, 1);
   }
   return [...items.values()];
+}
+
+/**
+ * Colour per instance of a coloured card item: the n-th LED gets the n-th colour named
+ * ("green, yellow, red" × 3); with one colour named, every LED is that colour.
+ */
+export function colourForInstance(item: CardItem, n: number): PartColour | undefined {
+  const cs = item.colours ?? [];
+  if (!cs.length) return undefined;
+  return cs.length === 1 ? cs[0] : cs[n];
+}
+
+/** Gives each coloured card item's instances their colours (keeps colours already set). */
+export function applyCardColours<T extends { partId: string; variant?: string }>(spec: ProductSpec, components: T[]): T[] {
+  const out = components.map((c) => ({ ...c }));
+  for (const item of cardItems(spec)) {
+    if (!item.colours?.length) continue;
+    let n = 0;
+    for (const c of out) {
+      if (!item.ids.includes(c.partId)) continue;
+      const colour = colourForInstance(item, n++);
+      if (colour && !c.variant) c.variant = colour;
+    }
+  }
+  return out;
+}
+
+/** Every library id a sensor / output card item can stand for. */
+const CARD_IDS = new Set([...SENSOR_RULES, ...OUTPUT_RULES].flatMap((r) => r.ids));
+
+/**
+ * Sensors and outputs the picker added that the card never mentions (an LED ring when
+ * the card says "3 LEDs"): with a full understanding, the card decides. Helpers,
+ * boards, power and movers are never dropped here.
+ */
+export function offCard(spec: ProductSpec, partId: string): boolean {
+  if (!spec.understanding || !CARD_IDS.has(partId)) return false;
+  return !cardItems(spec).some((i) => i.ids.includes(partId));
 }
 
 export type Missing = { key: string; want: number; have: number };

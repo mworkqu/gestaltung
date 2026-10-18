@@ -20,7 +20,7 @@ import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/
 import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
 import { mockOptionsFromUrl } from "./product";
 import { forModel, sameSpec } from "./steps";
-import { cardItems } from "@/lib/studio/card-parts";
+import { applyCardColours, cardItems } from "@/lib/studio/card-parts";
 import { actuatorCountIn, actuatorCountLabel, actuatorTotals, setActuatorCount } from "@/lib/studio/actuators";
 
 /**
@@ -309,12 +309,12 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       );
       const seen = new Map<string, number>();
       const reasonOf = new Map(picked.map((c) => [c.partId, c.reason]));
-      const ruled: StudioComponent[] = slots.map((s) => {
+      const ruled: StudioComponent[] = applyCardColours(spec, slots.map((s) => {
         const n = (seen.get(s.partId) ?? 0) + 1;
         seen.set(s.partId, n);
         const reason = reasonOf.get(s.partId);
-        return { partId: s.partId, instanceId: `${s.partId}_${n}`, label: s.label, ...(reason ? { reason } : {}) };
-      });
+        return { partId: s.partId, instanceId: `${s.partId}_${n}`, label: s.label, ...(reason ? { reason } : {}) } as StudioComponent;
+      }));
       let components = ruled;
       try {
         components = buildWiring(ruled, spec, getPart, locale).components;

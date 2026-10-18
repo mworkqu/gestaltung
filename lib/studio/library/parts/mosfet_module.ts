@@ -3,7 +3,8 @@ import type { LibraryPart } from "../../schema";
 // Logic-level MOSFET switch module (AO3400 / D4184 style, flyback diode on board): lets a
 // 3.3 V or 5 V pin switch a pump, fan or one-way motor on and off (PWM for speed). The
 // wiring prefers it for loads that only switch on/off; a motor that must reverse keeps the
-// H-bridge (motor_driver). No store SKU yet: shown as "we'll source this" until one is set.
+// H-bridge (motor_driver). Store: the IRF520 MOSFET driver module (best with a 5 V board such
+// as the Arduino Uno; on a 3.3 V board a logic-level module switches harder loads better).
 export const mosfetModule: LibraryPart = {
   id: "mosfet_module",
   name: { en: "MOSFET switch module", ar: "وحدة مفتاح MOSFET" },
@@ -12,7 +13,7 @@ export const mosfetModule: LibraryPart = {
     ar: "تتيح للوحتك تشغيل المضخة أو المحرّك وإيقافه بأمان.",
   },
   category: "actuator",
-  storeSkus: [],
+  storeSkus: ["VLT-32033979334758"],
   tags: ["driver", "module", "mosfet", "switch", "transistor", "pump", "fan", "on_off", "pwm", "flyback", "diode", "actuator"],
   dims: { x: 22, y: 16, z: 8 },
   model: {

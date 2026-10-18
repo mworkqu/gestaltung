@@ -4660,7 +4660,8 @@
     },
     "engineeringView": "Engineering view",
     "partsOnRequestPlus": "+ {form, select, one {1 part priced on request} other {{count} parts priced on request}}",
-    "partsOnRequestOnly": "{form, select, one {1 part priced on request} other {{count} parts priced on request}}"
+    "partsOnRequestOnly": "{form, select, one {1 part priced on request} other {{count} parts priced on request}}",
+    "partNeedPacks": "Need {need} · {form, select, one {1 pack} other {{count} packs}} of {size}"
   },
   "StudioLibrary": {
     "pageTitle": "Studio parts",

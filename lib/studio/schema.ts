@@ -336,6 +336,8 @@ export const StudioComponentSchema = z.object({
   reason: z.string().optional(),
   /** Added automatically by the rules (resistor, level shifter…), not by the picker. */
   auto: z.boolean().optional(),
+  /** The part's colour when it is sold in colours (lib/studio/variants.ts), e.g. a green LED. */
+  variant: z.string().max(20).optional(),
 });
 export type StudioComponent = z.infer<typeof StudioComponentSchema>;
 

@@ -7,6 +7,7 @@
 //   getProjectQuote   the owner's quote for a project the caller owns (0073 RPC)
 //   isMissingQuoteColumn  0073 not run yet
 
+import { skusFor } from "../variants";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { studioLibrary } from "../library/remote";
@@ -50,7 +51,7 @@ export async function linkedPrices(
   doc: StudioDoc | null,
   getPart: (id: string) => LibraryPart | undefined,
 ): Promise<Map<string, number>> {
-  const skus = [...new Set((doc?.components ?? []).flatMap((c) => getPart(c.partId)?.storeSkus?.[0] ?? []))];
+  const skus = [...new Set((doc?.components ?? []).flatMap((c) => skusFor(getPart(c.partId), c.variant)[0] ?? []))];
   const out = new Map<string, number>();
   if (!skus.length) return out;
   const { data } = await db.from("parts").select("sku, unit_price").in("sku", skus).eq("is_published", true).is("merged_into", null);
