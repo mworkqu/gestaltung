@@ -19,13 +19,18 @@
 //  * The input is focused on load and after every reply (phones too) and is
 //    never disabled, so the keyboard stays up. Answers live in doc.answers and
 //    are never asked again.
+//  * 2026-10-18: "Our understanding" (UnderstandingPanel) sits on top of the main
+//    column — goal, how it works, the parts with counts and the build tier — and
+//    the chat moves to the side column. Every turn the agent rebuilds the whole
+//    understanding. Ideation tokens: the balance line above the chat (a new idea
+//    1, edits 1 per N messages, × the tier); a tier change shows a notice.
 //
 // Consent: a project created on /projects/new already has it; otherwise the
 // existing consent line shows and is recorded on the first send.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, ChevronDown, Minus, Plus, Send } from "lucide-react";
+import { Check, ChevronDown, Coins, Minus, Plus, Send, TrendingUp } from "lucide-react";
 
 import { ChatConsent } from "@/components/prototyping/chat-thread";
 import { LIMITS, type ActuatorKind, type ProductSpec, type StudioDoc } from "@/lib/studio/schema";
@@ -36,8 +41,12 @@ import {
   answersFrom, cardRows, changedRows, forModel, historyFrom, sameSpec, type CardRow, type IdeaMessage,
 } from "@/lib/studio/client/steps";
 import { STEP_ACCENT } from "@/lib/studio/palette";
+import { IDEATION } from "@/lib/studio/tiers";
+import type { TokenInfo } from "@/lib/studio/client/api";
+import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../StudioShell";
+import { UnderstandingPanel } from "./UnderstandingPanel";
 import { Bar, MainButton, Problem, StepFrame } from "../ui";
 import { problemKey } from "./problem";
 
@@ -74,6 +83,11 @@ export function IdeaStep({
   const [ticked, setTicked] = useState(false);
   // Phones: the card panel opens by itself once the spec is there.
   const [cardOpen, setCardOpen] = useState(Boolean(doc?.spec));
+  const [understandingOpen, setUnderstandingOpen] = useState(true);
+  const [tokens, setTokens] = useState<TokenInfo | null>(null);
+  const [outOfTokens, setOutOfTokens] = useState(false);
+  /** Shown once after the turn that moved the build to another tier (never stored, never sent to the AI). */
+  const [tierNotice, setTierNotice] = useState<{ dir: "up" | "down"; tier: TokenInfo["tier"]; m: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
@@ -86,14 +100,23 @@ export function IdeaStep({
   async function ask(nextIdea: string, history: IdeaMessage[], current: ProductSpec | null) {
     setBusy(true);
     setProblem(null);
+    setOutOfTokens(false);
+    setTierNotice(null);
     const r = await ctx.api.spec({ idea: nextIdea, messages: forModel(history), locale: ctx.locale, current });
     setBusy(false);
     if (!r.ok) {
-      setProblem(t(problemKey(r)));
+      if (r.error === "no_tokens") {
+        setOutOfTokens(true);
+        void ctx.api.tokens?.().then((v) => v && setTokens(v));
+      } else setProblem(t(problemKey(r)));
       focusInput();
       return;
     }
     const data = r.data;
+    if (data.tokens) {
+      setTokens(data.tokens);
+      if (data.tokens.tierChange) setTierNotice({ dir: data.tokens.tierChange, tier: data.tokens.tier, m: data.tokens.multiplier });
+    }
     if ("question" in data) {
       setMessages([...history, { role: "assistant", text: data.question, choices: data.choices }]);
       focusInput();
@@ -138,6 +161,15 @@ export function IdeaStep({
       await ask(idea, history, spec);
     }
   }
+
+  // The token line: balance + tier (grants the welcome tokens on first sight).
+  useEffect(() => {
+    let live = true;
+    void ctx.api.tokens?.().then((v) => live && v && setTokens(v));
+    return () => {
+      live = false;
+    };
+  }, [ctx.api]);
 
   // Opened from /projects/new: carry on with the first message, once.
   useEffect(() => {
@@ -194,30 +226,15 @@ export function IdeaStep({
         ) : undefined
       }
     >
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,21rem)] lg:items-start lg:gap-6">
-        {/* The card: end column on desktop, a collapsible panel above the chat on phones. */}
-        <div className="min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-start-1" data-testid="studio-idea-card-col">
-          <SpecCard
-            spec={cardSpec}
-            draft={!spec}
-            idea={idea}
-            rows={rows}
-            fresh={fresh}
-            busy={busy}
-            known={known}
-            open={cardOpen}
-            onToggle={() => setCardOpen((o) => !o)}
-            // Part B: the count stepper is a card change like any other (→ "Update my parts").
-            onCount={spec && !busy ? (kind, n) => setSpec(setActuatorCount(spec, kind, n)) : undefined}
-          />
-          {redoParts && (
-            <p className="mt-3 text-sm leading-relaxed text-mutedtext" data-testid="studio-update-parts-note">
-              {t("ideaCard.updatePartsNote")}
-            </p>
-          )}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start lg:gap-6">
+        {/* "Our understanding": top of the main column (first on phones too). */}
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <UnderstandingPanel spec={spec} busy={busy} open={understandingOpen} onToggle={() => setUnderstandingOpen((o) => !o)} />
         </div>
 
-        <div className="min-w-0 space-y-3 lg:col-start-1 lg:row-start-1" data-testid="studio-idea-chat">
+        {/* The chat: the side column on desktop (sticky), under the understanding on phones. */}
+        <div className="min-w-0 space-y-3 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1" data-testid="studio-idea-chat">
+          <TokenLine tokens={tokens} />
           <div
             ref={logRef}
             role="log"
@@ -245,6 +262,19 @@ export function IdeaStep({
                 {m.changed && <UpdatedChip changed={m.changed} />}
               </div>
             ))}
+            {tierNotice && (
+              <p
+                className="flex items-start gap-2 rounded-xl bg-white/80 px-3 py-2 text-xs font-semibold text-heading shadow-neu-sm motion-safe:animate-rise"
+                role="status"
+                data-testid="studio-tier-notice"
+              >
+                <TrendingUp className={cn("mt-px h-4 w-4 shrink-0", tierNotice.dir === "down" && "-scale-y-100")} style={{ color: accent.ink }} aria-hidden />
+                {t(tierNotice.dir === "up" ? "tokens.tierUp" : "tokens.tierDown", {
+                  tier: t(`tiers.${tierNotice.tier}`),
+                  m: String(tierNotice.m),
+                })}
+              </p>
+            )}
             {busy && (
               <div className="flex justify-start" data-testid="studio-typing">
                 <span className="inline-flex items-center gap-1 rounded-2xl rounded-es-md bg-surface px-3.5 py-3 shadow-neu-sm">
@@ -310,10 +340,65 @@ export function IdeaStep({
           {!consented && (
             <ChatConsent destination={destination} checked={ticked} onChange={setTicked} disabled={busy} id="studio-consent" />
           )}
+          {outOfTokens && (
+            <Problem>
+              {t("tokens.empty")}{" "}
+              <Link href="/contact" className="font-semibold underline underline-offset-2">
+                {t("tokens.contact")}
+              </Link>
+            </Problem>
+          )}
           {problem && <Problem>{problem}</Problem>}
+        </div>
+
+        {/* The product card: under the understanding on desktop, after the chat on phones. */}
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2" data-testid="studio-idea-card-col">
+          <SpecCard
+            spec={cardSpec}
+            draft={!spec}
+            idea={idea}
+            rows={rows}
+            fresh={fresh}
+            busy={busy}
+            known={known}
+            open={cardOpen}
+            onToggle={() => setCardOpen((o) => !o)}
+            // Part B: the count stepper is a card change like any other (→ "Update my parts").
+            onCount={spec && !busy ? (kind, n) => setSpec(setActuatorCount(spec, kind, n)) : undefined}
+          />
+          {redoParts && (
+            <p className="mt-3 text-sm leading-relaxed text-mutedtext" data-testid="studio-update-parts-note">
+              {t("ideaCard.updatePartsNote")}
+            </p>
+          )}
         </div>
       </div>
     </StepFrame>
+  );
+}
+
+/** "Ideation tokens: 4" + the rule (new idea 1, edits 1 per N messages, × tier). Hidden before 0088 runs. */
+function TokenLine({ tokens }: { tokens: TokenInfo | null }) {
+  const t = useTranslations("Studio");
+  if (!tokens) return null;
+  const low = !tokens.admin && (tokens.balance ?? 0) <= 1;
+  return (
+    <div className="space-y-1 rounded-2xl bg-panel px-3.5 py-2.5 shadow-neu-sm" data-testid="studio-tokens" data-balance={tokens.balance ?? ""}>
+      <p className="flex items-center gap-2 text-sm font-bold text-heading">
+        <Coins className="h-4 w-4 shrink-0" style={{ color: accent.ink }} strokeWidth={2} aria-hidden />
+        <span className={cn(low && "text-destructive")}>
+          {tokens.admin ? t("tokens.admin") : t("tokens.balance", { n: String(tokens.balance ?? 0) })}
+        </span>
+      </p>
+      <p className="text-[11px] leading-snug text-mutedtext">
+        {t("tokens.rule", {
+          idea: String(IDEATION.newIdeaCost * tokens.multiplier),
+          cost: String(tokens.multiplier),
+          every: String(tokens.turnsPerToken),
+          next: String(tokens.nextChargeIn),
+        })}
+      </p>
+    </div>
   );
 }
 

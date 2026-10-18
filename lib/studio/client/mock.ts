@@ -157,6 +157,28 @@ const PICK: { partId: string; reason: Record<Locale, string> }[] = [
   { partId: "led_5mm", reason: { en: "A small light that says it is on.", ar: "ضوء صغير يدل على أنه يعمل." } },
 ];
 
+/** The mock's "Our understanding": derived from the card each time (the real model rebuilds it every turn). */
+function mockUnderstood(spec: ProductSpec, locale: Locale): ProductSpec {
+  const ar = locale === "ar";
+  const plant = spec.outputs.includes("pump") || /plant|soil|نبت|تربة/i.test(`${spec.name} ${spec.oneLine}`);
+  const movers = actuatorTotals(spec).map(({ kind, count }) => ({
+    name: kind === "servo" ? (ar ? "سيرفو SG90" : "SG90 servo") : kind,
+    count,
+    kind,
+  }));
+  return {
+    ...spec,
+    understanding: {
+      goal: spec.oneLine || spec.name,
+      howItWorks: ar ? "يقرأ الحساس ما حوله، ويقرر المتحكّم، ثم تتحرك القطع." : "The sensor reads its surroundings, the board decides, then the parts act.",
+      controller: "Arduino Uno",
+      sensors: [plant ? { name: ar ? "حساس رطوبة التربة" : "Soil moisture sensor", count: 1 } : { name: ar ? "حساس حركة" : "Motion sensor", count: 1 }],
+      actuators: movers,
+      outputs: spec.outputs.filter((o) => o !== "pump" && o !== "motor").map((o) => ({ name: o, count: 1 })),
+    },
+  };
+}
+
 export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"): StudioApi {
   return {
     mode: "mock",
@@ -186,6 +208,7 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
         // Part B: "make it 4 joints" / "2 pumps" sets that count on the card.
         const asked = actuatorCountIn(last);
         if (asked) next = setActuatorCount(next, asked.kind, asked.count);
+        next = mockUnderstood(next, locale);
         if (sameSpec(next, current)) return { ok: true, data: { reply: MOCK_REPLY[locale].nothing, changed: [] } };
         const changed =
           asked && actuatorTotals(next).find((a) => a.kind === asked.kind)?.count === asked.count
@@ -196,14 +219,14 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       // Part F: an industrial arm ("big robotic arm like ur10") gets the desktop version at once,
       // with the scale note and the reply that says so (as the real model does on its first card).
       if (BIG_ARM.test(userTexts(idea, turn.messages).join(" "))) {
-        return { ok: true, data: { spec: guardSpec(robotArmSpec(locale), turn).spec, reply: ROBOT_ARM_REPLY[locale] } };
+        return { ok: true, data: { spec: mockUnderstood(guardSpec(robotArmSpec(locale), turn).spec, locale), reply: ROBOT_ARM_REPLY[locale] } };
       }
       if (!turn.messages.some((m) => m.role === "assistant")) return { ok: true, data: QUESTION[locale] };
       const plant = WORDS.plant.test(userTexts(idea, turn.messages).join(" "));
       return {
         ok: true,
         data: {
-          spec: guardSpec(clampSpec({
+          spec: mockUnderstood(guardSpec(clampSpec({
             name: plant ? (locale === "ar" ? "مساعد النبتة" : "Plant helper") : locale === "ar" ? "رفيق المكتب" : "Desk buddy",
             oneLine: idea.slice(0, 120) || "A little desk friend that waves when you walk in.",
             use: "desk",
@@ -215,9 +238,12 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
             sizeHint: "palm",
             style: "rounded",
             quantity: 1,
-          }), turn).spec,
+          }), turn).spec, locale),
         },
       };
+    },
+    async tokens() {
+      return { balance: 5, admin: false, charged: 0, tier: "explorer", multiplier: 1, turnsPerToken: 5, nextChargeIn: 5 };
     },
     async pick(spec, locale) {
       await wait(300);

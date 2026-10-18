@@ -323,6 +323,6 @@ describe("Part F guards from the real-AI check", () => {
     const m = fakeModel([{ reply: "Ok.", changed: [] }]);
     await runSpecChat({ call: m.call, idea: "robotic arm", messages: [{ role: "user", text: "big robotic arm like ur10" }], locale: "en", current: arm });
     expect(m.prompts[0]).toContain("IS a change");
-    expect(m.prompts[0]).toContain("copy every field the user did not ask to change");
+    expect(m.prompts[0]).toContain("Rebuild the FULL understanding");
   });
 });

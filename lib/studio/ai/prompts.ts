@@ -6,7 +6,7 @@
 // small, and our clamp*() helpers enforce the real limits anyway.
 
 import {
-  ACTUATOR_KINDS, ACTUATOR_LOADS, COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
+  ACTUATOR_KINDS, ACTUATOR_LOADS, MOVER_KINDS, COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
   MECH_TEMPLATES, MATERIALS, OUTPUTS, PHASE_TEMPLATES, PLACEMENTS, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
   type EnclosureTemplate, type MechTemplate, type ProductSpec,
 } from "../schema";
@@ -70,15 +70,55 @@ export const SPEC_SYSTEM =
   "and add a reply (1–2 sentences) that says so plainly, e.g. 'A real UR10 is an industrial arm (1.3 m reach, 10 kg). " +
   "We can build a desktop arm that moves like it, about 30–40 cm, with hobby servos.' " +
   // Part A: once the card exists the chat answers like a person.
-  "Once a card exists, every turn returns {reply, changed, spec?}: " +
+  "Once a card exists, every turn returns {diff, spec, reply, changed} with the FULL rebuilt understanding and spec: " +
   `reply = one or two plain sentences (at most ${REPLY_MAX} characters) in the page language, always present. ` +
-  "If the user asks for a change, apply it, return the full updated spec, list what changed in changed (short labels like " +
+  "If the user asks for a change, rebuild everything it touches, list what changed in changed (short labels like " +
   "'Now solar powered') and say it in reply. If the user asks a question about the idea or a product they mention " +
-  "(e.g. 'what is UR10'), answer briefly and relate it to what we can build; no spec. " +
+  "(e.g. 'what is UR10'), answer briefly and relate it to what we can build; the spec comes back unchanged. " +
   "Off-topic or 'who made you': say you are Gestaltung's design assistant who helps turn an idea into parts, wiring and a case, " +
-  "and steer back to the idea; no spec. Rude messages: one calm line, no lecture, no spec. " +
+  "and steer back to the idea; spec unchanged. Rude messages: one calm line, no lecture, spec unchanged. " +
   "Never claim to be human. Never name the AI company or model behind you; you are Gestaltung's design assistant. " +
+  // 2026-10-18: the "Our understanding" panel, rebuilt in full on every turn.
+  "Every spec carries spec.understanding — your full understanding of the idea, shown to the user to confirm: " +
+  "goal (one sentence), howItWorks (2–4 plain sentences: what it senses, what it decides, what it does), " +
+  "controller (the board, e.g. 'Arduino Uno'), sensors, actuators (servo, linear_actuator, motor, pump, stepper) and " +
+  "outputs (screen, LEDs, buzzer…), each {name, count, purpose}. List every part the goal needs and nothing it does not. " +
+  "spec.actuators must match the understanding's movers (same kinds and counts; a small linear actuator stays only in the understanding). " +
+  "Keep it a student-sized build unless the user asks for more: one controller, the fewest sensors and movers that do the job. " +
   "Use Western digits (0-9) in Arabic too.";
+
+const U = LIMITS.understanding;
+const partProps = (what: string) => ({
+  name: str(`${what}, at most ${U.name} characters`),
+  count: { type: "INTEGER", description: `1–${U.countMax}` },
+  purpose: str(`What it does in this build, at most ${U.purpose} characters`),
+});
+const partList = (what: string) => ({
+  type: "ARRAY",
+  maxItems: U.items,
+  items: { type: "OBJECT", properties: partProps(what), required: ["name", "count"] },
+});
+
+export const UNDERSTANDING_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    goal: str(`What the build is for, one sentence, at most ${U.goal} characters`),
+    howItWorks: str(`2–4 plain sentences: what it senses, decides and does, at most ${U.how} characters`),
+    controller: str("The one controller board, e.g. Arduino Uno"),
+    sensors: partList("Sensor name"),
+    actuators: {
+      type: "ARRAY",
+      maxItems: U.items,
+      items: {
+        type: "OBJECT",
+        properties: { ...partProps("Mover name, e.g. SG90 micro servo"), kind: enumOf(MOVER_KINDS) },
+        required: ["name", "count", "kind"],
+      },
+    },
+    outputs: partList("Output name, e.g. Buzzer, OLED screen, LED"),
+  },
+  required: ["goal", "howItWorks", "controller", "sensors", "actuators", "outputs"],
+};
 
 export const PRODUCT_SPEC_SCHEMA = {
   type: "OBJECT",
@@ -112,9 +152,10 @@ export const PRODUCT_SPEC_SCHEMA = {
         required: ["kind", "count", "load"],
       },
     },
+    understanding: UNDERSTANDING_SCHEMA,
     quantity: { type: "INTEGER", description: "Always 1" },
   },
-  required: ["name", "oneLine", "use", "power", "environment", "features", "inputs", "outputs", "sizeHint", "style", "quantity"],
+  required: ["name", "oneLine", "use", "power", "environment", "features", "inputs", "outputs", "sizeHint", "style", "understanding", "quantity"],
 };
 
 export const SPEC_RESPONSE_SCHEMA = {
@@ -130,6 +171,21 @@ export const SPEC_RESPONSE_SCHEMA = {
       maxItems: CHANGED_ITEMS,
     },
   },
+};
+/** A turn once the card exists: the whole understanding + spec come back every time (2026-10-18). */
+export const REFINE_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    diff: {
+      type: "ARRAY",
+      maxItems: 8,
+      items: str("One thing the newest message changes versus the current understanding, at most 100 characters"),
+    },
+    spec: PRODUCT_SPEC_SCHEMA,
+    reply: SPEC_RESPONSE_SCHEMA.properties.reply,
+    changed: SPEC_RESPONSE_SCHEMA.properties.changed,
+  },
+  required: ["diff", "spec", "reply", "changed"],
 };
 
 export type ChatMessage = { role: "user" | "assistant"; text: string; choices?: string[] };
@@ -149,20 +205,29 @@ export function specPrompt(opts: {
     : "(none yet)";
   if (opts.current) {
     const change = [...opts.messages].reverse().find((m) => m.role === "user")?.text ?? "";
+    const { understanding, ...card } = opts.current;
     return [
       `Idea:\n${opts.idea || "(see the conversation)"}`,
-      `Conversation so far:\n${history}`,
-      `Current spec:\n${JSON.stringify(opts.current)}`,
-      `The user's latest message: ${change}`,
-      "Return {reply, changed, spec?}. Never return a question. " +
-        "Only when the message asks for a change: include the full updated spec (apply the change, keep everything else as it is) " +
-        "and list what changed. Otherwise leave spec out, changed empty, and just answer in reply. " +
-        "A message that names a reference product to copy ('big robotic arm like a UR10', 'make it like X') IS a change: " +
-        "return the spec of the desktop version with that product's joint/motor count in actuators and a scaleNote when the real " +
-        "thing is far bigger, and list it in changed (e.g. '6 joints'). A question ('what is UR10', 'who made you') is never a change. " +
-        "When you do return a spec, copy every field the user did not ask to change exactly as it is in the current spec " +
-        "(actuators, scaleNote, placement, power…).",
-      `Language for the reply, names and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+      `Our current understanding (shown to the user above the chat):\n${understanding ? JSON.stringify(understanding) : "(none yet — build it now)"}`,
+      `Current spec:\n${JSON.stringify(card)}`,
+      `The whole conversation, oldest first:\n${history}`,
+      `The user's newest message: ${change}`,
+      "Do this on EVERY turn, in order:\n" +
+        "1. Re-read the idea, the whole conversation and the current understanding.\n" +
+        "2. Diff: work out what the newest message, read together with everything said before, changes about the goal, " +
+        "how it works, the controller, the sensors, the movers (servos, small linear actuators, motors, pumps) and the outputs. " +
+        "Earlier requests that still hold stay applied. Put each change in diff (empty when nothing changes).\n" +
+        "3. Rebuild the FULL understanding from the goal down, then the FULL spec from that understanding. Never patch only the " +
+        "field the last message names: if the goal or how it works changes, re-think every part — add the parts the new behaviour " +
+        "needs and drop the parts that no longer serve it. A count change ('4 servos', 'two sensors') changes that part's count " +
+        "and spec.actuators to match.\n" +
+        "4. Return {diff, spec (with spec.understanding), reply, changed}. changed = short labels the user sees (e.g. 'Now 4 servos'). " +
+        "When the message is only a question ('what is UR10', 'who made you') or small talk, return the current understanding and spec " +
+        "copied exactly, diff and changed empty, and answer in reply. " +
+        "Copy the wording of everything that did not change exactly, so only real changes show. " +
+        "A message that names a reference product to copy ('big robotic arm like a UR10') IS a change: rebuild for the desktop " +
+        "version with that product's joint/motor count and a scaleNote when the real thing is far bigger.",
+      `Language for the reply, names, understanding and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
     ].join("\n\n");
   }
   return [
@@ -183,6 +248,8 @@ export const PICK_SYSTEM =
   "Heavy or medium servo joints use the strong metal-gear servo, light ones the small servo; 3 or more servos go on the servo driver board " +
   "and need a supply that can feed them all. " +
   "Exactly one mcu. Choose power parts that match spec.power. Only ids from the list. " +
+  "When spec.understanding lists the controller, sensors, movers and outputs, pick the library parts that match that list " +
+  "(same kinds and counts); a part it lists that the library lacks is left out. " +
   "Return {components:[{partId,label}], reasons:{partId:plainSentence}}. " +
   `Labels are short names for the user (at most ${LABEL_MAX} characters); ` +
   `each reason is one plain sentence (at most ${REASON_MAX} characters) on why the part is there. ` +

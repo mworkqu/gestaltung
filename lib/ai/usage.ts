@@ -12,6 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { dayStart, guardThreshold, providerLimits, type ProviderId } from "./limits";
+import { callCostUsd } from "./prices";
 
 // "studio" (Design Studio, 0068): until 0068 runs the ai_usage check constraint
 // rejects it — logUsage only warns, so the user's call is never affected.
@@ -22,8 +23,8 @@ export type UsageRow = {
   model?: string | null;
   projectId?: string | null;
   feature: Feature;
-  /** Sub-step within a feature (e.g. studio: spec | pick | enclosure | mech). ai_usage has no
-   *  step column yet, so it goes to the server console line only. */
+  /** Sub-step within a feature (e.g. studio: spec | pick | enclosure | mech). Stored in
+   *  ai_usage.step from migration 0088 on; before that, the server console line only. */
   step?: string | null;
   promptTokens?: number | null;
   completionTokens?: number | null;
@@ -46,7 +47,7 @@ export async function logUsage(supabase: SupabaseClient, u: UsageRow): Promise<v
     } ${u.latencyMs ?? "-"}ms${u.remainingRequests != null ? ` remaining-requests=${u.remainingRequests}` : ""}`
   );
   const int = (v: number | null | undefined) => (v == null ? null : Math.round(v));
-  const { error } = await supabase.rpc("log_ai_usage", {
+  const args = {
     p_provider: u.provider,
     p_model: u.model ?? null,
     p_project: u.projectId ?? null,
@@ -60,7 +61,14 @@ export async function logUsage(supabase: SupabaseClient, u: UsageRow): Promise<v
     p_error_code: u.errorCode ?? null,
     p_remaining_requests: int(u.remainingRequests),
     p_remaining_tokens: int(u.remainingTokens),
-  });
+  };
+  // 0088: step + what the call cost at the paid list price (lib/ai/prices.ts).
+  const cost = u.outcome === "blocked" ? 0 : callCostUsd(u);
+  let { error } = await supabase.rpc("log_ai_usage", { ...args, p_step: u.step ?? null, p_cost_usd: cost });
+  // Before 0088 the 15-argument form does not exist: log without step/cost.
+  if (error && (error.code === "PGRST202" || /could not find the function/i.test(error.message ?? ""))) {
+    ({ error } = await supabase.rpc("log_ai_usage", args));
+  }
   if (error) console.warn(`[ai] usage not recorded (run migration 0023?): ${error.message}`);
 }
 

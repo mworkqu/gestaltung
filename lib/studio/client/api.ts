@@ -14,7 +14,10 @@ import { STORE_CARD_COLUMNS, type StoreCardPart } from "@/lib/store/catalog";
 import type { EnclosureSpec, MechPart, Net, ProductSpec, StudioCheck, StudioComponent, StudioDoc } from "@/lib/studio/schema";
 import type { ProductMockOptions } from "@/lib/studio/geometry/protocol";
 import { PROJECT_IMAGE_BUCKET } from "@/lib/projects/constants";
+import type { TokenInfo } from "@/lib/studio/server/tokens";
 import type { IdeaMessage } from "./steps";
+
+export type { TokenInfo };
 
 export type Locale = "en" | "ar";
 
@@ -36,10 +39,11 @@ export type SaveResult =
  * honesty), or — once the card exists (Part A) — a reply with a spec only when the
  * card changed and `changed` = short labels of what changed.
  */
-export type SpecReply =
+export type SpecReply = (
   | { question: string; choices: string[] }
   | { spec: ProductSpec; reply?: string }
-  | { reply: string; spec?: ProductSpec; changed: string[] };
+  | { reply: string; spec?: ProductSpec; changed: string[] }
+) & { tokens?: TokenInfo };
 export type PickReply = { components: StudioComponent[]; docVersion: number | null };
 export type WiringReply = {
   components: StudioComponent[];
@@ -103,6 +107,8 @@ export interface StudioApi {
   readonly projectId: string;
   load(): Promise<LoadResult>;
   save(doc: StudioDoc, version: number): Promise<SaveResult>;
+  /** Ideation token balance + tier (migration 0088); null before it runs or in the mock. */
+  tokens?(): Promise<TokenInfo | null>;
   /** `current` = the card already shown: the last user message refines it (W3). */
   spec(body: { idea: string; messages: IdeaMessage[]; locale: Locale; current?: ProductSpec | null }): Promise<Res<SpecReply>>;
   pick(spec: ProductSpec, locale: Locale): Promise<Res<PickReply>>;
@@ -244,6 +250,15 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     spec: ({ idea, messages, locale, current }) => postJson("/api/studio/spec", { projectId, locale, idea, messages, current: current ?? null }),
+    async tokens() {
+      try {
+        const res = await fetch(`/api/studio/tokens?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
+        const body = (await res.json().catch(() => ({}))) as { tokens?: TokenInfo | null };
+        return res.ok ? (body.tokens ?? null) : null;
+      } catch {
+        return null;
+      }
+    },
     pick: (spec, locale) => postJson("/api/studio/pick", { projectId, locale, spec }),
     wiring: (spec, components, locale) => postJson("/api/studio/wiring", { projectId, locale, spec, components }),
     enclosure: (spec, components, bbox, locale) =>

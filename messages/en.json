@@ -383,7 +383,8 @@
     "listPrev": "Previous",
     "listNext": "Next",
     "listSearch": "Search",
-    "listSearchProducts": "Search by name or SKU"
+    "listSearchProducts": "Search by name or SKU",
+    "aiCosts": "AI costs"
   },
   "Notifications": {
     "kicker": "Settings",
@@ -4597,6 +4598,45 @@
         "guide": "Open wokwi.com → new project → upload these 2 files",
         "failed": "We couldn't make the file. Try again."
       }
+    },
+    "understanding": {
+      "title": "Our understanding",
+      "note": "Check this is right. Tell us in the chat what to change and we rebuild it.",
+      "empty": "We'll fill this in as soon as we understand your idea.",
+      "old": "Send any message to build the full understanding of this idea.",
+      "learning": "Updating our understanding…",
+      "goal": "Goal",
+      "how": "How it works",
+      "parts": "Parts",
+      "controller": "Controller",
+      "sensors": "Sensors",
+      "actuators": "Servos & actuators",
+      "outputs": "Outputs",
+      "none": "None",
+      "count": "{controllers} controller · {sensors} sensors · {movers} servos/actuators",
+      "kind_servo": "servo",
+      "kind_linear_actuator": "linear actuator",
+      "kind_motor": "motor",
+      "kind_pump": "pump",
+      "kind_stepper": "stepper"
+    },
+    "tiers": {
+      "explorer": "Explorers",
+      "maker": "Makers",
+      "engineer": "Engineers",
+      "level": "{tier} level",
+      "explorer_blurb": "Starter build: 1 controller, up to 3 sensors, up to 2 servos or small actuators.",
+      "maker_blurb": "Bigger build: up to 6 sensors and 4 servos or actuators. Tokens cost ×{m}.",
+      "engineer_blurb": "Advanced build: more parts than a Makers build. Tokens cost ×{m}."
+    },
+    "tokens": {
+      "balance": "Ideation tokens: {n}",
+      "admin": "Ideation tokens: unlimited (admin)",
+      "rule": "New idea: {idea} · edits: {cost} every {every} messages · next in {next}",
+      "tierUp": "Your build grew to the {tier} level. Ideation tokens now cost ×{m}.",
+      "tierDown": "Your build is back to the {tier} level. Ideation tokens cost ×{m}.",
+      "empty": "You've used your ideation tokens. Contact us and we'll top you up.",
+      "contact": "Contact us"
     }
   },
   "StudioLibrary": {
@@ -4753,5 +4793,50 @@
   "StudioPreview": {
     "alt": "Picture of your chosen design",
     "altNamed": "Picture of the chosen design for {name}"
+  },
+  "AiCosts": {
+    "kicker": "AI costs",
+    "title": "AI costs per user",
+    "intro": "Every user, their projects, the ideation tokens they spent and what the AI calls cost us. Click a user to see each project and call.",
+    "priceNote": "Costs are at the provider's paid list price (lib/ai/prices.ts). While we stay on Gemini's free tier the actual bill is $0.",
+    "needsMigration": "Run migration 0088 to see AI costs.",
+    "loadError": "Could not load AI costs. Try again.",
+    "searchPlaceholder": "Search by email or name",
+    "search": "Search",
+    "clear": "Clear",
+    "users": "Users",
+    "calls": "Calls",
+    "tokensIn": "Input tokens",
+    "tokensOut": "Output tokens",
+    "totalCost": "Total cost (USD)",
+    "cost": "Cost (USD)",
+    "ideaUsed": "Idea tokens used",
+    "ideaBalance": "Idea tokens balance",
+    "usersTitle": "Users by cost",
+    "noUsers": "No users yet.",
+    "user": "User",
+    "projects": "Projects",
+    "lastCall": "Last call",
+    "guest": "Guest",
+    "guestFlag": "Guest",
+    "back": "Back to AI costs",
+    "projectsTitle": "Projects",
+    "project": "Project",
+    "created": "Created",
+    "tier": "Tier",
+    "editTurns": "Edit turns",
+    "untitled": "Untitled",
+    "noProjects": "No projects.",
+    "noProjectRow": "Calls with no project",
+    "tier_explorer": "Explorers",
+    "tier_maker": "Makers",
+    "tier_engineer": "Engineers",
+    "perModel": "Per model",
+    "model": "Model",
+    "noCalls": "No calls yet.",
+    "lastCalls": "Last {count} calls",
+    "time": "Time (Qatar)",
+    "featureStep": "Feature / step",
+    "outcome": "Outcome"
   }
 }

@@ -23,12 +23,13 @@
 // empty messages get a canned reply from chatGuardTurn() without a model call. The
 // first card may carry a reply too (scope honesty: "a real UR10 is 1.3 m...").
 
-import { clampSpec, type ClampLog, type ProductSpec } from "../schema";
+import { ACTUATOR_KINDS, clampSpec, type ClampLog, type ProductSpec } from "../schema";
 import { chatGuardTurn, guardSpec, vagueTurn } from "./spec-guards";
-import { actuatorCountLabel, actuatorTotals, capStrongServos } from "../actuators";
+import { actuatorCountLabel, actuatorTotals, capStrongServos, setActuatorCount } from "../actuators";
 import { outcomeCached, specKey, type AiCache } from "./cache";
 import {
-  CHANGED_ITEMS, CHANGED_MAX, CHOICE_MAX, MAX_QUESTIONS, QUESTION_MAX, REPLY_MAX, SPEC_RESPONSE_SCHEMA, SPEC_SYSTEM, specPrompt,
+  CHANGED_ITEMS, CHANGED_MAX, CHOICE_MAX, MAX_QUESTIONS, QUESTION_MAX, REFINE_RESPONSE_SCHEMA, REPLY_MAX, SPEC_RESPONSE_SCHEMA, SPEC_SYSTEM,
+  specPrompt,
   type ChatMessage,
 } from "./prompts";
 import { cut, isObj, type Outcome, type StudioCall } from "./types";
@@ -38,7 +39,7 @@ export type SpecTurn =
   /** The first card (before it existed); `reply` only when there is something to say (scope honesty). */
   | { kind: "spec"; spec: ProductSpec; reply?: string }
   /** Part A: a turn once the card exists. No `spec` = the card is untouched. */
-  | { kind: "reply"; reply: string; spec?: ProductSpec; changed: string[] };
+  | { kind: "reply"; reply: string; spec?: ProductSpec; changed: string[]; diff?: string[] };
 
 /** How a turn is asked: a question may come back, the spec is due, or the card exists (refine). */
 export type TurnMode = "ask" | "force" | "refine";
@@ -131,8 +132,9 @@ export function validateTurn(
     const reply = cleanReply(raw.reply, locale, turnLog);
     if (!reply) return { value: null, errors: ["reply is required: one or two plain sentences answering the user's message"] };
     opts.log.push(...turnLog);
-    if (!spec) return { value: { kind: "reply", reply, changed: [] }, errors: [] };
-    return { value: { kind: "reply", reply, spec, changed: cleanChanged(raw.changed) }, errors: [] };
+    const diff = (Array.isArray(raw.diff) ? raw.diff : []).map((d) => cut(d, 100)).filter(Boolean).slice(0, 8);
+    if (!spec) return { value: { kind: "reply", reply, changed: [], ...(diff.length ? { diff } : {}) }, errors: [] };
+    return { value: { kind: "reply", reply, spec, changed: cleanChanged(raw.changed), ...(diff.length ? { diff } : {}) }, errors: [] };
   }
   if (spec) {
     const reply = cleanReply(raw.reply, locale, turnLog);
@@ -153,6 +155,17 @@ export function validateTurn(
   return { value: { kind: "question", question, choices }, errors: [] };
 }
 
+/**
+ * A turn our own rules answer without a model call (free — no ideation token):
+ * "hi", "thanks", "are you stupid", an emoji, "?" get a canned answer; a vague idea
+ * ("something with Arduino") gets one short question with chips.
+ */
+export function ruleTurn(idea: string, messages: ChatMessage[], locale: "en" | "ar", current: ProductSpec | null): SpecTurn | null {
+  const canned = chatGuardTurn(idea, messages, locale, Boolean(current));
+  if (canned) return canned;
+  return current ? null : vagueTurn(idea, messages, locale);
+}
+
 export async function runSpecChat(opts: {
   call: StudioCall;
   idea: string;
@@ -166,15 +179,8 @@ export async function runSpecChat(opts: {
   const ctx = { idea: opts.idea, messages: opts.messages, locale: opts.locale };
   const current = opts.current ?? null;
 
-  // "hi", "thanks", "are you stupid", an emoji, "?": a canned answer, no model call, no card change.
-  const canned = chatGuardTurn(opts.idea, opts.messages, opts.locale, Boolean(current));
-  if (canned) return { ok: true, value: canned, source: "rules", clampLog: [], problems: [] };
-
-  // A vague idea ("something with Arduino"): one short question with chips, no model call.
-  if (!current) {
-    const vague = vagueTurn(opts.idea, opts.messages, opts.locale);
-    if (vague) return { ok: true, value: vague, source: "rules", clampLog: [], problems: [] };
-  }
+  const rules = ruleTurn(opts.idea, opts.messages, opts.locale, current);
+  if (rules) return { ok: true, value: rules, source: "rules", clampLog: [], problems: [] };
 
   const key = specKey({ idea: opts.idea, messages: opts.messages, locale: opts.locale, current });
   return outcomeCached(opts.cache, key, () => modelTurn(opts, ctx, current));
@@ -191,7 +197,8 @@ async function modelTurn(
     step: "spec",
     system: SPEC_SYSTEM,
     prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, forceSpec: mode === "force", current }),
-    schema: SPEC_RESPONSE_SCHEMA,
+    // 2026-10-18: once the card exists the whole understanding + spec come back on every turn.
+    schema: mode === "refine" ? REFINE_RESPONSE_SCHEMA : SPEC_RESPONSE_SCHEMA,
     validate: (raw) => {
       // Only the accepted attempt's changes are kept.
       const attempt: ClampLog = [];
@@ -201,7 +208,7 @@ async function modelTurn(
     },
   });
   const guard = (spec: ProductSpec, into: ClampLog) => {
-    const guarded = guardSpec(spec, ctx, into).spec;
+    const guarded = guardSpec(syncMovers(spec, into), ctx, into).spec;
     // Part F: a 4th strong servo would take the 5 A supply over budget (power rule).
     const capped = capStrongServos(guarded);
     if (capped !== guarded) into.push({ path: "actuators", from: guarded.actuators, to: capped.actuators });
@@ -251,11 +258,45 @@ export function keepCardFields(spec: ProductSpec, current: ProductSpec, lastUser
   if (current.actuators?.length && !spec.actuators?.length && !DROPS_MOVERS.test(lastUser)) {
     log.push({ path: "actuators", from: spec.actuators ?? null, to: current.actuators });
     out = { ...out, actuators: current.actuators };
+    // The understanding lost its movers the same way: bring them back too (syncMovers would drop them again).
+    if (out.understanding && current.understanding && !out.understanding.actuators.length) {
+      out = { ...out, understanding: { ...out.understanding, actuators: current.understanding.actuators } };
+    }
+  }
+  if (current.understanding && !spec.understanding) {
+    log.push({ path: "understanding", from: null, to: "kept" });
+    out = { ...out, understanding: current.understanding };
   }
   if (current.scaleNote && !spec.scaleNote) {
     log.push({ path: "scaleNote", from: null, to: current.scaleNote });
     out = { ...out, scaleNote: current.scaleNote };
   }
+  return out;
+}
+
+/**
+ * 2026-10-18: the understanding is what the user confirms, so its movers win: spec.actuators
+ * (which the part picker counts) gets the same servo / motor / pump / stepper totals.
+ * Small linear actuators have no spec kind and stay in the understanding only.
+ */
+export function syncMovers(spec: ProductSpec, log: ClampLog = []): ProductSpec {
+  const u = spec.understanding;
+  if (!u) return spec;
+  let out = spec;
+  for (const kind of ACTUATOR_KINDS) {
+    const want = u.actuators.filter((a) => a.kind === kind).reduce((s, a) => s + a.count, 0);
+    const have = actuatorTotals(out).find((t) => t.kind === kind)?.count ?? 0;
+    if (want === have) continue;
+    if (want === 0) {
+      const rest = (out.actuators ?? []).filter((a) => a.kind !== kind);
+      const { actuators: _drop, ...noActuators } = out;
+      void _drop;
+      out = rest.length ? { ...out, actuators: rest } : noActuators;
+    } else {
+      out = setActuatorCount(out, kind, want);
+    }
+  }
+  if (out !== spec) log.push({ path: "actuators", from: spec.actuators ?? null, to: out.actuators ?? null });
   return out;
 }
 
@@ -278,6 +319,7 @@ function finish(
 ): SpecTurn {
   if (turn.kind === "question") return turn;
   if (turn.kind === "spec") return { ...turn, spec: guard(turn.spec, log) };
+  if (turn.diff?.length) log.push({ path: "diff", from: null, to: turn.diff });
   if (!turn.spec || !current) return { kind: "reply", reply: turn.reply, changed: [] };
   // A question that came back with a card but no change label: the card stays.
   if (!turn.changed.length && isQuestionOnly(lastUser)) {

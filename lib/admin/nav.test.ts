@@ -34,6 +34,7 @@ const OLD_ROUTES = [
   "/dashboard/store/suppliers/lookup",
   "/dashboard/store/suppliers/voltaat",
   "/dashboard/usage",
+  "/dashboard/ai-costs",
   "/dashboard/notifications",
   "/inventory",
 ];
@@ -60,6 +61,7 @@ describe("admin nav groups", () => {
         "/dashboard/store/gaps",
         "/dashboard/store/youtube",
         "/dashboard/usage",
+        "/dashboard/ai-costs",
         "/dashboard/notifications",
         "/dashboard/contact",
         "/inventory",

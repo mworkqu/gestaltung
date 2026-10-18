@@ -36,6 +36,8 @@ export const SIZE_HINTS = ["pocket", "palm", "desk", "large"] as const;
 export const ACTUATOR_KINDS = ["servo", "motor", "pump", "stepper"] as const;
 export const ACTUATOR_LOADS = ["light", "medium", "heavy"] as const;
 export const STYLES = ["rounded", "soft_tech", "rugged", "minimal"] as const;
+/** The understanding panel's movers (2026-10-18): linear_actuator has no spec.actuators kind (understanding only). */
+export const MOVER_KINDS = ["servo", "linear_actuator", "motor", "pump", "stepper"] as const;
 
 export const CATEGORIES = [
   "mcu", "power", "sensor", "display", "input", "output", "actuator", "connector",
@@ -91,6 +93,7 @@ export type SizeHint = (typeof SIZE_HINTS)[number];
 export type Style = (typeof STYLES)[number];
 export type Placement = (typeof PLACEMENTS)[number];
 export type ActuatorKind = (typeof ACTUATOR_KINDS)[number];
+export type MoverKind = (typeof MOVER_KINDS)[number];
 export type ActuatorLoad = (typeof ACTUATOR_LOADS)[number];
 export type Category = (typeof CATEGORIES)[number];
 export type Look = (typeof LOOKS)[number];
@@ -115,6 +118,8 @@ export const LIMITS = {
   features: { max: 8, itemMax: 60 },
   /** Part B: at most 4 actuator groups, each 1..8 of the same kind ("servo × 6"). */
   actuators: { max: 4, countMin: 1, countMax: 8, roleMax: 40 },
+  /** "Our understanding" panel (2026-10-18): goal, how it works, the parts it needs. */
+  understanding: { goal: 220, how: 600, name: 50, purpose: 100, items: 6, countMax: 8 },
   widthToDepth: { min: 0.5, max: 2.5 },
   cornerRadius: { min: 3, max: 20 },
   edgeFillet: { min: 1, max: 6 },
@@ -143,6 +148,31 @@ export const ActuatorSchema = z.object({
 });
 export type Actuator = z.infer<typeof ActuatorSchema>;
 
+/** One line of the understanding's parts list: "Soil moisture sensor ×2 — tells when the pot is dry". */
+const U = LIMITS.understanding;
+export const UnderstandingPartSchema = z.object({
+  name: z.string().min(1).max(U.name),
+  count: z.number().int().min(1).max(U.countMax),
+  purpose: z.string().max(U.purpose).optional(),
+});
+export const UnderstandingMoverSchema = UnderstandingPartSchema.extend({ kind: z.enum(MOVER_KINDS) });
+
+/**
+ * The agent's full understanding of the idea (2026-10-18), rebuilt on every chat turn and
+ * shown above the chat so the user can confirm it. Tiers are counted from it (lib/studio/tiers.ts).
+ */
+export const UnderstandingSchema = z.object({
+  goal: z.string().max(U.goal),
+  howItWorks: z.string().max(U.how),
+  controller: z.string().max(U.name),
+  sensors: z.array(UnderstandingPartSchema).max(U.items),
+  actuators: z.array(UnderstandingMoverSchema).max(U.items),
+  outputs: z.array(UnderstandingPartSchema).max(U.items),
+});
+export type Understanding = z.infer<typeof UnderstandingSchema>;
+export type UnderstandingPart = z.infer<typeof UnderstandingPartSchema>;
+export type UnderstandingMover = z.infer<typeof UnderstandingMoverSchema>;
+
 export const ProductSpecSchema = z.object({
   name: z.string().min(LIMITS.name.min).max(LIMITS.name.max),
   oneLine: z.string().max(LIMITS.oneLine.max),
@@ -159,6 +189,8 @@ export const ProductSpecSchema = z.object({
   scaleNote: z.string().max(LIMITS.scaleNote.max).optional(),
   /** Part B: how many motors / servos / pumps, when it is more than "one of something" (max 4 groups). */
   actuators: z.array(ActuatorSchema).max(LIMITS.actuators.max).optional(),
+  /** 2026-10-18: the "Our understanding" panel. Absent on cards made before it. */
+  understanding: UnderstandingSchema.optional(),
   quantity: z.literal(1),
 });
 export type ProductSpec = z.infer<typeof ProductSpecSchema>;
@@ -542,6 +574,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   if (o.placement !== undefined && o.placement !== null && o.placement !== "" && !placement) log.push({ path: "placement", from: o.placement, to: null });
   const scaleNote = typeof o.scaleNote === "string" && o.scaleNote.trim() ? clampStr(o.scaleNote, LIMITS.scaleNote.max, "", "scaleNote", log) : "";
   const actuators = clampActuators(o.actuators, log);
+  const understanding = clampUnderstanding(o.understanding, log);
   return {
     name,
     oneLine: typeof o.oneLine === "string" && o.oneLine.trim() ? clampStr(o.oneLine, LIMITS.oneLine.max, "", "oneLine", log) : "",
@@ -556,8 +589,62 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
     ...(placement ? { placement: placement as Placement } : {}),
     ...(scaleNote ? { scaleNote } : {}),
     ...(actuators.length ? { actuators } : {}),
+    ...(understanding ? { understanding } : {}),
     quantity: 1,
   };
+}
+
+/** Any value → a valid Understanding, or undefined when there is nothing usable. */
+export function clampUnderstanding(v: unknown, log: ClampLog = []): Understanding | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!isObj(v)) {
+    log.push({ path: "understanding", from: v, to: null });
+    return undefined;
+  }
+  const text = (x: unknown, max: number) => (typeof x === "string" ? x.replace(/\s+/g, " ").trim().slice(0, max) : "");
+  const part = (x: unknown): UnderstandingPart | null => {
+    if (!isObj(x)) return null;
+    const name = text(x.name, U.name);
+    if (!name) return null;
+    const n = Math.round(Number(x.count));
+    const purpose = text(x.purpose, U.purpose);
+    return { name, count: Number.isFinite(n) ? Math.min(U.countMax, Math.max(1, n)) : 1, ...(purpose ? { purpose } : {}) };
+  };
+  const list = (x: unknown, path: string): UnderstandingPart[] => {
+    if (!Array.isArray(x)) return [];
+    const out = x.map(part).filter((p): p is UnderstandingPart => p !== null).slice(0, U.items);
+    if (out.length !== x.length) log.push({ path: `understanding.${path}`, from: x.length, to: out.length });
+    return out;
+  };
+  const movers: UnderstandingMover[] = Array.isArray(v.actuators)
+    ? v.actuators
+        .map((x) => {
+          const p = part(x);
+          if (!p || !isObj(x)) return null;
+          const raw = typeof x.kind === "string" ? x.kind.trim().toLowerCase().replace(/[\s-]+/g, "_") : "";
+          const kind = (MOVER_KINDS as readonly string[]).includes(raw)
+            ? (raw as MoverKind)
+            : /linear/.test(raw) || /linear/i.test(p.name)
+              ? "linear_actuator"
+              : /pump/.test(raw)
+                ? "pump"
+                : /stepper/.test(raw)
+                  ? "stepper"
+                  : /motor/.test(raw)
+                    ? "motor"
+                    : "servo";
+          return { ...p, kind };
+        })
+        .filter((p): p is UnderstandingMover => p !== null)
+        .slice(0, U.items)
+    : [];
+  const goal = text(v.goal, U.goal);
+  const howItWorks = text(v.howItWorks, U.how);
+  const controller = text(v.controller, U.name);
+  const sensors = list(v.sensors, "sensors");
+  const outputs = list(v.outputs, "outputs");
+  if (!goal && !howItWorks && !controller && !sensors.length && !movers.length && !outputs.length) return undefined;
+  return { goal, howItWorks, controller, sensors, actuators: movers, outputs };
 }
 
 export const DEFAULT_ENCLOSURE: EnclosureSpec = {
