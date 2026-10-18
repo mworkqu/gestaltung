@@ -1,2 +1,3 @@
 # Python services deploy separately (Cloud Run); keep them out of the Vercel upload.
-services/
+# Leading slash: only the top-level folder, not lib/services or components/services.
+/services/
