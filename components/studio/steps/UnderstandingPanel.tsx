@@ -9,8 +9,10 @@
 import { useTranslations } from "next-intl";
 import { ChevronDown, Cpu, Gauge, Lightbulb, Move } from "lucide-react";
 
-import type { ProductSpec, UnderstandingMover, UnderstandingPart } from "@/lib/studio/schema";
+import type { ProductSpec, Understanding, UnderstandingMover, UnderstandingPart } from "@/lib/studio/schema";
 import { countParts, tierOf } from "@/lib/studio/tiers";
+import { isLight } from "@/lib/studio/card-parts";
+import { arabicCountForm } from "@/lib/text/count";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { cn } from "@/lib/utils";
 import { Bar } from "../ui";
@@ -98,11 +100,7 @@ export function UnderstandingPanel({
                 <h3 className="text-sm font-bold text-heading">{t("understanding.parts")}</h3>
                 {count && (
                   <p className="font-mono text-[11px] tabular-nums text-mutedtext rtl:font-sans" data-testid="studio-part-count">
-                    {t("understanding.count", {
-                      controllers: String(count.controllers),
-                      sensors: String(count.sensors),
-                      movers: String(count.movers),
-                    })}
+                    {tally(u).map(([key, n]) => t(`understanding.cnt_${key}`, { count: String(n), form: arabicCountForm(n) })).join(" · ")}
                   </p>
                 )}
               </div>
@@ -128,6 +126,17 @@ export function UnderstandingPanel({
       </div>
     </section>
   );
+}
+
+/** "1 controller · 1 sensor · 1 pump · 3 lights": every kind of part on the card, zeros left out. */
+function tally(u: Understanding): [string, number][] {
+  const out = new Map<string, number>();
+  const add = (k: string, n: number) => n > 0 && out.set(k, (out.get(k) ?? 0) + n);
+  add("controller", u.controller ? 1 : 0);
+  add("sensor", u.sensors.reduce((s, x) => s + x.count, 0));
+  for (const a of u.actuators) add(a.kind, a.count);
+  for (const o of u.outputs) add(isLight(o.name) ? "light" : "output", o.count);
+  return [...out.entries()];
 }
 
 function Field({ label, text }: { label: string; text: string }) {

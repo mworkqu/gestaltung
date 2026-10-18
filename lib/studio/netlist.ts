@@ -96,6 +96,17 @@ const isAnalog = (p: LibraryPart) => tagged(p, ["analog", "analogue"]);
 /** Helper part ids we add when the library has them (skipped silently otherwise). */
 export const LEVEL_SHIFTER_IDS = ["level_shifter_4ch", "level_shifter"] as const;
 export const DRIVER_IDS = ["mosfet_driver", "mosfet_module", "motor_driver", "relay_module"] as const;
+/** On/off switches (MOSFET) vs direction + speed (H-bridge). */
+export const SWITCH_DRIVER_IDS = ["mosfet_module", "mosfet_driver"] as const;
+export const HBRIDGE_DRIVER_IDS = ["motor_driver"] as const;
+/**
+ * A load that only ever switches on and off (one direction): a pump, fan, solenoid or
+ * relay coil gets a MOSFET switch; a motor that may need to reverse keeps the H-bridge.
+ */
+export const isOnOffLoad = (p: LibraryPart) => tagged(p, ["pump", "fan", "solenoid", "relay_coil", "coil"]);
+export const isHBridge = (p: LibraryPart) => tagged(p, ["h-bridge", "h_bridge", "motor_driver"]);
+/** Does this driver suit that load? (MOSFET for on/off loads, H-bridge for motors.) */
+export const driverSuits = (driver: LibraryPart, load: LibraryPart) => (isOnOffLoad(load) ? !isHBridge(driver) : isHBridge(driver));
 export const BOOSTER_IDS = ["boost_5v"] as const;
 
 // ── Entries ─────────────────────────────────────────────────────────────────
@@ -374,12 +385,27 @@ export function resolveRequired(
   };
   const firstFound = (ids: readonly string[]) => ids.map(getPart).find((p): p is LibraryPart => !!p);
 
-  // 1. Drivers for inductive loads (motor, pump, solenoid, bare relay coil).
+  // 1. Drivers for inductive loads (motor, pump, solenoid, bare relay coil): a MOSFET switch
+  //    for a load that only switches on/off, an H-bridge for a motor (owner, 2026-10-18).
   const ents = () => entriesOf(out, getPart);
-  const loads = ents().filter((e) => isInductive(e.p)).length;
-  const drivers = ents().filter((e) => isDriver(e.p)).length;
-  const driver = firstFound(DRIVER_IDS);
-  if (driver) for (let i = drivers; i < loads; i++) add(driver, "driver");
+  {
+    const free = ents().filter((e) => isDriver(e.p));
+    const needs: LibraryPart[] = [];
+    // On/off loads first, so a matching driver already in the list goes to the load it suits.
+    const loads = ents().filter((e) => isInductive(e.p)).sort((a, b) => Number(isOnOffLoad(b.p)) - Number(isOnOffLoad(a.p)));
+    for (const load of loads) {
+      const i = free.findIndex((d) => driverSuits(d.p, load.p));
+      if (i >= 0) free.splice(i, 1);
+      else if (free.length) free.shift();
+      else needs.push(load.p);
+    }
+    for (const load of needs) {
+      const driver = isOnOffLoad(load)
+        ? firstFound(SWITCH_DRIVER_IDS) ?? firstFound(DRIVER_IDS)
+        : firstFound(HBRIDGE_DRIVER_IDS) ?? firstFound(DRIVER_IDS);
+      if (driver) add(driver, "driver");
+    }
+  }
 
   // 1b. A 5 V booster when a battery can't reach what a part needs and no converter is there.
   const booster = firstFound(BOOSTER_IDS);
@@ -588,7 +614,8 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
   const driverOf = new Map<string, Entry>();
   const loadOf = new Map<string, Entry>();
   for (const load of entries.filter((e) => isInductive(e.p))) {
-    const d = entries.find((x) => isDriver(x.p) && !loadOf.has(x.c.instanceId));
+    const open = (x: Entry) => isDriver(x.p) && !loadOf.has(x.c.instanceId);
+    const d = entries.find((x) => open(x) && driverSuits(x.p, load.p)) ?? entries.find(open);
     if (!d) continue;
     driverOf.set(load.c.instanceId, d);
     loadOf.set(d.c.instanceId, load);

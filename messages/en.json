@@ -4156,7 +4156,7 @@
       "card_hint_power": "How it's powered",
       "card_hint_size": "How big it is",
       "updatedChip": "Card updated",
-      "refinePlaceholder": "Change anything or ask, e.g. “make it solar”",
+      "refinePlaceholder": "Change or ask anything",
       "updateParts": "Update my parts",
       "updatePartsNote": "Your parts were picked for the old card. Tap Update my parts and we'll pick them again.",
       "act_servo": "{form, select, one {1 joint} other {{count} joints}} · servo motors",
@@ -4620,15 +4620,23 @@
       "parts": "Parts",
       "controller": "Controller",
       "sensors": "Sensors",
-      "actuators": "Servos & actuators",
+      "actuators": "Motors & pumps",
       "outputs": "Outputs",
       "none": "None",
-      "count": "{controllers} controller · {sensors} sensors · {movers} servos/actuators",
       "kind_servo": "servo",
       "kind_linear_actuator": "linear actuator",
       "kind_motor": "motor",
       "kind_pump": "pump",
-      "kind_stepper": "stepper"
+      "kind_stepper": "stepper",
+      "cnt_controller": "{form, select, one {1 controller} other {{count} controllers}}",
+      "cnt_sensor": "{form, select, one {1 sensor} other {{count} sensors}}",
+      "cnt_servo": "{form, select, one {1 servo} other {{count} servos}}",
+      "cnt_motor": "{form, select, one {1 motor} other {{count} motors}}",
+      "cnt_pump": "{form, select, one {1 pump} other {{count} pumps}}",
+      "cnt_linear_actuator": "{form, select, one {1 linear actuator} other {{count} linear actuators}}",
+      "cnt_stepper": "{form, select, one {1 stepper motor} other {{count} stepper motors}}",
+      "cnt_light": "{form, select, one {1 light} other {{count} lights}}",
+      "cnt_output": "{form, select, one {1 output} other {{count} outputs}}"
     },
     "tiers": {
       "explorer": "Explorers",
@@ -4650,7 +4658,9 @@
       "pass": "Maker Pass until {date}",
       "get": "Get tokens"
     },
-    "engineeringView": "Engineering view"
+    "engineeringView": "Engineering view",
+    "partsOnRequestPlus": "+ {form, select, one {1 part priced on request} other {{count} parts priced on request}}",
+    "partsOnRequestOnly": "{form, select, one {1 part priced on request} other {{count} parts priced on request}}"
   },
   "StudioLibrary": {
     "pageTitle": "Studio parts",

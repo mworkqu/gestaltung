@@ -13,7 +13,7 @@ const phase1Ids = ["esp32_devkit", "arduino_uno", "cell_18650", "tp4056_usbc", "
 const phase2Ids = [
   "esp32_c3_mini", "pico_w", "arduino_nano", "aa_holder_2", "lipo_1000", "usbc_power_5v", "boost_5v", "buck_converter",
   "hcsr04", "bh1750", "soil_moisture_cap", "mpu6050", "ds18b20", "ldr_module", "oled_13_i2c", "lcd1602_i2c",
-  "ws2812_ring", "buzzer", "speaker_amp", "relay_module", "sg90_servo", "n20_motor", "motor_driver",
+  "ws2812_ring", "buzzer", "speaker_amp", "relay_module", "sg90_servo", "n20_motor", "motor_driver", "mosfet_module",
   "rotary_encoder", "slide_switch", "microsd_module", "rtc_ds3231", "usbc_breakout", "level_shifter_4ch",
 ];
 // W3: the water pump the idea guards add for "automatic watering".

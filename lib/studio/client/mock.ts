@@ -20,6 +20,7 @@ import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/
 import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
 import { mockOptionsFromUrl } from "./product";
 import { forModel, sameSpec } from "./steps";
+import { cardItems } from "@/lib/studio/card-parts";
 import { actuatorCountIn, actuatorCountLabel, actuatorTotals, setActuatorCount } from "@/lib/studio/actuators";
 
 /**
@@ -166,6 +167,10 @@ function mockUnderstood(spec: ProductSpec, locale: Locale): ProductSpec {
     count,
     kind,
   }));
+  // A pump on the card is a mover in the understanding (as the real model lists it).
+  if (spec.outputs.includes("pump") && !movers.some((m) => m.kind === "pump")) {
+    movers.push({ name: ar ? "مضخة ماء 5 فولت" : "5V water pump", count: 1, kind: "pump" });
+  }
   return {
     ...spec,
     understanding: {
@@ -174,7 +179,13 @@ function mockUnderstood(spec: ProductSpec, locale: Locale): ProductSpec {
       controller: "Arduino Uno",
       sensors: [plant ? { name: ar ? "حساس رطوبة التربة" : "Soil moisture sensor", count: 1 } : { name: ar ? "حساس حركة" : "Motion sensor", count: 1 }],
       actuators: movers,
-      outputs: spec.outputs.filter((o) => o !== "pump" && o !== "motor").map((o) => ({ name: o, count: 1 })),
+      // "3 LEDs" said in the chat (kept as a feature by the mock refine) → the lights' count.
+      outputs: spec.outputs
+        .filter((o) => o !== "pump" && o !== "motor")
+        .map((o) => {
+          const n = o === "led" ? Number(spec.features.map((f) => /(\d+)\s*(?:leds?|lights?|أضواء)/i.exec(f)?.[1]).find(Boolean) ?? 1) : 1;
+          return { name: o === "led" ? (ar ? "أضواء LED" : "LEDs") : o, count: n };
+        }),
     },
   };
 }
@@ -208,6 +219,15 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
         // Part B: "make it 4 joints" / "2 pumps" sets that count on the card.
         const asked = actuatorCountIn(last);
         if (asked) next = setActuatorCount(next, asked.kind, asked.count);
+        // "add 3 LEDs": the lights become an output with their count (as the real model does).
+        const leds = /(\d+)\s*(?:leds?|lights?|أضواء)/i.exec(last);
+        if (leds) {
+          next = {
+            ...next,
+            outputs: next.outputs.includes("led") ? next.outputs : [...next.outputs, "led"],
+            features: [...next.features.filter((f) => !/(\d+)\s*(?:leds?|lights?|أضواء)/i.test(f)), `${leds[1]} LEDs`].slice(0, 8),
+          };
+        }
         next = mockUnderstood(next, locale);
         if (sameSpec(next, current)) return { ok: true, data: { reply: MOCK_REPLY[locale].nothing, changed: [] } };
         const changed =
@@ -272,6 +292,14 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       for (const id of specParts(spec)) {
         const part = getPart(id);
         if (part && !picked.some((c) => c.partId === id)) picked.splice(1, 0, { partId: id, instanceId: `${id}_1`, label: part.name[locale] });
+      }
+      // Everything on the card (3 LEDs, the soil sensor…), as the server's enforcePick adds it.
+      for (const item of cardItems(spec)) {
+        const id = item.ids.find((x) => getPart(x));
+        if (!id) continue;
+        const have = picked.filter((c) => item.ids.includes(c.partId)).length;
+        const want = item.key === "servo" ? Math.min(item.count, 1) : item.count;
+        for (let i = have; i < want; i++) picked.push({ partId: id, instanceId: `${id}_${i + 1}`, label: getPart(id)!.name[locale] });
       }
       // Part D: the same actuator rules as the server (servo count, driver, 5 A supply).
       const index = libraryIndexForAI();

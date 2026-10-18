@@ -4156,7 +4156,7 @@
       "card_hint_power": "كيف يعمل بالطاقة",
       "card_hint_size": "ما حجمه",
       "updatedChip": "تم تحديث البطاقة",
-      "refinePlaceholder": "غيّر أي شيء أو اسأل، مثلاً «اجعله يعمل بالطاقة الشمسية»",
+      "refinePlaceholder": "غيّر أو اسأل أي شيء",
       "updateParts": "حدّث قطعي",
       "updatePartsNote": "اخترنا قطعك للبطاقة القديمة. اضغط «حدّث قطعي» وسنختارها من جديد.",
       "act_servo": "{form, select, one {مفصل واحد} two {مفصلان} few {{count} مفاصل} other {{count} مفصلًا}} · محركات سيرفو",
@@ -4620,15 +4620,23 @@
       "parts": "القطع",
       "controller": "المتحكّم",
       "sensors": "الحساسات",
-      "actuators": "السيرفو والمشغّلات",
+      "actuators": "المحرّكات والمضخات",
       "outputs": "المخرجات",
       "none": "لا يوجد",
-      "count": "متحكّم: {controllers} · حساسات: {sensors} · سيرفو/مشغّلات: {movers}",
       "kind_servo": "سيرفو",
       "kind_linear_actuator": "مشغّل خطّي",
       "kind_motor": "محرّك",
       "kind_pump": "مضخة",
-      "kind_stepper": "محرّك خطوي"
+      "kind_stepper": "محرّك خطوي",
+      "cnt_controller": "{form, select, one {متحكّم واحد} two {متحكّمان} few {{count} متحكّمات} other {{count} متحكّماً}}",
+      "cnt_sensor": "{form, select, one {حساس واحد} two {حساسان} few {{count} حساسات} other {{count} حساساً}}",
+      "cnt_servo": "{form, select, one {محرّك سيرفو واحد} two {محرّكا سيرفو} few {{count} محرّكات سيرفو} other {{count} محرّك سيرفو}}",
+      "cnt_motor": "{form, select, one {محرّك واحد} two {محرّكان} few {{count} محرّكات} other {{count} محرّكاً}}",
+      "cnt_pump": "{form, select, one {مضخة واحدة} two {مضختان} few {{count} مضخات} other {{count} مضخة}}",
+      "cnt_linear_actuator": "{form, select, one {مشغّل خطّي واحد} two {مشغّلان خطّيان} few {{count} مشغّلات خطّية} other {{count} مشغّلاً خطّياً}}",
+      "cnt_stepper": "{form, select, one {محرّك خطوي واحد} two {محرّكان خطويان} few {{count} محرّكات خطوية} other {{count} محرّكاً خطوياً}}",
+      "cnt_light": "{form, select, one {ضوء واحد} two {ضوءان} few {{count} أضواء} other {{count} ضوءاً}}",
+      "cnt_output": "{form, select, one {مخرج واحد} two {مخرجان} few {{count} مخرجات} other {{count} مخرجاً}}"
     },
     "tiers": {
       "explorer": "المستكشفون",
@@ -4650,7 +4658,9 @@
       "pass": "بطاقة الصانع حتى {date}",
       "get": "احصل على رموز"
     },
-    "engineeringView": "العرض الهندسي"
+    "engineeringView": "العرض الهندسي",
+    "partsOnRequestPlus": "+ {form, select, one {قطعة واحدة يُحدَّد سعرها عند الطلب} two {قطعتان يُحدَّد سعرهما عند الطلب} few {{count} قطع يُحدَّد سعرها عند الطلب} other {{count} قطعة يُحدَّد سعرها عند الطلب}}",
+    "partsOnRequestOnly": "{form, select, one {قطعة واحدة يُحدَّد سعرها عند الطلب} two {قطعتان يُحدَّد سعرهما عند الطلب} few {{count} قطع يُحدَّد سعرها عند الطلب} other {{count} قطعة يُحدَّد سعرها عند الطلب}}"
   },
   "StudioLibrary": {
     "pageTitle": "قطع الاستوديو",

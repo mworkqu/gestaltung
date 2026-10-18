@@ -44,6 +44,7 @@ import { levelShifter4ch } from "./parts/level_shifter_4ch";
 import { mg996rServo } from "./parts/mg996r_servo";
 import { pca9685Servo } from "./parts/pca9685_servo";
 import { psu5v5a } from "./parts/psu_5v_5a";
+import { mosfetModule } from "./parts/mosfet_module";
 
 export const LIBRARY: LibraryPart[] = [
   esp32Devkit,
@@ -80,6 +81,7 @@ export const LIBRARY: LibraryPart[] = [
   n20Motor,
   pump5v,
   motorDriver,
+  mosfetModule,
   rotaryEncoder,
   slideSwitch,
   microsdModule,

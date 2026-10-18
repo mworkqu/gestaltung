@@ -15,35 +15,34 @@ beforeEach(() => {
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
-/** Output of the pre-stage code (e2dbf23) for each golden idea. */
+/** Output of the pre-stage code (e2dbf23) for each golden idea. plant_waterer: since 2026-10-18 a pump
+ *  that only switches on/off gets a MOSFET switch (5 V load power) instead of the H-bridge. */
 const BEFORE: Record<string, { picked: string[]; wired: string[]; nets: string[]; checks: string[] }> = {
   "plant_waterer": {
     "picked": [
       "esp32_c3_mini_1",
       "soil_moisture_cap_1",
       "pump_5v_1",
-      "motor_driver_1",
+      "mosfet_module_1",
       "ws2812_ring_1"
     ],
     "wired": [
       "esp32_c3_mini_1",
       "soil_moisture_cap_1",
       "pump_5v_1",
-      "motor_driver_1",
+      "mosfet_module_1",
       "ws2812_ring_1"
     ],
     "nets": [
-      "3V3:esp32_c3_mini_1.3V3,motor_driver_1.VCC,soil_moisture_cap_1.VCC",
-      "5V:esp32_c3_mini_1.VIN,ws2812_ring_1.VCC",
-      "GND:esp32_c3_mini_1.GND_L,motor_driver_1.GND,pump_5v_1.M_MINUS,soil_moisture_cap_1.GND,ws2812_ring_1.GND",
-      "MOTOR_IN1:esp32_c3_mini_1.GPIO3,motor_driver_1.IN1",
-      "MOTOR_IN2:esp32_c3_mini_1.GPIO10,motor_driver_1.IN2",
-      "PUMP_PUMP:motor_driver_1.OUT1,pump_5v_1.M_PLUS",
+      "3V3:esp32_c3_mini_1.3V3,soil_moisture_cap_1.VCC",
+      "5V:esp32_c3_mini_1.VIN,mosfet_module_1.VIN,ws2812_ring_1.VCC",
+      "GND:esp32_c3_mini_1.GND_L,mosfet_module_1.GND,pump_5v_1.M_MINUS,soil_moisture_cap_1.GND,ws2812_ring_1.GND",
+      "MOSFET_SIG:esp32_c3_mini_1.GPIO3,mosfet_module_1.SIG",
+      "PUMP_PUMP:mosfet_module_1.OUT,pump_5v_1.M_PLUS",
       "SOIL_AOUT:esp32_c3_mini_1.GPIO2,soil_moisture_cap_1.AOUT",
-      "WS2812_DIN:esp32_c3_mini_1.GPIO4,ws2812_ring_1.DIN"
+      "WS2812_DIN:esp32_c3_mini_1.GPIO10,ws2812_ring_1.DIN"
     ],
     "checks": [
-      "pins_out:motor_driver_1:false",
       "ok_usb:true",
       "ok_voltage:true",
       "ok_budget:true"

@@ -11,6 +11,7 @@
 // part" opens the library by category (helper parts hidden). ONE main
 // button: Next. "Add all to cart" is a quiet secondary action.
 
+import { arabicCountForm } from "@/lib/text/count";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
@@ -240,6 +241,8 @@ export function PartsStep({
 
   const { lines, total } = storeLines(doc.components, products, getPart);
   const groups = groupComponents(doc.components);
+  // Parts with no store price ("We'll source this"): never silently left out of the total.
+  const onRequest = productsLoading ? 0 : groups.filter((g) => !productFor(g.partId, products, getPart)).length;
   const sel = doc.components.find((c) => c.instanceId === selected);
   const selPart = sel ? getPart(sel.partId) : undefined;
   const loading = busy && doc.components.length === 0;
@@ -330,7 +333,7 @@ export function PartsStep({
                   <li
                     key={g.key}
                     className={cn(
-                      "tile relative flex items-start gap-3 p-3 transition-[box-shadow,border-color] motion-safe:transition-[box-shadow,border-color,transform]",
+                      "tile relative flex scroll-mt-44 items-start gap-3 p-3 transition-[box-shadow,border-color] motion-safe:transition-[box-shadow,border-color,transform]",
                       "hover:ring-1 motion-safe:hover:-translate-y-0.5 hover:shadow-neu",
                       isSel && "ring-2 shadow-neu motion-safe:-translate-y-0.5",
                       popFor === c.instanceId && "z-20",
@@ -424,9 +427,19 @@ export function PartsStep({
                 <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                 {t("addPart")}
               </button>
-              {lines.length > 0 && (
-                <p className="text-sm text-body">
-                  {t("partsTotal")} <span className="font-bold tabular-nums text-heading">{formatPrice(total, locale)}</span>
+              {(lines.length > 0 || onRequest > 0) && (
+                <p className="text-sm text-body" data-testid="studio-parts-total" data-on-request={onRequest}>
+                  {lines.length > 0 && (
+                    <>
+                      {t("partsTotal")} <span className="font-bold tabular-nums text-heading">{formatPrice(total, locale)}</span>
+                    </>
+                  )}
+                  {onRequest > 0 && (
+                    <span className="text-mutedtext">
+                      {lines.length > 0 ? " " : ""}
+                      {t(lines.length > 0 ? "partsOnRequestPlus" : "partsOnRequestOnly", { count: String(onRequest), form: arabicCountForm(onRequest) })}
+                    </span>
+                  )}
                 </p>
               )}
             </div>
@@ -627,8 +640,9 @@ export function PartsPicturePane({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the parts + size
   }, [key, supported]);
 
-  // A new list keeps the last picture on screen (dimmed) until the new one is drawn.
-  const current = supported ? (spin?.value ?? null) : null;
+  // Only a picture of THIS parts list is shown (owner 2026-10-18: an older plate with other
+  // parts on it was left on screen); while a new list is drawn, the grid shows exactly the list.
+  const current = supported && spin?.key === key ? spin.value : null;
   const drawing = supported && !!key && pic?.key !== key && failed !== key;
   const gridOnly = !current || !current.frames[0] || (failed === key && pic?.key !== key);
   const readyUrl = !gridOnly && !drawing && current ? (current.frames[0]?.url ?? null) : null;

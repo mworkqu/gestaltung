@@ -13,6 +13,7 @@ import { applyActuatorRules, capKinds, SUPPLY_BOARD_IDS } from "./actuator-rules
 import { LABEL_MAX, MAX_COMPONENTS, PICK_RESPONSE_SCHEMA, PICK_SYSTEM, REASON_MAX, pickPrompt } from "./prompts";
 import { outcomeCached, pickKey, type AiCache } from "./cache";
 import { cut, isObj, type Outcome, type StudioCall } from "./types";
+import { cardItems } from "../card-parts";
 
 /** What libraryIndexForAI() gives the model (only id + category are relied on here). */
 export type PickIndexEntry = {
@@ -121,6 +122,11 @@ export function specParts(spec: ProductSpec): string[] {
 
 /** Optional localized display name (e.g. getPart(id)?.name[locale]). */
 export type NameFor = (id: string, locale: "en" | "ar") => string | undefined;
+/**
+ * Any library part by id, helpers included (e.g. the LED, which the model's index leaves
+ * out): what the card names is added even when the model could not pick it.
+ */
+export type Lookup = (id: string) => PickIndexEntry | undefined;
 /** Optional library pins per part id (e.g. getPart(id)?.pins): the actuator rules' pin budget. */
 export type PinsOf = (id: string) => readonly Pin[] | undefined;
 
@@ -139,7 +145,7 @@ function nameOf(entry: PickIndexEntry, locale: "en" | "ar", nameFor?: NameFor): 
 /** Model answer (any shape) → a rule-abiding parts list. Every change goes to `log`. */
 export function enforcePick(
   raw: unknown,
-  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf },
+  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf; lookup?: Lookup },
 ): Picked {
   const { index, log, locale } = opts;
   const name = (e: PickIndexEntry) => cut(nameOf(e, locale, opts.nameFor), LABEL_MAX);
@@ -204,6 +210,24 @@ export function enforcePick(
     log.push({ path: "components.spec", from: null, to: id });
   }
 
+  // Everything on the card (2026-10-18): each sensor, output and mover becomes a part, with
+  // its count ("3 LEDs" → 3 LEDs; the wiring adds a resistor each). Servo counts and the
+  // servo mix stay with the actuator rules below.
+  for (const item of cardItems(opts.spec)) {
+    for (const x of item.ids) {
+      const e = byId.get(x) ?? opts.lookup?.(x);
+      if (e) byId.set(x, e);
+    }
+    const id = item.ids.find((x) => byId.has(x));
+    if (!id) continue;
+    const have = list.filter((p) => item.ids.includes(p.partId)).length;
+    const want = item.key === "servo" ? Math.min(item.count, 1) : item.count;
+    for (let i = have; i < want; i++) {
+      list.push({ partId: id, label: name(byId.get(id)!) });
+      log.push({ path: "components.card", from: null, to: id });
+    }
+  }
+
   // Part D: how many servos / pumps / motors, the servo driver and a supply strong enough.
   list = applyActuatorRules(list, {
     spec: opts.spec,
@@ -212,6 +236,19 @@ export function enforcePick(
     name: (id) => name(byId.get(id) ?? { id, category: "" }),
     pinsOf: opts.pinsOf,
   });
+
+  // A pump or fan that only switches on/off takes a MOSFET switch, not an H-bridge (owner,
+  // 2026-10-18); the H-bridge stays when a motor in the list may need to reverse.
+  const tagsOf = (id: string) => byId.get(id)?.tags ?? [];
+  const needsHBridge = list.some((p) => {
+    const tags = tagsOf(p.partId);
+    return tags.includes("motor") && !tags.some((t) => t === "pump" || t === "fan" || t === "driver" || t === "module" || t === "servo");
+  });
+  if (!needsHBridge && byId.has("mosfet_module") && list.some((p) => p.partId === "motor_driver")) {
+    const sw = byId.get("mosfet_module")!;
+    list = list.map((p) => (p.partId === "motor_driver" ? { partId: sw.id, label: name(sw) } : p));
+    log.push({ path: "components.driver", from: "motor_driver", to: "mosfet_module" });
+  }
 
   // At most 12 kinds of part (identical parts are one slot), at most 8 of one part.
   list = capKinds(list, MAX_COMPONENTS, log);
@@ -241,7 +278,7 @@ export function enforcePick(
 
 export function validatePick(
   raw: unknown,
-  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf },
+  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf; lookup?: Lookup },
 ): { value: Picked | null; errors: string[] } {
   if (!isObj(raw) || !Array.isArray(raw.components)) return { value: null, errors: ["the answer must be {components:[{partId,label}], reasons}"] };
   const ids = new Set(opts.index.map((e) => e.id));
@@ -260,6 +297,7 @@ export async function runPick(opts: {
   locale: "en" | "ar";
   nameFor?: NameFor;
   pinsOf?: PinsOf;
+  lookup?: Lookup;
   /** W8: the same spec (and language, and library) is answered without a model call. */
   cache?: AiCache | null;
 }): Promise<Outcome<Picked>> {
@@ -273,6 +311,7 @@ async function pickWithModel(opts: {
   locale: "en" | "ar";
   nameFor?: NameFor;
   pinsOf?: PinsOf;
+  lookup?: Lookup;
 }): Promise<Outcome<Picked>> {
   const log: ClampLog = [];
   const r = await opts.call<Picked>({
@@ -282,7 +321,7 @@ async function pickWithModel(opts: {
     schema: PICK_RESPONSE_SCHEMA,
     validate: (raw) => {
       const attempt: ClampLog = [];
-      const res = validatePick(raw, { spec: opts.spec, index: opts.index, locale: opts.locale, log: attempt, nameFor: opts.nameFor, pinsOf: opts.pinsOf });
+      const res = validatePick(raw, { spec: opts.spec, index: opts.index, locale: opts.locale, log: attempt, nameFor: opts.nameFor, pinsOf: opts.pinsOf, lookup: opts.lookup });
       if (res.value) log.splice(0, log.length, ...attempt);
       return res;
     },
@@ -291,6 +330,6 @@ async function pickWithModel(opts: {
   if (r.error === "paused" || r.error === "rate_limited") return { ok: false, error: r.error, clampLog: log, problems: r.problems };
   // invalid twice, or the provider is down: the minimal deterministic list.
   const fallback: ClampLog = [];
-  const value = enforcePick({ components: [] }, { spec: opts.spec, index: opts.index, locale: opts.locale, log: fallback, nameFor: opts.nameFor, pinsOf: opts.pinsOf });
+  const value = enforcePick({ components: [] }, { spec: opts.spec, index: opts.index, locale: opts.locale, log: fallback, nameFor: opts.nameFor, pinsOf: opts.pinsOf, lookup: opts.lookup });
   return { ok: true, value, source: "default", clampLog: fallback, problems: r.problems };
 }

@@ -35,6 +35,11 @@ export async function POST(request: Request) {
     locale: body.locale,
     nameFor: (id, locale) => getPart(id)?.name[locale],
     pinsOf: (id) => getPart(id)?.pins, // Part D: servo pin budget
+    // Card items the model's index leaves out (the LED is a helper part): added by id.
+    lookup: (id) => {
+      const p = getPart(id);
+      return p ? { id: p.id, category: p.category, tags: p.tags } : undefined;
+    },
     cache: pickCache, // W8: the same spec is not asked twice
   });
   if (!r.ok) return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });

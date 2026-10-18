@@ -30,6 +30,7 @@ export function ProgressLine({
   const t = useTranslations("Studio");
   const top = useStickyTop();
   return (
+    <>
     <nav
       aria-label={t("progressLabel")}
       className="sticky z-30 -mx-2 bg-gradient-to-b from-[#eef2f7] from-70% to-[#eef2f7]/0 px-2 pb-2 pt-2"
@@ -80,8 +81,10 @@ export function ProgressLine({
           );
         })}
       </ol>
-      {status && <div className="flex justify-end px-3 pt-1.5 sm:px-5">{status}</div>}
     </nav>
+    {/* In the page flow, not in the sticky bar: it can never sit on top of a step's content. */}
+    {status && <div className="flex min-h-6 justify-end px-3 sm:px-5">{status}</div>}
+    </>
   );
 }
 
