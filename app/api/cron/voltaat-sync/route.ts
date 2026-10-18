@@ -15,7 +15,9 @@ export async function GET(request: Request) {
   const db = createServiceClient();
   if (!db) return Response.json({ error: "no_service_key" }, { status: 500 });
   const result = await runVoltaatSync(db, "cron");
-  // Mirror prices / availability may have moved: refresh the cached storefront.
-  revalidateStorefront();
+  // Purge only when prices / availability moved: an unconditional daily purge
+  // re-rendered every crawled page and its cache entries (Vercel ISR writes).
+  // Unchanged pages still expire on their own after 24 h (STOREFRONT_REVALIDATE).
+  if (result.changed > 0 || result.dropped > 0 || result.missing > 0) revalidateStorefront();
   return Response.json(result);
 }

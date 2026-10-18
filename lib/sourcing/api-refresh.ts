@@ -33,6 +33,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Change = { partName: string; sku: string; field: string; from: string | number | null; to: string | number | null };
 
+/** True when any supplier in a runApiRefresh summary changed or dropped an offer. */
+export function refreshChangedSomething(summary: Record<string, unknown>): boolean {
+  return Object.values(summary).some((v) => {
+    if (!v || typeof v !== "object") return false;
+    const r = v as { changed?: number; dropped?: number };
+    return (r.changed ?? 0) > 0 || (r.dropped ?? 0) > 0;
+  });
+}
+
 export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manual") {
   const started = Date.now();
   const summary: Record<string, unknown> = {};
