@@ -1,5 +1,20 @@
 # Sign in with Google, Microsoft or Apple
 
+**State on 18 Oct 2026** (checked in the Supabase dashboard):
+
+| Setting | Now | Needed |
+| --- | --- | --- |
+| Email sign-in | on | — |
+| Guest (anonymous) sessions | on | keep on |
+| Allow manual linking | **off** | turn on before Google goes live (step 1) |
+| Google | **off** | Client ID + secret (step 2) — only you can paste the secret |
+| Microsoft / Apple | off | optional; Apple costs USD 99/year |
+| Prevent use of leaked passwords | off | **Pro plan only** — not available on the free plan |
+
+Instead of leaked-password protection, the free plan can still raise
+**Authentication → Sign In / Providers → Email → Minimum password length** from 6 to 10 and
+set **Password requirements** to letters + digits + symbols.
+
 The buttons "Continue with Google / Apple / Microsoft" are already in the code on /sign-in and /sign-up.
 Each button appears **by itself** within 5 minutes of you turning that provider on in Supabase (no deploy).
 Nothing is on today, so the pages look the same as before.
