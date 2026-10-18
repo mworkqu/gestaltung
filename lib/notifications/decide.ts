@@ -29,6 +29,7 @@ export const OUTBOX_KINDS = [
   "first_circuit",
   "discount_ready",
   ...ORDER_KINDS,
+  "engineering_job_ready",
 ] as const;
 export type OutboxKind = (typeof OUTBOX_KINDS)[number];
 
@@ -48,6 +49,7 @@ export const DEFAULT_KIND_SETTINGS: Record<OutboxKind, boolean> = {
   order_shipped: true,
   order_delivered: true,
   order_cancelled: true,
+  engineering_job_ready: true,
 };
 
 export type OutboxStatus = "queued" | "sent" | "failed" | "skipped";
@@ -81,8 +83,9 @@ export function isOutboxKind(v: unknown): v is OutboxKind {
  * link or token needed (the unsubscribe page says order emails are not
  * affected). The owner switch in store_settings.notifications still applies.
  */
-export function isTransactional(kind: unknown): kind is OrderKind {
-  return typeof kind === "string" && (ORDER_KINDS as readonly string[]).includes(kind);
+/** Order emails and "your requested job is ready" (0091) are transactional. */
+export function isTransactional(kind: unknown): kind is OrderKind | "engineering_job_ready" {
+  return typeof kind === "string" && ((ORDER_KINDS as readonly string[]).includes(kind) || kind === "engineering_job_ready");
 }
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;

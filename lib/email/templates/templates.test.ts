@@ -28,6 +28,7 @@ const payloads: Record<NotificationKind, Record<string, unknown>> = {
   order_shipped: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "shipped", note: "Driver calls before noon" },
   order_delivered: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "delivered" },
   order_cancelled: { ref: ORDER, order_id: ORDER, order_short: "1a2b3c4d", status: "cancelled" },
+  engineering_job_ready: { ref: "r6", job_kind: "step_model", project_id: "p1", project_name: "Plant monitor" },
 };
 
 describe.each(NOTIFICATION_KINDS)("%s", (kind) => {

@@ -6,6 +6,7 @@ import { render as creditsAdminGrant } from "./credits-admin-grant";
 import { render as firstProject } from "./first-project";
 import { render as firstCircuit } from "./first-circuit";
 import { render as discountReady } from "./discount-ready";
+import { render as engineeringJobReady } from "./engineering-job-ready";
 import { orderStatusRenderer } from "./order-status";
 import type { NotificationLinks, NotificationLocale, Rendered } from "./layout";
 
@@ -26,6 +27,7 @@ export const NOTIFICATION_KINDS = [
   "order_shipped",
   "order_delivered",
   "order_cancelled",
+  "engineering_job_ready",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -44,6 +46,7 @@ const RENDERERS = {
   order_shipped: orderStatusRenderer("shipped"),
   order_delivered: orderStatusRenderer("delivered"),
   order_cancelled: orderStatusRenderer("cancelled"),
+  engineering_job_ready: engineeringJobReady,
 } as const;
 
 export function renderNotification(
@@ -82,6 +85,8 @@ export function samplePayload(kind: NotificationKind): Record<string, unknown> {
         earned_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10),
         valid_until: new Date(Date.now() + 28 * 24 * 3600 * 1000).toISOString().slice(0, 10),
       };
+    case "engineering_job_ready":
+      return { ref: "sample", job_kind: "step_model", project_id: "00000000-0000-0000-0000-000000000000", project_name: "Plant monitor" };
     case "order_confirmed":
     case "order_paid":
     case "order_sourcing":

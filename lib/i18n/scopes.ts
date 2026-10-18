@@ -62,6 +62,8 @@ export const MESSAGE_SCOPES = {
   // /orders/[id]: only PaymentInstructions is a client component; the rest of
   // the Orders namespace is read on the server.
   orders: ["PayMethods"],
+  // /projects/[id]/engineering: StepPanel + CopyCode + DownloadJson.
+  engineering: ["Engineering", "Services", "Tokens"],
   project: ["PartsDashboard", "ProjectCad", "Projects", "Prototyping", "Search", "Turnstile"],
   // Design Studio (P5-13): the flow + what its reused client pieces read
   // (AccessNote, the consent line, PhonePrompt, the guest check dialog).

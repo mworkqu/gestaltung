@@ -64,6 +64,7 @@ describe("admin nav groups", () => {
         "/dashboard/usage",
         "/dashboard/ai-costs",
         "/dashboard/payments",
+        "/dashboard/engineering-jobs",
         "/dashboard/notifications",
         "/dashboard/contact",
         "/inventory",

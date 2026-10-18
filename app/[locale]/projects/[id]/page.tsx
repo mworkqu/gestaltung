@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { pageMetadata } from "@/lib/seo";
 
 import { createClient } from "@/lib/supabase/server";
@@ -111,9 +112,15 @@ export default async function ProjectPage({
     redirect(studioRedirectPath(locale, id, sp));
   }
 
+  const tp = await getTranslations("Projects");
   return (
     <MessagesScope scope="project">
     <div className="container max-w-3xl py-8">
+      <div className="mb-3 flex justify-end">
+        <Link href={`/projects/${id}/engineering`} className="inline-flex min-h-11 items-center text-sm font-semibold text-cobalt hover:text-cobalt-hover">
+          {tp("engineeringView")}
+        </Link>
+      </div>
       <ProjectClaimGate projectId={id} />
       {/* P2-08: the claim gate (a #key= link in a fresh browser) mints a guest
           session; ensureSession() asks this dialog for the token. Off = nothing. */}

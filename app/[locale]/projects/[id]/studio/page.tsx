@@ -54,16 +54,22 @@ export default async function StudioPage({
   return (
     <MessagesScope scope="studio">
       <div className="container max-w-5xl space-y-3 py-5 sm:py-8">
-        {isAdmin && (
-          <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-1">
+          <Link
+            href={`/projects/${id}/engineering`}
+            className="inline-flex min-h-11 items-center rounded-full px-3 text-xs font-semibold text-mutedtext hover:text-cobalt"
+          >
+            {t("engineeringView")}
+          </Link>
+          {isAdmin && (
             <Link
               href={`/projects/${id}/prototyping`}
               className="inline-flex min-h-11 items-center rounded-full px-3 text-xs font-semibold text-mutedtext hover:text-cobalt"
             >
               {t("engineerView")}
             </Link>
-          </div>
-        )}
+          )}
+        </div>
         <StudioShell
           projectId={id}
           destination={destination ?? ""}
