@@ -30,6 +30,17 @@ function safeNext(raw: string | null): string {
   return raw;
 }
 
+/**
+ * True when the browser sent the PKCE code verifier that the exchange needs.
+ * The browser client (createBrowserClient) stores it in a cookie named
+ * sb-<ref>-auth-token-code-verifier; if it is missing here, the verifier was
+ * lost between starting the sign-in and coming back (a different browser,
+ * cookies cleared, or an in-app browser handing off to the real one).
+ */
+function hasVerifierCookie(request: NextRequest): boolean {
+  return request.cookies.getAll().some((c) => c.name.endsWith("-code-verifier"));
+}
+
 function localeOf(next: string): string {
   const first = next.split("/")[1];
   return (routing.locales as readonly string[]).includes(first) ? first : routing.defaultLocale;
@@ -87,9 +98,32 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     ok = !error;
+    // Why a social sign-in bounced back to /sign-in. Without this the exchange
+    // failure is silent and the visitor only sees "that did not work".
+    // Codes and messages only - never the code, the verifier or a token.
+    if (error) {
+      console.warn(
+        "[auth-callback] code exchange failed:",
+        JSON.stringify({
+          provider: provider ?? "none",
+          link: searchParams.get("link") === "1",
+          hadGuestSession: guestToken !== null,
+          hadVerifierCookie: hasVerifierCookie(request),
+          status: error.status ?? null,
+          code: error.code ?? null,
+          name: error.name,
+          message: error.message,
+        })
+      );
+    }
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     ok = !error;
+  } else if (provider) {
+    console.warn(
+      "[auth-callback] social sign-in came back with no code:",
+      JSON.stringify({ provider, params: [...searchParams.keys()] })
+    );
   }
 
   if (ok) {
