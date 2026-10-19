@@ -268,9 +268,9 @@ export default async function Home({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-            {/* The first four photos are above the fold on desktop: eager + high priority. */}
-            {products.map((part, i) => (
-              <PartCard key={part.id} part={part} locale={locale} priority={i < 4} />
+            {/* Below the hero, the tiles and the video: every photo stays lazy. */}
+            {products.map((part) => (
+              <PartCard key={part.id} part={part} locale={locale} />
             ))}
           </div>
         )}

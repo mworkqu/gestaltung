@@ -18,7 +18,10 @@ import { truncateAtWord } from "@/lib/text/title";
 // AddToCartButton child. Image URLs are admin-pasted from arbitrary hosts, so a
 // plain <img> is used rather than next/image (which needs configured domains);
 // the Shopify CDN resizes it to the card size (lib/store/image-url.ts). Cards
-// are lazy except the first row of the homepage (`priority`).
+// are lazy except the first row of a store listing (`priority`), where the cards
+// are the first thing on the page. The home pages do NOT set it: their featured
+// row sits below the hero, the tiles and the video, so loading it eagerly only
+// steals bandwidth from what the visitor can actually see.
 // Reads only StoreCardPart (lib/store/catalog.ts) — the /store list sends no more.
 //
 // The SKU is not shown (owner decision D4); it stays in the product URL.

@@ -109,6 +109,15 @@ export default async function LocaleLayout({
       className={`${sans.variable} ${mono.variable} ${sansArabic.variable}`}
     >
       <body className="min-h-screen bg-background font-sans text-body">
+        {/*
+          Every product photo is hotlinked from the Shopify CDN (lib/store/image-url.ts),
+          so the first one pays a cold DNS + TCP + TLS handshake to a second host - about
+          half a second on a phone on mobile data, before a single image byte arrives.
+          Warming it costs nothing and is the cheapest win on a slow connection.
+          React 19 hoists these into <head>.
+        */}
+        <link rel="preconnect" href="https://cdn.shopify.com" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://cdn.shopify.com" />
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ContactPhoneProvider phone={phone}>
           <AuthProvider>
