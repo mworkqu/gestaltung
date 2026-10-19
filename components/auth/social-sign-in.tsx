@@ -14,7 +14,7 @@
 // account already has a user, /api/auth/callback starts the plain sign-in
 // itself and moves the guest's work with claim_guest_work (migration 0071).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 
@@ -43,6 +43,26 @@ export function SocialSignIn({
   const locale = useLocale();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
   const [failed, setFailed] = useState<OAuthProvider | null>(errorProvider);
+  const firstProvider = providers[0] ?? null;
+
+  // Supabase reports a provider failure in the URL FRAGMENT
+  // (#error=...&error_code=...), and a fragment never reaches the server, so
+  // /api/auth/callback cannot see it: it only knows the code was missing.
+  // Read it here, so the visitor gets the message either way, and move the
+  // code into the query (?e=) where it survives being copied or screenshotted
+  // - on a phone that is the only way to see why a sign-in failed.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.includes("error")) return;
+    const fragment = new URLSearchParams(hash.replace(/^#/, ""));
+    const code = fragment.get("error_code") ?? fragment.get("error");
+    if (!code) return;
+    setFailed((current) => current ?? firstProvider);
+    const url = new URL(window.location.href);
+    url.hash = "";
+    url.searchParams.set("e", code);
+    window.history.replaceState(null, "", url.toString());
+  }, [firstProvider]);
 
   if (providers.length === 0 && !failed) return null;
 

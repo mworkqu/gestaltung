@@ -43,6 +43,32 @@ Also check **Authentication → URL Configuration**: Site URL `https://gestaltun
 `https://gestaltung360.com/**`, `https://www.gestaltung360.com/**`, `http://localhost:3000/**`
 (the same list as in `docs/AUTH_EMAILS.md`). The social buttons return to `/api/auth/callback`, which these cover.
 
+## If sign-in bounces back to /sign-in
+
+The address bar is the evidence. A failed sign-in carries the reason, either as
+`?e=<code>` or in the `#`-fragment after it.
+
+| What you see | What it means | Fix |
+| --- | --- | --- |
+| `error_code=unexpected_failure`, `Unable to exchange external code` | Supabase got Google's code but could not trade it for a token. The **client secret** stored in Supabase does not match the client id. | Google Cloud -> Credentials -> client "Gestaltung sign-in" -> add a new secret, copy the **value**, paste it into Supabase -> Providers -> Google -> Save. |
+| `redirect_uri_mismatch` (shown by Google, before leaving Google) | The Supabase callback is not on the client's redirect URI list. | Add `https://jgwuafubtmpaonsznfyw.supabase.co/auth/v1/callback` to that client. |
+| `e=nocode` and no fragment | Supabase sent the visitor back with nothing to exchange. | Check **Redirect URLs** below. |
+| `e=...noverifier` | The PKCE cookie did not come back - the sign-in started in one browser and finished in another (an in-app browser handing off to Safari/Chrome). | Open the site in the real browser, not inside WhatsApp/Instagram. |
+| Lands on the HOME page, signed out | The `redirectTo` was not on Supabase's allow-list, so Supabase fell back to the Site URL. | Add the origin to **Redirect URLs**. |
+
+**Redirect URLs** (Authentication -> URL Configuration) must list every origin the
+site is served from. Checked 19 Oct 2026 by sending a throwaway token through
+`/auth/v1/verify?redirect_to=...` and seeing which came back unchanged:
+
+| Origin | On the list |
+| --- | --- |
+| `https://gestaltung360.com/**` | yes |
+| `https://www.gestaltung360.com/**` | **no - add it** |
+
+`www` currently redirects to the bare domain before the sign-in page loads, so
+this is not breaking anyone today, but a sign-in that does start on `www` ends
+up dumped on the home page, signed out.
+
 ## 2. Google (free)
 
 You already have the Google Cloud project **dazzling-card-506200-g5** (the Drive picker uses it). Its consent
