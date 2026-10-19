@@ -46,9 +46,13 @@ function localeOf(next: string): string {
   return (routing.locales as readonly string[]).includes(first) ? first : routing.defaultLocale;
 }
 
-function signInError(origin: string, next: string, provider: OAuthProvider) {
+function signInError(origin: string, next: string, provider: OAuthProvider, reason?: string | null) {
   const params = new URLSearchParams({ oauth_error: provider });
   if (next !== "/") params.set("next", next);
+  // A short diagnostic code in the URL (no secrets): on a phone there is no
+  // console and the Hobby plan keeps no runtime logs, so this is the only way
+  // to see WHY a sign-in bounced back. The page still shows the plain message.
+  if (reason) params.set("e", reason.slice(0, 48).replace(/[^a-zA-Z0-9_.:-]/g, "_"));
   return NextResponse.redirect(`${origin}/${localeOf(next)}/sign-in?${params.toString()}`);
 }
 
@@ -95,9 +99,11 @@ export async function GET(request: NextRequest) {
   }
 
   let ok = false;
+  let failReason: string | null = null;
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     ok = !error;
+    if (error) failReason = `${error.code ?? error.name}${hasVerifierCookie(request) ? "" : ".noverifier"}`;
     // Why a social sign-in bounced back to /sign-in. Without this the exchange
     // failure is silent and the visitor only sees "that did not work".
     // Codes and messages only - never the code, the verifier or a token.
@@ -119,11 +125,27 @@ export async function GET(request: NextRequest) {
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     ok = !error;
+    if (error) failReason = error.code ?? error.name;
   } else if (provider) {
+    failReason = "nocode";
     console.warn(
       "[auth-callback] social sign-in came back with no code:",
       JSON.stringify({ provider, params: [...searchParams.keys()] })
     );
+  }
+
+  // A one-time code can only be spent once. If the browser fetched this URL
+  // twice (a prefetch, a retried request), the first fetch signed the visitor
+  // in and the second finds the code already used - bouncing them to /sign-in
+  // while they are in fact signed in. Trust the cookies over the exchange.
+  if (!ok && code) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user && !user.is_anonymous) {
+      ok = true;
+      guestToken = null; // the first request already did the claim
+    }
   }
 
   if (ok) {
@@ -131,7 +153,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}${next}`);
   }
 
-  if (provider) return signInError(origin, next, provider);
+  if (provider) return signInError(origin, next, provider, failReason);
 
   // Expired or already-used link: send them back to request a fresh one.
   return NextResponse.redirect(`${origin}/${localeOf(next)}/forgot-password?expired=1`);
