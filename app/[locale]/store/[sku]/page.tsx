@@ -118,7 +118,7 @@ export default async function PartDetailPage({
   // A product with no supplier offer is still sold at its listed price; its
   // date is confirmed after the order (0032).
   const tDelivery = await getTranslations("Delivery");
-  const quote: DeliveryQuote | null = await getProductDeliveryQuote(part.id, part.min_order_qty);
+  const quote: DeliveryQuote | null = await getProductDeliveryQuote(part.id, part.min_order_qty, part.sku);
   const onRequest = !part.lead_time_class;
   // Standard-tier date: the quote's, else the same sum computed in TS (the
   // card's formula) if the quote couldn't load.
@@ -129,12 +129,17 @@ export default async function PartDetailPage({
   // so; the TS fallback has the setting) — then the note is shown once.
   const workingDays = Boolean(quote?.working_days) || (!quote && Boolean(await getHolidays()));
   // Source line (P2-07): supplier name + lead class only — never a cost.
-  const source = await getPartSource(part.id);
+  const source = await getPartSource(part.id, part.sku);
   const srcLine = sourceLine(source, part.lead_time_class);
   const sourceText =
     !srcLine || srcLine.kind === "on_request" // the LeadTimeBadge above already says "Available on request"
       ? null
-      : srcLine.kind === "stocked_local"
+      : srcLine.kind === "stocked_own"
+        ? // the green badge already says it when the shelf count is above zero
+          part.in_own_stock === true
+          ? null
+          : t("inStockLusail")
+        : srcLine.kind === "stocked_local"
         ? t("sourceStockedLocal", { supplier: srcLine.supplier })
         : srcLine.kind === "sourced"
           ? t("sourceFrom", { supplier: srcLine.supplier })

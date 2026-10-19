@@ -64,3 +64,45 @@ If you ever turn the site switch off while Supabase CAPTCHA is still on, every a
 ## What is NOT checked
 
 These server endpoints do not ask for the bot check: `/api/bom/electronics`, `/api/brief-chat`, `/api/projects/name`, `/api/design-quote`. Do not expect the check to appear for them; the daily AI limits and the other server rules still apply. Adding the check to them would be a separate change.
+
+---
+
+## "I added the key in Vercel and nothing happened"
+
+Adding `NEXT_PUBLIC_TURNSTILE_SITE_KEY` on its own changes nothing on the live
+site. Nothing breaks either — the widget simply never renders and every form
+keeps working exactly as before. Walk down this list in order; it is almost
+always the first or the second one.
+
+1. **The switch is still off.** The keys are only half of it. The bot check is a
+   row in the database (`store_settings.turnstile`) and it reads OFF until you
+   turn it on: dashboard -> **AI usage & pricing** -> **Bot check** -> tick the
+   box -> Save. A fresh project has never had it on.
+2. **No redeploy since you added the key.** `NEXT_PUBLIC_` variables are baked
+   into the JavaScript when the site is built, not read when a visitor loads the
+   page. A variable added after the last build is invisible to the browser until
+   you deploy again: Vercel -> Deployments -> latest Production -> **Redeploy**.
+   The Bot check card now says so itself — if it shows an amber
+   "redeploy needed" line, this is your problem.
+3. **You are looking at a page cached before the change.** The switch is cached
+   for 24 hours. Saving the switch clears that cache; a hard refresh
+   (Ctrl+Shift+R) clears the browser's copy.
+4. **The hostname is not on the Cloudflare widget.** If the widget renders but
+   shows a Cloudflare error, the domain you are browsing is missing from the
+   widget's hostname list (see the four hostnames above). Preview deploys on
+   `*.vercel.app` need `gestaltung.vercel.app` listed.
+5. **The variable is set for the wrong environment.** Production, Preview and
+   Development are separate lists in Vercel. A key set only for Production will
+   not appear on a preview deploy.
+
+### Secret or Config?
+
+Vercel offers two types. Either works for the build, so this is not a cause of
+the problem above — but:
+
+- **`TURNSTILE_SECRET_KEY`** -> **Secret**. It must never be readable.
+- **`NEXT_PUBLIC_TURNSTILE_SITE_KEY`** -> **Config** is the better choice. The
+  site key is public by design: it is shipped to every visitor's browser, so
+  hiding it in the dashboard protects nothing and only stops you checking later
+  what the value is. Vercel also refuses Secret variables in the **Development**
+  environment, which step 1 of the setup asks for.

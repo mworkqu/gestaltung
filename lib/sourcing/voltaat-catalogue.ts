@@ -7,6 +7,7 @@
 
 import { partKey } from "@/lib/parts/part-key";
 import { VOLTAAT_BASE } from "@/lib/sourcing/adapters/voltaat";
+import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 
 export type RawVoltaatProduct = {
   id: number;
@@ -187,7 +188,7 @@ export function buildImportRows(
         retail_price: price,
         currency: "QAR",
         availability: v.available ? "in_stock" : "unavailable",
-        lead_time_days: v.available ? 1 : null,
+        lead_time_days: v.available ? SUPPLIER_LEAD_DAYS.voltaat : null,
         active: v.available,
         pack_size: 1,
         moq: 1,

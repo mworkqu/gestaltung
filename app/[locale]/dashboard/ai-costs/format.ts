@@ -1,4 +1,6 @@
 import { callCostUsd } from "@/lib/ai/prices";
+import { DEFAULT_QAR_PER_USD } from "@/lib/pricing/fx";
+import { USAGE_PRICE_RULE } from "@/lib/pricing/usage-price";
 
 // Shared helpers for the AI costs pages: pure formatting + cost fallbacks.
 
@@ -41,7 +43,21 @@ export function rowCost(r: CallRow): number | null {
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** QAR per USD (the riyal is pegged); AI cost is stored in USD, revenue in QAR. */
-export const QAR_PER_USD = 3.64;
+export const QAR_PER_USD = DEFAULT_QAR_PER_USD;
+
+/**
+ * What the same work is worth to a client: the owner's pay-as-you-go rule is
+ * 10x what it costs us (lib/pricing/usage-price.ts). These pages show the raw
+ * 10x figure, not the rounded credit price — it is the margin check, not a
+ * price list.
+ */
+export const COST_MULTIPLIER = USAGE_PRICE_RULE.multiplier;
+
+/** Cost in USD -> what we would charge for it, in QAR, before rounding. */
+export function billableQar(costUsd: number | null | undefined): number | null {
+  if (costUsd == null || !Number.isFinite(costUsd)) return null;
+  return costUsd * COST_MULTIPLIER * QAR_PER_USD;
+}
 
 export function qarFormatter(locale: string) {
   const f = new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 2 });

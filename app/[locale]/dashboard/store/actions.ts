@@ -10,7 +10,7 @@ import { STOCK_STATUSES } from "@/lib/parts/constants";
 import { isDuplicateProductError } from "@/lib/parts/part-key";
 import { parseSheet, type ExistingPart, type SkippedRow } from "@/lib/parts/sheet-import";
 import type { StockStatus } from "@/lib/supabase/types";
-import { revalidateStorefront } from "@/lib/cache/storefront";
+import { revalidatePart, revalidateStorefront } from "@/lib/cache/storefront";
 import { isStoreCategory, type StoreCategory } from "@/lib/store/store-categories";
 import { returnToOrCatalog } from "@/lib/admin/return-to";
 
@@ -104,6 +104,38 @@ async function parsePart(
   };
 }
 
+// The product fields a storefront LISTING repeats: the card columns
+// (lib/store/catalog.ts STORE_CARD_COLUMNS), the filter facets and the search
+// columns. An edit that leaves every one of them as it was can only change the
+// product's own page, so it may use the narrow cache tag.
+const LISTED_FIELDS = [
+  "sku",
+  "name",
+  "name_ar",
+  "unit_price",
+  "image_url",
+  "category",
+  "store_category",
+  "material",
+  "min_order_qty",
+  "is_published",
+] as const;
+
+function onlyThisProductChanged(before: Record<string, unknown> | null, after: ParsedPart): boolean {
+  if (!before) return false;
+  const next = after as unknown as Record<string, unknown>;
+  return LISTED_FIELDS.every((field) => {
+    // A field the form did not send (store_category before 0048) is untouched.
+    if (!(field in next)) return true;
+    const a = before[field] ?? null;
+    const b = next[field] ?? null;
+    // unit_price arrives as a number here and may arrive as a numeric string
+    // from PostgREST, so compare it as a number.
+    if (typeof a === "number" || typeof b === "number") return Number(a) === Number(b);
+    return a === b;
+  });
+}
+
 export async function createPart(
   _prev: PartFormState,
   formData: FormData
@@ -149,7 +181,10 @@ export async function updatePart(
   if ("error" in parsed) return { error: parsed.error };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("parts").update(parsed).eq("id", id);
+  // The row as it stands, to see whether this edit can change a listing.
+  // select("*") so it still works before a migration adds a column.
+  const { data: before } = await supabase.from("parts").select("*").eq("id", id).maybeSingle();
+  const { data: after, error } = await supabase.from("parts").update(parsed).eq("id", id).select("sku").maybeSingle();
 
   if (error) {
     if (isDuplicateProductError(error)) return { error: t("error_duplicate_product") };
@@ -157,7 +192,13 @@ export async function updatePart(
     return { error: t("error_unknown") };
   }
 
-  revalidateStorefront();
+  // A description, a standard or an Arabic text only the product's own page
+  // shows: purge that product, not the ~2,600 cached catalogue pages (each
+  // re-render is an ISR write). Anything a card, a facet or search carries —
+  // or a row we could not read first — still purges everything.
+  const sku = (after as { sku: string } | null)?.sku;
+  if (sku && onlyThisProductChanged(before as Record<string, unknown> | null, parsed)) revalidatePart(sku);
+  else revalidateStorefront();
   revalidatePath(`/${locale}/dashboard/store`);
   revalidatePath(`/${locale}/dashboard/store/fix`);
   // D1: back to the list the owner came from (validated), else the catalog.

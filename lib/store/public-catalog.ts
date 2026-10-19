@@ -4,7 +4,9 @@
 // cookies, no headers), so the pages calling them can be static / ISR, and is
 // wrapped in unstable_cache with the "parts" tag (lib/cache/storefront.ts):
 // the data is reused across renders and across visitors for up to 5 minutes,
-// or until an admin write calls revalidateStorefront(). The search route is
+// or until an admin write calls revalidateStorefront(). The reads that belong
+// to one product carry "part-<sku>" as well, so an edit that cannot show up in
+// a listing refreshes that product alone (revalidatePart). The search route is
 // dynamic HTML, but its data still comes from here, keyed by the normalised
 // query, so repeated searches do not hit the database.
 
@@ -25,7 +27,7 @@ import {
 } from "@/lib/store/catalog";
 import { sortProducts } from "@/lib/store/search";
 import type { DeliveryQuote } from "@/lib/store/delivery";
-import { CATALOG_TAG, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
+import { CATALOG_TAG, partTag, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
 import { parseTrustedBy, TRUSTED_BY_KEY, type TrustedLogo } from "@/lib/trust";
 import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServicePrices } from "@/lib/pricing/defaults";
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
@@ -44,6 +46,20 @@ import {
 } from "@/lib/store/bought-together";
 
 const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
+
+/**
+ * Cache options for a read that belongs to ONE product: the broad "parts" tag
+ * as before, plus "part-<sku>". Next gives a page the tags of every cache
+ * entry it read, so the product's own two pages carry the narrow tag too and
+ * revalidatePart(sku) can refresh just them — a single-product edit then costs
+ * two ISR writes instead of ~2,600. The unstable_cache wrapper is built per
+ * call because the tag depends on the argument; the cache key does not change
+ * (it is the key parts plus the arguments), so the entry is still shared.
+ */
+const partCache = (sku: string, settings = false) => ({
+  revalidate: STOREFRONT_REVALIDATE,
+  tags: settings ? [CATALOG_TAG, SETTINGS_TAG, partTag(sku)] : [CATALOG_TAG, partTag(sku)],
+});
 
 // A search ranks every matching row before paging; the catalogue is a few
 // hundred to ~1,000 products, so this stays a handful of slim rows.
@@ -208,47 +224,48 @@ export const getFeaturedParts = unstable_cache(
 );
 
 /** A published product by SKU (the product page needs description/specs; private sourcing fields dropped), or null. */
-export const getPublishedPart = unstable_cache(
-  async (sku: string): Promise<Part | null> => {
-    const supabase = createPublicClient();
-    if (!supabase) return null;
-    // select("*"): specs_ar (0047) may not exist yet, so no named columns here.
-    const { data } = await supabase.from("parts").select("*").eq("sku", sku).eq("is_published", true).maybeSingle();
-    // Cost / income / sourcing internals never enter the cached public row (P2-07).
-    return data ? withoutPrivateFields(data as Part) : null;
-  },
-  ["store:part"],
-  CACHE,
-);
+export function getPublishedPart(sku: string): Promise<Part | null> {
+  return unstable_cache(publishedPart, ["store:part"], partCache(sku))(sku);
+}
+
+async function publishedPart(sku: string): Promise<Part | null> {
+  const supabase = createPublicClient();
+  if (!supabase) return null;
+  // select("*"): specs_ar (0047) may not exist yet, so no named columns here.
+  const { data } = await supabase.from("parts").select("*").eq("sku", sku).eq("is_published", true).maybeSingle();
+  // Cost / income / sourcing internals never enter the cached public row (P2-07).
+  return data ? withoutPrivateFields(data as Part) : null;
+}
 
 /** The SKU an old, merged product now lives under (0030), or null. */
-export const getMergedRedirectSku = unstable_cache(
-  async (sku: string): Promise<string | null> => {
-    const supabase = createPublicClient();
-    if (!supabase) return null;
-    const { data } = await supabase.rpc("part_merged_redirect_sku", { p_sku: sku });
-    return typeof data === "string" && data && data !== sku ? data : null;
-  },
-  ["store:merged-redirect"],
-  CACHE,
-);
+export function getMergedRedirectSku(sku: string): Promise<string | null> {
+  return unstable_cache(mergedRedirectSku, ["store:merged-redirect"], partCache(sku))(sku);
+}
+
+async function mergedRedirectSku(sku: string): Promise<string | null> {
+  const supabase = createPublicClient();
+  if (!supabase) return null;
+  const { data } = await supabase.rpc("part_merged_redirect_sku", { p_sku: sku });
+  return typeof data === "string" && data && data !== sku ? data : null;
+}
 
 /**
  * order_delivery_quote for one product (the same computation checkout
  * records). Dates move daily: the daily cron purge re-renders it each morning,
  * and both tags (offers move the lead time, settings move tier days and prices)
- * keep it current between purges.
+ * keep it current between purges. The sku is passed for the per-product tag
+ * only — the cached value is still keyed by the part and the quantity.
  */
-export const getProductDeliveryQuote = unstable_cache(
-  async (partId: string, quantity: number): Promise<DeliveryQuote | null> => {
-    const supabase = createPublicClient();
-    if (!supabase) return null;
-    const { data } = await supabase.rpc("order_delivery_quote", { p_items: [{ part_id: partId, quantity }] });
-    return (data ?? null) as DeliveryQuote | null;
-  },
-  ["store:delivery-quote"],
-  { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG, SETTINGS_TAG] },
-);
+export function getProductDeliveryQuote(partId: string, quantity: number, sku: string): Promise<DeliveryQuote | null> {
+  return unstable_cache(deliveryQuote, ["store:delivery-quote"], partCache(sku, true))(partId, quantity);
+}
+
+async function deliveryQuote(partId: string, quantity: number): Promise<DeliveryQuote | null> {
+  const supabase = createPublicClient();
+  if (!supabase) return null;
+  const { data } = await supabase.rpc("order_delivery_quote", { p_items: [{ part_id: partId, quantity }] });
+  return (data ?? null) as DeliveryQuote | null;
+}
 
 /**
  * store_settings.trusted_by → the "Trusted by" logos (P1-04). Same cookie-free
@@ -373,19 +390,20 @@ export const getCardsBySkus = unstable_cache(
  * supplier code / lead class — never a cost, landed cost, income or margin
  * (suppliers and supplier_offers stay admin-only). null before 0054 runs or
  * when the product is not published. Same tags as the product read: offer and
- * supplier writes call revalidateStorefront().
+ * supplier writes call revalidateStorefront(). The sku is passed for the
+ * per-product tag only; the cached value is still keyed by the part.
  */
-export const getPartSource = unstable_cache(
-  async (partId: string): Promise<PartSource | null> => {
-    const supabase = createPublicClient();
-    if (!supabase) return null;
-    const { data, error } = await supabase.rpc("part_public_source", { p_part: partId });
-    if (error) return null;
-    return parsePartSource(data);
-  },
-  ["store:part-source"],
-  { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG, SETTINGS_TAG] },
-);
+export function getPartSource(partId: string, sku: string): Promise<PartSource | null> {
+  return unstable_cache(partSource, ["store:part-source"], partCache(sku, true))(partId);
+}
+
+async function partSource(partId: string): Promise<PartSource | null> {
+  const supabase = createPublicClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc("part_public_source", { p_part: partId });
+  if (error) return null;
+  return parsePartSource(data);
+}
 
 // ── Upsell (P3-06 / WF-34) ──────────────────────────────────────────────────
 
@@ -440,8 +458,11 @@ export function getUpsellPool(categories: readonly string[]): Promise<StoreCardP
  * same-category products; fewer than three co-purchased products are topped
  * up the same way. `source` says which, so the heading stays honest.
  */
-export const getFrequentlyBoughtTogether = unstable_cache(
-  async (sku: string, storeCategory: string | null): Promise<UpsellPick> => {
+export function getFrequentlyBoughtTogether(sku: string, storeCategory: string | null): Promise<UpsellPick> {
+  return unstable_cache(boughtTogether, ["store:bought-together"], partCache(sku))(sku, storeCategory);
+}
+
+const boughtTogether = async (sku: string, storeCategory: string | null): Promise<UpsellPick> => {
     const supabase = createPublicClient();
     if (!supabase) return { parts: [], source: "category" };
     let together: StoreCardPart[] = [];
@@ -461,10 +482,7 @@ export const getFrequentlyBoughtTogether = unstable_cache(
     }
     const fallback = together.length >= UPSELL_COUNT || !storeCategory ? [] : await getUpsellPool([storeCategory]);
     return mergeBoughtTogether({ together, fallback, currentSku: sku });
-  },
-  ["store:bought-together"],
-  CACHE,
-);
+};
 
 // Approved customer reviews (P4-03, migration 0058). approved_reviews() and
 // approved_review_count() are anon-callable and return only approved rows with
@@ -481,20 +499,20 @@ function reviewsFailed(what: string, error: { code?: string; message: string }):
 }
 
 /** Up to six approved reviews from orders that contained this SKU, newest first. */
-export const getApprovedReviewsForSku = unstable_cache(
-  async (sku: string): Promise<ApprovedReview[]> => {
-    const supabase = createPublicClient();
-    if (!supabase) return [];
-    const { data, error } = await supabase.rpc("approved_reviews", { p_sku: sku, p_limit: REVIEWS_PER_SECTION });
-    if (error) {
-      reviewsFailed("approved_reviews", error);
-      return [];
-    }
-    return parseApprovedReviews(data);
-  },
-  ["store:reviews-by-sku"],
-  CACHE,
-);
+export function getApprovedReviewsForSku(sku: string): Promise<ApprovedReview[]> {
+  return unstable_cache(approvedReviewsForSku, ["store:reviews-by-sku"], partCache(sku))(sku);
+}
+
+async function approvedReviewsForSku(sku: string): Promise<ApprovedReview[]> {
+  const supabase = createPublicClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("approved_reviews", { p_sku: sku, p_limit: REVIEWS_PER_SECTION });
+  if (error) {
+    reviewsFailed("approved_reviews", error);
+    return [];
+  }
+  return parseApprovedReviews(data);
+}
 
 /** The home strip: how many approved reviews exist, plus the newest six. */
 export const getHomeReviews = unstable_cache(

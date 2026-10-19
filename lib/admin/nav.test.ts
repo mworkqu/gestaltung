@@ -56,7 +56,7 @@ describe("admin nav groups", () => {
         "/dashboard/store/discounts",
         "/dashboard/reviews",
       ],
-      ["/dashboard/leads", "/dashboard/projects", "/dashboard/credits", "/dashboard/studio-library"],
+      ["/dashboard/leads", "/dashboard/customers", "/dashboard/projects", "/dashboard/credits", "/dashboard/studio-library"],
       [
         "/dashboard/store/suppliers",
         "/dashboard/store/gaps",

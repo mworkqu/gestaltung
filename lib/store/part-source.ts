@@ -4,6 +4,7 @@
 // It never carries a cost, landed cost, income or margin, and nothing here
 // may add one: the customer sees a supplier name and a lead class only.
 
+import { OWN_STOCK_SUPPLIER } from "@/lib/sourcing/lead-times";
 import { LEAD_TIME_CLASSES, type LeadTimeClass } from "@/lib/store/sourcing";
 
 export type PartSourceBackup = {
@@ -55,6 +56,8 @@ export function parsePartSource(raw: unknown): PartSource | null {
 }
 
 export type SourceLine =
+  /** Our own shelf in Lusail — no supplier is named, because there isn't one. */
+  | { kind: "stocked_own" }
   | { kind: "stocked_local"; supplier: string }
   | { kind: "sourced"; supplier: string }
   | { kind: "sourced_lead"; supplier: string; leadTimeClass: LeadTimeClass }
@@ -63,6 +66,7 @@ export type SourceLine =
 /**
  * Which source sentence a product gets:
  *   no lead class (no offer)            → on_request ("Available on request")
+ *   our own stock                       → stocked_own ("In stock in Lusail")
  *   Voltaat + in_stock                  → "Stocked by Voltaat in Qatar"
  *   Voltaat, any other class            → "Sourced from Voltaat"
  *   another known supplier              → "Sourced from DigiKey, 1–2 weeks"
@@ -71,6 +75,9 @@ export type SourceLine =
  */
 export function sourceLine(source: PartSource | null, leadTimeClass: LeadTimeClass | null | undefined): SourceLine | null {
   if (!leadTimeClass) return { kind: "on_request" };
+  // Our own shelf has no supplier to credit, and SUPPLIER_LABELS deliberately
+  // has no entry for it — "Sourced from Own stock (Lusail)" reads like a joke.
+  if (source?.supplier?.toLowerCase() === OWN_STOCK_SUPPLIER) return { kind: "stocked_own" };
   const supplier = supplierLabel(source?.supplier);
   if (!source || !supplier) return null;
   if (source.supplier!.toLowerCase() === LOCAL_SUPPLIER) {

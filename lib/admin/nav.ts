@@ -13,6 +13,7 @@ export type NavIcon =
   | "discounts"
   | "reviews"
   | "leads"
+  | "customers"
   | "projects"
   | "credits"
   | "studio"

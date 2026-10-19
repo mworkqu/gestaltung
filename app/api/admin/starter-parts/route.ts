@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { mouserSearch } from "@/lib/sourcing/adapters/mouser";
 import { parametersToAttributes } from "@/lib/sourcing/spec-map";
+import { qarPerUnit } from "@/lib/pricing/fx";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 
@@ -63,7 +64,7 @@ export async function POST() {
   const { data: sups } = await supabase.from("suppliers").select("id, code, landed_overhead_pct").in("code", ["digikey", "mouser"]);
   const supplier = (via: Via) => sups?.find((s) => s.code === via);
   const { data: fxRow } = await supabase.from("store_settings").select("value").eq("key", "fx_to_qar").maybeSingle();
-  const usd = Number((fxRow?.value as Record<string, number> | null)?.USD) || 3.64;
+  const usd = qarPerUnit("USD", fxRow?.value as Record<string, number> | null);
 
   const results: { name: string; status: string; sku?: string; price?: number }[] = [];
   let calls = 0;

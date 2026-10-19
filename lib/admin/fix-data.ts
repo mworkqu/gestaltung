@@ -7,6 +7,7 @@ import type { createClient } from "@/lib/supabase/server";
 import { fixIssues, isLiveProduct, type FixIssue, type FixPart } from "@/lib/admin/home-tiles";
 import {
   deliveryWhy,
+  isAutoOnRequest,
   ON_REQUEST_KEY,
   parseOnRequest,
   supplierBucket,
@@ -106,13 +107,17 @@ export async function loadFixParts(db: Db, opts: { ids?: string[] } = {}): Promi
     })
     .filter(({ full }) => isLiveProduct(full))
     .map(({ part, full, partOffers }) => {
-      const issues = fixIssues(full);
+      // Why there is no date, worked out before the issue list, because an
+      // out-of-stock supplier counts as "on request" rather than as a gap.
+      const why = part.lead_time_class ? null : deliveryWhy({ pricingMode: part.pricing_mode, offers: partOffers });
+      const treatAsOnRequest = full.onRequest || isAutoOnRequest(why);
+      const issues = fixIssues({ ...full, onRequest: treatAsOnRequest });
       return {
         part,
         issues,
         offers: partOffers,
         bucket: supplierBucket({ sku: part.sku, inOwnStock: part.in_own_stock, offers: partOffers }),
-        why: issues.includes("delivery") ? deliveryWhy({ pricingMode: part.pricing_mode, offers: partOffers }) : null,
+        why: issues.includes("delivery") ? why : null,
       };
     })
     .filter((x) => x.issues.length > 0)

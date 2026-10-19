@@ -4,7 +4,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { QAR_PER_USD, UUID_RE, needsMigration, qarFormatter, rowCost, usdFormatter, type CallRow, type RevenueRow } from "../format";
+import { COST_MULTIPLIER, QAR_PER_USD, UUID_RE, needsMigration, qarFormatter, rowCost, usdFormatter, type CallRow, type RevenueRow } from "../format";
 
 // One user's AI cost: projects (with ideation tokens used), per-model totals
 // and the latest calls. Costs are the stored ai_usage.cost_usd, or the paid
@@ -141,6 +141,7 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
     { label: t("tokensIn"), value: num.format(all.tin) },
     { label: t("tokensOut"), value: num.format(all.tout) },
     { label: t("totalCost"), value: cost(all) },
+    { label: t("billable"), value: qar(all.cost * COST_MULTIPLIER * QAR_PER_USD) },
     { label: t("ideaUsed"), value: num.format(ideaTotal) },
     { label: t("ideaBalance"), value: num.format(balance) },
     { label: t("revenue"), value: qar(Number(rev?.revenue_qar ?? 0)) },
@@ -176,6 +177,7 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
         </dl>
         <p className="mt-4 text-[12px] text-mutedtext">{t("priceNote")}</p>
         <p className="mt-1 text-[12px] text-mutedtext">{t("qarNote", { value: qar(all.cost * QAR_PER_USD), rate: QAR_PER_USD })}</p>
+        <p className="mt-1 text-[12px] text-mutedtext">{t("billableNote", { multiplier: COST_MULTIPLIER })}</p>
       </section>
 
       <section className="neu space-y-3 p-6">

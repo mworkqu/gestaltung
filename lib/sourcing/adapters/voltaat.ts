@@ -5,6 +5,7 @@
 // with a contact address, one run a day. A 403/429 stops the run; we never
 // retry around a block.
 
+import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 import type { SupplierAdapter } from "@/lib/sourcing/types";
 
 export const voltaatAdapter: SupplierAdapter = { code: "voltaat", kind: "api" };
@@ -153,8 +154,8 @@ export type OfferChange = {
   oldOurPrice: number;
 };
 
-/** Voltaat is local: in stock → 1 day to reach us. Out of stock keeps the lead time we knew. */
-export const VOLTAAT_IN_STOCK_DAYS = 1;
+/** Voltaat is local but not ours: in stock → 2 days to reach us (lib/sourcing/lead-times.ts). Out of stock keeps the lead time we knew. */
+export const VOLTAAT_IN_STOCK_DAYS = SUPPLIER_LEAD_DAYS.voltaat;
 
 export function planChanges(
   offers: MappedOffer[],

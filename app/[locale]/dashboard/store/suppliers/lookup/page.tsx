@@ -5,6 +5,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { SupplierLookup } from "@/components/admin/supplier-lookup";
 import { digikeyConfigured } from "@/lib/sourcing/adapters/digikey";
 import { mouserConfigured } from "@/lib/sourcing/adapters/mouser";
+import { qarPerUnit } from "@/lib/pricing/fx";
 import { cn } from "@/lib/utils";
 
 // Find parts at Mouser and DigiKey (Task 19b). super_admin only (store layout).
@@ -32,7 +33,7 @@ export default async function SupplierLookupPage({ params }: { params: Promise<{
   const categories = [...new Set(cats.rows.map((r) => r.category))].sort();
   const overheadPct: Record<string, number> = {};
   for (const s of sups.data ?? []) overheadPct[s.code as string] = Number(s.landed_overhead_pct) || 0;
-  const usdToQar = Number((fx.data?.value as Record<string, number> | null)?.USD) || 3.64;
+  const usdToQar = qarPerUnit("USD", fx.data?.value as Record<string, number> | null);
 
   return (
     <div className="space-y-6">

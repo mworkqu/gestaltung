@@ -59,6 +59,15 @@ describe("sourceLine", () => {
     expect(sourceLine(null, null)).toEqual({ kind: "on_request" });
     expect(sourceLine(voltaat, undefined)).toEqual({ kind: "on_request" });
   });
+  it("our own stock → In stock in Lusail, with no supplier named", () => {
+    expect(sourceLine({ supplier: "own_stock", leadTimeClass: "in_stock", backup: null }, "in_stock")).toEqual({
+      kind: "stocked_own",
+    });
+    // Still ours even when the shelf offer carries a longer lead time.
+    expect(sourceLine({ supplier: "OWN_STOCK", leadTimeClass: "3_5_days", backup: null }, "3_5_days")).toEqual({
+      kind: "stocked_own",
+    });
+  });
   it("no source data (before 0054) or an unknown supplier → no line", () => {
     expect(sourceLine(null, "in_stock")).toBeNull();
     expect(sourceLine({ supplier: "acme", leadTimeClass: "in_stock", backup: null }, "in_stock")).toBeNull();

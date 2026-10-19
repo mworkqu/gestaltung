@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { partKey } from "@/lib/parts/part-key";
+import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 import { buildImportRows, categoryFor, isGiftCard, stripHtml } from "./voltaat-catalogue";
 
 describe("categoryFor", () => {
@@ -51,7 +52,12 @@ describe("buildImportRows", () => {
     expect(skippedDuplicate).toBe(1);
     expect(rows[0].part.description).toContain("Options: SG90, MG90S.");
     expect(rows[0].part).toMatchObject({ sku: "VLT-11", unit_price: 19, pricing_mode: "mirror", category: "Motors", is_published: true });
-    expect(rows[0].offer).toMatchObject({ supplier_url: "https://www.voltaat.com/products/servo?variant=11", active: true, lead_time_days: 1 });
+    // 2 days is the owner's Voltaat promise (lib/sourcing/lead-times.ts).
+    expect(rows[0].offer).toMatchObject({
+      supplier_url: "https://www.voltaat.com/products/servo?variant=11",
+      active: true,
+      lead_time_days: SUPPLIER_LEAD_DAYS.voltaat,
+    });
   });
 
   it("follows the first option in stock", () => {
