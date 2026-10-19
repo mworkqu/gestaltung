@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   SHELF_QTY_MAX,
   allShelfRows,
+  isMirror,
   onShelfRows,
   parseShelfQty,
   searchShelfRows,
@@ -11,7 +12,14 @@ import {
 } from "@/lib/admin/own-stock";
 import type { StockBucket, StockItem, StockLists } from "@/lib/admin/stock-lists";
 
-function item(id: string, name: string, sku: string, ownQty: number, bucket: StockBucket = "buy"): StockItem {
+function item(
+  id: string,
+  name: string,
+  sku: string,
+  ownQty: number,
+  bucket: StockBucket = "buy",
+  pricingMode: string | null = "markup"
+): StockItem {
   return {
     part: {
       id,
@@ -26,6 +34,7 @@ function item(id: string, name: string, sku: string, ownQty: number, bucket: Sto
       moq: 1,
       leadTimeClass: null,
       ownQty,
+      pricingMode,
     },
     bucket,
     interest: { cartPeople: 0, requestPeople: 0, requestedQty: 0, olderSignals: 0, views: 0 },
@@ -35,7 +44,7 @@ function item(id: string, name: string, sku: string, ownQty: number, bucket: Sto
 
 const lists: StockLists = {
   buy: [item("1", "Soil moisture sensor", "VLT-1", 0)],
-  watch: [item("2", "ESP32 DevKit", "VLT-2", 4, "watch")],
+  watch: [item("2", "ESP32 DevKit", "VLT-2", 4, "watch", "mirror")],
   dont: [item("3", "Brass hex nut M3", "DK-3", 12, "dont"), item("4", "Zip ties", "VLT-4", 0, "dont")],
 };
 
@@ -56,14 +65,39 @@ describe("parseShelfQty", () => {
   });
 });
 
+describe("isMirror", () => {
+  it("reads parts.pricing_mode", () => {
+    expect(isMirror("mirror")).toBe(true);
+    expect(isMirror("MIRROR")).toBe(true);
+    expect(isMirror("markup")).toBe(false);
+    expect(isMirror(null)).toBe(false);
+    expect(isMirror(undefined)).toBe(false);
+  });
+});
+
 describe("shelfPlan", () => {
   it("gives the own-stock offer above zero", () => {
-    expect(shelfPlan(1)).toEqual({ qty: 1, giveOwnOffer: true, parkOwnOffer: false });
-    expect(shelfPlan(250)).toEqual({ qty: 250, giveOwnOffer: true, parkOwnOffer: false });
+    expect(shelfPlan(1)).toEqual({ qty: 1, giveOwnOffer: true, parkOwnOffer: false, fixPrice: false });
+    expect(shelfPlan(250)).toEqual({ qty: 250, giveOwnOffer: true, parkOwnOffer: false, fixPrice: false });
   });
 
   it("parks the offer at zero instead of deleting it", () => {
-    expect(shelfPlan(0)).toEqual({ qty: 0, giveOwnOffer: false, parkOwnOffer: true });
+    expect(shelfPlan(0)).toEqual({ qty: 0, giveOwnOffer: false, parkOwnOffer: true, fixPrice: false });
+  });
+
+  // 0095 only lets an offer with a retail price whose supplier has a
+  // commission win for a mirror product, and own stock has neither, so the
+  // offer would be written and silently ignored.
+  it("fixes the price of a mirror product when stock goes on the shelf", () => {
+    expect(shelfPlan(5, { mirror: true })).toEqual({ qty: 5, giveOwnOffer: true, parkOwnOffer: false, fixPrice: true });
+  });
+
+  it("leaves the price alone at zero, so it never starts following Voltaat again", () => {
+    expect(shelfPlan(0, { mirror: true }).fixPrice).toBe(false);
+  });
+
+  it("does not touch a product that already sets its own price", () => {
+    expect(shelfPlan(5, { mirror: false }).fixPrice).toBe(false);
   });
 });
 
@@ -79,7 +113,14 @@ describe("allShelfRows", () => {
 
   it("carries the shelf count of each product", () => {
     const rows = allShelfRows(lists);
-    expect(rows.find((r) => r.id === "2")).toEqual<ShelfRow>({ id: "2", sku: "VLT-2", name: "ESP32 DevKit", qty: 4 });
+    expect(rows.find((r) => r.id === "2")).toEqual<ShelfRow>({
+      id: "2",
+      sku: "VLT-2",
+      name: "ESP32 DevKit",
+      qty: 4,
+      price: 10,
+      mirror: true,
+    });
   });
 });
 

@@ -107,6 +107,34 @@ the same thing the Fix list's "Set delivery time -> Own stock in Lusail" does �
 so the part is immediately sold as ours and no longer sourced from Voltaat or
 DigiKey. You never have to do that step by hand any more.
 
+### Why a Voltaat product's price gets fixed
+
+Every product the Voltaat catalogue import creates is **mirror**-priced: its
+shop price follows Voltaat's retail price. The rule in `refresh_part_sourcing`
+lets a mirror product follow only an offer that *has* a retail price and whose
+supplier *has* a commission percent — and our own shelf has neither. So on a
+mirror product the own-stock offer would be written and then silently ignored,
+and the part would keep being sourced from Voltaat. The whole imported
+catalogue is mirror, so this is nearly every product.
+
+Putting units on the shelf therefore switches that product to **markup**: from
+then on *you* set its price. The panel says so, with the exact figure, before
+you press Save.
+
+- **The price does not move at that moment.** In markup mode the recompute
+  writes `unit_price` back unchanged, so a customer sees the same number. It
+  simply stops tracking Voltaat, so the nightly Voltaat sync no longer moves it.
+- **It is not switched back when the shelf empties.** That would start the price
+  following Voltaat again behind your back. If you want a part to follow Voltaat
+  again, set "Price mode" back to mirror on the product's edit page.
+- Our own offer carries no cost, so "income %" shows blank for that part until
+  you record what you paid. Nothing else changes, and the Fix list does not ask
+  for it.
+
+The clean long-term fix is to make own stock always eligible in
+`refresh_part_sourcing` instead, but that needs a new migration — raise it with
+the owner rather than doing it in passing.
+
 **Saving zero does not delete the offer.** It *parks* it: the offer stays with
 its cost, SKU and link, but is marked `unavailable`, so the ranked rule (in
 stock first) falls back to Voltaat or DigiKey. If that offer was pinned, the pin

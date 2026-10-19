@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { ensureOwnStockSupplier, parkSupplierOffer, setPartDelivery } from "@/lib/admin/fix-delivery";
-import { parseShelfQty, shelfPlan } from "@/lib/admin/own-stock";
+import { isMirror, parseShelfQty, shelfPlan } from "@/lib/admin/own-stock";
 import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 import { createClient } from "@/lib/supabase/server";
 
@@ -44,14 +44,25 @@ function revalidateStock(locale: string) {
 // count after a stock take, a loss or a correction, and 0069's set_own_stock
 // writes it. Above zero the product also gets the own-stock offer at 1 day
 // (the same thing the Fix list's "Set delivery time -> Own stock in Lusail"
-// does), because a count alone does not make us the supplier. Back at zero the
-// offer is PARKED, never deleted — see parkSupplierOffer.
+// does), because a count alone does not make us the supplier, AND a mirror
+// product is switched to 'markup' first, because 0095 never lets our offer win
+// for a mirror product (shelfPlan explains both). Back at zero the offer is
+// PARKED, never deleted — see parkSupplierOffer.
 // super_admin only (checked here and inside the database function).
 
 /** What happened to the own-stock offer beside the count. */
 export type ShelfOffer = "added" | "parked" | "none" | "failed";
 
-export type ShelfResult = { ok: true; qty: number; offer: ShelfOffer; reason?: string } | { error: string };
+export type ShelfResult =
+  | {
+      ok: true;
+      qty: number;
+      offer: ShelfOffer;
+      reason?: string;
+      /** The shop price this product is now fixed at (it was following its supplier). */
+      priceFixed?: number;
+    }
+  | { error: string };
 
 export async function setShelfUnits(locale: string, partId: string, qtyRaw: string | number): Promise<ShelfResult> {
   const s = await getSessionContext();
@@ -61,16 +72,34 @@ export async function setShelfUnits(locale: string, partId: string, qtyRaw: stri
   if (!id || qty === null) return { error: "quantity" };
 
   const supabase = await createClient();
+  // The pricing mode decides whether our offer can win at all, so it is read
+  // here rather than trusted from the page.
+  const part = await supabase.from("parts").select("pricing_mode, unit_price").eq("id", id).maybeSingle();
+  if (part.error || !part.data) return { error: part.error?.message ?? "notFound" };
+
   const set = await supabase.rpc("set_own_stock", { p_part: id, p_qty: qty });
   if (set.error) return { error: set.error.message };
 
-  // The count is saved from here on, so a failure of the offer step is
-  // reported as a saved count with a warning, never as "nothing happened".
-  const plan = shelfPlan(qty);
+  // The count is saved from here on, so a failure of a later step is reported
+  // as a saved count with a warning, never as "nothing happened".
+  const plan = shelfPlan(qty, { mirror: isMirror(part.data.pricing_mode as string | null) });
   const supplier = await ensureOwnStockSupplier(supabase);
   if (!supplier) {
     revalidateStock(locale);
     return { ok: true, qty, offer: "failed", reason: "ownSupplier" };
+  }
+
+  let priceFixed: number | undefined;
+  if (plan.fixPrice) {
+    // The price stops following the supplier here. unit_price is left exactly
+    // as it is: markup mode writes it back unchanged, so nothing moves for a
+    // customer at this moment.
+    const up = await supabase.from("parts").update({ pricing_mode: "markup" }).eq("id", id);
+    if (up.error) {
+      revalidateStock(locale);
+      return { ok: true, qty, offer: "failed", reason: "priceMode" };
+    }
+    priceFixed = Number(part.data.unit_price) || 0;
   }
 
   let offer: ShelfOffer;
@@ -86,5 +115,5 @@ export async function setShelfUnits(locale: string, partId: string, qtyRaw: stri
   }
 
   revalidateStock(locale);
-  return reason ? { ok: true, qty, offer, reason } : { ok: true, qty, offer };
+  return { ok: true, qty, offer, ...(reason ? { reason } : {}), ...(priceFixed === undefined ? {} : { priceFixed }) };
 }

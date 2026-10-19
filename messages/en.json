@@ -2844,7 +2844,9 @@
     "shelfOfferFailed": "The count was saved, but the own-stock delivery time could not be set ({error}). Try again, or set it from the Fix list.",
     "shelfError": "Could not save: {error}",
     "shelfEmpty": "Nothing on the shelf yet. Search for a product to set its count.",
-    "shelfNoMatch": "No product matches “{q}”."
+    "shelfNoMatch": "No product matches “{q}”.",
+    "shelfMirrorWarning": "This price follows Voltaat. Saving a count above zero fixes it at {price} and you set it from then on — otherwise your own stock can never win the sourcing rule.",
+    "shelfPriceFixed": "Price fixed at {price}; it no longer follows Voltaat."
   },
   "Restock": {
     "kicker": "Store · restock",

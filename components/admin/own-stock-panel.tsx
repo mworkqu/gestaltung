@@ -9,13 +9,14 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, Loader2, Save, Search } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Save, Search } from "lucide-react";
 
 import { setShelfUnits } from "@/app/[locale]/dashboard/store/stock/actions";
 import { Link } from "@/i18n/navigation";
 import { useEditHref } from "@/components/admin/use-edit-href";
-import { allShelfRows, onShelfRows, parseShelfQty, searchShelfRows, type ShelfRow } from "@/lib/admin/own-stock";
+import { allShelfRows, onShelfRows, parseShelfQty, searchShelfRows, shelfPlan, type ShelfRow } from "@/lib/admin/own-stock";
 import type { StockLists } from "@/lib/admin/stock-lists";
+import { formatPrice } from "@/lib/parts/format";
 import { cn } from "@/lib/utils";
 
 type Note = { kind: "ok" | "warn" | "error"; text: string };
@@ -38,6 +39,7 @@ export function OwnStockPanel({ locale, lists }: { locale: string; lists: StockL
   const rows = searching ? hits : onShelf;
 
   const valueOf = (row: ShelfRow) => draft[row.id] ?? String(row.qty);
+  const money = (n: number) => formatPrice(n, locale);
 
   const save = (row: ShelfRow) => {
     const raw = valueOf(row);
@@ -54,11 +56,12 @@ export function OwnStockPanel({ locale, lists }: { locale: string; lists: StockL
         setNotes((cur) => ({ ...cur, [row.id]: { kind: "error", text: t("shelfError", { error: res.error }) } }));
         return;
       }
+      const fixed = res.priceFixed === undefined ? "" : ` ${t("shelfPriceFixed", { price: money(res.priceFixed) })}`;
       const note: Note =
         res.offer === "failed"
-          ? { kind: "warn", text: t("shelfOfferFailed", { error: res.reason ?? "" }) }
+          ? { kind: "warn", text: t("shelfOfferFailed", { error: res.reason ?? "" }) + fixed }
           : res.offer === "added"
-            ? { kind: "ok", text: t("shelfSavedOn", { count: String(res.qty) }) }
+            ? { kind: "ok", text: t("shelfSavedOn", { count: String(res.qty) }) + fixed }
             : res.offer === "parked"
               ? { kind: "ok", text: t("shelfSavedParked") }
               : { kind: "ok", text: t("shelfSavedZero") };
@@ -74,9 +77,13 @@ export function OwnStockPanel({ locale, lists }: { locale: string; lists: StockL
 
   const row = (r: ShelfRow) => {
     const raw = valueOf(r);
-    const bad = parseShelfQty(raw) === null;
+    const typed = parseShelfQty(raw);
+    const bad = typed === null;
     const busy = pending && saving === r.id;
     const note = notes[r.id];
+    // Warn BEFORE the save: this product's price follows its supplier, and
+    // putting units on the shelf has to stop that (see shelfPlan).
+    const willFixPrice = typed !== null && shelfPlan(typed, { mirror: r.mirror }).fixPrice;
     return (
       <li key={r.id} id={`shelf-${r.id}`} className="neu-inset rounded-xl p-3">
         <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
@@ -115,6 +122,12 @@ export function OwnStockPanel({ locale, lists }: { locale: string; lists: StockL
             {t("shelfSave")}
           </button>
         </div>
+        {willFixPrice && !note && (
+          <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-amber-700">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{t("shelfMirrorWarning", { price: money(r.price) })}</span>
+          </p>
+        )}
         {note && (
           <p
             role="status"

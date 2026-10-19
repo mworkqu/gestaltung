@@ -14,7 +14,21 @@ export const SHELF_QTY_MAX = 1_000_000;
 /** Rows a search shows at once (a stock take is done product by product). */
 export const SHELF_SEARCH_LIMIT = 20;
 
-export type ShelfRow = { id: string; sku: string; name: string; qty: number };
+export type ShelfRow = {
+  id: string;
+  sku: string;
+  name: string;
+  qty: number;
+  /** Shop price today, so the panel can say what it will be fixed at. */
+  price: number;
+  /** The price follows the supplier's retail price (parts.pricing_mode = 'mirror'). */
+  mirror: boolean;
+};
+
+/** A 'mirror' product follows its supplier's retail price. */
+export function isMirror(pricingMode: string | null | undefined): boolean {
+  return String(pricingMode ?? "").toLowerCase() === "mirror";
+}
 
 /**
  * A hand-typed shelf count: a whole number from 0 to SHELF_QTY_MAX.
@@ -36,20 +50,36 @@ export type ShelfPlan = {
   giveOwnOffer: boolean;
   /** Back to zero: park the own-stock offer (never delete it). */
   parkOwnOffer: boolean;
+  /**
+   * Above zero on a mirror product: switch it to 'markup' first, or the
+   * own-stock offer can never win (see below). The shop price does not move —
+   * refresh_part_sourcing writes unit_price back unchanged in markup mode — it
+   * simply stops following the supplier from that moment.
+   */
+  fixPrice: boolean;
 };
 
 /**
  * What setting the count to `qty` has to do besides writing the number.
  *
- * Holding units does not by itself create a supplier offer, so a product with
- * qty > 0 and no own-stock offer is still sourced from Voltaat or DigiKey.
- * Above zero we therefore add the same offer the Fix list's "Set delivery time
- * -> Own stock in Lusail" adds. Back at zero the offer is *parked*, not
- * deleted: the cost, SKU and link stay for the next delivery, and the shelf
- * only stops winning the sourcing rule.
+ * 1. Holding units does not by itself create a supplier offer, so a product
+ *    with qty > 0 and no own-stock offer is still sourced from Voltaat or
+ *    DigiKey. Above zero we add the same offer the Fix list's "Set delivery
+ *    time -> Own stock in Lusail" adds.
+ * 2. That offer still loses on a MIRROR product: 0095 only lets an offer with
+ *    a retail price whose supplier has a commission win for a mirror product,
+ *    and the own-stock supplier is created with no commission (0095 seeds it
+ *    the same way). The whole Voltaat catalogue is mirror, so without this the
+ *    offer would be written and silently ignored. Holding our own stock means
+ *    we set the price rather than following Voltaat, so the product moves to
+ *    'markup'. It is NOT moved back at zero: that would start the price
+ *    following Voltaat again behind the owner's back.
+ * 3. Back at zero the offer is *parked*, not deleted: the cost, SKU and link
+ *    stay for the next delivery, and the shelf only stops winning.
  */
-export function shelfPlan(qty: number): ShelfPlan {
-  return { qty, giveOwnOffer: qty > 0, parkOwnOffer: qty === 0 };
+export function shelfPlan(qty: number, opts: { mirror?: boolean } = {}): ShelfPlan {
+  const on = qty > 0;
+  return { qty, giveOwnOffer: on, parkOwnOffer: qty === 0, fixPrice: on && opts.mirror === true };
 }
 
 const rowOf = (it: StockItem): ShelfRow => ({
@@ -57,6 +87,8 @@ const rowOf = (it: StockItem): ShelfRow => ({
   sku: it.part.sku,
   name: it.part.name,
   qty: it.part.ownQty,
+  price: it.part.price,
+  mirror: isMirror(it.part.pricingMode),
 });
 
 /** Every product the page loaded, by name — what the panel searches. */
