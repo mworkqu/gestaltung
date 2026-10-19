@@ -98,6 +98,13 @@ type ShellProps = {
   initial?: Extract<LoadResult, { ok: true }> | null;
   /** super_admin (checked on the server page): Engineer view of the product designs. */
   isAdmin?: boolean;
+  /**
+   * 3c/3d: set when this project belongs to a school class team (read on the
+   * server). Safety mode is on, and the project never asks the team for a
+   * phone number or an email, never offers checkout and never shows "Get it
+   * made" — their teacher orders the parts.
+   */
+  classTeam?: { teamName: string; className: string } | null;
 };
 
 /** Owner-edited / new library parts (studio_parts, validated on the server); none = the code library. */
@@ -117,8 +124,10 @@ function StudioShellInner({
   api: injected,
   initial = null,
   isAdmin = false,
+  classTeam = null,
 }: ShellProps) {
   const t = useTranslations("Studio");
+  const tSafe = useTranslations("SchoolSafety");
   const { getPart } = useStudioLibrary();
   const locale: Locale = useLocale() === "ar" ? "ar" : "en";
   // W8: repeat chat turns / picks for the same spec come from the tab cache, never the model.
@@ -600,8 +609,10 @@ function StudioShellInner({
   const engine = !!doc && (!!doc.product?.unlockedId || productFlowOf(doc, previews) !== "product");
   const chosenId = doc?.product?.chosenId ?? null;
   const chosenPicture = previews.cards.find((c) => c.id === chosenId && c.url)?.url ?? previews.cards.find((c) => c.url)?.url ?? null;
-  // W2: one "Get it made" bar from the Enclosure step onward.
-  const showGetItMade = !!doc && current >= FLOW.indexOf("enclosure");
+  // W2: one "Get it made" bar from the Enclosure step onward. 3c: never in a
+  // class project — a team is never asked for a name, a phone number or an
+  // email, and never sends a quote request; their teacher orders the parts.
+  const showGetItMade = !classTeam && !!doc && current >= FLOW.indexOf("enclosure");
 
   return (
     <div
@@ -613,6 +624,15 @@ function StudioShellInner({
       data-testid="studio-shell"
       data-step={step}
     >
+      {classTeam && (
+        <ClassBanner
+          teamName={classTeam.teamName}
+          label={tSafe("classLabel", { team: classTeam.teamName })}
+          banner={tSafe("banner")}
+          more={tSafe("bannerMore")}
+          breadboard={step === "wiring" || step === "print" || step === "code" ? tSafe("breadboard") : null}
+        />
+      )}
       <ProgressLine
         current={current}
         furthest={furthest}
@@ -684,7 +704,9 @@ function StudioShellInner({
             onShowInWiring={showInWiring}
           />
         )}
-        {step === "make" && doc && <MakeStep ctx={ctx} doc={doc} products={products} engine={engine} pictureUrl={chosenPicture} />}
+        {step === "make" && doc && (
+          <MakeStep ctx={ctx} doc={doc} products={products} engine={engine} pictureUrl={chosenPicture} isClass={!!classTeam} />
+        )}
       </StepSlide>
       {showGetItMade && doc && (
         <GetItMade
@@ -699,6 +721,34 @@ function StudioShellInner({
       )}
       {doc && persist.current && api.mode !== "mock" && <DeleteProject projectId={projectId} />}
     </div>
+  );
+}
+
+/**
+ * 3d: shown on EVERY step of a class project. The age line is the rule the
+ * owner set ("12+ with adult supervision"); the breadboard line appears on the
+ * steps where a team is holding parts.
+ */
+function ClassBanner({
+  teamName,
+  label,
+  banner,
+  more,
+  breadboard,
+}: {
+  teamName: string;
+  label: string;
+  banner: string;
+  more: string;
+  breadboard: string | null;
+}) {
+  return (
+    <aside className="neu-inset space-y-1 rounded-2xl p-4" aria-label={teamName}>
+      <p className="kicker text-mutedtext">{label}</p>
+      <p className="text-sm font-bold text-heading">{banner}</p>
+      <p className="text-xs leading-relaxed text-mutedtext">{more}</p>
+      {breadboard && <p className="text-xs leading-relaxed text-mutedtext">{breadboard}</p>}
+    </aside>
   );
 }
 

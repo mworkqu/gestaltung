@@ -10,12 +10,19 @@ import { studioLibraryOverrides } from "@/lib/studio/library/remote";
 import { loadStudioInitial } from "@/lib/studio/server/initial";
 import { pageMetadata } from "@/lib/seo";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+import { createClient } from "@/lib/supabase/server";
+import { classTeamOf } from "@/lib/schools/server";
 
 // Design Studio (P5-13 Phase 1): the client's flow from idea to "get it
 // made". Private and per-visitor: the doc is loaded in the browser through
 // the visitor's own session (guests included), exactly like the workspace.
 // A super_admin also gets a small "Engineer view" link to the old workspace
 // (checked here, never shown to anyone else).
+//
+// 3c/3d: when the project belongs to a school class team, the shell is told so
+// (read here under RLS — a team sees only its own row). Safety mode is then on
+// server-side too (lib/schools/safe-parts.ts), and the project never asks the
+// team for a phone number or an email and never offers checkout.
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +48,18 @@ export default async function StudioPage({
   // Only the provider's public name crosses to the client — never its key.
   // Owner-edited / new library parts (studio_parts, 0070); [] before it runs.
   // The project + its StudioDoc are read here too, so the first step arrives rendered (P5-15e).
-  const [{ destination }, session, turnstileEnabled, t, libraryParts, initial] = await Promise.all([
+  const [{ destination }, session, turnstileEnabled, t, libraryParts, initial, classTeam] = await Promise.all([
     providerStatus(),
     getSessionContext().catch(() => null),
     turnstileEnabledForPages(),
     getTranslations({ locale, namespace: "Studio" }),
     studioLibraryOverrides().catch(() => []),
     loadStudioInitial(id),
+    // null for a normal project, before migration 0096, or when the caller may
+    // not see the row.
+    createClient()
+      .then((supabase) => classTeamOf(supabase, id))
+      .catch(() => null),
   ]);
   const isAdmin = session?.profile.role === "super_admin";
 
@@ -72,6 +84,7 @@ export default async function StudioPage({
           libraryParts={libraryParts}
           initial={initial}
           isAdmin={isAdmin}
+          classTeam={classTeam ? { teamName: classTeam.teamName, className: classTeam.className } : null}
         />
         <TurnstileChallenge enabled={turnstileEnabled} />
       </div>

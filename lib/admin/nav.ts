@@ -22,6 +22,7 @@ export type NavIcon =
   | "usage"
   | "notifications"
   | "contact"
+  | "schools"
   | "inventory";
 
 /** "Something to do" counts shown next to a nav item. */

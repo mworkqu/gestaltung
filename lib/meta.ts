@@ -16,6 +16,9 @@ export type MetaKey =
   | "contact"
   | "drawing"
   | "students"
+  | "schools"
+  | "schoolClasses"
+  | "join"
   | "trust"
   | "institutions"
   | "institutionsProposal"
@@ -39,6 +42,11 @@ const PAGES: Record<MetaKey, { path: string; noindex?: boolean }> = {
   contact: { path: "/contact" },
   drawing: { path: "/design/drawing" },
   students: { path: "/students" },
+  schools: { path: "/schools" },
+  // The teacher area and the student join form are useless without a
+  // session or a class code, so they stay out of search results.
+  schoolClasses: { path: "/schools/classes", noindex: true },
+  join: { path: "/join", noindex: true },
   trust: { path: "/trust" },
   institutions: { path: "/institutions" },
   // P2-05: the print sheet is not for search results.

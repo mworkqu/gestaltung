@@ -18,11 +18,16 @@ import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from 
 import { kitDiscountQar as kitDiscountOf } from "@/lib/prototyping/kit-plan";
 import { arabicCountForm } from "@/lib/text/count";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useClassOrderId, withClassOrder } from "@/lib/schools/client";
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
 // Lines "available on request" can be checked out at their listed price; their
 // delivery date is to be confirmed after the order (0032).
+//
+// 3e: ?class=<id> marks a teacher's class order (set by "Buy parts for all
+// teams"). It changes nothing here except the quote the server returns and the
+// link to checkout, which carries it on. The database decides whether it counts.
 
 /** Same grid as the loaded cart: title, a few line cards, the summary card. */
 function CartSkeleton() {
@@ -64,7 +69,8 @@ export default function CartPage() {
   const locale = useLocale();
   const { items, updateQty, removeItem, removeKit, subtotalQar, kitDiscountQar, kitDiscountPct, totalQar, ready, stale, error, retry } =
     useCart();
-  const { quote } = useDeliveryQuote(items);
+  const classOrderId = useClassOrderId();
+  const { quote } = useDeliveryQuote(items, classOrderId);
   const toConfirm = (i: CartItem) => isOnRequest(i, quote ? quote.on_request : null);
 
   // Until the first read finishes (or the last-known cart is on hand) show the
@@ -317,7 +323,7 @@ export default function CartPage() {
             </Button>
           ) : (
             <Button asChild size="lg" className="w-full rounded-full">
-              <Link href="/store/checkout">{t("checkoutCta")}</Link>
+              <Link href={withClassOrder("/store/checkout", classOrderId)}>{t("checkoutCta")}</Link>
             </Button>
           )}
           <Button asChild variant="ghost" className="w-full rounded-full">

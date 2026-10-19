@@ -10,6 +10,19 @@ A running list. Add a row whenever test or demo data is written to production. N
 | Test order #945ea389 "TEST ORDER — please delete" (Fawran, QAR 53.50) | `945ea389...` (full id to be read by the dry-run SELECT) | 2026-09-29 | Checkout and payment-instruction checks; keep as a reference for the order flow until all phases are verified. |
 | Inquiry row "TEST LEAD (please ignore)" (plus one test email in the info@ mailbox) | inquiries row, message "TEST LEAD (please ignore)" (id to be read by the dry-run SELECT) | July 2026 (2026-07-05) | Proof that the lead endpoint saves and emails; the email in the mailbox is deleted by hand. |
 
+## To add when the school stage is tested (2026-10-20)
+
+Nothing was written for the school classes stage: migrations 0096 / 0097 are not run and no code of it has
+touched the database. When the owner tests it, these rows appear and belong in the table above:
+
+| What | Where to find the id | Why it exists |
+|---|---|---|
+| The test class | `select id, name, join_code from public.school_classes order by created_at desc limit 5` | Proof a teacher can create a class and print the sheet. |
+| Its team(s) + their projects | `select t.id, t.team_name, t.project_id from public.class_teams t join public.school_classes c on c.id = t.class_id where c.name = '<the test class>'` | Proof a team joins with the code and reaches Parts. Deleting the class cascades to the teams; the PROJECTS are separate rows and must be deleted too. |
+| Any teacher comment | `select id from public.class_team_comments` | Cascades with the team. |
+| The class parts order, if one is placed | `select id, class_id, total_qar from public.part_orders where class_id is not null` | Proof Economy delivery is QAR 0 on a class order. |
+| The credit spend rows the test circuits cost | `select id, reason from public.credits_ledger where reason like 'spend:%'` for the test projects | They came out of the teacher's balance; the owner may want them refunded rather than deleted. |
+
 ## Dry run 2026-10-10 (read-only; nothing deleted, waiting for the owner's "delete")
 
 | # | Table | Id | What |

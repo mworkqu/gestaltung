@@ -9,7 +9,7 @@ describe("shouldShowPhonePrompt", () => {
   });
 
   it("never shows when a phone is set (never asked twice)", () => {
-    expect(shouldShowPhonePrompt({ profilePhone: "+97466567410", isAccount: false, dismissed: false })).toBe(false);
+    expect(shouldShowPhonePrompt({ profilePhone: "+97433664265", isAccount: false, dismissed: false })).toBe(false);
   });
 
   it("not when dismissed in this browser", () => {
@@ -17,7 +17,7 @@ describe("shouldShowPhonePrompt", () => {
   });
 
   it("not for an account whose profile already has a phone", () => {
-    expect(shouldShowPhonePrompt({ profilePhone: "+97466567410", isAccount: true, dismissed: false })).toBe(false);
+    expect(shouldShowPhonePrompt({ profilePhone: "+97433664265", isAccount: true, dismissed: false })).toBe(false);
   });
 
   it("waits while the profile is loading", () => {

@@ -166,7 +166,8 @@ export default async function LeadsPage({
         locale={locale}
         accuracy={accuracy}
         rule={ruleRead.rule}
-        ruleSource={ruleRead.source}
+        // The leads page reads the rule with no project, so it is never "school".
+        ruleSource={ruleRead.source === "school" ? "settings" : ruleRead.source}
         migrated={migrated}
         action={saveQuoteRule}
       />

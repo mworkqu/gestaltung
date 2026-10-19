@@ -46,7 +46,7 @@ describe("renderLeadEmail", () => {
   const mail = renderLeadEmail({
     title: "New quote request",
     name: "Mona",
-    phone: "+97466567410",
+    phone: "+97433664265",
     email: "mona@example.com",
     method: "CNC machining",
     file: { name: "bracket.stl", sizeBytes: 2048 },
@@ -57,8 +57,8 @@ describe("renderLeadEmail", () => {
   });
 
   it("shows the formatted phone, a wa.me button and the real size", () => {
-    expect(visible(mail.html)).toContain("+974 6656 7410");
-    expect(mail.html).toContain('href="https://wa.me/97466567410"');
+    expect(visible(mail.html)).toContain("+974 3366 4265");
+    expect(mail.html).toContain('href="https://wa.me/97433664265"');
     expect(visible(mail.html)).toContain("bracket.stl (2 KB)");
     expect(mail.html).not.toContain("0.00 MB");
   });
@@ -71,7 +71,7 @@ describe("renderLeadEmail", () => {
     expect(v).not.toMatch(/https?:\/\//);
     expect(v).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
     expect(v).not.toContain("token=");
-    expect(v).not.toContain("+97466567410");
+    expect(v).not.toContain("+97433664265");
   });
 
   it("is English whatever the customer's language", () => {
@@ -83,7 +83,7 @@ describe("renderLeadEmail", () => {
 describe("parseLeadMessage", () => {
   it("reads a quote message, hides the link and id, keeps the notes", () => {
     const p = parseLeadMessage(
-      `Custom manufacturing quote request.\nMethod: Laser cutting\nFile: a.dxf (1.5 MB)\nStorage: quote-uploads/u/a.dxf\nDownload (valid 7 days): ${SIGNED}\nProject: Box — https://gestaltung360.com/en/projects/${UUID}\nEmail: a@b.c\nPhone / WhatsApp: +97466567410\n\nNotes:\n3 mm acrylic, 10 pcs`
+      `Custom manufacturing quote request.\nMethod: Laser cutting\nFile: a.dxf (1.5 MB)\nStorage: quote-uploads/u/a.dxf\nDownload (valid 7 days): ${SIGNED}\nProject: Box — https://gestaltung360.com/en/projects/${UUID}\nEmail: a@b.c\nPhone / WhatsApp: +97433664265\n\nNotes:\n3 mm acrylic, 10 pcs`
     );
     expect(p).toMatchObject({ method: "Laser cutting", fileName: "a.dxf", fileSize: "1.5 MB", projectId: UUID, projectName: "Box" });
     expect(p.storage).toEqual({ bucket: "quote-uploads", path: "u/a.dxf" });

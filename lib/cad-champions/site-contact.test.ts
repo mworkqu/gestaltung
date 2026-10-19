@@ -5,8 +5,8 @@ import { buildWhatsAppUrl, getCcContact } from "./site-contact";
 
 describe("buildWhatsAppUrl", () => {
   it("strips non-digits and encodes text", () => {
-    expect(buildWhatsAppUrl("+974 6656-7410", "Hi there & مرحبا")).toBe(
-      `https://wa.me/97466567410?text=${encodeURIComponent("Hi there & مرحبا")}`,
+    expect(buildWhatsAppUrl("+974 3366-4265", "Hi there & مرحبا")).toBe(
+      `https://wa.me/97433664265?text=${encodeURIComponent("Hi there & مرحبا")}`,
     );
   });
   it("returns null for empty or digit-less numbers", () => {

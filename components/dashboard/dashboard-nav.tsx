@@ -18,6 +18,7 @@ import {
   Cpu,
   FolderKanban,
   Gauge,
+  GraduationCap,
   House,
   Inbox,
   Package,
@@ -58,6 +59,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   usage: Gauge,
   notifications: Bell,
   contact: Phone,
+  schools: GraduationCap,
   inventory: Warehouse,
 };
 

@@ -55,7 +55,7 @@
 
 **16. Your legal rights.** Nothing here removes rights you have under Qatari consumer law.
 
-**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 6656 7410. Email: info@gestaltung360.com.
+**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 3366 4265. Email: info@gestaltung360.com.
 
 ## التوصيل والإرجاع — العربية
 
@@ -99,7 +99,7 @@
 
 **16. حقوقك القانونية.** لا يسقط هذا النص أي حق لك بموجب قانون حماية المستهلك في قطر.
 
-**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 6656 7410‎. البريد الإلكتروني: info@gestaltung360.com.
+**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 3366 4265‎. البريد الإلكتروني: info@gestaltung360.com.
 
 ---
 
@@ -130,7 +130,7 @@
 
 **9. Your legal rights.** This warranty does not remove rights you have under Qatari consumer law.
 
-**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 6656 7410. Email: info@gestaltung360.com.
+**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 3366 4265. Email: info@gestaltung360.com.
 
 ## الضمان — العربية
 
@@ -159,7 +159,7 @@
 
 **9. حقوقك القانونية.** لا يسقط هذا الضمان أي حق لك بموجب قانون حماية المستهلك في قطر.
 
-**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 6656 7410‎. البريد الإلكتروني: info@gestaltung360.com.
+**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 3366 4265‎. البريد الإلكتروني: info@gestaltung360.com.
 
 ---
 
@@ -203,7 +203,7 @@
 
 **18. Language.** If the English and Arabic versions differ, the Arabic version prevails for Qatari consumers.
 
-**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 6656 7410. Email: info@gestaltung360.com.
+**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 3366 4265. Email: info@gestaltung360.com.
 
 ## الشروط والأحكام — العربية
 
@@ -245,7 +245,7 @@
 
 **18. اللغة.** عند اختلاف النسختين العربية والإنجليزية، تسري النسخة العربية على المستهلكين في قطر.
 
-**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 6656 7410‎. البريد الإلكتروني: info@gestaltung360.com.
+**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 3366 4265‎. البريد الإلكتروني: info@gestaltung360.com.
 
 ---
 
@@ -295,7 +295,7 @@
 
 **12. Changes.** We may update this policy. The date above shows the latest version.
 
-**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 6656 7410. Email: info@gestaltung360.com.
+**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 3366 4265. Email: info@gestaltung360.com.
 
 ## الخصوصية — العربية
 
@@ -343,4 +343,4 @@
 
 **12. التعديلات.** قد نحدّث هذه السياسة، والتاريخ أعلاه يبيّن أحدث نسخة.
 
-**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 6656 7410‎. البريد الإلكتروني: info@gestaltung360.com.
+**للتواصل:** جستالتونج للتجارة والخدمات ذ.م.م، سجل تجاري 236988، برج رافال، لوسيل، قطر. واتساب/هاتف: ‎+974 3366 4265‎. البريد الإلكتروني: info@gestaltung360.com.

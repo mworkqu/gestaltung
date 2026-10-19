@@ -52,9 +52,9 @@ describe("signing", () => {
   });
 
   it("puts the phone in its slot with a + prefix", () => {
-    const body = buildCreateBody({ ...draft, customer: { ...draft.customer, phone: "0097466567410" } }, { keyId: "k" }, "u");
-    expect(body.Phone).toBe("+97466567410");
-    expect(combinedData(body, CREATE_SIGNATURE_FIELDS)).toContain("LastName=Al-Kuwari,Phone=+97466567410,Email=");
+    const body = buildCreateBody({ ...draft, customer: { ...draft.customer, phone: "0097433664265" } }, { keyId: "k" }, "u");
+    expect(body.Phone).toBe("+97433664265");
+    expect(combinedData(body, CREATE_SIGNATURE_FIELDS)).toContain("LastName=Al-Kuwari,Phone=+97433664265,Email=");
   });
 
   it("verifies a webhook with the documented field order (test vector)", () => {

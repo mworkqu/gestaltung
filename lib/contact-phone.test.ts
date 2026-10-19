@@ -13,7 +13,7 @@ describe("contact phone", () => {
   it("defaults to the number in lib/company.ts", () => {
     expect(DEFAULT_CONTACT_PHONE.display).toBe(COMPANY_WHATSAPP.display);
     expect(DEFAULT_CONTACT_PHONE.whatsappUrl).toBe(COMPANY_WHATSAPP.url);
-    expect(DEFAULT_CONTACT_PHONE.tel).toBe("tel:+97466567410");
+    expect(DEFAULT_CONTACT_PHONE.tel).toBe("tel:+97433664265");
   });
 
   it("derives display, wa.me and tel: from one E.164 value", () => {

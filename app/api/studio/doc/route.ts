@@ -3,6 +3,9 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { DOC_MAX_BYTES, loadDoc, saveDoc } from "@/lib/studio/server/doc";
 import { DocPutBody } from "@/lib/studio/server/http";
+import { studioLibrary } from "@/lib/studio/library/remote";
+import { classDocRefusal } from "@/lib/schools/safe-parts";
+import { isClassProject } from "@/lib/schools/server";
 
 // GET  /api/studio/doc?projectId= → {doc, version} (doc null when none / unreadable)
 // PUT  /api/studio/doc {projectId, doc, version} → 200 {version}
@@ -10,6 +13,10 @@ import { DocPutBody } from "@/lib/studio/server/http";
 //      | 400 invalid | 413 too_large
 // projects.studio + studio_version (0068), written through RLS with
 // optimistic concurrency. Guest sessions count as users.
+//
+// 3d safety mode: the Parts step can add a part BY HAND, which never goes near
+// /api/studio/pick, so a class project's save is refused (422 unsafe_part) when
+// the document names a part a class may not use.
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +55,16 @@ export async function PUT(request: Request) {
   }
   const parsed = DocPutBody.safeParse(json);
   if (!parsed.success) return Response.json({ error: "invalid" }, { status: 400 });
+
+  // 3d: refuse an unsafe part in a class project's document. Only asked when
+  // the document actually names parts, so an empty autosave costs nothing.
+  if (parsed.data.doc.components.length > 0 && (await isClassProject(supabase, parsed.data.projectId))) {
+    const refusal = classDocRefusal(parsed.data.doc.components, await studioLibrary());
+    if (refusal) {
+      console.warn(`[studio/doc] ${parsed.data.projectId}: class project refused ${refusal.parts.join(", ")}`);
+      return Response.json(refusal, { status: 422 });
+    }
+  }
 
   const r = await saveDoc(supabase, parsed.data.projectId, parsed.data.doc, parsed.data.version);
   if (r.ok) return Response.json({ version: r.version });

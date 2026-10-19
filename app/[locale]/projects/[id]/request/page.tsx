@@ -53,7 +53,7 @@ export default async function ProjectRequestPage({ params }: { params: Promise<{
   const [loaded, lib, rule, ownerQuote, pictureUrl, tp] = await Promise.all([
     loadDoc(supabase, id),
     studioLibrary().catch(() => null),
-    getQuoteRule(supabase),
+    getQuoteRule(supabase, id),
     getProjectQuote(supabase, id),
     projectPreviewUrl(supabase, id),
     getTranslations({ locale, namespace: "StudioPreview" }),

@@ -7,10 +7,14 @@
 // The 3D view needs the 3D engine, so it shows only once the design has its CAD
 // (or in the template enclosure flow); before that the chosen design's picture
 // (else the parts picture) stands in, and "Share picture" uses it (owner 2026-10-11).
+//
+// 3c: in a CLASS project there is no checkout. "Order the parts" becomes
+// "Ask your teacher to order the parts" — a plain line, not a button — because
+// their teacher buys the parts for every team in one order.
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Factory, Loader2, ShoppingCart } from "lucide-react";
+import { Factory, Loader2, School, ShoppingCart } from "lucide-react";
 
 import { useRouter } from "@/i18n/navigation";
 import { StudioViewer } from "@/components/studio/viewer/ViewerLazy";
@@ -77,6 +81,7 @@ export function MakeStep({
   products,
   engine,
   pictureUrl,
+  isClass = false,
 }: {
   ctx: StudioCtx;
   doc: StudioDoc;
@@ -85,9 +90,12 @@ export function MakeStep({
   engine: boolean;
   /** The chosen design's picture, when there is one. */
   pictureUrl: string | null;
+  /** 3c: a school class team — no checkout, their teacher orders the parts. */
+  isClass?: boolean;
 }) {
   const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
+  const tSafe = useTranslations("SchoolSafety");
   const router = useRouter();
   const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
   const viewer = useRef<ShareSource | null>(null);
@@ -126,13 +134,25 @@ export function MakeStep({
   return (
     <StepFrame step="make" n={ctx.n("make")} title={t("title_make")} headline={t("headline_make")} intro={t("intro_make")}>
       <div className="grid gap-4">
-        <BigOption
-          icon={ShoppingCart}
-          title={t("orderParts")}
-          text={t("orderPartsText")}
-          busy={cart.state === "adding"}
-          onClick={() => void orderParts()}
-        />
+        {isClass ? (
+          <div className="tile flex items-start gap-3" data-testid="studio-ask-teacher">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
+              <School className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block title-card">{tSafe("askTeacher")}</span>
+              <span className="mt-1 block text-sm leading-relaxed text-mutedtext">{tSafe("askTeacherNote")}</span>
+            </span>
+          </div>
+        ) : (
+          <BigOption
+            icon={ShoppingCart}
+            title={t("orderParts")}
+            text={t("orderPartsText")}
+            busy={cart.state === "adding"}
+            onClick={() => void orderParts()}
+          />
+        )}
       </div>
       {placed.length > 0 && (
         <div className="space-y-2">

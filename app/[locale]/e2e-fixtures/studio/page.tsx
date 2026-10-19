@@ -42,6 +42,8 @@ export default async function StudioFixturePage({
           product={sp.product === "1"}
           idea={idea}
           admin={sp.admin === "1"}
+          classTeam={sp.class === "1"}
+          finished={sp.finished === "1"}
         />
       </div>
     </MessagesScope>

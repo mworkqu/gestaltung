@@ -28,6 +28,7 @@ import { shippingFor } from "@/lib/store/shipping";
 import { checkoutRpcError, validateCheckoutEmail } from "@/lib/store/checkout";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { arabicCountForm } from "@/lib/text/count";
+import { useClassOrderId } from "@/lib/schools/client";
 
 const fieldClass =
   "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -44,8 +45,19 @@ export default function CheckoutClient() {
   const tPay = useTranslations("PayMethods");
   const tPhone = useTranslations("Phone");
   const [payMethod, setPayMethod] = useState<PaymentMethod>("cash_on_delivery");
-  const { quote, legacy, error: quoteError } = useDeliveryQuote(items);
+  // 3e: a teacher's class order (?class=<id>). The quote then comes from
+  // class_order_delivery_quote (Economy at QAR 0), the tier starts on Economy,
+  // and the id goes to create_part_order, which checks it is their own class.
+  const classOrderId = useClassOrderId();
+  const { quote, legacy, error: quoteError } = useDeliveryQuote(items, classOrderId);
   const [tier, setTier] = useState<ShippingTier>("standard");
+  const classTierSet = useRef(false);
+  useEffect(() => {
+    if (classOrderId && !classTierSet.current) {
+      classTierSet.current = true;
+      setTier("economy");
+    }
+  }, [classOrderId]);
   const [split, setSplit] = useState(false);
   const canSplit = Boolean(quote?.can_split);
   const doSplit = split && canSplit;
@@ -176,13 +188,24 @@ export default function CheckoutClient() {
       // Before migration 0029 the RPC has no shipping parameters.
       ...(legacy ? {} : { p_shipping_tier: tier, p_split: doSplit }),
     };
+    // 3e: only sent for a class order, so a normal checkout is byte-for-byte
+    // the call it was before.
+    const classArgs = !legacy && classOrderId ? { p_class_id: classOrderId } : {};
     // The payment method goes in with the order (0044) so a bank transfer
     // without an email is refused before any order exists. A database
     // without 0044 has no such parameter (PGRST202): place it without.
     let { data, error: rpcError } = await supabase.rpc(
       "create_part_order",
-      legacy ? orderArgs : { ...orderArgs, p_payment_method: payMethod }
+      legacy ? orderArgs : { ...orderArgs, p_payment_method: payMethod, ...classArgs }
     );
+    // A database without migration 0097 has no p_class_id: place the order
+    // without the class link (delivery is then charged at the normal price).
+    if (rpcError?.code === "PGRST202" && classOrderId) {
+      ({ data, error: rpcError } = await supabase.rpc(
+        "create_part_order",
+        legacy ? orderArgs : { ...orderArgs, p_payment_method: payMethod }
+      ));
+    }
     if (rpcError?.code === "PGRST202" && !legacy) {
       ({ data, error: rpcError } = await supabase.rpc("create_part_order", orderArgs));
     }

@@ -72,7 +72,7 @@ Source: STAGE_SITE_REVIEW_FIXES_PROMPT.md
 - Delivery cost is shown on the product page and in the cart ("Delivery from QAR 50", free-delivery gap).
 - An empty cart sent to checkout is redirected to the cart on the server (client check stays as a fallback).
 - Handling line hidden at 0; split-shipment option no longer reads "(+QAR 0.00)" when delivery is free.
-- Copy fixes A4-A9: price note ("This is your final price. We confirm your order on WhatsApp."), card-payment "coming soon" once under the method list, Fawran account name shown with the legal name (page and email; IBAN stays email-only), email required with hint and inline error for bank transfer (EN + AR), company WhatsApp +974 6656 7410 link under the payment confirmation note (`COMPANY_WHATSAPP` in lib/company.ts), hint for delivery area "Other".
+- Copy fixes A4-A9: price note ("This is your final price. We confirm your order on WhatsApp."), card-payment "coming soon" once under the method list, Fawran account name shown with the legal name (page and email; IBAN stays email-only), email required with hint and inline error for bank transfer (EN + AR), company WhatsApp +974 3366 4265 link under the payment confirmation note (`COMPANY_WHATSAPP` in lib/company.ts), hint for delivery area "Other".
 - Guest cart persistence verified: @supabase/ssr cookies have a 400-day maxAge, so no change was needed.
 - Tests 319; i18n parity 2295/2295 EN/AR; `scripts/check-i18n-parity.mjs` added.
 - Pending owner steps: run 0044 (after 0043).

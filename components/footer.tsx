@@ -28,6 +28,7 @@ export async function Footer() {
     { href: "/how-it-works", label: tNav("howItWorks") },
     { href: "/about", label: tNav("about") },
     { href: "/students", label: t("students") },
+    { href: "/schools", label: t("schools") },
     { href: "/institutions", label: t("institutions") },
     { href: "/partners/schools", label: t("partners") },
     { href: "/trust", label: t("trust") },

@@ -13,8 +13,17 @@ import type { DeliveryQuote } from "@/lib/store/delivery";
  * say so instead of silently showing no delivery options.
  * kit_id is sent so the server's goods subtotal (free delivery, 0044) applies
  * the kit discount exactly as the order will; older databases ignore it.
+ *
+ * 3e: with `classId` (a teacher buying the parts for every team in their class)
+ * the quote comes from public.class_order_delivery_quote instead, which is the
+ * same quote with Economy at QAR 0 — the rule lives in the database, so the
+ * page only displays it. Only the class's own teacher may call it; anything
+ * else, or a database without migration 0097, falls back to the normal quote.
  */
-export function useDeliveryQuote(items: { partId: string; quantity: number; kitId?: string | null }[]) {
+export function useDeliveryQuote(
+  items: { partId: string; quantity: number; kitId?: string | null }[],
+  classId?: string | null,
+) {
   const [quote, setQuote] = useState<DeliveryQuote | null>(null);
   const [legacy, setLegacy] = useState(false);
   const [error, setError] = useState(false);
@@ -30,8 +39,13 @@ export function useDeliveryQuote(items: { partId: string; quantity: number; kitI
       const [part_id, quantity, kit_id] = s.split(":");
       return { part_id, quantity: Number(quantity), kit_id: kit_id || null };
     });
-    createClient()
-      .rpc("order_delivery_quote", { p_items })
+    const client = createClient();
+    const normal = () => client.rpc("order_delivery_quote", { p_items });
+    const first = classId
+      ? client.rpc("class_order_delivery_quote", { p_items, p_class: classId })
+      : normal();
+    first
+      .then((r) => (classId && r.error ? normal() : r))
       .then(({ data, error }) => {
         if (cancelled) return;
         setLegacy(error?.code === "PGRST202");
@@ -41,7 +55,7 @@ export function useDeliveryQuote(items: { partId: string; quantity: number; kitI
     return () => {
       cancelled = true;
     };
-  }, [key]);
+  }, [key, classId]);
 
   return { quote, legacy, error };
 }

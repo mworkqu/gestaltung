@@ -225,8 +225,12 @@ export function quoteBreakdown({
 export type QuoteCalc = {
   v: 1;
   rule_version: string;
-  /** "settings" = store_settings.studio_quote_rule, "default" = the code defaults. */
-  rule_source: "settings" | "default";
+  /**
+   * "settings" = store_settings.studio_quote_rule, "default" = the code
+   * defaults, "school" = the school print rule for a class project (3e,
+   * store_settings.school_pricing.print).
+   */
+  rule_source: "settings" | "default" | "school";
   base_qar: number;
   per_gram_qar: number;
   spread: number;
@@ -247,7 +251,7 @@ export type QuoteCalc = {
 
 export function quoteCalcSnapshot(
   b: QuoteBreakdown,
-  meta: { ruleSource: "settings" | "default"; projectId: string | null; projectLink: string | null; now?: Date },
+  meta: { ruleSource: "settings" | "default" | "school"; projectId: string | null; projectLink: string | null; now?: Date },
 ): QuoteCalc {
   const e = b.estimate;
   return {
@@ -317,7 +321,7 @@ export function parseQuoteCalc(value: unknown): QuoteCalc | null {
   return {
     v: 1,
     rule_version: str(o.rule_version) ?? "",
-    rule_source: o.rule_source === "settings" ? "settings" : "default",
+    rule_source: o.rule_source === "settings" || o.rule_source === "school" ? o.rule_source : "default",
     base_qar: base,
     per_gram_qar: rate,
     spread,

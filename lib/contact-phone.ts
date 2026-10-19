@@ -10,13 +10,13 @@ import { normalizePhone } from "@/lib/phone";
 export const CONTACT_PHONE_KEY = "contact_phone";
 
 export type ContactPhone = {
-  /** Bare E.164, e.g. "+97466567410" (what is stored). */
+  /** Bare E.164, e.g. "+97433664265" (what is stored). */
   e164: string;
-  /** How it is shown: "+974 6656 7410". */
+  /** How it is shown: "+974 3366 4265". */
   display: string;
-  /** "https://wa.me/97466567410" (no text; use whatsappLink() for a prefilled message). */
+  /** "https://wa.me/97433664265" (no text; use whatsappLink() for a prefilled message). */
   whatsappUrl: string;
-  /** "tel:+97466567410" */
+  /** "tel:+97433664265" */
   tel: string;
 };
 

@@ -22,9 +22,13 @@ export function isAppPath(pathname: string): boolean {
   );
 }
 
-/** The printable pilot proposal (P2-05) is a sheet of paper: no site header or trust block, on screen or in print. */
+/**
+ * A printable sheet is a sheet of paper: no site header or trust block, on
+ * screen or in print. The pilot proposal (P2-05) and the class join sheet a
+ * teacher puts on the wall (3b).
+ */
 export function isPrintSheetPath(pathname: string): boolean {
-  return pathname === "/institutions/proposal";
+  return pathname === "/institutions/proposal" || /^\/schools\/classes\/[^/]+\/sheet$/.test(pathname);
 }
 
 export function HeaderGate({ children }: { children: React.ReactNode }) {

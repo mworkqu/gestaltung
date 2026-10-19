@@ -1,21 +1,21 @@
 -- 0064_normalise_phones.sql  (NOT RUN — owner runs it, after 0063)
 --
--- Group 7 (P5-07): one stored form for phone numbers, bare E.164 (+97466567410).
--- The app DISPLAYS Qatar numbers as "+974 6656 7410" (lib/phone.ts formatPhoneDisplay);
+-- Group 7 (P5-07): one stored form for phone numbers, bare E.164 (+97433664265).
+-- The app DISPLAYS Qatar numbers as "+974 3366 4265" (lib/phone.ts formatPhoneDisplay);
 -- stored values stay compact because wa.me and tel: need digits only. New writes are
 -- already normalised by normalizePhone() (store-lead, design-quote, phone prompt,
 -- sign-up); this fixes the rows saved before that.
 --
 -- Rule (same as lib/phone.ts normalizePhone, a little stricter on 8-digit numbers):
 --   1. keep digits only; drop a leading "00" (international access code);
---   2. collapse a doubled country code ("974 974 6656 7410" -> "974 6656 7410");
+--   2. collapse a doubled country code ("974 974 3366 4265" -> "974 3366 4265");
 --   3. an 8-digit number starting 3-7 is a Qatar number -> prefix 974;
 --   4. only when the result is "974" + 8 digits is it written as "+974XXXXXXXX".
 -- Anything else (foreign numbers, test placeholders, junk) is left exactly as it is.
 --
 -- Read-only check against production on 2026-10-10 (rows that WOULD change):
 --   inquiries.phone          6 of 10  (3 spaced "+974 NNNN NNNN", 2 bare 8-digit, 1 doubled code
---                                      "+97497466567410" -> "+97466567410")
+--                                      "+97497433664265" -> "+97433664265")
 --   profiles.phone           0 of 6
 --   part_orders.customer_phone 3 of 11 (2 spaced, 1 bare 8-digit)
 --

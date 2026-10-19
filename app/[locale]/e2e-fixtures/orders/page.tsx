@@ -22,7 +22,7 @@ function order(id: string, status: string, extra: Partial<OrderListRow> = {}): O
     id,
     profile_id: null,
     customer_name: "Sample Customer",
-    customer_phone: "+97466567410",
+    customer_phone: "+97433664265",
     customer_email: null,
     delivery_area: "doha",
     delivery_notes: null,

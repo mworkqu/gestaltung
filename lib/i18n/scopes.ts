@@ -56,6 +56,11 @@ export const MESSAGE_SCOPES = {
     "PriceInvite",
   ],
   auth: ["Auth", "GuestClaim", "Phone.invalid", "Turnstile"],
+  // /join: the student form. No personal data is ever asked for, so the
+  // only extras are the safety banner and the guest-session bot check.
+  join: ["SchoolJoin", "SchoolSafety", "Turnstile"],
+  // /schools/classes and a class page: the teacher's own forms and buttons.
+  schools: ["SchoolClasses", "SchoolSafety", "Parts", "Delivery", "Turnstile"],
   projects: ["Projects", "Turnstile"],
   // /orders/[id]: only PaymentInstructions is a client component; the rest of
   // the Orders namespace is read on the server.
@@ -65,6 +70,8 @@ export const MESSAGE_SCOPES = {
   // (AccessNote, the consent line, PhonePrompt, the guest check dialog).
   studio: [
     "Studio",
+    // 3d: the class banner + "ask your teacher" wording on a class project.
+    "SchoolSafety",
     // W2: the "Get it made" bar + pop-up (components/studio/GetItMade.tsx).
     "StudioRequest",
     "Credits",

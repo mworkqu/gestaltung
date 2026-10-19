@@ -41,7 +41,7 @@ describe("projectLinkEmail", () => {
     expect(m.html).toContain("Plant &lt;monitor&gt;");
     expect(m.html).toContain("Keep this email to open your project on any device.");
     expect(m.html).toContain("Gestaltung for Trading and Services W.L.L · C.R. 236988");
-    expect(m.html).toContain("+974 6656 7410");
+    expect(m.html).toContain("+974 3366 4265");
     expect(m.text).toContain(url);
     expect(m.html).not.toContain("Earlier links no longer work");
   });
