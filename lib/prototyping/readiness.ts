@@ -46,6 +46,12 @@ export type ReadinessInput = {
   parts: PartLike[];
   routeAccepted: boolean;
   /**
+   * When an analysis last succeeded for this project (spec.runAt, or the latest
+   * successful run). With it, a spec the analysis left empty can say so instead
+   * of claiming the brief was never analysed.
+   */
+  analysedAt?: string | null;
+  /**
    * Known boards the project uses (footprints.projectBoards over its BOM,
    * catalog parts and store lines), so an enclosure too small for its board
    * ("tooSmall") blocks like any other part need (audit #5).
@@ -107,25 +113,42 @@ export function projectReadiness(p: ReadinessInput, t: Translate): Readiness {
   const add = (r: Omit<Requirement, "blockingReason">, reason: string) =>
     req.push(r.satisfied ? r : { ...r, blockingReason: reason });
 
-  // Brief
+  // Brief. A brief that exists but is too short is NOT a brief that was never
+  // written: saying so was the complaint in the 18 Oct 2026 export, where a
+  // 24-character brief read "Brief not written". Each of the three states gets
+  // its own words, and the short one names the length it has to reach.
   const brief = (p.brief ?? "").trim();
   const schema = looksLikeSchema(brief);
+  const briefReady = !schema && brief.length >= MIN_BRIEF_CHARS;
   add(
     {
       id: "brief",
       group: "brief",
       label: t("req_brief"),
-      satisfied: !schema && brief.length >= MIN_BRIEF_CHARS,
+      satisfied: briefReady,
       focus: "brief-editor",
     },
-    schema ? t("block_briefSchema") : t("block_briefMissing")
+    schema
+      ? t("block_briefSchema")
+      : brief.length === 0
+        ? t("block_briefMissing")
+        : t("block_briefShort", { min: String(MIN_BRIEF_CHARS), have: String(brief.length) })
   );
 
-  // What we understood: analysed, then confirmed as a block.
+  // What we understood: analysed, then confirmed as a block. While the brief
+  // itself is the blocker there is nothing to analyse, so the row says that
+  // rather than blaming the analysis; and a brief that WAS analysed but left
+  // the spec empty says so instead of "not analysed yet".
   const spec = p.spec ?? null;
   add(
     { id: "understanding", group: "understanding", label: t("req_understanding"), satisfied: !!spec?.confirmed },
-    isAnalysed(spec) ? t("block_specUnconfirmed") : t("block_notAnalysed")
+    isAnalysed(spec)
+      ? t("block_specUnconfirmed")
+      : !briefReady
+        ? t("block_briefFirst")
+        : p.analysedAt
+          ? t("block_analysedNothing")
+          : t("block_notAnalysed")
   );
 
   // Needs your input: one requirement per open question that changes the plan

@@ -76,7 +76,20 @@ export type FallbackReason = "missing_key" | "rate_limited" | "malformed" | "una
 /** One line of the /api/analyse NDJSON stream. */
 export type AnalysisEvent =
   | { type: "step"; step: AnalysisStep }
-  | { type: "result"; analysis: Analysis; provider: string; fallback: FallbackReason | null }
+  | {
+      type: "result";
+      analysis: Analysis;
+      provider: string;
+      fallback: FallbackReason | null;
+      /**
+       * The stored answer to an identical request: no provider was called and
+       * nothing was charged. The client has nothing new to show, so it puts the
+       * focus on the question still waiting for an answer instead.
+       */
+      reused?: boolean;
+      /** When the run being reused actually happened. */
+      runAt?: string;
+    }
   | { type: "error" };
 
 // ── Standard facts ─────────────────────────────────────────────────────────

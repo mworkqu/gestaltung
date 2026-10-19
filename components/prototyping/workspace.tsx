@@ -509,6 +509,9 @@ export function PrototypingWorkspace({
       spec,
       parts,
       routeAccepted,
+      // Lets "Understanding confirmed" say "we read it and could not make
+      // anything of it" instead of "not analysed yet".
+      analysedAt: spec?.runAt ?? null,
       // The same boards the Parts list checks enclosures against (audit #5).
       boards: projectBoards({
         bom,
