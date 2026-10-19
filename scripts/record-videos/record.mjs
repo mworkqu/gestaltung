@@ -72,16 +72,18 @@ const CURSOR_SCRIPT = `
 
 // "-ar" recipes record the Arabic site (YouTube versions).
 const AR = slug.endsWith("-ar");
+// -ar and -en takes are the YouTube cuts: wider page, 1600x900.
+const YT = AR || slug.endsWith("-en");
 const browser = await chromium.launch();
 const context = await browser.newContext({
   // -ar (YouTube) takes: a wider page (1600x900 CSS px). Playwright paints the
   // video in CSS pixels, so the frame size must equal the viewport (a bigger
   // frame only adds grey bands); youtube.mjs scales it up to 1080p.
-  viewport: AR ? { width: 1600, height: 900 } : { width: 1280, height: 720 },
-  deviceScaleFactor: AR ? 1.2 : 1,
+  viewport: YT ? { width: 1600, height: 900 } : { width: 1280, height: 720 },
+  deviceScaleFactor: YT ? 1.2 : 1,
   locale: AR ? "ar-QA" : "en-GB",
   timezoneId: "Asia/Qatar",
-  recordVideo: { dir, size: AR ? { width: 1600, height: 900 } : { width: 1280, height: 720 } },
+  recordVideo: { dir, size: YT ? { width: 1600, height: 900 } : { width: 1280, height: 720 } },
   ...(STATE ? { storageState: STATE } : {}),
 });
 await context.addInitScript(CURSOR_SCRIPT);
@@ -532,6 +534,311 @@ const CLIPS = {
     await wait(1500);
     mark("payment");
     for (const name of ["فوران", "تحويل بنكي"]) {
+      const el = page.getByText(name, { exact: true }).first();
+      if (await el.count()) { await moveTo(el).catch(() => {}); await wait(1300); }
+    }
+    await wait(2500);
+    mark("end");
+  },
+
+  // English twins of the -ar recipes above (YouTube, 2026-10-19): same steps on /en.
+  async "idea-to-kit-en"() {
+    await goto("/en");
+    await declineCookies();
+    await wait(800);
+    mark("home");
+    await wait(1500);
+    await click(page.getByRole("link", { name: "Start a project" }).first());
+    await page.waitForURL(/\/projects\/new/, { timeout: 30000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(900);
+    mark("new");
+    await typeInto(page.getByPlaceholder(/handheld milk frother/).first(), "A device that waters a small plant automatically when the soil is dry, powered by a USB adapter, with a 3D-printed case");
+    mark("typed");
+    await wait(600);
+    await click(page.getByRole("checkbox").first());
+    await wait(700);
+    mark("consent");
+    await click(page.getByRole("button", { name: "Start", exact: true }));
+    mark("start");
+    await page.waitForURL(/\/projects\/[0-9a-f-]{36}\/studio/, { timeout: 90000 });
+    const projectId = page.url().match(/projects\/([0-9a-f-]{36})/)[1];
+    fs.writeFileSync(path.join(dir, "project.json"), JSON.stringify({ projectId, url: page.url() }, null, 2));
+    console.log(`PROJECT ${projectId}`);
+    await page.waitForLoadState("networkidle").catch(() => {});
+    mark("studio");
+    await debug("studio");
+    // Answer the tap questions until the summary card offers "Looks right — next".
+    const confirm = page.getByTestId("studio-idea-confirm");
+    for (let i = 0; i < 6; i++) {
+      const choice = page.getByTestId("studio-choices").getByRole("button").first();
+      const which = await Promise.race([
+        confirm.waitFor({ state: "visible", timeout: 90000 }).then(() => "confirm"),
+        choice.waitFor({ state: "visible", timeout: 90000 }).then(() => "choice"),
+      ]).catch(() => "none");
+      if (which !== "choice") break;
+      await wait(1800);
+      mark(`answer-${i}`);
+      await click(choice);
+      await wait(800);
+    }
+    await confirm.waitFor({ state: "visible", timeout: 120000 });
+    await wait(1500);
+    mark("summary");
+    await debug("summary");
+    await shot("summary");
+    await wait(3000);
+    await click(confirm);
+    mark("parts-start");
+    await page.getByTestId("studio-part-row").first().waitFor({ state: "visible", timeout: 180000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(2500);
+    mark("parts");
+    await debug("parts");
+    await shot("parts");
+    const rows = page.getByTestId("studio-part-row");
+    const n = Math.min(await rows.count(), 4);
+    for (let i = 0; i < n; i++) { await moveTo(rows.nth(i)).catch(() => {}); await wait(1100); }
+    mark("rows");
+    await moveTo(page.getByText("Parts total").first()).catch(() => {});
+    await wait(2500);
+    mark("total");
+    await shot("total");
+    await wait(2500);
+    mark("end");
+  },
+
+  async "studio-3d-en"() {
+    await goto("/en/e2e-fixtures/studio?product=1&idea=plant_waterer&step=wiring");
+    await declineCookies();
+    const tabs = page.getByTestId("studio-wiring-tabs");
+    const draw = page.getByRole("button", { name: /Draw my wiring/ }).first();
+    await tabs.or(draw).first().waitFor({ state: "visible", timeout: 30000 });
+    await wait(1500);
+    mark("wiring");
+    if (!(await tabs.isVisible())) {
+      await click(draw);
+      await tabs.waitFor({ state: "visible", timeout: 30000 });
+    }
+    await page.waitForTimeout(2500);
+    mark("wiring-drawn");
+    await debug("wiring");
+    await scrollToEl(tabs, 150);
+    await wait(2500);
+    await smoothScroll(380);
+    await wait(3500);
+    await scrollToEl(tabs, 200);
+    await wait(600);
+    mark("wiring-pic");
+    await click(page.getByTestId("studio-wiring-tab-3d"));
+    await page.getByTestId("studio-wiring-panel-3d").waitFor({ state: "visible", timeout: 20000 });
+    await wait(4500);
+    mark("breadboard");
+    await debug("breadboard");
+    await shot("breadboard");
+    // A slow orbit of the breadboard: drag across the 3D view.
+    const p3 = await page.getByTestId("studio-wiring-panel-3d").boundingBox();
+    if (p3) {
+      const cx = p3.x + p3.width / 2, cy = p3.y + p3.height / 2;
+      await page.mouse.move(cx + 120, cy); mouse = { x: cx + 120, y: cy };
+      await page.mouse.down();
+      await page.mouse.move(cx - 160, cy + 30, { steps: 90 });
+      await page.mouse.up();
+      mouse = { x: cx - 160, y: cy + 30 };
+    }
+    await wait(3000);
+    mark("orbit");
+    await scrollToEl(tabs, 200);
+    await wait(500);
+    await click(page.getByTestId("studio-wiring-tab-pins"));
+    await wait(1200);
+    const pins = page.getByTestId("studio-pin-row");
+    for (let i = 0; i < Math.min(await pins.count(), 3); i++) { await moveTo(pins.nth(i)).catch(() => {}); await wait(900); }
+    mark("pins");
+    await debug("pins");
+    await click(page.getByRole("button", { name: "Next", exact: true }).first());
+    mark("enclosure");
+    await page.getByTestId("studio-product-pictures").waitFor({ state: "visible", timeout: 30000 });
+    await page.locator('[data-testid="studio-product-pictures"][data-phase="ready"]').waitFor({ timeout: 90000 });
+    await wait(1000);
+    mark("pictures");
+    await scrollToEl(page.getByTestId("studio-product-pictures"), 140);
+    await wait(1500);
+    const cards = page.getByTestId("studio-product-card");
+    for (let i = 0; i < Math.min(await cards.count(), 3); i++) { await moveTo(cards.nth(i)).catch(() => {}); await wait(1300); }
+    await debug("pictures");
+    await shot("pictures");
+    mark("cards");
+    await click(cards.first());
+    await wait(1200);
+    await click(page.getByTestId("studio-create-cad"));
+    mark("cad");
+    const viewer = page.getByTestId("studio-product-viewer");
+    await viewer.waitFor({ state: "visible", timeout: 90000 });
+    await wait(4000);
+    await scrollToEl(viewer, 140).catch(() => {});
+    await wait(2000);
+    mark("viewer");
+    await debug("viewer");
+    await shot("viewer");
+    const vb = await viewer.boundingBox();
+    if (vb) {
+      const cx = vb.x + vb.width / 2, cy = vb.y + vb.height / 2;
+      await page.mouse.move(cx - 150, cy); mouse = { x: cx - 150, y: cy };
+      await page.mouse.down();
+      await page.mouse.move(cx + 170, cy - 20, { steps: 100 });
+      await page.mouse.up();
+      mouse = { x: cx + 170, y: cy - 20 };
+    }
+    await wait(2500);
+    mark("orbit-3d");
+    await click(page.getByTestId("studio-take-apart"));
+    await wait(4500);
+    mark("apart");
+    await debug("apart");
+    await shot("apart");
+    await wait(2500);
+    mark("end");
+  },
+
+  async "file-to-part-en"() {
+    const stl = fs.readFileSync(path.join(dir, "bracket.stl"), "utf8");
+    await goto("/en/design");
+    await declineCookies();
+    await wait(1200);
+    mark("design");
+    await wait(1500);
+    const zone = page.getByRole("button", { name: /Drop your 3D or drawing file/ }).first();
+    await scrollToEl(zone, 200);
+    await wait(600);
+    await moveTo(zone);
+    const dt = await page.evaluateHandle((text) => {
+      const d = new DataTransfer();
+      d.items.add(new File([text], "bracket.stl", { type: "model/stl" }));
+      return d;
+    }, stl);
+    await zone.dispatchEvent("dragenter", { dataTransfer: dt });
+    await zone.dispatchEvent("dragover", { dataTransfer: dt });
+    await wait(1600);
+    mark("dragover");
+    await zone.dispatchEvent("drop", { dataTransfer: dt });
+    mark("drop");
+    await page.waitForURL(/\/design\/quote/, { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1800);
+    mark("quote");
+    await debug("quote");
+    await moveTo(page.getByText("bracket.stl").first()).catch(() => {});
+    await wait(2200);
+    await smoothScroll(360);
+    await wait(2200);
+    mark("form");
+    await goto("/en/how-it-works#make");
+    await wait(1500);
+    mark("how");
+    await debug("how");
+    for (const step of ["Our engineer quotes the method", "Made in our Lusail studio", "Delivered"]) {
+      const el = page.getByText(step, { exact: true }).first();
+      if (await el.count()) { await scrollToEl(el, 300).catch(() => {}); await moveTo(el).catch(() => {}); await wait(1500); }
+    }
+    mark("steps");
+    await goto("/en/design");
+    await wait(1000);
+    const ways = page.getByText("Four ways to make your part").first();
+    await scrollToEl(ways, 160).catch(() => {});
+    await wait(1000);
+    mark("ways");
+    await debug("ways");
+    for (const m of ["3D printing", "CNC machining", "Laser cutting", "EDM"]) {
+      const el = page.getByText(m).first();
+      if (await el.count()) { await moveTo(el).catch(() => {}); await wait(1100); }
+    }
+    await wait(2000);
+    mark("end");
+  },
+
+  async "sketch-to-drawing-en"() {
+    await goto("/en/design/drawing");
+    await declineCookies();
+    await wait(1200);
+    mark("drawing");
+    await wait(2200);
+    const tiers = page.getByText("Simple, flat tiers.").first();
+    await scrollToEl(tiers, 190).catch(() => {});
+    await wait(1000);
+    mark("tiers");
+    await debug("tiers");
+    await shot("tiers");
+    await smoothScroll(220);
+    await wait(2500);
+    await smoothScroll(-2400, { step: 14 });
+    await wait(700);
+    const cta = page.getByRole("link", { name: "Start a drawing request" }).first();
+    await click(cta);
+    await page.waitForURL(/for=drawing/, { timeout: 30000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1400);
+    mark("form");
+    await debug("form");
+    await typeInto(page.getByPlaceholder("e.g. Dive watch"), "Shelf bracket");
+    await wait(600);
+    mark("name");
+    await typeInto(page.locator("textarea").first(), "L-shaped wall bracket, 80 x 60 mm, 4 mm thick aluminium, two 5 mm screw holes.");
+    await wait(1600);
+    mark("described");
+    await debug("described");
+    await wait(2500);
+    mark("end");
+  },
+
+  async "store-to-door-en"() {
+    await goto("/en/store?q=" + encodeURIComponent("soil moisture"));
+    await declineCookies();
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1500);
+    mark("results");
+    await debug("results");
+    const product = page.locator('a[href*="/store/VLT-"]').filter({ hasText: /Soil/i }).first();
+    await moveTo(product);
+    await wait(700);
+    await click(product);
+    await page.waitForURL(/\/store\/VLT-/, { timeout: 30000 });
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1200);
+    mark("product");
+    await debug("product");
+    await shot("product");
+    await moveTo(page.getByText(/Arrives by/).first()).catch(() => {});
+    await wait(2200);
+    mark("arrives");
+    await moveTo(page.getByText(/Stocked by|Sourced/).first()).catch(() => {});
+    await wait(1600);
+    await smoothScroll(520);
+    await wait(1800);
+    mark("specs");
+    await smoothScroll(-520);
+    await wait(600);
+    const add = page.getByRole("button", { name: "Add to Cart" }).first();
+    await click(add);
+    mark("added");
+    await wait(2200);
+    await goto("/en/store/cart");
+    await wait(1500);
+    mark("cart");
+    await debug("cart");
+    await wait(1600);
+    const checkout = page.getByRole("link", { name: /checkout/i }).or(page.getByRole("button", { name: /checkout/i }));
+    await click(checkout.first());
+    await page.waitForURL(/\/store\/checkout/, { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await wait(1400);
+    mark("checkout");
+    await debug("checkout");
+    const pay = page.getByText("Cash on delivery").first();
+    if (await pay.count()) { await scrollToEl(pay, 220).catch(() => {}); await wait(600); await moveTo(pay).catch(() => {}); }
+    await wait(1500);
+    mark("payment");
+    for (const name of ["Fawran", "Bank transfer"]) {
       const el = page.getByText(name, { exact: true }).first();
       if (await el.count()) { await moveTo(el).catch(() => {}); await wait(1300); }
     }

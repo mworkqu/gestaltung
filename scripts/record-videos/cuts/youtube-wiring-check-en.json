@@ -1,0 +1,47 @@
+{
+  "lang": "en",
+  "sources": [
+    "studio-3d-en/raw.webm"
+  ],
+  "crop": [
+    null
+  ],
+  "intro": {
+    "seconds": 2.5,
+    "title": "From parts list to circuit"
+  },
+  "outro": {
+    "seconds": 4,
+    "title": "Start your project today"
+  },
+  "segments": [
+    {
+      "src": 0,
+      "from": 11,
+      "to": 26.3,
+      "speed": 1.6,
+      "vo": 1,
+      "at": 0.8
+    },
+    {
+      "src": 0,
+      "from": 27,
+      "to": 97,
+      "speed": 4.5,
+      "vo": 2,
+      "at": 1
+    },
+    {
+      "src": 0,
+      "from": 100,
+      "to": 120.5,
+      "speed": 1.6,
+      "vo": 3,
+      "at": 0.3
+    }
+  ],
+  "voOutro": {
+    "vo": 4,
+    "at": 0.4
+  }
+}

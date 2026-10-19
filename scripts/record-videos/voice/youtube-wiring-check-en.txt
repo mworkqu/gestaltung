@@ -1,0 +1,4 @@
+In one click we draw your wiring: every wire, where it starts and where it goes.
+You see it on a 3D breadboard before you touch a single part.
+With a list of every connection to tick off as you build.
+Each wiring diagram costs one credit.

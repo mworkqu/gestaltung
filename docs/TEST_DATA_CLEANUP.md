@@ -56,6 +56,10 @@ Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test 
 
 - Live-site re-test project `6803a44d-b025-4873-967d-cc26891ac834` "Smart Plant Monitor" (created 2026-10-18 on gestaltung360.com, guest session), with its guest user's ideation-token ledger rows, `idea_sessions` row and `ai_usage` rows.
 
+## English site-clip recordings (2026-10-19)
+
+- Guest project `17eee324-310d-4eed-b297-a72a1f9fab51` (Studio plant waterer, `record.mjs idea-to-kit-en`) and one guest cart line (soil moisture sensor, `store-to-door-en`). Nothing ordered; quote and drawing-request takes not submitted.
+
 ## Already deleted
 
 - Crash-repro project `6b5907f2-c957-43f9-bce8-42e73beeff33` "TEST crash repro — delete" (created 2026-10-09): already deleted by the owner. No action.
