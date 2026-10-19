@@ -2832,7 +2832,19 @@
     "bought": "I bought these",
     "boughtDone": "{form, select, one {Saved: 1 product marked as bought.} other {Saved: {count} products marked as bought.}}",
     "boughtError": "Could not save: {error}",
-    "whatsappHeading": "Order list {date}"
+    "whatsappHeading": "Order list {date}",
+    "shelfTitle": "Units on the shelf ({count})",
+    "shelfHelp": "What we hold in Lusail. Type the real count after a stock take, a loss or a correction. Any count above zero also makes the product sell as ours, arriving the next day.",
+    "shelfOn": "On the shelf: {count}",
+    "shelfQtyLabel": "Units on the shelf",
+    "shelfSave": "Save count",
+    "shelfSavedOn": "Saved: {count} on the shelf, sold as ours and arriving the next day.",
+    "shelfSavedParked": "Shelf empty. The own-stock offer was kept but marked unavailable, so this product is sourced from its other suppliers again.",
+    "shelfSavedZero": "Shelf empty. This product has no own-stock offer, so nothing else changed.",
+    "shelfOfferFailed": "The count was saved, but the own-stock delivery time could not be set ({error}). Try again, or set it from the Fix list.",
+    "shelfError": "Could not save: {error}",
+    "shelfEmpty": "Nothing on the shelf yet. Search for a product to set its count.",
+    "shelfNoMatch": "No product matches “{q}”."
   },
   "Restock": {
     "kicker": "Store · restock",

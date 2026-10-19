@@ -90,30 +90,34 @@ Own stock is a supplier like any other, with the code `own_stock` and the name
   thing the storefront reads, and it is what puts the green **In stock in
   Lusail** badge on the product page.
 
-### Putting units on the shelf today
+### Putting units on the shelf
 
-1. **Dashboard -> Store -> Stock.** The Buy list has an "I bought these" button.
-   It records the receipt and adds the units to `own_stock`.
-2. **A stock take, a loss, a correction** has no button yet. For now, in the
-   Supabase SQL editor:
+Everything happens on **Dashboard -> Store -> Stock**. No SQL.
 
-   ```sql
-   select public.set_own_stock('<part-uuid>', 42);
-   ```
+1. **A delivery you just bought:** the Buy list has an **"I bought these"**
+   button. It records the receipt and adds the units to `own_stock`.
+2. **A stock take, a loss, a correction:** the **"Units on the shelf"** panel
+   on the same page. Every product we hold is listed with its count; the search
+   box finds any other published product, so a product that is not on the Buy
+   list can be put on the shelf too. Type the real count and press **Save
+   count**.
 
-3. **Giving a part an own-stock delivery time** (so it is sold as ours even
-   before the first receipt): Fix list -> select the products -> **Set delivery
-   time** -> supplier **Own stock in Lusail** -> 1 day.
+Saving a count above zero also gives the part the **own-stock offer at 1 day**,
+the same thing the Fix list's "Set delivery time -> Own stock in Lusail" does —
+so the part is immediately sold as ours and no longer sourced from Voltaat or
+DigiKey. You never have to do that step by hand any more.
+
+**Saving zero does not delete the offer.** It *parks* it: the offer stays with
+its cost, SKU and link, but is marked `unavailable`, so the ranked rule (in
+stock first) falls back to Voltaat or DigiKey. If that offer was pinned, the pin
+is cleared too — a pinned offer beats availability, and we must not promise
+next-day delivery from an empty shelf. The next delivery only has to flip the
+count back above zero. `parts.in_own_stock` goes false on its own, so the green
+**In stock in Lusail** badge disappears from the product page.
 
 Selling counts down automatically: every order line takes its quantity off
 `own_stock`, never below zero. **Cancelling an order does not put the units
-back** — correct it with `set_own_stock`.
-
-### What own stock does *not* do yet
-
-Having units on the shelf does not by itself create a supplier offer, so a part
-with `own_stock.qty > 0` and no own-stock offer will still be sourced from
-Voltaat or DigiKey. Until that is wired up, use step 3 above once per part.
+back** — correct the count in the "Units on the shelf" panel.
 
 ---
 
@@ -127,3 +131,5 @@ Voltaat or DigiKey. Until that is wired up, use step 3 above once per part.
 | Out of stock = on request | `isAutoOnRequest()` in `lib/admin/fix-groups.ts` |
 | What the customer reads | `lib/store/part-source.ts` |
 | Own stock tables | migration `0069` |
+| "Units on the shelf" panel | `components/admin/own-stock-panel.tsx`, `lib/admin/own-stock.ts` |
+| Setting the count + the offer | `setShelfUnits()` in `app/[locale]/dashboard/store/stock/actions.ts` |
