@@ -23,6 +23,20 @@ export function LeadTimeBadge({
 }) {
   const t = useTranslations("Delivery");
   const key = leadClass ?? "on_request";
+  // Spelled out rather than built from the key: a template message key makes
+  // the whole "Delivery" namespace (70 keys, admin delivery-settings help text
+  // included) reachable, so lib/i18n/scopes.ts has to ship all of it to every
+  // page with a product card. Literal calls keep public pages to these five.
+  const label =
+    key === "in_stock"
+      ? t("lt_in_stock")
+      : key === "3_5_days"
+        ? t("lt_3_5_days")
+        : key === "1_2_weeks"
+          ? t("lt_1_2_weeks")
+          : key === "2_4_weeks"
+            ? t("lt_2_4_weeks")
+            : t("lt_on_request");
   return (
     <span
       className={cn(
@@ -31,7 +45,7 @@ export function LeadTimeBadge({
         className
       )}
     >
-      {t(`lt_${key}`)}
+      {label}
     </span>
   );
 }

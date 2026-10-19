@@ -24,10 +24,7 @@ export const DELIVERY_AREAS = [
 ] as const;
 export type DeliveryArea = (typeof DELIVERY_AREAS)[number];
 
-// localStorage key for the guest cart.
-export const CART_KEY = "gestaltung:cart";
-
-// sessionStorage key holding a snapshot of the just-placed order, so the
-// (guest-safe) success page can render a summary without reading it back from
-// the DB — RLS hides a guest's own order rows.
-export const LAST_ORDER_KEY = "gestaltung:last-order";
+// The storage keys now live in ./storage-keys, an import-free leaf, so code in
+// the locale layout (the cart) can read them without this file's order-status
+// import. Re-exported here, where they have always been read from.
+export { CART_KEY, LAST_ORDER_KEY } from "./storage-keys";

@@ -15,7 +15,7 @@ import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
 import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
-import { kitDiscountQar as kitDiscountOf } from "@/lib/prototyping/kit-plan";
+import { kitDiscountQar as kitDiscountOf } from "@/lib/prototyping/kit-money";
 import { arabicCountForm } from "@/lib/text/count";
 import { Skeleton } from "@/components/ui/skeleton";
 

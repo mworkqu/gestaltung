@@ -7,9 +7,20 @@
 // it is read from the listing's name — the live catalogue stores 1 for most
 // packs, which is how a line needing 4 screws put 4 packs of 5 in the cart.
 //
-// Pure and client-safe.
+// Pure and client-safe, and deliberately import-free: lib/parts/cart.ts reads
+// packSizeOf, and the cart provider sits in the locale layout, so anything this
+// file imports lands in the first-load JS of every route. parsePack used to be
+// in ./derive-attributes (27 kB, plus ./attributes) and came along for the ride.
 
-import { parsePack } from "./derive-attributes";
+/** Pieces per listing: "(5 Pack)", "pack of 10", "20 Pieces", "5 Pcs", "4 Pieces Pack". */
+export function parsePack(name: string): number | null {
+  const m =
+    name.match(/\bpack of (\d+)\b/i) ??
+    name.match(/\b(\d+)\s?(?:pcs|pieces|pc|pack)\b/i) ??
+    name.match(/\((\d+)\s?(?:x|pack)\)/i);
+  const n = m ? Number(m[1]) : NaN;
+  return Number.isInteger(n) && n > 1 && n <= 1000 ? n : null;
+}
 
 export type PackProduct = {
   pack_size?: number | null;

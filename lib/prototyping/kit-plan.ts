@@ -20,6 +20,12 @@
 // Pure and client-safe.
 
 import { buyable, groupOf, orderQty, packOf, type LineMatch, type ProjectLine, type ScoredCandidate } from "./bom";
+import { kitDiscountQar, money } from "./kit-money";
+
+// Re-exported so callers that only need the discount can import it from
+// ./kit-money instead and leave the BOM (and lib/store/attributes +
+// derive-attributes) out of their bundle. See lib/prototyping/kit-money.ts.
+export { kitDiscountQar };
 
 export type KitLine = {
   lineId: string;
@@ -51,14 +57,6 @@ export type KitPlan = {
   discount: number;
   total: number;
 };
-
-const money = (n: number) => Math.round(n * 100) / 100;
-
-/** The kit discount in QAR for a goods sum, rounded the way the cart rounds it. */
-export function kitDiscountQar(goods: number, pct: number): number {
-  const p = Math.min(Math.max(Number(pct) || 0, 0), 90);
-  return money((goods * p) / 100);
-}
 
 /** A line's packs and money for one product (the same maths as the cost summary). */
 export function kitLine(l: ProjectLine, p: ScoredCandidate): KitLine {

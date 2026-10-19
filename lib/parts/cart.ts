@@ -3,7 +3,7 @@
 // read/save pair that touch storage. Items are keyed by SKU (unique per part).
 
 import type { CartItem, Part } from "@/lib/supabase/types";
-import { CART_KEY } from "@/lib/parts/constants";
+import { CART_KEY } from "@/lib/parts/storage-keys";
 import type { LeadTimeClass } from "@/lib/store/sourcing";
 import { packSizeOf } from "@/lib/store/pack";
 

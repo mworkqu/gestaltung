@@ -18,7 +18,7 @@ import { track } from "@/lib/analytics";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { loadSupabase } from "@/lib/supabase/lazy";
 import { trackDemand } from "@/lib/store/demand-client";
-import { kitDiscountQar } from "@/lib/prototyping/kit-plan";
+import { kitDiscountQar } from "@/lib/prototyping/kit-money";
 
 // ── The cart ────────────────────────────────────────────────────────────────
 //

@@ -16,6 +16,13 @@
 // board, kit) never decide. The fields then come from the whole name.
 
 import { isAttrClass, type AttrClass, type Attributes } from "./attributes";
+// parsePack lives in ./pack, the leaf the cart uses: lib/parts/cart.ts imports
+// packSizeOf, which pulled this file (and ./attributes) into the first-load JS
+// of every route for one regex. Re-exported here, where it has always been read
+// from, so the dependency points one way: derive-attributes -> pack.
+import { parsePack } from "./pack";
+
+export { parsePack };
 
 export type NamedProduct = {
   name: string;
@@ -67,16 +74,6 @@ export function parseFarads(s: string): number | null {
   const found = new Set<number>();
   for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s?([pnuµm])F\b/g)) found.add(Number((num(m[1]) * MULT[m[2]]).toPrecision(6)));
   return found.size === 1 ? [...found][0] : null;
-}
-
-/** Pieces per listing: "(5 Pack)", "pack of 10", "20 Pieces", "5 Pcs", "4 Pieces Pack". */
-export function parsePack(name: string): number | null {
-  const m =
-    name.match(/\bpack of (\d+)\b/i) ??
-    name.match(/\b(\d+)\s?(?:pcs|pieces|pc|pack)\b/i) ??
-    name.match(/\((\d+)\s?(?:x|pack)\)/i);
-  const n = m ? Number(m[1]) : NaN;
-  return Number.isInteger(n) && n > 1 && n <= 1000 ? n : null;
 }
 
 const E12 = [1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2];

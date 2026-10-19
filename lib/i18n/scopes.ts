@@ -36,7 +36,71 @@ export const BASE_MESSAGES = [
 export const MESSAGE_SCOPES = {
   // YourWork + Orders: the signed-in "Your work" strip on the v2 home (P3-05).
   // StoreSearch: the instant store search combobox (W7) on home + store.
-  home: ["Delivery", "Hero", "Orders", "Parts", "Phone", "StoreLanding", "StoreSearch", "Turnstile", "YourWork"],
+  // The home pages (v1 + v2) and /v2/design. Spelled out key by key, not as
+  // whole namespaces: "Delivery", "Parts" and "StoreLanding" together are
+  // 11.7 kB of en.json / 16.4 kB of ar.json, nearly all of it admin dashboard
+  // text (delivery settings, stock and sourcing forms) that no client component
+  // on a public landing page reads - "Run migration 0054 first" was in the
+  // inline payload of every home page visit. The list below is what they really
+  // read; scopes.test.ts fails the moment that stops being true.
+  home: [
+    // components/parts/request-item-button.tsx ("order on request" dialog)
+    "Delivery.close",
+    "Delivery.requestEmail",
+    "Delivery.requestEmailError",
+    "Delivery.requestError",
+    "Delivery.requestHelp",
+    "Delivery.requestItem",
+    "Delivery.requestNote",
+    "Delivery.requestQty",
+    "Delivery.requestSent",
+    "Delivery.requestSubmit",
+    "Delivery.requestTitle",
+    "Delivery.requestWhat",
+    // components/parts/lead-time-badge.tsx
+    "Delivery.lt_in_stock",
+    "Delivery.lt_3_5_days",
+    "Delivery.lt_1_2_weeks",
+    "Delivery.lt_2_4_weeks",
+    "Delivery.lt_on_request",
+    // components/design/design-dropzone.tsx
+    "Hero.formats",
+    "StoreLanding.customKicker",
+    "StoreLanding.dropBrowse",
+    "StoreLanding.dropCta",
+    "StoreLanding.dropError",
+    "StoreLanding.dropExplore",
+    "StoreLanding.dropHint",
+    "StoreLanding.dropText",
+    // components/store-landing/callback-form.tsx
+    "Phone.invalid",
+    "StoreLanding.callbackDone",
+    "StoreLanding.callbackError",
+    "StoreLanding.callbackName",
+    "StoreLanding.callbackPhone",
+    "StoreLanding.callbackPrompt",
+    "StoreLanding.callbackSla",
+    "StoreLanding.callbackSubmit",
+    "StoreLanding.footerCta",
+    // components/parts/add-to-cart-button.tsx + added-view-cart.tsx
+    "Parts.addToCart",
+    "Parts.addedViewCart",
+    // components/turnstile.tsx + turnstile-challenge.tsx + the callback form
+    "Turnstile.cancel",
+    "Turnstile.captchaFailed",
+    "Turnstile.challengeIntro",
+    "Turnstile.challengeTitle",
+    "Turnstile.failed",
+    "Turnstile.loading",
+    "Turnstile.required",
+    "Turnstile.retry",
+    // Whole namespaces, each well under 1.5 kB: the signed-in "Your work" strip
+    // (P3-05, loaded only for a signed-in visitor) and the store search
+    // combobox (W7) read them with keys this analysis cannot see.
+    "Orders",
+    "StoreSearch",
+    "YourWork",
+  ],
   store: ["Delivery", "Parts", "StoreSearch", "Turnstile"],
   product: ["Delivery", "Parts", "Turnstile"],
   cart: ["Cart", "Delivery", "Parts"],

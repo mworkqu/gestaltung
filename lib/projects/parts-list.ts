@@ -18,7 +18,7 @@
 // order. No ids, no match scores. Pure and client-safe.
 
 import { normaliseOrderStatus } from "@/lib/orders/status";
-import { kitDiscountQar } from "@/lib/prototyping/kit-plan";
+import { kitDiscountQar } from "@/lib/prototyping/kit-money";
 import {
   activeLines,
   buyable,
