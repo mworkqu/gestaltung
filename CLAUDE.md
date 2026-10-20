@@ -1307,11 +1307,12 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 - CLIENT VIEW OF THE WORKSPACE (P5-04, 2026-10-10, no migration): every non-admin gets a four-card page (components/prototyping/client/*): 1 Your idea (chat + chips + "Find my parts"), 2 Your parts (photo, name, qty incl. pack, price, one total, "Add all to cart — QAR x" from lib/prototyping/kit-plan, "We'll source these for you", small "Change" picker, Also useful), 3 Your wiring (coloured picture with plain labels from lib/prototyping/plain-names, zoom only, one plain safety line, "Draw my wiring (1 credit)"; "(free)" only when the DB says the step costs nothing), 4 Get it made (price rule in one sentence from service_prices, ask for a quote, 3D model card). Board = saved route or prototype, power = client answer -> brief powerSource -> plug-in adapter (lib/prototyping/auto-electronics), saved just before drawing. "Find my electronics" calls /api/bom/electronics with listOnly (no circuit, no credit). Engineer view = the previous workspace unchanged (readiness, counters, tree, legend, open items, netlist names, SVG download); super_admin default, toggle remembered per browser (lib/prototyping/view-mode). Also useful filtered by the project's function words (lib/store/also-useful-relevance), hidden under 2 items. Not simplified yet: the 3D model card wording and the brief chat dialog labels. Cart (P5-08, 161888f): last-known cart snapshot + skeleton + parallel reads.
 
 - EDU CREDITS (owner request 2026-10-11, migrations 0074 + 0075 RUN ✔): an account whose CONFIRMED, non-anonymous email is educational (domain ends .edu, or .edu.<cc> / .ac.<cc> with a label before: qu.edu.qa, hbku.edu.qa, udst.edu.qa, ox.ac.uk, qatar.cmu.edu; NOT bare edu.qa / ac.uk) gets 3 credits (2 wiring + 1 cad, owner 2026-10-11; 0074 gave 1 + 1, 0075 changes the grant and tops up earlier grants) ONCE per account and once per email (key = lowercase, +tag dropped; table edu_credit_grants, RLS on, no client access). Kind = 2 wiring + 1 cad, ledger reason 'edu_grant' (not admin_grant, so the 0061 price funnel does not count it as bought and no admin email is queued); plain positive rows, so spending / oldest-first / 30-day rules treat them like any grant. Hook = AFTER INSERT/UPDATE OF email, email_confirmed_at trigger on auth.users (edu_credit_trigger -> edu_credit_grant; errors never block auth), so changing to an edu address later also qualifies once; the migration back-fills existing confirmed edu accounts once. Rule lives twice, keep identical: SQL is_edu_email / edu_email_key (0074) and lib/credits/edu.ts isEduEmail / eduEmailKey (+ edu.test.ts). Copy EN+AR: Pricing.creditEduTitle/Text (#credits tile), Students.get4Title/Text (What you get). Before 0074 runs nothing is granted.
-- SCHOOL PROJECTS (owner request 2026-10-20, migrations 0096 + 0097 - NOT RUN YET): a teacher runs a CLASS;
+- SCHOOL PROJECTS (owner request 2026-10-20, migrations 0096 + 0097 - BOTH RUN ✔ 2026-10-21): a teacher runs a CLASS;
   teams of four prep students (12-15) bring their OWN idea and walk the Studio steps themselves
   (Idea -> Parts -> Wiring -> Enclosure -> Print -> Code -> Make). No ready-made kits, no student accounts,
-  no personal data from a team. Before 0096 runs nothing changes: is_class_project() does not exist, every
-  project reads as "not a class", and /schools/classes + /join say so politely.
+  no personal data from a team. Both are now run, so the feature is live. (Before 0096 ran, is_class_project() did not exist, every project
+  read as "not a class", and /schools/classes + /join said so politely - that degradation path is still in the
+  code and is what a fresh database gets.)
   * 0096_school_classes.sql: school_classes (teacher_id -> profiles, name, school_name, join_code unique 6
     chars from BCDFGHJKLMNPQRSTVWXYZ23456789 - no vowels, no 0/1/O/I, archived), class_teams (class_id,
     project_id unique -> projects, team_name <= 40), class_team_comments (team_id, author_id, body <= 2000).
@@ -1397,7 +1398,8 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
     join-code,client,safe-parts,qr,class-parts}.test.ts. e2e/schools.spec.ts, e2e/schools-join.spec.ts and
     e2e/schools-class-studio.spec.ts (the fixture gained ?class=1 and ?finished=1), all under the write guard
     - the suite creates nothing.
-  * OWNER: run 0096, then 0097 (0097 on its own, then place one test order to confirm checkout). Then create
+  * OWNER: 0096 + 0097 are RUN ✔ 2026-10-21. A test order through checkout is still worth placing, because 0097
+    replaced create_part_order. Then create
     a class, open the printable sheet, join as a team from a phone, and check the parts list offers no mains
     relay and no lithium cell. Confirm the school prices in Dashboard -> Store -> Schools.
   * NOT verified by Claude: nothing was run against the database (the migrations are not applied), so the
@@ -1501,14 +1503,14 @@ Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
 
 ## PENDING MIGRATIONS (run in order if not already done)
 Check Supabase → Table Editor to confirm which tables exist before running:
-- 0096_school_classes.sql - NOT RUN. School classes: school_classes / class_teams / class_team_comments
+- 0096_school_classes.sql - RUN ✔ 2026-10-21 (owner; verified by live probe: school_classes readable, is_class_project() answers, school_pricing seeded 3/49, 15/199, 30 + 0.7/g). School classes: school_classes / class_teams / class_team_comments
   (+ RLS, no anon privileges), class_teacher_of_project / is_class_project / is_class_teacher_of_project /
   ai_role_of / new_join_code, the extra projects SELECT policy for the class teacher, credit_can_use +
   spend_credit v4 (a class team project spends the TEACHER's credits), projects_enforce_limit v2 (class team
   projects are outside the 3-active cap), create_school_class + join_class_team, and the school_pricing seed.
   RUN AFTER 0093. Safe to re-run. Until it runs, /schools/classes and /join say classes are not set up and
   every project reads as "not a class" (no safety mode, nothing else changes).
-- 0097_class_order.sql - NOT RUN. The class parts order: part_orders.class_id + class_breakdown,
+- 0097_class_order.sql - RUN ✔ 2026-10-21 (owner; verified by live probe: part_orders.class_id readable). STILL TO CONFIRM: one test order through checkout, since this file replaced create_part_order. The class parts order: part_orders.class_id + class_breakdown,
   school_free_class_delivery(), class_order_delivery_quote(), and create_part_order v5 with p_class_id
   (Economy delivery QAR 0 on a class order). RUN AFTER 0096, ON ITS OWN - it is the only file of the school
   stage that replaces create_part_order, so place one test order straight after. It drops the 0044
