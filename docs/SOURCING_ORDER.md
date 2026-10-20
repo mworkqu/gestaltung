@@ -90,30 +90,62 @@ Own stock is a supplier like any other, with the code `own_stock` and the name
   thing the storefront reads, and it is what puts the green **In stock in
   Lusail** badge on the product page.
 
-### Putting units on the shelf today
+### Putting units on the shelf
 
-1. **Dashboard -> Store -> Stock.** The Buy list has an "I bought these" button.
-   It records the receipt and adds the units to `own_stock`.
-2. **A stock take, a loss, a correction** has no button yet. For now, in the
-   Supabase SQL editor:
+Everything happens on **Dashboard -> Store -> Stock**. No SQL.
 
-   ```sql
-   select public.set_own_stock('<part-uuid>', 42);
-   ```
+1. **A delivery you just bought:** the Buy list has an **"I bought these"**
+   button. It records the receipt and adds the units to `own_stock`.
+2. **A stock take, a loss, a correction:** the **"Units on the shelf"** panel
+   on the same page. Every product we hold is listed with its count; the search
+   box finds any other published product, so a product that is not on the Buy
+   list can be put on the shelf too. Type the real count and press **Save
+   count**.
 
-3. **Giving a part an own-stock delivery time** (so it is sold as ours even
-   before the first receipt): Fix list -> select the products -> **Set delivery
-   time** -> supplier **Own stock in Lusail** -> 1 day.
+Saving a count above zero also gives the part the **own-stock offer at 1 day**,
+the same thing the Fix list's "Set delivery time -> Own stock in Lusail" does —
+so the part is immediately sold as ours and no longer sourced from Voltaat or
+DigiKey. You never have to do that step by hand any more.
+
+### Why a Voltaat product's price gets fixed
+
+Every product the Voltaat catalogue import creates is **mirror**-priced: its
+shop price follows Voltaat's retail price. The rule in `refresh_part_sourcing`
+lets a mirror product follow only an offer that *has* a retail price and whose
+supplier *has* a commission percent — and our own shelf has neither. So on a
+mirror product the own-stock offer would be written and then silently ignored,
+and the part would keep being sourced from Voltaat. The whole imported
+catalogue is mirror, so this is nearly every product.
+
+Putting units on the shelf therefore switches that product to **markup**: from
+then on *you* set its price. The panel says so, with the exact figure, before
+you press Save.
+
+- **The price does not move at that moment.** In markup mode the recompute
+  writes `unit_price` back unchanged, so a customer sees the same number. It
+  simply stops tracking Voltaat, so the nightly Voltaat sync no longer moves it.
+- **It is not switched back when the shelf empties.** That would start the price
+  following Voltaat again behind your back. If you want a part to follow Voltaat
+  again, set "Price mode" back to mirror on the product's edit page.
+- Our own offer carries no cost, so "income %" shows blank for that part until
+  you record what you paid. Nothing else changes, and the Fix list does not ask
+  for it.
+
+The clean long-term fix is to make own stock always eligible in
+`refresh_part_sourcing` instead, but that needs a new migration — raise it with
+the owner rather than doing it in passing.
+
+**Saving zero does not delete the offer.** It *parks* it: the offer stays with
+its cost, SKU and link, but is marked `unavailable`, so the ranked rule (in
+stock first) falls back to Voltaat or DigiKey. If that offer was pinned, the pin
+is cleared too — a pinned offer beats availability, and we must not promise
+next-day delivery from an empty shelf. The next delivery only has to flip the
+count back above zero. `parts.in_own_stock` goes false on its own, so the green
+**In stock in Lusail** badge disappears from the product page.
 
 Selling counts down automatically: every order line takes its quantity off
 `own_stock`, never below zero. **Cancelling an order does not put the units
-back** — correct it with `set_own_stock`.
-
-### What own stock does *not* do yet
-
-Having units on the shelf does not by itself create a supplier offer, so a part
-with `own_stock.qty > 0` and no own-stock offer will still be sourced from
-Voltaat or DigiKey. Until that is wired up, use step 3 above once per part.
+back** — correct the count in the "Units on the shelf" panel.
 
 ---
 
@@ -127,3 +159,5 @@ Voltaat or DigiKey. Until that is wired up, use step 3 above once per part.
 | Out of stock = on request | `isAutoOnRequest()` in `lib/admin/fix-groups.ts` |
 | What the customer reads | `lib/store/part-source.ts` |
 | Own stock tables | migration `0069` |
+| "Units on the shelf" panel | `components/admin/own-stock-panel.tsx`, `lib/admin/own-stock.ts` |
+| Setting the count + the offer | `setShelfUnits()` in `app/[locale]/dashboard/store/stock/actions.ts` |

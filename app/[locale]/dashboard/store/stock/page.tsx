@@ -40,7 +40,13 @@ export default async function StockPage({ params }: { params: Promise<{ locale: 
       ) : (
         <>
           {!data.ownStockReady && <p className="neu p-4 text-xs text-amber-800">{t("run0069")}</p>}
-          <StockListsView locale={locale} buy={data.lists.buy} watch={data.lists.watch} dont={data.lists.dont} />
+          <StockListsView
+            locale={locale}
+            buy={data.lists.buy}
+            watch={data.lists.watch}
+            dont={data.lists.dont}
+            ownStockReady={data.ownStockReady}
+          />
         </>
       )}
     </div>

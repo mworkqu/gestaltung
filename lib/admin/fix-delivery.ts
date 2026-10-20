@@ -122,6 +122,50 @@ export async function setPartDelivery(
   return after ? { ok: true } : { ok: false, reason: "stillMissing" };
 }
 
+/**
+ * The shelf is empty again: keep this supplier's offer but mark it
+ * unavailable, so the ranked rule (in stock first) falls back to Voltaat or
+ * DigiKey instead of promising next day from an empty shelf.
+ *
+ * Nothing is deleted — the cost, SKU and link stay for the next delivery, and
+ * refilling the count only flips availability back. A pin on that offer WOULD
+ * beat availability (0095 picks a pinned active offer outright), so a pin on
+ * this very offer is cleared as well; any other pin is left alone.
+ *
+ * `parked` is false when there was no offer to park (nothing to do).
+ */
+export async function parkSupplierOffer(
+  db: Db,
+  partId: string,
+  supplier: SupplierRef
+): Promise<{ ok: true; parked: boolean } | { ok: false; reason: string }> {
+  const existing = await db
+    .from("supplier_offers")
+    .select("id")
+    .eq("part_id", partId)
+    .eq("supplier_id", supplier.id)
+    .eq("active", true)
+    .order("created_at")
+    .limit(1);
+  if (existing.error) return { ok: false, reason: "offerSave" };
+  const offerId: string | null = existing.data?.[0]?.id ?? null;
+  if (!offerId) return { ok: true, parked: false };
+
+  const up = await db
+    .from("supplier_offers")
+    .update({ availability: "unavailable", last_checked_at: new Date().toISOString() })
+    .eq("id", offerId)
+    .eq("part_id", partId);
+  if (up.error) return { ok: false, reason: "offerSave" };
+
+  const unpin = await db.from("parts").update({ pinned_offer_id: null }).eq("id", partId).eq("pinned_offer_id", offerId);
+  if (unpin.error) return { ok: false, reason: "recompute" };
+
+  const rpc = await db.rpc("refresh_part_sourcing", { p_part_id: partId });
+  if (rpc.error) return { ok: false, reason: "recompute" };
+  return { ok: true, parked: true };
+}
+
 /** Add / remove part ids on the "on request" list (store_settings). */
 export async function updateOnRequest(db: Db, change: { add?: string[]; remove?: string[] }): Promise<boolean> {
   const { data, error } = await db.from("store_settings").select("value").eq("key", ON_REQUEST_KEY).maybeSingle();
