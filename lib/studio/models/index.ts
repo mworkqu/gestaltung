@@ -27,6 +27,8 @@ import { waterPump } from "./waterPump";
 import { slideSwitch } from "./slideSwitch";
 import { ds18b20Probe } from "./ds18b20Probe";
 import { lcdModule } from "./lcdModule";
+import { dipChip } from "./dipChip";
+import { breadboard, dipSwitch, jumperKit } from "./logicSupplies";
 
 export const BUILDERS: Record<string, ModelBuilder> = {
   devBoard,
@@ -51,6 +53,10 @@ export const BUILDERS: Record<string, ModelBuilder> = {
   slideSwitch,
   ds18b20Probe,
   lcdModule,
+  dipChip,
+  breadboard,
+  dipSwitch,
+  jumperKit,
 };
 
 /** Grey rounded box of the part's dims (STL parts: the viewer swaps in the real mesh). */

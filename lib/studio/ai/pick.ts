@@ -2,13 +2,18 @@
 //
 // The model may only name ids from the library index it was given. The server
 // then enforces the rules the model cannot be trusted with: unknown ids are
-// dropped, exactly one mcu (none → esp32_devkit, several → the first), the
+// dropped, one mcu when the build class needs a controller (none → esp32_devkit,
+// several → the first) and NONE when it does not (a logic or cad build — see
+// lib/studio/build-class.ts; an mcu the model slipped in is dropped and logged), the
 // power parts that spec.power needs, the actuator rules (Part D, actuator-rules.ts:
 // servo count/size from spec.actuators, PCA9685 driver, 5 V 5 A supply), at most 12
 // KINDS of part (6 servos = 1 slot), short labels/reasons.
-// Two failed answers → a minimal default (the mcu + the power parts + the actuator rules).
+// Two failed answers → a minimal default: the power parts, the actuator rules and whatever
+// the card itself promises, led by the mcu — or, on a logic build, by the breadboard and
+// the gate chips the card names, with no mcu at all.
 
-import type { ClampLog, Pin, ProductSpec, StudioComponent } from "../schema";
+import type { BuildClass, ClampLog, Pin, ProductSpec, StudioComponent } from "../schema";
+import { classFor, needsController } from "../build-class";
 import { applyActuatorRules, capKinds, SUPPLY_BOARD_IDS } from "./actuator-rules";
 import { LABEL_MAX, MAX_COMPONENTS, PICK_RESPONSE_SCHEMA, PICK_SYSTEM, REASON_MAX, pickPrompt } from "./prompts";
 import { outcomeCached, pickKey, type AiCache } from "./cache";
@@ -28,6 +33,16 @@ export type PickIndexEntry = {
 export type Picked = { components: StudioComponent[]; reasons: Record<string, string> };
 
 export const DEFAULT_MCU = "esp32_devkit";
+/**
+ * A logic build (no microcontroller, no firmware) is still a build: the gates have to sit
+ * on something and be wired with something. Only ids present in the library are added.
+ */
+export const LOGIC_PARTS: readonly string[] = ["breadboard_830", "jumper_kit"];
+/**
+ * Parts the 12-kind cap must never drop. On an mcu build that is the board. On a logic
+ * build the board does not exist, so it is the gate chips and the breadboard they sit on.
+ */
+const LOGIC_LEAD_IDS = new Set(["breadboard_830"]);
 /** Power parts per spec.power (only those present in the library are added). */
 export const POWER_PARTS: Record<ProductSpec["power"], readonly string[]> = {
   usb: [],
@@ -167,10 +182,18 @@ export function enforcePick(
     list.push({ partId, label });
   }
 
-  // Exactly one mcu.
+  // One mcu — but only for a build that runs firmware (2026-10-20). A logic or cad build
+  // has NO microcontroller: zero is the right answer, and one the model slipped in goes.
+  const buildClass: BuildClass = classFor(opts.spec);
+  const wantsMcu = needsController({ buildClass });
   const isMcu = (p: Pending) => byId.get(p.partId)?.category === "mcu";
   const mcus = list.filter(isMcu);
-  if (mcus.length === 0) {
+  if (!wantsMcu) {
+    if (mcus.length) {
+      list = list.filter((p) => !isMcu(p));
+      log.push({ path: "components.mcu", from: mcus.map((m) => m.partId), to: null });
+    }
+  } else if (mcus.length === 0) {
     const fallback = byId.get(DEFAULT_MCU) ?? index.find((e) => e.category === "mcu");
     if (fallback) {
       list.unshift({ partId: fallback.id, label: name(fallback) });
@@ -181,9 +204,37 @@ export function enforcePick(
     list = list.filter((p) => !isMcu(p) || p === keep);
     log.push({ path: "components.mcu", from: mcus.map((m) => m.partId), to: keep.partId });
   }
-  // The mcu leads the list so the 12-part cap never drops it.
-  const mcuIdx = list.findIndex(isMcu);
-  if (mcuIdx > 0) list.unshift(...list.splice(mcuIdx, 1));
+
+  // A logic build needs the breadboard and the jumpers to be a build at all.
+  if (buildClass === "logic") {
+    for (const id of LOGIC_PARTS) {
+      const entry = byId.get(id) ?? opts.lookup?.(id);
+      if (!entry) continue;
+      byId.set(id, entry);
+      if (list.some((p) => p.partId === id)) continue;
+      list.push({ partId: id, label: name(entry) });
+      log.push({ path: "components.logic", from: null, to: id });
+    }
+  }
+
+  /**
+   * The lead parts head the list, so the 12-kind cap never drops them and the power parts
+   * are inserted after them: the board on an mcu build, the gate chips and their
+   * breadboard on a logic build.
+   */
+  const isLead = (p: Pending) =>
+    wantsMcu ? isMcu(p) : byId.get(p.partId)?.category === "logic" || LOGIC_LEAD_IDS.has(p.partId);
+  const hoistLeads = () => {
+    if (!list.some(isLead)) return;
+    list = [...list.filter(isLead), ...list.filter((p) => !isLead(p))];
+  };
+  /** Where a part that is not a lead belongs: straight after the lead block. */
+  const afterLeads = () => {
+    let n = 0;
+    while (n < list.length && isLead(list[n])) n++;
+    return n;
+  };
+  hoistLeads();
 
   // Two batteries / a battery plus a wall supply: one power source.
   list = enforceSinglePower(list, { spec: opts.spec, byId, log });
@@ -198,7 +249,7 @@ export function enforcePick(
     power.push({ partId: id, label: name(entry) });
     log.push({ path: "components.power", from: null, to: id });
   }
-  if (power.length) list.splice(list.length && isMcu(list[0]) ? 1 : 0, 0, ...power);
+  if (power.length) list.splice(afterLeads(), 0, ...power);
   // Added parts can again pair a charger with the wrong cell, or a cell with a supply.
   list = enforceSinglePower(list, { spec: opts.spec, byId, log });
 
@@ -206,7 +257,7 @@ export function enforcePick(
   for (const id of specParts(opts.spec)) {
     const entry = byId.get(id);
     if (!entry || list.some((p) => p.partId === id)) continue;
-    list.splice(list.length && isMcu(list[0]) ? 1 : 0, 0, { partId: id, label: name(entry) });
+    list.splice(afterLeads(), 0, { partId: id, label: name(entry) });
     log.push({ path: "components.spec", from: null, to: id });
   }
 
@@ -257,7 +308,9 @@ export function enforcePick(
     log.push({ path: "components.driver", from: "motor_driver", to: "mosfet_module" });
   }
 
-  // At most 12 kinds of part (identical parts are one slot), at most 8 of one part.
+  // At most 12 kinds of part (identical parts are one slot), at most 8 of one part. The
+  // leads go first again: the card and the actuator rules appended parts after them.
+  hoistLeads();
   list = capKinds(list, MAX_COMPONENTS, log);
 
   const counts = new Map<string, number>();

@@ -160,8 +160,34 @@ export function validateDesigns(
 /** In-memory cache of AI answers (W8 style); only model answers are kept. */
 export type DesignCache = { get(key: string): unknown; set(key: string, v: unknown): void };
 
-export function designKey(spec: ProductSpec, parts: readonly LayoutInput[], archetypes: readonly Archetype[]): string {
-  return stableHash({ v: 1, spec, parts: parts.map((p) => p.part.id).sort(), archetypes: [...archetypes] });
+/**
+ * Cache key of one design run. The client's feedback and the regeneration number are part of it:
+ * the same spec, parts and archetypes asked again WITH feedback must never return the cached set.
+ * Without feedback and attempt the key is exactly the old one.
+ */
+export function designKey(
+  spec: ProductSpec,
+  parts: readonly LayoutInput[],
+  archetypes: readonly Archetype[],
+  extra: { feedback?: string | null; attempt?: number } = {},
+): string {
+  const feedback = cleanFeedback(extra.feedback);
+  const attempt = extra.attempt && extra.attempt > 0 ? Math.floor(extra.attempt) : 0;
+  return stableHash({
+    v: 1,
+    spec,
+    parts: parts.map((p) => p.part.id).sort(),
+    archetypes: [...archetypes],
+    ...(feedback || attempt ? { feedback, attempt } : {}),
+  });
+}
+
+export const FEEDBACK_LIMIT = 400;
+
+/** Trimmed, capped, empty → null. */
+export function cleanFeedback(v: string | null | undefined): string | null {
+  const s = (v ?? "").trim().slice(0, FEEDBACK_LIMIT).trim();
+  return s || null;
 }
 
 function finish(a: Archetype, model: ProductModel, why: Why, source: "ai" | "default", parts: readonly LayoutInput[], spec: ProductSpec, notes: unknown[]): DesignOut {
@@ -179,6 +205,10 @@ export async function runProductDesign(opts: {
   parts: readonly LayoutInput[];
   archetypes: readonly Archetype[];
   brief?: string | null;
+  /** What the client says is wrong with the earlier designs (a regeneration). Additional to `brief`. */
+  feedback?: string | null;
+  /** Which regeneration this is (1 = the first); part of the cache key together with the feedback. */
+  attempt?: number;
   cache?: DesignCache | null;
 }): Promise<DesignRun> {
   const { spec, parts } = opts;
@@ -192,7 +222,8 @@ export async function runProductDesign(opts: {
   if (!archetypes.length) return defaults([]);
   if (!opts.call) return defaults(["no_model"]);
 
-  const key = designKey(spec, parts, archetypes);
+  const feedback = cleanFeedback(opts.feedback);
+  const key = designKey(spec, parts, archetypes, { feedback, attempt: opts.attempt });
   let raw = opts.cache?.get(key) as RawDesign[] | undefined;
   let modelName: string | null | undefined;
   if (raw) raw = structuredClone(raw);
@@ -205,6 +236,7 @@ export async function runProductDesign(opts: {
       prompt: designerPrompt({
         spec,
         brief: opts.brief,
+        feedback,
         parts: designerParts(parts),
         starts: archetypes.map((a) => ({ archetype: a, model: defaultModels.get(a)! })),
       }),

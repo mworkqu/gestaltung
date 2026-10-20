@@ -278,7 +278,10 @@ export function guardSpec(
 
   s.features = [...addFeatures, ...s.features].slice(0, LIMITS.features.max);
   if (addFeatures.length) log.push({ path: "features", from: input.features, to: s.features });
-  return { spec: clampSpec(s), touched };
+  // clampSpec() rebuilds the object field by field; buildClass (2026-10-20) is carried
+  // across by hand so a guarded logic build does not quietly become an mcu build again.
+  const out = clampSpec(s);
+  return { spec: s.buildClass && !out.buildClass ? { ...out, buildClass: s.buildClass } : out, touched };
 }
 
 function setPlacement(s: ProductSpec, p: Placement, log: ClampLog) {

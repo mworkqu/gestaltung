@@ -326,3 +326,51 @@ describe("Part F guards from the real-AI check", () => {
     expect(m.prompts[0]).toContain("Rebuild the FULL understanding");
   });
 });
+
+describe("the build class travels with the card (2026-10-20)", () => {
+  const LOGIC_SPEC = {
+    ...SPEC,
+    name: "De Morgan kit",
+    oneLine: "Shows De Morgan's law with gate chips on a breadboard.",
+    buildClass: "logic",
+    understanding: {
+      goal: "Prove De Morgan's law by hand",
+      howItWorks: "Two switches feed the gate chips; the LEDs show each gate's output.",
+      controller: "",
+      sensors: [{ name: "Toggle Switches", count: 2 }],
+      actuators: [],
+      outputs: [{ name: "AND gate (7408)", count: 1 }, { name: "LEDs", count: 2 }],
+    },
+  };
+
+  it('a first card with buildClass "logic" keeps it, with no controller', async () => {
+    const m = fakeModel([{ spec: LOGIC_SPEC }]);
+    const r = await runSpecChat({ call: m.call, idea: "and gate 7408 or gate 7432 for de morgan, no microcontroller", messages: [], locale: "en" });
+    if (!r.ok || r.value.kind !== "spec") throw new Error("expected a spec");
+    expect(r.value.spec.buildClass).toBe("logic");
+    expect(r.value.spec.understanding?.controller).toBe("");
+  });
+
+  it("an unreadable class is dropped and logged, never guessed", async () => {
+    const m = fakeModel([{ spec: { ...SPEC, buildClass: "ttl" } }]);
+    const r = await runSpecChat({ call: m.call, idea: "a plant monitor", messages: [], locale: "en" });
+    if (!r.ok || r.value.kind !== "spec") throw new Error("expected a spec");
+    expect(r.value.spec.buildClass).toBeUndefined();
+    expect(r.clampLog.some((l) => l.path === "buildClass" && l.from === "ttl")).toBe(true);
+  });
+
+  it("a refine turn that forgets the class does not put the board back", async () => {
+    const current = { ...clampSpec(LOGIC_SPEC), buildClass: "logic" as const };
+    const m = fakeModel([{ diff: ["one more LED"], spec: { ...LOGIC_SPEC, buildClass: undefined, features: ["three LEDs"] }, reply: "Added a third LED.", changed: ["3 LEDs"] }]);
+    const r = await runSpecChat({ call: m.call, idea: "de morgan kit", messages: [{ role: "user", text: "add one more LED" }], locale: "en", current });
+    if (!r.ok || r.value.kind !== "reply") throw new Error("expected a reply");
+    expect(r.value.spec?.buildClass).toBe("logic");
+  });
+
+  it('a normal card stays classless, which reads as "mcu"', async () => {
+    const m = fakeModel([{ spec: SPEC }]);
+    const r = await runSpecChat({ call: m.call, idea: "a plant monitor", messages: [], locale: "en" });
+    if (!r.ok || r.value.kind !== "spec") throw new Error("expected a spec");
+    expect(r.value.spec.buildClass).toBeUndefined();
+  });
+});

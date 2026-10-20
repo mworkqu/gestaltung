@@ -20,6 +20,9 @@ import {
   nextInstanceId,
   sameSpec,
   stepDone,
+  stepFaded,
+  stepFadedReasonKey,
+  stepSettled,
   withLastStep,
 } from "./steps";
 
@@ -201,5 +204,56 @@ describe("idea chat W3: refinements and the live card", () => {
 
   it("facts use the placement when there is one", () => {
     expect(factKeys({ ...DEFAULT_SPEC, placement: "on_wrist" })[0]).toBe("fact_place_on_wrist");
+  });
+});
+
+describe("faded steps (build class)", () => {
+  const wiredDoc = (buildClass?: "mcu" | "logic" | "cad"): StudioDoc => ({
+    ...withParts(),
+    spec: { ...DEFAULT_SPEC, buildClass },
+    netlist: { nets: [{ name: "GND", pins: ["a.1", "b.1"] }] },
+    checks: [{ id: "x", ok: true, plain: "ok" }],
+  });
+
+  it("an mcu spec behaves exactly as before: nothing is faded", () => {
+    for (const d of [wiredDoc("mcu"), wiredDoc(undefined)]) {
+      for (const s of FLOW) expect(stepFaded(s, d)).toBe(false);
+      expect(stepFadedReasonKey("code", d)).toBeNull();
+      // Wiring done, the case not drawn yet -> still stops at Enclosure.
+      expect(firstOpenStep(d)).toBe(FLOW.indexOf("enclosure"));
+      const done = { ...d, enclosure: DEFAULT_ENCLOSURE, mech: [{ id: "lid_0", template: "lid", params: {}, printable: { material: "PLA", estGrams: 10 } }] } as StudioDoc;
+      expect(firstOpenStep(done)).toBe(FLOW.indexOf("code")); // Code still has to be passed
+      expect(stepSettled("code", done)).toBe(false);
+    }
+    expect(firstOpenStep(null)).toBe(0);
+  });
+
+  it("a logic spec reaches Make without the faded case, print or code", () => {
+    const d = wiredDoc("logic");
+    expect(stepFaded("enclosure", d)).toBe(true);
+    expect(stepFaded("print", d)).toBe(true);
+    expect(stepFaded("code", d)).toBe(true);
+    expect(stepFaded("wiring", d)).toBe(false);
+    expect(stepFadedReasonKey("code", d)).toBe("fadedLogic");
+    expect(stepDone("code", d)).toBe(false); // faded is not done...
+    expect(stepSettled("code", d)).toBe(true); // ...but it does not block
+    expect(firstOpenStep(d)).toBe(FLOW.indexOf("make"));
+    expect(furthestStep(d, 0)).toBe(FLOW.indexOf("make"));
+    // Faded steps stay reachable: opening one is allowed (not disabled).
+    expect(initialStep(d, "code")).toBe(FLOW.indexOf("code"));
+  });
+
+  it("a logic spec still needs the real steps before it", () => {
+    const d = { ...wiredDoc("logic"), netlist: { nets: [] }, checks: [] };
+    expect(firstOpenStep(d)).toBe(FLOW.indexOf("wiring"));
+  });
+
+  it("a cad spec fades wiring and code but keeps the case and print", () => {
+    const d = { ...withParts(), spec: { ...DEFAULT_SPEC, buildClass: "cad" as const } };
+    expect(stepFaded("wiring", d)).toBe(true);
+    expect(stepFaded("code", d)).toBe(true);
+    expect(stepFaded("enclosure", d)).toBe(false);
+    expect(stepFadedReasonKey("wiring", d)).toBe("fadedCad");
+    expect(firstOpenStep(d)).toBe(FLOW.indexOf("enclosure"));
   });
 });

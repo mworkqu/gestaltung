@@ -70,6 +70,7 @@ const KIND_TEXT: Record<LibraryPart["category"], Record<Locale, string>> = {
   display: { en: "display", ar: "شاشة" },
   input: { en: "input", ar: "إدخال" },
   output: { en: "output", ar: "إخراج" },
+  logic: { en: "logic gate", ar: "بوابة منطقية" },
   actuator: { en: "motion", ar: "حركة" },
   connector: { en: "connector", ar: "موصّل" },
 };

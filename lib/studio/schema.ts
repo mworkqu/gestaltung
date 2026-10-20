@@ -40,8 +40,24 @@ export const STYLES = ["rounded", "soft_tech", "rugged", "minimal"] as const;
 export const MOVER_KINDS = ["servo", "linear_actuator", "motor", "pump", "stepper"] as const;
 
 export const CATEGORIES = [
-  "mcu", "power", "sensor", "display", "input", "output", "actuator", "connector",
+  "mcu", "power", "sensor", "display", "input", "output", "actuator", "connector", "logic",
 ] as const;
+
+/**
+ * What KIND of build this is (owner, 2026-10-20) — a second axis next to the
+ * tier in lib/studio/tiers.ts. The tier says how BIG a build is (it sets the
+ * price); the class says what SHAPE it is, and that is what decides whether a
+ * microcontroller is forced, which part of the library applies, and which of
+ * the three deliverable steps (wiring / print / code) leads.
+ *
+ *   mcu    the default: a board runs firmware. All three deliverables.
+ *   logic  discrete logic ICs on a breadboard, no firmware at all (a De Morgan
+ *          gate kit). Wiring leads; enclosure/print and code fade out.
+ *   cad    the deliverable is mainly a printed part. Print leads; wiring and
+ *          code fade out.
+ */
+export const BUILD_CLASSES = ["mcu", "logic", "cad"] as const;
+export type BuildClass = (typeof BUILD_CLASSES)[number];
 export const LOOKS = [
   "pcb_green", "pcb_black", "pcb_blue", "metal", "plastic_black", "plastic_white", "battery_wrap",
 ] as const;
@@ -164,6 +180,7 @@ export const UnderstandingMoverSchema = UnderstandingPartSchema.extend({ kind: z
 export const UnderstandingSchema = z.object({
   goal: z.string().max(U.goal),
   howItWorks: z.string().max(U.how),
+  /** The one controller board. Empty on a logic / cad build, which has none. */
   controller: z.string().max(U.name),
   sensors: z.array(UnderstandingPartSchema).max(U.items),
   actuators: z.array(UnderstandingMoverSchema).max(U.items),
@@ -191,6 +208,12 @@ export const ProductSpecSchema = z.object({
   actuators: z.array(ActuatorSchema).max(LIMITS.actuators.max).optional(),
   /** 2026-10-18: the "Our understanding" panel. Absent on cards made before it. */
   understanding: UnderstandingSchema.optional(),
+  /**
+   * 2026-10-20: what kind of build this is. Absent on cards made before it, which
+   * are read as "mcu" (buildClassOf() in lib/studio/build-class.ts). The user can
+   * override what the agent chose, so this is the stored answer, not a guess.
+   */
+  buildClass: z.enum(BUILD_CLASSES).optional(),
   quantity: z.literal(1),
 });
 export type ProductSpec = z.infer<typeof ProductSpecSchema>;
@@ -389,6 +412,8 @@ export const ProductDocSchema = z.object({
   unlockedId: z.string().nullable(),
   /** Hash of the spec + parts the designs were made for (a new spec starts a new set). */
   specHash: z.string().max(64),
+  /** Regenerations (new sets of 3 from "Try another" / feedback) made so far; the first is free, later ones cost ideation tokens. Server-owned. */
+  regens: z.number().int().min(0).max(1000).optional(),
 });
 export type ProductDoc = z.infer<typeof ProductDocSchema>;
 
@@ -577,6 +602,15 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   const scaleNote = typeof o.scaleNote === "string" && o.scaleNote.trim() ? clampStr(o.scaleNote, LIMITS.scaleNote.max, "", "scaleNote", log) : "";
   const actuators = clampActuators(o.actuators, log);
   const understanding = clampUnderstanding(o.understanding, log);
+  // clampSpec rebuilds the spec field by field, so a field missing from this
+  // list is silently dropped. buildClass MUST survive: losing it turns a
+  // "no microcontroller" build back into an mcu one, which is the exact bug
+  // this field exists to stop. Absent stays absent (older cards read as mcu).
+  const rawClass = typeof o.buildClass === "string" ? o.buildClass.trim().toLowerCase() : "";
+  const buildClass = rawClass ? (BUILD_CLASSES as readonly string[]).find((c) => c === rawClass) : undefined;
+  if (o.buildClass !== undefined && o.buildClass !== null && o.buildClass !== "" && !buildClass) {
+    log.push({ path: "buildClass", from: o.buildClass, to: null });
+  }
   return {
     name,
     oneLine: typeof o.oneLine === "string" && o.oneLine.trim() ? clampStr(o.oneLine, LIMITS.oneLine.max, "", "oneLine", log) : "",
@@ -592,6 +626,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
     ...(scaleNote ? { scaleNote } : {}),
     ...(actuators.length ? { actuators } : {}),
     ...(understanding ? { understanding } : {}),
+    ...(buildClass ? { buildClass: buildClass as BuildClass } : {}),
     quantity: 1,
   };
 }

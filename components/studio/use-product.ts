@@ -41,7 +41,7 @@ export type ProductCard = {
   previewPath: string | null;
 };
 
-export type ProductPhase = "idle" | "running" | "ready" | "failed" | "unsupported" | "guest_limit" | "sign_in";
+export type ProductPhase = "idle" | "running" | "ready" | "failed" | "unsupported" | "guest_limit" | "sign_in" | "no_tokens";
 
 export type ProductPreviews = {
   /** The Studio has the product pipeline (api.product). */
@@ -51,8 +51,14 @@ export type ProductPreviews = {
   cards: ProductCard[];
   /** productSpecHash of the doc the cards belong to. */
   key: string;
-  /** New designs with archetypes not shown yet. */
-  tryAnother(): void;
+  /**
+   * Three NEW designs. With `feedback` they are steered by what the visitor says is wrong (the same
+   * archetypes may come back, changed); without it they use archetypes not shown yet. The shown
+   * designs are never modified. The first regeneration is free, later ones cost ideation tokens.
+   */
+  tryAnother(feedback?: string): void;
+  /** Regenerations made on this project so far (0 = the next one is free). */
+  regens: number;
   /** The designs (and pictures) to keep in the doc. */
   choose(designId: string): void;
 };
@@ -90,6 +96,7 @@ export function useProductPreviews({
   const [cardsKey, setCardsKey] = useState("");
   const runId = useRef(0);
   const startedKey = useRef<string | null>(null);
+  const [regensSeen, setRegensSeen] = useState(0);
   const excluded = useRef<Set<Archetype>>(new Set());
   const blobs = useRef<string[]>([]);
   const docRef = useRef(doc);
@@ -103,7 +110,7 @@ export function useProductPreviews({
   );
 
   const run = useCallback(
-    async (exclude: Archetype[], previous: ProductCard[] = []) => {
+    async (exclude: Archetype[], previous: ProductCard[] = [], feedback = "") => {
       const d = docRef.current;
       if (!product || !d || !d.components.length) return;
       const id = ++runId.current;
@@ -132,6 +139,7 @@ export function useProductPreviews({
             projectId: api.projectId,
             count: 3,
             ...(exclude.length ? { exclude } : {}),
+            ...(feedback ? { feedback } : {}),
             spec: d.spec,
             parts: partsInput(d, getPart),
             apiBase: product.base,
@@ -141,16 +149,18 @@ export function useProductPreviews({
         );
         if (!live()) return;
         setStage(null);
+        if (typeof result.regens === "number") setRegensSeen((n) => Math.max(n, result.regens as number));
         const ready = result.designs.filter((x) => x.status === "ready");
         if (!ready.length && previous.length) {
           // "Try another" found nothing new (all archetypes shown, limit, an outage): keep the pictures shown.
           setCards(previous);
-          setPhase(result.error === "guest_limit" ? "guest_limit" : result.error === "sign_in" ? "sign_in" : "ready");
+          setPhase(result.error === "guest_limit" ? "guest_limit" : result.error === "sign_in" ? "sign_in" : result.error === "no_tokens" ? "no_tokens" : "ready");
           return;
         }
         if (result.error === "no_render") setPhase(got.length ? "ready" : "unsupported");
         else if (result.error === "guest_limit") setPhase("guest_limit");
         else if (result.error === "sign_in") setPhase("sign_in");
+        else if (result.error === "no_tokens") setPhase("no_tokens");
         else setPhase(ready.length ? "ready" : "failed");
         if (!ready.length) return;
         // Keep the page-safe part in the doc (pictures, why, status). The first design is chosen.
@@ -161,7 +171,13 @@ export function useProductPreviews({
         const chosen = keep?.chosenId && designs.some((x) => x.id === keep.chosenId) ? keep.chosenId : ready[0].id;
         onProduct((prev) => {
           const kept = prev && prev.specHash === runKey ? prev : undefined;
-          return { designs, chosenId: chosen, unlockedId: kept?.unlockedId ?? null, specHash: runKey };
+          return {
+            designs,
+            chosenId: chosen,
+            unlockedId: kept?.unlockedId ?? null,
+            specHash: runKey,
+            ...(prev?.regens !== undefined ? { regens: prev.regens } : {}),
+          };
         });
         void product.choose(chosen).catch(() => undefined);
       } catch {
@@ -219,13 +235,22 @@ export function useProductPreviews({
     void run([]);
   }, [enabled, active, key, run, product]);
 
-  const tryAnother = useCallback(() => {
-    if (phase === "running") return;
-    for (const c of cards) excluded.current.add(c.archetype);
-    // Every archetype seen: start again from the best ones.
-    if (excluded.current.size >= 11) excluded.current = new Set(cards.map((c) => c.archetype));
-    void run([...excluded.current], cards);
-  }, [cards, phase, run]);
+  const tryAnother = useCallback(
+    (feedback?: string) => {
+      if (phase === "running") return;
+      const text = feedback?.trim() ?? "";
+      if (text) {
+        // Feedback steers a fresh set (the same archetypes, changed); the shown designs stay as they are.
+        void run([], cards, text);
+        return;
+      }
+      for (const c of cards) excluded.current.add(c.archetype);
+      // Every archetype seen: start again from the best ones.
+      if (excluded.current.size >= 11) excluded.current = new Set(cards.map((c) => c.archetype));
+      void run([...excluded.current], cards);
+    },
+    [cards, phase, run],
+  );
 
   const choose = useCallback(
     (designId: string) => {
@@ -234,6 +259,7 @@ export function useProductPreviews({
         chosenId: designId,
         unlockedId: prev?.unlockedId ?? null,
         specHash: prev?.specHash ?? key,
+        ...(prev?.regens !== undefined ? { regens: prev.regens } : {}),
       }));
       void product?.choose(designId).catch(() => undefined);
     },
@@ -246,6 +272,7 @@ export function useProductPreviews({
     stage,
     cards: cardsKey === key ? cards : [],
     key,
+    regens: Math.max(regensSeen, doc?.product?.regens ?? 0),
     tryAnother,
     choose,
   };

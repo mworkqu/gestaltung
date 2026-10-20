@@ -88,3 +88,114 @@ describe("the card decides the sensors and outputs", () => {
     expect(ids).toEqual(expect.arrayContaining(["arduino_uno", "pump_5v", "usbc_power_5v", "led_5mm", "soil_moisture_cap"]));
   });
 });
+
+/** The owner's live card, after "i dont need any microcontroller i need actual ics". */
+const demorgan: ProductSpec = {
+  ...clampSpec({
+    name: "De Morgan logic kit",
+    oneLine: "Shows De Morgan's law with real gate chips on a breadboard.",
+    outputs: ["led"],
+    inputs: [],
+    features: ["7400-series gates", "truth table"],
+    understanding: {
+      goal: "Prove De Morgan's law by hand",
+      howItWorks: "Two switches feed the gate chips; the LEDs show each gate's output.",
+      controller: "",
+      sensors: [{ name: "Toggle Switches", count: 2 }],
+      actuators: [],
+      outputs: [
+        { name: "AND gate (7408)", count: 1 },
+        { name: "OR gate (7432)", count: 1 },
+        { name: "NOT gate (7404)", count: 1 },
+        { name: "LEDs", count: 2 },
+      ],
+    },
+  }),
+  // Set by hand: clampSpec() in schema.ts does not carry the field through yet. The
+  // inference net in build-class.ts reads these same words, so the picker would get
+  // "logic" even without it.
+  buildClass: "logic",
+};
+
+// ── The two holes in the coverage check (2026-10-20) ────────────────────────
+//
+// 1. understanding.controller was never mapped to a part, so the "card ⊆ parts"
+//    guarantee had a hole exactly at the brain of the build.
+// 2. SENSOR_RULES had a `button` rule but no switch/toggle rule, so "Toggle Switches ×2"
+//    matched nothing, was silently left out of the check, and the user got one push button.
+
+describe("the card's controller is checked too", () => {
+  it("a card that promises a controller and parts without one → missing", () => {
+    const missing = cardCoverage(plant, [{ partId: "soil_moisture_cap" }, { partId: "pump_5v" }, { partId: "led_5mm" }, { partId: "led_5mm" }, { partId: "led_5mm" }]);
+    expect(missing).toEqual([{ key: "controller", want: 1, have: 0 }]);
+  });
+
+  it("any board satisfies it: the card says Uno, the picker chose the C3", () => {
+    const parts = [{ partId: "esp32_c3_mini" }, { partId: "soil_moisture_cap" }, { partId: "pump_5v" }, ...Array(3).fill({ partId: "led_5mm" })];
+    expect(cardCoverage(plant, parts)).toEqual([]);
+  });
+
+  it("a logic build's controller promise is the gate chips, never a board", () => {
+    const items = Object.fromEntries(cardItems(demorgan).map((i) => [i.key, i]));
+    expect(items.controller.ids).toContain("ic_7408");
+    expect(items.controller.ids).not.toContain("esp32_devkit");
+    // A gate chip covers it; an ESP32 does not.
+    expect(cardCoverage(demorgan, [{ partId: "ic_7408" }]).map((m) => m.key)).not.toContain("controller");
+    expect(cardCoverage(demorgan, [{ partId: "esp32_devkit" }]).map((m) => m.key)).toContain("controller");
+  });
+
+  it("a card with no controller line promises none (the board is never dropped)", () => {
+    const noBrain = clampSpec({
+      ...plant,
+      understanding: { ...plant.understanding!, controller: "" },
+    }) as ProductSpec;
+    expect(cardItems(noBrain).map((i) => i.key)).not.toContain("controller");
+    const picked = pick(noBrain, { components: [{ partId: "arduino_uno" }] });
+    expect(picked.components.map((c) => c.partId)).toContain("arduino_uno");
+  });
+});
+
+describe("switches and gate chips on the card", () => {
+  it('"Toggle Switches ×2" → 2 switch parts, and the gates map to their chips', () => {
+    const items = Object.fromEntries(cardItems(demorgan).map((i) => [i.key, i.count]));
+    expect(items).toMatchObject({ switch: 2, gate_and: 1, gate_or: 1, gate_not: 1, led: 2 });
+    const picked = pick(demorgan, { components: [{ partId: "ic_7408" }] });
+    const ids = picked.components.map((c) => c.partId);
+    expect(ids.filter((id) => id === "slide_switch" || id === "dip_switch_4")).toHaveLength(2);
+    expect(ids).toEqual(expect.arrayContaining(["ic_7408", "ic_7432", "ic_7404", "breadboard_830", "jumper_kit"]));
+    expect(ids).not.toContain("esp32_devkit");
+    expect(cardCoverage(demorgan, picked.components)).toEqual([]);
+  });
+
+  it("a push button is still a button, not a switch (rule order)", () => {
+    const keys = (name: string) =>
+      cardItems(clampSpec({
+        name: "Button test",
+        oneLine: "x",
+        understanding: {
+          goal: "g", howItWorks: "h", controller: "Arduino Uno",
+          sensors: [{ name, count: 1 }], actuators: [], outputs: [],
+        },
+      })).map((i) => i.key);
+    expect(keys("Push button")).toContain("button");
+    expect(keys("Push button switch")).toContain("button");
+    expect(keys("Push button switch")).not.toContain("switch");
+    expect(keys("Toggle switch")).toContain("switch");
+    expect(keys("4-way DIP switch")).toContain("dip_switch");
+  });
+
+  it("an LED that merely mentions a gate stays an LED", () => {
+    const keys = cardItems(clampSpec({
+      name: "Gate watcher",
+      oneLine: "x",
+      understanding: {
+        goal: "g", howItWorks: "h", controller: "",
+        sensors: [], actuators: [],
+        outputs: [{ name: "LED showing the AND gate output", count: 1 }],
+      },
+      buildClass: "logic",
+    })).map((i) => i.key);
+    expect(keys).toContain("led");
+    expect(keys).not.toContain("gate_and");
+  });
+});

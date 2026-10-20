@@ -14,7 +14,7 @@
 import { arabicCountForm } from "@/lib/text/count";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import {
+import { Binary,
   BatteryCharging,
   Check,
   Cpu,
@@ -66,6 +66,7 @@ export const CATEGORY_ICON: Record<Category, LucideIcon> = {
   output: Lightbulb,
   actuator: Settings2,
   connector: Plug,
+  logic: Binary,
 };
 
 function PartTile({ part, product, size = 56 }: { part: LibraryPart | undefined; product: StoreCardPart | null; size?: number }) {

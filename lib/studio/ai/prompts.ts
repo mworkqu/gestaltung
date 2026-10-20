@@ -6,7 +6,7 @@
 // small, and our clamp*() helpers enforce the real limits anyway.
 
 import {
-  ACTUATOR_KINDS, ACTUATOR_LOADS, MOVER_KINDS, COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
+  ACTUATOR_KINDS, ACTUATOR_LOADS, BUILD_CLASSES, MOVER_KINDS, COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
   MECH_TEMPLATES, MATERIALS, OUTPUTS, PHASE_TEMPLATES, PLACEMENTS, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
   type EnclosureTemplate, type MechTemplate, type ProductSpec,
 } from "../schema";
@@ -81,10 +81,20 @@ export const SPEC_SYSTEM =
   // 2026-10-18: the "Our understanding" panel, rebuilt in full on every turn.
   "Every spec carries spec.understanding — your full understanding of the idea, shown to the user to confirm: " +
   "goal (one sentence), howItWorks (2–4 plain sentences: what it senses, what it decides, what it does), " +
-  "controller (the board, e.g. 'Arduino Uno'), sensors, actuators (servo, linear_actuator, motor, pump, stepper) and " +
+  "controller (the board, e.g. 'Arduino Uno' — leave it EMPTY when the build has no microcontroller), " +
+  "sensors, actuators (servo, linear_actuator, motor, pump, stepper) and " +
   "outputs (screen, LEDs, buzzer…), each {name, count, purpose}. List every part the goal needs and nothing it does not. " +
   "spec.actuators must match the understanding's movers (same kinds and counts; a small linear actuator stays only in the understanding). " +
   "Keep it a student-sized build unless the user asks for more: one controller, the fewest sensors and movers that do the job. " +
+  // 2026-10-20: the second axis next to the tier — what SHAPE the build is.
+  "Always set spec.buildClass: \"mcu\" when a board runs firmware (the normal case); " +
+  "\"logic\" when the build is discrete logic chips wired by hand — 7400-series gates (7408 AND, 7432 OR, 7404 NOT, " +
+  "7400 NAND, 7402 NOR, 7486 XOR), a truth table, De Morgan's law, a breadboard with switches and LEDs — with no " +
+  "microcontroller and no code at all; \"cad\" when the deliverable is mainly a printed or modelled part with little or no electronics. " +
+  "If the user says they want no microcontroller, or names gate chips, set buildClass \"logic\", leave understanding.controller " +
+  "EMPTY and list the gate chips themselves (e.g. 'AND gate (7408)') in the understanding, with the breadboard, the switches " +
+  "and the LEDs. Never put a breadboard or a power module in the controller slot. " +
+  "Keep spec.buildClass on every later turn unless the user asks for the other shape. " +
   "Use Western digits (0-9) in Arabic too.";
 
 const U = LIMITS.understanding;
@@ -104,7 +114,10 @@ export const UNDERSTANDING_SCHEMA = {
   properties: {
     goal: str(`What the build is for, one sentence, at most ${U.goal} characters`),
     howItWorks: str(`2–4 plain sentences: what it senses, decides and does, at most ${U.how} characters`),
-    controller: str("The one controller board, e.g. Arduino Uno"),
+    controller: str(
+      'The one controller board, e.g. "Arduino Uno". Empty string when the build has no microcontroller at all ' +
+        "(buildClass logic or cad): a breadboard, a power module or a gate chip is NEVER the controller.",
+    ),
     sensors: partList("Sensor name"),
     actuators: {
       type: "ARRAY",
@@ -117,7 +130,9 @@ export const UNDERSTANDING_SCHEMA = {
     },
     outputs: partList("Output name, e.g. Buzzer, OLED screen, LED"),
   },
-  required: ["goal", "howItWorks", "controller", "sensors", "actuators", "outputs"],
+  // `controller` is not required: a logic / cad build has none, and before this the model
+  // had no way to say so — it wrote "Breadboard Power Supply Module" into the slot instead.
+  required: ["goal", "howItWorks", "sensors", "actuators", "outputs"],
 };
 
 export const PRODUCT_SPEC_SCHEMA = {
@@ -152,6 +167,11 @@ export const PRODUCT_SPEC_SCHEMA = {
         required: ["kind", "count", "load"],
       },
     },
+    buildClass: enumOf(
+      BUILD_CLASSES,
+      'What SHAPE the build is: "mcu" = a board runs firmware (the default); "logic" = discrete 7400-series gate chips ' +
+        'on a breadboard, no microcontroller and no code at all; "cad" = the deliverable is a printed part, little or no electronics.',
+    ),
     understanding: UNDERSTANDING_SCHEMA,
     quantity: { type: "INTEGER", description: "Always 1" },
   },
@@ -258,7 +278,15 @@ export const PICK_SYSTEM =
   "include exactly that many of the matching actuator (one entry per unit: 6 servos = 6 entries). " +
   "Heavy or medium servo joints use the strong metal-gear servo, light ones the small servo; 3 or more servos go on the servo driver board " +
   "and need a supply that can feed them all. " +
-  "Exactly one mcu. Choose power parts that match spec.power. Only ids from the list. " +
+  // 2026-10-20: the build class decides whether there is a controller at all.
+  "spec.buildClass says what SHAPE the build is, and it decides the controller: " +
+  "\"mcu\" (or no buildClass at all) = exactly one mcu. " +
+  "\"logic\" = NO microcontroller and NO firmware whatsoever: never include an mcu part, not even a small one. " +
+  "A logic build is discrete 7400-series gate chips on a breadboard — the gate ICs the card names, " +
+  "the breadboard they sit on, jumper wires, switches for the inputs and LEDs (with their resistors) for the outputs. " +
+  "The gate chips ARE the brain; a breadboard power supply or a 5 V source is power, never a controller. " +
+  "\"cad\" = the deliverable is a printed part and there may be no electronics at all: no mcu, and only the parts the card names. " +
+  "Choose power parts that match spec.power. Only ids from the list. " +
   "When spec.understanding lists the controller, sensors, movers and outputs, pick the library parts that match that list " +
   "(same kinds and counts); a part it lists that the library lacks is left out. " +
   "Return {components:[{partId,label}], reasons:{partId:plainSentence}}. " +

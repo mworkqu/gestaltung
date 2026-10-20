@@ -243,7 +243,16 @@ export function IdeaStep({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-start lg:gap-6">
         {/* "Our understanding": top of the main column (first on phones too). */}
         <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-          <UnderstandingPanel spec={spec} busy={busy} open={understandingOpen} onToggle={() => setUnderstandingOpen((o) => !o)} />
+          <UnderstandingPanel
+            spec={spec}
+            busy={busy}
+            open={understandingOpen}
+            onToggle={() => setUnderstandingOpen((o) => !o)}
+            // The agent's class is a guess; the user always gets the last word.
+            // This rides the same save path as every other card edit, so later
+            // steps are cleared the same way — the parts really do differ by class.
+            onBuildClass={spec && !busy ? (buildClass) => setSpec({ ...spec, buildClass }) : undefined}
+          />
         </div>
 
         {/* The chat: the side column on desktop (sticky), under the understanding on phones. */}

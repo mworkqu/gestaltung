@@ -7,6 +7,7 @@
 import type { StepId } from "@/lib/studio/palette";
 import type { ProductSpec, StudioDoc } from "@/lib/studio/schema";
 import type { CardSlot } from "@/lib/studio/ai/spec-guards";
+import { classFor, fadedReasonKey, isFadedStep } from "@/lib/studio/build-class";
 
 export const FLOW = ["idea", "parts", "wiring", "enclosure", "print", "code", "make"] as const satisfies readonly StepId[];
 export type FlowStep = (typeof FLOW)[number];
@@ -58,9 +59,32 @@ export function stepDone(step: FlowStep, doc: StudioDoc | null): boolean {
   }
 }
 
-/** Index of the first step that is not done (the last step when all are). */
+/**
+ * Is this step faded for the doc's build (greyed, with a reason, but still reachable)?
+ * Uses classFor(): the stored class, else what the card's words imply, else "mcu".
+ * Faded is NOT disabled: it never changes what a visitor may open, only what they must finish.
+ */
+export function stepFaded(step: FlowStep, doc: Pick<StudioDoc, "spec"> | null): boolean {
+  return !!doc && isFadedStep({ buildClass: classFor(doc.spec) }, step);
+}
+
+/** The i18n key (under Studio) saying why `step` is faded for this build, or null. */
+export function stepFadedReasonKey(step: FlowStep, doc: Pick<StudioDoc, "spec"> | null): string | null {
+  return doc ? fadedReasonKey({ buildClass: classFor(doc.spec) }, step) : null;
+}
+
+/**
+ * Does `step` stop the visitor from moving on? A step that is done does not, and neither does
+ * a faded one (a logic kit has no firmware: Code never has to be passed to reach Make).
+ * stepDone() itself stays "did this step produce its result?" — only navigation reads this.
+ */
+export function stepSettled(step: FlowStep, doc: StudioDoc | null): boolean {
+  return stepDone(step, doc) || stepFaded(step, doc);
+}
+
+/** Index of the first step that is not settled (the last step when all are). */
 export function firstOpenStep(doc: StudioDoc | null): number {
-  const i = FLOW.findIndex((s) => !stepDone(s, doc));
+  const i = FLOW.findIndex((s) => !stepSettled(s, doc));
   return i === -1 ? FLOW.length - 1 : i;
 }
 

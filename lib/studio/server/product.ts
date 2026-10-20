@@ -37,10 +37,19 @@ const Archetype = z.enum(ARCHETYPES);
 /** base64 (optionally a data: URL); the size is checked again after decoding. */
 const B64 = (maxBytes: number) => z.string().min(16).max(Math.ceil((maxBytes * 4) / 3) + 64);
 
+/** Longest "what is wrong with these?" text. */
+export const FEEDBACK_MAX = 400;
+
 export const DesignBody = z.object({
   projectId: ProjectId,
   count: z.number().int().min(1).max(3).optional().default(3),
   exclude: z.array(z.string().max(32)).max(12).optional().default([]),
+  /** What is wrong with the designs shown: steers a NEW set of three (never edits the old ones). */
+  feedback: z
+    .string()
+    .max(FEEDBACK_MAX * 5)
+    .transform((s) => s.trim().slice(0, FEEDBACK_MAX).trim())
+    .optional(),
 });
 export const CheckBody = z.object({
   projectId: ProjectId,

@@ -20,7 +20,10 @@ const phase2Ids = [
 const w3Ids = ["pump_5v"];
 // Multi-actuator stage (6-servo arm): strong servo, 16-channel servo driver, 5 A supply.
 const armIds = ["mg996r_servo", "pca9685_servo", "psu_5v_5a"];
-const ids = [...phase1Ids, ...phase2Ids, ...w3Ids, ...armIds];
+// Discrete-logic builds (breadboard + 7400-series gates, no microcontroller).
+const logicIcIds = ["ic_7408", "ic_7432", "ic_7404", "ic_7400", "ic_7402", "ic_7486"];
+const logicIds = [...logicIcIds, "breadboard_830", "jumper_kit", "dip_switch_4"];
+const ids = [...phase1Ids, ...phase2Ids, ...w3Ids, ...armIds, ...logicIds];
 
 function vertexCount(g: THREE.Group): number {
   let n = 0;
@@ -145,6 +148,42 @@ describe("library", () => {
     expect(getPart("led_5mm")!.requires?.[0].id).toBe("resistor_220");
     expect(getPart("pir_hcsr501")!.requires).toBeUndefined();
     expect(getPart("cell_18650")!.power).toMatchObject({ vMin: 3.0, vMax: 4.2 });
+  });
+
+  it("7400-series logic ICs have the real DIP-14 pinouts", () => {
+    // [input pins, output pin] per gate, from the standard datasheets.
+    const quad = [[[1, 2], 3], [[4, 5], 6], [[9, 10], 8], [[12, 13], 11]] as const; // 7400 / 7408 / 7432 / 7486
+    const nor = [[[2, 3], 1], [[5, 6], 4], [[8, 9], 10], [[11, 12], 13]] as const; // 7402
+    const hex = [[[1], 2], [[3], 4], [[5], 6], [[9], 8], [[11], 10], [[13], 12]] as const; // 7404
+    const gates: Record<string, readonly (readonly [readonly number[], number])[]> = {
+      ic_7400: quad, ic_7408: quad, ic_7432: quad, ic_7486: quad, ic_7402: nor, ic_7404: hex,
+    };
+    for (const id of logicIcIds) {
+      const p = getPart(id)!;
+      expect(p.category, id).toBe("logic");
+      expect(p.storeSkus, id).toEqual([]);
+      expect(p.pins, id).toHaveLength(14);
+      const role = (n: number) => p.pins.find((x) => x.id === String(n))?.role;
+      expect(role(7), id + " pin 7").toBe("gnd");
+      expect(role(14), id + " pin 14").toBe("5v");
+      const used = new Set<number>([7, 14]);
+      for (const [ins, out] of gates[id]) {
+        for (const n of ins) { expect(role(n), id + " pin " + n).toBe("in"); used.add(n); }
+        expect(role(out), id + " pin " + out).toBe("out");
+        used.add(out);
+      }
+      // Every one of the 14 pins is accounted for.
+      expect([...used].sort((a, b) => a - b)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+    }
+  });
+
+  it("logic supplies exist with the right categories and are pickable (not helpers)", () => {
+    expect(getPart("breadboard_830")!.category).toBe("connector");
+    expect(getPart("jumper_kit")!.category).toBe("connector");
+    expect(getPart("dip_switch_4")!.category).toBe("input");
+    for (const id of logicIds) expect(getPart(id)!.helper, id).toBeFalsy();
+    expect(partsByCategory("logic").map((p) => p.id).sort()).toEqual([...logicIcIds].sort());
+    expect(getPart("ic_7408")!.tags).toEqual(expect.arrayContaining(["logic", "gate", "ttl", "7408", "and", "boolean"]));
   });
 
   it("bilingual text is present and storeSkus never invented", () => {

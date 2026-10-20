@@ -23,7 +23,7 @@
 // empty messages get a canned reply from chatGuardTurn() without a model call. The
 // first card may carry a reply too (scope honesty: "a real UR10 is 1.3 m...").
 
-import { ACTUATOR_KINDS, clampSpec, type ClampLog, type ProductSpec } from "../schema";
+import { ACTUATOR_KINDS, BUILD_CLASSES, clampSpec, type BuildClass, type ClampLog, type ProductSpec } from "../schema";
 import { chatGuardTurn, guardSpec, vagueTurn } from "./spec-guards";
 import { actuatorCountLabel, actuatorTotals, capStrongServos, setActuatorCount } from "../actuators";
 import { outcomeCached, specKey, type AiCache } from "./cache";
@@ -104,6 +104,23 @@ function cleanChanged(v: unknown): string[] {
     .slice(0, CHANGED_ITEMS);
 }
 
+/**
+ * 2026-10-20: the build class the model chose survives the clamp. It is the one field that
+ * decides whether the parts list gets a microcontroller at all, so an unreadable value is
+ * logged and dropped (absent = "mcu", see lib/studio/build-class.ts) rather than guessed.
+ */
+export function withBuildClass(spec: ProductSpec, raw: unknown, log: ClampLog = []): ProductSpec {
+  if (raw === undefined || raw === null || raw === "") return spec;
+  const want = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  const cls = BUILD_CLASSES.find((c) => c === want) as BuildClass | undefined;
+  if (!cls) {
+    log.push({ path: "buildClass", from: raw, to: null });
+    return spec;
+  }
+  if (spec.buildClass === cls) return spec;
+  return { ...spec, buildClass: cls };
+}
+
 /** Same card? (key order and input/output order do not count) */
 export function sameCard(a: ProductSpec, b: ProductSpec): boolean {
   const key = (s: ProductSpec) =>
@@ -126,7 +143,7 @@ export function validateTurn(
   const turnLog: ClampLog = [];
   if (isObj(raw.spec)) {
     if (typeof raw.spec.name !== "string" || !raw.spec.name.trim()) return { value: null, errors: ["spec.name is required"] };
-    spec = clampSpec(raw.spec, turnLog);
+    spec = withBuildClass(clampSpec(raw.spec, turnLog), raw.spec.buildClass, turnLog);
   }
   if (opts.mode === "refine") {
     const reply = cleanReply(raw.reply, locale, turnLog);
@@ -267,6 +284,12 @@ export function keepCardFields(spec: ProductSpec, current: ProductSpec, lastUser
     if (out.understanding && current.understanding && !out.understanding.actuators.length) {
       out = { ...out, understanding: { ...out.understanding, actuators: current.understanding.actuators } };
     }
+  }
+  // The class is what the user already agreed to ("no microcontroller"): a refine turn that
+  // simply forgets the field must not silently put the board back.
+  if (current.buildClass && !spec.buildClass) {
+    log.push({ path: "buildClass", from: null, to: current.buildClass });
+    out = { ...out, buildClass: current.buildClass };
   }
   if (current.understanding && !spec.understanding) {
     log.push({ path: "understanding", from: null, to: "kept" });

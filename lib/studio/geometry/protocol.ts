@@ -98,7 +98,12 @@ type ProductCommon = {
   mock?: ProductMockOptions | null;
 };
 
-export type ProductPreviewInput = ProductCommon & { count: number; exclude?: Archetype[] };
+export type ProductPreviewInput = ProductCommon & {
+  count: number;
+  exclude?: Archetype[];
+  /** What the visitor says is wrong with the designs shown: steers a NEW set (a regeneration). */
+  feedback?: string;
+};
 export type ProductUnlockInput = ProductCommon & { designId: string };
 /** STL files of a product already built in this worker (after unlock). */
 export type ProductStlInput = { hash: string; name: string };
@@ -127,8 +132,14 @@ export type ProductPreviewDesign = {
   previewPath: string | null;
   status: "ready" | "failed";
 };
-export type ProductPreviewError = "guest_limit" | "sign_in" | "no_render" | "failed";
-export type ProductPreviewResult = { designs: ProductPreviewDesign[]; error?: ProductPreviewError; ms: number };
+export type ProductPreviewError = "guest_limit" | "sign_in" | "no_tokens" | "no_render" | "failed";
+export type ProductPreviewResult = {
+  designs: ProductPreviewDesign[];
+  error?: ProductPreviewError;
+  ms: number;
+  /** Regenerations made on the project so far (set by the server on a regeneration; the first is free). */
+  regens?: number;
+};
 
 /** After payment only: the built product with geometry, and what the viewer needs for the scene. */
 export type ProductUnlockResult = PackedProduct & { designId: string; scene: Scene; stage: SceneMetrics };

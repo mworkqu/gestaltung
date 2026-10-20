@@ -157,10 +157,17 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
   emit({ kind: "productProgress", stage: "designing" });
   const r = await deps.http("/design", {
     method: "POST",
-    body: { projectId: input.projectId, count: Math.max(1, Math.min(3, Math.round(input.count))), ...(input.exclude?.length ? { exclude: input.exclude } : {}) },
+    body: {
+      projectId: input.projectId,
+      count: Math.max(1, Math.min(3, Math.round(input.count))),
+      ...(input.exclude?.length ? { exclude: input.exclude } : {}),
+      ...(input.feedback?.trim() ? { feedback: input.feedback.trim().slice(0, 400) } : {}),
+    },
   });
   if (r.status === 429 || r.data.error === "guest_limit") return { designs: [], error: "guest_limit", ms: ms() };
   if (r.status === 401 || r.data.error === "sign_in") return { designs: [], error: "sign_in", ms: ms() };
+  if (r.status === 402 || r.data.error === "no_tokens") return { designs: [], error: "no_tokens", ms: ms() };
+  const regens = typeof r.data.regens === "number" ? r.data.regens : undefined;
   const raw = Array.isArray(r.data.designs) ? (r.data.designs as unknown[]).filter(isObj) : [];
   if (r.status < 200 || r.status >= 300 || raw.length === 0) return { designs: [], error: "failed", ms: ms() };
 
@@ -178,11 +185,11 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
       designs.push({ id, archetype: best.model.archetype, why, previewPath, status: "ready" });
     } catch (err) {
       console.warn("[studio product] design failed", id, err instanceof Error ? err.message : err);
-      if (err instanceof Error && err.message === "no_render") return { designs, error: "no_render", ms: ms() };
+      if (err instanceof Error && err.message === "no_render") return { designs, error: "no_render", ms: ms(), ...(regens !== undefined ? { regens } : {}) };
       designs.push({ id, archetype, why, previewPath: null, status: "failed" });
     }
   }
-  return { designs, ...(designs.some((d) => d.status === "ready") ? {} : { error: "failed" as const }), ms: ms() };
+  return { designs, ...(designs.some((d) => d.status === "ready") ? {} : { error: "failed" as const }), ms: ms(), ...(regens !== undefined ? { regens } : {}) };
 }
 
 /** After "Create my CAD": the unlocked model from the server, solved and built (geometry stays for the caller to pack). */

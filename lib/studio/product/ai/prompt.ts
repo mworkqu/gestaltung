@@ -165,6 +165,8 @@ export function formKitText(): string {
 export function designerPrompt(i: {
   spec: ProductSpec;
   brief?: string | null;
+  /** The client's complaints about the designs they were shown (regeneration). */
+  feedback?: string | null;
   parts: DesignerPart[];
   starts: { archetype: Archetype; model: ProductModel }[];
 }): string {
@@ -172,6 +174,11 @@ export function designerPrompt(i: {
   const lines = [
     `Product: ${s.name}. ${s.oneLine}`,
     i.brief ? `The client wrote: ${i.brief.slice(0, 600)}` : null,
+    i.feedback
+      ? `The client saw an earlier set of designs and said what is wrong with them (their words, quoted): ${JSON.stringify(i.feedback.slice(0, 400))}. ` +
+        "Make NEW designs that fix these complaints: change the shape, proportions or features they point at, and do not repeat the earlier look. " +
+        "Still honour the product description and keep every electronics part below fitting and working."
+      : null,
     `Use: ${s.use}${s.placement ? `, placement ${s.placement}` : ""}; size: ${s.sizeHint}; style: ${s.style}; environment: ${s.environment}; power: ${s.power}.`,
     s.features.length ? `Features: ${s.features.join("; ")}.` : null,
     `Inputs: ${s.inputs.join(", ") || "none"}. Outputs: ${s.outputs.join(", ") || "none"}.`,

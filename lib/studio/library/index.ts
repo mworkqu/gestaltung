@@ -46,6 +46,16 @@ import { pca9685Servo } from "./parts/pca9685_servo";
 import { psu5v5a } from "./parts/psu_5v_5a";
 import { mosfetModule } from "./parts/mosfet_module";
 
+import { ic7408 } from "./parts/ic_7408";
+import { ic7432 } from "./parts/ic_7432";
+import { ic7404 } from "./parts/ic_7404";
+import { ic7400 } from "./parts/ic_7400";
+import { ic7402 } from "./parts/ic_7402";
+import { ic7486 } from "./parts/ic_7486";
+import { breadboard830 } from "./parts/breadboard_830";
+import { jumperKit } from "./parts/jumper_kit";
+import { dipSwitch4 } from "./parts/dip_switch_4";
+
 export const LIBRARY: LibraryPart[] = [
   esp32Devkit,
   arduinoUno,
@@ -91,6 +101,15 @@ export const LIBRARY: LibraryPart[] = [
   mg996rServo,
   pca9685Servo,
   psu5v5a,
+  ic7408,
+  ic7432,
+  ic7404,
+  ic7400,
+  ic7402,
+  ic7486,
+  breadboard830,
+  jumperKit,
+  dipSwitch4,
 ];
 
 const BY_ID = new Map(LIBRARY.map((p) => [p.id, p]));

@@ -45,6 +45,8 @@ import {
   passedAnswers,
   sameSpec,
   stepDone,
+  stepFaded,
+  stepFadedReasonKey,
   type FlowStep,
 } from "@/lib/studio/client/steps";
 import { saveStatus, shouldWarnOnLeave, stepChangeSave, type SaveStatus } from "@/lib/studio/client/save-state";
@@ -654,10 +656,20 @@ function StudioShellInner({
         current={current}
         furthest={furthest}
         done={(s) => stepDone(s, doc)}
+        faded={(s) => stepFaded(s, doc)}
         onGo={go}
         status={doc && persist.current ? <SaveIndicator status={status} guest={guest} onRetry={() => void flush()} /> : null}
       />
       <StepSlide index={current}>
+        {doc && stepFaded(step, doc) && (
+          <FadedBanner
+            reason={t(stepFadedReasonKey(step, doc) ?? "fadedLogic")}
+            title={t("fadedTitle")}
+            continueLabel={t("fadedContinue")}
+            onContinue={next}
+            last={current >= FLOW.length - 1}
+          />
+        )}
         {step === "idea" && (
           <IdeaStep
             ctx={ctx}
@@ -739,6 +751,45 @@ function StudioShellInner({
       )}
       {doc && persist.current && api.mode !== "mock" && <DeleteProject projectId={projectId} />}
     </div>
+  );
+}
+
+/**
+ * A faded step, opened on purpose: why it is probably not needed for this build, and a clear
+ * way to carry on. The step itself is rendered below it unchanged — the visitor may overrule us.
+ */
+function FadedBanner({
+  title,
+  reason,
+  continueLabel,
+  onContinue,
+  last,
+}: {
+  title: string;
+  reason: string;
+  continueLabel: string;
+  onContinue: () => void;
+  last: boolean;
+}) {
+  return (
+    <aside
+      className="neu-inset mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4"
+      data-testid="studio-faded-banner"
+    >
+      <div className="min-w-0 flex-1 space-y-0.5">
+        <p className="kicker text-mutedtext">{title}</p>
+        <p className="text-sm leading-relaxed text-heading">{reason}</p>
+      </div>
+      {!last && (
+        <button
+          type="button"
+          onClick={onContinue}
+          className="inline-flex min-h-11 items-center rounded-xl bg-panel px-4 text-sm font-bold text-cobalt shadow-neu-sm transition-colors hover:text-cobalt-hover"
+        >
+          {continueLabel}
+        </button>
+      )}
+    </aside>
   );
 }
 

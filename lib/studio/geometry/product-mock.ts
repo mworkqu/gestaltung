@@ -17,9 +17,12 @@ type Design = { id: string; archetype: Archetype; model: ProductModel; score?: n
 const store = new Map<string, Map<string, Design>>();
 let builds = 0;
 
+const regens = new Map<string, number>();
+
 /** Forget everything (tests). */
 export function resetProductMock() {
   store.clear();
+  regens.clear();
   builds = 0;
 }
 
@@ -36,6 +39,8 @@ export function mockProductHttp(input: Pick<ProductPreviewInput, "projectId" | "
         const count = Math.max(1, Math.min(3, Number(body.count) || 3));
         if (opts.guestLimitAfter != null && builds + count > opts.guestLimitAfter) return { status: 429, data: { error: "guest_limit" } };
         builds += count;
+        const regen = Boolean(body.feedback) || (Array.isArray(body.exclude) && body.exclude.length > 0);
+        if (regen) regens.set(input.projectId, (regens.get(input.projectId) ?? 0) + 1);
         const exclude = new Set(Array.isArray(body.exclude) ? (body.exclude as string[]) : []);
         const picked = rankArchetypes(input.spec)
           .map((r) => r.archetype)
@@ -49,7 +54,7 @@ export function mockProductHttp(input: Pick<ProductPreviewInput, "projectId" | "
           // Empty why → the page shows Studio.product.why_<archetype> (EN + AR).
           return { id, archetype, model, why: { en: "", ar: "" } };
         });
-        return { status: 200, data: { designs: out } };
+        return { status: 200, data: { designs: out, ...(regen ? { regens: regens.get(input.projectId) } : {}) } };
       }
       case "/check": {
         const d = designs.get(String(body.designId));

@@ -4376,6 +4376,12 @@
       "pictureAlt": "{name}, design {n}",
       "whyLabel": "Why this design:",
       "tryAnother": "Try another",
+      "feedbackLabel": "What's wrong with these?",
+      "feedbackPlaceholder": "For example: too tall, the lid should open on a hinge, make it rounder.",
+      "feedbackHint": "These three stay as they are. Your words shape three new designs.",
+      "regenFree": "Make 3 new designs (free)",
+      "regenCost": "Make 3 new designs ({n, plural, one {1 token} other {# tokens}})",
+      "regenNote": "The first new set is free. Each one after that costs ideation tokens.",
       "createCad": "Create my CAD ({n, plural, one {1 credit} other {# credits}})",
       "createCadIncluded": "Create my CAD (included)",
       "createCadNoCost": "Create my CAD",
@@ -4644,7 +4650,12 @@
       "cnt_linear_actuator": "{form, select, one {1 linear actuator} other {{count} linear actuators}}",
       "cnt_stepper": "{form, select, one {1 stepper motor} other {{count} stepper motors}}",
       "cnt_light": "{form, select, one {1 light} other {{count} lights}}",
-      "cnt_output": "{form, select, one {1 output} other {{count} outputs}}"
+      "cnt_output": "{form, select, one {1 output} other {{count} outputs}}",
+      "buildClass": "What kind of build is this?",
+      "buildClass_mcu": "Runs code on a board",
+      "buildClass_logic": "Pure logic chips, no code",
+      "buildClass_cad": "Mainly a 3D-printed part",
+      "buildClassNote": "This decides which steps matter most. Steps we grey out stay open if you want them."
     },
     "tiers": {
       "explorer": "Explorers",
@@ -4669,7 +4680,12 @@
     "engineeringView": "Engineering view",
     "partsOnRequestPlus": "+ {form, select, one {1 part priced on request} other {{count} parts priced on request}}",
     "partsOnRequestOnly": "{form, select, one {1 part priced on request} other {{count} parts priced on request}}",
-    "partNeedPacks": "Need {need} · {form, select, one {1 pack} other {{count} packs}} of {size}"
+    "partNeedPacks": "Need {need} · {form, select, one {1 pack} other {{count} packs}} of {size}",
+    "stepFadedSr": "Optional for this build. You can still open it.",
+    "fadedTitle": "Probably not needed for this build",
+    "fadedContinue": "Skip to the next step",
+    "fadedLogic": "This build is pure logic chips — there is no firmware to write and no sealed case to print.",
+    "fadedCad": "This build is mainly a printed part — there is no circuit to wire and no code to write."
   },
   "StudioLibrary": {
     "pageTitle": "Studio parts",

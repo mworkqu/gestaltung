@@ -9,7 +9,8 @@
 import { useTranslations } from "next-intl";
 import { ChevronDown, Cpu, Gauge, Lightbulb, Move } from "lucide-react";
 
-import type { ProductSpec, Understanding, UnderstandingMover, UnderstandingPart } from "@/lib/studio/schema";
+import { BUILD_CLASSES, type BuildClass, type ProductSpec, Understanding, UnderstandingMover, UnderstandingPart } from "@/lib/studio/schema";
+import { classFor } from "@/lib/studio/build-class";
 import { countParts, tierOf } from "@/lib/studio/tiers";
 import { isLight } from "@/lib/studio/card-parts";
 import { arabicCountForm } from "@/lib/text/count";
@@ -24,12 +25,19 @@ export function UnderstandingPanel({
   busy,
   open,
   onToggle,
+  onBuildClass,
 }: {
   /** The confirmed card (null while the first questions are asked). */
   spec: ProductSpec | null;
   busy: boolean;
   open: boolean;
   onToggle: () => void;
+  /**
+   * The visitor overrules the build shape. The parent saves it exactly like any other card edit:
+   * setSpec({ ...spec, buildClass }) (IdeaStep) -> onDraft -> StudioShell.docForCard -> commit.
+   * Omitted = the control is not shown (read-only card).
+   */
+  onBuildClass?: (buildClass: BuildClass) => void;
 }) {
   const t = useTranslations("Studio");
   const u = spec?.understanding;
@@ -119,6 +127,7 @@ export function UnderstandingPanel({
                 </Group>
               </div>
             </div>
+            {spec && onBuildClass && <BuildClassPicker value={classFor(spec)} disabled={busy} onChange={onBuildClass} />}
             <p className="text-xs leading-relaxed text-mutedtext">{t("understanding.note")}</p>
           </>
         )}
@@ -137,6 +146,42 @@ function tally(u: Understanding): [string, number][] {
   for (const a of u.actuators) add(a.kind, a.count);
   for (const o of u.outputs) add(isLight(o.name) ? "light" : "output", o.count);
   return [...out.entries()];
+}
+
+/** What kind of build this is, in words a non-engineer reads (never "mcu / logic / cad"). */
+function BuildClassPicker({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: BuildClass;
+  disabled: boolean;
+  onChange: (c: BuildClass) => void;
+}) {
+  const t = useTranslations("Studio");
+  return (
+    <fieldset className="space-y-2" disabled={disabled} data-testid="studio-build-class">
+      <legend className="text-xs font-semibold text-mutedtext">{t("understanding.buildClass")}</legend>
+      <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("understanding.buildClass")}>
+        {BUILD_CLASSES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            role="radio"
+            aria-checked={value === c}
+            onClick={() => value !== c && onChange(c)}
+            className={cn(
+              "min-h-11 rounded-xl px-3.5 text-sm font-semibold transition-colors disabled:opacity-60",
+              value === c ? "bg-panel text-heading shadow-neu-inset" : "bg-panel text-mutedtext shadow-neu-sm hover:text-heading",
+            )}
+          >
+            {t(`understanding.buildClass_${c}`)}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs leading-relaxed text-mutedtext">{t("understanding.buildClassNote")}</p>
+    </fieldset>
+  );
 }
 
 function Field({ label, text }: { label: string; text: string }) {

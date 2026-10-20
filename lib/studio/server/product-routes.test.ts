@@ -7,6 +7,7 @@ import { CODE_LIBRARY } from "@/lib/studio/library";
 import { emptyStudioDoc, type StudioDoc } from "@/lib/studio/schema";
 import { GOLDEN_IDEAS, goldenParts } from "@/lib/studio/product/__fixtures__/golden";
 import { archetypeDefault } from "@/lib/studio/product/archetypes";
+import { regenCost } from "@/lib/studio/tiers";
 import { fakeSupabase, type FakeDb } from "./fake-supabase";
 
 type Fake = ReturnType<typeof fakeSupabase>;
@@ -164,6 +165,61 @@ describe("POST /design", () => {
 
   it("signed-in users are not guest-limited", async () => {
     for (let i = 0; i < 4; i++) expect((await design(post({ projectId: P, count: 1 }))).status).toBe(200);
+  });
+});
+
+describe("POST /design regeneration (feedback + ideation tokens)", () => {
+  const A = "stake_device";
+  const aiAnswer = () => ({
+    designs: [{ archetype: A, thinking: {}, why_en: "Stands in the soil.", why_ar: "يقف في التربة.", model: archetypeDefault(A, g.spec, parts) }],
+  });
+  const tokenRpc = (balance: number) => {
+    state.main.db.rpc.idea_token_status = () => ({ data: { role: "user", balance, started: true, edit_turns: 0, tokens_used: 0, tier: "explorer" } });
+    state.main.db.rpc.idea_token_charge = (a) => ({ data: { ok: true, charged: a.p_amount, balance: balance - Number(a.p_amount), edit_turns: 0, tokens_used: 1 } });
+  };
+  const charges = () => state.main.db.rpcCalls.filter((c) => c.fn === "idea_token_charge");
+  const regens = () => (studioOf().product as { regens?: number }).regens;
+
+  it("the first regeneration is free, the second is charged 1 x tier", async () => {
+    state.gemini = true;
+    tokenRpc(5);
+    state.answers = [aiAnswer(), aiAnswer()];
+    const first = await design(post({ projectId: P, count: 1, feedback: "regen test: too tall" }));
+    expect(first.status).toBe(200);
+    expect(((await first.json()) as { charged: number }).charged).toBe(0);
+    expect(charges()).toHaveLength(0);
+    expect(regens()).toBe(1);
+
+    const second = await design(post({ projectId: P, count: 1, feedback: "regen test: lid hinge is wrong" }));
+    expect(second.status).toBe(200);
+    expect(charges()).toHaveLength(1);
+    expect(charges()[0].args.p_amount).toBe(regenCost(1, g.spec));
+    expect(regens()).toBe(2);
+  });
+
+  it("a plain design call (no feedback, no exclude) is neither counted nor charged", async () => {
+    state.gemini = true;
+    tokenRpc(5);
+    state.answers = [aiAnswer()];
+    expect((await design(post({ projectId: P, count: 1 }))).status).toBe(200);
+    expect(charges()).toHaveLength(0);
+    expect(regens()).toBeUndefined();
+  });
+
+  it("not enough tokens: 402 no_tokens and the model is never called", async () => {
+    state.gemini = true;
+    tokenRpc(0);
+    state.answers = [aiAnswer(), aiAnswer(), aiAnswer()];
+    expect((await design(post({ projectId: P, count: 1, feedback: "broke test one" }))).status).toBe(200); // free
+    const left = state.answers.length;
+    const r = await design(post({ projectId: P, count: 1, feedback: "broke test two" }));
+    expect(r.status).toBe(402);
+    const body = (await r.json()) as { error: string; need: number };
+    expect(body.error).toBe("no_tokens");
+    expect(body.need).toBe(regenCost(1, g.spec));
+    expect(state.answers).toHaveLength(left); // no model call consumed an answer
+    expect(charges()).toHaveLength(0);
+    expect(regens()).toBe(1);
   });
 });
 

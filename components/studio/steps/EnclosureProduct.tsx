@@ -23,7 +23,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Layers, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Coins, Layers, Loader2, RefreshCw, Sparkles } from "lucide-react";
 
 import { AccessNote } from "@/components/credits/access-note";
 import { cadCost, studioCadTier } from "@/lib/credits/cad-cost";
@@ -32,6 +32,9 @@ import { ProductViewer, ProductViewerLoading, preloadProductViewer } from "@/com
 import type { ViewerApi } from "@/components/studio/viewer/types";
 import { track } from "@/lib/analytics";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import type { TokenInfo } from "@/lib/studio/client/api";
+import { regenCost } from "@/lib/studio/tiers";
+import { Link } from "@/i18n/navigation";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import { FINISHES, type Finish, type StudioDoc, type StudioProduct } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
@@ -77,6 +80,8 @@ export function EnclosureProduct({
   const [apart, setApart] = useState(false);
   const [explode, setExplode] = useState(0);
   const viewer = useRef<ViewerApi | null>(null);
+  const [feedback, setFeedback] = useState("");
+  const [tokens, setTokens] = useState<TokenInfo | null>(null);
 
   const product = doc.product;
   const unlockedId = product?.unlockedId ?? null;
@@ -85,6 +90,25 @@ export function EnclosureProduct({
   const chosenId = product?.chosenId && cards.some((c) => c.id === product.chosenId) ? product.chosenId : (ready[0]?.id ?? null);
   const running = previews.phase === "running" || previews.phase === "idle";
   const finish = (doc.answers?.[PRODUCT_FINISH_KEY] as Finish | undefined) ?? null;
+
+  // The token line beside the regenerate button: read on arrival and again after every run
+  // (a charged regeneration changes it; "no tokens" too).
+  const tokensApi = ctx.api.tokens;
+  const phaseNow = previews.phase;
+  useEffect(() => {
+    if (phaseNow === "running") return;
+    let live = true;
+    void tokensApi?.().then((v) => live && v && setTokens(v));
+    return () => {
+      live = false;
+    };
+  }, [tokensApi, phaseNow]);
+  const regenPrice = regenCost(previews.regens, doc.spec);
+
+  async function regenerate() {
+    previews.tryAnother(feedback);
+    setFeedback("");
+  }
 
   // Smart prefetch: only for someone the unlock will let through (the credits hook the
   // step already reads; no extra request). Idle time, so the pictures come first.
@@ -129,6 +153,7 @@ export function EnclosureProduct({
       specHash: prev?.specHash ?? previews.key,
       chosenId,
       unlockedId: r.data.unlockedId || chosenId,
+      ...(prev?.regens !== undefined ? { regens: prev.regens } : {}),
     }));
   }
 
@@ -257,14 +282,6 @@ export function EnclosureProduct({
           {busy ? t("product.opening") : createLabel}
         </MainButton>
       }
-      secondary={
-        cards.length > 0 || !running ? (
-          <button type="button" className={linkCls} onClick={previews.tryAnother} disabled={running || busy || limit} data-testid="studio-try-another">
-            <RefreshCw className={cn("h-4 w-4", running && "motion-safe:animate-spin")} strokeWidth={1.75} aria-hidden />
-            {t("product.tryAnother")}
-          </button>
-        ) : null
-      }
     >
       <p
         role="status"
@@ -316,6 +333,62 @@ export function EnclosureProduct({
           </div>
         ))}
       </div>
+
+      {(cards.length > 0 || !running) && !busy && (
+        <div className="space-y-2.5" data-testid="studio-product-feedback">
+          <label htmlFor="studio-product-feedback-text" className="block text-sm font-bold text-heading">
+            {t("product.feedbackLabel")}
+          </label>
+          <textarea
+            id="studio-product-feedback-text"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder={t("product.feedbackPlaceholder")}
+            dir="auto"
+            rows={3}
+            maxLength={400}
+            disabled={running}
+            data-testid="studio-product-feedback-text"
+            className="min-h-24 w-full resize-y rounded-2xl border border-white/60 bg-panel px-4 py-3 text-base text-heading shadow-neu-inset outline-none placeholder:text-faint focus:ring-2 focus:ring-cobalt/60"
+          />
+          <p className="text-xs text-mutedtext">{t("product.feedbackHint")}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button
+              type="button"
+              className={linkCls}
+              onClick={() => void regenerate()}
+              disabled={running || busy || limit}
+              data-testid="studio-try-another"
+              data-cost={regenPrice}
+            >
+              <RefreshCw className={cn("h-4 w-4", running && "motion-safe:animate-spin")} strokeWidth={1.75} aria-hidden />
+              {regenPrice > 0 ? t("product.regenCost", { n: regenPrice }) : t("product.regenFree")}
+            </button>
+            {tokens && (
+              <p className="inline-flex items-center gap-2 text-sm font-bold text-heading" data-testid="studio-product-tokens" data-balance={tokens.balance ?? ""}>
+                <Coins className="h-4 w-4 shrink-0" style={{ color: accent.ink }} strokeWidth={2} aria-hidden />
+                <span className={cn(!tokens.admin && (tokens.balance ?? 0) < regenPrice && "text-destructive")}>
+                  {tokens.admin ? t("tokens.admin") : t("tokens.balance", { n: String(tokens.balance ?? 0) })}
+                </span>
+                {!tokens.admin && (
+                  <Link href="/tokens" className="text-xs font-semibold text-cobalt underline-offset-2 hover:underline" data-testid="studio-get-tokens">
+                    {t("tokens.get")}
+                  </Link>
+                )}
+              </p>
+            )}
+          </div>
+          <p className="text-xs text-mutedtext">{t("product.regenNote")}</p>
+          {previews.phase === "no_tokens" && (
+            <Problem>
+              {t("tokens.empty")}{" "}
+              <Link href="/tokens" className="font-semibold underline underline-offset-2">
+                {t("tokens.contact")}
+              </Link>
+            </Problem>
+          )}
+        </div>
+      )}
 
       {limit && (
         <div className="tile flex flex-wrap items-center justify-between gap-2 p-4" data-testid="studio-product-limit">

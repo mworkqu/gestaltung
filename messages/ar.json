@@ -4376,6 +4376,12 @@
       "pictureAlt": "{name}، التصميم {n}",
       "whyLabel": "لماذا هذا التصميم:",
       "tryAnother": "جرّب تصميمًا آخر",
+      "feedbackLabel": "ما الذي لا يعجبك في هذه التصاميم؟",
+      "feedbackPlaceholder": "مثلًا: طويل جدًا، يجب أن يُفتح الغطاء بمفصّلة، اجعله أكثر استدارة.",
+      "feedbackHint": "تبقى هذه الثلاثة كما هي. ملاحظاتك تُشكّل ثلاثة تصاميم جديدة.",
+      "regenFree": "أنشئ 3 تصاميم جديدة (مجانًا)",
+      "regenCost": "أنشئ 3 تصاميم جديدة ({n, plural, one {رمز واحد} two {رمزان} few {# رموز} many {# رمزًا} other {# رمز}})",
+      "regenNote": "المجموعة الجديدة الأولى مجانية. كل مجموعة بعدها تكلّف رموز الأفكار.",
       "createCad": "أنشئ ملف CAD ({n, plural, one {رصيد واحد} two {رصيدان} few {# أرصدة} many {# رصيداً} other {# رصيد}})",
       "createCadIncluded": "أنشئ ملف CAD (مشمول)",
       "createCadNoCost": "أنشئ ملف CAD",
@@ -4644,7 +4650,12 @@
       "cnt_linear_actuator": "{form, select, one {مشغّل خطّي واحد} two {مشغّلان خطّيان} few {{count} مشغّلات خطّية} other {{count} مشغّلاً خطّياً}}",
       "cnt_stepper": "{form, select, one {محرّك خطوي واحد} two {محرّكان خطويان} few {{count} محرّكات خطوية} other {{count} محرّكاً خطوياً}}",
       "cnt_light": "{form, select, one {ضوء واحد} two {ضوءان} few {{count} أضواء} other {{count} ضوءاً}}",
-      "cnt_output": "{form, select, one {مخرج واحد} two {مخرجان} few {{count} مخرجات} other {{count} مخرجاً}}"
+      "cnt_output": "{form, select, one {مخرج واحد} two {مخرجان} few {{count} مخرجات} other {{count} مخرجاً}}",
+      "buildClass": "ما نوع هذا المشروع؟",
+      "buildClass_mcu": "يشغّل برنامجًا على لوحة تحكم",
+      "buildClass_logic": "شرائح منطقية فقط، بلا برمجة",
+      "buildClass_cad": "قطعة مطبوعة ثلاثية الأبعاد بالدرجة الأولى",
+      "buildClassNote": "هذا يحدد الخطوات الأهم. الخطوات الباهتة تبقى متاحة متى أردتها."
     },
     "tiers": {
       "explorer": "المستكشفون",
@@ -4669,7 +4680,12 @@
     "engineeringView": "العرض الهندسي",
     "partsOnRequestPlus": "+ {form, select, one {قطعة واحدة يُحدَّد سعرها عند الطلب} two {قطعتان يُحدَّد سعرهما عند الطلب} few {{count} قطع يُحدَّد سعرها عند الطلب} other {{count} قطعة يُحدَّد سعرها عند الطلب}}",
     "partsOnRequestOnly": "{form, select, one {قطعة واحدة يُحدَّد سعرها عند الطلب} two {قطعتان يُحدَّد سعرهما عند الطلب} few {{count} قطع يُحدَّد سعرها عند الطلب} other {{count} قطعة يُحدَّد سعرها عند الطلب}}",
-    "partNeedPacks": "مطلوب {need} · {form, select, one {عبوة واحدة} two {عبوتان} few {{count} عبوات} other {{count} عبوة}} من {size}"
+    "partNeedPacks": "مطلوب {need} · {form, select, one {عبوة واحدة} two {عبوتان} few {{count} عبوات} other {{count} عبوة}} من {size}",
+    "stepFadedSr": "اختياري لهذا المشروع. ما زال بإمكانك فتحه.",
+    "fadedTitle": "غالبًا لا تحتاجها في هذا المشروع",
+    "fadedContinue": "تخطَّ إلى الخطوة التالية",
+    "fadedLogic": "هذا المشروع شرائح منطقية بحتة — لا توجد برمجة ولا علبة مغلقة لطباعتها.",
+    "fadedCad": "هذا المشروع قطعة مطبوعة بالدرجة الأولى — لا توجد دائرة لتوصيلها ولا كود لكتابته."
   },
   "StudioLibrary": {
     "pageTitle": "قطع الاستوديو",

@@ -57,6 +57,9 @@ export const IDEATION = {
   welcomeTokens: 5,
   /** A new idea (the first model turn on a project). */
   newIdeaCost: 1,
+  /** 3D product designs: regenerations that are free per project (the first one), then `regenCost` (× tier) each. */
+  regenFree: 1,
+  regenCost: 1,
   /** Edits: 1 token (× tier) every N chat turns on an existing understanding. IDEA_TURNS_PER_TOKEN overrides. */
   get turnsPerToken() {
     return envInt("IDEA_TURNS_PER_TOKEN", 5, 1);
@@ -112,4 +115,14 @@ export function turnCost(opts: { started: boolean; editTurnsSoFar: number; curre
 export function turnsUntilCharge(editTurnsSoFar: number): number {
   const n = IDEATION.turnsPerToken;
   return n - (editTurnsSoFar % n);
+}
+
+/**
+ * What the next "give me three new designs" costs in the 3D product step.
+ * `regensSoFar` = regenerations already made on the project; the first IDEATION.regenFree are free,
+ * every later one costs regenCost × tier (admins are never charged, see idea_token_charge).
+ */
+export function regenCost(regensSoFar: number, spec: Pick<ProductSpec, "actuators" | "understanding"> | null | undefined): number {
+  if (regensSoFar < IDEATION.regenFree) return 0;
+  return IDEATION.regenCost * tierOf(spec).multiplier;
 }

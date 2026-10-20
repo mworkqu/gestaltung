@@ -17,12 +17,18 @@ export function ProgressLine({
   current,
   furthest,
   done,
+  faded,
   onGo,
   status = null,
 }: {
   current: number;
   furthest: number;
   done: (step: FlowStep) => boolean;
+  /**
+   * Faded = "probably not for this build" (greyed, still tappable). Not the same as disabled,
+   * which means "not reachable yet": a faded step is opened by tapping it like any other.
+   */
+  faded?: (step: FlowStep) => boolean;
   onGo: (index: number) => void;
   /** D4: the "Saved ✓ / Saving…" line under the dots. */
   status?: ReactNode;
@@ -45,6 +51,9 @@ export function ProgressLine({
           const isDone = done(step) && !isCurrent;
           const reachable = i <= furthest;
           const lit = isCurrent || isDone || reachable;
+          // Faded only matters while it is not the open step; the banner explains it once opened.
+          const isFaded = !isCurrent && !!faded?.(step);
+          const hintId = `studio-faded-${step}`;
           return (
             <li key={step} className="relative flex min-w-0 flex-1 justify-center">
               {i > 0 && <Segment side="start" lit={i <= furthest} colour={STEP_ACCENT[FLOW[i - 1]].base} />}
@@ -54,15 +63,20 @@ export function ProgressLine({
                 onClick={() => onGo(i)}
                 disabled={!reachable || isCurrent}
                 aria-current={isCurrent ? "step" : undefined}
+                aria-describedby={isFaded ? hintId : undefined}
+                data-faded={isFaded ? "true" : undefined}
                 className={cn(
                   "relative z-10 flex min-h-11 min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 text-[9px] font-semibold tracking-tight transition-colors min-[400px]:text-[10px] sm:text-[11px] sm:tracking-normal",
                   isCurrent ? "text-heading" : reachable ? "text-body hover:text-heading" : "cursor-default text-faint",
+                  // Faded: muted like an unreachable step, but it keeps the pointer and wakes on hover/focus.
+                  isFaded && "text-faint opacity-55 hover:opacity-100 hover:text-heading focus-visible:opacity-100",
                 )}
               >
                 <span
                   className={cn(
                     "grid h-7 w-7 place-items-center rounded-full border-2 transition-[transform,background-color] duration-300",
                     isCurrent && "motion-safe:scale-110",
+                    isFaded && "border-dashed",
                   )}
                   style={{
                     borderColor: lit ? accent.base : "#d3dbe6",
@@ -78,6 +92,11 @@ export function ProgressLine({
                 </span>
                 <span className="whitespace-nowrap">{t(`step_${step}`)}</span>
                 {isDone && <span className="sr-only">{t("stepDoneSr")}</span>}
+                {isFaded && (
+                  <span id={hintId} className="sr-only">
+                    {t("stepFadedSr")}
+                  </span>
+                )}
               </button>
             </li>
           );

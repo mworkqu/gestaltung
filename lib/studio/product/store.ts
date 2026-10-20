@@ -44,6 +44,7 @@ export function addDesigns(s: ProductData, designs: (DesignOut & { id: string })
       chosenId: s.product.chosenId && ids.has(s.product.chosenId) ? s.product.chosenId : null,
       unlockedId: s.product.unlockedId && ids.has(s.product.unlockedId) ? s.product.unlockedId : null,
       specHash,
+      ...(s.product.regens !== undefined ? { regens: s.product.regens } : {}),
     },
     priv: { designs: priv.filter((d) => ids.has(d.id)) },
   };
@@ -105,4 +106,9 @@ export function applyChoose(s: ProductData, id: string): ProductData {
 
 export function applyUnlock(s: ProductData, id: string): ProductData {
   return { product: { ...s.product, chosenId: id, unlockedId: id }, priv: s.priv };
+}
+
+/** One more regeneration was made (the first one is free, see regenCost in lib/studio/tiers.ts). */
+export function applyRegen(s: ProductData): ProductData {
+  return { product: { ...s.product, regens: (s.product.regens ?? 0) + 1 }, priv: s.priv };
 }
