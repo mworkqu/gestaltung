@@ -42,7 +42,7 @@ import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/type
 // answer can be traced to the model or to our parsing.
 //
 // An identical request is never sent twice. Each run records the fingerprint of
-// what was asked (0096), so a second press on an unchanged brief is answered
+// what was asked (0099), so a second press on an unchanged brief is answered
 // from the stored run: no provider call, nothing metered, nothing charged. The
 // decision is made here rather than in the browser, so holding the button down
 // cannot get past it.
@@ -207,11 +207,11 @@ export async function POST(request: Request) {
           let { error: runErr } = await supabase
             .from("analysis_runs")
             .insert({ ...row, request_hash: fingerprint });
-          // Before 0096 there is no request_hash column: record the run as
+          // Before 0099 there is no request_hash column: record the run as
           // before, so only the reuse is missing, not the diagnostics.
           if (runErr?.code === "PGRST204") {
             ({ error: runErr } = await supabase.from("analysis_runs").insert(row));
-            if (!runErr) console.warn("[analyse] run recorded without its request fingerprint (migration 0096?)");
+            if (!runErr) console.warn("[analyse] run recorded without its request fingerprint (migration 0099?)");
           }
           if (runErr) console.warn(`[analyse] run not recorded (migration 0024?): ${runErr.message}`);
         }

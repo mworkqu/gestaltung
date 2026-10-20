@@ -1,5 +1,5 @@
 -- ============================================================================
--- Gestaltung — 0096: remember which request each analysis answered
+-- Gestaltung — 0099: remember which request each analysis answered
 -- ============================================================================
 -- A client pressed "Analyse" twenty-four times in nine minutes on an unchanged
 -- five-word brief (project 9196d9cc, 18 Oct 2026). Every press reached the
@@ -18,14 +18,19 @@
 --
 -- Old rows keep request_hash null and are simply never reused.
 --
--- Run after 0095. Safe to re-run.
+-- Run after 0095. Safe to re-run. Nothing here depends on 0096-0098.
+--
+-- It was written as 0096 and renumbered: while it sat on the review branch,
+-- main took 0096 (school classes) and 0097 (class order), and the margin-floor
+-- branch took 0098. Two different files called 0096 would have been run in
+-- whichever order they happened to be listed.
 -- ============================================================================
 
 alter table public.analysis_runs
   add column if not exists request_hash text;
 
 comment on column public.analysis_runs.request_hash is
-  'Fingerprint of the request this run answered (lib/prototyping/analysis-request.ts). Null on rows written before 0096.';
+  'Fingerprint of the request this run answered (lib/prototyping/analysis-request.ts). Null on rows written before 0099.';
 
 -- The lookup is always "this project, this feature, this fingerprint, newest
 -- successful first", so the index carries created_at as well.
