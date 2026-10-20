@@ -28,17 +28,21 @@ const BENIGN_BEACONS: { method: string; pathname: string }[] = [{ method: "POST"
 
 const ROOT = path.resolve(__dirname, "..");
 
-/** NEXT_PUBLIC_SUPABASE_URL from the environment or .env.local (never printed). */
-function supabaseHost(): string | null {
-  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) {
-    try {
-      const env = readFileSync(path.join(ROOT, ".env.local"), "utf8");
-      url = /^NEXT_PUBLIC_SUPABASE_URL=(.*)$/m.exec(env)?.[1]?.trim().replace(/^["']|["']$/g, "");
-    } catch {
-      /* no .env.local */
-    }
+/** A public env var from the environment or .env.local (never printed). */
+export function envVar(name: string): string | undefined {
+  const fromProcess = process.env[name];
+  if (fromProcess) return fromProcess;
+  try {
+    const env = readFileSync(path.join(ROOT, ".env.local"), "utf8");
+    return new RegExp(`^${name}=(.*)$`, "m").exec(env)?.[1]?.trim().replace(/^["']|["']$/g, "") || undefined;
+  } catch {
+    return undefined; /* no .env.local */
   }
+}
+
+/** The Supabase host, from NEXT_PUBLIC_SUPABASE_URL. */
+function supabaseHost(): string | null {
+  const url = envVar("NEXT_PUBLIC_SUPABASE_URL");
   if (!url) return null;
   try {
     return new URL(url).host;
