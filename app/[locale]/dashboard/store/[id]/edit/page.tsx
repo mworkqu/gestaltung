@@ -5,7 +5,7 @@ import type { Part } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/server";
 import { PartEditor } from "@/components/admin/part-editor";
 import { SourcingPanel } from "@/components/admin/sourcing-panel";
-import type { PartSourcing, Supplier, SupplierOffer } from "@/lib/store/sourcing";
+import { readFloors, type PartSourcing, type Supplier, type SupplierOffer } from "@/lib/store/sourcing";
 import { loadOnRequest } from "@/lib/admin/fix-data";
 import { hasGalleryPhoto, partMissing } from "@/lib/admin/part-missing";
 import { safeReturnTo } from "@/lib/admin/return-to";
@@ -41,10 +41,14 @@ export default async function EditPartPage({
   const [suppliersRes, offersRes, floorRes, onRequest] = await Promise.all([
     supabase.from("suppliers").select("*").order("name"),
     supabase.from("supplier_offers").select("*").eq("part_id", id).order("created_at"),
-    supabase.from("store_settings").select("value").eq("key", "margin_floor_pct").maybeSingle(),
+    supabase.from("store_settings").select("key, value").in("key", ["margin_floor_pct", "commission_floor_pct"]),
     loadOnRequest(supabase),
   ]);
   const sourcingReady = !suppliersRes.error && !offersRes.error;
+  // Two floors: our margin on parts we price, the supplier's commission on
+  // mirror parts (migration 0098).
+  const floorRow = (k: string) => floorRes.data?.find((r) => r.key === k)?.value;
+  const floors = readFloors(floorRow("margin_floor_pct"), floorRow("commission_floor_pct"));
   const offers = (offersRes.data ?? []) as SupplierOffer[];
   const landed = await Promise.all(
     offers.map(async (o) => {
@@ -83,7 +87,7 @@ export default async function EditPartPage({
               sourcing={part as unknown as PartSourcing}
               offers={landed}
               suppliers={(suppliersRes.data ?? []) as Supplier[]}
-              floorPct={Number(floorRes.data?.value ?? 15)}
+              floors={floors}
             />
           ) : (
             <p className="text-sm text-mutedtext">{tSourcing("needsMigration")}</p>

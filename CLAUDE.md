@@ -1396,6 +1396,13 @@ Source prompt: STAGE_SITE_REVIEW_FIXES_PROMPT.md. One commit per phase (A–I).
 
 ## PENDING MIGRATIONS (run in order if not already done)
 Check Supabase → Table Editor to confirm which tables exist before running:
+- 0098_commission_floor.sql — NOT RUN. store_settings.commission_floor_pct (default 8) + refresh_part_sourcing
+  replaced so a mirror part is judged against the commission floor and a markup part against margin_floor_pct
+  (15). Numbered 0098 because review-analyse-guard took 0096 and main took 0096 + 0097. RUN AFTER 0095 — it
+  builds on 0095's version of the function, so running it does NOT revert suppliers.rank. Safe to re-run; an
+  owner-edited commission floor survives. Until it runs, every Voltaat product stays flagged "below margin"
+  (911 of them, because income_pct on a mirror part always equals the supplier's commission) and the admin UI
+  shows the commission floor as 8 without a row behind it.
 - 0010_job_upsells.sql — jobs upsell columns (speed_tier, post_processing, inspection_report, job_path, production_qty_range)
 - 0011_parts_store.sql — parts, part_orders, part_order_items tables + create_part_order RPC
 - 0012_quote_uploads.sql — private `quote-uploads` storage bucket + policies for the public /design/quote flow

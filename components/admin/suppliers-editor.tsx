@@ -1,8 +1,8 @@
 "use client";
 
 // Suppliers (pricing mode, commission, landed overhead, currency) and the
-// sourcing settings (margin floor, exchange rates to QAR). Saving settings
-// re-derives every product's income and floor flag.
+// sourcing settings (the two income floors, exchange rates to QAR). Saving
+// settings re-derives every product's income and floor flag.
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -31,6 +31,7 @@ export function SuppliersEditor({
   suppliers,
   offerCounts,
   floorPct,
+  commissionFloorPct,
   fx,
 }: {
   locale: string;
@@ -38,6 +39,7 @@ export function SuppliersEditor({
   /** Offers per supplier; null when the offers query failed (cell shows "—"). */
   offerCounts: Record<string, number> | null;
   floorPct: number;
+  commissionFloorPct: number;
   fx: Record<string, number>;
 }) {
   const t = useTranslations("Sourcing");
@@ -74,7 +76,7 @@ export function SuppliersEditor({
         )}
       </div>
 
-      <Settings locale={locale} floorPct={floorPct} fx={fx} />
+      <Settings locale={locale} floorPct={floorPct} commissionFloorPct={commissionFloorPct} fx={fx} />
     </div>
   );
 }
@@ -155,10 +157,21 @@ function SupplierRow({
   );
 }
 
-function Settings({ locale, floorPct, fx }: { locale: string; floorPct: number; fx: Record<string, number> }) {
+function Settings({
+  locale,
+  floorPct,
+  commissionFloorPct,
+  fx,
+}: {
+  locale: string;
+  floorPct: number;
+  commissionFloorPct: number;
+  fx: Record<string, number>;
+}) {
   const t = useTranslations("Sourcing");
   const router = useRouter();
   const [floor, setFloor] = useState(String(floorPct));
+  const [commissionFloor, setCommissionFloor] = useState(String(commissionFloorPct));
   const [rates, setRates] = useState(
     Object.entries(fx)
       .map(([k, v]) => `${k}=${v}`)
@@ -174,7 +187,7 @@ function Settings({ locale, floorPct, fx }: { locale: string; floorPct: number; 
         const [k, v] = line.split("=").map((x) => x.trim());
         if (k && v) parsed[k] = Number(v);
       }
-      const r = await saveSourcingSettings(locale, Number(floor), parsed);
+      const r = await saveSourcingSettings(locale, Number(floor), Number(commissionFloor), parsed);
       setMsg(r.error ?? t("saved"));
       if (!r.error) router.refresh();
     });
@@ -187,6 +200,17 @@ function Settings({ locale, floorPct, fx }: { locale: string; floorPct: number; 
         <input value={floor} onChange={(e) => setFloor(e.target.value)} inputMode="decimal" className={cn(input, "mt-2 w-32 text-sm")} dir="ltr" />
       </label>
       <label className="block text-sm text-body">
+        <span className="font-semibold text-heading">{t("commissionFloorLabel")}</span>
+        <span className="mt-1 block text-xs text-mutedtext">{t("commissionFloorHelp")}</span>
+        <input
+          value={commissionFloor}
+          onChange={(e) => setCommissionFloor(e.target.value)}
+          inputMode="decimal"
+          className={cn(input, "mt-2 w-32 text-sm")}
+          dir="ltr"
+        />
+      </label>
+      <label className="block text-sm text-body sm:col-span-2">
         <span className="font-semibold text-heading">{t("fxLabel")}</span>
         <span className="mt-1 block text-xs text-mutedtext">{t("fxHelp")}</span>
         <textarea value={rates} onChange={(e) => setRates(e.target.value)} rows={6} className={cn(input, "mt-2 font-mono text-sm")} dir="ltr" />
