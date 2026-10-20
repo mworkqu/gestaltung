@@ -6,7 +6,7 @@
 // refresh facts, but an edited row keeps the client's value and only records
 // what the analysis said beside it, so the UI can show "kept your answer".
 
-import type { Analysis, Answer, FallbackReason, Question, RouteRecommendation } from "./analysis";
+import { isStandardFact, type Analysis, type Answer, type FallbackReason, type Question, type RouteRecommendation } from "./analysis";
 
 export type RowSource = "brief" | "assumed" | "you";
 
@@ -38,6 +38,13 @@ export type Spec = {
   /** Which reader produced the facts, and why the basic one was used if it was. */
   provider: string;
   fallback: FallbackReason | null;
+  /**
+   * When the analysis behind these facts ran. The project's own record of its
+   * latest successful analysis: the 18 Oct 2026 export showed an empty
+   * `analysis` block beside 24 recorded runs, because the only place the answer
+   * lived was analysis_runs. Absent on specs written before this was recorded.
+   */
+  runAt?: string | null;
   /** The analysis's advice on how to build the electronics (advice only). */
   routeRecommendation?: RouteRecommendation | null;
   /** Set once the client agreed to send their brief to an outside provider. */
@@ -81,7 +88,7 @@ export const answersOf = (spec: Spec | null | undefined): Answer[] =>
 export function mergeAnalysis(
   prev: Spec | null | undefined,
   a: Analysis,
-  meta: { provider: string; fallback: FallbackReason | null }
+  meta: { provider: string; fallback: FallbackReason | null; runAt?: string }
 ): Spec {
   const before = new Map((prev?.rows ?? []).map((r) => [r.id, r]));
   const rows: SpecRow[] = a.requirements.map((r) => {
@@ -118,11 +125,24 @@ export function mergeAnalysis(
     confirmed: Boolean(prev?.confirmed) && same,
     provider: meta.provider,
     fallback: meta.fallback,
+    // A reused answer keeps the time of the run it came from, so the project
+    // records when its facts were actually read.
+    runAt: meta.runAt ?? prev?.runAt ?? null,
     // A basic-reader run cannot advise, so it keeps the earlier advice.
     routeRecommendation: a.electronicsRoute ?? prev?.routeRecommendation ?? null,
     // Consent is the client's, not the analysis's: it survives every re-analysis.
     aiConsent: prev?.aiConsent ?? null,
   };
+}
+
+/**
+ * The question still waiting for an answer, standard facts first — those are
+ * the ones that block, so that is where a client who pressed Analyse again on
+ * an unchanged brief is sent instead of paying for the same answer twice.
+ */
+export function nextOpenQuestion(spec: Spec | null | undefined): Question | null {
+  const open = (spec?.questions ?? []).filter((q) => !rowOf(spec, q.id)?.edited);
+  return open.find((q) => isStandardFact(q.id)) ?? open[0] ?? null;
 }
 
 /** A spec before any analysis: lets a choice (e.g. power) be saved first. */

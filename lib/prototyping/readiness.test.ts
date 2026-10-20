@@ -4,6 +4,7 @@ import { deriveElectronics } from "./electronics-rules";
 import { projectBoards } from "./footprints";
 import { plantLines, plantNetlist, tKey } from "./plant-monitor.fixture";
 import { projectReadiness, type ReadinessInput } from "./readiness";
+import { EMPTY_SPEC } from "./spec";
 import { branches, nodeOf, nodeStates, visibleNodes } from "./tree";
 import type { Netlist } from "./netlist";
 
@@ -120,5 +121,59 @@ describe("readiness: a circuit part whose line was removed (review round 1)", ()
       "circuit:orphan:R_LED3",
       "circuit:orphan:R_LED4",
     ]);
+  });
+});
+
+// The 18 Oct 2026 export (project 9196d9cc) told a client "Brief not written"
+// about a brief they had written, and "Brief not analysed yet" with 24 runs on
+// record. Both rows now say which of their states they are actually in.
+describe("readiness: the brief and understanding rows say what is true", () => {
+  const base: ReadinessInput = { brief: null, spec: null, parts: [], routeAccepted: false };
+  const rowOf = (p: ReadinessInput, id: string) => projectReadiness(p, tKey).requirements.find((r) => r.id === id)!;
+
+  it("an empty brief is the only one that reads 'not written'", () => {
+    expect(rowOf(base, "brief")).toMatchObject({ satisfied: false, blockingReason: "block_briefMissing" });
+    expect(rowOf({ ...base, brief: "   \n  " }, "brief").blockingReason).toBe("block_briefMissing");
+  });
+
+  it("a too-short brief says so, with the length it has to reach", () => {
+    const r = rowOf({ ...base, brief: "iwant pcb for my project" }, "brief");
+    expect(r.satisfied).toBe(false);
+    expect(r.blockingReason).toBe(`block_briefShort ${JSON.stringify({ min: "40", have: "24" })}`);
+  });
+
+  it("a long enough brief satisfies the row", () => {
+    expect(rowOf({ ...base, brief: "A plant monitor that waters the plant when the soil is dry." }, "brief").satisfied).toBe(true);
+  });
+
+  it("database code still reads as database code, not as a short brief", () => {
+    const sql = "create table public.things (id uuid primary key default gen_random_uuid())";
+    expect(rowOf({ ...base, brief: sql }, "brief").blockingReason).toBe("block_briefSchema");
+  });
+
+  it("while the brief is the blocker, understanding points at the brief", () => {
+    expect(rowOf({ ...base, brief: "iwant pcb for my project" }, "understanding").blockingReason).toBe("block_briefFirst");
+    expect(rowOf(base, "understanding").blockingReason).toBe("block_briefFirst");
+  });
+
+  it("a brief ready to analyse but never analysed reads 'not analysed yet'", () => {
+    const brief = "A plant monitor that waters the plant when the soil is dry.";
+    expect(rowOf({ ...base, brief }, "understanding").blockingReason).toBe("block_notAnalysed");
+  });
+
+  it("analysed but nothing read says that, instead of 'not analysed yet'", () => {
+    const brief = "A plant monitor that waters the plant when the soil is dry.";
+    const emptySpec = { ...EMPTY_SPEC, runAt: "2026-10-18T05:54:05.704Z" };
+    const r = rowOf({ ...base, brief, spec: emptySpec, analysedAt: emptySpec.runAt }, "understanding");
+    expect(r.blockingReason).toBe("block_analysedNothing");
+  });
+
+  it("once the analysis read something, the row waits on the confirmation", () => {
+    const brief = "A plant monitor that waters the plant when the soil is dry.";
+    const spec = { ...EMPTY_SPEC, summary: "A plant monitor.", runAt: "2026-10-18T05:54:05.704Z" };
+    expect(rowOf({ ...base, brief, spec, analysedAt: spec.runAt }, "understanding").blockingReason).toBe(
+      "block_specUnconfirmed"
+    );
+    expect(rowOf({ ...base, brief, spec: { ...spec, confirmed: true } }, "understanding").satisfied).toBe(true);
   });
 });
