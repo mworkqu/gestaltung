@@ -21,14 +21,14 @@ export const PAYMENT_DETAILS = {
 // Contact info; read it through lib/contact-phone(-server).ts, never from here.
 // These two constants stay as the fallback when no row exists.
 export const COMPANY_WHATSAPP = {
-  display: "+974 6656 7410",
-  url: "https://wa.me/97466567410",
+  display: "+974 3366 4265",
+  url: "https://wa.me/97433664265",
 } as const;
 
 // Same number as the WhatsApp line (default; see above).
 export const COMPANY_PHONE = {
-  display: "+974 6656 7410",
-  tel: "tel:+97466567410",
+  display: "+974 3366 4265",
+  tel: "tel:+97433664265",
 } as const;
 
 // Registered office (owner, 2026-10-03). Opening hours were not provided, so

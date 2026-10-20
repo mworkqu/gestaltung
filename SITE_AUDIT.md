@@ -170,7 +170,7 @@ Fix one section at a time and re-test with the checklist at the bottom.
 43. **Inventory** tab opens a different layout (dashboard tabs vanish). The tenant filter lists "Client A" and "Workshop B" **twice**. Admin "Inventory" vs customer "My inventory" are two unrelated systems with the same name.
 44. **Projects (admin):** the Owner filter is 10 identical "Guest (no account)" rows. Guest projects have no contact details, so you can't follow up.
 45. **Leads:** a quote request's CAD file shows only as a storage path (`433c184e…/smalhaj_safety_helmet.stl`), not a download link. Closed leads show both "Reopen" and "Mark contacted"; contacted leads show "Reopen" too. There's no filter by status or source, and leads don't link to a project.
-46. **Phone validation:** leads accepted `+97497466567410` (duplicated prefix) and `66567410`, and checkout accepted `00000000`. → Validate and normalise to E.164 (+974 + 8 digits) on every form.
+46. **Phone validation:** leads accepted `+97497433664265` (duplicated prefix) and `33664265`, and checkout accepted `00000000`. → Validate and normalise to E.164 (+974 + 8 digits) on every form.
 47. **Store orders:** there's no link from an order to its project, and no order-detail view in the list.
     - **Status:** Fixed in code (Phase 2, commit dbaea1d) — admin side fixed in code (dbaea1d), order detail links each line to its project; customer side shows order id + status, no customer order page exists yet. Pending: customer order page.
 48. **Sourcing gaps:** mixes short names ("USB adapter") with sentence-style names ("Seals the enclosure against dust…") from older analyses. The 120 Ω resistor demand (4 units) is missing — only 4.7 kΩ shows. Two tabs are highlighted at once (Store + Sourcing gaps).

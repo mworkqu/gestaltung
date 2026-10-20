@@ -42,4 +42,4 @@
 
 **12. Changes.** We may update this policy. The date above shows the latest version.
 
-**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 6656 7410. Email: info@gestaltung360.com.
+**Contact:** Gestaltung for Trading and Services W.L.L, C.R. 236988, Rafal Tower, Lusail, Qatar. WhatsApp/phone: +974 3366 4265. Email: info@gestaltung360.com.

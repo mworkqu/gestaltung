@@ -10,7 +10,7 @@ const links: NotificationLinks = {
   storeUrl: "https://gestaltung360.com/en/store",
   projectUrl: "https://gestaltung360.com/en/projects/abc-123",
   unsubscribeUrl: "https://gestaltung360.com/api/notifications/unsubscribe?token=tok123",
-  whatsappUrl: "https://wa.me/97466567410",
+  whatsappUrl: "https://wa.me/97433664265",
 };
 const LOCALES = ["en", "ar"] as const;
 const ORDER = "1a2b3c4d-0000-4000-8000-000000000001";
@@ -51,8 +51,8 @@ describe.each(NOTIFICATION_KINDS)("%s", (kind) => {
     it("has the brand strip, WhatsApp number and no bank details", () => {
       expect(out.html).toContain("236988");
       expect(out.text).toContain("236988");
-      expect(out.html).toContain("+974 6656 7410");
-      expect(out.text).toContain("+974 6656 7410");
+      expect(out.html).toContain("+974 3366 4265");
+      expect(out.text).toContain("+974 3366 4265");
       if (locale === "en") expect(out.html).toContain("Gestaltung for Trading and Services W.L.L · C.R. 236988");
       for (const s of [out.html, out.text]) {
         expect(s).not.toMatch(/IBAN/i);

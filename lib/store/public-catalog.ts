@@ -31,6 +31,7 @@ import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServiceP
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
 import { HOLIDAYS_KEY, parseHolidays, type Holidays } from "@/lib/store/working-days";
 import { OCCASIONS_KEY, parseOccasions, type Occasion } from "@/lib/occasions";
+import { parseSchoolPricing, SCHOOL_PRICING_KEY, type SchoolPricing } from "@/lib/schools/pricing";
 import { EMPTY_YOUTUBE, parseYoutube, YOUTUBE_KEY, type Youtube } from "@/lib/youtube";
 import { parsePartSource, withoutPrivateFields, type PartSource } from "@/lib/store/part-source";
 import { parseApprovedReviews, parseReviewCount, type ApprovedReview } from "@/lib/reviews/reviews";
@@ -340,6 +341,24 @@ export const getYoutube = unstable_cache(
     return parseYoutube(data?.value);
   },
   ["store-settings:youtube"],
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+);
+
+/**
+ * School pricing (3e, migration 0096): the team / class credit packs, the
+ * school print rule and the free-delivery-on-a-class-order switch. Same
+ * cookie-free anon client + "store-settings" tag as the other settings reads,
+ * so /schools stays static / ISR. Falls back to the identical defaults when the
+ * row is missing or malformed (before 0096 runs).
+ */
+export const getSchoolPricing = unstable_cache(
+  async (): Promise<SchoolPricing> => {
+    const supabase = createPublicClient();
+    if (!supabase) return parseSchoolPricing(null);
+    const { data } = await supabase.from("store_settings").select("value").eq("key", SCHOOL_PRICING_KEY).maybeSingle();
+    return parseSchoolPricing(data?.value);
+  },
+  ["store-settings:school-pricing"],
   { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
 );
 

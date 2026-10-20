@@ -1,6 +1,6 @@
 // Phone normalisation for inbound leads. Every callback we promise happens over
-// WhatsApp, and a wa.me link needs bare E.164 digits — so a stored "66567410"
-// or "+974 974 66567410" is a number we can't actually call back.
+// WhatsApp, and a wa.me link needs bare E.164 digits — so a stored "33664265"
+// or "+974 974 33664265" is a number we can't actually call back.
 //
 // Best-effort by design, matching the lead routes: if we can't confidently read
 // a number we keep what the visitor typed rather than mangle or reject it. A
@@ -10,7 +10,7 @@ const QA_DIALLING_CODE = "974";
 const QA_SUBSCRIBER_LEN = 8; // Qatar mobiles/landlines are 8 digits, no trunk prefix
 
 /**
- * Normalise a submitted phone number to E.164 (`+97466567410`) where we can.
+ * Normalise a submitted phone number to E.164 (`+97433664265`) where we can.
  *
  * Handles the shapes we've actually seen in the inquiries table: bare local
  * numbers, spaced groups, `00` international prefixes, and a duplicated country
@@ -28,7 +28,7 @@ export function normalizePhone(raw: string): string {
   // `00974…` — international access code rather than a `+`.
   if (digits.startsWith("00")) digits = digits.slice(2);
 
-  // `+974 974 66567410` — country code applied twice. Collapse the repeats.
+  // `+974 974 33664265` — country code applied twice. Collapse the repeats.
   while (digits.startsWith(QA_DIALLING_CODE.repeat(2))) {
     digits = digits.slice(QA_DIALLING_CODE.length);
   }
@@ -95,7 +95,7 @@ export function isValidPhone(raw: string): boolean {
 
 /**
  * How a phone number is SHOWN to people (admin cards, emails): Qatar numbers
- * as `+974 XXXX XXXX`. Stored values stay bare E.164 (`+97466567410`) because
+ * as `+974 XXXX XXXX`. Stored values stay bare E.164 (`+97433664265`) because
  * wa.me and tel: need that; this is display only. A number we can't read as a
  * Qatar number is returned as typed (foreign E.164 keeps its `+digits`).
  * Never throws; null / undefined → "".

@@ -5,6 +5,7 @@ import { emptyStudioDoc } from "@/lib/studio/schema";
 import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
 import { creditDenied, WiringBody, wiringKey } from "@/lib/studio/server/http";
 import { studioRequest } from "@/lib/studio/server/context";
+import { classDocRefusal, classGuard } from "@/lib/schools/safe-parts";
 
 // POST /api/studio/wiring — the circuit for the chosen parts. No AI call: the
 // netlist and checks come from our rules (buildWiring). Credits follow the
@@ -13,6 +14,10 @@ import { studioRequest } from "@/lib/studio/server/context";
 // Charged only AFTER the circuit was built; a failure never charges.
 // Idempotent re-open: when spec + parts equal what is saved and checks exist,
 // the saved wiring is returned and nothing is charged.
+//
+// 3d safety mode: a class project is refused (422 unsafe_part) before any
+// credit is checked when the parts include one a class may not use, and the
+// helper parts the rules add come from the class-safe library.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,7 +27,17 @@ export async function POST(request: Request) {
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
   // Code library + the owner's studio_parts edits (P5-15c), per request.
-  const { getPart } = await studioLibrary();
+  const fullLib = await studioLibrary();
+  // 3d: a class project wires only class-safe parts (helpers included).
+  const { isClass, lib } = await classGuard(supabase, project.id, fullLib);
+  if (isClass) {
+    const refusal = classDocRefusal(body.components, fullLib);
+    if (refusal) {
+      console.warn(`[studio/wiring] ${project.id}: class project refused ${refusal.parts.join(", ")}`);
+      return Response.json(refusal, { status: 422 });
+    }
+  }
+  const { getPart } = lib;
 
   const current = await loadDoc(supabase, project.id);
   if (current.ok && current.doc && current.doc.checks.length > 0 && current.doc.netlist.nets.length > 0) {

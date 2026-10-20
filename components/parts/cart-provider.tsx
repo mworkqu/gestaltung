@@ -67,6 +67,14 @@ type CartContextValue = {
    * never holds half a kit (P5-02). Resolves the kit id, or null on failure.
    */
   addKit: (projectId: string, rows: KitRowInput[]) => Promise<string | null>;
+  /**
+   * Several loose lines in ONE insert, on no project and in no kit (3e: a
+   * teacher buying the parts for every team in their class). All or nothing,
+   * like addKit, so the cart can never hold half a class order. A product the
+   * cart already holds loose has its quantity topped up by the unique index
+   * (user_id, product_id, project_id), so the insert is an upsert on it.
+   */
+  addAll: (rows: KitRowInput[]) => Promise<boolean>;
   clearCart: () => Promise<boolean>;
   itemCount: number;
   /** Before any kit discount. */
@@ -406,6 +414,43 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [reload, failed]
   );
 
+  // 3e: one insert for every line of a class order. No project (the teacher
+  // does not own their teams' projects) and no kit, so no kit discount applies.
+  const addAll = useCallback(
+    async (rows: KitRowInput[]) => {
+      if (!rows.length) return true;
+      let user: Awaited<ReturnType<typeof ensureSession>>;
+      try {
+        user = await ensureSession();
+      } catch (e) {
+        await failed("addAll (session)", e);
+        return false;
+      }
+      const supabase = await loadSupabase();
+      const { error: linesError } = await supabase.from("cart_items").upsert(
+        rows.map((r) => ({
+          user_id: user.id,
+          product_id: r.part.id,
+          project_id: null,
+          quantity: Math.max(r.part.min_order_qty || 1, Math.trunc(r.quantity) || 1),
+        })),
+        { onConflict: "user_id,product_id,project_id" },
+      );
+      if (linesError) {
+        // One statement: nothing was written.
+        await failed("addAll", linesError);
+        return false;
+      }
+      for (const r of rows) {
+        trackDemand("add_to_cart", { partId: r.part.id });
+        track("add_to_cart", { sku: r.part.sku ?? r.part.id, qty: r.quantity });
+      }
+      await reload();
+      return true;
+    },
+    [reload, failed],
+  );
+
   const clearCart = useCallback(async () => {
     const supabase = await loadSupabase();
     const user = await getCurrentUser();
@@ -429,6 +474,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       removeItem,
       removeKit,
       addKit,
+      addAll,
       clearCart,
       itemCount: cartItemCount(items),
       subtotalQar: subtotal,
@@ -441,7 +487,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       retry: reload,
       reload,
     };
-  }, [items, addItem, updateQty, removeItem, removeKit, addKit, clearCart, kitDiscountPct, ready, stale, error, reload]);
+  }, [items, addItem, updateQty, removeItem, removeKit, addKit, addAll, clearCart, kitDiscountPct, ready, stale, error, reload]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

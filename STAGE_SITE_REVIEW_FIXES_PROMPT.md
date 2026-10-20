@@ -19,7 +19,7 @@ Rules per phase:
 2. After each phase print "How to test locally" steps.
 3. Append a dated entry to `CLAUDE.md` PROGRESS and to `CHANGELOG-audit.md` after each phase.
 4. Any new migration continues numbering (latest is 0043, so 0044+), is idempotent (`if not exists`, `create or replace`, `drop ... if exists`), has a dry-run comment block at the top, and is NOT run by you. Tell the owner to run it and wait.
-5. Owner rules: never sign the owner up for paid services. The IBAN never appears on the site (email only). AI is free during launch. WhatsApp +974 6656 7410 is already public on /design/drawing.
+5. Owner rules: never sign the owner up for paid services. The IBAN never appears on the site (email only). AI is free during launch. WhatsApp +974 3366 4265 is already public on /design/drawing.
 
 ## 1. Decisions
 
@@ -36,7 +36,7 @@ Before touching code, ask the owner ONE numbered question list containing the de
 | D7 | Analytics | Simple cookie notice (Accept / Decline). Remove the Google Signals / ga-audiences pixel. GA4 loads only after Accept. |
 | D8 | Returns, warranty, terms, privacy | Owner supplies the text. Build the pages from his text. A "coming soon" placeholder is NOT acceptable. Ask for the text in this same question list and do not start Phase D pages until it arrives; do the rest of Phase D first. |
 | D9 | Store scope | Keep all published products. |
-| D10 | WhatsApp number | Publish +974 6656 7410 on Contact, footer, checkout, 404. |
+| D10 | WhatsApp number | Publish +974 3366 4265 on Contact, footer, checkout, 404. |
 | D11 | About page facts | Ask for 3 facts: (a) year/story of the studio, (b) machines list, (c) one photo path or "no photo". |
 | D12 | Opening hours and full street address for Contact/footer | Ask. Until answered, show "Lusail, Qatar" and omit hours. |
 | D13 | Category consolidation | Show the proposed mapping table (Phase C) and wait for approval before applying. |
@@ -56,7 +56,7 @@ Tasks (opus for A1–A3, sonnet for the rest):
 - **A5** "Card payment … coming soon": show once, below the payment method list, not under each method.
 - **A6** Fawran account name: keep "GESTALTUNG FOR TRD AND SERV" (the bank alias) and add beside it "(Gestaltung for Trading and Services W.L.L)". The IBAN stays off the site.
 - **A7** Verify (and fix if wrong): when "Bank transfer" is chosen, the Email field label loses "(optional)", is marked required, validated client and server side, with the hint "We email you the bank details." Test AR too.
-- **A8** Under "We confirm your payment on WhatsApp before we ship." add the number as a `wa.me/97466567410` link (D10).
+- **A8** Under "We confirm your payment on WhatsApp before we ship." add the number as a `wa.me/97433664265` link (D10).
 - **A9** Delivery area "Other": add a hint "Outside Doha, Lusail, Al Wakra and the Industrial Area? We confirm if we can deliver on WhatsApp."
 - **A10** Verify: add an item, close the browser, reopen; check the cart persists for a guest session. If lost, fix persistence (cart_items keyed to the anonymous user) and report.
 - Tests: shipping calculation (tiers, threshold, handling 0), empty-cart redirect, bank-transfer email requirement.
@@ -224,7 +224,7 @@ For `discount_ready`, first read migration 0042 and how `spend:` rows and the QA
 - [ ] About 8 category pills; EN store shows "Clear filters" when filtered.
 
 **Phase D**
-- [ ] Contact and footer show WhatsApp +974 6656 7410, address, C.R. 236988, payment icons, Delivery and returns / Terms / Privacy (with your text).
+- [ ] Contact and footer show WhatsApp +974 3366 4265, address, C.R. 236988, payment icons, Delivery and returns / Terms / Privacy (with your text).
 - [ ] `/en/nope` shows the branded 404 with search and links. Guest opening `/en/dashboard` or `/en/inventory` lands on `/projects`.
 - [ ] `/projects` empty state shows an example and a sign-in link. A guest opening a foreign prototyping URL sees the guest explanation.
 

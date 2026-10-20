@@ -111,7 +111,7 @@ for (const locale of LOCALES) {
       await expect(cards).toHaveCount(3);
       await expect(cards.nth(0)).toHaveAttribute("href", `/${locale}/projects/new`);
       await expect(cards.nth(1)).toHaveAttribute("href", `/${locale}/store`);
-      await expect(cards.nth(2)).toHaveAttribute("href", "https://wa.me/97466567410");
+      await expect(cards.nth(2)).toHaveAttribute("href", "https://wa.me/97433664265");
       await expect(cards.nth(0)).toContainText(msg(locale, "StoreLanding", "founders1Title"));
     });
 

@@ -90,6 +90,9 @@ const CONTACT_KINDS: Record<string, { tag: string; subject: string }> = {
   school: { tag: "School / class project", subject: " (school / class project)" },
   institution: { tag: "Institution / team plan", subject: " (institution / team plan)" },
   partner: { tag: "Partnership", subject: " (partnership)" },
+  // 3g: a teacher asking for an invoice for their class parts order. Sent by
+  // the class page's "Request an invoice" action, never by the public form.
+  school_invoice: { tag: "School invoice request", subject: " (school invoice request)" },
 };
 
 type QuoteItem = { function: string; spec: string; quantity: number };

@@ -33,6 +33,12 @@ export type AnalyticsEvents = {
   // ("Frequently bought together" / "You may also need").
   kit_added: { lines: number; total_qar: number };
   upsell_added: { sku: string; where: "bom" | "product" };
+  // 3g school classes. Nothing here identifies a student: a team is counted,
+  // never named, and a class is counted without its join code.
+  class_created: Record<string, never>;
+  team_joined: Record<string, never>;
+  class_parts_ordered: { teams: number; lines: number; total_qar: number };
+  school_invoice_requested: { teams: number; total_qar: number };
 };
 
 export type AnalyticsEvent = keyof AnalyticsEvents;
