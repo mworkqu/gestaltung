@@ -82,9 +82,11 @@ export default async function SourcingOverviewPage({ params }: { params: Promise
     const v = byId.get(b.backup_for!);
     return !!v && Number(b.unit_price) > Number(v.unit_price) * 1.3;
   });
-  // Voltaat items earn a fixed commission (mirror pricing), so only the
-  // products whose price we set can be "below margin".
-  const belowFloor = shown.filter((p) => p.below_floor && src(p) !== "voltaat");
+  // Each pricing mode now has its own floor (migration 0098), so below_floor
+  // means "earns less than we accept" for every product and needs no filter
+  // here. Before 0098 a Voltaat item's 10% commission was compared to the 15%
+  // margin floor, which flagged all 911 of them, and this list excluded them.
+  const belowFloor = shown.filter((p) => p.below_floor);
   const noPhoto = shown.filter((p) => !p.image_url);
   const noSpecs = shown.filter((p) => !p.datasheet_url && productSpecs(p).specs.length === 0);
   const changes = (runs ?? []).flatMap((r) =>

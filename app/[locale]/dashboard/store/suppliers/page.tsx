@@ -13,7 +13,12 @@ import { ShippingSettingsEditor } from "@/components/admin/shipping-settings";
 import { HolidaySettingsEditor } from "@/components/admin/holiday-settings";
 import { HOLIDAYS_KEY, parseHolidays } from "@/lib/store/working-days";
 import type { ShippingSettings } from "@/app/[locale]/dashboard/store/sourcing/actions";
-import type { Supplier } from "@/lib/store/sourcing";
+import {
+  DEFAULT_COMMISSION_FLOOR_PCT,
+  DEFAULT_MARGIN_FLOOR_PCT,
+  floorSetting,
+  type Supplier,
+} from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
 import { FileUp, RefreshCw, Search } from "lucide-react";
@@ -81,7 +86,10 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
       supabase.from("supplier_offers").select("part_id, supplier_id, active").order("id").range(from, to)
     ),
     loadPublishedParts(supabase),
-    supabase.from("store_settings").select("key, value").in("key", ["margin_floor_pct", "fx_to_qar", "shipping", HOLIDAYS_KEY]),
+    supabase
+      .from("store_settings")
+      .select("key, value")
+      .in("key", ["margin_floor_pct", "commission_floor_pct", "fx_to_qar", "shipping", HOLIDAYS_KEY]),
   ]);
 
   const suppliers = (suppliersRes.data ?? []) as Supplier[];
@@ -138,7 +146,8 @@ export default async function SuppliersPage({ params }: { params: Promise<{ loca
             locale={locale}
             suppliers={suppliers}
             offerCounts={offersRes.error ? null : counts}
-            floorPct={Number(setting("margin_floor_pct") ?? 15)}
+            floorPct={floorSetting(setting("margin_floor_pct"), DEFAULT_MARGIN_FLOOR_PCT)}
+            commissionFloorPct={floorSetting(setting("commission_floor_pct"), DEFAULT_COMMISSION_FLOOR_PCT)}
             fx={(setting("fx_to_qar") as Record<string, number>) ?? { QAR: 1 }}
           />
         </>

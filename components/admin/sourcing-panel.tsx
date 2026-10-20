@@ -20,6 +20,8 @@ import {
 import type { OfferInput } from "@/lib/store/offer-clean";
 import {
   AVAILABILITIES,
+  floorFor,
+  type Floors,
   type PartSourcing,
   type PricingMode,
   type Supplier,
@@ -38,11 +40,15 @@ type Props = {
   sourcing: PartSourcing;
   offers: (SupplierOffer & { landed_qar: number | null })[];
   suppliers: Supplier[];
-  floorPct: number;
+  floors: Floors;
 };
 
-export function SourcingPanel({ locale, partId, unitPrice, sourcing, offers, suppliers, floorPct }: Props) {
+export function SourcingPanel({ locale, partId, unitPrice, sourcing, offers, suppliers, floors }: Props) {
   const t = useTranslations("Sourcing");
+  // A mirror part earns the supplier's commission, not a margin we set, so it
+  // is judged against the commission floor (migration 0098).
+  const mirror = sourcing.pricing_mode === "mirror";
+  const floorPct = floorFor(sourcing.pricing_mode, floors);
   const router = useRouter();
   const [pending, start] = useTransition();
   const [editing, setEditing] = useState<string | "new" | null>(null);
@@ -92,7 +98,7 @@ export function SourcingPanel({ locale, partId, unitPrice, sourcing, offers, sup
           label={t("incomePct")}
           value={sourcing.income_pct === null ? "—" : `${sourcing.income_pct}%`}
           warn={sourcing.below_floor}
-          sub={t("floor", { pct: floorPct })}
+          sub={t(mirror ? "floorCommission" : "floor", { pct: floorPct })}
         />
         <Stat label={t("leadTime")} value={sourcing.lead_time_class ? t(`lt_${sourcing.lead_time_class}`) : t("onRequest")} />
       </div>
@@ -100,7 +106,7 @@ export function SourcingPanel({ locale, partId, unitPrice, sourcing, offers, sup
       {sourcing.below_floor && (
         <p className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          {t("belowFloor", { pct: floorPct })}
+          {t(mirror ? "belowFloorCommission" : "belowFloor", { pct: floorPct })}
         </p>
       )}
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}

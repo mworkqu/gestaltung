@@ -4,7 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
-import { PRICING_MODES, type PricingMode } from "@/lib/store/sourcing";
+import {
+  DEFAULT_COMMISSION_FLOOR_PCT,
+  DEFAULT_MARGIN_FLOOR_PCT,
+  floorSetting,
+  PRICING_MODES,
+  type PricingMode,
+} from "@/lib/store/sourcing";
 import { cleanOffer, offerNum, offerText, type OfferInput } from "@/lib/store/offer-clean";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { HOLIDAYS_KEY, isIsoDate, parseHolidays } from "@/lib/store/working-days";
@@ -106,8 +112,13 @@ export async function saveSupplier(locale: string, s: SupplierInput) {
   return { ok: true };
 }
 
-/** Margin floor + exchange rates, then re-derive every product. */
-export async function saveSourcingSettings(locale: string, floorPct: number, fx: Record<string, number>) {
+/** Both income floors + exchange rates, then re-derive every product. */
+export async function saveSourcingSettings(
+  locale: string,
+  floorPct: number,
+  commissionFloorPct: number,
+  fx: Record<string, number>
+) {
   await requireAdmin();
   const cleanFx: Record<string, number> = { QAR: 1 };
   for (const [k, v] of Object.entries(fx)) {
@@ -115,10 +126,12 @@ export async function saveSourcingSettings(locale: string, floorPct: number, fx:
     const n = Number(v);
     if (/^[A-Z]{3}$/.test(code) && Number.isFinite(n) && n > 0) cleanFx[code] = n;
   }
-  const floor = Number.isFinite(Number(floorPct)) ? Number(floorPct) : 15;
+  const floor = floorSetting(floorPct, DEFAULT_MARGIN_FLOOR_PCT);
+  const commissionFloor = floorSetting(commissionFloorPct, DEFAULT_COMMISSION_FLOOR_PCT);
   const supabase = await createClient();
   const { error } = await supabase.from("store_settings").upsert([
     { key: "margin_floor_pct", value: floor, updated_at: new Date().toISOString() },
+    { key: "commission_floor_pct", value: commissionFloor, updated_at: new Date().toISOString() },
     { key: "fx_to_qar", value: cleanFx, updated_at: new Date().toISOString() },
   ]);
   if (error) return { error: error.message };
