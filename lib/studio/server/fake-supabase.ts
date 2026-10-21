@@ -1,6 +1,6 @@
 // Test helper: a tiny in-memory Supabase for the Studio product routes
 // (lib/studio/server/product-routes.test.ts, doc.test.ts). Emulates just what
-// those routes use: auth.getUser, from(table) select / eq / in / like / order /
+// those routes use: auth.getUser, from(table) select / eq / in / not / like / order /
 // limit / maybeSingle / update(...).select / insert / upsert, json-path select
 // aliases (`product:studio->product`), RLS on projects (owner or super_admin),
 // storage signed URLs and rpc() with scripted answers. Never used by app code.
@@ -63,6 +63,12 @@ class Query implements PromiseLike<{ data: unknown; error: unknown }> {
   }
   in(col: string, vs: unknown[]) {
     this.filters.push((r) => vs.includes(r[col]));
+    return this;
+  }
+  /** Only the "is null" form the reuse lookup uses (`.not(col, "is", null)`). */
+  not(col: string, op: string, v: unknown) {
+    if (op === "is" && v === null) this.filters.push((r) => r[col] !== null && r[col] !== undefined);
+    else this.filters.push((r) => r[col] !== v);
     return this;
   }
   like(col: string, pattern: string) {

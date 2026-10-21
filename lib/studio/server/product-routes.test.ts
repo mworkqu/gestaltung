@@ -192,6 +192,33 @@ describe("POST /check", () => {
     const s = (await (await check(post({ projectId: P, designId: id, images, loop: 1 }))).json()) as { skipped?: string };
     expect(s.skipped).toBe("quota");
   });
+
+  it("an identical check is answered from the stored run, with no second model call", async () => {
+    const id = await designOne();
+    state.gemini = true;
+    const answer = { score: 6, looksLike: "a puck", missing: ["outlet"], patches: [] };
+    state.answers = [answer];
+    const body = { projectId: P, designId: id, images, loop: 0 };
+
+    const first = (await (await check(post(body))).json()) as { score: number };
+    expect(first.score).toBe(6);
+    expect(state.answers).toEqual([]); // the one scripted answer was spent
+
+    // Nothing left to answer with: a second model call would come back invalid
+    // and the route would say "quota". The stored run answers instead.
+    const second = (await (await check(post(body))).json()) as { score?: number; skipped?: string };
+    expect(second.skipped).toBeUndefined();
+    expect(second.score).toBe(6);
+
+    // The reuse is a read, so it records no second run.
+    const runs = state.main.db.tables.analysis_runs.filter((r) => r.feature === "studio");
+    expect(runs.length).toBe(1);
+    expect(runs[0].request_hash).toEqual(expect.any(String));
+
+    // A different request (another round) is not reused.
+    const other = (await (await check(post({ ...body, loop: 1 }))).json()) as { skipped?: string };
+    expect(other.skipped).toBe("quota");
+  });
 });
 
 describe("POST /preview + /choose", () => {

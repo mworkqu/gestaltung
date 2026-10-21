@@ -3,8 +3,9 @@
 //
 //  productPreview: POST {apiBase}/design → for each design: solveProduct
 //    (pure) → build (manifold kernel, cached by solved hash) → three 512 px views
-//    in the scene → POST /check (vision) — at most 2 more loops while the score
-//    is < 7 and the check changed the model; the best-scoring model wins →
+//    in the scene → POST /check (vision) — one check per design, plus refinement
+//    loops from a pool the PRESS shares (vision-budget.ts) while the score is
+//    < 7 and the check changed the model; the best-scoring model wins →
 //    final 3/4 picture (1024 px) → POST /preview. The page receives progress
 //    ("designing" / "checking" / "polishing", never a score) and the PNG bytes.
 //    NO model JSON and NO geometry ever leave the worker here.
@@ -32,11 +33,10 @@ import type {
   ProductWhy,
 } from "./protocol";
 import type { RenderShot, SolvedStage } from "./product-render";
+import { visionBudget, type VisionBudget } from "./vision-budget";
 
 /** A score at or above this is good enough (no more vision loops). */
 export const GOOD_SCORE = 7;
-/** Extra check loops after the first one (spec: "max 2 loops"). */
-export const MAX_LOOPS = 2;
 export const CHECK_SIZE = 512;
 export const PICTURE_SIZE = 1024;
 
@@ -93,8 +93,9 @@ type Candidate = { model: ProductModel; solved: SolvedProduct; built: BuiltProdu
 const partsOf = (input: { parts: ProductPreviewInput["parts"] }): LayoutInput[] => input.parts.map(([instanceId, part]) => ({ instanceId, part }));
 
 /**
- * One design: build, check (≤ 1 + MAX_LOOPS times), keep the best, render its picture, upload it.
- * Returns the picture bytes and the stored path. Throws when the design cannot be built at all.
+ * One design: build, check once, refine while the shared budget allows, keep the
+ * best, render its picture, upload it. Returns the picture bytes and the stored
+ * path. Throws when the design cannot be built at all.
  */
 async function designOne(
   input: ProductPreviewInput,
@@ -103,11 +104,12 @@ async function designOne(
   deps: PreviewDeps,
   index: number,
   total: number,
+  budget: VisionBudget,
 ): Promise<{ png: ArrayBuffer; previewPath: string | null; best: Candidate }> {
   const parts = partsOf(input);
   let model = clampProductModel(d.model);
   let best: Candidate | null = null;
-  for (let loop = 0; loop <= MAX_LOOPS; loop++) {
+  for (let loop = 0; ; loop++) {
     const solved = solveProduct(model, parts, { spec: input.spec });
     const built = await deps.build(solved);
     emit({ kind: "productProgress", stage: "checking", designId: d.id, index, total });
@@ -116,6 +118,10 @@ async function designOne(
       { view: "side", size: CHECK_SIZE },
       { view: "iso", size: CHECK_SIZE },
     ]);
+    // With no refinement loop left we still want the score — it decides which
+    // version is kept — but patches we could not apply are output tokens
+    // nobody reads, so the reviewer is told to leave them out.
+    const final = budget.left === 0;
     const c = await deps.http("/check", {
       method: "POST",
       body: {
@@ -123,6 +129,7 @@ async function designOne(
         designId: d.id,
         images: { front: bytesToBase64(front), side: bytesToBase64(side), iso: bytesToBase64(iso) },
         loop,
+        ...(final ? { final: true } : {}),
       },
     });
     const ok = c.status >= 200 && c.status < 300 && !c.data.error;
@@ -134,7 +141,8 @@ async function designOne(
       break;
     }
     if (!best || best.score === null || score > best.score) best = cur;
-    if (score >= GOOD_SCORE || c.data.changed !== true || loop === MAX_LOOPS || !isObj(c.data.model)) break;
+    if (score >= GOOD_SCORE || c.data.changed !== true || !isObj(c.data.model)) break;
+    if (!budget.take()) break;
     model = clampProductModel(c.data.model);
   }
   const chosen = best as Candidate;
@@ -166,6 +174,8 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
 
   const designs: ProductPreviewDesign[] = [];
   const list = raw.slice(0, 3);
+  // One pool for the press, not one per design (vision-budget.ts).
+  const budget = visionBudget();
   for (let i = 0; i < list.length; i++) {
     const d = list[i];
     const id = typeof d.id === "string" ? d.id.slice(0, 64) : `d${i + 1}`;
@@ -173,7 +183,7 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
     const why = whyOf(d.why);
     const t = deps.now();
     try {
-      const { png, previewPath, best } = await designOne(input, { id, model: d.model }, emit, deps, i, list.length);
+      const { png, previewPath, best } = await designOne(input, { id, model: d.model }, emit, deps, i, list.length, budget);
       emit({ kind: "productPicture", designId: id, archetype: best.model.archetype, why, previewPath, png, ms: Math.round(deps.now() - t) });
       designs.push({ id, archetype: best.model.archetype, why, previewPath, status: "ready" });
     } catch (err) {

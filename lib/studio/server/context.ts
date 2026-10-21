@@ -3,7 +3,10 @@
 //  * studioRequest(): session (guest sessions count) → body (zod) → project
 //    under RLS → optional AI-consent check. Returns a Response on refusal.
 //  * studioCall(): binds validatedCall to feature "studio", the step, low
-//    temperature. Logging with feature "studio" fails the ai_usage /
+//    temperature, and asks for durable reuse — an identical step (same spec,
+//    same parts, same pictures) is answered from its stored run instead of the
+//    provider, which the in-memory caches cannot do across Vercel instances.
+//    Logging with feature "studio" fails the ai_usage /
 //    analysis_runs check constraints until 0068 runs; both writes are
 //    best-effort (they only warn), so the user's call is never affected.
 //  * logClamp(): clamp changes go to the server console (admin), never to the
@@ -66,6 +69,7 @@ export function studioCall(supabase: SupabaseClient, projectId: string): StudioC
       validate: req.validate,
       temperature: STUDIO_TEMPERATURE,
       timeoutMs: req.timeoutMs ?? 45_000,
+      reuse: true,
       ...(req.images?.length ? { images: req.images } : {}),
       ...(req.model ? { model: req.model } : {}),
     });

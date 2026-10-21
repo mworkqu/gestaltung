@@ -23,6 +23,7 @@ import { stableHash } from "../cache";
 import type { LayoutInput } from "../layout";
 import type { LibraryPart, ProductSpec, StudioComponent } from "../schema";
 import { ARCHETYPES } from "../product/schema";
+import { MAX_REFINEMENTS } from "../geometry/vision-budget";
 
 export const PREVIEW_BUCKET = "project-images";
 export const PREVIEW_PREFIX = "studio-previews";
@@ -46,7 +47,11 @@ export const CheckBody = z.object({
   projectId: ProjectId,
   designId: DesignId,
   images: z.object({ front: B64(CHECK_IMAGE_MAX_BYTES), side: B64(CHECK_IMAGE_MAX_BYTES), iso: B64(CHECK_IMAGE_MAX_BYTES) }),
-  loop: z.number().int().min(0).max(2),
+  // A design can be checked once plus every refinement loop of the press's
+  // shared pool, so the highest round it can reach is the pool's size.
+  loop: z.number().int().min(0).max(MAX_REFINEMENTS),
+  /** The worker has no refinement loop left: score it, but do not write patches. */
+  final: z.boolean().optional(),
 });
 export const PreviewBody = z.object({ projectId: ProjectId, designId: DesignId, png: B64(PREVIEW_MAX_BYTES) });
 export const DesignRefBody = z.object({ projectId: ProjectId, designId: DesignId });

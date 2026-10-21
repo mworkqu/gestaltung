@@ -89,7 +89,17 @@ describe("runVisionCheck", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("prompt names the round", () => {
-    expect(visionPrompt({ idea: "i", spec: g.spec, partNames: [], model, loop: 2 })).toMatch(/round 3 of 3/);
+  it("prompt names the round, without claiming how many are left", () => {
+    // The rounds come from a pool the press shares, so "of 3" was a promise the loop no longer makes.
+    const p = visionPrompt({ idea: "i", spec: g.spec, partNames: [], model, loop: 2 });
+    expect(p).toMatch(/round 3\./);
+    expect(p).not.toMatch(/of 3/);
+    expect(p).not.toMatch(/last round/);
+  });
+
+  it("the last round asks for no patches (they could not be applied)", () => {
+    const p = visionPrompt({ idea: "i", spec: g.spec, partNames: [], model, loop: 1, final: true });
+    expect(p).toMatch(/last round for this design/);
+    expect(p).toMatch(/empty patches list/);
   });
 });

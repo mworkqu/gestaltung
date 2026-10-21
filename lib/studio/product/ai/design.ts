@@ -197,7 +197,6 @@ export async function runProductDesign(opts: {
   let modelName: string | null | undefined;
   if (raw) raw = structuredClone(raw);
   else {
-    let attempt = 0;
     const defaultModels = new Map(archetypes.map((a) => [a, archetypeDefault(a, spec, parts)] as const));
     const r = await opts.call<RawDesign[]>({
       step: "product",
@@ -209,7 +208,7 @@ export async function runProductDesign(opts: {
         starts: archetypes.map((a) => ({ archetype: a, model: defaultModels.get(a)! })),
       }),
       schema: designerSchema(archetypes),
-      validate: (v) => validateDesigns(v, archetypes, attempt++ === 0, defaultModels),
+      validate: (v, attempt) => validateDesigns(v, archetypes, attempt === 1, defaultModels),
       timeoutMs: 90_000,
     });
     if (!r.ok) return defaults([r.error, ...r.problems]);

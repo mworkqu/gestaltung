@@ -8,7 +8,7 @@ import { studioCall, studioRequest } from "@/lib/studio/server/context";
 import { loadDocPrivate, updateProductDoc } from "@/lib/studio/server/doc";
 import { CHECK_IMAGE_MAX_BYTES, CheckBody, decodePng, json, partsOf, pngBase64 } from "@/lib/studio/server/product";
 
-// POST /api/studio/product/check {projectId, designId, images: {front, side, iso} (base64 PNG, 512 px), loop 0..2}
+// POST /api/studio/product/check {projectId, designId, images: {front, side, iso} (base64 PNG, 512 px), loop 0..2, final?}
 //   → 200 {score 1..10, looksLike, missing, model, changed}
 //   → 200 {skipped: "quota" | "no_key", model}   (the model is kept as it is)
 // Gemini vision judges "does this look like <product> at a glance, are all its
@@ -56,6 +56,7 @@ export async function POST(request: Request) {
     model,
     images: { front: pngBase64(images.front), side: pngBase64(images.side), iso: pngBase64(images.iso) },
     loop: body.loop,
+    final: body.final === true,
   });
   // Quota, rate limit, an outage or two unreadable answers: keep the solved model.
   if (!r.ok) return json({ skipped: "quota", model });

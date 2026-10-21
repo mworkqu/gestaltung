@@ -9,7 +9,8 @@ import { buildSceneProps } from "../product/scene/props";
 import { SCENES } from "../product/schema";
 import { productSpecHash } from "../product/spec-hash";
 import { mockProductHttp, resetProductMock } from "./product-mock";
-import { bytesToBase64, loadUnlockedProduct, MAX_LOOPS, productStlFiles, runProductPreview, type Http, type PreviewDeps } from "./product-preview";
+import { bytesToBase64, loadUnlockedProduct, productStlFiles, runProductPreview, type Http, type PreviewDeps } from "./product-preview";
+import { MAX_REFINEMENTS, maxVisionCalls } from "./vision-budget";
 import type { BuiltProduct } from "./product-kernel";
 import type { ProductEvent, ProductPreviewInput } from "./protocol";
 
@@ -133,11 +134,49 @@ describe("vision loop", () => {
     expect(s.checks).toEqual([0]);
   });
 
-  it("loops at most MAX_LOOPS more times while the score is low and the model changed", async () => {
+  it("loops at most MAX_REFINEMENTS more times while the score is low and the model changed", async () => {
     const s = scripted([3, 4, 5, 6]);
     await runProductPreview(input, () => {}, deps(s.http));
     expect(s.checks).toEqual([0, 1, 2]);
-    expect(s.checks.length).toBe(1 + MAX_LOOPS);
+    expect(s.checks.length).toBe(1 + MAX_REFINEMENTS);
+  });
+
+  it("tells the reviewer not to write patches on a design's last round", async () => {
+    const s = scripted([3, 4, 5]);
+    const finals: boolean[] = [];
+    const base = deps(s.http);
+    await runProductPreview(input, () => {}, {
+      ...base,
+      http: async (path, init) => {
+        if (path === "/check") finals.push(((init.body ?? {}) as { final?: boolean }).final === true);
+        return s.http(path, init);
+      },
+    });
+    // Two refinement loops left, then one left, then none: only the last asks for no patches.
+    expect(finals).toEqual([false, false, true]);
+  });
+
+  it("three designs share one refinement pool instead of getting three loops each", async () => {
+    const checks: { id: string; loop: number }[] = [];
+    const designs = ["d1", "d2", "d3"].map((id) => ({ id, archetype: "stake_device", model, why: { en: "x", ar: "y" } }));
+    const http: Http = async (path, init) => {
+      const body = (init.body ?? {}) as Record<string, unknown>;
+      if (path === "/design") return { status: 200, data: { designs } };
+      if (path === "/check") {
+        checks.push({ id: String(body.designId), loop: Number(body.loop) });
+        // Always poor and always changed: the old per-design cap would run to nine.
+        return { status: 200, data: { score: 3, changed: true, model: structuredClone(model), looksLike: "", missing: [] } };
+      }
+      if (path === "/preview") return { status: 200, data: { previewPath: "studio-previews/p1/x.png" } };
+      return { status: 404, data: {} };
+    };
+    await runProductPreview(input, () => {}, deps(http));
+    expect(checks.length).toBe(maxVisionCalls(3));
+    expect(checks.length).toBeLessThan(9);
+    // Every design is still scored once; the pool went to the first (best-ranked) one.
+    expect(checks.filter((c) => c.id === "d1").map((c) => c.loop)).toEqual([0, 1, 2]);
+    expect(checks.filter((c) => c.id === "d2").map((c) => c.loop)).toEqual([0]);
+    expect(checks.filter((c) => c.id === "d3").map((c) => c.loop)).toEqual([0]);
   });
 
   it("does not loop when the check changed nothing", async () => {
