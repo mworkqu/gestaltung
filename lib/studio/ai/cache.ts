@@ -2,6 +2,11 @@
 // instance; the routes pass them in, the orchestrators stay pure (tests pass
 // their own, or none). Only answers that came from the model are kept: a safe
 // default after an invalid answer is retried next time.
+//
+// These save the round trip on a warm instance only. The reuse that actually
+// saves money lives one layer down, in validatedCall's request fingerprint
+// (lib/prototyping/call-fingerprint.ts): on Vercel the next press can land on
+// another instance, where this map is empty but the stored run is not.
 
 import { Lru, stableHash } from "@/lib/studio/cache";
 import type { Outcome } from "./types";
