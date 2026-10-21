@@ -106,7 +106,9 @@ export default async function DashboardFixturePage({
             <h1 className="mt-2 text-2xl font-extrabold text-heading">{t("title")}</h1>
             <p className="mt-1 max-w-2xl text-sm text-mutedtext">{t("intro")}</p>
           </div>
-          <StockListsView locale={locale} buy={BUY} watch={WATCH} dont={DONT} />
+          {/* ownStockReady false: the "Units on the shelf" panel calls set_own_stock,
+              and the e2e write guard must never let a fixture write. */}
+          <StockListsView locale={locale} buy={BUY} watch={WATCH} dont={DONT} ownStockReady={false} />
         </div>
       </MessagesScope>
     );

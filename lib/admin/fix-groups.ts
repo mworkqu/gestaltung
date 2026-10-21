@@ -4,9 +4,10 @@
 // turns it into copy). Pure, no I/O; lib/admin/fix-data.ts loads the rows.
 
 import type { FixIssue } from "@/lib/admin/home-tiles";
+import { OWN_STOCK_SUPPLIER } from "@/lib/sourcing/lead-times";
 
-/** Supplier code of the "Own stock in Lusail" offers (created on first use). */
-export const OWN_STOCK_SUPPLIER_CODE = "own_stock";
+/** Supplier code of the "Own stock in Lusail" offers (0095 seeds the row). */
+export const OWN_STOCK_SUPPLIER_CODE = OWN_STOCK_SUPPLIER;
 
 /** store_settings key: part ids the owner marked "on request" from the Fix list. */
 export const ON_REQUEST_KEY = "fix_on_request";
@@ -96,6 +97,18 @@ export function deliveryWhy(p: { pricingMode?: string | null; offers: FixOffer[]
   if (eligible.every((o) => OUT.has(String(o.availability)))) return { code: "outOfStock", supplier: first.supplierName };
   if (eligible.every((o) => o.leadDays === null)) return { code: "noLeadTime", supplier: first.supplierName };
   return { code: "notWorkedOut", supplier: first.supplierName };
+}
+
+/**
+ * Out of stock at the supplier is NOT a gap for the owner to fix (owner,
+ * 2026-10-19): the product is simply "available on request" until the
+ * supplier has it again, and nagging about it every day is noise. These
+ * products leave the Fix list on their own and stay in the "available on
+ * request" count on the admin overview, exactly as if they had been marked
+ * on request by hand.
+ */
+export function isAutoOnRequest(why: Why | null | undefined): boolean {
+  return why?.code === "outOfStock";
 }
 
 export type FixRow = {

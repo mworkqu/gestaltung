@@ -1,7 +1,9 @@
 // Server read of the contact number (store_settings.contact_phone, anon
 // readable). Cached like the shipping settings: React cache() within a render,
-// unstable_cache across renders under the "store-settings" tag, so the
-// dashboard save (revalidateStorefront) refreshes every page at once.
+// unstable_cache across renders under the "store-settings" tag (so a broad
+// storefront purge refreshes it too) plus its own "contact-phone" tag, which
+// is what the dashboard save purges: the number changes about once a year, and
+// it has no business re-reading the catalogue when it does.
 //
 // peekContactPhone() is for synchronous code (email shells, the rating page):
 // it returns the last value this server instance loaded, else the default, and
@@ -12,7 +14,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 
 import { createPublicClient } from "@/lib/supabase/public";
-import { SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
+import { CONTACT_PHONE_TAG, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
 import { CONTACT_PHONE_KEY, contactPhoneFromSetting, DEFAULT_CONTACT_PHONE, type ContactPhone } from "@/lib/contact-phone";
 
 const readContactPhoneValue = unstable_cache(
@@ -23,7 +25,7 @@ const readContactPhoneValue = unstable_cache(
     return data?.value ?? null;
   },
   ["store-settings:contact_phone"],
-  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
+  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG, CONTACT_PHONE_TAG] },
 );
 
 let last: ContactPhone | null = null;

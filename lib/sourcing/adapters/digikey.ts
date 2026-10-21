@@ -4,6 +4,7 @@
 // parametric data — the source for our typed attributes.
 
 import type { SupplierAdapter, SupplierProduct } from "@/lib/sourcing/types";
+import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 
 export const digikeyAdapter: SupplierAdapter = { code: "digikey", kind: "api" };
 
@@ -108,8 +109,14 @@ export function mapDigikey(p: DkProduct): SupplierProduct | null {
     cost: firstBreak?.UnitPrice ?? p.UnitPrice ?? null,
     currency: "USD",
     availability: p.Discontinued || p.EndOfLife ? "unavailable" : stock > 0 ? "in_stock" : "backorder",
-    // In stock: DigiKey ships within days; otherwise the manufacturer's lead time.
-    leadTimeDays: stock > 0 ? 7 : Number.isFinite(weeks) && weeks > 0 ? weeks * 7 : null,
+    // Our own lead time, not DigiKey's: even a part in their warehouse takes
+    // two weeks to reach a customer here. A longer manufacturer lead wins.
+    leadTimeDays:
+      stock > 0
+        ? SUPPLIER_LEAD_DAYS.digikey
+        : Number.isFinite(weeks) && weeks > 0
+          ? Math.max(SUPPLIER_LEAD_DAYS.digikey, weeks * 7)
+          : null,
     moq: Math.max(1, v?.MinimumOrderQuantity ?? 1),
     parameters: (p.Parameters ?? [])
       .filter((x) => x.ParameterText && x.ValueText && x.ValueText !== "-")

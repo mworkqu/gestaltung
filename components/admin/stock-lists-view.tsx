@@ -2,7 +2,8 @@
 
 // /dashboard/store/stock: three plain lists (Buy now / Watch / Do not buy),
 // "Add to order", one order list per supplier with Copy for WhatsApp and
-// Download CSV, and "I bought these". Logic lives in lib/admin/stock-lists.ts.
+// Download CSV, "I bought these", and "Units on the shelf" (the by-hand count,
+// components/admin/own-stock-panel.tsx). Logic lives in lib/admin/stock-lists.ts.
 // No scores, weights, SKUs or margins here; "Details" opens the full restock table.
 
 import { useMemo, useState, useTransition } from "react";
@@ -12,6 +13,7 @@ import { Check, ClipboardCopy, Download, Loader2, PackageCheck, Plus } from "luc
 
 import { markBought } from "@/app/[locale]/dashboard/store/stock/actions";
 import { Link } from "@/i18n/navigation";
+import { OwnStockPanel } from "@/components/admin/own-stock-panel";
 import { useEditHref } from "@/components/admin/use-edit-href";
 import { buildOrderGroups, groupsCsv, whatsappText, type Interest, type StockItem } from "@/lib/admin/stock-lists";
 import { formatPrice } from "@/lib/parts/format";
@@ -26,11 +28,14 @@ export function StockListsView({
   buy,
   watch,
   dont,
+  ownStockReady,
 }: {
   locale: string;
   buy: StockItem[];
   watch: StockItem[];
   dont: StockItem[];
+  /** 0069 is in the database, so set_own_stock can be called. */
+  ownStockReady: boolean;
 }) {
   const t = useTranslations("AdminStock");
   const router = useRouter();
@@ -278,6 +283,8 @@ export function StockListsView({
           </p>
         )}
       </section>
+
+      {ownStockReady && <OwnStockPanel locale={locale} lists={{ buy, watch, dont }} />}
 
       {section("watch", watch, true)}
       {section("dont", dont, false, true)}

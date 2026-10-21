@@ -4,7 +4,7 @@ import { Link } from "@/i18n/navigation";
 import { modelPrice } from "@/lib/ai/prices";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { QAR_PER_USD, needsMigration, qarFormatter, usdFormatter, type RevenueRow } from "./format";
+import { COST_MULTIPLIER, QAR_PER_USD, needsMigration, qarFormatter, usdFormatter, type RevenueRow } from "./format";
 
 // Per-user AI cost overview (owner, 2026-10-18): who uses the AI, how many
 // ideation tokens they spent and what the calls cost us at the provider's
@@ -122,6 +122,7 @@ export default async function AiCostsPage({
     { label: t("tokensIn"), value: num.format(total.tin) },
     { label: t("tokensOut"), value: num.format(total.tout) },
     { label: t("totalCost"), value: usd(total.cost) },
+    { label: t("billable"), value: qar(total.cost * COST_MULTIPLIER * QAR_PER_USD) },
     { label: t("ideaUsed"), value: num.format(total.idea) },
     { label: t("totalRevenue"), value: qar(totalRevenue) },
     { label: t("activePasses"), value: num.format(activePasses) },
@@ -160,7 +161,7 @@ export default async function AiCostsPage({
           </form>
 
           <section className="neu p-6">
-            <dl className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
+            <dl className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
               {stats.map((s) => (
                 <div key={s.label}>
                   <dt className="text-[10px] uppercase tracking-wider text-faint">{s.label}</dt>
@@ -170,6 +171,7 @@ export default async function AiCostsPage({
             </dl>
             <p className="mt-4 text-[12px] text-mutedtext">{t("priceNote")}</p>
             <p className="mt-1 text-[12px] text-mutedtext">{t("qarNote", { value: qar(total.cost * QAR_PER_USD), rate: QAR_PER_USD })}</p>
+            <p className="mt-1 text-[12px] text-mutedtext">{t("billableNote", { multiplier: COST_MULTIPLIER })}</p>
           </section>
 
           <section className="neu space-y-3 p-6">
@@ -178,7 +180,7 @@ export default async function AiCostsPage({
               <p className="text-sm text-mutedtext">{t("noUsers")}</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-sm">
+                <table className="w-full min-w-[1200px] text-sm">
                   <thead>
                     <tr className="text-[10px] uppercase tracking-wider text-faint">
                       <th className="pb-2 text-start font-medium">{t("user")}</th>
@@ -189,6 +191,7 @@ export default async function AiCostsPage({
                       <th className="pb-2 text-end font-medium">{t("tokensIn")}</th>
                       <th className="pb-2 text-end font-medium">{t("tokensOut")}</th>
                       <th className="pb-2 text-end font-medium">{t("cost")}</th>
+                      <th className="pb-2 text-end font-medium">{t("billable")}</th>
                       <th className="pb-2 text-end font-medium">{t("revenue")}</th>
                       <th className="pb-2 text-end font-medium">{t("pass")}</th>
                       <th className="pb-2 text-end font-medium">{t("lastCall")}</th>
@@ -211,6 +214,7 @@ export default async function AiCostsPage({
                         <td className="py-2 text-end font-mono font-semibold tabular-nums text-heading">{usd(u.cost)}
                           <span className="block text-[10px] font-normal text-faint">{qar(u.cost * QAR_PER_USD)}</span>
                         </td>
+                        <td className="py-2 text-end font-mono font-semibold tabular-nums text-heading">{qar(u.cost * COST_MULTIPLIER * QAR_PER_USD)}</td>
                         <td className="py-2 text-end font-mono tabular-nums text-heading">{u.revenue > 0 ? qar(u.revenue) : "—"}</td>
                         <td className="py-2 text-end text-[12px] text-mutedtext">{u.passUntil ? dayFmt.format(new Date(u.passUntil)) : "—"}</td>
                         <td className="py-2 text-end text-[12px] text-mutedtext">{u.last ? timeFmt.format(new Date(u.last)) : "—"}</td>

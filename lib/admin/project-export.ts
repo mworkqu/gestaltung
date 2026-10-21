@@ -143,6 +143,14 @@ export async function buildProjectExport(
   const t = await getTranslations({ locale: "en", namespace: "Prototyping" });
   const tProj = await getTranslations({ locale: "en", namespace: "Projects" });
   const tr = (k: string, p?: Record<string, string | number>) => t(k, p);
+
+  // The latest SUCCESSFUL brief analysis. A rejected or failed attempt is not
+  // the project's analysis, and analysisHistory below holds every attempt
+  // anyway.
+  const succeeded = (r: Row) => r.outcome === "ok" || r.outcome === "fallback";
+  const analyseRuns = (runs ?? []).filter((r) => r.feature === "analyse");
+  const latest = [...analyseRuns].reverse().find(succeeded) ?? null;
+
   const readiness = projectReadiness(
     {
       brief: project.brief,
@@ -150,6 +158,9 @@ export async function buildProjectExport(
       parts: allParts,
       routeAccepted: project.stages?.manufacturing === "complete",
       bom: bom ? { lines: bom.lines, matches: matchOf } : null,
+      // So "Understanding confirmed" can tell a brief that was never analysed
+      // from one that was analysed and read nothing.
+      analysedAt: spec?.runAt ?? (latest?.created_at as string | undefined) ?? null,
     },
     tr
   );
@@ -158,8 +169,6 @@ export async function buildProjectExport(
   const lastEvent = (type: string, match?: (d: Row) => boolean) =>
     [...ev].reverse().find((e) => e.type === type && (!match || match((e.detail ?? {}) as Row)))?.created_at ?? null;
 
-  const analyseRuns = (runs ?? []).filter((r) => r.feature === "analyse");
-  const latest = analyseRuns[analyseRuns.length - 1] ?? null;
   const runView = (r: Row) => ({
     id: r.id,
     feature: r.feature,
@@ -175,6 +184,15 @@ export async function buildProjectExport(
     parsedResponse: r.parsed_response,
   });
   if (!runs?.length) notes.push("analysis: no recorded runs (raw responses are kept from migration 0024 on)");
+  // `analysis` reads brief analyses only. Saying nothing while runs of other
+  // features sit in analysisHistory read as "never analysed" in the 18 Oct 2026
+  // export, so the file now names what it did find.
+  else if (!latest) {
+    const features = [...new Set(runs.map((r) => String(r.feature)))].sort().join(", ");
+    notes.push(
+      `analysis: no successful run of feature "analyse" for this project; analysisHistory holds ${runs.length} run(s) of: ${features}`
+    );
+  }
 
   const bs = branches(project.disciplines, project.brief, allParts);
 
@@ -217,9 +235,23 @@ export async function buildProjectExport(
       lastEditedAt: lastEvent("brief_edited") ?? null,
       lastEditedAtSource: lastEvent("brief_edited") ? "event log" : "unknown (no brief_edited event recorded)",
     },
+    // With no run row to show, the project's own record of its latest analysis
+    // still answers "when was this read" (projects.spec.runAt).
     analysis: latest
-      ? { ...runView(latest), specProvider: spec?.provider ?? null, specFallback: spec?.fallback ?? null }
-      : { provider: spec?.provider ?? null, fallback: spec?.fallback ?? null, runAt: null, rawResponse: null, parsedResponse: null },
+      ? {
+          ...runView(latest),
+          specProvider: spec?.provider ?? null,
+          specFallback: spec?.fallback ?? null,
+          specRunAt: spec?.runAt ?? null,
+        }
+      : {
+          provider: spec?.provider ?? null,
+          fallback: spec?.fallback ?? null,
+          runAt: spec?.runAt ?? null,
+          runAtSource: spec?.runAt ? "projects.spec.runAt" : null,
+          rawResponse: null,
+          parsedResponse: null,
+        },
     analysisHistory: (runs ?? []).map(runView),
     summary: spec?.summary ?? null,
     understandingConfirmed: spec?.confirmed ?? false,

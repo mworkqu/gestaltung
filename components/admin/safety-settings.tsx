@@ -29,6 +29,13 @@ export function SafetySettings({
   runs: CleanupRun[] | null;
 }) {
   const t = useTranslations("Safety");
+  // The widget is a client component, so Next inlines the site key at BUILD
+  // time. `turnstile.siteKeySet` is what the SERVER sees right now, so the two
+  // disagree whenever the variable was added in Vercel after the last build —
+  // and that is exactly what "I set the key and nothing happened" looks like.
+  // Saying so here saves the next hour of hunting.
+  const siteKeyInBuild = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim();
+  const needsRedeploy = turnstile.siteKeySet && !siteKeyInBuild;
   const [tsOn, setTsOn] = useState(turnstile.enabled);
   const [tsMsg, setTsMsg] = useState<string | null>(null);
   const [tsPending, startTs] = useTransition();
@@ -69,6 +76,11 @@ export function SafetySettings({
             <dd>{keyBadge(turnstile.secretSet)}</dd>
           </div>
         </dl>
+        {needsRedeploy && (
+          <p className="rounded-xl bg-amber-100 px-3 py-2 text-[12px] font-medium leading-relaxed text-amber-900">
+            {t("turnstileNeedsRedeploy")}
+          </p>
+        )}
         <details className="text-[12px] text-mutedtext">
           <summary className="min-h-6 cursor-pointer font-medium text-cobalt">{t("turnstileOrderTitle")}</summary>
           <p className="mt-1.5 leading-relaxed">{t("turnstileWarning")}</p>

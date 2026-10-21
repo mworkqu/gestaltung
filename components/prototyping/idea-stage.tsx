@@ -29,13 +29,14 @@ import { MIN_BRIEF_CHARS } from "@/lib/prototyping/constants";
 import { suggestSpec } from "@/lib/prototyping/engine";
 import { disciplineOf } from "@/lib/prototyping/parts";
 import { mergeBom } from "@/lib/prototyping/bom";
-import { looksLikeSchema } from "@/lib/prototyping/readiness";
+import { factFocus, looksLikeSchema } from "@/lib/prototyping/readiness";
 import {
   EMPTY_SPEC,
   aiConsentOf,
   answersOf,
   isAnalysed,
   mergeAnalysis,
+  nextOpenQuestion,
   type AiConsent,
   type Spec,
 } from "@/lib/prototyping/spec";
@@ -135,6 +136,10 @@ export function IdeaStage({
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState<AnalysisStep[]>([]);
   const [problem, setProblem] = useState<"short" | "schema" | "failed" | "captchaRequired" | "captchaFailed" | null>(null);
+  // The server answered from a run we already paid for. Nothing new to read, so
+  // the page says so and sends the client to the question still open.
+  const [reused, setReused] = useState<"question" | "answered" | null>(null);
+  const [focusId, setFocusId] = useState<string | null>(null);
   const [guest, setGuest] = useState(false);
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
@@ -159,9 +164,20 @@ export function IdeaStage({
     return () => window.removeEventListener("beforeunload", warn);
   }, [saveState]);
 
+  // The questions render below this card, so they can only be reached once the
+  // merged spec has been painted.
+  useEffect(() => {
+    if (!focusId) return;
+    setFocusId(null);
+    const el = document.getElementById(focusId);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    el?.focus({ preventScroll: true });
+  }, [focusId]);
+
   function onBriefChange(value: string) {
     setBrief(value);
     setSaveState(value === savedBrief ? "clean" : "dirty");
+    setReused(null);
   }
 
   /** Saves the brief if it changed. Resolves false if the write failed. */
@@ -225,6 +241,7 @@ export function IdeaStage({
       if (!checkToken) return setProblem("captchaRequired");
     }
     setProblem(null);
+    setReused(null);
     setDone([]);
     setRunning(true);
     const started = Date.now();
@@ -270,10 +287,13 @@ export function IdeaStage({
       const result = await streamAnalysis(res, mark);
       if (!result) throw new Error("no result");
 
-      // Checking for gaps: merge with what the client already decided.
+      // Checking for gaps: merge with what the client already decided. The run
+      // time is stored with it, so the project itself records when its facts
+      // were last read — a reused answer keeps the time of the run it came from.
       const merged = mergeAnalysis(spec, result.analysis, {
         provider: result.provider,
         fallback: result.fallback,
+        runAt: result.runAt ?? new Date().toISOString(),
       });
       if (newConsent) merged.aiConsent = newConsent;
       const { error } = await supabase
@@ -285,6 +305,15 @@ export function IdeaStage({
         })
         .eq("id", project.id);
       if (error) throw error;
+
+      // Nothing was re-read, so point at the one thing that would actually move
+      // the project on. Saving the merge above is still worth doing: it is how
+      // a project whose earlier spec write failed catches up.
+      if (result.reused) {
+        const open = nextOpenQuestion(merged);
+        setReused(open ? "question" : "answered");
+        if (open) setFocusId(factFocus(open.id));
+      }
 
       // The bill of materials: functions to buy. A pick the client already
       // made carries over to the same line. The basic reader returns none, so
@@ -385,8 +414,13 @@ export function IdeaStage({
               : problem === "captchaFailed"
                 ? tCheck("captchaFailed")
                 : problemKey
-                  ? t(problemKey)
+                  ? t(problemKey, { min: String(MIN_BRIEF_CHARS) })
                   : null}
+          </p>
+        )}
+        {reused && !running && (
+          <p className="text-sm text-mutedtext" aria-live="polite">
+            {t(reused === "question" ? "analyseReusedQuestion" : "analyseReused")}
           </p>
         )}
         {needsCheck && (
@@ -463,8 +497,14 @@ export function IdeaStage({
                       ? "briefTooShort"
                       : problem === "schema"
                         ? "block_briefSchema"
-                        : "analyseFailed"
+                        : "analyseFailed",
+                    { min: String(MIN_BRIEF_CHARS) }
                   )}
+          </p>
+        )}
+        {reused && !running && (
+          <p className="text-xs text-mutedtext" aria-live="polite">
+            {t(reused === "question" ? "analyseReusedQuestion" : "analyseReused")}
           </p>
         )}
         {needsCheck && (

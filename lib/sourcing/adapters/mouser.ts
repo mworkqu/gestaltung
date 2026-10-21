@@ -4,6 +4,7 @@
 // mostly come from DigiKey; Mouser gives price, stock and lead time.
 
 import type { SupplierAdapter, SupplierProduct } from "@/lib/sourcing/types";
+import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 
 export const mouserAdapter: SupplierAdapter = { code: "mouser", kind: "api" };
 
@@ -77,9 +78,18 @@ export function mapMouser(p: MouserPart): SupplierProduct | null {
     datasheetUrl: p.DataSheetUrl || null,
     cost: money(first?.Price),
     currency: first?.Currency || "USD",
-    // In stock at Mouser means it ships from their warehouse; we still add our own transit.
+    // In stock at Mouser means it ships from their warehouse; our own transit
+    // is two weeks on top, so that is the number we promise. A longer
+    // manufacturer lead wins.
     availability: inStock > 0 ? "in_stock" : (p.AvailabilityOnOrder?.length ?? 0) > 0 ? "backorder" : "unavailable",
-    leadTimeDays: inStock > 0 ? 7 : lead ? Number(lead[1]) : leadWeeks ? Number(leadWeeks[1]) * 7 : null,
+    leadTimeDays:
+      inStock > 0
+        ? SUPPLIER_LEAD_DAYS.mouser
+        : lead
+          ? Math.max(SUPPLIER_LEAD_DAYS.mouser, Number(lead[1]))
+          : leadWeeks
+            ? Math.max(SUPPLIER_LEAD_DAYS.mouser, Number(leadWeeks[1]) * 7)
+            : null,
     moq: Math.max(1, Number(p.Min) || 1),
     parameters: (p.ProductAttributes ?? []).map((a) => ({ name: a.AttributeName, value: a.AttributeValue })),
   };

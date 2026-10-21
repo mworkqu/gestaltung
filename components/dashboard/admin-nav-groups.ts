@@ -32,6 +32,7 @@ export function adminNavGroups(t: (key: string) => string): NavGroup[] {
       label: t("group_build"),
       items: [
         { href: "/dashboard/leads", label: t("leads"), icon: "leads", badge: "leads" },
+        { href: "/dashboard/customers", label: t("customers"), icon: "customers" },
         { href: "/dashboard/projects", label: t("projects"), icon: "projects" },
         { href: "/dashboard/credits", label: t("aiCredits"), icon: "credits" },
         { href: "/dashboard/studio-library", label: t("studioLibrary"), icon: "studio" },

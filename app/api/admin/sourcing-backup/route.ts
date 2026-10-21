@@ -6,6 +6,7 @@ import { digikeyPart, digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { mouserPart, mouserSearch } from "@/lib/sourcing/adapters/mouser";
 import { backupName, isComponent, modelCodes, pickBackup } from "@/lib/sourcing/backup";
 import { parametersToAttributes } from "@/lib/sourcing/spec-map";
+import { qarPerUnit } from "@/lib/pricing/fx";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
 import type { SupplierProduct } from "@/lib/sourcing/types";
 
@@ -126,7 +127,7 @@ async function backups(db: Db, preview: boolean) {
     if (preview) continue;
     const sup = sups.find((s) => s.code === hit!.supplierCode);
     if (!sup) continue;
-    const rate = Number(fx[hit.currency]) || (hit.currency === "QAR" ? 1 : 3.64);
+    const rate = qarPerUnit(hit.currency, fx);
     const landed = hit.cost! * rate * (1 + (Number(sup.landed_overhead_pct) || 0) / 100);
     const price = Math.max(2, Math.ceil(landed * MARKUP * 2) / 2);
     const { data: part, error } = await db

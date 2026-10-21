@@ -30,12 +30,14 @@ type PartRow = {
   landed_cost_qar: number | string | null;
   lead_time_class: string | null;
   preferred_offer_id: string | null;
+  pricing_mode: string | null;
   is_test?: boolean | null;
 };
 
 type SignalRow = { part_id: string; kind: string; quantity: number | null; user_id: string | null; created_at: string };
 
-const PART_COLS = "id, sku, name, unit_price, image_url, images, landed_cost_qar, lead_time_class, preferred_offer_id, is_test";
+const PART_COLS =
+  "id, sku, name, unit_price, image_url, images, landed_cost_qar, lead_time_class, preferred_offer_id, pricing_mode, is_test";
 
 function chunks<T>(list: T[], size = 200): T[][] {
   const out: T[][] = [];
@@ -147,6 +149,7 @@ export async function loadStockData(db: Db, opts: { buyOnly?: boolean } = {}): P
       moq: Math.max(1, Number(o?.moq ?? 1) || 1),
       leadTimeClass: p.lead_time_class,
       ownQty: own.get(p.id) ?? 0,
+      pricingMode: p.pricing_mode,
     };
   });
 

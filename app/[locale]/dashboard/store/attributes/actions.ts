@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cleanAttributes, isAttrClass, type Attributes } from "@/lib/store/attributes";
 import { deriveAttributes } from "@/lib/store/derive-attributes";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
-import { revalidateStorefront } from "@/lib/cache/storefront";
+import { revalidatePart, revalidateStorefront } from "@/lib/cache/storefront";
 
 // Product attributes and store settings. super_admin only — checked here and
 // again by RLS (parts and store_settings writes are super_admin).
@@ -17,15 +17,22 @@ async function requireAdmin() {
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 
+// Specs + pack size live on the product's own page only (no card, facet or
+// search column reads them), so one product is purged, not the catalogue: the
+// broad purge would re-render every cached page for a spec typo. The sku comes
+// back from the update so the narrow tag can be named; without it, fall back
+// to the broad purge rather than leave the page stale.
 export async function savePartAttributes(locale: string, id: string, attributes: Attributes, packSize: number) {
   await requireAdmin();
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("parts")
     .update({ attributes: cleanAttributes(attributes), pack_size: Math.max(1, Math.trunc(packSize) || 1) })
-    .eq("id", id);
+    .eq("id", id)
+    .select("sku")
+    .maybeSingle();
   if (error) return { error: error.message };
-  revalidateStorefront();
+  revalidatePart((data as { sku: string } | null)?.sku ?? "");
   revalidatePath(`/${locale}/dashboard/store/attributes`);
   return { ok: true };
 }

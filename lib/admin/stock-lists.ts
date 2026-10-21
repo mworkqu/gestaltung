@@ -45,6 +45,13 @@ export type StockPart = {
   leadTimeClass: string | null;
   /** Units we hold ourselves (Lusail). 0 when none. */
   ownQty: number;
+  /**
+   * parts.pricing_mode. A 'mirror' product follows its supplier's retail
+   * price, and 0095 lets only an offer with a retail price AND a supplier
+   * commission win for it — so our own-stock offer can never win while it is
+   * mirror (see lib/admin/own-stock.ts).
+   */
+  pricingMode?: string | null;
 };
 
 export type StockBucket = "buy" | "watch" | "dont";

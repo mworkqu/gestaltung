@@ -13,6 +13,7 @@ import {
   DisciplinesSchema,
   RequirementsSchema,
 } from "@/lib/prototyping/analysis-schema";
+import { analysisFingerprint } from "@/lib/prototyping/analysis-request";
 import { logUsage, quota } from "@/lib/ai/usage";
 import { bomRate } from "@/lib/credits/server";
 import { readTurnstileToken } from "@/lib/turnstile";
@@ -39,6 +40,12 @@ import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/type
 // Every provider call is recorded in ai_usage (lib/ai/usage), and every run's
 // raw reply beside its parsed result in analysis_runs (0024) — so a wrong
 // answer can be traced to the model or to our parsing.
+//
+// An identical request is never sent twice. Each run records the fingerprint of
+// what was asked (0099), so a second press on an unchanged brief is answered
+// from the stored run: no provider call, nothing metered, nothing charged. The
+// decision is made here rather than in the browser, so holding the button down
+// cannot get past it.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -75,6 +82,40 @@ export async function POST(request: Request) {
       send({ type: "step", step: "reading" });
 
       const name = configuredProviderName();
+
+      // The same brief and the same answers as a run we already paid for: send
+      // that run's answer back and stop. The stored result still goes through
+      // the schema — a row written by an older shape of the analysis is not
+      // reused rather than shown unvalidated.
+      const fingerprint = analysisFingerprint(req);
+      if (req.projectId) {
+        const { data: prior } = await supabase
+          .from("analysis_runs")
+          .select("parsed_response, provider, created_at")
+          .eq("project_id", req.projectId)
+          .eq("feature", "analyse")
+          .eq("request_hash", fingerprint)
+          .in("outcome", ["ok", "fallback"])
+          .not("parsed_response", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const stored = prior ? AnalysisSchema.safeParse(prior.parsed_response) : null;
+        if (prior && stored?.success) {
+          for (const step of ["disciplines", "requirements"] as const) send({ type: "step", step });
+          send({
+            type: "result",
+            analysis: stored.data,
+            provider: prior.provider,
+            fallback: null,
+            reused: true,
+            runAt: prior.created_at,
+          });
+          controller.close();
+          return;
+        }
+      }
+
       let analysis: Analysis | null = null;
       let fallback: FallbackReason | null = null;
       let usedProvider = name;
@@ -152,7 +193,7 @@ export async function POST(request: Request) {
         const normalised = withStandardGaps(analysis);
         const final = { ...normalised, requirements: honestSources(normalised.requirements, req.brief) };
         if (req.projectId) {
-          const { error: runErr } = await supabase.from("analysis_runs").insert({
+          const row = {
             project_id: req.projectId,
             feature: "analyse",
             provider: called ? name : usedProvider,
@@ -162,7 +203,16 @@ export async function POST(request: Request) {
             parsed_response: final,
             outcome: usedProvider === name ? "ok" : "fallback",
             error: errorText,
-          });
+          };
+          let { error: runErr } = await supabase
+            .from("analysis_runs")
+            .insert({ ...row, request_hash: fingerprint });
+          // Before 0099 there is no request_hash column: record the run as
+          // before, so only the reuse is missing, not the diagnostics.
+          if (runErr?.code === "PGRST204") {
+            ({ error: runErr } = await supabase.from("analysis_runs").insert(row));
+            if (!runErr) console.warn("[analyse] run recorded without its request fingerprint (migration 0099?)");
+          }
           if (runErr) console.warn(`[analyse] run not recorded (migration 0024?): ${runErr.message}`);
         }
         send({

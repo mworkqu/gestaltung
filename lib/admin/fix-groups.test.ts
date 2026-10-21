@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   chunk,
   deliveryWhy,
+  isAutoOnRequest,
   groupFixRows,
   mainOffer,
   nextRowId,
@@ -127,6 +128,19 @@ describe("summariseBulk", () => {
       { id: "1", name: "A", ok: true },
     ]);
     expect(s).toEqual({ fixed: 1, failed: [] });
+  });
+});
+
+describe("isAutoOnRequest", () => {
+  it("out of stock at the supplier is not a gap — the product is on request", () => {
+    expect(isAutoOnRequest({ code: "outOfStock", supplier: "Voltaat" })).toBe(true);
+  });
+  it("every other reason still asks the owner to do something", () => {
+    for (const code of ["noOffer", "offerOff", "supplierOff", "mirrorNoRetail", "noLeadTime", "notWorkedOut"] as const) {
+      expect(isAutoOnRequest({ code, supplier: "Voltaat" })).toBe(false);
+    }
+    expect(isAutoOnRequest(null)).toBe(false);
+    expect(isAutoOnRequest(undefined)).toBe(false);
   });
 });
 
