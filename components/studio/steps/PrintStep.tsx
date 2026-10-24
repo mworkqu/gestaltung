@@ -220,7 +220,7 @@ function PrintTemplate({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per visit
   }, [doc.enclosure, doc.mech.length]);
 
-  // ── Build the printable parts (three + CSG, loaded on demand) ────────────
+  // ── Build the printable parts (the geometry worker, loaded on demand) ────
   const encKey = doc.enclosure ? JSON.stringify({ ...doc.enclosure, colour: undefined, finish: undefined, accentColour: undefined }) : "";
   const mechKey = JSON.stringify(doc.mech);
   const [built, setBuilt] = useState<BuiltMechPart[] | null>(null);

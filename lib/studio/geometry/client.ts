@@ -17,7 +17,7 @@ import type { LayoutResult } from "../layout";
 import type { BuiltMechPart } from "../mech/build";
 import { materialFor } from "../mech/materials";
 import type { EnclosureSpec, Environment, LibraryPart, MechPart } from "../schema";
-import type { EnclosureMeta } from "../enclosure/build";
+import type { EnclosureMeta } from "../enclosure/plan";
 import { enclosureKey, mechKey } from "./key";
 import { unpackGeometry } from "./pack";
 import type { GeometryReply, GeometryRequest, PackedEnclosure, PackedMechPart, PackedProduct } from "./protocol";
@@ -55,7 +55,7 @@ async function runOnMain(job: Job): Promise<GeometryReply> {
   }
   if (job.kind === "enclosure" || job.kind === "mech") {
     const { handleRequest } = await import("./job");
-    return handleRequest({ ...job, id: 0 } as GeometryRequest).reply;
+    return (await handleRequest({ ...job, id: 0 } as GeometryRequest)).reply;
   }
   // Preview pictures need the worker's OffscreenCanvas: no main-thread fallback (the page keeps the template flow).
   return { id: 0, ok: false, error: "no_worker" };
@@ -291,7 +291,7 @@ let feetMat: THREE.MeshStandardMaterial | null = null;
 const shellMaterial = () => (shellMat ??= new THREE.MeshStandardMaterial({ color: 0xf2f0eb, roughness: 0.7, metalness: 0 }));
 const feetMaterial = () => (feetMat ??= new THREE.MeshStandardMaterial({ color: 0x1f2125, roughness: 0.9, metalness: 0 }));
 
-/** New base (with its rubber feet) + lid meshes over the cached geometry, named like buildEnclosure's. */
+/** New base (with its rubber feet) + lid meshes over the cached geometry, named like the kernel's. */
 export function enclosureMeshes(g: EnclosureGeometry): { base: THREE.Mesh; lid: THREE.Mesh } {
   const base = new THREE.Mesh(g.base, shellMaterial());
   base.name = "enclosure_base";

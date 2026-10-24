@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { layoutComponents, layoutResultOf } from "../layout";
 import { getPart } from "../library";
 import type { LibraryPart, StudioComponent } from "../schema";
-import { buildEnclosure } from "../enclosure/build";
+import { buildEnclosure } from "./job";
 import { spec } from "../enclosure/test-fixtures";
 import { defaultMechParts, mechSummary } from "../ai/mech-default";
 import { exportObjectsSTL } from "../export";
@@ -45,9 +45,9 @@ describe("geometry keys", () => {
 });
 
 describe("pack / unpack", () => {
-  it("round-trips an enclosure mesh exactly and lists each buffer once", () => {
+  it("round-trips an enclosure mesh exactly and lists each buffer once", async () => {
     const { parts, lr } = scene();
-    const enc = buildEnclosure(spec(), lr, parts);
+    const enc = await buildEnclosure(spec(), lr, parts);
     const packed = packGeometry(enc.lid.geometry);
     const g = unpackGeometry(packed);
     expect(Array.from(g.getAttribute("position").array)).toEqual(Array.from(enc.lid.geometry.getAttribute("position").array));
@@ -69,7 +69,7 @@ describe("geometry client (no Worker → same job on the main thread)", () => {
     expect(g.meta.cutouts.length).toBeGreaterThan(0);
     expect(g.base.getAttribute("position").count).toBeGreaterThan(100);
     // Same numbers as a direct build (the plan + triangles travel with the result).
-    const direct = buildEnclosure(spec(), lr, parts);
+    const direct = await buildEnclosure(spec(), lr, parts);
     expect(g.meta.triangles).toBe(direct.meta.triangles);
     expect(g.meta.W).toBe(direct.meta.W);
 
@@ -147,8 +147,8 @@ describe("geometry client (no Worker → same job on the main thread)", () => {
     expect(await prebuildInOrder(shapes, () => n++ > 0)).toBe(1);
   });
 
-  it("a failing job answers ok:false instead of throwing", () => {
-    const r = handleRequest({ id: 7, kind: "enclosure", key: "x", input: { spec: spec(), layout: null as never, parts: [] } });
+  it("a failing job answers ok:false instead of throwing", async () => {
+    const r = await handleRequest({ id: 7, kind: "enclosure", key: "x", input: { spec: spec(), layout: null as never, parts: [] } });
     expect(r.reply).toMatchObject({ id: 7, ok: false });
   });
 });

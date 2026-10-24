@@ -8,7 +8,7 @@ import { useViewerCtx } from "./context";
 import { makeEnclosureMaterial, type StudioObjectData } from "./materials";
 
 type Props = {
-  /** Built by buildEnclosure (geometry owned by the caller). */
+  /** Built by the enclosure kernel (geometry owned by the caller). */
   base: THREE.Mesh;
   lid: THREE.Mesh;
   finish: Finish;
@@ -19,7 +19,7 @@ type Props = {
 
 const XRAY_OPACITY = 0.25;
 const XRAY_MS = 250;
-/** Same name as lib/studio/enclosure/build.ts SPIKE_MESH (no CSG import in the viewer chunk). */
+/** Same name as lib/studio/geometry/enclosure-kernel.ts SPIKE_ID (no kernel import in the viewer chunk). */
 const SPIKE = "enclosure_spike";
 /** How far the spike slides out of its socket at full "Take it apart" (mm). */
 const SPIKE_DROP_MM = 24;

@@ -1,11 +1,11 @@
-// Design Studio geometry worker: enclosure CSG + printed parts off the main
-// thread (a mid phone spends 1–5 s here). Bundled by webpack from
+// Design Studio geometry worker: the template enclosure + printed parts off the
+// main thread. Bundled by webpack from
 // `new Worker(new URL("./studio-geometry.worker.ts", import.meta.url))` in
-// client.ts, so three-bvh-csg / three-mesh-bvh live in this chunk only.
+// client.ts, so three.js and the geometry kernel live in this chunk only.
 //
-// P5-16: "product" requests (the real product model) are handled by
-// product-job.ts, imported on the first such request, which in turn loads
-// manifold-3d (WASM) lazily — workers that only build enclosures never fetch it.
+// Both model paths now build with manifold-3d (WASM), loaded on demand: the
+// template enclosure through job.ts and the product model through
+// product-job.ts, so a worker that is never asked for a model never fetches it.
 
 import { handleRequest } from "./job";
 import type { GeometryRequest, WorkerMessage } from "./protocol";
@@ -46,6 +46,7 @@ ctx.onmessage = (e) => {
       .catch((err: unknown) => ctx.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }));
     return;
   }
-  const { reply, transfer } = handleRequest(req);
-  ctx.postMessage(reply, transfer);
+  handleRequest(req)
+    .then(({ reply, transfer }) => ctx.postMessage(reply, transfer))
+    .catch((err: unknown) => ctx.postMessage({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }));
 };

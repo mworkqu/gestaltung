@@ -1,7 +1,7 @@
 // Messages between the main thread (geometry/client.ts) and the geometry
 // worker (studio-geometry.worker.ts → job.ts). Plain data only.
 
-import type { EnclosureMeta } from "../enclosure/build";
+import type { EnclosureMeta } from "../enclosure/plan";
 import type { Vec3 } from "../explode";
 import type { LayoutResult } from "../layout";
 import type { MechTemplate, EnclosureSpec, Environment, LibraryPart, MechPart } from "../schema";

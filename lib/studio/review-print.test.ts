@@ -18,7 +18,8 @@ import { PLANT_WATERER } from "./__fixtures__/plant-waterer";
 import { getPart } from "./library";
 import { isExternalPart, layoutComponents, type LayoutInput } from "./layout";
 import { defaultEnclosureFor, enclosureDims, envelopeCap } from "./enclosure/templates";
-import { buildEnclosure, planEnclosure } from "./enclosure/build";
+import { planEnclosure } from "./enclosure/plan";
+import { buildEnclosure } from "./geometry/job";
 import { defaultMechParts, mechSummary } from "./ai/mech-default";
 import { buildMechParts } from "./mech/build";
 import { MK4_BED, checkPrintable, platePlan, shellCount } from "./geometry/mesh-check";
@@ -104,7 +105,7 @@ describe("F-005 every part gets a way in", () => {
     expect(leads).toEqual(expect.arrayContaining(["pump_5v_1", "soil_moisture_cap_1"]));
   });
 
-  it("exports the soil spike named in 'Why this shape' as its own printed body", () => {
+  it("exports the soil spike named in 'Why this shape' as its own printed body", async () => {
     const { spec, lr } = enclosureOf("stake_pod");
     const parts = partsMap();
     const plan = planEnclosure(spec, lr, parts);
@@ -116,9 +117,9 @@ describe("F-005 every part gets a way in", () => {
       enclosure: { w: plan.dims.W, d: plan.dims.D, h: plan.dims.H },
       template: plan.dims.template,
     });
-    const built = builtMech(spec, lr, parts, defaultMechParts(summary));
+    const built = await builtMech(spec, lr, parts, defaultMechParts(summary));
     expect(built.map((b) => b.id)).toContain("stake_spike");
-  });
+  }, HEAVY);
 
   it("gives a flat LiPo a flat retainer and a round cell a cradle", () => {
     const shapeOf = (partId: string) => {
@@ -234,10 +235,12 @@ describe("F-003 the plate rule", () => {
     expect(plan.plates.flatMap((p) => p.items.map((i) => i.index))).toEqual([1]);
   });
 
-  it("refuses the template enclosure's own CSG meshes — they are not closed", () => {
-    // Recorded, not aspirational: the three-bvh-csg shell the template builder
-    // makes is a triangle soup (manifold-3d itself rejects it as "Not manifold"),
-    // so the Print step must withhold those files rather than hand them over.
+  it("hands over the template enclosure's own shells — they are closed now", async () => {
+    // This is where F-003 bit: the old three-bvh-csg shell was a triangle soup
+    // (the dome lid came back with 2,611 unbalanced edges out of 6,275 triangles
+    // and manifold-3d refused it), so the Print step had to withhold every file
+    // after the CAD credit was already spent. The template path now goes through
+    // the product kernel, so the same body comes back printable.
     const { spec, lr } = enclosureOf("dome_base");
     const parts = partsMap();
     const plan = planEnclosure(spec, lr, parts);
@@ -248,20 +251,23 @@ describe("F-003 the plate rule", () => {
       enclosure: { w: plan.dims.W, d: plan.dims.D, h: plan.dims.H },
       template: plan.dims.template,
     });
-    const built = builtMech(spec, lr, parts, defaultMechParts(summary));
-    const shells = built.find((b) => b.template === "lid")!;
-    expect(shells.check.watertight).toBe(false);
-    expect(shells.check.badEdges).toBeGreaterThan(0);
-  });
+    const built = await builtMech(spec, lr, parts, defaultMechParts(summary));
+    for (const template of ["lid", "base"] as const) {
+      const body = built.find((b) => b.template === template)!;
+      expect(body.check.watertight, template).toBe(true);
+      expect(body.check.badEdges, template).toBe(0);
+      expect(body.check.shells, template).toBe(1);
+    }
+  }, HEAVY);
 });
 
-function builtMech(
+async function builtMech(
   spec: ReturnType<typeof defaultEnclosureFor>,
   lr: ReturnType<typeof layoutComponents>,
   parts: Map<string, LibraryPart>,
   mech: ReturnType<typeof defaultMechParts>,
 ) {
-  const enc = buildEnclosure(spec, lr, parts);
+  const enc = await buildEnclosure(spec, lr, parts);
   return buildMechParts(mech, lr, parts, { base: enc.base, lid: enc.lid, dims: enc.meta.dims });
 }
 

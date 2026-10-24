@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { LIBRARY } from "../library";
 import { isExternalPart, isPokeSensor, layoutComponents, worldBox } from "../layout";
-import { buildEnclosure } from "./build";
+import { buildEnclosure } from "../geometry/job";
 import { innerTopAt, insideSection } from "./templates";
 import { ALL_TEMPLATES, spec } from "./test-fixtures";
 
@@ -14,10 +14,10 @@ describe("real library", () => {
   const parts = new Map(list.map((i) => [i.instanceId, i.part]));
 
   for (const template of TEMPLATES) {
-    it(`builds an enclosure around every library part: ${template}`, () => {
+    it(`builds an enclosure around every library part: ${template}`, async () => {
       const lr = layoutComponents(list, { clearance: 2 });
       const t0 = performance.now();
-      const { base, lid, meta } = buildEnclosure(spec({ template, feet: "rubber_4" }), lr, parts);
+      const { base, lid, meta } = await buildEnclosure(spec({ template, feet: "rubber_4" }), lr, parts);
       const ms = performance.now() - t0;
       console.info(`[enclosure] library/${template}: ${meta.W}×${meta.D}×${meta.H} mm, ${ms.toFixed(0)} ms, ${meta.triangles} tris, ${meta.cutouts.length} cutouts`);
       expect(base.geometry.getAttribute("position").count).toBeGreaterThan(0);

@@ -37,7 +37,7 @@ import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { arabicCountForm } from "@/lib/text/count";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { downloadBlob } from "@/lib/studio/download";
-import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/plan";
 import { labelSupport } from "@/lib/studio/enclosure/label-font";
 import { shapeReason, shapeVariants } from "@/lib/studio/enclosure/shape-pick";
 import { shapeOf, stableJson } from "@/lib/studio/geometry/key";

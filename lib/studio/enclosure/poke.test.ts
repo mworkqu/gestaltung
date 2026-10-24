@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { getPart } from "../library";
 import { isPokeSensor, layoutComponents, mountLift, POKE_OUT, worldBox } from "../layout";
-import { buildEnclosure } from "./build";
+import { buildEnclosure } from "../geometry/job";
 import { cutoutBox } from "./cutouts";
 import { innerTopAt, settlePokes, topAt } from "./templates";
 import { ALL_TEMPLATES, spec, items, P } from "./test-fixtures";
@@ -40,11 +40,11 @@ describe("poke-through sensor (PIR)", () => {
   });
 
   for (const template of TEMPLATES) {
-    it(`dome top sits above the lid's inner top, through a round opening: ${template}`, () => {
+    it(`dome top sits above the lid's inner top, through a round opening: ${template}`, async () => {
       const list = deskFriend();
       const parts = new Map(list.map((i) => [i.instanceId, i.part]));
       const lr = layoutComponents(list, { clearance: 2 });
-      const { meta } = buildEnclosure(spec({ template }), lr, parts);
+      const { meta } = await buildEnclosure(spec({ template }), lr, parts);
       const d = meta.dims;
       const pir = meta.layout.find((l) => l.instanceId === "pir")!;
       const dome = parts.get("pir")!;
@@ -72,11 +72,11 @@ describe("poke-through sensor (PIR)", () => {
     });
   }
 
-  it("the OLED stays flush right under its window (not lifted with the PIR)", () => {
+  it("the OLED stays flush right under its window (not lifted with the PIR)", async () => {
     const list = deskFriend();
     const parts = new Map(list.map((i) => [i.instanceId, i.part]));
     const lr = layoutComponents(list, { clearance: 2 });
-    const { meta } = buildEnclosure(spec({ template: "rounded_box" }), lr, parts);
+    const { meta } = await buildEnclosure(spec({ template: "rounded_box" }), lr, parts);
     const d = meta.dims;
     const oled = meta.layout.find((l) => l.instanceId === "oled")!;
     const top = d.floorZ + oled.pos[2] + parts.get("oled")!.dims.z;
@@ -84,11 +84,11 @@ describe("poke-through sensor (PIR)", () => {
     expect(d.H - d.wall - top).toBeLessThan(6);
   });
 
-  it("settlePokes only moves poke sensors", () => {
+  it("settlePokes only moves poke sensors", async () => {
     const list = deskFriend();
     const parts = new Map(list.map((i) => [i.instanceId, i.part]));
     const lr = layoutComponents(list, { clearance: 2 });
-    const { meta } = buildEnclosure(spec(), lr, parts);
+    const { meta } = await buildEnclosure(spec(), lr, parts);
     const out = settlePokes(lr.layout, parts, meta.dims);
     for (const it of out) {
       const before = lr.layout.find((l) => l.instanceId === it.instanceId)!;

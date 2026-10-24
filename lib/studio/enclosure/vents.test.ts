@@ -4,7 +4,8 @@ import { computeMeshVolume } from "three-bvh-csg";
 import { describe, expect, it } from "vitest";
 import { layoutComponents } from "../layout";
 import { VENT_FACES, VENT_PATTERNS, clampEnclosure, type EnclosureSpec } from "../schema";
-import { buildEnclosure, planEnclosure } from "./build";
+import { planEnclosure } from "./plan";
+import { buildEnclosure } from "../geometry/job";
 import { GRILLE, VENT_MARGIN, boxesOverlap, cutoutBox, grilleArcs, ventCutouts } from "./cutouts";
 import { insideSection } from "./templates";
 import { ALL_TEMPLATES, P, items, spec, typical } from "./test-fixtures";
@@ -34,7 +35,7 @@ describe("vent patterns", () => {
     }
   });
 
-  it("grille = concentric arcs with bridges, centred on the face", () => {
+  it("grille = concentric arcs with bridges, centred on the face", async () => {
     const arcs = grilleArcs(9, 40, 40);
     expect(arcs.length).toBe(9);
     const radii = [...new Set(arcs.map((a) => a.arc!.r))];
@@ -48,14 +49,14 @@ describe("vent patterns", () => {
     expect(grilleArcs(9, 6, 6)).toEqual([]);
 
     const { lr, parts } = setup(items(["u1", P.board]));
-    const plain = buildEnclosure(spec({ template: "dome_base" }), lr, parts);
-    const grilled = buildEnclosure(spec({ template: "dome_base", vents: vents("grille", "+z", 9) }), lr, parts);
+    const plain = await buildEnclosure(spec({ template: "dome_base" }), lr, parts);
+    const grilled = await buildEnclosure(spec({ template: "dome_base", vents: vents("grille", "+z", 9) }), lr, parts);
     expect(grilled.meta.vents.length).toBeGreaterThan(3);
     expect(grilled.meta.vents.every((v) => v.shape === "arc" && v.face === "+z")).toBe(true);
     expect(computeMeshVolume(grilled.lid)).toBeLessThan(computeMeshVolume(plain.lid) - 1);
   }, 30_000);
 
-  it("louvres = slanted, chamfered slats on a side face", () => {
+  it("louvres = slanted, chamfered slats on a side face", async () => {
     const { lr, parts } = setup(items(["u1", P.board]));
     const s = spec({ proportions: { heightBias: "tall" }, vents: vents("louvres", "+x", 4) });
     const plan = planEnclosure(s, lr, parts);
@@ -67,8 +68,8 @@ describe("vent patterns", () => {
       expect(v.bevel).toBeGreaterThan(0);
       expect(v.w).toBeGreaterThan(v.h * 3);
     }
-    const plain = buildEnclosure(spec({ proportions: { heightBias: "tall" } }), lr, parts);
-    const built = buildEnclosure(s, lr, parts);
+    const plain = await buildEnclosure(spec({ proportions: { heightBias: "tall" } }), lr, parts);
+    const built = await buildEnclosure(s, lr, parts);
     expect(computeMeshVolume(built.base)).toBeLessThan(computeMeshVolume(plain.base) - 1);
     // On a top / bottom face louvres make no sense: clamp moves them to a side, the planner falls back to slots.
     expect(clampEnclosure({ ...s, vents: vents("louvres", "-z") }).vents.face).toBe("+x");
@@ -85,7 +86,7 @@ describe("vent patterns", () => {
 });
 
 describe("wall plate keyholes", () => {
-  it("two keyholes in the back, inside the floor, no feet", () => {
+  it("two keyholes in the back, inside the floor, no feet", async () => {
     const { lr, parts } = setup();
     const plan = planEnclosure(spec({ template: "wall_plate", feet: "rubber_4" }), lr, parts);
     expect(plan.keyholes.length).toBe(2);
@@ -99,9 +100,9 @@ describe("wall plate keyholes", () => {
     }
     expect(plan.keyholes[0].center[0]).toBeCloseTo(-plan.keyholes[1].center[0], 6);
     expect(planEnclosure(spec(), lr, parts).keyholes).toEqual([]);
-    const built = buildEnclosure(spec({ template: "wall_plate", feet: "rubber_4" }), lr, parts);
+    const built = await buildEnclosure(spec({ template: "wall_plate", feet: "rubber_4" }), lr, parts);
     expect(built.base.children.length).toBe(0);
-    const solid = buildEnclosure(spec({ template: "rounded_box", proportions: { widthToDepth: built.meta.W / built.meta.D } }), lr, parts);
+    const solid = await buildEnclosure(spec({ template: "rounded_box", proportions: { widthToDepth: built.meta.W / built.meta.D } }), lr, parts);
     expect(computeMeshVolume(built.base)).toBeGreaterThan(0);
     expect(solid.meta.keyholes).toEqual([]);
   }, 30_000);
@@ -109,21 +110,21 @@ describe("wall plate keyholes", () => {
 
 describe("budget per template (label + vents + feet)", () => {
   for (const template of ALL_TEMPLATES) {
-    it(`< 60k triangles and < 1500 ms: ${template}`, () => {
+    it(`< 60k triangles and < 1500 ms: ${template}`, async () => {
       const { lr, parts } = setup();
       const pattern: EnclosureSpec["vents"]["pattern"] = template === "dome_base" ? "grille" : template === "rounded_box" ? "louvres" : "slots";
       const face: EnclosureSpec["vents"]["face"] = template === "dome_base" ? "+z" : "+x";
       const s = spec({ template, label: "Gestaltung 360", vents: vents(pattern, face, 12), feet: "rubber_4" });
-      buildEnclosure(s, lr, parts); // warm-up
+      await buildEnclosure(s, lr, parts); // warm-up
       // The budget is the build's own CPU time (vitest runs each file in its own process), best
       // of 5 — wall time on a busy machine (other suites in parallel) says nothing about the code.
       let ms = Infinity;
       let wall = Infinity;
-      let meta = buildEnclosure(s, lr, parts).meta;
+      let meta = (await buildEnclosure(s, lr, parts)).meta;
       for (let i = 0; i < 5 && ms >= 1500; i++) {
         const c0 = process.cpuUsage();
         const t0 = performance.now();
-        meta = buildEnclosure(s, lr, parts).meta;
+        meta = (await buildEnclosure(s, lr, parts)).meta;
         wall = Math.min(wall, performance.now() - t0);
         const c = process.cpuUsage(c0);
         ms = Math.min(ms, (c.user + c.system) / 1000);

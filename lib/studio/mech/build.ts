@@ -1,7 +1,8 @@
 // Printable mechanical parts → three.js objects, placed in enclosure coords,
 // with an explode vector and real grams (from the built geometry's volume).
 // lid / base reuse the enclosure's own meshes when given (the enclosure IS the
-// printable lid and base); otherwise the template fallback is built.
+// printable lid and base, built by geometry/enclosure-kernel.ts); otherwise the
+// plain template fallback is built.
 
 import * as THREE from "three";
 import { type Environment, type LibraryPart, type MechPart, type MechTemplate } from "../schema";
@@ -26,10 +27,11 @@ export type BuiltMechPart = {
   volumeMm3: number;
   triangles: number;
   /**
-   * F-003: can a slicer print this mesh? The template builder works with
-   * three-bvh-csg, whose boolean results are triangle soups (the tester's lid
-   * had 2,483 unbalanced edges and read as 297 shells), so every body is checked
-   * and a failing one is never offered as a download.
+   * F-003: can a slicer print this mesh? The case's shells now come from the
+   * product kernel (manifold-3d) instead of three-bvh-csg, whose booleans were
+   * triangle soups (the tester's lid had 2,483 unbalanced edges and read as 297
+   * shells) — but every body is still checked here, and a failing one is never
+   * offered as a download.
    */
   check: PrintCheck;
   /** Outer size in the print pose (mm) — what the plate packer needs. */
@@ -134,5 +136,5 @@ export function buildMechParts(
 /** The stake pod's soil spike in the printed-parts list (an extra part next to lid + base). */
 export const STAKE_SPIKE_ID = "stake_spike";
 export const STAKE_SPIKE_NAME = { en: "Soil spike", ar: "وتد التربة" } as const;
-/** Same name as lib/studio/enclosure/build.ts SPIKE_MESH (kept here so this file needs no CSG import). */
+/** Same name as lib/studio/geometry/enclosure-kernel.ts SPIKE_ID (kept here so this file needs no kernel import). */
 const SPIKE_MESH = "enclosure_spike";

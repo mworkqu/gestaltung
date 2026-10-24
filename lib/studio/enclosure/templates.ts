@@ -1,7 +1,8 @@
 // Enclosure templates: EnclosureSpec (tiny AI JSON) + layout → outer/inner
-// dimensions that obey the design rules. Pure maths, no three.js — build.ts and
-// cutouts.ts both read the shape through the helpers exported here, so the
-// geometry, the cut-outs and the tests all agree on one definition.
+// dimensions that obey the design rules. Pure maths, no three.js — the kernel
+// (geometry/enclosure-kernel.ts) and cutouts.ts both read the shape through the
+// helpers exported here, so the geometry, the cut-outs and the tests all agree
+// on one definition.
 //
 // Enclosure space (all mm, Z up): outer shell spans x ∈ [-W/2, W/2],
 // y ∈ [-D/2, D/2], z ∈ [0, H]; the floor top is at z = floorZ (= wall; wall +
@@ -158,16 +159,6 @@ export function taperScale(d: EnclosureDims, c: number, inset: number): number {
   const a = clamp((c + len / 2 - start) / (len - start), 0, 1);
   const s = 1 - d.taper.amount * a;
   return (half * s - inset) / Math.max(1e-6, half - inset);
-}
-
-/** d(taperScale)/dc — for transforming normals. */
-export function taperSlope(d: EnclosureDims, c: number, inset: number): number {
-  if (!d.taper) return 0;
-  const len = d.taper.axis === "x" ? d.W : d.D;
-  const half = (d.taper.axis === "x" ? d.D : d.W) / 2;
-  const start = Math.min(d.cornerRadius, len / 3);
-  if (c + len / 2 < start || c > len / 2) return 0;
-  return (-half * d.taper.amount) / (len - start) / Math.max(1e-6, half - inset);
 }
 
 function insideRounded(hw: number, hd: number, r: number, x: number, y: number): boolean {

@@ -432,7 +432,7 @@ export function ventCutouts(
   const faces: VentFace[] = dims.template === "lantern" && isSide(face) ? SIDE_FACES : [face];
   const blocks = [...avoid.map(cutoutBox), ...keepOut];
   const out: Cutout[] = [];
-  // Around a lantern the count is shared out (half per side keeps the band airy and the CSG quick).
+  // Around a lantern the count is shared out (half per side keeps the band airy and the build quick).
   const perFace = faces.length > 1 ? Math.max(2, Math.ceil(count / 2)) : count;
   let n = 0;
   for (const f of faces) {

@@ -13,7 +13,7 @@ import { layoutComponents, worldBox, type RotZ, type Vec3 } from "../layout";
 import { buildPartModel } from "../models";
 import { contentOffsetOf, placePart } from "../placement";
 import type { EnclosureTemplate, LayoutItem, LibraryPart } from "../schema";
-import { planEnclosure } from "./build";
+import { planEnclosure } from "./plan";
 import { portLocal, type Cutout } from "./cutouts";
 import { innerTopAt } from "./templates";
 import { ALL_TEMPLATES, items, spec } from "./test-fixtures";

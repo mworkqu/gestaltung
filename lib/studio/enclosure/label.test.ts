@@ -4,7 +4,8 @@ import { computeMeshVolume } from "three-bvh-csg";
 import { describe, expect, it } from "vitest";
 import { layoutComponents } from "../layout";
 import { LIMITS } from "../schema";
-import { buildEnclosure, planEnclosure } from "./build";
+import { planEnclosure } from "./plan";
+import { buildEnclosure } from "../geometry/job";
 import { boxesOverlap, cutoutBox } from "./cutouts";
 import { LABEL_MARGIN, planLabel } from "./label";
 import { LABEL_CHARS, STROKE_GAP, labelSupport, layoutLabel, segmentDistance } from "./label-font";
@@ -122,10 +123,10 @@ describe("planLabel", () => {
 
 describe("label geometry", () => {
   for (const template of ["rounded_box", "dome_base", "lantern", "wall_plate", "soft_wedge"] as const) {
-    it(`is part of the lid mesh and adds volume: ${template}`, () => {
+    it(`is part of the lid mesh and adds volume: ${template}`, async () => {
       const { lr, parts } = setup();
-      const plain = buildEnclosure(spec({ template }), lr, parts);
-      const named = buildEnclosure(spec({ template, label: "Desk Buddy" }), lr, parts);
+      const plain = await buildEnclosure(spec({ template }), lr, parts);
+      const named = await buildEnclosure(spec({ template, label: "Desk Buddy" }), lr, parts);
       expect(named.meta.label).toBeTruthy();
       expect(named.meta.labelSkipped).toBeUndefined();
       const v0 = computeMeshVolume(plain.lid);
@@ -141,10 +142,10 @@ describe("label geometry", () => {
     }, 30_000);
   }
 
-  it("Arabic: lid unchanged, flagged", () => {
+  it("Arabic: lid unchanged, flagged", async () => {
     const { lr, parts } = setup();
-    const plain = buildEnclosure(spec(), lr, parts);
-    const ar = buildEnclosure(spec({ label: "مصباح" }), lr, parts);
+    const plain = await buildEnclosure(spec(), lr, parts);
+    const ar = await buildEnclosure(spec({ label: "مصباح" }), lr, parts);
     expect(ar.meta.labelSkipped).toBe("script");
     expect(ar.meta.label).toBeNull();
     expect(computeMeshVolume(ar.lid)).toBeCloseTo(computeMeshVolume(plain.lid), 3);
