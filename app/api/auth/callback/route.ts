@@ -118,6 +118,13 @@ export async function GET(request: NextRequest) {
       );
     }
   } else if (tokenHash && type) {
+    // LEGACY, REMOVE AFTER 2026-10-31 (7 days after deploy). Email links now
+    // go straight to /{locale}/reset-password and /{locale}/confirm-email,
+    // which verify only on submit; this GET path spends the token on load, so a
+    // mail scanner's pre-fetch burns it. It stays only for emails already sitting
+    // in inboxes. When it goes, drop `tokenHash` / `type` and the
+    // /{locale}/reset-password exception in callbackNextPath too; the `code`
+    // path (social sign-in) stays.
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     ok = !error;
     if (error) failReason = error.code ?? error.name;
