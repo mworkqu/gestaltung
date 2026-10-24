@@ -4,6 +4,7 @@ import {
   activeFilterCount,
   emptyState,
   hasActiveFilters,
+  LEAD_FILTER_OPTIONS,
   leadClassesFor,
   parseStoreParams,
   resolveSort,
@@ -13,6 +14,8 @@ import {
   storeQuery,
   STORE_URL_PARAMS,
 } from "@/lib/store/catalog";
+import { arrivesByDate } from "@/lib/store/delivery";
+import { LEAD_TIME_CLASSES } from "@/lib/store/sourcing";
 import { readFileSync } from "node:fs";
 
 describe("parseStoreParams", () => {
@@ -104,11 +107,48 @@ describe("activeFilterCount (badge on the mobile Filters button)", () => {
   });
 });
 
-describe("leadClassesFor (delivery-time options → lead_time_class)", () => {
-  it("maps by each class's upper bound in days", () => {
-    expect(leadClassesFor("3_5_days")).toEqual(["in_stock", "3_5_days"]);
-    expect(leadClassesFor("1_2_weeks")).toEqual(["1_2_weeks"]);
-    expect(leadClassesFor("2_4_weeks")).toEqual(["2_4_weeks"]);
+describe("leadClassesFor (delivery-time options → lead_time_class, by computed arrival date)", () => {
+  // Calendar-day settings (no holidays row): arrival = today + lead + 1 + 2 + 3.
+  const slow = { handlingDays: 1, bufferDays: 3, standardTransitDays: 2 };
+  const today = "2026-10-03";
+
+  it("a product whose lead class says 3_5_days but arrives in 11 days is NOT in the 3–5 days option (F-013)", () => {
+    expect(arrivesByDate("3_5_days", slow, today)).toBe("2026-10-14");
+    expect(leadClassesFor("3_5_days", slow, today)).not.toContain("3_5_days");
+    expect(leadClassesFor("1_2_weeks", slow, today)).toContain("3_5_days");
+  });
+
+  it("matches the date the card shows: each class lands in the option holding its arrival", () => {
+    // in_stock 8 days, 3_5_days 11, 1_2_weeks 20, 2_4_weeks 34.
+    expect(leadClassesFor("3_5_days", slow, today)).toEqual([]);
+    expect(leadClassesFor("1_2_weeks", slow, today)).toEqual(["in_stock", "3_5_days"]);
+    // The slowest option is open-ended, so 2_4_weeks (34 days, past its own
+    // 28-day bound once handling and buffer are added) is still reachable from
+    // a filter rather than only from "All".
+    expect(leadClassesFor("2_4_weeks", slow, today)).toEqual(["1_2_weeks", "2_4_weeks"]);
+  });
+
+  it("no product falls outside every option, however slow the settings", () => {
+    const verySlow = { handlingDays: 5, bufferDays: 10, standardTransitDays: 7 };
+    const covered = LEAD_FILTER_OPTIONS.flatMap((o) => leadClassesFor(o, verySlow, today));
+    for (const c of LEAD_TIME_CLASSES) expect(covered).toContain(c);
+  });
+
+  it("with no handling, transit or buffer the old class ranges come back", () => {
+    const none = { handlingDays: 0, bufferDays: 0, standardTransitDays: 0 };
+    expect(leadClassesFor("3_5_days", none, today)).toEqual(["in_stock", "3_5_days"]);
+    expect(leadClassesFor("1_2_weeks", none, today)).toEqual(["1_2_weeks"]);
+    expect(leadClassesFor("2_4_weeks", none, today)).toEqual(["2_4_weeks"]);
+  });
+
+  it("every option is a disjoint range: no class is in two options", () => {
+    const all = LEAD_FILTER_OPTIONS.flatMap((o) => leadClassesFor(o, slow, today));
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("without shipping settings (no card shows a date) it falls back to the class's own range", () => {
+    expect(leadClassesFor("3_5_days", null, today)).toEqual(["in_stock", "3_5_days"]);
+    expect(leadClassesFor("1_2_weeks", undefined, today)).toEqual(["1_2_weeks"]);
   });
 });
 

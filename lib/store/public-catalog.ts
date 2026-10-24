@@ -27,11 +27,12 @@ import {
 } from "@/lib/store/catalog";
 import { sortProducts } from "@/lib/store/search";
 import type { DeliveryQuote } from "@/lib/store/delivery";
+import { loadShippingSettings } from "@/lib/store/shipping-settings";
+import type { LeadTimeClass } from "@/lib/store/sourcing";
 import { CATALOG_TAG, partTag, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
 import { parseTrustedBy, TRUSTED_BY_KEY, type TrustedLogo } from "@/lib/trust";
 import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServicePrices } from "@/lib/pricing/defaults";
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
-import { HOLIDAYS_KEY, parseHolidays, type Holidays } from "@/lib/store/working-days";
 import { OCCASIONS_KEY, parseOccasions, type Occasion } from "@/lib/occasions";
 import { parseSchoolPricing, SCHOOL_PRICING_KEY, type SchoolPricing } from "@/lib/schools/pricing";
 import { EMPTY_YOUTUBE, parseYoutube, YOUTUBE_KEY, type Youtube } from "@/lib/youtube";
@@ -146,15 +147,25 @@ export const getStoreFacets = unstable_cache(
  * (bots, the instant-search box typing) would otherwise write its own cache
  * entry and rarely be read twice (ISR-write allowance, 2026-10-16).
  */
-export function getStoreListing(state: StoreState, locale: string): Promise<{ parts: StoreCardPart[]; total: number }> {
-  return state.q ? storeListing(state, locale) : cachedStoreListing(state, locale);
+export async function getStoreListing(state: StoreState, locale: string): Promise<{ parts: StoreCardPart[]; total: number }> {
+  // ?stock= filters on the computed arrival date (F-013). Dates move daily, so
+  // resolve the option to lead classes for today here and pass them in: they
+  // join the cache key, and the filter stays in the query (paging is exact).
+  const leadClasses = state.stock ? leadClassesFor(state.stock, await loadShippingSettings()) : undefined;
+  return state.q ? storeListing(state, locale, leadClasses) : cachedStoreListing(state, locale, leadClasses);
 }
 
 const cachedStoreListing = unstable_cache(storeListing, ["store:listing"], CACHE);
 
-async function storeListing(state: StoreState, locale: string): Promise<{ parts: StoreCardPart[]; total: number }> {
+async function storeListing(
+  state: StoreState,
+  locale: string,
+  leadClasses?: LeadTimeClass[],
+): Promise<{ parts: StoreCardPart[]; total: number }> {
     const supabase = createPublicClient();
     if (!supabase) return { parts: [], total: 0 };
+    // No lead class arrives inside the chosen range today: nothing to list.
+    if (leadClasses && leadClasses.length === 0) return { parts: [], total: 0 };
     const store = await hasStoreCategory();
     const filter = searchFilter(state.q, { storeCategory: store });
     // ?category= is a store category once 0048 has run; an older source
@@ -172,7 +183,7 @@ async function storeListing(state: StoreState, locale: string): Promise<{ parts:
         .not("lead_time_class", "is", null);
       if (state.category) query = query.eq(categoryColumn, state.category);
       if (state.material) query = query.eq("material", state.material);
-      if (state.stock) query = query.in("lead_time_class", leadClassesFor(state.stock));
+      if (leadClasses) query = query.in("lead_time_class", leadClasses);
       if (filter) query = query.or(filter);
       return query;
     };
@@ -311,22 +322,9 @@ export const getServicePrices = unstable_cache(
   { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
 );
 
-/**
- * store_settings.holidays (P2-06, 0054): the weekend + public holidays that
- * every promise date skips. null when the row does not exist (0054 not run):
- * callers then keep calendar days, exactly like the database before 0054.
- */
-export const getHolidays = unstable_cache(
-  async (): Promise<Holidays | null> => {
-    const supabase = createPublicClient();
-    if (!supabase) return null;
-    const { data, error } = await supabase.from("store_settings").select("value").eq("key", HOLIDAYS_KEY).maybeSingle();
-    if (error || !data) return null;
-    return parseHolidays(data.value);
-  },
-  ["store-settings:holidays"],
-  { revalidate: STOREFRONT_REVALIDATE, tags: [SETTINGS_TAG] },
-);
+// Lives in lib/store/holidays.ts so shipping-settings.ts can read it without a
+// cycle back through this module; re-exported here for the existing callers.
+export { getHolidays } from "@/lib/store/holidays";
 
 /**
  * store_settings.occasions (P3-07, 0056): the seasonal campaigns, validated

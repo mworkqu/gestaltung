@@ -19,10 +19,16 @@ import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
 import {
   formatDeliveryDate,
   isOnRequest,
-  SHIPPING_TIERS,
   type ShippingTier,
 } from "@/lib/store/delivery";
-import { checkoutTotals, isZeroTotal } from "@/lib/store/checkout-totals";
+import {
+  checkoutGoodsQar,
+  checkoutTotals,
+  displayedTiers,
+  isZeroTotal,
+  pricedTiers,
+  selectableTier,
+} from "@/lib/store/checkout-totals";
 import {
   checkoutBlocked,
   EMAIL_FIELD_ERRORS,
@@ -53,7 +59,7 @@ export default function CheckoutClient() {
   // and the id goes to create_part_order, which checks it is their own class.
   const classOrderId = useClassOrderId();
   const { quote, legacy, error: quoteError } = useDeliveryQuote(items, classOrderId);
-  const [tier, setTier] = useState<ShippingTier>("standard");
+  const [pickedTier, setTier] = useState<ShippingTier>("standard");
   const classTierSet = useRef(false);
   useEffect(() => {
     if (classOrderId && !classTierSet.current) {
@@ -65,6 +71,12 @@ export default function CheckoutClient() {
   // AI credits spent in the last 30 days come back as one discount (0042); the
   // server applies it (redeem_credits) right after the order is created.
   const credits = useCreditSummary();
+  // Same-price tiers: only the fastest is shown (F-014), and the picked tier
+  // falls back to the shown one with its price, so what is submitted is always
+  // a tier on screen.
+  const offered = pricedTiers(quote, checkoutGoodsQar(quote, totalQar), split && Boolean(quote?.can_split));
+  const shownTiers = displayedTiers(offered);
+  const tier = selectableTier(pickedTier, offered, shownTiers);
   // The server quote decides the price (0044); see lib/store/checkout-totals.
   const totals = checkoutTotals({ quote, cartTotalQar: totalQar, tier, split, credits });
   const { canSplit, doSplit, priceOf, shippingQar, handlingQar, splitExtraQar, creditQar, grandTotal } = totals;
@@ -176,7 +188,7 @@ export default function CheckoutClient() {
           <fieldset className="space-y-2">
             <legend className={mono("block text-[10px] text-mutedtext")}>{tD("shippingLabel")}</legend>
             <div className="grid gap-2 sm:grid-cols-3">
-              {SHIPPING_TIERS.filter((k) => quote?.tiers[k]).map((k) => {
+              {shownTiers.map(({ tier: k }) => {
                 const q = quote!.tiers[k]!;
                 const price = priceOf(k);
                 return (

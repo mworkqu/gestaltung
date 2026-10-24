@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   checkoutTotals,
   creditDiscountQar,
+  displayedTiers,
+  pricedTiers,
+  selectableTier,
+  type PricedTier,
   grandTotalQar,
   isZeroTotal,
   placedTotalQar,
@@ -122,5 +126,85 @@ describe("grandTotalQar / placedTotalQar", () => {
     expect(placedTotalQar(152.65, 17.35, 17.35)).toBe(152.65);
     expect(placedTotalQar(152.65, 17.35, 0)).toBe(170);
     expect(placedTotalQar(152.65, 17.35, 10)).toBe(160);
+  });
+});
+
+describe("displayedTiers (same price: only the fastest is shown, F-014)", () => {
+  const t = (tierKey: PricedTier["tier"], priceQar: number, date: string | null): PricedTier => ({ tier: tierKey, priceQar, date });
+  // The reported case: Express 50 (29 Oct), Standard 50 (2 Nov), Economy 30 (8 Nov).
+  const reported = [t("express", 50, "2026-10-29"), t("standard", 50, "2026-11-02"), t("economy", 30, "2026-11-08")];
+
+  it("hides Standard when it costs the same as faster Express", () => {
+    expect(displayedTiers(reported).map((x) => x.tier)).toEqual(["express", "economy"]);
+  });
+
+  it("keeps every tier when all prices differ", () => {
+    const distinct = [t("express", 70, "2026-10-29"), t("standard", 50, "2026-11-02"), t("economy", 30, "2026-11-08")];
+    expect(displayedTiers(distinct)).toEqual(distinct);
+  });
+
+  it("never drops every tier: all the same price leaves the fastest", () => {
+    const same = [t("express", 50, "2026-10-29"), t("standard", 50, "2026-11-02"), t("economy", 50, "2026-11-08")];
+    expect(displayedTiers(same).map((x) => x.tier)).toEqual(["express"]);
+  });
+
+  it("picks by arrival date, not by tier name", () => {
+    const odd = [t("express", 50, "2026-11-05"), t("standard", 50, "2026-11-02")];
+    expect(displayedTiers(odd).map((x) => x.tier)).toEqual(["standard"]);
+  });
+
+  it("a tier without a date is the slowest; equal dates go to the earlier tier", () => {
+    expect(displayedTiers([t("express", 50, null), t("standard", 50, "2026-11-02")]).map((x) => x.tier)).toEqual(["standard"]);
+    expect(displayedTiers([t("express", 50, "2026-11-02"), t("standard", 50, "2026-11-02")]).map((x) => x.tier)).toEqual(["express"]);
+  });
+
+  it("handles one tier and none", () => {
+    expect(displayedTiers([t("economy", 30, null)]).map((x) => x.tier)).toEqual(["economy"]);
+    expect(displayedTiers([])).toEqual([]);
+  });
+});
+
+describe("selectableTier (the chosen tier is always one that is shown)", () => {
+  const t = (tierKey: PricedTier["tier"], priceQar: number, date: string): PricedTier => ({ tier: tierKey, priceQar, date });
+  const offered = [t("express", 50, "2026-10-29"), t("standard", 50, "2026-11-02"), t("economy", 30, "2026-11-08")];
+
+  it("keeps a shown selection", () => {
+    expect(selectableTier("economy", offered)).toBe("economy");
+    expect(selectableTier("express", offered)).toBe("express");
+  });
+
+  it("the default Standard falls back to the shown tier with the same price", () => {
+    expect(selectableTier("standard", offered)).toBe("express");
+  });
+
+  it("uses the first shown tier when the hidden tier's price is unknown, and the selection when nothing is offered", () => {
+    expect(selectableTier("standard", [t("express", 50, "2026-10-29")])).toBe("express");
+    expect(selectableTier("standard", [])).toBe("standard");
+  });
+});
+
+describe("pricedTiers (quote → priced tiers, uses the same prices as the totals)", () => {
+  const dated = (cost: number, date: string) => ({ ...tier(cost), date });
+  const q = quote(120, {
+    tiers: { express: dated(50, "2026-10-29"), standard: dated(50, "2026-11-02"), economy: dated(30, "2026-11-08") },
+    free_shipping: null,
+  });
+
+  it("prices every offered tier and feeds displayedTiers", () => {
+    const priced = pricedTiers(q, 120, false);
+    expect(priced.map((x) => [x.tier, x.priceQar])).toEqual([["express", 50], ["standard", 50], ["economy", 30]]);
+    expect(displayedTiers(priced).map((x) => x.tier)).toEqual(["express", "economy"]);
+  });
+
+  it("free Standard from the threshold is a different price, so it stays", () => {
+    const free = quote(320, {
+      tiers: q.tiers,
+      free_shipping: { threshold_qar: 300, tiers: ["standard"], goods_qar: 320 },
+    });
+    expect(displayedTiers(pricedTiers(free, 320, false)).map((x) => x.tier)).toEqual(["express", "standard", "economy"]);
+  });
+
+  it("is empty before the quote has loaded", () => {
+    expect(pricedTiers(null, 0, false)).toEqual([]);
   });
 });

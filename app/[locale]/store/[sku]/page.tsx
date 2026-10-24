@@ -14,7 +14,8 @@ import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { RequestItemButton } from "@/components/parts/request-item-button";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
-import { arrivesByDate, formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
+import { arrivesByDate, formatDeliveryDate, type DeliveryQuote } from "@/lib/store/delivery";
+import { displayedTiers, pricedTiers, selectableTier } from "@/lib/store/checkout-totals";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { canRequestItem, showMinOrder } from "@/lib/store/product-display";
 import { minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
@@ -151,6 +152,12 @@ export default async function PartDetailPage({
   const backup = backupLine(source);
   // Cheapest tier at its normal price (0044); shown beside the date.
   const deliveryFrom = minDeliveryFrom(quote?.tiers);
+  // Same-price tiers: only the faster is shown (F-014). The headline stays on
+  // Standard unless Standard is hidden, then on the tier shown at its price.
+  const offered = pricedTiers(quote, part.unit_price * part.min_order_qty, false);
+  const shownTiers = displayedTiers(offered);
+  const headlineTier = selectableTier("standard", offered, shownTiers);
+  const headlineDate = quote?.tiers?.[headlineTier]?.date ?? standardDate;
   const deliveryFromLine =
     deliveryFrom !== null ? tDelivery("deliveryFrom", { min: qarAmount(deliveryFrom) }) : null;
 
@@ -267,16 +274,18 @@ export default async function PartDetailPage({
               {deliveryFromLine && <p className="text-sm font-medium text-heading">{deliveryFromLine}</p>}
             </div>
           ) : (
-            standardDate && (
+            headlineDate && (
               <div className="rounded-xl bg-panel p-3 text-sm shadow-neu-inset">
                 <p className="font-semibold text-heading">
-                  {tDelivery("arrivesBy", { date: formatDeliveryDate(standardDate, locale) })}
-                  <span className="font-normal text-mutedtext"> · {tDelivery("tier_standard")}</span>
+                  {tDelivery("arrivesBy", { date: formatDeliveryDate(headlineDate, locale) })}
+                  <span className="font-normal text-mutedtext"> · {tDelivery(`tier_${headlineTier}`)}</span>
                   {deliveryFromLine && <span className="font-normal text-body"> · {deliveryFromLine}</span>}
                 </p>
                 {quote && (
                   <p className="mt-1 text-xs text-mutedtext">
-                    {SHIPPING_TIERS.filter((k) => k !== "standard" && quote.tiers[k]?.date)
+                    {shownTiers
+                      .map((t) => t.tier)
+                      .filter((k) => k !== headlineTier && quote.tiers[k]?.date)
                       .map((k) => `${tDelivery(`tier_${k}`)}: ${formatDeliveryDate(quote.tiers[k]!.date, locale)}`)
                       .join(" · ")}
                   </p>

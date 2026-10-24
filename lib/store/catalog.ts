@@ -14,7 +14,8 @@
 
 import type { Part } from "@/lib/supabase/types";
 import { LEAD_TIME_CLASSES, type LeadTimeClass } from "@/lib/store/sourcing";
-import { LEAD_CLASS_DAYS } from "@/lib/store/delivery";
+import { arrivesByDate, LEAD_CLASS_DAYS, todayIso, type ShippingSettings } from "@/lib/store/delivery";
+import { DAY_MS } from "@/lib/format/date";
 import { categoriesForArabicTerm } from "@/lib/store/category-label";
 import type { ProductSort } from "@/lib/store/search";
 
@@ -63,22 +64,53 @@ export const sortOptions = (hasQuery: boolean): StoreSort[] =>
   STORE_SORTS.filter((s) => s !== "relevance" || hasQuery);
 
 // ── Delivery-time filter ─────────────────────────────────────────────────────
-// Options are delivery ranges; each lead-time class goes to the range its
-// upper bound in days (LEAD_CLASS_DAYS, mirrors SQL lead_class_days()) falls
-// in. in_stock (<= 2 days) has no option of its own any more, so it counts as
-// "3–5 days" (it arrives at least that fast) rather than vanishing.
+// Options are delivery ranges in days from today. A product matches when the
+// date its card shows ("Arrives by", arrivesByDate: supplier lead + handling +
+// transit + buffer in Qatar working days) falls inside the range — NOT when its
+// supplier lead class does, which ignored our own days and contradicted the
+// card (F-013). That date depends only on the lead class, today and the
+// shipping settings, so the filter still resolves to a set of lead_time_class
+// values the database can match: no page is filtered after paging.
+// Ranges are (previous option's max, own max]; the first starts at today.
 
 export const LEAD_FILTER_OPTIONS = ["3_5_days", "1_2_weeks", "2_4_weeks"] as const;
 export type LeadFilter = (typeof LEAD_FILTER_OPTIONS)[number];
 
 const LEAD_FILTER_MAX_DAYS: Record<LeadFilter, number> = { "3_5_days": 5, "1_2_weeks": 14, "2_4_weeks": 28 };
 
-/** The lead_time_class values an option shows. */
-export function leadClassesFor(option: LeadFilter): LeadTimeClass[] {
-  const max = LEAD_FILTER_MAX_DAYS[option];
+/** The day range an option stands for: more than `after`, at most `upTo` days from today. */
+export function leadFilterRange(option: LeadFilter): { after: number; upTo: number } {
   const idx = LEAD_FILTER_OPTIONS.indexOf(option);
-  const min = idx > 0 ? LEAD_FILTER_MAX_DAYS[LEAD_FILTER_OPTIONS[idx - 1]] : -Infinity;
-  return LEAD_TIME_CLASSES.filter((c) => LEAD_CLASS_DAYS[c] > min && LEAD_CLASS_DAYS[c] <= max);
+  // The slowest option is open-ended: handling and buffer push a 2_4_weeks
+  // product past its own 28-day bound, and a product that fits no option at all
+  // would be reachable only from "All".
+  const last = idx === LEAD_FILTER_OPTIONS.length - 1;
+  return {
+    after: idx > 0 ? LEAD_FILTER_MAX_DAYS[LEAD_FILTER_OPTIONS[idx - 1]] : -Infinity,
+    upTo: last ? Infinity : LEAD_FILTER_MAX_DAYS[option],
+  };
+}
+
+/** Whole days from `from` to `to` (ISO dates). */
+const daysUntil = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+
+/**
+ * The lead_time_class values an option shows: those whose computed arrival
+ * date (the card's) is inside the option's day range. Without shipping
+ * settings no card shows a date, so it falls back to the class's own upper
+ * bound (LEAD_CLASS_DAYS, mirrors SQL lead_class_days()).
+ */
+export function leadClassesFor(
+  option: LeadFilter,
+  settings: ShippingSettings | null | undefined,
+  today: string = todayIso()
+): LeadTimeClass[] {
+  const { after, upTo } = leadFilterRange(option);
+  return LEAD_TIME_CLASSES.filter((c) => {
+    const date = arrivesByDate(c, settings, today);
+    const days = date ? daysUntil(today, date) : LEAD_CLASS_DAYS[c];
+    return days > after && days <= upTo;
+  });
 }
 
 export function parseLeadFilter(raw: string | null | undefined): LeadFilter | undefined {
