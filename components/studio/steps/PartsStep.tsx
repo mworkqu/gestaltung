@@ -26,8 +26,8 @@ import { STEP_ACCENT } from "@/lib/studio/palette";
 import { CATEGORIES, type Category, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../studio-ctx";
-import { Bar, linkCls, MainButton, Problem, Sheet, StepFrame } from "../ui";
-import { linePrice, orderQty, productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
+import { Bar, linkCls, MainButton, Problem, Sheet, StepFrame, Toast } from "../ui";
+import { addedToCartLine, linePrice, orderQty, productFor, studioKitPlan, useStudioCart } from "../use-studio-cart";
 import { packSizeOf } from "@/lib/store/pack";
 import { colourName } from "@/lib/studio/variants";
 import { groupComponents, groupHas, withQuantity } from "@/lib/studio/parts-group";
@@ -70,7 +70,7 @@ export function PartsStep({
   const [addCat, setAddCat] = useState<Category>("sensor");
   const [popFor, setPopFor] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
+  const cart = useStudioCart(ctx.api.mode === "live" ? ctx.projectId : null);
   const { busy, problem, pick, edit, swap, add } = usePartsActions({
     ctx,
     doc,
@@ -97,10 +97,12 @@ export function PartsStep({
     };
   }, [popFor]);
 
-  const { lines, total } = storeLines(doc.components, products, getPart);
+  // The ONE plan: what the button adds, what it costs, and what we will source.
+  const plan = studioKitPlan(doc.components, products, getPart);
+  const total = plan.goods;
   const groups = groupComponents(doc.components);
   // Parts with no store price ("We'll source this"): never silently left out of the total.
-  const onRequest = productsLoading ? 0 : groups.filter((g) => !productFor(g.partId, products, getPart, g.variant)).length;
+  const onRequest = productsLoading ? 0 : plan.toSource;
   const sel = doc.components.find((c) => c.instanceId === selected);
   const selPart = sel ? getPart(sel.partId) : undefined;
   const loading = busy && doc.components.length === 0;
@@ -120,13 +122,13 @@ export function PartsStep({
         </MainButton>
       }
       secondary={
-        lines.length > 0 ? (
+        plan.rows.length > 0 ? (
           cart.state === "added" ? (
             <Link href="/store/cart" className={linkCls}>
               <Check className="h-4 w-4" aria-hidden /> {t("viewCart")}
             </Link>
           ) : (
-            <button type="button" className={linkCls} onClick={() => void cart.addAll(lines)} disabled={cart.state === "adding"}>
+            <button type="button" className={linkCls} onClick={() => void cart.add(plan)} disabled={cart.state === "adding"}>
               <ShoppingCart className="h-4 w-4" strokeWidth={1.75} aria-hidden />
               {cart.state === "adding" ? t("addingToCart") : t("addAllToCart")}
             </button>
@@ -306,17 +308,20 @@ export function PartsStep({
                 <Plus className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                 {t("addPart")}
               </button>
-              {(lines.length > 0 || onRequest > 0) && (
+              {(plan.rows.length > 0 || onRequest > 0) && (
                 <p className="text-sm text-body" data-testid="studio-parts-total" data-on-request={onRequest}>
-                  {lines.length > 0 && (
+                  {plan.rows.length > 0 && (
                     <>
                       {t("partsTotal")} <span className="font-bold tabular-nums text-heading">{formatPrice(total, locale)}</span>
                     </>
                   )}
                   {onRequest > 0 && (
                     <span className="text-mutedtext">
-                      {lines.length > 0 ? " " : ""}
-                      {t(lines.length > 0 ? "partsOnRequestPlus" : "partsOnRequestOnly", { count: String(onRequest), form: arabicCountForm(onRequest) })}
+                      {plan.rows.length > 0 ? " " : ""}
+                      {t(plan.rows.length > 0 ? "partsOnRequestPlus" : "partsOnRequestOnly", {
+                        count: String(onRequest),
+                        form: arabicCountForm(onRequest),
+                      })}
                     </span>
                   )}
                 </p>
@@ -324,6 +329,11 @@ export function PartsStep({
             </div>
           )}
           {cart.state === "failed" && <Problem>{t("cartFailed")}</Problem>}
+          {cart.counts && (
+            // The numbers come from the plan the cart actually wrote, not from
+            // the list we meant to add.
+            <Toast onClose={cart.dismiss}>{addedToCartLine(cart.counts.added, cart.counts.sourced, locale)}</Toast>
+          )}
           {problem && (
             <div className="space-y-2">
               <Problem>{problem}</Problem>

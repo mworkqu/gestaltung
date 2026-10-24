@@ -25,7 +25,7 @@ import type { StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import type { StudioCtx } from "../studio-ctx";
 import { Problem, StepFrame } from "../ui";
-import { storeLines, useAddAllToCart } from "../use-studio-cart";
+import { studioKitPlan, useStudioCart } from "../use-studio-cart";
 import { pictureShareSource, ShareActions, type ShareSource } from "./share";
 import { PartsPicturePane } from "./PartsStep";
 
@@ -97,7 +97,7 @@ export function MakeStep({
   const t = useTranslations("Studio");
   const tSafe = useTranslations("SchoolSafety");
   const router = useRouter();
-  const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
+  const cart = useStudioCart(ctx.api.mode === "live" ? ctx.projectId : null);
   const viewer = useRef<ShareSource | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -126,8 +126,7 @@ export function MakeStep({
   );
 
   async function orderParts() {
-    const { lines } = storeLines(doc.components, products, getPart);
-    const ok = await cart.addAll(lines);
+    const ok = await cart.add(studioKitPlan(doc.components, products, getPart));
     if (ok) router.push("/store/cart");
   }
 
