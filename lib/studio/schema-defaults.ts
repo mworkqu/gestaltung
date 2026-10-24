@@ -7,6 +7,7 @@ import {
 import {
   StudioDocSchema, type EnclosureSpec, type ProductSpec, type StudioDoc,
 } from "./schema-zod";
+import { gramsFromVolume } from "./weight";
 
 export const DEFAULT_SPEC: ProductSpec = {
   name: "My product",
@@ -58,7 +59,10 @@ export const THROUGH_LID = {
 export const MECH_PARAMS: Record<MechTemplate, Record<string, [number, number, number]>> = {
   standoff: { height: [2, 25, 6], outerD: [4, 10, 6], holeD: [1.6, 3.4, 2.5] },
   pcb_cradle: { width: [10, 120, 30], depth: [10, 120, 50], railHeight: [2, 10, 4], wall: [1.2, 3, 1.6] },
-  battery_clip: { cellD: [10, 22, 18.6], length: [30, 75, 65], wall: [1.2, 3, 1.8] },
+  // F-005: the clip follows the BATTERY. `flat` 1 = a pouch cell (LiPo) gets a
+  // flat retainer sized by `cellW` x `cellT`; 0 = a round cell gets a cradle
+  // sized by `cellD`. A cradle can never hold a pouch, which is what shipped.
+  battery_clip: { cellD: [10, 22, 18.6], length: [30, 75, 65], wall: [1.2, 3, 1.8], cellW: [8, 60, 18.6], cellT: [2, 12, 6], flat: [0, 1, 0] },
   sensor_mount: { width: [8, 60, 25], height: [8, 60, 25], tilt: [0, 45, 0], wall: [1.2, 3, 1.6] },
   cable_clip: { cableD: [2, 10, 4], width: [4, 15, 8] },
   button_extender: { capD: [4, 14, 8], length: [2, 20, 6] },
@@ -68,10 +72,13 @@ export const MECH_PARAMS: Record<MechTemplate, Record<string, [number, number, n
   base: { width: [15, 300, 60], depth: [15, 300, 40], height: [10, 200, 30] },
 };
 
-/** Grams of PLA (density 1.24) for a volume in mm³, at ~35 % effective fill. */
+/**
+ * Grams of a printed body from its MESH volume. Thin alias so older call sites
+ * keep working: the one calculation lives in lib/studio/weight.ts (F-004).
+ * There is no infill factor — a Studio body is already a hollow shell.
+ */
 export function estGrams(volumeMm3: number, material: (typeof MATERIALS)[number] = "PLA"): number {
-  const density = material === "TPU" ? 1.21 : material === "PETG" ? 1.27 : 1.24;
-  return Math.max(1, Math.round((volumeMm3 / 1000) * density * 0.35));
+  return gramsFromVolume(volumeMm3, material);
 }
 
 export function emptyStudioDoc(spec: ProductSpec = DEFAULT_SPEC): StudioDoc {

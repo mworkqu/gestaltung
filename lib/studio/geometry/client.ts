@@ -328,6 +328,8 @@ export function mechObjects(m: MechGeometry, enc: EnclosureGeometry): BuiltMechP
       printable: p.printable,
       volumeMm3: p.volumeMm3,
       triangles: p.triangles,
+      check: p.check,
+      size: p.size,
     };
   });
 }

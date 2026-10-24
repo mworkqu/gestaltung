@@ -220,7 +220,37 @@ function pcbCradle(p: MechParams): THREE.BufferGeometry {
 }
 
 /** U-cradle for a round cell (axis along x) with two inward snap lips. */
+/**
+ * F-005: a pouch cell (flat LiPo) held by a flat retainer, not a cradle.
+ *
+ * A tray the thickness of the pouch, open along its length, with two snap arms
+ * that reach over the top face. The tester's flat LiPo got a cylindrical cradle,
+ * which simply cannot hold it.
+ */
+function flatBatteryRetainer(p: MechParams): THREE.BufferGeometry {
+  const w = p.wall;
+  const cw = p.cellW;
+  const ct = p.cellT; // pouch thickness
+  const L = Math.max(14, p.length * 0.6);
+  const lip = Math.min(1.6, cw * 0.08 + 0.6);
+  // Section across the pouch (x = across, y = up): floor, two side walls, two lips.
+  const hw = cw / 2 + 0.4;
+  const top = w + ct + 0.4;
+  const s = polyShape([
+    [-hw - w, 0], [hw + w, 0],
+    [hw + w, top + w], [hw - lip, top + w], [hw - lip, top], [hw, top],
+    [hw, w], [-hw, w],
+    [-hw, top], [-hw + lip, top], [-hw + lip, top + w], [-hw - w, top + w],
+  ]);
+  const g = extrude(s, L, Math.min(0.3, w / 6), 10);
+  // shape (x, y) + extrude z → world (y, z, x): same permutation as the cradle.
+  g.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1));
+  g.translate(-L / 2, 0, 0);
+  return merge([g]);
+}
+
 function batteryClip(p: MechParams): THREE.BufferGeometry {
+  if (p.flat >= 0.5) return flatBatteryRetainer(p);
   const R = p.cellD / 2;
   const w = p.wall;
   const Ro = R + w;

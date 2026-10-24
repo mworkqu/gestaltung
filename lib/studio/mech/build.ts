@@ -4,10 +4,12 @@
 // printable lid and base); otherwise the template fallback is built.
 
 import * as THREE from "three";
-import { estGrams, type Environment, type LibraryPart, type MechPart, type MechTemplate } from "../schema";
+import { type Environment, type LibraryPart, type MechPart, type MechTemplate } from "../schema";
 import type { LayoutResult } from "../layout";
 import type { Vec3 } from "../explode";
 import { defaultMaterial, materialFor, type Material } from "./materials";
+import { checkPrintable, type PrintCheck } from "../geometry/mesh-check";
+import { gramsFromVolume } from "../weight";
 import { MECH_BUILDERS, signedVolume, triangleCount } from "./templates";
 import { dimsFromLayout, placeMechParts, type MechDims } from "./place";
 
@@ -23,12 +25,44 @@ export type BuiltMechPart = {
   printable: { material: Material; estGrams: number };
   volumeMm3: number;
   triangles: number;
+  /**
+   * F-003: can a slicer print this mesh? The template builder works with
+   * three-bvh-csg, whose boolean results are triangle soups (the tester's lid
+   * had 2,483 unbalanced edges and read as 297 shells), so every body is checked
+   * and a failing one is never offered as a download.
+   */
+  check: PrintCheck;
+  /** Outer size in the print pose (mm) — what the plate packer needs. */
+  size: { w: number; d: number; h: number };
 };
 
 export type MechEnclosure = { base: THREE.Mesh; lid: THREE.Mesh; dims: MechDims };
 
 import { MECH_NAMES } from "./names";
 export { MECH_NAMES };
+
+/** The manifold check on a three.js geometry (F-003). */
+export function checkGeometry(g: THREE.BufferGeometry): PrintCheck {
+  const pos = g.getAttribute("position");
+  if (!pos) return { ok: false, watertight: false, badEdges: 0, shells: 0, triangles: 0 };
+  const positions = new Float32Array(pos.array as ArrayLike<number>);
+  const index = g.getIndex();
+  const indices = index
+    ? new Uint32Array(index.array as ArrayLike<number>)
+    : Uint32Array.from({ length: positions.length / 3 }, (_, i) => i);
+  return checkPrintable({ positions, indices });
+}
+
+/** Outer size of a mesh as it would sit on the bed (its own rotation applied). */
+function sizeOf(mesh: THREE.Mesh): { w: number; d: number; h: number } {
+  const g = mesh.geometry.clone();
+  g.applyQuaternion(mesh.quaternion);
+  g.computeBoundingBox();
+  const b = g.boundingBox;
+  g.dispose();
+  if (!b) return { w: 0, d: 0, h: 0 };
+  return { w: b.max.x - b.min.x, d: b.max.y - b.min.y, h: b.max.z - b.min.z };
+}
 
 export function buildMechParts(
   mech: readonly MechPart[],
@@ -63,9 +97,11 @@ export function buildMechParts(
       name: MECH_NAMES[m.template],
       object: mesh,
       explode: pl.explode,
-      printable: { material, estGrams: estGrams(volumeMm3, material) },
+      printable: { material, estGrams: gramsFromVolume(volumeMm3, material) },
       volumeMm3,
       triangles: triangleCount(mesh.geometry),
+      check: checkGeometry(mesh.geometry),
+      size: sizeOf(mesh),
     };
   });
   // stake_pod: the soil spike is printed on its own, peg end down (turned over here so the
@@ -85,9 +121,11 @@ export function buildMechParts(
       object: mesh,
       explode: [0, 0, -Math.max(20, dims.H * 0.8)],
       // Soil is wet: PETG, whatever the environment.
-      printable: { material: "PETG", estGrams: estGrams(volumeMm3, "PETG") },
+      printable: { material: "PETG", estGrams: gramsFromVolume(volumeMm3, "PETG") },
       volumeMm3,
       triangles: triangleCount(geometry),
+      check: checkGeometry(geometry),
+      size: sizeOf(mesh),
     });
   }
   return list;

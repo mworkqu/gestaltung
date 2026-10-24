@@ -152,7 +152,8 @@ export async function RequestReceived({
                 <>
                   <ul className="space-y-1.5 text-sm" data-testid="studio-request-printed">
                     {summary.printed.map((r) => {
-                      const name = MECH_NAMES[r.template as MechTemplate]?.[lang] ?? r.template;
+                      const own = lang === "ar" ? r.name_ar : r.name;
+                      const name = MECH_NAMES[r.template as MechTemplate]?.[lang] ?? own ?? r.template;
                       return (
                         <li key={`${r.template}:${r.material}`} className="flex items-baseline justify-between gap-3">
                           <span className="min-w-0 text-heading">

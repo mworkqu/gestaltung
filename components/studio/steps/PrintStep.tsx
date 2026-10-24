@@ -38,7 +38,10 @@ import { layoutComponents, layoutResultOf } from "@/lib/studio/layout";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import type { BuiltMechPart } from "@/lib/studio/mech/build";
 import { STEP_ACCENT } from "@/lib/studio/palette";
-import type { MechPart, MechTemplate, StudioDoc } from "@/lib/studio/schema";
+import type { MechPart, MechTemplate, PrintedList, StudioDoc } from "@/lib/studio/schema";
+import { printedGramsOf } from "@/lib/studio/weight";
+import { printNote } from "@/lib/studio/print-notes";
+import { platePlan } from "@/lib/studio/geometry/mesh-check";
 import { fileSlug } from "@/lib/studio/client/steps";
 import type { StudioCtx } from "../studio-ctx";
 import type { UnlockedProduct } from "../use-product";
@@ -69,25 +72,59 @@ type Row = {
   material: BuiltMechPart["printable"]["material"];
   count: number;
   grams: number;
+  /** F-003: false when any body in the row failed the manifold check. */
+  printable: boolean;
   parts: BuiltMechPart[];
 };
+
+/**
+ * F-027: the row key carries the SIZE, so two battery clips cut for different
+ * cells (49.6 mm and 24.0 mm) are two rows and never one line reading "x 2".
+ */
+function rowKey(b: BuiltMechPart): string {
+  const size = `${Math.round(b.size.w * 10)}x${Math.round(b.size.d * 10)}x${Math.round(b.size.h * 10)}`;
+  return `${b.template}:${b.printable.material}:${b.name.en}:${size}`;
+}
 
 function rowsOf(built: BuiltMechPart[]): Row[] {
   const rows = new Map<string, Row>();
   for (const b of built) {
     // (The stake pod's spike is a "base"-template part with its own name: its own row.)
-    const key = `${b.template}:${b.printable.material}:${b.name.en}`;
+    const key = rowKey(b);
     const row = rows.get(key);
     if (row) {
       row.count += 1;
       row.grams += b.printable.estGrams;
+      row.printable = row.printable && b.check.ok;
       row.parts.push(b);
     } else {
-      rows.set(key, { key, template: b.template, name: b.name, material: b.printable.material, count: 1, grams: b.printable.estGrams, parts: [b] });
+      rows.set(key, {
+        key,
+        template: b.template,
+        name: b.name,
+        material: b.printable.material,
+        count: 1,
+        grams: b.printable.estGrams,
+        printable: b.check.ok,
+        parts: [b],
+      });
     }
   }
   const rank = (r: Row) => (FIRST.includes(r.template) ? FIRST.indexOf(r.template) : FIRST.length);
   return [...rows.values()].sort((a, b) => rank(a) - rank(b));
+}
+
+/** The printed list as BUILT, stored on the doc so the quote reads the same grams (F-004). */
+export function printedListOf(rows: readonly Row[], plates: number): PrintedList {
+  const list = rows.map((r) => ({
+    key: r.key,
+    name: r.name,
+    material: r.material,
+    count: r.count,
+    grams: Math.round(r.grams),
+    printable: r.printable,
+  }));
+  return { source: "template", rows: list, grams: printedGramsOf(list.filter((r) => r.printable)), plates };
 }
 
 // P5-16: an unlocked product prints its own bodies (PrintProduct.tsx, its own chunk).
@@ -99,6 +136,7 @@ export function PrintStep({
   unlocked,
   beforeServer,
   onMech,
+  onPrinted,
   onNext,
 }: {
   ctx: StudioCtx;
@@ -106,10 +144,11 @@ export function PrintStep({
   unlocked: UnlockedProduct;
   beforeServer: () => Promise<void>;
   onMech: (mech: MechPart[], serverVersion: number | null) => void;
+  onPrinted: (printed: PrintedList) => void;
   onNext: () => void;
 }) {
-  if (doc.product?.unlockedId) return <PrintProduct ctx={ctx} unlocked={unlocked} onNext={onNext} />;
-  return <PrintTemplate ctx={ctx} doc={doc} beforeServer={beforeServer} onMech={onMech} onNext={onNext} />;
+  if (doc.product?.unlockedId) return <PrintProduct ctx={ctx} doc={doc} unlocked={unlocked} onPrinted={onPrinted} onNext={onNext} />;
+  return <PrintTemplate ctx={ctx} doc={doc} beforeServer={beforeServer} onMech={onMech} onPrinted={onPrinted} onNext={onNext} />;
 }
 
 function PrintTemplate({
@@ -117,12 +156,14 @@ function PrintTemplate({
   doc,
   beforeServer,
   onMech,
+  onPrinted,
   onNext,
 }: {
   ctx: StudioCtx;
   doc: StudioDoc;
   beforeServer: () => Promise<void>;
   onMech: (mech: MechPart[], serverVersion: number | null) => void;
+  onPrinted: (printed: PrintedList) => void;
   onNext: () => void;
 }) {
   const { getPart } = useStudioLibrary();
@@ -228,23 +269,49 @@ function PrintTemplate({
   );
 
   const rows = useMemo(() => rowsOf(built ?? []), [built]);
-  const total = rows.reduce((g, r) => g + r.grams, 0);
+  // F-003: only closed bodies are weighed and offered.
+  const printableRows = rows.filter((r) => r.printable);
+  const total = Math.round(printedGramsOf(printableRows));
+  const unclosed = rows.filter((r) => !r.printable);
+  const plateItems = useMemo(
+    () => (built ?? []).filter((b) => b.check.ok).map((b) => ({ w: b.size.w, d: b.size.d, h: b.size.h })),
+    [built],
+  );
+  const plan = useMemo(() => platePlan(plateItems), [plateItems]);
+
+  // F-004: the grams the Print step BUILT are stored on the doc, so the Request
+  // page and the quote estimate read this list instead of their own guess.
+  const printedKey = JSON.stringify(printedListOf(rows, plan.plates.length));
+  useEffect(() => {
+    if (!built?.length) return;
+    const next = JSON.parse(printedKey) as PrintedList;
+    if (JSON.stringify(doc.printed) === printedKey) return;
+    onPrinted(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the built list
+  }, [printedKey, built]);
 
   // ── Downloads ────────────────────────────────────────────────────────────
   const slug = fileSlug(ctx.projectName);
   const fileName = (b: BuiltMechPart) => `${slug}-${b.id}.stl`;
   // The STL writer (three.js exporter) loads on first use.
   async function downloadAll() {
-    if (!built?.length) return;
-    const { plateSTL } = await import("@/lib/studio/export");
-    downloadBlob(`${slug}-print-parts.stl`, plateSTL(built.map((b) => b.object)), "model/stl");
+    const closed = (built ?? []).filter((b) => b.check.ok);
+    if (!closed.length) return;
+    const { platesSTL } = await import("@/lib/studio/export");
+    const out = platesSTL(closed.map((b) => b.object));
+    out.plates.forEach((pl, i) => {
+      const suffix = out.plates.length > 1 ? `-plate-${i + 1}` : "";
+      downloadBlob(`${slug}-print-parts${suffix}.stl`, pl.data, "model/stl");
+    });
   }
   async function downloadRow(row: Row) {
+    if (!row.printable) return;
     const { printableSTL } = await import("@/lib/studio/export");
     for (const b of row.parts) downloadBlob(fileName(b), printableSTL(b.object), "model/stl");
   }
 
   const ready = !!built && built.length > 0;
+  const anyFile = printableRows.length > 0;
   const loading = !ready && !buildFailed && (fetching || doc.mech.length > 0 || !!doc.enclosure);
 
   return (
@@ -256,7 +323,7 @@ function PrintTemplate({
       intro={t("intro_print")}
       footer={<MainButton onClick={onNext}>{t("next")}</MainButton>}
       secondary={
-        <button type="button" className={linkCls} onClick={() => void downloadAll()} disabled={!ready}>
+        <button type="button" className={linkCls} onClick={() => void downloadAll()} disabled={!ready || !anyFile}>
           <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
           {t("downloadAllStl")}
         </button>
@@ -302,24 +369,46 @@ function PrintTemplate({
                         )}
                       </span>
                       <span className="block text-xs text-mutedtext">
-                        {t(`material_${r.material}`)} · {t("grams", { g: String(r.grams) })}
+                        {r.printable
+                          ? `${t(`material_${r.material}`)} · ${t("grams", { g: String(Math.round(r.grams)) })}`
+                          : printNote("unclosed", locale)}
                       </span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => void downloadRow(r)}
-                      aria-label={t("downloadPartStl", { name })}
-                      title={t("downloadPartStl", { name })}
-                      className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-cobalt hover:bg-white"
-                    >
-                      <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-                    </button>
+                    {r.printable && (
+                      <button
+                        type="button"
+                        onClick={() => void downloadRow(r)}
+                        aria-label={t("downloadPartStl", { name })}
+                        title={t("downloadPartStl", { name })}
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-cobalt hover:bg-white"
+                      >
+                        <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+                      </button>
+                    )}
                   </li>
                 );
               })}
             </ul>
-            <p className="text-sm font-semibold" style={{ color: accent.ink }} data-testid="studio-print-total">
-              {t("printTotal", { g: String(total) })}
+            {anyFile && (
+              <p className="text-sm font-semibold" style={{ color: accent.ink }} data-testid="studio-print-total">
+                {t("printTotal", { g: String(total) })}
+              </p>
+            )}
+            {plan.plates.length > 1 && (
+              <p className="text-xs text-mutedtext" data-testid="studio-print-plates">
+                {printNote("plates", locale, { n: plan.plates.length })}
+              </p>
+            )}
+            {plan.tooBig.length > 0 && <Problem>{printNote("tooBig", locale)}</Problem>}
+            {unclosed.length > 0 && (
+              <Problem>
+                {printNote("unclosed", locale)} {printNote("unclosedParts", locale)}{" "}
+                {unclosed.map((r) => r.name[locale]).join(", ")}
+              </Problem>
+            )}
+            {/* F-042: this step gives STL only; the editable STEP comes with the engineer quote. */}
+            <p className="text-xs text-mutedtext" data-testid="studio-print-step-format">
+              {printNote("stepFormat", locale)}
             </p>
           </>
         )}

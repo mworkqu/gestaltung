@@ -128,6 +128,8 @@ export function gripFillet(wall: number): number {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+/** Round DOWN to 2 dp: a limit that is rounded up stops being a limit. */
+const floor2 = (v: number) => Math.floor(v * 100) / 100;
 
 export function resolveTemplate(t: EnclosureTemplate | string | undefined): BuildableTemplate {
   return (BUILDABLE_TEMPLATES as readonly string[]).includes(t ?? "") ? (t as BuildableTemplate) : "rounded_box";
@@ -328,7 +330,7 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
   const wantR =
     tpl === "wall_plate" ? Math.max(spec.cornerRadius, WALL_PLATE_MIN_RADIUS) : grip ? Math.max(spec.cornerRadius, 0.3 * minSide) : spec.cornerRadius;
   const cornerRadius =
-    shape === "circle" ? W / 2 : shape === "stadium" ? minSide / 2 : clamp(wantR, LIMITS.cornerRadius.min, 0.33 * minSide);
+    shape === "circle" ? W / 2 : shape === "stadium" ? minSide / 2 : clamp(floor2(wantR), LIMITS.cornerRadius.min, floor2(0.33 * minSide));
   // Grip-friendly: a handheld taper rounds its top and bottom edges as far as the wall allows.
   const wantFillet = grip ? Math.max(spec.edgeFillet, gripFillet(wall)) : Math.min(spec.edgeFillet, 0.9 * wall);
   let edgeFillet = clamp(
@@ -413,23 +415,67 @@ export function contentFits(d: EnclosureDims, lr: Pick<LayoutResult, "bbox" | "b
   return true;
 }
 
-export function enclosureDims(spec: EnclosureSpec, lr: LayoutResult): EnclosureDims {
-  const tpl = resolveTemplate(spec.template);
-  const wall = clamp(spec.wall, LIMITS.wall.min, LIMITS.wall.max);
+/**
+ * F-004: the outer footprint may never exceed the PACKED PARTS ENVELOPE plus
+ * margins. The old growth loop had no cap, and for a round template it grew
+ * towards the rectangle's CORNERS (a circle through the corners of a
+ * 122 x 80 box is Ø 164), so a palm-sized waterer came out Ø 190 mm.
+ *
+ * The allowance is the part clearance + the lid lip + the two walls, plus a
+ * little room for the bosses and the vent band: anything beyond that is the
+ * rule failing, not a design decision.
+ */
+export const ENVELOPE_ALLOWANCE = 12;
+
+/** The smallest inner width/depth that really holds the packed parts. */
+export function envelopeNeed(spec: EnclosureSpec, lr: LayoutResult, round: boolean): { iw: number; id: number } {
   const c = clamp(spec.clearance, LIMITS.clearance.min, LIMITS.clearance.max);
   const m = c + LIP_ALLOWANCE;
   // The layout box is centred on XY, but use its real extents to be safe.
   const fw = 2 * Math.max(Math.abs(lr.bbox.min[0]), Math.abs(lr.bbox.max[0]));
   const fd = 2 * Math.max(Math.abs(lr.bbox.min[1]), Math.abs(lr.bbox.max[1]));
+  if (!round) return { iw: fw + 2 * m, id: fd + 2 * m };
+  // A round case has to swallow the box's corners, so the inner diameter is the
+  // box's DIAGONAL, not its longest side. Asking for the side and then growing
+  // until the corners fit is what ran away.
+  const dia = Math.hypot(fw, fd) + 2 * m;
+  return { iw: dia, id: dia };
+}
+
+/**
+ * The outer size this layout is allowed to reach (mm) — asserted by the tests.
+ *
+ * The limit is the circle that circumscribes the packed parts (the worst case any
+ * section has to swallow) plus the clearance, the lip, the walls and the
+ * allowance. No shape needs more than that to hold its own contents.
+ */
+export function envelopeCap(spec: EnclosureSpec, lr: LayoutResult, _template?: EnclosureTemplate | string): number {
+  const wall = clamp(spec.wall, LIMITS.wall.min, LIMITS.wall.max);
+  return innerCap(spec, lr) + 2 * wall + ENVELOPE_ALLOWANCE;
+}
+
+/** The largest inner width/depth the growth loop may ask for. */
+function innerCap(spec: EnclosureSpec, lr: LayoutResult): number {
+  const round = envelopeNeed(spec, lr, true);
+  return Math.max(round.iw, round.id);
+}
+
+export function enclosureDims(spec: EnclosureSpec, lr: LayoutResult): EnclosureDims {
+  const tpl = resolveTemplate(spec.template);
+  const wall = clamp(spec.wall, LIMITS.wall.min, LIMITS.wall.max);
+  const c = clamp(spec.clearance, LIMITS.clearance.min, LIMITS.clearance.max);
+  const square = SQUARE_FOOTPRINT.includes(tpl);
+  const env = envelopeNeed(spec, lr, square);
   const need: Need = {
-    iw: Math.max(fw + 2 * m, LIMITS.minFootprint - 2 * wall),
-    id: Math.max(fd + 2 * m, LIMITS.minFootprint - 2 * wall),
+    iw: Math.max(env.iw, LIMITS.minFootprint - 2 * wall),
+    id: Math.max(env.id, LIMITS.minFootprint - 2 * wall),
     ih: (lr.bodyHeight ?? lr.height) + (c + LID_SPACE) * HEADROOM_MULT[spec.proportions.heightBias],
   };
   // A poke-through dome must still stand on the floor with its top POKE_OUT above the lid.
   if (lr.pokeHeight) need.ih = Math.max(need.ih, lr.pokeHeight - POKE_OUT - wall);
-  const square = SQUARE_FOOTPRINT.includes(tpl);
+  const capInner = innerCap(spec, lr) + ENVELOPE_ALLOWANCE;
   let d = shapeDims(tpl, spec, need);
+  let best = d;
   for (let i = 0; i < 200; i++) {
     if (!heightRuleOk(d)) {
       // Too tall for its footprint → grow the footprint (never squash the content).
@@ -437,13 +483,22 @@ export function enclosureDims(spec: EnclosureSpec, lr: LayoutResult): EnclosureD
       if (d.W <= d.D || square) need.iw = Math.max(need.iw + 0.5, target);
       if (d.D <= d.W || square) need.id = Math.max(need.id + 0.5, target);
     } else if (!contentFits(d, lr, c)) {
+      // F-004: this is the branch that ran away. It used to grow the footprint by
+      // 3 % a step until the layout box's CORNERS fitted a round section, which
+      // for a 122 x 80 box means Ø 164 and never converges on a dome (a wider
+      // case grows a taller dome, which asks for a wider case again). The need
+      // is now sized from the box's diagonal up front, so a step here means the
+      // shape still cannot hold the parts — stop at the envelope cap instead of
+      // handing back a case twice the size of its contents.
+      if (Math.max(need.iw, need.id) >= capInner) return best;
       const step = Math.max(1, 0.03 * Math.max(need.iw, need.id));
-      need.iw += step;
-      need.id += step;
+      need.iw = Math.min(capInner, need.iw + step);
+      need.id = Math.min(capInner, need.id + step);
     } else {
       return d;
     }
     d = shapeDims(tpl, spec, need);
+    best = d;
   }
   return d;
 }

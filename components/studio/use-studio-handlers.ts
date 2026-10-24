@@ -12,6 +12,7 @@ import {
   type Finish,
   type LibraryPart,
   type MechPart,
+  type PrintedList,
   type ProductSpec,
   type StudioComponent,
   type StudioDoc,
@@ -171,6 +172,17 @@ export function useStudioHandlers({
     [commit, latest],
   );
 
+  // F-004: the printed list as the Print step BUILT it (grams from real mesh
+  // volumes), so the Request page and the quote estimate read the same numbers.
+  const onPrinted = useCallback(
+    (printed: PrintedList) => {
+      const base = latest.current;
+      if (!base) return;
+      commit({ ...base, printed });
+    },
+    [commit, latest],
+  );
+
   const onFirmware = useCallback(
     (firmware: { board: string; code: string }, serverVersion: number | null) => {
       const base = latest.current;
@@ -232,6 +244,7 @@ export function useStudioHandlers({
     onWiring,
     onEnclosure,
     onMech,
+    onPrinted,
     onFirmware,
     flushBeforeServer,
     wireFocus,

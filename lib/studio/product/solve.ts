@@ -1053,10 +1053,28 @@ export function solveProduct(input: unknown, parts: readonly LayoutInput[], opts
     const centerLocal: Vec3 = [0, 0, r3(L + above - p.dims.x / 2)];
     const originLocal = v3.sub(centerLocal, rotate(m, [0, 0, p.dims.z / 2]));
     addElectronic(item.instanceId, p, stake, r3v(originLocal), m);
-    const wide = Math.max(p.dims.y, p.dims.z);
-    const thin = Math.min(p.dims.y, p.dims.z);
-    const depth = p.dims.x - above + 0.6;
-    pockets.set(stake.id, [{ instanceId: item.instanceId, center: [0, 0, r3(L - depth / 2 + 0.5)], size: [r3(wide + 0.8), r3(thin + 0.8), r3(depth + 1)] }]);
+    // F-003/F-005: the pocket must stay INSIDE the tapering blade. Sized from the
+    // part it holds and then shrunk to the blade's own section minus a printable
+    // wall — a pocket wider than the blade gets lower down cut the stake into two
+    // halves (two shells, nothing a slicer can print).
+    const minWall = 1.2;
+    const wide0 = Math.max(p.dims.y, p.dims.z) + 0.8;
+    const thin0 = Math.min(p.dims.y, p.dims.z) + 0.8;
+    const holds = (z: number, hw: number, hd: number) => {
+      const sec = sectionAt(stake.form, Math.max(0, Math.min(z, L)), minWall);
+      return !!sec && [-hw, hw].every((x) => [-hd, hd].every((y) => insideSection(sec, x, y)));
+    };
+    let wide = wide0;
+    let thin = thin0;
+    // At the blade's top the pocket may be no wider than the section allows.
+    while (wide > 4 && !holds(L - 0.5, wide / 2, thin / 2)) {
+      wide = r3(wide - 0.4);
+      thin = Math.min(thin, r3(wide * (thin0 / wide0)));
+    }
+    let depth = p.dims.x - above + 0.6;
+    // …and it may not reach deeper than the blade is still wide enough to hold it.
+    while (depth > 6 && !holds(L - depth, wide / 2, thin / 2)) depth = r3(depth - 1);
+    pockets.set(stake.id, [{ instanceId: item.instanceId, center: [0, 0, r3(L - depth / 2 + 0.5)], size: [r3(wide), r3(thin), r3(depth + 1)] }]);
     // …and through the floor of the body standing on the stake.
     const above1 = model.bodies.find((b) => b.attach.to === stake.id && b.attach.anchor === "top");
     if (above1) {

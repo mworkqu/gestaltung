@@ -27,7 +27,7 @@ import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferG
 import { ADDITION, Brush, Evaluator, INTERSECTION, SUBTRACTION } from "three-bvh-csg";
 import type { EnclosureSpec, LayoutItem, LibraryPart } from "../schema";
 import type { LayoutResult } from "../layout";
-import { cutoutsFor, keyholeCutouts, ventCutouts, type Cutout } from "./cutouts";
+import { cutoutsFor, keyholeCutouts, leadCutouts, ventCutouts, type Cutout } from "./cutouts";
 import { labelGeometry, planLabel, type LabelPlan } from "./label";
 import type { LabelSkipReason } from "./label-font";
 import {
@@ -575,7 +575,8 @@ function feet(d: EnclosureDims, kind: EnclosureSpec["feet"]): THREE.Mesh[] {
 export function planEnclosure(spec: EnclosureSpec, layoutResult: LayoutResult, parts: Map<string, LibraryPart>) {
   const dims = enclosureDims(spec, layoutResult);
   const placed = settleLayout(layoutResult.layout, parts, dims);
-  const cutouts = cutoutsFor(placed, parts, dims);
+  // F-005: ports of the parts inside, plus a cable gland for every part outside.
+  const cutouts = [...cutoutsFor(placed, parts, dims), ...leadCutouts(placed, parts, dims)];
   const keyholes = keyholeCutouts(dims);
   const label = planLabel(spec.label, dims, [...cutouts, ...keyholes]);
   const vents = ventCutouts(spec, dims, [...cutouts, ...keyholes], label.plan ? [label.plan.box] : []);

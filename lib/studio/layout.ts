@@ -448,13 +448,43 @@ function assemble(groups: { L: Group; R: Group; F: Group; B: Group; C: Group }, 
 }
 
 /**
+ * Parts that live OUTSIDE the case, on a lead (F-004 / F-005).
+ *
+ * The plant waterer's case came out Ø190 mm for a "palm-sized" device because
+ * the packer put the 98 mm soil blade and the 53 mm submersible pump INSIDE it,
+ * as if they were boards. They are not: the probe goes into the soil and the
+ * pump goes into the water, both on a cable, so the case only has to give them
+ * a cable exit (enclosure/cutouts.ts) — never room for their whole body.
+ *
+ * Read from the part, not guessed: its own tags say a submersible pump or a soil
+ * blade (the only two kinds the library has today).
+ */
+export function isExternalPart(part: LibraryPart): boolean {
+  const tags = part.tags;
+  // A submersible pump or a soil blade: the body is outside, only its lead comes in.
+  if (tags.includes("submersible")) return true;
+  if (tags.includes("soil") && (tags.includes("capacitive") || tags.includes("probe"))) return true;
+  return false;
+}
+
+/**
  * Part E: servos plugged into a servo driver move the product's arm links (a separate
  * design job), so the case packs only the rest: the board, the driver and the supply.
+ * Plus the external parts above, which are never inside the shell.
  */
 export function enclosedItems(items: LayoutInput[]): LayoutInput[] {
   const driver = items.some((i) => i.part.tags.includes("servo_driver"));
-  if (!driver) return items;
-  return items.filter((i) => !(i.part.category === "actuator" && i.part.tags.includes("servo") && !i.part.tags.includes("servo_driver")));
+  const inside = items.filter((i) => !isExternalPart(i.part));
+  // Never empty the case: a product made only of external parts keeps them in.
+  const kept = inside.length ? inside : items;
+  if (!driver) return kept;
+  return kept.filter((i) => !(i.part.category === "actuator" && i.part.tags.includes("servo") && !i.part.tags.includes("servo_driver")));
+}
+
+/** The parts the case does NOT hold; each needs a lead through the wall. */
+export function externalItems(items: LayoutInput[]): LayoutInput[] {
+  const inside = items.filter((i) => !isExternalPart(i.part));
+  return inside.length ? items.filter((i) => isExternalPart(i.part)) : [];
 }
 
 export function layoutComponents(items: LayoutInput[], opts: LayoutOptions = {}): LayoutResult {

@@ -78,6 +78,8 @@ export function runMech(encKey: string, input: MechInput): PackedMechPart[] {
       printable: b.printable,
       volumeMm3: b.volumeMm3,
       triangles: b.triangles,
+      check: b.check,
+      size: b.size,
       position: [mesh.position.x, mesh.position.y, mesh.position.z],
       rotation: [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z],
       ...(shell ? { shell } : { geometry: packGeometry(mesh.geometry) }),

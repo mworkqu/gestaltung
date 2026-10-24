@@ -89,6 +89,14 @@ export function mechSummary(opts: {
 const has = (item: MechSummaryItem, ...words: string[]) =>
   words.some((w) => item.partId.includes(w) || item.tags.some((t) => t.toLowerCase().includes(w)));
 
+/** A pouch / prismatic cell: said so by its tags, else much thinner than it is wide. */
+const isFlatCell = (i: MechSummaryItem) => {
+  if (has(i, "lipo", "li-po", "pouch", "flat")) return true;
+  if (has(i, "18650", "aa", "aaa", "cylindrical", "cr123")) return false;
+  const d = i.dims;
+  return !!d && Math.min(d.x, d.y, d.z) < 0.6 * Math.max(d.y, d.z);
+};
+
 const isCell = (i: MechSummaryItem) => i.category === "power" && (has(i, "cell", "18650", "battery") && !has(i, "charger", "tp4056"));
 // Through-lid parts follow the part's own +z port, never its name: "oled" contains "led"
 // (a light pipe used to land in the screen window) and a slide switch's lever is on a side.
@@ -114,9 +122,17 @@ export function defaultMechParts(summary: MechSummary, log: ClampLog = []): Mech
       add("standoff", { height, outerD, holeD }, item.instanceId, Math.PI * (outerD / 2) ** 2 * height);
     }
     if (isCell(item)) {
-      const cellD = clampTo("battery_clip", "cellD", item.dims ? Math.min(item.dims.y, item.dims.z) : 18.6);
-      const length = clampTo("battery_clip", "length", item.dims ? item.dims.x : 65);
-      add("battery_clip", { cellD, length, wall: 1.8 }, item.instanceId, length * (cellD + 3.6) * 1.8 * 2);
+      // F-005: the holder follows the battery's own shape — a pouch cell (flat
+      // LiPo) gets a flat retainer, a round cell gets a cradle. Read from the
+      // part: its tags first, then its proportions.
+      const flat = isFlatCell(item);
+      const d = item.dims;
+      const cellD = clampTo("battery_clip", "cellD", d ? Math.min(d.y, d.z) : 18.6);
+      const cellT = clampTo("battery_clip", "cellT", d ? Math.min(d.x, d.y, d.z) : 6);
+      const cellW = clampTo("battery_clip", "cellW", d ? Math.max(d.y, d.z) : 18.6);
+      const length = clampTo("battery_clip", "length", d ? d.x : 65);
+      const span = flat ? cellW + 3.6 : cellD + 3.6;
+      add("battery_clip", { cellD, cellT, cellW, length, wall: 1.8, flat: flat ? 1 : 0 }, item.instanceId, length * span * 1.8 * 2);
     }
     if (isButton(item)) add("button_extender", { capD: 8, length: 6 }, item.instanceId, Math.PI * 16 * 6);
     if (isLed(item)) add("light_pipe", { d: 3, length: 8 }, item.instanceId, Math.PI * 2.25 * 8);

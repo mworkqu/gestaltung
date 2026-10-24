@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 import { LIBRARY } from "../library";
-import { isPokeSensor, layoutComponents, worldBox } from "../layout";
+import { isExternalPart, isPokeSensor, layoutComponents, worldBox } from "../layout";
 import { buildEnclosure } from "./build";
 import { innerTopAt, insideSection } from "./templates";
 import { ALL_TEMPLATES, spec } from "./test-fixtures";
@@ -24,7 +24,11 @@ describe("real library", () => {
       expect(lid.geometry.getAttribute("position").count).toBeGreaterThan(0);
       expect(meta.triangles).toBeLessThan(60000);
       const placed = new Set(lr.layout.map((i) => i.instanceId));
-      expect(meta.cutouts.length).toBe(list.filter((i) => placed.has(i.instanceId)).reduce((n, i) => n + i.part.ports.length, 0));
+      // One opening per port of a part INSIDE, plus one cable gland per part
+      // the case does not hold (F-005: the soil probe and the pump sit outside).
+      const ports = list.filter((i) => placed.has(i.instanceId)).reduce((n, i) => n + i.part.ports.length, 0);
+      const leads = list.filter((i) => !placed.has(i.instanceId) && isExternalPart(i.part)).length;
+      expect(meta.cutouts.length).toBe(ports + leads);
       const d = meta.dims;
       for (const it of lr.layout) {
         // Poke-through domes (the PIR) leave the cavity through the lid on purpose.

@@ -18,7 +18,9 @@
 
 import type { CrossSection, Manifold, ManifoldToplevel, Mat4, SimplePolygon } from "manifold-3d";
 import { COLOUR_HEX } from "../palette";
-import { estGrams, type Colour } from "../schema";
+import { type Colour } from "../schema";
+import { gramsFromVolume } from "../weight";
+import { checkPrintable } from "./mesh-check";
 import { grilleHoles } from "../enclosure/cutouts";
 import {
   NOZZLE_FLANGE,
@@ -71,8 +73,17 @@ export type BuiltPiece = {
   print: PrintPlan;
   /** Full explode offset (body + piece). */
   explode: Vec3;
-  /** manifold-3d says the mesh is a closed, oriented 2-manifold. */
+  /**
+   * F-003: closed and consistently wound, checked twice — manifold-3d's own
+   * status AND an independent edge-balance check over the exact arrays we would
+   * write into the STL.
+   */
   watertight: boolean;
+  /**
+   * Connected components of the exported mesh. A PRINTABLE piece must have
+   * exactly 1; a bought body may legitimately be several (the probe's two pins).
+   */
+  shells: number;
 };
 
 export type BuiltLink = {
@@ -533,9 +544,10 @@ function oppositeFace(f: string): "top" | "bottom" | "front" | "back" | "left" |
 // Bodies → pieces
 // ---------------------------------------------------------------------------
 
+/** Grams of one body — the ONE weight calculation (lib/studio/weight.ts). */
 function gramsFor(volume: number, material: ProductMaterial): number {
-  if (material === "aluminium") return 0;
-  return estGrams(volume, material === "resin_clear" ? "PETG" : material);
+  if (material === "aluminium") return 0; // bought, not printed
+  return gramsFromVolume(volume, material === "resin_clear" ? "PETG" : material);
 }
 
 type RawPiece = { piece: SolvedPiece; m: Manifold };
@@ -668,10 +680,16 @@ export function buildProductMeshes(mf: ManifoldToplevel, solved: SolvedProduct):
     const pieces: BuiltPiece[] = [];
     for (const b of solved.bodies) {
       for (const raw of buildBody(k, b)) {
-        const world = k.a.t(k.a.t(raw.m.rotate(b.rotation)).translate(b.position));
+        // F-003: `union` collapses the body's CSG result into ONE solid before
+        // export — a body built from several overlapping primitives (shell +
+        // fused wall + snap lip) must leave here as a single closed mesh, not as
+        // the stack it was cut from.
+        const placed = k.a.t(k.a.t(raw.m.rotate(b.rotation)).translate(b.position));
+        const world = union(k, [placed]);
         const status = world.status();
         const arrays = meshArrays(k, world);
         const volume = Math.abs(world.volume());
+        const check = checkPrintable({ positions: arrays.positions, indices: arrays.indices });
         pieces.push({
           id: raw.piece.id,
           bodyId: b.id,
@@ -688,7 +706,8 @@ export function buildProductMeshes(mf: ManifoldToplevel, solved: SolvedProduct):
           printable: b.printable,
           print: raw.piece.print,
           explode: v3.add(b.explode, raw.piece.explode),
-          watertight: status === "NoError" && !world.isEmpty(),
+          watertight: status === "NoError" && !world.isEmpty() && check.watertight,
+          shells: check.shells,
         });
       }
     }

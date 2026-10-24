@@ -8,7 +8,8 @@ import { pointInCavity } from "../enclosure/templates";
 import { spec } from "../enclosure/test-fixtures";
 import { defaultMechParts, mechSummary } from "../ai/mech-default";
 import { explodeOffset, type ExplodeFrame } from "../explode";
-import { exportSTL, plateSTL, printableSTL } from "../export";
+import { exportSTL, platesSTL, printableSTL } from "../export";
+import { MK4_BED } from "../geometry/mesh-check";
 import { getCadBackend } from "../cad-adapter";
 import { buildMechParts, defaultMaterial } from "./build";
 import { dimsFromLayout, placeMechParts } from "./place";
@@ -223,9 +224,16 @@ describe("print files (P5-14)", () => {
     const b = new Uint8Array(printableSTL(lid.object));
     expect(b).toEqual(a);
     const tris = (buf: ArrayBuffer) => new DataView(buf).getUint32(80, true);
-    const plate = plateSTL(built.map((x) => x.object));
+    // F-003: parts are packed onto printer BEDS now, so the whole set can take
+    // more than one plate; together the plates must still hold every triangle.
+    const out = platesSTL(built.map((x) => x.object));
     const sum = built.reduce((n, x) => n + tris(printableSTL(x.object)), 0);
-    expect(tris(plate)).toBe(sum);
-    expect(plate.byteLength).toBe(84 + 50 * sum);
+    expect(out.tooBig).toEqual([]);
+    expect(out.plates.reduce((n, p) => n + tris(p.data), 0)).toBe(sum);
+    for (const p of out.plates) {
+      expect(p.data.byteLength).toBe(84 + 50 * tris(p.data));
+      expect(p.w).toBeLessThanOrEqual(MK4_BED.x);
+      expect(p.d).toBeLessThanOrEqual(MK4_BED.y);
+    }
   });
 });

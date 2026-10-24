@@ -176,6 +176,7 @@ function StudioShellInner({
     onWiring,
     onEnclosure,
     onMech,
+    onPrinted,
     onFirmware,
     flushBeforeServer,
     wireFocus,
@@ -362,7 +363,7 @@ function StudioShellInner({
           />
         )}
         {step === "print" && doc && (
-          <PrintStep ctx={ctx} doc={doc} unlocked={unlocked} beforeServer={flushBeforeServer} onMech={onMech} onNext={next} />
+          <PrintStep ctx={ctx} doc={doc} unlocked={unlocked} beforeServer={flushBeforeServer} onMech={onMech} onPrinted={onPrinted} onNext={next} />
         )}
         {step === "code" && doc && (
           <CodeStep

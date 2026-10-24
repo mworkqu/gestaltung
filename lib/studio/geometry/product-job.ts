@@ -129,8 +129,8 @@ export async function handleProductJob(req: ProductJobRequest, post: PostFn): Pr
     const hit = getBuiltProduct(req.input.hash);
     if (!hit) throw new Error("not_built");
     const result = productStlFiles(await hit, req.input.name);
-    const transfer: ArrayBuffer[] = result.files.map((f) => f.data);
-    if (result.combined) transfer.push(result.combined.data);
+    // One buffer per file and per plate; `combined` aliases plates[0], so it is not transferred twice.
+    const transfer: ArrayBuffer[] = [...result.files.map((f) => f.data), ...result.plates.map((pl) => pl.data)];
     post({ id: req.id, ok: true, kind: "productStl", result, ms: Math.round(now() - t0) }, transfer);
   } catch (err) {
     post({ id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) });

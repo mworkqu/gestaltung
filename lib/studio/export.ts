@@ -3,6 +3,7 @@
 
 import * as THREE from "three";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
+import { MK4_BED, platePlan } from "./geometry/mesh-check";
 
 export type ExportedFile = { name: string; data: ArrayBuffer | string };
 
@@ -69,35 +70,40 @@ export function printableSTL(object: THREE.Object3D): ArrayBuffer {
 }
 
 /**
- * Every printable part laid out side by side on one bed (rows up to `bedWidth`
- * mm, `gap` mm apart) as ONE binary STL — open it in a slicer and print.
+ * Every printable part laid out on PRINTER BEDS, one binary STL per bed (F-003).
+ *
+ * The old single-plate writer only wrapped rows at a width and let the plate
+ * grow in y without limit — the tester's plate came out 406 mm long, so it fitted
+ * no printer. The layout rule now lives in geometry/mesh-check.ts platePlan()
+ * and is shared with the product pipeline: parts are shelf-packed inside the
+ * MK4 envelope (250 x 210 mm) and spill onto a second bed instead of growing.
+ *
+ * A part larger than the bed on its own is reported in `tooBig` and left off.
  */
-export function plateSTL(objects: THREE.Object3D[], opts: { bedWidth?: number; gap?: number } = {}): ArrayBuffer {
-  const bedWidth = opts.bedWidth ?? 240;
-  const gap = opts.gap ?? 6;
-  const group = new THREE.Group();
-  let x = 0;
-  let y = 0;
-  let rowDepth = 0;
-  for (const o of objects) {
-    const m = onBed(o);
-    if (!m) continue;
-    const b = m.geometry.boundingBox!;
-    const w = b.max.x - b.min.x;
-    const d = b.max.y - b.min.y;
-    if (x > 0 && x + w > bedWidth) {
-      x = 0;
-      y += rowDepth + gap;
-      rowDepth = 0;
+export function platesSTL(
+  objects: THREE.Object3D[],
+  opts: { bed?: { x: number; y: number; z: number } } = {},
+): { plates: { data: ArrayBuffer; w: number; d: number }[]; tooBig: number[] } {
+  const meshes = objects.map((o) => onBed(o));
+  const items = meshes.map((m) => {
+    const b = m?.geometry.boundingBox;
+    return b ? { w: b.max.x - b.min.x, d: b.max.y - b.min.y, h: b.max.z - b.min.z } : { w: 0, d: 0, h: 0 };
+  });
+  const plan = platePlan(items, opts.bed ?? MK4_BED);
+  const plates = plan.plates.map((plate) => {
+    const group = new THREE.Group();
+    for (const it of plate.items) {
+      const m = meshes[it.index];
+      if (!m) continue;
+      m.position.set(it.x, it.y, 0);
+      group.add(m);
     }
-    m.position.set(x + w / 2, y + d / 2, 0);
-    group.add(m);
-    x += w + gap;
-    rowDepth = Math.max(rowDepth, d);
-  }
-  const out = exportSTL(group, true) as ArrayBuffer;
-  for (const c of group.children) (c as THREE.Mesh).geometry.dispose();
-  return out;
+    const data = exportSTL(group, true) as ArrayBuffer;
+    group.clear();
+    return { data, w: plate.w, d: plate.d };
+  });
+  for (const m of meshes) m?.geometry.dispose();
+  return { plates, tooBig: plan.tooBig };
 }
 
 export { downloadBlob, exportSVG } from "./download";

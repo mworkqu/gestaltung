@@ -290,6 +290,29 @@ export const ProductDocSchema = z.object({
 });
 export type ProductDoc = z.infer<typeof ProductDocSchema>;
 
+// The printed list as BUILT (F-004) — one row per identical body, grams from the
+// real mesh volume. `source` says which pipeline built it.
+export const PrintedRowSchema = z.object({
+  key: z.string().max(120),
+  name: z.object({ en: z.string().max(80), ar: z.string().max(80) }),
+  material: z.string().max(16),
+  count: z.number().int().min(1).max(64),
+  grams: z.number().min(0).max(100000),
+  /** False = the body failed the manifold check, so no STL was offered for it. */
+  printable: z.boolean(),
+});
+export type PrintedRow = z.infer<typeof PrintedRowSchema>;
+
+export const PrintedListSchema = z.object({
+  source: z.enum(["template", "product"]),
+  rows: z.array(PrintedRowSchema).max(64),
+  /** Sum of the rows that really are printable. */
+  grams: z.number().min(0).max(1000000),
+  /** How many beds the parts need (F-003 plate rule). */
+  plates: z.number().int().min(0).max(32).optional(),
+});
+export type PrintedList = z.infer<typeof PrintedListSchema>;
+
 export const StudioDocSchema = z.object({
   version: z.literal(1),
   spec: ProductSpecSchema,
@@ -310,6 +333,12 @@ export const StudioDocSchema = z.object({
   product: ProductDocSchema.optional(),
   /** P5-17 pin-list checklist: connectionKey() of every wire the client ticked while wiring. */
   wiringTicks: z.array(z.string().max(120)).max(300).optional(),
+  /**
+   * F-004: the printed list the Print step BUILT, so the Request page and the
+   * quote estimate read the same grams instead of each summing their own guess.
+   * Written by the Print step from real mesh volumes (lib/studio/weight.ts).
+   */
+  printed: PrintedListSchema.optional(),
 });
 export type StudioDoc = z.infer<typeof StudioDocSchema>;
 /** Page-side names for the same types (P5-16 Phase 2b). */
