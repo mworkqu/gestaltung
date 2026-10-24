@@ -76,18 +76,25 @@ export const sortOptions = (hasQuery: boolean): StoreSort[] =>
 export const LEAD_FILTER_OPTIONS = ["3_5_days", "1_2_weeks", "2_4_weeks"] as const;
 export type LeadFilter = (typeof LEAD_FILTER_OPTIONS)[number];
 
-const LEAD_FILTER_MAX_DAYS: Record<LeadFilter, number> = { "3_5_days": 5, "1_2_weeks": 14, "2_4_weeks": 28 };
+// The three buckets the customer picks from, by COMPUTED arrival date (lead
+// class + handling + transit + buffer), which is the date the card prints.
+//
+// The option VALUES are historical - "3_5_days" etc. were the supplier lead
+// classes before F-013 - and are kept so shared ?stock= links still work. Their
+// LABELS (Delivery.leadOpt_*) say what the bucket really is. Do not read the
+// value as a promise; the label and the card's date are the promise.
+const LEAD_FILTER_MAX_DAYS: Record<LeadFilter, number> = {
+  "3_5_days": 14, // "Up to 2 weeks"
+  "1_2_weeks": 28, // "2-4 weeks"
+  "2_4_weeks": Infinity, // "Over a month" - open-ended, so nothing falls outside every bucket
+};
 
 /** The day range an option stands for: more than `after`, at most `upTo` days from today. */
 export function leadFilterRange(option: LeadFilter): { after: number; upTo: number } {
   const idx = LEAD_FILTER_OPTIONS.indexOf(option);
-  // The slowest option is open-ended: handling and buffer push a 2_4_weeks
-  // product past its own 28-day bound, and a product that fits no option at all
-  // would be reachable only from "All".
-  const last = idx === LEAD_FILTER_OPTIONS.length - 1;
   return {
     after: idx > 0 ? LEAD_FILTER_MAX_DAYS[LEAD_FILTER_OPTIONS[idx - 1]] : -Infinity,
-    upTo: last ? Infinity : LEAD_FILTER_MAX_DAYS[option],
+    upTo: LEAD_FILTER_MAX_DAYS[option],
   };
 }
 
