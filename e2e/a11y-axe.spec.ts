@@ -34,7 +34,10 @@ const CONTRAST_WHY =
 const ALLOWED: Allowed[] = (
   [
     ["home", "en"],
-    ["home", "ar"],
+    // No ["home","ar"]: the Arabic home page has no serious/critical contrast
+    // failure. The RTL .kicker rule drops the 9px mono/uppercase treatment that
+    // fails on the English page, so the two really do differ - which is why
+    // this list is keyed by locale.
     ["store", "en"],
     ["checkout", "en"],
     ["studio-fixture", "en"],

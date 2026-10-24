@@ -20,6 +20,14 @@ const WIDTHS = [375, 1366] as const;
 /** Anything that would spend a token or sign someone in. */
 const AUTH_CALL = /\/auth\/v1\/(verify|otp|recover|token|signup)/;
 
+/**
+ * OUR alert, not Next's route announcer: #__next-route-announcer__ is always in
+ * the page with role="alert", so a bare getByRole("alert") is a strict-mode
+ * violation. The announcer is empty, so "has some non-space text" separates them.
+ */
+const alertBox = (page: import("@playwright/test").Page) =>
+  page.getByRole("alert").filter({ hasText: /\S/ });
+
 for (const locale of LOCALES) {
   test(`the reset link renders the form and verifies nothing on GET [${locale}]`, async ({ page }) => {
     const authCalls: string[] = [];
@@ -66,13 +74,15 @@ for (const locale of LOCALES) {
     // Client-side checks answer without a round trip, and still no auth call.
     await page.locator("#email").fill("someone@example.com");
     await page.locator("#code").fill("123456");
-    await page.locator("#password").fill("abcdef");
-    await page.locator("#confirm").fill("abcdefg");
+    // Long enough to pass the 8-character minimum (F-031), so the submit
+    // actually reaches our mismatch check instead of native validation.
+    await page.locator("#password").fill("abcdefgh");
+    await page.locator("#confirm").fill("abcdefghi");
     // Retry the press until React is attached (before that the form would not
     // be intercepted at all).
     await expect(async () => {
       await page.getByRole("button", { name: msg(locale, "Auth", "resetSubmit") }).click();
-      await expect(page.getByRole("alert")).toHaveText(msg(locale, "Auth", "passwordMismatch"), { timeout: 1000 });
+      await expect(alertBox(page)).toHaveText(msg(locale, "Auth", "passwordMismatch"), { timeout: 1000 });
     }).toPass({ timeout: 15_000 });
     expect(authCalls).toEqual([]);
 
@@ -86,7 +96,7 @@ for (const locale of LOCALES) {
     await page.goto(`/${locale}/forgot-password?expired=1`);
     await expectLocale(page, locale);
 
-    await expect(page.getByRole("alert")).toHaveText(msg(locale, "Auth", "linkUsedOrExpired"));
+    await expect(alertBox(page)).toHaveText(msg(locale, "Auth", "linkUsedOrExpired"));
     await expect(page.locator("#email")).toBeVisible();
     // The way out when the link keeps failing: the code from the same email.
     await expect(page.getByRole("link", { name: msg(locale, "Auth", "haveCode") })).toHaveAttribute(
