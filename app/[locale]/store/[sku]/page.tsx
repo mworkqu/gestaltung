@@ -372,7 +372,13 @@ export default async function PartDetailPage({
                   </a>
                 )}
               </div>
-              {specRows.length === 0 && untranslated.specs && !untranslated.description && notTranslated}
+              {/*
+                F-019: the table itself now falls back to the English rows (see
+                lib/store/product-details.ts), so this note sits UNDER it rather
+                than replacing it - the reader gets the numbers and still knows
+                the section is awaiting translation.
+              */}
+              {untranslated.specs && !untranslated.description && notTranslated}
               {specRows.length > 0 && (
                 <div className="neu overflow-x-auto">
                   <table className="w-full text-sm">
