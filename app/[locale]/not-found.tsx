@@ -2,6 +2,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { MessageCircle, Search } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
+import { DocumentTitle } from "@/components/document-title";
 import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 export default async function LocaleNotFound() {
   const locale = await getLocale();
   const t = await getTranslations("NotFound");
+  const tMeta = await getTranslations("Meta");
   const phone = await getContactPhone();
   const isRtl = locale === "ar";
 
@@ -19,6 +21,8 @@ export default async function LocaleNotFound() {
 
   return (
     <div className="container py-10">
+      {/* F-033: see components/document-title.tsx for why the title is set here. */}
+      <DocumentTitle title={tMeta("notFoundTitle")} />
       <section className="neu animate-fade-up mx-auto flex max-w-2xl flex-col gap-6 p-8 text-center sm:p-12">
         <span
           className={cn(

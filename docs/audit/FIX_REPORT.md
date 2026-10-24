@@ -41,8 +41,49 @@ Three pieces of work on one branch:
 | F-013 Delivery-time filter | **Fixed** | `leadClassesFor()` in `lib/store/catalog.ts` now keeps a lead class when the **computed arrival date** — the one the card prints — falls in the option's range, instead of matching the supplier's lead class. The date depends only on the lead class, today and the shipping settings, so it still resolves to a short list of classes the database can match: filtering, `total` and paging stay in the query and the page stays static/ISR. `?stock=` option names and values are unchanged. **See §3.3 for a side effect you need to decide on.** |
 | F-014 Two delivery tiers cost the same | **Fixed** | `displayedTiers()` in `lib/store/checkout-totals.ts` groups tiers by price and keeps only the fastest in each group, so Standard disappears while it costs the same QAR 50 as Express. `selectableTier()` moves the selection onto a visible tier, so a hidden tier cannot be submitted from the page. Applied at checkout, on the product page "Arrives by" line and in the cart. The data model, `create_part_order` and the order/email rendering are untouched, so an order already placed on a now-hidden tier still displays correctly. |
 | F-026 Missing `Studio.cat_logic` | **Fixed** | See the F-001/F-026 commit above. |
+| F-020 "You may also need" nonsense | **Fixed** | The filler came from any product in the same store category — including "Tools and accessories", the catch-all where unreviewed products land, which is why a DC jack got an HDMI cable. Filler now has to be in the product's exact category and that category must not be the catch-all; real co-purchases still show whatever their category. Nothing relevant → the block hides itself. Suggestions are still not filtered by stock; left as it was. |
+| F-038 Content invisible in a background tab | **Fixed** | `animate-fade-up` started at `opacity: 0` with `fill-mode: both`, so a page opened in a background tab stayed blank. It now starts at `0.6`, readable even if the animation never runs. Not dropping fill-mode on purpose: the `.delay-1`/`.delay-2` stagger would paint at full opacity and then jump back when the animation began. |
+| F-049 235+ requests on one store visit | **Fixed** | Product cards no longer RSC-prefetch on sight. `components/parts/hover-prefetch-link.tsx` sets `prefetch={false}` and prefetches on pointer-enter and on focus, so keyboard users keep it. |
+| F-054 Cart thumbnails are grey squares | **Fixed** | The first three load eagerly; the rest stay lazy. |
+| F-037 409 on `PUT /api/studio/doc` | **Fixed** | `saveWithConflictRetry` retries once against the version the server returned before falling back to the existing "adopt their doc" path. Other failures are not retried. |
+| F-037 three.js on the store page | **Could not reproduce — no change** | The store, home and product initial chunks contain no `three`/BVH code, and a live load of `/en/store` logged no BVH warning; the only chunk containing `maxLeafSize` is loaded lazily from the Studio. The home hero *does* deliberately load a 3D loop once idle (your W7 decision). The tester most likely went home → store in one tab and saw the hero's warnings still in the console. **Removing the hero's 3D would be your decision, not a bug fix**, so nothing was changed. |
+| F-037 one 404 asset on `/projects/new` | **Could not reproduce — no change** | Every asset path, `/api` path, `rpc()` and table name the page references resolves. The only 404s observed were `/apple-touch-icon.png` and `/apple-touch-icon-precomposed.png`, which browsers probe for unprompted and the page does not reference. The QA run did not capture the URL. If you see it again, please grab the request URL. |
+
+| F-015 "Final price" on the cart | **Fixed** | The cart says "Final price shown at checkout."; the binding line stays only on checkout, where the total really is final (D3). |
+| F-016 Checkout does not prefill | **Fixed** | Reuses the same profile reader the Get-it-made dialog uses (dynamic import, so Studio code stays out of the checkout bundle). Fills only empty fields; guests still check out with empty ones. |
+| F-017 Three meanings of "confirm" | **Fixed** | The first status reads **"Received" / "تم الاستلام"** everywhere a customer sees it, including the order email's subject and headline. **The stored value is untouched — still `confirmed`** — and the admin screens still say "Confirmed", because an admin picks the real stored state and a different word there would not match it. Button → "Message us on WhatsApp". The "within one working day" sentence is unchanged. |
+| F-036 Pricing FAQ vs Terms §13 | **Fixed** | The FAQ now says what Terms §13 says: a credit can be redeemed as a QAR 20 discount within 30 days, then it expires; no cash value, no transfer. EN + AR. |
+| F-050 Ambiguous Arabic credit words | **Fixed** | "أرصدة مخططات التوصيل" (not "أرصدة توصيل", which reads as delivery) and "رصيد النموذج ثلاثي الأبعاد" (not "رصيد CAD"), in the UI and the credit emails, singular/plural made to agree, Western digits kept. |
+| F-007 Pump wired so it cannot work | **Fixed** | The IRF520 low-side module was wired OUT → pump +, pump − → GND, so the MOSFET switched nothing. A low-side switch module and a two-terminal load path are now modelled explicitly, and the pair is wired V+ → load → switched terminal. New **hard** rule `load_return_on_ground` blocks readiness: a load on a low-side switch may not also sit on a ground net. It fails rather than warns — "Checked ✓" on a dead circuit is worse than no check. The tester's exact netlist is a fixture and fails it. |
+| F-052 USB back-feed caution | **Fixed** | "Unplug USB while the power board feeds the 5 V pin" now appears in "What we checked" whenever a power part feeds the board's own 5 V/VIN pin. Known gap: it does not fire for a USB-C 5 V supply board, which is not classified as a power *source*; widening that was an unrelated behaviour change so it was left. |
+| F-010 Inverted sensor logic, no safety | **Fixed** | Calibration facts live on the library part as data: the capacitive probe states that the reading goes **up** as soil dries, with dry/wet as **percentages of the board's ADC range** (so they hold on a 10-bit and a 12-bit board) and a comment to calibrate in your own soil — no invented absolute numbers. They are re-inserted into the generated pin block verbatim after the model answers. Any inductive load (pump, motor, solenoid, relay, fan) gets a safety block our code inserts itself: 10 s per run, 60 s per hour. A promise no part can keep is now stated in a "NOT IN THIS SKETCH" block instead of silently dropped. |
+| F-011 Promised feature with no part | **Fixed** | The Parts step cannot be marked done while an "Includes" line maps to no part. A float/level/tank line is explicitly unmappable, so a plain slide switch can no longer stand in for the tank sensor — which is what would have happened before. The main button still advances, so nobody is trapped. **Not yet shown in the Parts UI** — it only blocks the step; a "we have no part for: Float switch" line needs copy and is listed under §9. |
+| F-012 Invented features | **Fixed** | A feature line is kept only if every concept it names appears in the visitor's own words across the whole conversation, or was confirmed in chat. Lines naming no known concept are kept (we cannot judge them), and only new lines are judged, so what the visitor already saw stays. The tester's "Motion sensor" and "small screen" go; the real features stay. |
+| F-046 Unstocked part preferred | **Fixed** | A part with no store product is swapped for a stocked equivalent, within hand-checked equivalent groups only, after every other rule. The model never sees stock and never names a SKU. When nothing stocked does the job, the row says so. |
+
+| F-006 "Add all to cart" added 3 of 7 | **Fixed** | The Studio Parts step added parts in a **client loop, one line at a time** — session, lookup, insert and a full cart reload per line (~0.6 s each, which is why the badge crept 2 → 3). No single statement, no rollback: a loop that stops part way leaves the first rows saved and the rest never attempted. This is the **same failure mode as P5-02**, fixed once for the BOM kit and never picked up by the Studio path, which was written separately. Now one plan, written through the existing atomic `addKit`, so a half-filled cart is impossible; the step's total, its "+N priced on request" count and the button all read the plan that is written. Nothing was filtering helpers or packs out — that was the obvious suspicion and it was wrong; the lost lines were simply at the tail of the loop. Toast: "Added 7 parts · 2 we'll source", counted from the rows actually written. |
+| F-029 Search suggestions | **Fixed, with a caveat** | Links named, thumbnails no longer lazy. The threshold was **already 2 characters** in both the route and the component, so it was left at 2 (3 would have been worse) and the component now imports the constant so they cannot drift. If the live site still needs four characters, the deployed build is older than this code. |
+| F-030, F-031, F-032 (partial), F-033, F-034, F-051 | **Fixed** | See the accessibility commit. F-031 cannot be fully enforced by us — see §7 for the Supabase setting you must change. The Studio's seven step buttons and "Order the parts" are **still to do**. |
+| F-021, F-022 | **Fixed** | Quote success and the confirmation email now carry a reference (`Q-` + eight hex digits, derived from the row id the route generates — no migration) and the file name; the "open your project" link is shown only to a signed-in account. `/design/drawing` describes the on-site form, with WhatsApp as the marked alternative, and hides "My projects" from guests. |
 
 *(the remaining F-ids follow as they land)*
+
+### Phase C — password reset and email confirmation
+
+| Piece | Status | Note |
+|---|---|---|
+| Emails carry a token hash, not a spent link | **Done** | All four templates now link to `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=…` instead of `{{ .ConfirmationURL }}`, and print the 6-digit `{{ .Token }}` as a fallback a scanner cannot consume. Rendered to PNG at 600 and 360 px in `review/fixes/emails/` and checked by eye. |
+| `/{locale}/reset-password` does not verify on GET | **Done** | Server component, `force-dynamic`, `noindex`. It parses `token_hash` and renders the form with it in a hidden field. The page imports nothing from `lib/supabase` — no auth call, no cookie write — so a Safe Links / Mimecast / Proofpoint pre-fetch cannot spend the token. Verification happens only on submit: `verifyOtp` + `updateUser` + `signOut` in one server action. |
+| Any device works | **Done** | Verifying a token hash on submit needs no PKCE verifier cookie, so opening the email on a phone or in another browser now works. |
+| 6-digit code fallback | **Done** | Email + code + new password, one submit, rate-limited 8 attempts per 15 minutes per IP and per address. Deliberately one screen rather than verify-then-show-form: same two Supabase calls in one request, and it never leaves a half-spent recovery session between two round trips. |
+| `/{locale}/confirm-email` | **Done** | One "Confirm my email" button for `signup` and `email_change`; `recovery`, `magiclink` and `invite` are refused. Then `/{locale}` or a safe `?next=` path through the existing `safeNextPath`. |
+| Forgot-password UX | **Done** | Names the address, says to check Spam/Junk, states the validity, Resend after a 60-second countdown, a link to the code path, and a WhatsApp link. `?expired=1` shows "That link was already used or has expired" with the address prefilled from this browser's `localStorage`, never from the URL. |
+| Account enumeration | **Preserved** | Expired, already-used, wrong code and unknown address all return one answer. Nothing reveals whether an account exists. No token, hash, code or password is logged. |
+| Tests | **Done** | 33 unit tests; `e2e/reset-password.spec.ts` (5 tests × EN/AR, 375 and 1366 px) asserts that no request to `/auth/v1/(verify|otp|recover|token|signup)` happens before submit. The e2e write guard is untouched. The e2e run itself is Phase D. |
+
+**The "3 hours" in the copy is only true once you raise the Supabase OTP expiry** (§5 step 3).
+`OTP_VALID_HOURS` in `lib/auth/reset-token.ts` is the single place the number lives; if you
+choose a different expiry, change it there and the emails and pages follow.
 
 ## 3. Intentional behaviour changes
 
@@ -61,6 +102,61 @@ still applies and is not repeated here. What **this** branch changes on top:
    (F-014). Nothing about the stored order changed.
 6. **The delivery-time filter now means what it says, and that changes what it returns
    (F-013).** This one deserves your attention — see §3.3.
+7. The first order status reads "Received" to a customer and still "Confirmed" to an
+   admin; the stored value is unchanged (F-017).
+8. Arabic UI text now renders in IBM Plex Sans Arabic rather than a size-adjusted Arial
+   (F-035), and every page's CSS is inlined into its HTML (F-053) — about 19 kB gzip per
+   page, no longer cached across hard loads, in exchange for first paint going from 2.67 s
+   to 0.91 s on a throttled connection.
+9. The minimum password is 8 characters, not 6 (F-031). Sign-in keeps no minimum so
+   existing accounts can still sign in and reset.
+10. **A Studio kit now creates a `project_kit` row, so `kit_discount_pct` applies to
+    Studio parts (F-006).** They were loose project lines before and got no kit discount.
+    This is inherent to the atomic insert that fixes the bug, and it is arguably right —
+    it *is* a kit — but it changes what a customer pays. Tell me if Studio parts should be
+    excluded from the kit discount.
+
+### 3.2 The template enclosure now offers no STL at all — and the credit is already spent
+
+This is the most important thing in this report. Please read it before you merge.
+
+Fixing F-003 meant refusing to hand over a file we know is broken. Running the new
+manifold check against the **legacy template enclosure** (the Dome / Puck / Box shapes
+with "Try another look") shows its meshes cannot be made printable at all: the dome lid
+comes back with **2,611 unbalanced edges out of 6,275 triangles**, the base 1,044 of 1,467.
+`three-bvh-csg`'s booleans are non-manifold at the source, and `manifold-3d` refuses the
+same mesh even after welding coincident vertices. That is now recorded as a test, not an
+aspiration.
+
+So on that path the Print step correctly withholds every file and sends the customer to the
+engineer quote. **But the CAD credit was already spent at the Enclosure step** — `cad_deliver`
+runs as soon as the 3D model is produced, and the Print step is free. The customer pays, sees
+a model on screen, and then cannot download anything.
+
+Before this change they paid and got a file with 297 loose shells that no slicer would
+print. So nothing has been taken away that was ever worth having — but a visible refusal
+after payment is a different kind of bad from a broken download, and it is your call.
+
+**Your options:**
+
+1. **Rebuild the template path on the product kernel.** The product kernel already builds
+   all eight templates (plus `stake_pod`) as the `enclosure` form kind, so the route is
+   "send the template path through the product kernel", not "repair the soup". It is a
+   stage of its own and was too large to land safely inside this review. *My recommendation
+   — it is the only option that ends with a printable file.*
+2. **Don't charge when nothing printable comes out**, or refund the credit. The honest
+   reading is that the credit buys the 3D model and the quote route, both of which are
+   still delivered — but if you tell customers a credit buys a downloadable model, option 2
+   is the minimum until option 1 lands.
+3. **Ship as it is** and let the engineer quote carry it. Defensible, since the old files
+   were worthless, but a customer who paid will notice.
+
+Which path real customers hit matters here, and I could not confirm it from the repo: the
+tester's downloads were named `lid_1`, `base_1`, `battery_clip_1`, `light_pipe_1`, which are
+the **template/mech** names — so the live site appears to serve the template path. The
+product path (which does export clean files: 7 bodies, all watertight, single-shell, 204 g,
+two plates inside the bed) is the default in this code. **Please confirm on the live site
+which one a customer actually gets** before deciding.
 
 ### 3.3 The delivery filter now returns fewer things, and "3–5 days" may be empty
 
@@ -106,7 +202,7 @@ each one before moving on. 0100 and 0105 need the app commit **deployed** first.
 | 0103 | `0103_guards_and_grants.sql` (needs 0098 first) | `select count(*) from pg_trigger where tgname in ('part_order_items_limits','part_orders_rate_limit','projects_guard_admin_columns','inquiries_guard_insert');` → 4 |
 | 0104 | `0104_quote_upload_path.sql` | `select with_check from pg_policies where policyname = 'quote_uploads_insert';` contains the path regex |
 | 0105 | `0105_parts_cost_private.sql` (deploy the app first) | `select has_column_privilege('anon','public.parts','landed_cost_qar','select');` → false |
-| 0106+ | *(pending — any migration this branch adds)* | |
+| 0106+ | **None.** This branch adds no migration of its own — every fix was possible in application code. The only new SQL files are the audit's 0100–0105, re-reviewed above. | — |
 
 Smoke test after each: open the site and the dashboard once. After **0105** specifically,
 place one small test order and open Dashboard → Store, to confirm the admin still reads
@@ -201,6 +297,11 @@ New, found while doing this work:
 - Confirm `SUPABASE_SERVICE_ROLE_KEY` is set in **all three** Vercel environments
   (Production, Preview, Development). Many routes answer 503 without it, and the new startup
   warning is the only thing that will tell you.
+- **Supabase → Authentication → set the minimum password length to 8.** F-031 raised the
+  minimum everywhere we control it, but sign-up talks to Supabase straight from the browser,
+  so without this setting a 6-character password can still be created through the API.
+- **Dashboard → Store → clean the product descriptions** and run the Arabic translate step
+  (F-018, F-019). Both are metered admin actions and are yours to run, not ours.
 - *(pending — clean descriptions, the Arabic translate step, test-data cleanup)*
 
 ## 8. Test data to delete (one pass, at the end)
@@ -219,6 +320,62 @@ is done:
 | Quote request | no reference shown; file `test-bracket.stl`, name "TEST QA — please ignore" | 22 Oct |
 | Contact message | "TEST QA — please ignore" | 22 Oct |
 
-## 9. Next steps
+## 8b. Verification
 
-*(pending)*
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `npm run lint` | **0 errors**, 213 warnings (the pre-existing complexity / max-lines ratchet; the audit's baseline was 209) |
+| `npx vitest run` | **299 files, 3,962 tests pass** (the audit's baseline was 288 files / 3,855 — this branch adds 107 tests) |
+| `node scripts/check-i18n-parity.mjs` | en 5,275 · ar 5,275 |
+| `node scripts/split-legal-draft.mjs --check` | OK — the generated legal files match the draft |
+| `npm run check:cycles` | no circular dependency (one was introduced by the F-013 work and fixed; `check:cycles` is part of the green bar for a reason) |
+| `npm run build` | passes |
+| Route table vs `origin/main` | **No static/ISR flag changed anywhere.** One new route, `/[locale]/confirm-email`. Shared First Load JS identical at 104 kB. |
+| First Load JS | `/[locale]` 149 kB, `/[locale]/store` 148 kB, `/[locale]/store/[sku]` 211 kB — all within 2 kB of baseline. `/[locale]/reset-password` **198 → 133 kB** (−65 kB: the page no longer pulls the Supabase browser client, because it does not authenticate on GET). `/[locale]/forgot-password` 201 → 228 kB. Note the baseline is `origin/main` *before* the audit's own 129 commits, so these deltas are the audit plus this branch, not this branch alone. |
+| `npm run test:e2e` | see below |
+
+**A safety property worth stating:** this branch was built in a git worktree that has **no
+`.env.local`**. The production Supabase credentials were never reachable from it, so no
+migration, write or paid API call was possible at any point — not by policy, but
+structurally. It is also why the e2e suite's numbers look the way they do: it runs without
+Supabase env, exactly as the audit's baseline did.
+
+## 9. Follow-ups
+
+1. **After 2026-10-31 (7 days after this deploys), remove the legacy link path.**
+   `/api/auth/callback` still accepts `token_hash` + `type` so that reset emails already
+   sitting in inboxes keep working. To remove it: delete the `else if (tokenHash && type)`
+   branch and the `tokenHash` / `type` / `EmailOtpType` reads in
+   `app/api/auth/callback/route.ts`, and delete the `/{locale}/reset-password` exception at
+   the end of `callbackNextPath` in `lib/auth/next-path.ts` (and its test case). The `code`
+   path stays — social sign-in uses it.
+2. **Test the reset end to end with a real mailbox**, including one sent to a `@qu.edu.qa`
+   address, following the numbered test in `docs/AUTH_EMAILS.md`. That is the one thing
+   this branch cannot prove: it needs a real inbox and a write to production.
+3. **Re-run the QA pass** on the branch once it is deployed, with the same script, to
+   confirm the findings are actually gone on the live site rather than only in tests.
+4. **An H-bridge motor driver has the same bug F-007 had.** A load on `motor_driver` is
+   still wired OUT1 → motor +, motor − → GND. A reversible motor belongs between OUT1 and
+   OUT2; as wired it can only ever turn one way, if at all. The new hard rule is scoped to
+   low-side modules only, because the H-bridge was not in this round's findings and
+   widening it would change designs nobody has reviewed. It is the same class of mistake
+   and should be the next Studio fix.
+5. **Show the unmet promise on the Parts step.** `unmetPromises()` already knows that, say,
+   "Float switch" has no part; today it only blocks the step from being ticked. A line
+   saying so needs one new string in EN + AR.
+6. **Move the two Studio toast strings into `messages/**`.** They live inline in
+   `lib/studio/kit-plan.ts` for now (the arrangement `plain-checks.ts` already uses). The
+   keys, with the same ICU `form` + `count` shape as `Studio.partsOnRequestPlus`:
+   `Studio.addedToCart` — EN `Added {form, select, one {1 part} other {{count} parts}}`,
+   AR `أضفنا {form, select, one {قطعة واحدة} two {قطعتين} few {{count} قطع} other {{count} قطعة}}`;
+   and `Studio.addedToCartSourced`, the same plus ` · {sourced} we'll source` /
+   ` · {sourced} سنوفّرها لك`.
+7. **`pack_size` is not in `STORE_CARD_COLUMNS`.** The Studio reads a product's pack size
+   from its NAME, so a pack product whose name does not say the size is bought one listing
+   per piece. Adding the column to the card query would fix it, but that query is shared by
+   the storefront, so it needs its own change and its own test.
+8. **Add `Prototyping.hard_load_return_on_ground`** to `messages/{en,ar}.json`, params
+   `{ref}`, `{driver}`, `{net}`, for the legacy Engineer view. No user can hit a missing
+   key today — the flag only arises from Studio wiring, and the Studio shows its own inline
+   line — but the Engineer view would render the raw key if it ever did.

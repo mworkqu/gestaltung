@@ -110,7 +110,13 @@ Full text: `docs/DECISIONS.md` (D1-D13, owner site review 2026-10-03).
 - Do not publish "1 free revision; you own the files" (B7).
 
 ## PENDING MIGRATIONS (run in order if not already done)
-Check Supabase → Table Editor to confirm which tables exist before running:
+Check Supabase → Table Editor to confirm which tables exist before running.
+**Run order is load-bearing: 0096, 0097, 0098, 0099, then 0100-0105.** 0103's order-line
+guard reads `part_orders.class_id`, which comes from 0097; plpgsql resolves that column when
+the trigger first fires, so applying 0103 before 0097 succeeds and then makes every
+`part_order_items` insert fail — checkout dies silently. See `docs/audit/FIX_REPORT.md` §4,
+which also records that the run status of 0096/0097 disagrees between two copies of this
+file and must be confirmed in Supabase first.
 - 0100_studio_private.sql — NOT RUN. Audit DB-01: public.project_studio_private (service_role only; the Studio
   product models, back-filled from projects.studio.productPrivate, which is then removed — updated_at kept), trigger
   projects_guard_studio_server_keys (anon/authenticated writes cannot store productPrivate or change studio.product;
@@ -293,3 +299,13 @@ Full run log, rules for new migrations and the next free number (0106): `docs/MI
 - The Content-Security-Policy is shipped as `Content-Security-Policy-Report-Only` (`lib/security/headers.mjs`); promote it to enforcing only after the reports are clean for one release.
 - Turnstile: client wiring already exists (`lib/turnstile-client.ts`, `components/turnstile-challenge.tsx`); it stays off until the flag and keys are set (`docs/TURNSTILE.md`).
 - Items that need an owner decision (nothing was deleted without one) are listed in `docs/audit/CODE_QUALITY_AUDIT.md` and `SECURITY_AUDIT.md`.
+
+## Review fixes 2026-10 (branch `fix/review-2026-10`)
+- **Start at `docs/audit/FIX_REPORT.md`.** It holds every F-id and its status, the intentional behaviour changes, the migration run order, the Supabase auth-email checklist, the owner decisions and the follow-ups. The live-site QA report it answers is `review/qa/REPORT.md` (findings F-001…F-054); `review/` is untracked working material, not part of the build.
+- This branch applies the 2026-10 audit (which existed only as two diffs), restores the docs that diff could not carry, re-reviews its migrations, fixes the QA findings and rebuilds password reset. Nothing is pushed, merged or deployed, and **no migration has been run**.
+- Auth emails: the four templates in `supabase/auth-templates/` now link to `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=…` and print the 6-digit `{{ .Token }}`. `/{locale}/reset-password` and `/{locale}/confirm-email` **verify only on submit, never on GET**, so a mail scanner that pre-fetches the link cannot spend it and no PKCE cookie is needed. Do not revert that to `{{ .ConfirmationURL }}`; `docs/AUTH_EMAILS.md` says why and lists the dashboard settings the owner must apply (including raising the OTP expiry to 10800 s, which the "3 hours" copy depends on — the number lives in `OTP_VALID_HOURS`).
+- `/api/auth/callback` keeps its legacy `token_hash` branch for emails already in inboxes. **Remove it after 2026-10-31**, along with the `/{locale}/reset-password` exception in `callbackNextPath` (FIX_REPORT §9).
+- Studio engineering rules now live in deterministic code, not prompts: a low-side switch module's load is wired V+ → load → switched terminal and a **hard** rule fails a circuit whose load returns to ground; firmware carries per-part calibration facts and a max-run guard for inductive loads; a feature the visitor never asked for is dropped; an "Includes" line with no part blocks the Parts step.
+- A Studio kit is written through the atomic `addKit` (one insert, all or nothing). Never add kit lines in a client loop — that is the P5-02 failure mode and it came back as F-006.
+- STL export refuses a body it cannot close (`lib/studio/geometry/mesh-check.ts`) and plates are packed within the MK4 bed. **The legacy template enclosure path cannot produce a printable mesh and therefore offers no file** — FIX_REPORT §3.2 explains the options; this one needs an owner decision.
+- Grams come from `lib/studio/weight.ts` (`volume × density`, no infill factor) and nowhere else.

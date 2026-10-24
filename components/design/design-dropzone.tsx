@@ -94,18 +94,28 @@ export function DesignDropzone({ compact = false, hideExplore = false }: { compa
           <span className="mt-1 text-xs text-cobalt">{t("dropBrowse")}</span>
           <span className="mt-3 text-[10px] text-faint">{t("dropHint")}</span>
         </div>
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ACCEPT_ATTR}
-          onChange={(e) => {
-            accept(e.target.files?.[0]);
-            e.target.value = "";
-          }}
-          className="sr-only"
-        />
       </button>
+
+      {/*
+        Outside the button, not inside it: a file input nested in a button is two
+        interactive controls in one (axe nested-interactive), and it had no
+        accessible name of its own (axe label, critical) - a screen-reader user
+        could not tell what the control uploads. The button above is the visible
+        control and opens this one; tabIndex -1 keeps it out of the tab order so
+        there is still only one stop.
+      */}
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT_ATTR}
+        aria-label={t("dropCta")}
+        tabIndex={-1}
+        onChange={(e) => {
+          accept(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+        className="sr-only"
+      />
 
       <div className="space-y-3">
         {error ? (

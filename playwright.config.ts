@@ -7,8 +7,17 @@ import { defineConfig } from "@playwright/test";
 //   npm run build && npm run test:e2e
 //
 // `npm run start` serves the production build, so `npm run build` must have
-// run first (the webServer below does not build). An already running server
-// on :3000 is reused.
+// run first (the webServer below does not build). An already running server on
+// the port below is reused.
+//
+// SET E2E_PORT when another checkout of this repo is already serving :3000.
+// reuseExistingServer cannot tell whose server it is, so the suite would
+// silently test THAT build and report confident, meaningless results - which is
+// exactly what happened once. A worktree should run on its own port:
+//   E2E_PORT=3100 npm run test:e2e
+const PORT = process.env.E2E_PORT || "3000";
+const ORIGIN = `http://localhost:${PORT}`;
+
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
@@ -19,16 +28,16 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: ORIGIN,
     trace: "on-first-retry",
   },
   webServer: {
-    command: "npm run start",
-    url: "http://localhost:3000/en",
+    command: `npm run start -- -p ${PORT}`,
+    url: `${ORIGIN}/en`,
     reuseExistingServer: true,
     // Turns on the test-only routes under /{locale}/e2e-fixtures (lib/e2e-fixtures.ts;
     // never reachable on Vercel). A server you started yourself needs E2E_FIXTURES=1 too.
-    env: { E2E_FIXTURES: "1" },
+    env: { E2E_FIXTURES: "1", PORT },
     timeout: 120_000,
   },
   projects: [
