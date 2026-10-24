@@ -1,8 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { pageMetadata } from "@/lib/seo";
-import { ArrowRight } from "lucide-react";
 
-import { Link } from "@/i18n/navigation";
+import { MyProjectsLink } from "@/components/projects/my-projects-link";
 import { NewProjectForm } from "@/components/projects/new-project-form";
 import { cn } from "@/lib/utils";
 import { MessagesScope } from "@/components/i18n/messages-scope";
@@ -69,13 +68,7 @@ export default async function NewProjectPage({
       <header className="space-y-2">
         <div className="flex items-center justify-between gap-3">
           <p className={mono("text-[10px] text-azure")}>{t("kicker")}</p>
-          <Link
-            href="/projects"
-            className="inline-flex items-center gap-1 text-sm font-medium text-cobalt hover:underline"
-          >
-            {t("myProjectsLink")}
-            <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden />
-          </Link>
+          <MyProjectsLink />
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight text-heading">
           {forDrawing ? t("drawingHeading") : t("newHeading")}

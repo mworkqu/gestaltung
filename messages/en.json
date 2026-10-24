@@ -21,7 +21,8 @@
     "closeMenu": "Close menu",
     "pathBuy": "Shop parts",
     "pathMake": "Get a part made",
-    "pathIdea": "Plan a product"
+    "pathIdea": "Plan a product",
+    "skipToContent": "Skip to content"
   },
   "LanguageSwitcher": {
     "label": "Language",
@@ -34,7 +35,7 @@
   "CadAssistance": {
     "kicker": "We draw it for you",
     "heading": "No file? We'll draw it for you.",
-    "subheading": "Send a sketch, a photo, or just the dimensions over WhatsApp. Our team returns a manufacturing-ready drawing file you can quote and produce right away.",
+    "subheading": "Describe your part in a short form and attach a sketch or photo. Our team returns a manufacturing-ready drawing file you can quote and produce right away.",
     "specTurnaroundLabel": "Turnaround",
     "specTurnaroundValue": "Typically 2–3 working days",
     "specOutputLabel": "Output",
@@ -43,7 +44,7 @@
     "specPriceValue": "{n} QAR",
     "stepsTag": "How it works",
     "step1Title": "Send what you have",
-    "step1Copy": "A hand sketch, a photo of the part, or a list of dimensions — straight over WhatsApp.",
+    "step1Copy": "A hand sketch, a photo of the part, or a list of dimensions — in the request form on this site.",
     "step2Title": "We model it",
     "step2Copy": "Our team turns it into a manufacturing-ready STEP file, typically within 2–3 working days.",
     "step3Title": "Approve and produce",
@@ -62,7 +63,7 @@
     "tier3Name": "Complex / Reverse Engineering",
     "tier3Desc": "From a physical sample or broken part",
     "tier3Price": "From {n} QAR",
-    "ctaWhatsApp": "Chat on WhatsApp",
+    "ctaWhatsApp": "Or chat on WhatsApp instead",
     "ctaProject": "Start a drawing request",
     "priceIncludes": "See what the price includes"
   },
@@ -221,7 +222,8 @@
     "emailLabel": "Email",
     "emailPlaceholder": "you@company.com",
     "passwordLabel": "Password",
-    "passwordPlaceholder": "At least 6 characters",
+    "signUpTerms": "By creating an account you agree to the <terms>Terms</terms> and <privacy>Privacy policy</privacy>.",
+    "passwordPlaceholder": "At least 8 characters",
     "noAccount": "Don't have an account?",
     "signUpLink": "Create one",
     "haveAccount": "Already have an account?",
@@ -260,7 +262,7 @@
     "codePlaceholder": "123456",
     "resetInvalidEmail": "Enter the email address the message went to.",
     "resetInvalidCode": "Enter the 6 digits from the email.",
-    "resetWeakPassword": "Use at least 6 characters.",
+    "resetWeakPassword": "Use at least 8 characters.",
     "resetTooMany": "Too many tries. Wait a few minutes, then try again.",
     "passwordUpdatedHeading": "Password updated",
     "confirmHeading": "Confirm your email",
@@ -1106,7 +1108,7 @@
     "technique_cnc_machining": "CNC machining",
     "technique_laser_cutting": "Laser cutting",
     "technique_edm": "EDM (spark erosion for hard metals)",
-    "technique_edm_from": "EDM from QAR {price}",
+    "edmPriceNote": "EDM jobs start from QAR {price}.",
     "technique_not_sure": "Not sure — our engineer picks",
     "messageLabel": "Notes",
     "messageOptional": "optional",
@@ -1114,6 +1116,9 @@
     "submit": "Send request",
     "sending": "Sending…",
     "successTitle": "Request received",
+    "successReference": "Request reference",
+    "successFile": "File",
+    "successNoFileName": "No file attached",
     "successBody": "Our engineer replies within one working day.",
     "successNoFile": "Our engineer replies within one working day.",
     "successLargeFile": "Our engineer replies within one working day. We couldn't upload {file} — please send it to us on WhatsApp or email.",
@@ -2952,7 +2957,9 @@
     "schoolClassesTitle": "My classes",
     "schoolClassesDescription": "Create a class, share the join code and order the parts for every team.",
     "joinTitle": "Join your class",
-    "joinDescription": "Type your class code and your team name to start your project."
+    "joinDescription": "Type your class code and your team name to start your project.",
+    "notFoundTitle": "Page not found",
+    "notFoundDescription": "That page does not exist. Search the store, or go back to the home page."
   },
   "CookieNotice": {
     "label": "Cookie notice",

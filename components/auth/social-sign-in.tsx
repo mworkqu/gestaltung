@@ -109,6 +109,7 @@ export function SocialSignIn({
           onClick={() => void start(provider)}
           disabled={busy !== null}
           aria-busy={busy === provider}
+          aria-label={t("continueWith", { provider: PROVIDER_LABEL[provider] })}
           data-testid={`oauth-${provider}`}
           className={cn(
             "flex h-11 min-h-11 w-full items-center justify-center gap-3 rounded-full border border-borderstrong bg-white px-5",

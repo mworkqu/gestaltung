@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
+
 // What the emailed password-reset / confirm links carry (docs/AUTH_EMAILS.md).
 //
 // The templates link to `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=…`
@@ -33,8 +35,8 @@ const TOKEN_HASH_RE = /^[A-Za-z0-9_-]{16,512}$/;
 export const tokenHashSchema = z.string().trim().regex(TOKEN_HASH_RE);
 export const otpCodeSchema = z.string().regex(/^[0-9]{6}$/);
 
-/** A password Supabase will accept: its own minimum is 6, bcrypt stops at 72 bytes. */
-export const passwordSchema = z.string().min(6).max(72);
+/** A password we accept (rules in ./password.ts, shared with sign-up). */
+export const passwordSchema = z.string().min(MIN_PASSWORD_LENGTH).max(MAX_PASSWORD_LENGTH);
 
 /** The `token_hash` query value, or null when it is missing or malformed. */
 export function parseTokenHash(raw: unknown): string | null {

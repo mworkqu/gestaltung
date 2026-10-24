@@ -12,6 +12,8 @@ import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 import { readTurnstileToken } from "@/lib/turnstile";
 import { checkTurnstile, turnstileEnforced } from "@/lib/turnstile-server";
 import { asLocale } from "@/lib/locale";
+import { quoteReference } from "@/lib/design/quote-reference";
+import { quoteReceivedEmail } from "@/lib/email/quote-received-email";
 
 // Public "request a quote" endpoint for the custom-manufacturing flow. The
 // homepage dropzone → /design/quote uploads the CAD file straight to Storage,
@@ -195,8 +197,14 @@ export async function POST(request: Request) {
       }`
     : "File: none provided";
 
+  // F-021: the row id is chosen here (the anonymous requester cannot read the row
+  // back) and the reference is derived from it, so no new column is needed.
+  const inquiryId = crypto.randomUUID();
+  const reference = quoteReference(inquiryId) ?? inquiryId.slice(0, 8).toUpperCase();
+
   const message =
     `Custom manufacturing quote request.\n` +
+    `Reference: ${reference}\n` +
     `Method: ${methodLabel}\n` +
     `${fileLine}\n` +
     projectLine +
@@ -212,6 +220,7 @@ export async function POST(request: Request) {
   if (supabase) {
     try {
       const { error } = await supabase.from("inquiries").insert({
+        id: inquiryId,
         name,
         phone: phone || "",
         email,
@@ -244,7 +253,7 @@ export async function POST(request: Request) {
     emailed = await sendEmail({
       to: [OWNER_EMAIL],
       replyTo: email || OWNER_EMAIL,
-      subject: `New quote request — ${name} (${methodLabel})`,
+      subject: `New quote request ${reference} — ${name} (${methodLabel})`,
       html: mail.html,
       text: mail.text,
     });
@@ -255,5 +264,15 @@ export async function POST(request: Request) {
   if (!saved && !emailed) {
     return NextResponse.json({ error: "not_delivered" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, saved, emailed });
+
+  // 3) The customer's own confirmation, only when they gave an email.
+  if (email) {
+    try {
+      const mail = quoteReceivedEmail({ locale, reference, fileName, fileUploaded: Boolean(storagePath), siteUrl });
+      await sendEmail({ to: [email], replyTo: OWNER_EMAIL, subject: mail.subject, html: mail.html, text: mail.text });
+    } catch {
+      // Best effort: the on-screen confirmation already carries the reference.
+    }
+  }
+  return NextResponse.json({ ok: true, saved, emailed, reference, file_name: fileName });
 }

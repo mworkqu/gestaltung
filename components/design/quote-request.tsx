@@ -71,6 +71,10 @@ export function QuoteRequest({
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<Done>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // Guests (anonymous sessions) cannot come back to the project, so only a real account gets the link.
+  const [canOpenProject, setCanOpenProject] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+  const [sentFileName, setSentFileName] = useState("");
   const [needsCheck, setNeedsCheck] = useState(false);
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
@@ -155,6 +159,7 @@ export function QuoteRequest({
       let storagePath: string | null = null;
       let bucket: "cad" | "quote" = "quote";
       let newProject: string | null = null;
+      let signedIn = false;
       try {
         let user: Awaited<ReturnType<typeof ensureSession>>;
         try {
@@ -166,6 +171,7 @@ export function QuoteRequest({
             setCaptchaReset((k) => k + 1);
           }
         }
+        signedIn = user.is_anonymous !== true;
         const supabase = createClient();
         const title = (file?.name.replace(/\.[^.]+$/, "") || name.trim() || t("projectDefaultName")).slice(0, 120);
         const { data: proj, error: projErr } = await supabase
@@ -234,6 +240,15 @@ export function QuoteRequest({
       // "sent" = file safely stored; "sent_large" = had a file but upload
       // failed (ask them to send it another way); "sent_nofile" = no file.
       setProjectId(newProject);
+      setCanOpenProject(signedIn && Boolean(newProject));
+      try {
+        const sent = (await res.json()) as { reference?: string; file_name?: string };
+        setReference(typeof sent.reference === "string" ? sent.reference : null);
+        setSentFileName(typeof sent.file_name === "string" && sent.file_name ? sent.file_name : file?.name ?? "");
+      } catch {
+        setReference(null);
+        setSentFileName(file?.name ?? "");
+      }
       if (phone.trim()) track("phone_captured", { where: "quote" });
       setDone(!file ? "sent_nofile" : storagePath ? "sent" : "sent_large");
     } catch {
@@ -254,6 +269,20 @@ export function QuoteRequest({
               ? t("successNoFile")
               : t("successBody")}
         </p>
+        <dl className="mx-auto mt-5 max-w-md space-y-2 rounded-xl bg-panel p-4 text-start text-sm shadow-neu-inset">
+          {reference && (
+            <div className="flex flex-wrap justify-between gap-x-4">
+              <dt className="text-mutedtext">{t("successReference")}</dt>
+              <dd className="font-semibold text-heading" dir="ltr">{reference}</dd>
+            </div>
+          )}
+          <div className="flex flex-wrap justify-between gap-x-4">
+            <dt className="text-mutedtext">{t("successFile")}</dt>
+            <dd className="min-w-0 break-all font-semibold text-heading" dir="ltr">
+              {sentFileName || t("successNoFileName")}
+            </dd>
+          </div>
+        </dl>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button
             type="button"
@@ -266,12 +295,14 @@ export function QuoteRequest({
               setName("");
               setTechnique(DEFAULT_QUOTE_METHOD);
               setMessage("");
+              setReference(null);
+              setSentFileName("");
               setDone(null);
             }}
           >
             {t("newRequest")}
           </Button>
-          {projectId && (
+          {projectId && canOpenProject && (
             <Button asChild className="rounded-full">
               <Link href={`/projects/${projectId}`}>{t("openProject")}</Link>
             </Button>
@@ -417,10 +448,12 @@ export function QuoteRequest({
           >
             {QUOTE_METHODS.map((m) => (
               <option key={m} value={m}>
-                {m === "edm" ? t("technique_edm_from", { price: edmFrom }) : t(`technique_${m}`)}
+                {t(`technique_${m}`)}
               </option>
             ))}
           </select>
+          {/* The price sits outside the select, so no option carries one the others lack (F-051). */}
+          <p className="text-[11px] text-faint">{t("edmPriceNote", { price: edmFrom })}</p>
         </div>
       </div>
 

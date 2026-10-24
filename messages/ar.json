@@ -21,7 +21,8 @@
     "closeMenu": "إغلاق القائمة",
     "pathBuy": "تسوّق القطع",
     "pathMake": "اصنع قطعتي",
-    "pathIdea": "خطّط لمنتج"
+    "pathIdea": "خطّط لمنتج",
+    "skipToContent": "تخطَّ إلى المحتوى"
   },
   "LanguageSwitcher": {
     "label": "اللغة",
@@ -34,7 +35,7 @@
   "CadAssistance": {
     "kicker": "نرسمه لك",
     "heading": "ليس لديك ملف؟ نرسمه لك.",
-    "subheading": "أرسل رسمة تخطيطية أو صورة أو الأبعاد فقط عبر واتساب — وسيعيد لك فريقنا ملف رسم جاهزًا للتصنيع، يمكنك تسعيره وإنتاجه مباشرة.",
+    "subheading": "صِف قطعتك في نموذج قصير وأرفق رسمة تخطيطية أو صورة — وسيعيد لك فريقنا ملف رسم جاهزًا للتصنيع، يمكنك تسعيره وإنتاجه مباشرة.",
     "specTurnaroundLabel": "مدة التسليم",
     "specTurnaroundValue": "عادةً 2–3 أيام عمل",
     "specOutputLabel": "المُخرَج",
@@ -43,7 +44,7 @@
     "specPriceValue": "{n} ر.ق",
     "stepsTag": "كيف تعمل الخدمة",
     "step1Title": "أرسل ما لديك",
-    "step1Copy": "رسمة يدوية، أو صورة للقطعة، أو قائمة بالأبعاد — مباشرة عبر واتساب.",
+    "step1Copy": "رسمة يدوية، أو صورة للقطعة، أو قائمة بالأبعاد — في نموذج الطلب على هذا الموقع.",
     "step2Title": "نحن نرسمها",
     "step2Copy": "يحوّلها فريقنا إلى ملف STEP جاهز للتصنيع، وعادةً خلال 2–3 أيام عمل.",
     "step3Title": "اعتمد وأنتِج",
@@ -62,7 +63,7 @@
     "tier3Name": "معقّد / هندسة عكسية",
     "tier3Desc": "من عيّنة فعلية أو قطعة مكسورة",
     "tier3Price": "من {n} ر.ق",
-    "ctaWhatsApp": "تواصل عبر واتساب",
+    "ctaWhatsApp": "أو تواصل عبر واتساب بدلًا من ذلك",
     "ctaProject": "ابدأ طلب رسم",
     "priceIncludes": "اطّلع على ما يشمله السعر"
   },
@@ -220,8 +221,9 @@
     "countryCode": "رمز الدولة",
     "emailLabel": "البريد الإلكتروني",
     "emailPlaceholder": "you@company.com",
+    "signUpTerms": "بإنشاء حساب فأنت توافق على <terms>الشروط والأحكام</terms> و<privacy>سياسة الخصوصية</privacy>.",
     "passwordLabel": "كلمة المرور",
-    "passwordPlaceholder": "6 أحرف على الأقل",
+    "passwordPlaceholder": "8 أحرف على الأقل",
     "noAccount": "ليس لديك حساب؟",
     "signUpLink": "أنشئ حسابًا",
     "haveAccount": "لديك حساب بالفعل؟",
@@ -260,7 +262,7 @@
     "codePlaceholder": "123456",
     "resetInvalidEmail": "أدخل البريد الإلكتروني الذي وصلت إليه الرسالة.",
     "resetInvalidCode": "أدخل الأرقام الستة الموجودة في البريد.",
-    "resetWeakPassword": "استخدم 6 أحرف على الأقل.",
+    "resetWeakPassword": "استخدم 8 أحرف على الأقل.",
     "resetTooMany": "محاولات كثيرة. انتظر بضع دقائق ثم حاول مرة أخرى.",
     "passwordUpdatedHeading": "تم تحديث كلمة المرور",
     "confirmHeading": "أكّد بريدك الإلكتروني",
@@ -1105,8 +1107,8 @@
     "technique_3d_printing": "طباعة ثلاثية الأبعاد",
     "technique_cnc_machining": "تشغيل آلي CNC",
     "technique_laser_cutting": "قطع بالليزر",
-    "technique_edm": "EDM (القطع بالشرارة للمعادن الصلبة)",
-    "technique_edm_from": "EDM ابتداءً من {price} ر.ق",
+    "technique_edm": "التفريغ الكهربائي EDM",
+    "edmPriceNote": "أعمال EDM تبدأ من {price} ر.ق.",
     "technique_not_sure": "لست متأكدًا — يختار مهندسنا",
     "messageLabel": "ملاحظات",
     "messageOptional": "اختياري",
@@ -1114,6 +1116,9 @@
     "submit": "إرسال الطلب",
     "sending": "جارٍ الإرسال…",
     "successTitle": "تم استلام الطلب",
+    "successReference": "رقم الطلب",
+    "successFile": "الملف",
+    "successNoFileName": "لا يوجد ملف مرفق",
     "successBody": "يردّ عليك مهندسنا خلال يوم عمل واحد.",
     "successNoFile": "يردّ عليك مهندسنا خلال يوم عمل واحد.",
     "successLargeFile": "يردّ عليك مهندسنا خلال يوم عمل واحد. تعذّر رفع {file} — يرجى إرساله لنا عبر واتساب أو البريد الإلكتروني.",
@@ -2952,7 +2957,9 @@
     "schoolClassesTitle": "صفوفي",
     "schoolClassesDescription": "أنشئ صفًّا، وشارك رمز الانضمام، واشترِ القطع لكل فريق.",
     "joinTitle": "انضم إلى صفّك",
-    "joinDescription": "اكتب رمز صفّك واسم فريقك لتبدأ مشروعكم."
+    "joinDescription": "اكتب رمز صفّك واسم فريقك لتبدأ مشروعكم.",
+    "notFoundTitle": "الصفحة غير موجودة",
+    "notFoundDescription": "هذه الصفحة غير موجودة. ابحث في المتجر أو عُد إلى الصفحة الرئيسية."
   },
   "CookieNotice": {
     "label": "إشعار ملفات تعريف الارتباط",

@@ -8,6 +8,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
 import { resetPasswordWithCode, resetPasswordWithHash, type ResetError } from "@/app/[locale]/reset-password/actions";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { cn } from "@/lib/utils";
 
 // Two ways in, one password form (2026-10):
@@ -38,7 +39,7 @@ export function ResetPasswordForm({ tokenHash }: { tokenHash: string | null }) {
     const confirm = String(data.get("confirm") ?? "");
 
     // Same checks as the action, so the common mistakes answer without a round trip.
-    if (password.length < 6) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       setError("weak_password");
       return;
     }
@@ -139,7 +140,7 @@ export function ResetPasswordForm({ tokenHash }: { tokenHash: string | null }) {
             name="password"
             type="password"
             required
-            minLength={6}
+            minLength={MIN_PASSWORD_LENGTH}
             autoComplete="new-password"
             placeholder={t("passwordPlaceholder")}
             className={authFieldClass}
@@ -155,7 +156,7 @@ export function ResetPasswordForm({ tokenHash }: { tokenHash: string | null }) {
             name="confirm"
             type="password"
             required
-            minLength={6}
+            minLength={MIN_PASSWORD_LENGTH}
             autoComplete="new-password"
             placeholder={t("passwordPlaceholder")}
             className={authFieldClass}

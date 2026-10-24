@@ -62,6 +62,7 @@ export async function PartCard({
       <HoverPrefetchLink
         href={`/store/${part.sku}`}
         className="block aspect-square overflow-hidden bg-panel"
+        aria-label={name}
       >
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

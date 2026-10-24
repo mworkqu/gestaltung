@@ -60,6 +60,15 @@ describe("toSuggestion field whitelist", () => {
 });
 
 describe("query handling", () => {
+  it("suggests from a three-letter prefix (F-029: no whole word needed)", async () => {
+    const d = deps([card(1)]);
+    const res = await handleStoreSearch(req("?q=mot"), d, "1.1.1.1");
+    const body = await res.json();
+    expect(d.listing).toHaveBeenCalledWith("mot", "en");
+    expect(body.results).toHaveLength(1);
+    expect(body.results[0].thumb).not.toBeNull();
+  });
+
   it("collapses spaces, trims and caps at 100 chars", () => {
     expect(normalizeSuggestQuery("  dc   motor ")).toBe("dc motor");
     expect(normalizeSuggestQuery(null)).toBe("");

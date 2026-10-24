@@ -6,7 +6,7 @@ import { useRouter as useNextRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { authAltHref, returnsToProject } from "@/lib/auth/next-path";
 import { createClient } from "@/lib/supabase/client";
 import { isGuest } from "@/lib/supabase/guest";
@@ -15,6 +15,7 @@ import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { PhoneInput } from "@/components/phone-input";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { cn } from "@/lib/utils";
 import { SocialSignIn } from "@/components/auth/social-sign-in";
 import type { OAuthProvider } from "@/lib/auth/providers";
@@ -239,7 +240,7 @@ export function SignUpForm({
             name="password"
             type="password"
             required
-            minLength={6}
+            minLength={MIN_PASSWORD_LENGTH}
             autoComplete="new-password"
             placeholder={t("passwordPlaceholder")}
             className={authFieldClass}
@@ -261,6 +262,20 @@ export function SignUpForm({
           {loading && <Loader2 className="animate-spin" />}
           {t("signUpSubmit")}
         </Button>
+        <p className="text-center text-xs leading-relaxed text-mutedtext">
+          {t.rich("signUpTerms", {
+            terms: (chunks) => (
+              <Link href="/terms" className="font-semibold underline underline-offset-2 hover:text-cobalt">
+                {chunks}
+              </Link>
+            ),
+            privacy: (chunks) => (
+              <Link href="/privacy" className="font-semibold underline underline-offset-2 hover:text-cobalt">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
       </form>
     </AuthShell>
   );

@@ -84,8 +84,9 @@ describe("isResetType", () => {
 
 describe("passwordSchema", () => {
   it("matches Supabase's own limits", () => {
-    expect(passwordSchema.safeParse("abcdef").success).toBe(true);
-    expect(passwordSchema.safeParse("abcde").success).toBe(false);
+    expect(passwordSchema.safeParse("abcdefgh").success).toBe(true);
+    expect(passwordSchema.safeParse("abcdefg").success).toBe(false);
+    expect(passwordSchema.safeParse("abcdef").success).toBe(false); // the old 6-character minimum
     expect(passwordSchema.safeParse("x".repeat(72)).success).toBe(true);
     expect(passwordSchema.safeParse("x".repeat(73)).success).toBe(false);
   });
