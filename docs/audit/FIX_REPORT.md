@@ -439,19 +439,30 @@ is done:
 | `npm run check:cycles` | no circular dependency (one was introduced by the F-013 work and fixed; `check:cycles` is part of the green bar for a reason) |
 | `npm run build` | passes |
 | Studio bundle (`scripts/studio-bundle-size.mjs`) | First load 197.6 kB gz unchanged. The enclosure rebuild took `three-bvh-csg`/`three-mesh-bvh` out of the graph: **worker 276.3 → 245.2 kB gz** (93.7 of it not shared, was 123.9) and the **no-Worker fallback 82.7 → 53.8 kB gz**. Studio-before-CAD is 484.3 against its 350 budget — still over, as it was before this branch. |
-| `npm run test:e2e` (`E2E_PORT=3100`) | 250 passed / 59 failed / 2 flaky / 65 skipped, against the audit baseline's 221 / 62 / — / 53 under the same no-Supabase condition. See §8c. |
+| `npm run test:e2e` | **249 passed / 60 failed / 2 flaky / 65 skipped**, against the audit baseline's 221 / 62 / — / 53 under the same no-Supabase condition. The three specs this branch adds or rewrote are clean: `a11y-axe` 0 failures, `reset-password` 0, `studio-engine` 0. See §8c. |
 | Route table vs `origin/main` | **No static/ISR flag changed anywhere.** One new route, `/[locale]/confirm-email`. Shared First Load JS identical at 104 kB. |
 | First Load JS | `/[locale]` 149 kB, `/[locale]/store` 148 kB, `/[locale]/store/[sku]` 211 kB — all within 2 kB of baseline. `/[locale]/reset-password` **198 → 133 kB** (−65 kB: the page no longer pulls the Supabase browser client, because it does not authenticate on GET). `/[locale]/forgot-password` 201 → 228 kB. Note the baseline is `origin/main` *before* the audit's own 129 commits, so these deltas are the audit plus this branch, not this branch alone. |
 | `npm run test:e2e` | see §8c |
 
 ## 8c. The e2e suite, and a trap worth knowing about
 
-**`playwright.config.ts` now takes `E2E_PORT`.** It used to hardcode `:3000` with
-`reuseExistingServer: true`. Another checkout of this repo was serving `:3000`, so the whole
-suite — the new axe scan included — silently tested **that** build and returned confident
-numbers about code it had never seen. I only noticed because a page rendered a message that
-exists nowhere in this source. If you ever run the suite while another copy of the project
-is running, use `E2E_PORT=3100 npm run test:e2e`.
+**Playwright no longer reuses a running server, and that matters more than it sounds.**
+`reuseExistingServer: true` cost two separate debugging sessions on this branch:
+
+1. Another checkout of this repo was serving `:3000`, so the whole suite — the new axe scan
+   included — tested **that** build. Noticed only because a page rendered a message that
+   exists nowhere in this source.
+2. A server *we* had started on `:3100` for a manual check was still running. `npm run
+   start` loads the build manifests at boot, so later rebuilds never reached it: every run
+   afterwards tested the app as it stood hours earlier against **current test code**. That
+   mismatch produced an apparent regression — `studio-engine`, the spec guarding the 3D
+   engine, going from 0 to 6 failures — which **does not exist**. Against a fresh server it
+   is 8/8, in 1.8 minutes instead of 12.6.
+
+The failure mode is nasty because nothing errors: the server answers 200, the tests run,
+and the only symptom is assertions failing for reasons that make no sense against the code
+in front of you. Reuse is now opt-in (`E2E_REUSE=1`); the default starts its own server and
+tears it down. `E2E_PORT` still exists for running beside another checkout.
 
 **The suite runs without Supabase env**, because this worktree has no `.env.local` — the
 same condition the audit's baseline ran under.
