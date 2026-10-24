@@ -3,26 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { after } from "next/server";
-import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getSessionContext } from "@/lib/auth/get-session";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 import { drainOutbox } from "@/lib/notifications/drain";
 import { siteUrlFor } from "@/lib/projects/recovery";
 import { canTransition, isOrderStatus, normaliseOrderStatus, toPre0053Status, type OrderStatus } from "@/lib/orders/status";
 import { canMarkTest, nextStepFor } from "@/lib/orders/admin-rules";
 import { setWhatsappSent } from "@/lib/orders/whatsapp";
-
-function safeLocale(formData: FormData): "en" | "ar" {
-  return String(formData.get("locale")) === "ar" ? "ar" : "en";
-}
-
-async function requireSuperAdmin(locale: string) {
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
-}
+import { asLocale } from "@/lib/locale";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 export type OrderStatusError =
   | "bad_status"
@@ -33,8 +24,6 @@ export type OrderStatusError =
   | "failed";
 
 export type OrderStatusState = { ok: true; status: OrderStatus } | { ok: false; error: OrderStatusError } | null;
-
-const MISSING_FN = new Set(["PGRST202", "42883"]);
 
 /**
  * One status change: set_order_status (0053: validates the transition, writes
@@ -48,7 +37,7 @@ async function applyOrderStatus(id: string, status: OrderStatus, note: string): 
   const { error } = await supabase.rpc("set_order_status", { p_order: id, p_status: status, p_note: note || null });
   if (!error) return { ok: true, status };
 
-  if (!MISSING_FN.has(error.code ?? "")) {
+  if (!isMissingFunction(error)) {
     const msg = error.message ?? "";
     for (const code of ["bad_transition", "same_status", "not_found", "bad_status"] as const) {
       if (msg.includes(code)) return { ok: false, error: code };
@@ -98,7 +87,7 @@ function revalidateOrder(locale: string, id: string) {
 
 /** Admin order page: status + note form (useActionState). */
 export async function setOrderStatus(_prev: OrderStatusState, formData: FormData): Promise<OrderStatusState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   await requireSuperAdmin(locale);
 
   const id = String(formData.get("id") ?? "");
@@ -116,7 +105,7 @@ export async function setOrderStatus(_prev: OrderStatusState, formData: FormData
 
 /** Orders list: inline select, no note. */
 export async function updateOrderStatus(formData: FormData): Promise<void> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   await requireSuperAdmin(locale);
 
   const id = String(formData.get("id") ?? "");
@@ -129,7 +118,7 @@ export async function updateOrderStatus(formData: FormData): Promise<void> {
 }
 
 export async function toggleWhatsappSent(formData: FormData): Promise<void> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   await requireSuperAdmin(locale);
 
   const id = String(formData.get("id") ?? "");
@@ -154,7 +143,7 @@ export type OrderActionState = { ok: true } | { ok: false; error: OrderActionErr
  * status email).
  */
 export async function advanceOrder(formData: FormData): Promise<OrderActionState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   await requireSuperAdmin(locale);
 
   const id = String(formData.get("id") ?? "");
@@ -175,7 +164,7 @@ export async function advanceOrder(formData: FormData): Promise<OrderActionState
 
 /** Cancel an order (never deleted): the normal status change to "cancelled", logged in the history. */
 export async function cancelOrder(formData: FormData): Promise<OrderActionState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   await requireSuperAdmin(locale);
 
   const id = String(formData.get("id") ?? "");
@@ -195,7 +184,7 @@ export async function cancelOrder(formData: FormData): Promise<OrderActionState>
  * been received. Un-marking is always allowed. Nothing is deleted.
  */
 export async function setOrderTest(formData: FormData): Promise<OrderActionState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   await requireSuperAdmin(locale);
 
   const id = String(formData.get("id") ?? "");

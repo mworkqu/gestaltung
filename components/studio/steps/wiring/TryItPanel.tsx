@@ -42,6 +42,7 @@ import {
 } from "@/lib/studio/sim/step";
 import { cn } from "@/lib/utils";
 import type { SimFrame } from "./sim-scene";
+import { isRtl } from "@/lib/locale";
 
 const accent = STEP_ACCENT.wiring;
 /** Loose `t` (keys are built from kinds). */
@@ -266,7 +267,7 @@ export function useSim({
       const next = !was;
       try {
         if (next) {
-          const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          const Ctor = window.AudioContext ?? window.webkitAudioContext;
           if (Ctor) {
             audio.current ??= new Ctor();
             void audio.current.resume();
@@ -310,7 +311,7 @@ export function TryItPanel({ sim, locale, reduced }: { sim: Sim; locale: Locale;
     <div
       role="group"
       aria-label={t("panelLabel")}
-      dir={locale === "ar" ? "rtl" : "ltr"}
+      dir={isRtl(locale) ? "rtl" : "ltr"}
       data-testid="studio-sim-panel"
       data-outputs={outputsAttr(state)}
       data-cause={state.cause}
@@ -552,7 +553,7 @@ export function SimStatus({ sim, locale }: { sim: Sim; locale: Locale }) {
     <p
       role="status"
       aria-label={t("statusLabel")}
-      dir={locale === "ar" ? "rtl" : "ltr"}
+      dir={isRtl(locale) ? "rtl" : "ltr"}
       data-testid="studio-sim-status"
       className="rounded-xl bg-surface px-3 py-2 text-sm font-semibold text-heading shadow-neu-inset"
     >

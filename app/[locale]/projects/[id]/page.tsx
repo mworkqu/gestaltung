@@ -11,8 +11,7 @@ import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { getSessionContext } from "@/lib/auth/get-session";
 import { PROJECT_HREF_COLUMNS, isStudioProject, studioRedirectPath, type ProjectHrefRow } from "@/lib/projects/href";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_RE } from "@/lib/uuid";
 
 /**
  * Whether this visitor's session can read the project AND it is a product project
@@ -20,7 +19,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * fresh browser; not theirs) or not a product project: render the page as before.
  */
 async function isReadableStudioProject(id: string): Promise<boolean> {
-  if (!UUID.test(id)) return false;
+  if (!UUID_RE.test(id)) return false;
   try {
     const supabase = await createClient();
     const {

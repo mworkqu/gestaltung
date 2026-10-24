@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import {
   DEFAULT_COMMISSION_FLOOR_PCT,
@@ -20,7 +20,7 @@ import { HOLIDAYS_KEY, isIsoDate, parseHolidays } from "@/lib/store/working-days
 // database triggers whenever an offer, a supplier or the product changes.
 
 async function requireAdmin() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 

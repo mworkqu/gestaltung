@@ -20,6 +20,7 @@ import {
   YT_INTEGRATION,
   type YoutubeMeta,
 } from "@/lib/youtube-upload";
+import { isMissingRelation } from "@/lib/supabase/errors";
 
 export type YoutubeConfig = { clientId: string; clientSecret: string; key: Buffer };
 
@@ -53,8 +54,7 @@ export type ReadResult =
   | { state: "ok"; db: SupabaseClient; row: IntegrationRow | null; meta: YoutubeMeta };
 
 const isMissingTable = (code: string | undefined, message: string | undefined) =>
-  code === "PGRST205" ||
-  code === "42P01" ||
+  isMissingRelation({ code }) ||
   (/integrations/.test(message ?? "") && /does not exist|schema cache/.test(message ?? ""));
 
 /** Read the youtube row with the service client. Missing 0072 = "no_table". */

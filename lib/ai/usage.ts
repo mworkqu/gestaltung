@@ -4,21 +4,34 @@
 // what it cost, how long it took, how it ended. quota() answers "may we call
 // this provider right now?" from today's rows and lib/ai/limits.
 //
-// Both go through the caller's own Supabase session and SECURITY DEFINER
-// functions, so no service key is needed. If 0023 has not run yet, logging
-// warns in the server console and the guard lets calls through (there is
-// nothing to count), rather than breaking the feature.
+// Logging is server-only since migration 0101 (audit DB-02): the row is
+// written with the service-role client through log_ai_usage_server, with the
+// user id verified by auth.getUser() on the caller's session (a browser can no
+// longer call log_ai_usage and inflate the totals). Before 0101 runs (no
+// log_ai_usage_server) it falls back to the old log_ai_usage on the caller's
+// session. Without a service key it warns once and skips the row — metering
+// is best-effort: a failed log never fails the user's call (it only warns),
+// but nothing is counted towards the daily guard while rows are skipped.
+//
+// quota() still reads ai_usage_totals with the caller's own session (every
+// AI route requires one). If 0023 has not run yet, the guard lets calls
+// through (there is nothing to count), rather than breaking the feature.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { createServiceClient } from "@/lib/supabase/service";
 import { dayStart, guardThreshold, providerLimits, type ProviderId } from "./limits";
 import { callCostUsd } from "./prices";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 // "studio" (Design Studio, 0068): until 0068 runs the ai_usage check constraint
 // rejects it — logUsage only warns, so the user's call is never affected.
 export type Feature = "analyse" | "netlist" | "transcribe" | "electronics" | "firmware" | "cad" | "studio" | "billing";
 
 export type UsageRow = {
+  /** The caller's id, already verified by the route with auth.getUser(). When
+   *  absent (older callers) logUsage looks it up once on `supabase`. */
+  userId?: string | null;
   provider: ProviderId;
   model?: string | null;
   projectId?: string | null;
@@ -47,7 +60,7 @@ export async function logUsage(supabase: SupabaseClient, u: UsageRow): Promise<v
     } ${u.latencyMs ?? "-"}ms${u.remainingRequests != null ? ` remaining-requests=${u.remainingRequests}` : ""}`
   );
   const int = (v: number | null | undefined) => (v == null ? null : Math.round(v));
-  const args = {
+  const args: UsageArgs = {
     p_provider: u.provider,
     p_model: u.model ?? null,
     p_project: u.projectId ?? null,
@@ -64,12 +77,79 @@ export async function logUsage(supabase: SupabaseClient, u: UsageRow): Promise<v
   };
   // 0088: step + what the call cost at the paid list price (lib/ai/prices.ts).
   const cost = u.outcome === "blocked" ? 0 : callCostUsd(u);
-  let { error } = await supabase.rpc("log_ai_usage", { ...args, p_step: u.step ?? null, p_cost_usd: cost });
-  // Before 0088 the 15-argument form does not exist: log without step/cost.
-  if (error && (error.code === "PGRST202" || /could not find the function/i.test(error.message ?? ""))) {
-    ({ error } = await supabase.rpc("log_ai_usage", args));
+  await recordUsage(supabase, args, { p_step: u.step ?? null, p_cost_usd: cost }, u.userId);
+}
+
+/** The 13 arguments every log_ai_usage form takes. */
+export type UsageArgs = {
+  p_provider: string;
+  p_model: string | null;
+  p_project: string | null;
+  p_feature: string;
+  p_prompt_tokens: number | null;
+  p_completion_tokens: number | null;
+  p_total_tokens: number | null;
+  p_audio_seconds: number | null;
+  p_latency_ms: number | null;
+  p_outcome: "ok" | "error" | "blocked";
+  p_error_code: string | null;
+  p_remaining_requests: number | null;
+  p_remaining_tokens: number | null;
+};
+
+type RpcError = { code?: string; message?: string } | null;
+const fnMissing = (e: RpcError) => !!e && (isMissingFunction(e) || /could not find the function/i.test(e.message ?? ""));
+
+// Fallback for callers that do not pass the verified id: one auth.getUser() per
+// session client. Only a found id is cached — a failed lookup is retried.
+const sessionUsers = new WeakMap<object, string>();
+async function sessionUserId(supabase: SupabaseClient): Promise<string | null> {
+  const known = sessionUsers.get(supabase);
+  if (known) return known;
+  const id = await supabase.auth.getUser().then(
+    (r) => r.data.user?.id ?? null,
+    () => null,
+  );
+  if (id) sessionUsers.set(supabase, id);
+  return id;
+}
+
+let warnedNoService = false;
+
+/**
+ * One ai_usage row. `supabase` is the caller's session (it identifies the user);
+ * the row itself is written with the service client (0101). Never throws.
+ */
+export async function recordUsage(
+  supabase: SupabaseClient,
+  args: UsageArgs,
+  extra: { p_step: string | null; p_cost_usd: number | null },
+  verifiedUserId?: string | null,
+): Promise<void> {
+  const service = createServiceClient();
+  if (!service) {
+    if (!warnedNoService) {
+      warnedNoService = true;
+      console.warn("[ai] usage not recorded: SUPABASE_SERVICE_ROLE_KEY is not set (AI usage is logged server-side only)");
+    }
+    return;
   }
-  if (error) console.warn(`[ai] usage not recorded (run migration 0023?): ${error.message}`);
+  const userId = verifiedUserId || (await sessionUserId(supabase));
+  if (!userId) {
+    console.warn("[ai] usage not recorded: no signed-in session");
+    return;
+  }
+  const { error } = await service.rpc("log_ai_usage_server", { p_user: userId, ...args, ...extra });
+  if (!error) return;
+  if (!fnMissing(error)) {
+    console.warn(`[ai] usage not recorded: ${error.message}`);
+    return;
+  }
+
+  // Before 0101: the old forms on the caller's session (15 args from 0088, else 13).
+  let { error: legacy } = await supabase.rpc("log_ai_usage", { ...args, ...extra });
+  if (fnMissing(legacy)) ({ error: legacy } = await supabase.rpc("log_ai_usage", args));
+  if (legacy) console.warn(`[ai] usage not recorded (run migration 0023?): ${legacy.message}`);
 }
 
 export type Quota = {

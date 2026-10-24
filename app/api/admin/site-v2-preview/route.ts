@@ -8,6 +8,7 @@ import {
   previewCookieOptions,
   previewRedirectPath,
 } from "@/lib/site-v2";
+import { isSuperAdminSession } from "@/lib/auth/guards";
 
 // site_v2 preview (P3-03). super_admin only. While store_settings.site_v2 is
 // OFF, /:locale/v2… answers 404 unless the browser carries site_v2=1; this
@@ -22,7 +23,7 @@ const NO_STORE = "private, no-store, max-age=0";
 
 export async function GET(request: NextRequest) {
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") {
+  if (!isSuperAdminSession(session)) {
     return new Response(null, { status: 403, headers: { "Cache-Control": NO_STORE } });
   }
 

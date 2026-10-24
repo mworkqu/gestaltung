@@ -188,9 +188,6 @@
   .delay-3 {
     animation-delay: 0.24s;
   }
-  .delay-4 {
-    animation-delay: 0.32s;
-  }
 
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-up,

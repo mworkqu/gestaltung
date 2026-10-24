@@ -12,28 +12,20 @@
 //     relation or function answers `errRunMigration` instead of crashing.
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
 
 import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { isValidPhone } from "@/lib/phone";
+import { leadDeps } from "@/lib/leads/deps";
+import { parseLead } from "@/lib/leads/parse";
+import { createLead, leadDelivered } from "@/lib/leads/save";
 import { SITE_URL } from "@/lib/seo";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { linkedPrices } from "@/lib/studio/server/quote";
 import { parseStudioDoc, type StudioDoc } from "@/lib/studio/schema";
 import { classPartsPlan, classPartsSummary, type ClassPartsProduct, type ClassTeamDoc } from "@/lib/schools/class-parts";
-
-type PgError = { code?: string; message?: string } | null;
-
-/** The relation or function does not exist yet (0096 / 0097 not run). */
-function isMissing(e: PgError): boolean {
-  if (!e) return false;
-  const code = e.code ?? "";
-  if (code === "42P01" || code === "PGRST202" || code === "PGRST205" || code === "42883") return true;
-  return /could not find the (?:function|table)|does not exist/i.test(e.message ?? "");
-}
-
-const safeLocale = (locale: string) => (locale === "ar" ? "ar" : "en");
+import { asLocale } from "@/lib/locale";
+import { isMissing } from "./missing";
 
 /** Message keys of the SchoolClasses namespace that an action may return. */
 export type ClassActionError =
@@ -60,7 +52,7 @@ async function teacher() {
 }
 
 function refreshClasses(locale: string) {
-  revalidatePath(`/${safeLocale(locale)}/schools/classes`);
+  revalidatePath(`/${asLocale(locale)}/schools/classes`);
 }
 
 // ── 3a. Create a class ──────────────────────────────────────────────────────
@@ -118,7 +110,7 @@ export async function setClassArchived(
   }
 
   refreshClasses(locale);
-  revalidatePath(`/${safeLocale(locale)}/schools/classes/${classId}`);
+  revalidatePath(`/${asLocale(locale)}/schools/classes/${classId}`);
   return { ok: true };
 }
 
@@ -149,7 +141,7 @@ export async function addTeamComment(
   }
 
   // "layout" so the team page the comment was written on refreshes too.
-  revalidatePath(`/${safeLocale(locale)}/schools/classes`, "layout");
+  revalidatePath(`/${asLocale(locale)}/schools/classes`, "layout");
   return { ok: true };
 }
 
@@ -172,7 +164,7 @@ export async function requestSchoolInvoice(
   if (!who) return { ok: false, error: "errSignIn" };
   if (!classId) return { ok: false, error: "invoiceFailed" };
 
-  const lang = safeLocale(locale);
+  const lang = asLocale(locale);
   const supabase = await createClient();
 
   const { data: klass, error: classError } = await supabase
@@ -191,16 +183,13 @@ export async function requestSchoolInvoice(
 
   const name = who.session.profile.full_name?.trim() || who.session.email || "Teacher";
   const phone = who.session.profile.phone?.trim() ?? "";
-  // /api/store-lead refuses a lead without a reachable WhatsApp number (422),
+  // A lead is refused (invalid_phone) without a reachable WhatsApp number,
   // and profiles.phone is often empty — say which thing to fix.
   if (!phone || !isValidPhone(phone)) return { ok: false, error: "invoiceNeedsPhone" };
 
-  // This deployment's own origin (the lead route is on the same app). Falls
-  // back to the canonical site when the headers say nothing.
-  const head = await headers();
-  const host = head.get("x-forwarded-host") ?? head.get("host");
-  const proto = head.get("x-forwarded-proto") ?? (host?.startsWith("localhost") ? "http" : "https");
-  const origin = host ? `${proto}://${host}` : SITE_URL;
+  // The canonical site: the lead is created in-process (createLead), so no
+  // request Host is trusted to build a link (API-09).
+  const origin = SITE_URL;
 
   const row = klass as { name: string; school_name: string };
   const message = [
@@ -212,28 +201,26 @@ export async function requestSchoolInvoice(
     `Class page: ${origin}/${lang}/schools/classes/${classId}`,
   ].join("\n");
 
+  // Same validation and delivery as POST /api/store-lead, minus the Turnstile
+  // gate: the caller is a signed-in, non-anonymous teacher (teacher() above),
+  // which that gate exempts anyway.
+  const parsed = parseLead({
+    source: "contact_form",
+    kind: "school_invoice",
+    name,
+    phone,
+    email: who.session.email || undefined,
+    locale: lang,
+    message,
+  });
+  if (!parsed.ok) {
+    console.error("[schools] invoice lead failed:", parsed.status, parsed.code);
+    return { ok: false, error: "invoiceFailed" };
+  }
   try {
-    const res = await fetch(`${origin}/api/store-lead`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        // Forwarded so /api/store-lead sees the teacher's session: a caller
-        // that holds one is exempt from the Turnstile check (leadAllowed).
-        ...(head.get("cookie") ? { cookie: head.get("cookie") as string } : {}),
-      },
-      body: JSON.stringify({
-        source: "contact_form",
-        kind: "school_invoice",
-        name,
-        phone,
-        email: who.session.email || undefined,
-        locale: lang,
-        message,
-      }),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      console.error("[schools] invoice lead failed:", res.status, await res.text().catch(() => ""));
+    const result = await createLead(leadDeps(origin), parsed.lead);
+    if (!leadDelivered(result)) {
+      console.error("[schools] invoice lead failed: not_delivered");
       return { ok: false, error: "invoiceFailed" };
     }
   } catch (err) {

@@ -6,7 +6,7 @@ import { applyPatches } from "@/lib/studio/product/schema";
 import { applyCheck, findDesign } from "@/lib/studio/product/store";
 import { studioCall, studioRequest } from "@/lib/studio/server/context";
 import { loadDocPrivate, updateProductDoc } from "@/lib/studio/server/doc";
-import { CHECK_IMAGE_MAX_BYTES, CheckBody, decodePng, json, partsOf, pngBase64 } from "@/lib/studio/server/product";
+import { CHECK_IMAGE_MAX_BYTES, CheckBody, decodePng, json, partsOf, pngBase64, loadErrorStatus } from "@/lib/studio/server/product";
 
 // POST /api/studio/product/check {projectId, designId, images: {front, side, iso} (base64 PNG, 512 px), loop 0..2}
 //   → 200 {score 1..10, looksLike, missing, model, changed}
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 90;
 
 export async function POST(request: Request) {
-  const ctx = await studioRequest(request, CheckBody, { consent: true });
+  const ctx = await studioRequest(request, CheckBody, { consent: true, owner: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
 
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   if (!images.front || !images.side || !images.iso) return json({ error: "bad_image" }, 400);
 
   const cur = await loadDocPrivate(supabase, project.id);
-  if (!cur.ok) return json({ error: cur.error }, cur.error === "not_found" ? 404 : 500);
+  if (!cur.ok) return json({ error: cur.error }, loadErrorStatus(cur.error));
   if (!cur.doc || !cur.owned.product || !cur.owned.productPrivate) return json({ error: "not_found" }, 404);
   const doc = cur.doc;
   const found = findDesign({ product: cur.owned.product, priv: cur.owned.productPrivate }, body.designId);
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   const idea = brief?.trim() || `${doc.spec.name}: ${doc.spec.oneLine}`;
 
   const r = await runVisionCheck({
-    call: studioCall(supabase, project.id),
+    call: studioCall(supabase, project.id, ctx.userId),
     idea,
     spec: doc.spec,
     partNames: parts.filter((p) => !p.part.helper).map((p) => p.part.name.en),
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     ...patched.rejected.slice(0, 8).map((x) => ({ code: "patch_rejected", severity: "info", detail: x.reason })),
   ];
 
-  const saved = await updateProductDoc(supabase, project.id, (s) => {
+  const saved = await updateProductDoc(supabase, ctx.userId, project.id, (s) => {
     const next = applyCheck({ product: s.product, priv: s.priv }, body.designId, {
       score: r.value.score,
       looksLike: r.value.looksLike,

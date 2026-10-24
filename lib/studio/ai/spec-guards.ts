@@ -14,8 +14,8 @@
 //  * the visitor's latest words win ("make it solar" after "plug it in").
 
 import { LIMITS, clampSpec, DEFAULT_SPEC, type ClampLog, type Output, type Placement, type ProductSpec } from "../schema";
+import type { Locale } from "@/lib/locale";
 
-type Locale = "en" | "ar";
 type Msg = { role: "user" | "assistant"; text: string };
 
 /** Card rows the guards (or the model) filled in. */

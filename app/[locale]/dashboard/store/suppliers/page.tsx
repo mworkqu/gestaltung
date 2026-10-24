@@ -22,6 +22,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/navigation";
 import { FileUp, RefreshCw, Search } from "lucide-react";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { isMissingColumn } from "@/lib/supabase/errors";
 
 // Suppliers and sourcing settings (Task 16). super_admin only (store layout).
 
@@ -60,7 +62,7 @@ async function loadPublishedParts(supabase: Supabase) {
       .order("id")
       .range(from, to)
   );
-  if (withMerged.error?.code !== "42703") return withMerged;
+  if (!isMissingColumn(withMerged.error)) return withMerged;
   return fetchAll<CoveragePart>((from, to) =>
     supabase
       .from("parts")
@@ -74,6 +76,7 @@ async function loadPublishedParts(supabase: Supabase) {
 
 export default async function SuppliersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("Sourcing");
   const isRtl = locale === "ar";

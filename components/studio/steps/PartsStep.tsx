@@ -10,146 +10,39 @@
 // and "We'll source this"), one plain "why" line, Swap and Remove. "Add a
 // part" opens the library by category (helper parts hidden). ONE main
 // button: Next. "Add all to cart" is a quiet secondary action.
+//
+// Pieces: parts/PartTile, parts/PartChoices, parts/PartsPicturePane (also used by
+// the Make step), parts/use-parts-actions.
 
 import { arabicCountForm } from "@/lib/text/count";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Binary,
-  BatteryCharging,
-  Check,
-  Cpu,
-  Lightbulb,
-  Monitor,
-  Plug,
-  Plus,
-  Radar,
-  Repeat2,
-  Settings2,
-  ShoppingCart,
-  ToggleLeft,
-  Trash2,
-  type LucideIcon,
-} from "lucide-react";
-
+import { Check, Plus, Repeat2, ShoppingCart, Trash2 } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { formatPrice, partImageUrl, partName } from "@/lib/parts/format";
-import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
+import { formatPrice, partName } from "@/lib/parts/format";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
-import { popoverPhoto, stockLine } from "@/lib/studio/part-photo";
-import { CATEGORIES, type Category, type LibraryPart, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
-import { nextInstanceId } from "@/lib/studio/client/steps";
+import { CATEGORIES, type Category, type StudioComponent, type StudioDoc } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { Bar, linkCls, MainButton, Problem, Sheet, StepFrame } from "../ui";
 import { linePrice, orderQty, productFor, storeLines, useAddAllToCart } from "../use-studio-cart";
 import { packSizeOf } from "@/lib/store/pack";
-import { colourName, styledPart } from "@/lib/studio/variants";
-import { applyCardColours, cardCoverage } from "@/lib/studio/card-parts";
+import { colourName } from "@/lib/studio/variants";
 import { groupComponents, groupHas, withQuantity } from "@/lib/studio/parts-group";
 import { usePickProgress } from "../use-pick-progress";
 import { PICK_STAGES } from "@/lib/studio/client/progress";
-import { problemKey } from "./problem";
-import { StudioLoader } from "../StudioLoader";
-import { partsPictureSupported, partsSpin, spreadSpots, type PartsSpin, type PartsSpinHandle } from "@/lib/studio/client/parts-picture";
-import { PartsFlipbook } from "./PartsFlipbook";
+import { PartTile, PartPopover } from "./parts/PartTile";
+import { PartChoices } from "./parts/PartChoices";
+import { PartsPicturePane } from "./parts/PartsPicturePane";
+import { usePartsActions } from "./parts/use-parts-actions";
+
+// Moved to ./parts (R8); re-exported so existing imports keep working.
+export { CATEGORY_ICON } from "./parts/PartTile";
+export { PartsPicturePane } from "./parts/PartsPicturePane";
 
 const accent = STEP_ACCENT.parts;
-
-export const CATEGORY_ICON: Record<Category, LucideIcon> = {
-  mcu: Cpu,
-  power: BatteryCharging,
-  sensor: Radar,
-  display: Monitor,
-  input: ToggleLeft,
-  output: Lightbulb,
-  actuator: Settings2,
-  connector: Plug,
-  logic: Binary,
-};
-
-function PartTile({ part, product, size = 56 }: { part: LibraryPart | undefined; product: StoreCardPart | null; size?: number }) {
-  const img = product ? partImageUrl(product) : null;
-  const Icon = part ? CATEGORY_ICON[part.category] : Cpu;
-  return (
-    <span
-      className="grid shrink-0 place-items-center overflow-hidden rounded-2xl shadow-neu-inset"
-      style={{ width: size, height: size, background: img ? "#fff" : accent.soft }}
-    >
-      {img ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={sizedImage(img, IMAGE_WIDTHS.thumb)!}
-          width={size}
-          height={size}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-contain"
-        />
-      ) : (
-        <Icon className="h-6 w-6" style={{ color: accent.ink }} strokeWidth={1.5} aria-hidden />
-      )}
-    </span>
-  );
-}
-
-/** Hover (mouse) / tap / keyboard popover: store photo (else the icon), name, purpose, price, stock. */
-function PartPopover({
-  id,
-  part,
-  product,
-  name,
-  purpose,
-  locale,
-}: {
-  id: string;
-  part: LibraryPart | undefined;
-  product: StoreCardPart | null;
-  name: string;
-  purpose: string;
-  locale: "en" | "ar";
-}) {
-  const t = useTranslations("Studio.partsPopover");
-  const photo = popoverPhoto(product as Parameters<typeof popoverPhoto>[0], 280);
-  const Icon = part ? CATEGORY_ICON[part.category] : Cpu;
-  const stock = stockLine(product);
-  const price = product ? formatPrice(Number(product.unit_price ?? 0) * Math.max(1, product.min_order_qty ?? 1), locale) : null;
-  return (
-    <div
-      id={id}
-      role="group"
-      aria-label={name}
-      className="tile absolute start-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-3rem))] space-y-2 p-3 text-start shadow-neu motion-safe:animate-rise"
-    >
-      <div className="grid h-36 place-items-center overflow-hidden rounded-xl" style={{ background: photo ? "#fff" : accent.soft }}>
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="" width={280} height={144} loading="lazy" decoding="async" className="h-full w-full object-contain" />
-        ) : (
-          <Icon className="h-12 w-12" style={{ color: accent.ink }} strokeWidth={1.25} aria-hidden />
-        )}
-      </div>
-      <p className="text-sm font-bold text-heading">{name}</p>
-      {purpose && <p className="text-[13px] leading-snug text-body">{purpose}</p>}
-      <p className="text-[13px] font-semibold" style={{ color: accent.ink }}>
-        {price ?? <span className="text-mutedtext">{t("noPrice")}</span>}
-      </p>
-      <p className="flex items-center gap-1.5 text-[13px] text-body">
-        <span
-          className={cn("inline-block h-2 w-2 shrink-0 rounded-full", stock.kind === "in_stock" ? "bg-emerald-500" : "bg-amber-400")}
-          aria-hidden
-        />
-        {stock.kind === "in_stock"
-          ? t("inStock")
-          : stock.cls
-            ? t("sourceTime", { time: t(`time_${stock.cls}`) })
-            : t("sourceNoTime")}
-      </p>
-    </div>
-  );
-}
 
 export function PartsStep({
   ctx,
@@ -171,40 +64,21 @@ export function PartsStep({
   const { getPart, partsByCategory } = useStudioLibrary();
   const t = useTranslations("Studio");
   const { locale } = ctx;
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [swapFor, setSwapFor] = useState<StudioComponent | null>(null);
   const [adding, setAdding] = useState(false);
   const [addCat, setAddCat] = useState<Category>("sensor");
   const [popFor, setPopFor] = useState<string | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const started = useRef(false);
   const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
-
-  async function pick() {
-    setBusy(true);
-    setProblem(null);
-    await beforeServer();
-    const r = await ctx.api.pick(doc.spec, locale);
-    setBusy(false);
-    if (!r.ok) {
-      setProblem(t(problemKey(r)));
-      return;
-    }
-    onComponents(r.data.components, r.data.docVersion, false);
-  }
-
-  useEffect(() => {
-    if (started.current) return;
-    // No parts yet, or parts picked before the card gained something it shows (a project
-    // saved before 2026-10-18: "3 LEDs" on the card, none in the list) → pick for the card.
-    const stale = doc.components.length > 0 && cardCoverage(doc.spec, doc.components, (id) => !!getPart(id)).length > 0;
-    if (doc.components.length > 0 && !stale) return;
-    started.current = true;
-    void pick();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on entry
-  }, []);
+  const { busy, problem, pick, edit, swap, add } = usePartsActions({
+    ctx,
+    doc,
+    beforeServer,
+    onComponents,
+    onSwapped: () => setSwapFor(null),
+    onAdded: () => setAdding(false),
+  });
 
   // Popover closes on Esc and on a press outside the list.
   useEffect(() => {
@@ -222,39 +96,6 @@ export function PartsStep({
       document.removeEventListener("pointerdown", onDown);
     };
   }, [popFor]);
-
-  const edit = (next: StudioComponent[]) => onComponents(next.filter((c) => !c.auto), null, true);
-
-  // The card's colours on parts picked before colours were kept (2026-10-18): "green, yellow and
-  // red LEDs" → each LED gets its colour once. Colour only: the circuit and layout stay.
-  useEffect(() => {
-    if (!doc.components.length) return;
-    const coloured = applyCardColours(doc.spec, doc.components);
-    if (coloured.some((c, i) => c.variant !== doc.components[i].variant)) onComponents(coloured, null, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the parts and the card
-  }, [doc.components, doc.spec]);
-
-  // Part D: a row stands for every identical part ("Servo × 3"): Swap swaps them all.
-  function swap(target: StudioComponent, part: LibraryPart) {
-    const next: StudioComponent[] = [];
-    for (const c of doc.components) {
-      next.push(
-        c.partId === target.partId && !c.auto
-          ? { partId: part.id, instanceId: nextInstanceId(part.id, [...doc.components, ...next]), label: part.name[locale], reason: part.blurb[locale] }
-          : c,
-      );
-    }
-    edit(next);
-    setSwapFor(null);
-  }
-
-  function add(part: LibraryPart) {
-    edit([
-      ...doc.components,
-      { partId: part.id, instanceId: nextInstanceId(part.id, doc.components), label: part.name[locale], reason: part.blurb[locale] },
-    ]);
-    setAdding(false);
-  }
 
   const { lines, total } = storeLines(doc.components, products, getPart);
   const groups = groupComponents(doc.components);
@@ -532,310 +373,5 @@ export function PartsStep({
         <PartChoices parts={partsByCategory(addCat)} products={products} locale={locale} empty={t("noOthers")} onPick={add} />
       </Sheet>
     </StepFrame>
-  );
-}
-
-function PartChoices({
-  parts,
-  products,
-  locale,
-  empty,
-  onPick,
-}: {
-  parts: LibraryPart[];
-  products: Map<string, StoreCardPart>;
-  locale: "en" | "ar";
-  empty: string;
-  onPick: (p: LibraryPart) => void;
-}) {
-  const { getPart } = useStudioLibrary();
-  if (!parts.length) return <p className="text-sm text-mutedtext">{empty}</p>;
-  return (
-    <ul className="space-y-2">
-      {parts.map((p) => {
-        const product = productFor(p.id, products, getPart);
-        return (
-          <li key={p.id}>
-            <button
-              type="button"
-              onClick={() => onPick(p)}
-              className="tile flex w-full items-center gap-3 p-3 text-start transition-colors hover:bg-white"
-            >
-              <PartTile part={p} product={product} size={48} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-heading">{p.name[locale]}</span>
-                <span className="block text-[13px] text-body">{p.blurb[locale]}</span>
-              </span>
-              {product && (
-                <span className="shrink-0 text-sm font-semibold tabular-nums" style={{ color: accent.ink }}>
-                  {formatPrice(Number(product.unit_price ?? 0), locale)}
-                </span>
-              )}
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-/** Box size in device pixels, in 40 px steps (a resize does not redraw for every pixel). */
-function usePictureSize(ref: React.RefObject<HTMLDivElement | null>): { w: number; h: number } | null {
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const step = (n: number) => Math.max(80, Math.round((n * dpr) / 40) * 40);
-      const w = step(el.clientWidth);
-      const h = step(el.clientHeight);
-      setSize((s) => (s && s.w === w && s.h === h ? s : { w, h }));
-    };
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref]);
-  return size;
-}
-
-/**
- * The Parts step picture: the worker's PNG of the plate with a tap target on every
- * part; the photo / icon grid while it is drawn, and in its place where the browser
- * cannot draw off screen or the drawing failed.
- */
-export function PartsPicturePane({
-  components,
-  products,
-  selected,
-  onSelect,
-  picking,
-  locale,
-  onPicture,
-}: {
-  components: StudioComponent[];
-  products: Map<string, StoreCardPart>;
-  selected: string | null;
-  onSelect: (id: string | null) => void;
-  picking: boolean;
-  locale: "en" | "ar";
-  /** The picture's URL once drawn (null while there is none), e.g. for "Share picture". */
-  onPicture?: (url: string | null) => void;
-}) {
-  const t = useTranslations("Studio");
-  const { getPart } = useStudioLibrary();
-  const box = useRef<HTMLDivElement>(null);
-  const size = usePictureSize(box);
-  const [supported] = useState(() => partsPictureSupported());
-  const shown = useMemo(
-    () =>
-      components.flatMap((c) => {
-        const part = getPart(c.partId);
-        // Coloured parts are drawn in their colour (a green LED is green on the plate).
-        return part ? [{ c, part: styledPart(part, c.variant) }] : [];
-      }),
-    [components, getPart],
-  );
-  const pairs = useMemo(() => shown.map(({ c, part }) => [c.instanceId, part] as [string, LibraryPart]), [shown]);
-  // The photo / icon grid shows identical parts once, with "× n" (the picture shows every one).
-  const tiles = useMemo(
-    () =>
-      groupComponents(components).flatMap((g) => {
-        const part = getPart(g.partId);
-        return part ? [{ g, part }] : [];
-      }),
-    [components, getPart],
-  );
-  // The turntable of this parts list: frame 0 first, the others stream in after it.
-  const [pic, setPic] = useState<{ key: string; handle: PartsSpinHandle } | null>(null);
-  const [spin, setSpin] = useState<{ key: string; value: PartsSpin } | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
-  const key =
-    size && pairs.length
-      ? `${shown.map(({ c, part }) => `${c.instanceId}:${part.id}:${c.variant ?? ""}`).join("|")}#${size.w}x${size.h}`
-      : "";
-
-  useEffect(() => {
-    if (!supported || !key || !size) return;
-    let alive = true;
-    const handle = partsSpin(pairs, size.w, size.h, accent.base);
-    const unsub = handle.subscribe(() => {
-      if (alive) setSpin({ key, value: handle.get() });
-    });
-    handle.first.then(
-      (value) => {
-        if (!alive) return;
-        setPic({ key, handle });
-        setSpin({ key, value: handle.get() });
-        void value;
-      },
-      () => {
-        if (alive) setFailed(key);
-      },
-    );
-    return () => {
-      alive = false;
-      unsub();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the parts + size
-  }, [key, supported]);
-
-  // Only a picture of THIS parts list is shown (owner 2026-10-18: an older plate with other
-  // parts on it was left on screen); while a new list is drawn, the grid shows exactly the list.
-  const current = supported && spin?.key === key ? spin.value : null;
-  const drawing = supported && !!key && pic?.key !== key && failed !== key;
-  const gridOnly = !current || !current.frames[0] || (failed === key && pic?.key !== key);
-  const readyUrl = !gridOnly && !drawing && current ? (current.frames[0]?.url ?? null) : null;
-  // More frames are still coming (frame 0 is already on screen).
-  const streaming = !gridOnly && !drawing && !!current && !current.done && !current.failed;
-  useEffect(() => {
-    onPicture?.(readyUrl);
-  }, [onPicture, readyUrl]);
-  const nameOf = (c: StudioComponent, part: LibraryPart) => {
-    const product = productFor(c.partId, products, getPart, c.variant);
-    const colour = colourName(c.variant, locale);
-    return product ? partName(product, locale) : `${colour ? `${colour} · ` : ""}${part.name[locale]}`;
-  };
-
-  return (
-    <div
-      ref={box}
-      className="absolute inset-0"
-      style={{ background: "linear-gradient(180deg, #f4f7fb 0%, #e6ebf2 100%)" }}
-      data-spin-frames={current?.total ?? 0}
-      data-spin-bytes={current?.bytes ?? 0}
-      data-spin-ms={current?.ms ?? 0}
-      data-spin-first-ms={current?.firstMs ?? 0}
-      data-picture={picking ? "picking" : !gridOnly ? (drawing ? "redrawing" : streaming ? "streaming" : "ready") : drawing ? "drawing" : "grid"}
-    >
-      {picking ? (
-        <StudioLoader label={t("loader.parts")} accent={accent.base} ink={accent.ink} status={false} className="h-full" />
-      ) : !gridOnly && current ? (
-        <>
-          <PartsFlipbook
-            frames={current.frames.map((f) => f?.url)}
-            total={current.total}
-            width={current.width}
-            height={current.height}
-            alt={t("loader.partsAlt")}
-            hold={selected !== null}
-            dim={drawing}
-          >
-            {({ frame, spinning }) =>
-              !drawing && !spinning ? (
-                <PartsSpots
-                  spots={current.frames[frame]?.spots ?? current.frames[0]?.spots ?? []}
-                  boxRef={box}
-                  size={size}
-                  frame={frame}
-                  shown={shown}
-                  selected={selected}
-                  onSelect={onSelect}
-                  nameOf={nameOf}
-                  accent={accent}
-                />
-              ) : null
-            }
-          </PartsFlipbook>
-          {(drawing || streaming) && (
-            <div className="pointer-events-none absolute end-3 top-3 rounded-2xl bg-white/85 backdrop-blur">
-              <StudioLoader label={t("loader.parts")} accent={accent.base} ink={accent.ink} className="p-2" />
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="relative h-full overflow-y-auto p-4" data-testid="studio-parts-grid">
-          <ul className={cn("grid grid-cols-3 content-center gap-3 sm:grid-cols-4", drawing && "opacity-50")} aria-label={t("loader.partsGrid")}>
-            {tiles.map(({ g, part }) => {
-              const c = g.first;
-              const on = groupHas(g, selected);
-              return (
-                <li key={g.key}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(on ? null : c.instanceId)}
-                    aria-pressed={on}
-                    className={cn("flex w-full flex-col items-center gap-1.5 rounded-2xl p-1.5 text-center", on && "ring-2")}
-                    style={{ "--tw-ring-color": accent.base } as React.CSSProperties}
-                  >
-                    <PartTile part={part} product={productFor(c.partId, products, getPart, c.variant)} size={56} />
-                    <span className="line-clamp-2 text-xs font-semibold leading-tight text-heading">{withQuantity(nameOf(c, part), g.quantity)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {drawing && (
-            <div className="pointer-events-none absolute inset-0 grid place-items-center">
-              <div className="rounded-2xl bg-white/85 backdrop-blur">
-                <StudioLoader label={t("loader.parts")} accent={accent.base} ink={accent.ink} />
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The tap dots for the frame on screen (they only exist while the parts are not turning). */
-function PartsSpots({
-  spots,
-  boxRef,
-  size,
-  frame,
-  shown,
-  selected,
-  onSelect,
-  nameOf,
-  accent: acc,
-}: {
-  spots: { instanceId: string; x: number; y: number }[];
-  boxRef: React.RefObject<HTMLDivElement | null>;
-  size: { w: number; h: number } | null;
-  frame: number;
-  shown: { c: StudioComponent; part: LibraryPart }[];
-  selected: string | null;
-  onSelect: (id: string | null) => void;
-  nameOf: (c: StudioComponent, part: LibraryPart) => string;
-  accent: { base: string; ink: string };
-}) {
-  // Tap targets at least 44 px apart (small parts side by side would hide each other).
-  const spread = useMemo(() => {
-    const el = boxRef.current;
-    return spreadSpots(spots, el?.clientWidth ?? 0, el?.clientHeight ?? 0, 44);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-spread per frame and when the box size changes
-  }, [spots, size, frame]);
-  return (
-    <>
-      {spread.map((spot) => {
-        const item = shown.find((x) => x.c.instanceId === spot.instanceId);
-        if (!item) return null;
-        const on = selected === spot.instanceId;
-        return (
-          <button
-            key={spot.instanceId}
-            type="button"
-            onClick={() => onSelect(on ? null : spot.instanceId)}
-            aria-pressed={on}
-            aria-label={nameOf(item.c, item.part)}
-            // The picture is not mirrored in Arabic: its coordinates are physical.
-            style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%` }}
-            className="group absolute grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full focus-visible:outline-none"
-            data-testid="studio-parts-spot"
-          >
-            <span
-              className={cn(
-                "block rounded-full border-2 border-white shadow-neu-sm transition-[width,height,opacity]",
-                on ? "h-5 w-5" : "h-3.5 w-3.5 opacity-80 group-hover:h-5 group-hover:w-5 group-hover:opacity-100 group-focus-visible:h-5 group-focus-visible:w-5",
-              )}
-              style={{ background: on ? acc.ink : acc.base }}
-            />
-          </button>
-        );
-      })}
-    </>
   );
 }

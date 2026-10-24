@@ -12,6 +12,8 @@ import {
   type DiscountOrderRow,
   type MonthRow,
 } from "@/lib/admin/discount-report";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Discount-leakage report (P4-07 / WF-27): QAR given away per Qatar calendar
 // month by kit discounts, credit redemptions, manual credit grants and waived
@@ -24,6 +26,7 @@ const SETTING_KEYS = ["pricing_plans", "free_shipping_threshold", "shipping"] as
 
 export default async function DiscountsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("Discounts");
   const isAr = locale === "ar";
@@ -77,7 +80,7 @@ export default async function DiscountsPage({ params }: { params: Promise<{ loca
   const money = (n: number) => (isAr ? `${num(n)} ${currency}` : `${currency} ${num(n)}`);
   const pct = (n: number | null) =>
     n === null ? t("noShare") : `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(n)}%`;
-  const monthFmt = new Intl.DateTimeFormat(isAr ? "ar-QA-u-nu-latn" : "en-GB", {
+  const monthFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     month: "long",
     year: "numeric",
     timeZone: "UTC",

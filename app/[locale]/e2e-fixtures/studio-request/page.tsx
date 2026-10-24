@@ -9,6 +9,7 @@ import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { getPart } from "@/lib/studio/library";
 import { REQUEST_SENT_KEY, requestSummary } from "@/lib/studio/request-summary";
 import { clampSpec, emptyStudioDoc, type StudioDoc } from "@/lib/studio/schema";
+import { asLocale } from "@/lib/locale";
 
 // TEST-ONLY (lib/e2e-fixtures.ts): the W2 "Request received" page for the
 // Studio fixture's "Get it made" (the mock has no project row). A canned doc
@@ -59,7 +60,7 @@ export default async function StudioRequestFixturePage({
   const ownerQuote =
     quoted === "1" ? { finalQar: 450, note: locale === "ar" ? "يشمل الطلاء الأسود المطفي." : "Includes the matte black finish." } : null;
   setRequestLocale(locale);
-  const lang = locale === "ar" ? "ar" : "en";
+  const lang = asLocale(locale);
   const summary = requestSummary({
     doc: fixtureDoc(lang),
     projectName: "Desk buddy",

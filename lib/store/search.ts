@@ -14,6 +14,8 @@
 // accessory nouns ("jumper wire", "case") the shopper didn't ask for.
 
 import { partName } from "@/lib/parts/format";
+import { asLocale } from "@/lib/locale";
+import { normalizeText } from "@/lib/text/normalize";
 
 /** The fields ranking and sorting read. StoreCardPart satisfies it. */
 export type SearchableProduct = {
@@ -74,18 +76,7 @@ export function categoryWeight(category: string | null | undefined): number {
 
 // ── Text normalisation ───────────────────────────────────────────────────────
 
-/** Lower-case, no Latin accents, Arabic without tashkeel/tatweel, one alef/ya/ta marbuta form, Western digits. */
-export function normalizeText(s: string): string {
-  return s
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[ً-ٰٟـ]/g, "")
-    .replace(/[أإآٱ]/g, "ا")
-    .replace(/ى/g, "ي")
-    .replace(/ة/g, "ه")
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
-    .toLowerCase();
-}
+export { normalizeText };
 
 const WORD = /[\p{L}\p{N}]+/gu;
 
@@ -245,7 +236,7 @@ export function scoreProduct(query: string, product: SearchableProduct): number 
 
 const collators = new Map<string, Intl.Collator>();
 function collator(locale: string): Intl.Collator {
-  const key = locale === "ar" ? "ar" : "en";
+  const key = asLocale(locale);
   let c = collators.get(key);
   if (!c) {
     c = new Intl.Collator(key, { sensitivity: "base", numeric: true });

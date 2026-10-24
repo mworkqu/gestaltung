@@ -12,11 +12,9 @@ import { useCart } from "@/components/parts/cart-provider";
 import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/parts/format";
-import { DELIVERY_AREAS, LAST_ORDER_KEY } from "@/lib/parts/constants";
 import { cn } from "@/lib/utils";
 import type { CartItem } from "@/lib/supabase/types";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
-import { isValidPhone } from "@/lib/phone";
 import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
 import {
   formatDeliveryDate,
@@ -24,23 +22,28 @@ import {
   SHIPPING_TIERS,
   type ShippingTier,
 } from "@/lib/store/delivery";
-import { shippingFor } from "@/lib/store/shipping";
-import { checkoutRpcError, validateCheckoutEmail } from "@/lib/store/checkout";
-import { IsolatedTitle } from "@/components/ltr-isolate";
-import { arabicCountForm } from "@/lib/text/count";
+import { checkoutTotals, isZeroTotal } from "@/lib/store/checkout-totals";
+import {
+  checkoutBlocked,
+  EMAIL_FIELD_ERRORS,
+  placeOrder,
+  quoteOnRequestIds,
+  readOrderFields,
+  type PlaceOrderError,
+} from "@/lib/store/place-order";
 import { useClassOrderId } from "@/lib/schools/client";
-
-const fieldClass =
-  "w-full rounded-xl border border-white/60 bg-panel px-4 py-3 text-sm text-heading shadow-neu-inset transition placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-cobalt/60";
+import { CustomerFields, FieldLabel, fieldClass, monoClass } from "./customer-fields";
+import { OrderSummary } from "./order-summary";
 
 // The form itself; page.tsx (server) sends an empty cart to /store/cart first.
+// Money comes from lib/store/checkout-totals, the order from lib/store/place-order;
+// this file is the state and the wiring.
 export default function CheckoutClient() {
   const t = useTranslations("Checkout");
   const locale = useLocale();
   const isRtl = locale === "ar";
   const router = useRouter();
   const { items, totalQar, kitDiscountQar, clearCart, ready } = useCart();
-  const tParts = useTranslations("Parts");
   const tD = useTranslations("Delivery");
   const tPay = useTranslations("PayMethods");
   const tPhone = useTranslations("Phone");
@@ -59,46 +62,22 @@ export default function CheckoutClient() {
     }
   }, [classOrderId]);
   const [split, setSplit] = useState(false);
-  const canSplit = Boolean(quote?.can_split);
-  const doSplit = split && canSplit;
-  // The server quote decides the price (0044): the same goods subtotal and
-  // free-delivery rule create_part_order charges. Before 0044 the quote has no
-  // free_shipping and the cart total stands in for the goods subtotal.
-  const goodsQar = quote?.free_shipping?.goods_qar ?? totalQar;
-  const priceOf = (k: ShippingTier) =>
-    quote
-      ? shippingFor({
-          tier: k,
-          goodsQar,
-          tiers: quote.tiers,
-          handlingFeeQar: quote.handling_fee_qar,
-          freeShipping: quote.free_shipping,
-          split: doSplit,
-        })
-      : { shippingQar: 0, handlingQar: 0, free: false };
-  const { shippingQar, handlingQar } = priceOf(tier);
-  // Extra delivery cost of splitting into two shipments (0 when delivery is free).
-  const splitExtraQar = quote
-    ? shippingFor({ tier, goodsQar, tiers: quote.tiers, freeShipping: quote.free_shipping }).shippingQar
-    : 0;
-  // AI credits spent in the last 30 days come back as one discount (0042),
-  // capped at the goods subtotal. The server applies it (redeem_credits) right
-  // after the order is created; this is the same figure, shown in advance.
+  // AI credits spent in the last 30 days come back as one discount (0042); the
+  // server applies it (redeem_credits) right after the order is created.
   const credits = useCreditSummary();
-  const tCr = useTranslations("Credits");
-  const creditQar = credits ? Math.min(credits.redeemable_qar, Math.max(totalQar, 0)) : 0;
-  const grandTotal = Math.round((totalQar - creditQar + shippingQar + handlingQar) * 100) / 100;
+  // The server quote decides the price (0044); see lib/store/checkout-totals.
+  const totals = checkoutTotals({ quote, cartTotalQar: totalQar, tier, split, credits });
+  const { canSplit, doSplit, priceOf, shippingQar, handlingQar, splitExtraQar, creditQar, grandTotal } = totals;
   const chosen = quote?.tiers[tier];
   // "Available on request" lines are sold at the listed price with the date to
   // be confirmed (0032); they no longer block checkout. Only a missing quote does.
-  const onRequestIds = quote ? quote.on_request ?? [] : null;
+  const onRequestIds = quoteOnRequestIds(quote);
   const toConfirm = (i: CartItem) => isOnRequest(i, onRequestIds);
   const anyToConfirm = items.some(toConfirm);
-  const blocked = !legacy && (!quote || !chosen);
+  const blocked = checkoutBlocked(quote, tier, legacy);
 
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [areaOther, setAreaOther] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const bankTransfer = payMethod === "bank_transfer";
 
@@ -119,159 +98,50 @@ export default function CheckoutClient() {
     track("checkout_started", { items: items.length, total_qar: totalQar });
   }, [ready, items.length, totalQar]);
 
-  const mono = (extra = "") =>
-    cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
+  const mono = (extra = "") => monoClass(isRtl, extra);
 
-  const label = (htmlFor: string, text: string, required = false) => (
-    <label htmlFor={htmlFor} className={mono("block text-[10px] text-mutedtext")}>
-      {text}
-      {required && <span className="text-destructive"> *</span>}
-    </label>
-  );
+  const message = (e: PlaceOrderError): string =>
+    e === "phoneInvalid"
+      ? tPhone("invalid")
+      : e === "quoteError" || e === "errorNoDate" || e === "cartBlocked"
+        ? tD(e)
+        : t(e);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setEmailError(null);
 
-    const form = new FormData(e.currentTarget);
-    const customerName = String(form.get("customer_name") ?? "").trim();
-    const customerPhone = String(form.get("customer_phone") ?? "").trim();
-    const customerEmail = String(form.get("customer_email") ?? "").trim();
-    const deliveryArea = String(form.get("delivery_area") ?? "").trim();
-    const deliveryNotes = String(form.get("delivery_notes") ?? "").trim();
-
-    if (!customerName || !customerPhone || !deliveryArea) {
-      setError(t("errorRequired"));
-      return;
-    }
-    if (!isValidPhone(customerPhone)) {
-      setError(tPhone("invalid"));
-      return;
-    }
-    const emailProblem = validateCheckoutEmail(customerEmail, payMethod);
-    if (emailProblem) {
-      setEmailError(t(emailProblem === "emailRequiredBank" ? "errorEmailBank" : "errorEmailInvalid"));
-      return;
-    }
-    if (items.length === 0) {
-      setError(t("errorEmpty"));
-      return;
-    }
-    if (blocked) {
-      setError(quoteError ? tD("quoteError") : tD("errorNoDate"));
-      return;
-    }
-    if (grandTotal <= 0) {
-      setError(t("errorTotalZero"));
-      return;
-    }
-
-    setSubmitting(true);
-    const supabase = createClient();
-
-    const orderArgs = {
-      p_customer_name: customerName,
-      p_customer_phone: customerPhone,
-      p_customer_email: customerEmail || null,
-      p_delivery_area: deliveryArea,
-      p_delivery_notes: deliveryNotes || null,
-      // Project, BOM lines and kit let the server price kits and mark the
-      // project's lines bought (0025); older databases ignore the extra keys.
-      p_items: items.map((i) => ({
-        part_id: i.partId,
-        quantity: i.quantity,
-        project_id: i.projectId ?? null,
-        bom_lines: i.bomLines ?? [],
-        kit_id: i.kitId ?? null,
-      })),
-      // Before migration 0029 the RPC has no shipping parameters.
-      ...(legacy ? {} : { p_shipping_tier: tier, p_split: doSplit }),
-    };
-    // 3e: only sent for a class order, so a normal checkout is byte-for-byte
-    // the call it was before.
-    const classArgs = !legacy && classOrderId ? { p_class_id: classOrderId } : {};
-    // The payment method goes in with the order (0044) so a bank transfer
-    // without an email is refused before any order exists. A database
-    // without 0044 has no such parameter (PGRST202): place it without.
-    let { data, error: rpcError } = await supabase.rpc(
-      "create_part_order",
-      legacy ? orderArgs : { ...orderArgs, p_payment_method: payMethod, ...classArgs }
+    const fields = readOrderFields(new FormData(e.currentTarget));
+    const result = await placeOrder(
+      {
+        supabase: createClient(),
+        storage: () => window.sessionStorage,
+        onPlacing: () => setSubmitting(true),
+        onCreditsApplied: creditsChanged,
+      },
+      {
+        fields,
+        items,
+        payMethod,
+        tier,
+        split: doSplit,
+        quote,
+        legacy,
+        quoteError,
+        classOrderId,
+        totals: { grandTotal, creditQar, shippingQar, handlingQar },
+      }
     );
-    // A database without migration 0097 has no p_class_id: place the order
-    // without the class link (delivery is then charged at the normal price).
-    if (rpcError?.code === "PGRST202" && classOrderId) {
-      ({ data, error: rpcError } = await supabase.rpc(
-        "create_part_order",
-        legacy ? orderArgs : { ...orderArgs, p_payment_method: payMethod }
-      ));
-    }
-    if (rpcError?.code === "PGRST202" && !legacy) {
-      ({ data, error: rpcError } = await supabase.rpc("create_part_order", orderArgs));
-    }
 
-    if (rpcError || !data) {
+    if (!result.ok) {
       setSubmitting(false);
-      // A database without 0032 still refuses on-request items; 0044 refuses a
-      // bank transfer without an email and an order with nothing to pay.
-      const key = checkoutRpcError(rpcError?.message);
-      if (key === "emailRequiredBank") setEmailError(t("errorEmailBank"));
-      else setError(key === "cartBlocked" ? tD("cartBlocked") : key === "totalZero" ? t("errorTotalZero") : t("errorSubmit"));
+      if (EMAIL_FIELD_ERRORS.includes(result.error)) setEmailError(message(result.error));
+      else setError(message(result.error));
       return;
     }
 
-    const orderId = data as string;
-
-    // Apply redeemable AI credits to this order (0042). The server decides the
-    // amount; before 0042 the call fails and nothing is applied.
-    const { data: applied } = await supabase.rpc("redeem_credits", { p_order: orderId }).then(
-      (r) => r,
-      () => ({ data: 0 })
-    );
-    const appliedQar = Number(applied) || 0;
-    const placedTotal = Math.round((grandTotal + creditQar - appliedQar) * 100) / 100;
-    if (appliedQar > 0) creditsChanged();
-
-    // Record how they'll pay (0039). Since 0044 create_part_order has already
-    // stored it and this is a no-op; before 0039 the call fails and the order
-    // simply has no method; the success page still shows the choice.
-    await supabase.rpc("set_order_payment_method", { p_order: orderId, p_method: payMethod }).then(
-      () => {},
-      () => {}
-    );
-
-    // Snapshot the order for the (guest-safe) success page — a guest can't read
-    // their own order back through RLS.
-    try {
-      window.sessionStorage.setItem(
-        LAST_ORDER_KEY,
-        JSON.stringify({
-          id: orderId,
-          customerName,
-          total: placedTotal,
-          shippingQar,
-          handlingQar,
-          tier,
-          split: doSplit,
-          promisedDate: chosen?.date ?? null,
-          earlyDate: doSplit ? chosen?.early_date ?? null : null,
-          heldBy: quote?.held_by ?? null,
-          hasOnRequest: anyToConfirm,
-          paymentMethod: payMethod,
-          items: items.map((i) => ({
-            sku: i.sku,
-            name: i.name,
-            nameAr: i.nameAr,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            leadTimeClass: i.leadTimeClass ?? null,
-            onRequest: toConfirm(i),
-          })),
-        })
-      );
-    } catch {
-      // sessionStorage unavailable — the success page falls back gracefully.
-    }
+    const { orderId, placedTotal } = result;
 
     // Confirmation email with the promised date(s); sent once, server-side.
     void fetch("/api/orders/confirmation", {
@@ -296,78 +166,12 @@ export default function CheckoutClient() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <form onSubmit={handleSubmit} className="neu space-y-5 p-5 sm:p-6">
-          <div className="space-y-2">
-            {label("customer_name", t("nameLabel"), true)}
-            <input id="customer_name" name="customer_name" required className={fieldClass} />
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div className="space-y-2">
-              {label("customer_phone", t("phoneLabel"), true)}
-              <input
-                id="customer_phone"
-                name="customer_phone"
-                required
-                inputMode="tel"
-                dir="ltr"
-                placeholder={t("phonePlaceholder")}
-                className={fieldClass}
-              />
-            </div>
-            <div className="space-y-2">
-              {bankTransfer
-                ? label("customer_email", t("emailLabelRequired"), true)
-                : label("customer_email", t("emailLabel"))}
-              <input
-                id="customer_email"
-                name="customer_email"
-                type="email"
-                dir="ltr"
-                required={bankTransfer}
-                aria-invalid={emailError ? true : undefined}
-                aria-describedby={emailError ? "customer_email_error" : bankTransfer ? "customer_email_hint" : undefined}
-                onChange={() => emailError && setEmailError(null)}
-                className={cn(fieldClass, emailError && "ring-2 ring-destructive/60")}
-              />
-              {emailError && (
-                <p id="customer_email_error" role="alert" className="text-[12px] font-medium text-destructive">
-                  {emailError}
-                </p>
-              )}
-              {bankTransfer && (
-                <p id="customer_email_hint" className="text-[11px] text-mutedtext">
-                  {tPay("emailForBank")}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {label("delivery_area", t("areaLabel"), true)}
-            <select
-              id="delivery_area"
-              name="delivery_area"
-              required
-              defaultValue=""
-              onChange={(e) => setAreaOther(e.target.value === "other")}
-              aria-describedby={areaOther ? "delivery_area_hint" : undefined}
-              className={cn(fieldClass, isRtl && "text-right")}
-            >
-              <option value="" disabled>
-                {t("areaPlaceholder")}
-              </option>
-              {DELIVERY_AREAS.map((a) => (
-                <option key={a} value={a}>
-                  {t(`area_${a}`)}
-                </option>
-              ))}
-            </select>
-            {areaOther && (
-              <p id="delivery_area_hint" className="text-[11px] text-mutedtext">
-                {t("areaOtherHint")}
-              </p>
-            )}
-          </div>
+          <CustomerFields
+            isRtl={isRtl}
+            bankTransfer={bankTransfer}
+            emailError={emailError}
+            onEmailInput={() => setEmailError(null)}
+          />
 
           <fieldset className="space-y-2">
             <legend className={mono("block text-[10px] text-mutedtext")}>{tD("shippingLabel")}</legend>
@@ -448,7 +252,7 @@ export default function CheckoutClient() {
           </fieldset>
 
           <div className="space-y-2">
-            {label("delivery_notes", t("notesLabel"))}
+            <FieldLabel htmlFor="delivery_notes" text={t("notesLabel")} isRtl={isRtl} />
             <textarea
               id="delivery_notes"
               name="delivery_notes"
@@ -463,7 +267,7 @@ export default function CheckoutClient() {
           )}
 
           <div className="flex items-center gap-3">
-            <Button type="submit" size="lg" disabled={submitting || blocked || grandTotal <= 0} className="rounded-full">
+            <Button type="submit" size="lg" disabled={submitting || blocked || isZeroTotal(grandTotal)} className="rounded-full">
               {submitting && <Loader2 className="animate-spin" />}
               {t("placeOrder")}
             </Button>
@@ -473,90 +277,21 @@ export default function CheckoutClient() {
           </div>
         </form>
 
-        {/* Order summary */}
-        <aside className="neu h-fit space-y-4 p-5 lg:sticky lg:top-24">
-          <h2 className="text-sm font-bold text-heading">{t("summaryTitle")}</h2>
-          <ul className="space-y-2">
-            {items.map((i) => (
-              <li key={i.rowId ?? i.sku} className="flex justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate text-body">
-                  <IsolatedTitle text={locale === "ar" && i.nameAr ? i.nameAr : i.name} locale={locale} />
-                  <span className="text-mutedtext">
-                    {" "}
-                    {(i.packSize ?? 1) > 1
-                      ? `· ${tParts("cartPacks", { n: i.quantity, count: String(i.quantity), form: arabicCountForm(i.quantity), size: String(i.packSize ?? 1) })}`
-                      : `× ${i.quantity}`}
-                  </span>
-                  {toConfirm(i) ? (
-                    <span className="block text-[11px] text-faint">{tD("dateTbc")}</span>
-                  ) : (
-                    i.leadTimeClass && (
-                      <span className="block text-[11px] text-faint">{tD(`lt_${i.leadTimeClass}`)}</span>
-                    )
-                  )}
-                </span>
-                <span className="shrink-0 tabular-nums text-heading">
-                  {formatPrice(i.unitPrice * i.quantity, locale)}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {kitDiscountQar > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-mutedtext">{tParts("kitDiscount")}</span>
-              <span className="tabular-nums text-buy">−{formatPrice(kitDiscountQar, locale)}</span>
-            </div>
-          )}
-          {creditQar > 0 && credits && (
-            <div className="space-y-0.5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-mutedtext">{tCr("checkoutLine")}</span>
-                <span className="tabular-nums text-buy">−{formatPrice(creditQar, locale)}</span>
-              </div>
-              {credits.next_expiry && (
-                <p className="text-[11px] text-faint">
-                  {tCr("checkoutExpiry", {
-                    date: new Date(credits.next_expiry).toLocaleDateString(locale === "ar" ? "ar-QA" : "en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    }),
-                  })}{" "}
-                  <Link href="/pricing#credits" className="font-semibold text-cobalt hover:underline">
-                    {tCr("howCreditsLink")}
-                  </Link>
-                </p>
-              )}
-            </div>
-          )}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-mutedtext">
-              {tD("shippingLine", { tier: tD(`tier_${tier}`) })}
-              {doSplit && " × 2"}
-            </span>
-            <span className="tabular-nums text-heading">
-              {quote && priceOf(tier).free ? tD("freeDelivery") : formatPrice(shippingQar, locale)}
-            </span>
-          </div>
-          {handlingQar > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-mutedtext">{tD("handlingLine")}</span>
-              <span className="tabular-nums text-heading">{formatPrice(handlingQar, locale)}</span>
-            </div>
-          )}
-          <div className="flex items-center justify-between border-t border-borderstrong/40 pt-3 text-sm">
-            <span className="font-semibold text-heading">{t("total")}</span>
-            <span className="font-bold tabular-nums text-heading">
-              {formatPrice(grandTotal, locale)}
-            </span>
-          </div>
-          {chosen?.date && (
-            <p className="text-[12.5px] font-semibold text-heading">
-              {tD("arrivesBy", { date: formatDeliveryDate(chosen.date, locale) })}
-            </p>
-          )}
-          <p className="text-[11px] leading-snug text-faint">{t("priceNote")}</p>
-        </aside>
+        <OrderSummary
+          items={items}
+          toConfirm={toConfirm}
+          kitDiscountQar={kitDiscountQar}
+          creditQar={creditQar}
+          creditExpiry={credits?.next_expiry ?? null}
+          hasCredits={Boolean(credits)}
+          tier={tier}
+          doSplit={doSplit}
+          shippingFree={Boolean(quote && priceOf(tier).free)}
+          shippingQar={shippingQar}
+          handlingQar={handlingQar}
+          grandTotal={grandTotal}
+          promisedDate={chosen?.date}
+        />
       </div>
     </div>
   );

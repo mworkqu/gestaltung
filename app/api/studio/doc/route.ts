@@ -1,11 +1,12 @@
 import { z } from "zod";
 
-import { createClient } from "@/lib/supabase/server";
 import { DOC_MAX_BYTES, loadDoc, saveDoc } from "@/lib/studio/server/doc";
 import { DocPutBody } from "@/lib/studio/server/http";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { classDocRefusal } from "@/lib/schools/safe-parts";
 import { isClassProject } from "@/lib/schools/server";
+import { requireUser } from "@/lib/auth/guards";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // GET  /api/studio/doc?projectId= → {doc, version} (doc null when none / unreadable)
 // PUT  /api/studio/doc {projectId, doc, version} → 200 {version}
@@ -23,38 +24,34 @@ export const dynamic = "force-dynamic";
 const Id = z.string().uuid();
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "sign_in" }, { status: 401 });
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
   const projectId = Id.safeParse(new URL(request.url).searchParams.get("projectId"));
-  if (!projectId.success) return Response.json({ error: "bad_request" }, { status: 400 });
+  if (!projectId.success) return jsonError("bad_request", 400);
 
   const r = await loadDoc(supabase, projectId.data);
-  if (!r.ok) return Response.json({ error: r.error }, { status: r.error === "not_found" ? 404 : 500 });
-  if (!r.available) return Response.json({ doc: null, version: 0, error: "run_0068" });
-  return Response.json({ doc: r.doc, version: r.version });
+  if (!r.ok) return jsonError(r.error, r.error === "not_found" ? 404 : 500);
+  if (!r.available) return jsonOk({ doc: null, version: 0, error: "run_0068" });
+  return jsonOk({ doc: r.doc, version: r.version });
 }
 
 export async function PUT(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "sign_in" }, { status: 401 });
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
 
   const text = await request.text().catch(() => "");
   // Envelope allowance on top of the doc cap.
-  if (Buffer.byteLength(text, "utf8") > DOC_MAX_BYTES + 4096) return Response.json({ error: "too_large" }, { status: 413 });
+  if (Buffer.byteLength(text, "utf8") > DOC_MAX_BYTES + 4096) return jsonError("too_large", 413);
   let json: unknown = null;
   try {
     json = JSON.parse(text);
   } catch {
-    return Response.json({ error: "bad_request" }, { status: 400 });
+    return jsonError("bad_request", 400);
   }
   const parsed = DocPutBody.safeParse(json);
-  if (!parsed.success) return Response.json({ error: "invalid" }, { status: 400 });
+  if (!parsed.success) return jsonError("invalid", 400);
 
   // 3d: refuse an unsafe part in a class project's document. Only asked when
   // the document actually names parts, so an empty autosave costs nothing.
@@ -67,11 +64,11 @@ export async function PUT(request: Request) {
   }
 
   const r = await saveDoc(supabase, parsed.data.projectId, parsed.data.doc, parsed.data.version);
-  if (r.ok) return Response.json({ version: r.version });
+  if (r.ok) return jsonOk({ version: r.version });
   if (r.error === "conflict") return Response.json({ error: "conflict", doc: r.doc, version: r.version }, { status: 409 });
-  if (r.error === "run_0068") return Response.json({ error: "run_0068" }, { status: 409 });
-  if (r.error === "too_large") return Response.json({ error: "too_large" }, { status: 413 });
-  if (r.error === "invalid") return Response.json({ error: "invalid" }, { status: 400 });
-  if (r.error === "not_found") return Response.json({ error: "not_found" }, { status: 404 });
-  return Response.json({ error: "failed" }, { status: 500 });
+  if (r.error === "run_0068") return jsonError("run_0068", 409);
+  if (r.error === "too_large") return jsonError("too_large", 413);
+  if (r.error === "invalid") return jsonError("invalid", 400);
+  if (r.error === "not_found") return jsonError("not_found", 404);
+  return jsonError("failed", 500);
 }

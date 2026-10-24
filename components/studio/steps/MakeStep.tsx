@@ -23,7 +23,7 @@ import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { Problem, StepFrame } from "../ui";
 import { storeLines, useAddAllToCart } from "../use-studio-cart";
 import { pictureShareSource, ShareActions, type ShareSource } from "./share";

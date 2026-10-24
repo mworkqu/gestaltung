@@ -20,11 +20,14 @@ export function ChatMessages({
   msgs,
   busy,
   error,
+  captchaFailed = false,
 }: {
   msgs: ChatMsg[];
   busy: boolean;
   /** Shows the chat's failure line (Prototyping.chatFailed). */
   error: boolean;
+  /** The server refused the Turnstile check: shows Prototyping.chatCaptchaFailed instead. */
+  captchaFailed?: boolean;
 }) {
   const t = useTranslations("Prototyping");
   return (
@@ -48,7 +51,9 @@ export function ChatMessages({
           {t("chatThinking")}
         </p>
       )}
-      {error && <p className="text-[12px] font-medium text-destructive">{t("chatFailed")}</p>}
+      {error && (
+        <p className="text-[12px] font-medium text-destructive">{captchaFailed ? t("chatCaptchaFailed") : t("chatFailed")}</p>
+      )}
     </>
   );
 }

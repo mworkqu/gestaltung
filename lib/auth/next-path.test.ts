@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   afterAuthPath,
+  callbackNextPath,
   authAltHref,
   returnsToProject,
   safeNextPath,
@@ -101,5 +102,31 @@ describe("signInHref / signUpHref", () => {
     expect(signInHref("en", null)).toBe("/en/sign-in");
     expect(signInHref("en", "//evil.example")).toBe("/en/sign-in");
     expect(signInHref("en", "/en/sign-in")).toBe("/en/sign-in");
+  });
+});
+
+describe("callbackNextPath (auth/callback)", () => {
+  it("keeps a locale-prefixed app path", () => {
+    expect(callbackNextPath("/en/projects/abc")).toBe("/en/projects/abc");
+    expect(callbackNextPath("/ar/projects/abc/studio?step=parts")).toBe("/ar/projects/abc/studio?step=parts");
+  });
+
+  it("rejects API paths, protocol-relative and absolute URLs, and the sign-in page", () => {
+    for (const bad of ["/api/x", "/api/auth/claim-guest", "//evil", "//evil.example/en/x", "https://evil", "/en/sign-in", "/\\evil", "/en/x\ny", "/projects/abc"]) {
+      expect(callbackNextPath(bad), bad).toBe("/");
+    }
+  });
+
+  it("falls back to / for a missing or non-string value", () => {
+    expect(callbackNextPath(null)).toBe("/");
+    expect(callbackNextPath(undefined)).toBe("/");
+    expect(callbackNextPath(["/en/x"])).toBe("/");
+  });
+
+  it("still lets the password-recovery link land on exactly /{locale}/reset-password", () => {
+    expect(callbackNextPath("/en/reset-password")).toBe("/en/reset-password");
+    expect(callbackNextPath("/ar/reset-password/")).toBe("/ar/reset-password");
+    expect(callbackNextPath("/en/reset-password/../../api/x")).toBe("/");
+    expect(callbackNextPath("/en/sign-up")).toBe("/");
   });
 });

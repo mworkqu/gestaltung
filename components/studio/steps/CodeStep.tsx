@@ -17,7 +17,7 @@ import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { StudioFirmware } from "@/lib/studio/client/api";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 
 const accent = STEP_ACCENT.code;

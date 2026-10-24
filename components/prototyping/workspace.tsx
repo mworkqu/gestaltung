@@ -110,6 +110,8 @@ import { PhonePrompt } from "@/components/projects/phone-prompt";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
 import { phonePromptDismissKey, saveLinkAvailable, shouldShowPhonePrompt } from "@/lib/projects/phone-prompt";
 import type { Firmware } from "@/lib/prototyping/firmware";
+import { svgDataUri } from "@/lib/prototyping/svg-data-uri";
+import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 
 /** Where a part's drawings are shown. */
 const drawingsNode = (p: ProjectPart): NodeId =>
@@ -314,7 +316,7 @@ export function PrototypingWorkspace({
         .order("created_at", { ascending: true }),
       supabase
         .from("project_items")
-        .select("*, part:parts(*)")
+        .select(`*, part:parts(${PART_PUBLIC_COLUMNS})`)
         .eq("project_id", projectId)
         .order("created_at", { ascending: true }),
     ]);
@@ -1015,7 +1017,7 @@ export function PrototypingWorkspace({
                           <img> data URI nothing inside the SVG can run. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(rev!.svg!)}`}
+                        src={svgDataUri(rev!.svg!)}
                         alt={`${s.code} ${s.title}`}
                         className="aspect-[4/3] w-full rounded bg-white object-contain"
                       />

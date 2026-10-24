@@ -10,10 +10,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ProductSpec } from "../schema";
 import { IDEATION, tierOf, tierRank, turnsUntilCharge, type Tier, type TierId } from "../tiers";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 type RpcError = { code?: string; message?: string } | null;
 const missing = (e: RpcError) =>
-  !!e && (e.code === "PGRST202" || e.code === "42883" || e.code === "42P01" || /could not find the function/i.test(e.message ?? ""));
+  !!e && (isMissingFunction(e) || e.code === "42P01" || /could not find the function/i.test(e.message ?? ""));
 
 export type IdeaStatus = {
   role: "anonymous" | "user" | "admin";

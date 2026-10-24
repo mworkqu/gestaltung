@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { logUsage, quota } from "@/lib/ai/usage";
+import { BriefChatBody, briefChatLimiters, rateLimited, routeRate } from "@/lib/prototyping/ai-route-guard";
 import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini-client";
 import { ProviderError } from "@/lib/prototyping/providers/types";
+import { clientIp } from "@/lib/rate-limit";
+import { readTurnstileToken } from "@/lib/turnstile";
+import { checkTurnstile } from "@/lib/turnstile-server";
+import { jsonError } from "@/lib/http";
 
 // "Help me describe it" chat on the brief (owner, 2026-09-29). The model asks
 // one plain question at a time about what matters for building the product,
@@ -9,11 +14,13 @@ import { ProviderError } from "@/lib/prototyping/providers/types";
 // never writes the brief itself — the client presses "Add to my brief".
 // Same gate as /api/analyse: a session (guests count), the daily guard, and
 // metered as feature "analyse" (the ai_usage feature list has no "chat").
+// Guests also pass Turnstile while the store_settings switch is on (token in
+// the x-turnstile-token header or body.turnstileToken), and every caller has a
+// per-user (guests: also per-IP) rate limit (AI-09). The body is zod-parsed
+// with the same cuts as before (AI-10, lib/prototyping/ai-route-guard.ts).
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-type Msg = { role: "user" | "assistant"; text: string };
 
 const SCHEMA = {
   type: "OBJECT",
@@ -32,23 +39,23 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return new Response(null, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as {
-    projectId?: string;
-    locale?: string;
-    brief?: string;
-    messages?: Msg[];
-  } | null;
-  if (!body) return new Response(null, { status: 400 });
-  const locale = body.locale === "ar" ? "ar" : "en";
-  const brief = String(body.brief ?? "").slice(0, 6000);
-  const messages = (Array.isArray(body.messages) ? body.messages : [])
-    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.text === "string")
-    .slice(-16)
-    .map((m) => ({ role: m.role, text: m.text.slice(0, 1500) }));
-  const projectId = typeof body.projectId === "string" && /^[0-9a-f-]{36}$/i.test(body.projectId) ? body.projectId : null;
+  const parsed = BriefChatBody.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return new Response(null, { status: 400 });
+  const { locale, brief, messages, projectId } = parsed.data;
 
-  if (!geminiConfigured()) return Response.json({ error: "unavailable" }, { status: 503 });
-  if ((await quota(supabase, "gemini")).paused) return Response.json({ error: "paused" }, { status: 429 });
+  if (user.is_anonymous) {
+    const token = readTurnstileToken(request.headers) ?? parsed.data.turnstileToken;
+    if (!(await checkTurnstile(request, token)).ok) return jsonError("captcha_failed", 403);
+  }
+  const rate = routeRate(briefChatLimiters, {
+    userId: user.id,
+    anonymous: user.is_anonymous === true,
+    ip: clientIp(request.headers),
+  });
+  if (!rate.allowed) return rateLimited(rate.retryAfterSec);
+
+  if (!geminiConfigured()) return jsonError("unavailable", 503);
+  if ((await quota(supabase, "gemini")).paused) return jsonError("paused", 429);
 
   const asked = messages.filter((m) => m.role === "assistant").length;
   const system =
@@ -68,7 +75,7 @@ export async function POST(request: Request) {
   try {
     const res = await callGemini({ system, prompt, schema: SCHEMA, temperature: 0.4, timeoutMs: 45_000 });
     const raw = (res.raw ?? {}) as { reply?: string; done?: boolean; addition?: string };
-    await logUsage(supabase, {
+    await logUsage(supabase, { userId: user.id,
       provider: "gemini",
       model: res.model,
       projectId,
@@ -86,7 +93,7 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     const reason = e instanceof ProviderError ? e.reason : "unavailable";
-    await logUsage(supabase, { provider: "gemini", projectId, feature: "analyse", outcome: "error", errorCode: reason });
-    return Response.json({ error: reason === "paused" ? "paused" : "unavailable" }, { status: 502 });
+    await logUsage(supabase, { userId: user.id, provider: "gemini", projectId, feature: "analyse", outcome: "error", errorCode: reason });
+    return jsonError(reason === "paused" ? "paused" : "unavailable", 502);
   }
 }

@@ -32,7 +32,10 @@ export function BriefEditor({
   state,
   projectId,
   simple = false,
+  turnstileEnabled = false,
 }: {
+  /** P2-08 switch, passed on to the voice tools (a guest's voice note needs a token). */
+  turnstileEnabled?: boolean;
   /** Client view: a plain box, no voice tools, no word count. */
   simple?: boolean;
   projectId?: string;
@@ -73,6 +76,7 @@ export function BriefEditor({
           onBusy={onBusy}
           onDone={focusEnd}
           projectId={projectId}
+          turnstileEnabled={turnstileEnabled}
         />
       )}
       <textarea

@@ -15,6 +15,7 @@ import {
 } from "@/lib/schools/join-code";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 type ErrKey = "errCode" | "errBadCode" | "errTeam" | "errFull" | "errFailed" | "errRunMigration";
 
@@ -24,7 +25,7 @@ const INPUT =
 function errorKey(err: unknown): ErrKey {
   const e = err as { code?: string; message?: string } | null;
   const message = (e?.message ?? "").toLowerCase();
-  if (e?.code === "PGRST202" || e?.code === "42883" || message.includes("could not find the function")) {
+  if (isMissingFunction(e) || message.includes("could not find the function")) {
     return "errRunMigration";
   }
   if (message.includes("bad_team_name")) return "errTeam";

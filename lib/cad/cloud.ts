@@ -98,14 +98,12 @@ function tokenExpiry(token: string): number {
 type RequestContext = { get?: () => { headers?: Record<string, unknown> } | undefined };
 
 /**
- * The Vercel OIDC token: one passed by the route (request header
- * x-vercel-oidc-token), else the current request's header through Vercel's
- * request context (what @vercel/functions getVercelOidcToken reads), else the
- * env var (set at build time, and by `vercel env pull` for local runs).
+ * The Vercel OIDC token: the current request's header through Vercel's request
+ * context (what @vercel/functions getVercelOidcToken reads), else the env var
+ * (set at build time, and by `vercel env pull` for local runs). A value from the
+ * caller is never accepted: it would become the STS subject token (AI-04).
  */
-export function vercelOidcToken(passed?: string | null): string | null {
-  const direct = passed?.trim();
-  if (direct) return direct;
+export function vercelOidcToken(): string | null {
   try {
     const ctx = (globalThis as unknown as Record<symbol, RequestContext | undefined>)[
       Symbol.for("@vercel/request-context")
@@ -155,14 +153,14 @@ async function googlePost(
   return ((await res.json().catch(() => null)) ?? {}) as Record<string, unknown>;
 }
 
-type AuthOpts = { fetchImpl?: typeof fetch; oidcToken?: string | null };
+type AuthOpts = { fetchImpl?: typeof fetch };
 
 /** Keyless: Vercel OIDC → STS federated access token → IAM Credentials generateIdToken. */
 async function keylessIdToken(audience: string, opts: AuthOpts): Promise<string> {
   const doFetch = opts.fetchImpl ?? fetch;
   const provider = (process.env.GCP_WIF_PROVIDER ?? "").trim().replace(/^\/\/iam\.googleapis\.com\//, "");
   const email = (process.env.GCP_CAD_SA_EMAIL ?? "").trim();
-  const subject = vercelOidcToken(opts.oidcToken);
+  const subject = vercelOidcToken();
   if (!subject) throw new Error("google auth: no Vercel OIDC token");
   const sts = await googlePost(doFetch, "sts", STS_URL, {
     grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
@@ -271,8 +269,6 @@ export type BuildOpts = {
   timeoutMs?: number;
   /** Used for the worker AND the keyless Google calls (tests route by URL). */
   fetchImpl?: typeof fetch;
-  /** The request's x-vercel-oidc-token header, when the route has it. */
-  oidcToken?: string | null;
 };
 
 /** One call to /build. Never throws. */
@@ -288,7 +284,7 @@ export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promis
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? CLOUD_BUILD_TIMEOUT_MS);
   try {
-    const token = await idToken(url, { fetchImpl: opts.fetchImpl, oidcToken: opts.oidcToken });
+    const token = await idToken(url, { fetchImpl: opts.fetchImpl });
     const res = await doFetch(`${url}/build`, {
       method: "POST",
       headers: workerHeaders(token),

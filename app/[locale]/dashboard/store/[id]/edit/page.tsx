@@ -10,6 +10,8 @@ import { loadOnRequest } from "@/lib/admin/fix-data";
 import { hasGalleryPhoto, partMissing } from "@/lib/admin/part-missing";
 import { safeReturnTo } from "@/lib/admin/return-to";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { readPartsAdmin } from "@/lib/store/part-columns";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export default async function EditPartPage({
   searchParams: Promise<{ returnTo?: string | string[] }>;
 }) {
   const { locale, id } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   // D1: where Save / Cancel go back to (Fix list, catalog, restock, stock).
   const raw = (await searchParams).returnTo;
@@ -32,7 +35,8 @@ export default async function EditPartPage({
     cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   const supabase = await createClient();
-  const { data } = await supabase.from("parts").select("*").eq("id", id).maybeSingle();
+  // Cost / sourcing columns: the admin view (0105).
+  const { data } = await readPartsAdmin((t) => supabase.from(t).select("*").eq("id", id).maybeSingle());
   const part = data as Part | null;
   if (!part) notFound();
 

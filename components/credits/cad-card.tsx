@@ -35,6 +35,7 @@ import { CadCloudResult } from "@/components/credits/cad-cloud-result";
 import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { isMissingRelation } from "@/lib/supabase/errors";
 
 const CadViewer = dynamic(() => import("./cad-viewer"), {
   ssr: false,
@@ -53,7 +54,7 @@ type Problem = { code: string; log?: string };
 
 /** The table is not there yet: migration 0043 has not run. */
 const tableMissing = (e: { code?: string; message?: string }) =>
-  e.code === "PGRST205" || e.code === "42P01" || /could not find the table|does not exist/i.test(e.message ?? "");
+  isMissingRelation(e) || /could not find the table|does not exist/i.test(e.message ?? "");
 
 const ERROR_KEY: Record<string, string> = {
   too_many_failed: "cadErr_too_many",

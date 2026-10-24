@@ -9,11 +9,10 @@
 // one row per order in demand_signals (kind "rating"); a second tap changes it.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { UUID_RE } from "@/lib/uuid";
 
 export const RATING_SCORES = [1, 2, 3, 4, 5] as const;
 export type RatingScore = (typeof RATING_SCORES)[number];
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function ratingSecret(env: Record<string, string | undefined> = process.env): string | null {
   return env.ORDER_RATING_SECRET || env.CRON_SECRET || null;
@@ -26,7 +25,7 @@ export function ratingToken(orderId: string, secret: string): string {
 
 /** Constant-time check of a token against the order id. False on any junk. */
 export function verifyRatingToken(orderId: unknown, token: unknown, secret: string | null): boolean {
-  if (!secret || typeof orderId !== "string" || !UUID.test(orderId) || typeof token !== "string") return false;
+  if (!secret || typeof orderId !== "string" || !UUID_RE.test(orderId) || typeof token !== "string") return false;
   const want = Buffer.from(ratingToken(orderId, secret));
   const got = Buffer.from(token);
   return want.length === got.length && timingSafeEqual(want, got);
@@ -45,6 +44,6 @@ export function ratingUrl(siteUrl: string, orderId: string, score: RatingScore, 
 
 /** The five score links (1 → 5), or [] without a valid order id or secret. */
 export function ratingUrls(siteUrl: string, orderId: unknown, secret: string | null, locale: "en" | "ar"): string[] {
-  if (!secret || typeof orderId !== "string" || !UUID.test(orderId)) return [];
+  if (!secret || typeof orderId !== "string" || !UUID_RE.test(orderId)) return [];
   return RATING_SCORES.map((s) => ratingUrl(siteUrl, orderId, s, secret, locale));
 }

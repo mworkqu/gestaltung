@@ -1,4 +1,7 @@
-// P5-16 server-only product data: projects.studio.productPrivate.
+// P5-16 server-only product data. Stored in public.project_studio_private
+// (service_role only) since migration 0100 (audit DB-01); before it, under
+// projects.studio.productPrivate. A DB trigger now also stops any anon /
+// authenticated write from storing productPrivate or changing studio.product.
 //
 // Owner rule: before "Create my CAD" the page gets pictures only. So the
 // ProductModels (and the vision scores, issues, loops for the Engineer view)

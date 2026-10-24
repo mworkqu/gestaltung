@@ -15,6 +15,7 @@ import { buildWiring } from "@/lib/studio/netlist";
 import { clampSpec, emptyStudioDoc, ENCLOSURE_TEMPLATES, parseStudioDoc, type EnclosureTemplate, type StudioDoc } from "@/lib/studio/schema";
 import { markPassed } from "@/lib/studio/client/steps";
 import { StudioShell } from "./StudioShell";
+import { asLocale } from "@/lib/locale";
 
 const FIXTURE_INITIAL = {
   ok: true as const,
@@ -48,7 +49,7 @@ export function StudioFixture({
   /** ?finished=1: every step before Make is done, so ?step=make opens (3c e2e). */
   finished?: boolean;
 }) {
-  const locale = useLocale() === "ar" ? "ar" : "en";
+  const locale = asLocale(useLocale());
   const api = useMemo(() => {
     const base = withCounts(withGate(withLook(withDelay(stored ? withTabStore(mockStudioApi()) : mockStudioApi()))));
     return product ? { ...base, product: mockProductApi() } : base;
@@ -234,7 +235,7 @@ function withCounts(api: StudioApi): StudioApi {
   const counts = { spec: 0, pick: 0 };
   let ms = 0;
   try {
-    (window as unknown as { __g360Ai?: typeof counts }).__g360Ai = counts;
+    window.__g360Ai = counts;
     ms = Math.min(5000, Math.max(0, Number(new URLSearchParams(window.location.search).get("pickdelay")) || 0));
   } catch {
     /* no window (server render) */

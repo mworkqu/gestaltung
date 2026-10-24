@@ -12,8 +12,10 @@
 
 import { COMPANY } from "@/lib/company";
 import { peekContactPhone } from "@/lib/contact-phone-server";
+import { asLocale, type Locale } from "@/lib/locale";
+import { escapeHtml } from "@/lib/text/escape";
 
-export type EmailLocale = "en" | "ar";
+export type EmailLocale = Locale;
 
 /** DESIGN.md palette, as hex (email clients have no CSS variables). */
 export const BRAND = {
@@ -31,10 +33,8 @@ export const BRAND = {
 const FONT_LTR = "Arial,Helvetica,sans-serif";
 const FONT_RTL = "'Segoe UI',Tahoma,Arial,sans-serif";
 
-export function escapeHtmlText(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-}
-const e = escapeHtmlText;
+export { escapeHtml as escapeHtmlText };
+const e = escapeHtml;
 
 export type BrandButton = { label: string; url: string; variant?: "primary" | "secondary" };
 
@@ -169,7 +169,7 @@ export function dataTable(headers: string[], rows: string[][], ar = false): { ht
 // ─── the shell ──────────────────────────────────────────────────────────────
 
 export function renderBrandedEmail(doc: BrandEmailDoc): { html: string; text: string } {
-  const locale: EmailLocale = doc.locale === "ar" ? "ar" : "en";
+  const locale: EmailLocale = asLocale(doc.locale);
   const ar = locale === "ar";
   const c = COPY[locale];
   const dir = ar ? "rtl" : "ltr";

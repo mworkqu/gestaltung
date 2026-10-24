@@ -147,6 +147,7 @@ export const MESSAGE_SCOPES = {
     "Prototyping.aiConsentHint",
     "Prototyping.chatThinking",
     "Prototyping.chatFailed",
+    "Prototyping.chatCaptchaFailed",
     "Prototyping.chatPlaceholder",
     "Prototyping.chatSend",
     "Prototyping.readAloud",

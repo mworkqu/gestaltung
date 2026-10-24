@@ -4,6 +4,8 @@ import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
 import { encryptSecret, verifyState } from "@/lib/integrations/crypto";
 import { readYoutubeIntegration, saveYoutubeRow, youtubeConfig } from "@/lib/integrations/youtube-server";
 import { addQuota, GOOGLE_TOKEN_URL, hasAllScopes, redirectUriFor, STATE_COOKIE, YT_COST } from "@/lib/youtube-upload";
+import { isSuperAdminSession } from "@/lib/auth/guards";
+import { emptyStatus } from "@/lib/http";
 
 // D6: Google redirects here after the consent screen. super_admin only. Checks
 // the signed state against the httpOnly cookie, swaps the code for tokens,
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
   const fail = (reason: string) => back(`yt=error&reason=${reason}`);
 
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
+  if (!isSuperAdminSession(session)) return emptyStatus(403);
   if (!c.ok) return fail("setup");
   if (!st) return fail("state");
   if (params.get("error")) return fail(params.get("error") === "access_denied" ? "denied" : "google");

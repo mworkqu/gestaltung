@@ -9,6 +9,8 @@
 // payments exist (Phase 4): nothing here bills anyone. Change a number in the
 // migration AND here, or edit the store_settings row directly.
 
+import { CREDIT_QAR } from "@/lib/format/money";
+
 export const PRICING_PLANS_KEY = "pricing_plans";
 export const SERVICE_PRICES_KEY = "service_prices";
 
@@ -60,7 +62,7 @@ export type ServicePrices = {
 
 export const DEFAULT_PRICING_PLANS: PricingPlans = {
   currency: "QAR",
-  overage_per_credit_qar: 20,
+  overage_per_credit_qar: CREDIT_QAR,
   refund_window_days: 30,
   plans: [
     {

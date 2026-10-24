@@ -2,6 +2,8 @@
 // demand signals, estimates units and revenue, groups a draft order by
 // supplier against each supplier's minimum order value, and writes the CSV.
 
+import { round2 } from "@/lib/format/money";
+
 export type RestockWeights = { request: number; bom_unmatched: number; add_to_cart: number; view: number };
 export const DEFAULT_WEIGHTS: RestockWeights = { request: 10, bom_unmatched: 8, add_to_cart: 5, view: 1 };
 
@@ -26,6 +28,11 @@ export function demandScore(c: SignalCounts, w: RestockWeights): number {
  */
 export function estimatedUnits(c: SignalCounts): number {
   return c.requestedQty + c.carts;
+}
+
+/** Revenue if the estimated units sell at the listed price, rounded to the fils. */
+export function estimatedRevenue(units: number, unitPrice: number): number {
+  return round2(units * unitPrice);
 }
 
 export type RestockRow = {
@@ -80,7 +87,7 @@ export function groupDraft(lines: DraftLine[]): DraftGroup[] {
       } as DraftGroup);
     g.lines.push(l);
     if (l.row.landedCost === null) g.unpriced++;
-    else g.total = Math.round((g.total + l.row.landedCost * l.qty) * 100) / 100;
+    else g.total = round2(g.total + l.row.landedCost * l.qty);
     map.set(key, g);
   }
   for (const g of map.values()) g.belowMinimum = g.minOrderValue !== null && g.total < g.minOrderValue;
@@ -105,7 +112,7 @@ export function draftCsv(groups: DraftGroup[]): string {
           l.row.name,
           l.qty,
           l.row.landedCost,
-          l.row.landedCost === null ? "" : Math.round(l.row.landedCost * l.qty * 100) / 100,
+          l.row.landedCost === null ? "" : round2(l.row.landedCost * l.qty),
           l.row.moq,
           l.row.supplierUrl,
           l.row.score,

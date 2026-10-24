@@ -10,6 +10,7 @@
 // what makes a revision reproducible and diffable.
 
 import type { SchematicKind } from "./constants";
+import { escapeXml } from "@/lib/text/escape";
 
 const INK = "#1c2434";
 const COBALT = "#0e59c5";
@@ -66,9 +67,6 @@ export type DrawInput = {
   features: SchematicFeatures;
 };
 
-const esc = (s: string) =>
-  String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-
 const dimH = (x1: number, x2: number, y: number, label: string) =>
   `<g stroke="${COBALT}" stroke-width="1"><path d="M${x1} ${y}H${x2}M${x1} ${y - 5}v10M${x2} ${y - 5}v10"/></g>` +
   `<text x="${(x1 + x2) / 2}" y="${y - 6}" fill="${COBALT}" font-size="10" text-anchor="middle" font-family="monospace">${label}</text>`;
@@ -83,8 +81,8 @@ function titleBlock(i: DrawInput) {
     `<rect x="372" y="232" width="136" height="76" fill="#ffffff" fill-opacity="0.65" stroke="${INK}" stroke-width="1"/>` +
     `<path d="M372 250h136M372 268h136M372 288h136M440 288v20" stroke="${INK}" stroke-width="0.6"/>` +
     `<text x="379" y="245" font-size="9" font-weight="500">GESTALTUNG</text>` +
-    `<text x="379" y="263" font-size="9">${esc(i.code)}</text>` +
-    `<text x="379" y="282" font-size="8.5">${esc(i.material.slice(0, 18).toUpperCase())}</text>` +
+    `<text x="379" y="263" font-size="9">${escapeXml(i.code)}</text>` +
+    `<text x="379" y="282" font-size="8.5">${escapeXml(i.material.slice(0, 18).toUpperCase())}</text>` +
     `<text x="379" y="302" font-size="9" fill="${COBALT}">REV ${i.rev}</text>` +
     `<text x="447" y="302" font-size="9">×${i.quantity}</text>` +
     `</g>`
@@ -153,8 +151,8 @@ function bracket(i: DrawInput) {
 function blockDiagram(i: DrawInput) {
   const box = (x: number, y: number, w: number, h: number, label: string, sub: string, hl = false) =>
     `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${hl ? "rgba(14,89,197,0.08)" : "rgba(255,255,255,0.5)"}" stroke="${hl ? COBALT : INK}" stroke-width="1.3"/>` +
-    `<text x="${x + w / 2}" y="${y + h / 2 - 1}" text-anchor="middle" font-size="11" font-weight="600" fill="${INK}">${esc(label)}</text>` +
-    `<text x="${x + w / 2}" y="${y + h / 2 + 13}" text-anchor="middle" font-size="8.5" fill="${FAINT}" font-family="monospace">${esc(sub)}</text>`;
+    `<text x="${x + w / 2}" y="${y + h / 2 - 1}" text-anchor="middle" font-size="11" font-weight="600" fill="${INK}">${escapeXml(label)}</text>` +
+    `<text x="${x + w / 2}" y="${y + h / 2 + 13}" text-anchor="middle" font-size="8.5" fill="${FAINT}" font-family="monospace">${escapeXml(sub)}</text>`;
 
   let s = `<g stroke="${COBALT}" stroke-width="1.2" fill="none"><path d="M150 84h50M150 158h50M320 84h46M320 158h46M260 210v26"/></g>`;
   s += box(40, 62, 110, 44, "Power in", "solar / mains");
@@ -163,7 +161,7 @@ function blockDiagram(i: DrawInput) {
   s += box(366, 62, 112, 44, "Actuator", "motor / pump");
   s += box(366, 136, 112, 44, "Sensors", "level · temp");
   s += box(200, 236, 120, 40, "User app", "status · alerts");
-  s += `<text x="40" y="300" font-family="monospace" font-size="9" fill="${FAINT}">${esc(i.code)} · REV ${i.rev} · BLOCK DIAGRAM — not a wiring schematic</text>`;
+  s += `<text x="40" y="300" font-family="monospace" font-size="9" fill="${FAINT}">${escapeXml(i.code)} · REV ${i.rev} · BLOCK DIAGRAM — not a wiring schematic</text>`;
   return s;
 }
 
@@ -180,7 +178,7 @@ export function drawSchematic(i: DrawInput): string {
     `<rect width="520" height="320" fill="url(#g)"/>`;
 
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="${esc(i.title)} — revision ${i.rev}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="${escapeXml(i.title)} — revision ${i.rev}">` +
     grid +
     body +
     (i.kind === "block_diagram" ? "" : titleBlock(i)) +

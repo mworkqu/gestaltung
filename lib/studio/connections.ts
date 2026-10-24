@@ -330,24 +330,6 @@ export function netColourMap(connections: Connection[]): Map<string, WireColour>
   return m;
 }
 
-/** Connections touching an instance pin ("led_5mm_1.A"), including via helpers. */
-export function connectionsAt(connections: Connection[], part: string, pin?: string): Connection[] {
-  return connections.filter(
-    (c) =>
-      (c.from.part === part && (!pin || c.from.pin === pin)) ||
-      (c.to.part === part && (!pin || c.to.pin === pin)) ||
-      (!pin && c.viaPart === part) ||
-      (!!pin && !!c.bundle?.some((b) => (b.from.part === part && b.from.pin === pin) || (b.to.part === part && b.to.pin === pin))),
-  );
-}
-
-/** "ESP32 brain board GPIO4 → Light + (yellow)". */
-export function describeConnection(c: Connection, getPart: GetPart, locale: Locale): string {
-  const a = `${endName(c.from, getPart, locale)} ${c.from.label}`;
-  const b = `${endName(c.to, getPart, locale)} ${c.to.label}`;
-  return `${a} → ${b} (${WIRE_NAME[c.wireColour][locale]})`;
-}
-
 // ── Code: pin constants and the pin block ──────────────────────────────────
 
 /** Value a sketch uses for a board pin: "2" for D2 / GPIO2 / GP2, "A0" for A0. */

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { loadFixParts } from "@/lib/admin/fix-data";
@@ -16,24 +16,26 @@ import {
   updateOnRequest,
   type SupplierRef,
 } from "@/lib/admin/fix-delivery";
+import { asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
+import { round2 } from "@/lib/format/money";
 
 // Fix list actions (D1). super_admin only — checked here and again by RLS.
 // The client sends at most MAX_IDS products per call (it batches) and shows
 // "N fixed, M failed — see why" from the per-product results.
 
 const MAX_IDS = 50;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type BulkResponse = { results: BulkItemResult[] } | { error: "forbidden" | "input" | "load" | "supplier" };
 
 async function isAdmin() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   return s?.profile.role === "super_admin";
 }
 
 function cleanIds(ids: unknown): string[] | null {
   if (!Array.isArray(ids)) return null;
-  const out = Array.from(new Set(ids.filter((x): x is string => typeof x === "string" && UUID.test(x))));
+  const out = Array.from(new Set(ids.filter((x): x is string => typeof x === "string" && UUID_RE.test(x))));
   return out.length > 0 && out.length <= MAX_IDS ? out : null;
 }
 
@@ -43,7 +45,7 @@ function cleanLead(v: unknown): number | null {
 }
 
 function refresh(locale: string) {
-  const l = locale === "ar" ? "ar" : "en";
+  const l = asLocale(locale);
   revalidateStorefront();
   revalidatePath(`/${l}/dashboard/store/fix`);
   revalidatePath(`/${l}/dashboard/store`);
@@ -58,7 +60,7 @@ async function names(db: Awaited<ReturnType<typeof createClient>>, ids: string[]
 
 async function resolveSupplier(db: Awaited<ReturnType<typeof createClient>>, supplier: string): Promise<SupplierRef | null> {
   if (supplier === "own") return ensureOwnStockSupplier(db);
-  if (!UUID.test(supplier)) return null;
+  if (!UUID_RE.test(supplier)) return null;
   return supplierRef(db, supplier);
 }
 
@@ -141,7 +143,7 @@ export type FixOneResponse =
 /** The drawer's Save: only the fields that were missing. Returns what is still missing. */
 export async function fixOne(locale: string, partId: string, input: FixOneInput): Promise<FixOneResponse> {
   if (!(await isAdmin())) return { error: "forbidden" };
-  if (typeof partId !== "string" || !UUID.test(partId)) return { error: "input" };
+  if (typeof partId !== "string" || !UUID_RE.test(partId)) return { error: "input" };
   const db = await createClient();
 
   const patch: Record<string, unknown> = {};
@@ -153,7 +155,7 @@ export async function fixOne(locale: string, partId: string, input: FixOneInput)
   if (input.price !== undefined && input.price !== null && String(input.price).trim() !== "") {
     const price = Number(input.price);
     if (!Number.isFinite(price) || price <= 0 || price > 1_000_000) return { error: "price" };
-    patch.unit_price = Math.round(price * 100) / 100;
+    patch.unit_price = round2(price);
   }
   if (Object.keys(patch).length > 0) {
     const { error } = await db.from("parts").update(patch).eq("id", partId);

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { isDuplicateProductError } from "@/lib/parts/part-key";
 import { cleanAttributes, type Attributes } from "@/lib/store/attributes";
@@ -50,7 +50,7 @@ function makeSku(category: string) {
 }
 
 export async function saveQuickProducts(locale: string, rows: QuickRow[]): Promise<QuickResult[]> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") throw new Error("forbidden");
   const supabase = await createClient();
 

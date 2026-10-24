@@ -16,7 +16,7 @@ import { useTranslations } from "next-intl";
 
 import type { EnclosureSpec, Finish, StudioDoc, StudioProduct } from "@/lib/studio/schema";
 import { servoPlan } from "@/lib/studio/servo-plan";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import type { ProductPreviews, UnlockedProduct } from "../use-product";
 import { Bar } from "../ui";

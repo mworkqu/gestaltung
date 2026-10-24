@@ -12,7 +12,7 @@ import { useTranslations } from "next-intl";
 import { preloadProductViewer } from "@/components/studio/viewer/ProductViewerLazy";
 import type { EngineerDesign } from "@/lib/studio/client/api";
 import type { StudioDoc } from "@/lib/studio/schema";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 
 export function ProductEngineer({ ctx, doc }: { ctx: StudioCtx; doc: StudioDoc }) {
   const t = useTranslations("Studio");

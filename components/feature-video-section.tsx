@@ -2,6 +2,7 @@ import { getTranslations } from "next-intl/server";
 
 import { FeatureVideo, type FeatureVideoProps } from "@/components/feature-video";
 import { videoBase, videoEntry } from "@/lib/videos";
+import { asLocale } from "@/lib/locale";
 
 // Server wrapper for public pages: reads the copy and the bucket URL, hands the
 // client player plain strings (so no MessagesScope change is needed).
@@ -40,7 +41,7 @@ export async function FeatureVideoSection({
       ratio={ratio}
       size={size}
       posterOnly={posterOnly}
-      locale={locale === "ar" ? "ar" : "en"}
+      locale={asLocale(locale)}
       href={href}
     />
   );

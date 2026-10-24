@@ -6,6 +6,7 @@ import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
 import { getContactPhone } from "@/lib/contact-phone-server";
 import type { PaymentMethod } from "@/lib/company";
 import { LEGAL_KEYS, LEGAL_SLUGS } from "@/lib/legal/content";
+import { asLocale } from "@/lib/locale";
 
 const EMAIL = "info@gestaltung360.com";
 
@@ -71,7 +72,7 @@ export async function Footer() {
             </a>
             <p className="flex items-start gap-2 py-2 text-sm text-mutedtext">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-cobalt" aria-hidden />
-              {COMPANY_ADDRESS[locale === "ar" ? "ar" : "en"]}
+              {COMPANY_ADDRESS[asLocale(locale)]}
             </p>
           </div>
 

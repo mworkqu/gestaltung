@@ -16,6 +16,8 @@ import { ListSearch } from "@/components/dashboard/list-search";
 import { matchesQuery, paginate, parsePage } from "@/lib/admin/pagination";
 import { cn } from "@/lib/utils";
 import { editHref, listUrl } from "@/lib/admin/return-to";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { readPartsAdmin } from "@/lib/store/part-columns";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function PartsCatalogManager({
   }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const sp = await searchParams;
   const { category, stock, published, merged, review, q } = sp;
   const showMerged = merged === "1";
@@ -52,8 +55,9 @@ export default async function PartsCatalogManager({
 
   const supabase = await createClient();
   // super_admin RLS returns every row (published or draft).
-  const { rows: all, error } = await fetchAllRows<Part>((from, to) =>
-    supabase.from("parts").select("*").order("created_at", { ascending: false }).order("id").range(from, to)
+  // select("*") includes the cost / sourcing columns: the admin view (0105).
+  const { rows: all, error } = await readPartsAdmin((t) =>
+    fetchAllRows<Part>((from, to) => supabase.from(t).select("*").order("created_at", { ascending: false }).order("id").range(from, to))
   );
   // Duplicates merged by 0030 (merged_into set) are hidden unless ?merged=1.
   // Before 0030 the column does not exist, so nothing counts as merged.

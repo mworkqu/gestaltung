@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:cycles": "madge --circular --extensions ts,tsx --ts-config tsconfig.json app components lib middleware.ts",
+    "check:unused": "knip --no-progress"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.1.1",
@@ -36,9 +38,12 @@
     "three": "^0.180.0",
     "three-bvh-csg": "0.0.18",
     "three-mesh-bvh": "0.9.16",
+    "three-stdlib": "2.36.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
+    "@eslint/eslintrc": "3.3.7",
     "@playwright/test": "1.64.0",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
@@ -48,6 +53,8 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.18",
+    "knip": "5.88.1",
+    "madge": "8.0.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
     "typescript": "^5",

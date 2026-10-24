@@ -4,7 +4,10 @@ import { Link } from "@/i18n/navigation";
 import { modelPrice } from "@/lib/ai/prices";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { COST_MULTIPLIER, QAR_PER_USD, needsMigration, qarFormatter, usdFormatter, type RevenueRow } from "./format";
+import { COST_MULTIPLIER, QAR_PER_USD, billableQar, needsMigration, qarFormatter, usdFormatter, type RevenueRow } from "./format";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { dayFormatter, timeFormatter } from "@/lib/format/date";
 
 // Per-user AI cost overview (owner, 2026-10-18): who uses the AI, how many
 // ideation tokens they spent and what the calls cost us at the provider's
@@ -57,17 +60,18 @@ export default async function AiCostsPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const { q } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("AiCosts");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const loc = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
+  const loc = intlTag(asLocale(locale));
   const num = new Intl.NumberFormat(loc);
   const usd = usdFormatter(locale);
   const qar = qarFormatter(locale);
-  const dayFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
-  const timeFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Qatar" });
+  const dayFmt = dayFormatter(asLocale(locale));
+  const timeFmt = timeFormatter(asLocale(locale));
   const query = (typeof q === "string" ? q : "").trim().slice(0, 80);
 
   const supabase = await createClient();
@@ -122,7 +126,7 @@ export default async function AiCostsPage({
     { label: t("tokensIn"), value: num.format(total.tin) },
     { label: t("tokensOut"), value: num.format(total.tout) },
     { label: t("totalCost"), value: usd(total.cost) },
-    { label: t("billable"), value: qar(total.cost * COST_MULTIPLIER * QAR_PER_USD) },
+    { label: t("billable"), value: qar(billableQar(total.cost)) },
     { label: t("ideaUsed"), value: num.format(total.idea) },
     { label: t("totalRevenue"), value: qar(totalRevenue) },
     { label: t("activePasses"), value: num.format(activePasses) },
@@ -214,7 +218,7 @@ export default async function AiCostsPage({
                         <td className="py-2 text-end font-mono font-semibold tabular-nums text-heading">{usd(u.cost)}
                           <span className="block text-[10px] font-normal text-faint">{qar(u.cost * QAR_PER_USD)}</span>
                         </td>
-                        <td className="py-2 text-end font-mono font-semibold tabular-nums text-heading">{qar(u.cost * COST_MULTIPLIER * QAR_PER_USD)}</td>
+                        <td className="py-2 text-end font-mono font-semibold tabular-nums text-heading">{qar(billableQar(u.cost))}</td>
                         <td className="py-2 text-end font-mono tabular-nums text-heading">{u.revenue > 0 ? qar(u.revenue) : "—"}</td>
                         <td className="py-2 text-end text-[12px] text-mutedtext">{u.passUntil ? dayFmt.format(new Date(u.passUntil)) : "—"}</td>
                         <td className="py-2 text-end text-[12px] text-mutedtext">{u.last ? timeFmt.format(new Date(u.last)) : "—"}</td>

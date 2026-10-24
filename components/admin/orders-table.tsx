@@ -15,6 +15,7 @@ import { suppliersOfOrder } from "@/lib/orders/line-suppliers";
 import type { OrderLine } from "@/lib/admin/order-lines";
 import type { PartOrder } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 export type OrderListRow = PartOrder & {
   is_test?: boolean | null;
@@ -44,7 +45,7 @@ export async function OrdersTable({
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "2-digit",
     month: "short",
     year: "numeric",

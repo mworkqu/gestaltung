@@ -8,6 +8,7 @@ import { parseStoreParams } from "@/lib/store/catalog";
 import type { LeadTimeClass } from "@/lib/store/sourcing";
 import { partImageUrl } from "@/lib/parts/format";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
+import { asLocale } from "@/lib/locale";
 
 /** Results shown in the dropdown. */
 export const SUGGEST_LIMIT = 6;
@@ -54,10 +55,6 @@ export function normalizeSuggestQuery(raw: string | null | undefined): string {
   return (raw ?? "").replace(/\s+/g, " ").trim().slice(0, SUGGEST_MAX_CHARS);
 }
 
-export function suggestLocale(raw: string | null | undefined): "en" | "ar" {
-  return raw === "ar" ? "ar" : "en";
-}
-
 /** Whitelist one card: copies the public fields by name, nothing else survives. */
 export function toSuggestion(p: StoreCardPart & Record<string, unknown>): StoreSuggestion {
   const img = partImageUrl(p);
@@ -89,7 +86,7 @@ export async function handleStoreSearch(request: Request, deps: StoreSearchDeps,
   }
   const url = new URL(request.url);
   const q = normalizeSuggestQuery(url.searchParams.get("q"));
-  const locale = suggestLocale(url.searchParams.get("locale"));
+  const locale = asLocale(url.searchParams.get("locale"));
   const headers = { "Cache-Control": SUGGEST_CACHE_CONTROL };
   if (q.length < SUGGEST_MIN_CHARS) {
     return Response.json({ q, results: [], total: 0 } satisfies StoreSearchResponse, { headers });

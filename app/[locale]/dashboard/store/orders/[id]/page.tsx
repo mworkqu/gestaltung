@@ -23,6 +23,8 @@ import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import { WhatsappSentToggle } from "@/components/parts/whatsapp-sent-toggle";
 import { cn } from "@/lib/utils";
 import { formatDeliveryDate } from "@/lib/store/delivery";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ export default async function OrderDetailPage({
   params: Promise<{ locale: string; id: string }>;
 }) {
   const { locale, id } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
@@ -77,7 +80,7 @@ export default async function OrderDetailPage({
   }
   const soleProject = projectIds.length === 1 && items.every((it) => it.projectId === projectIds[0]) ? projectIds[0] : null;
 
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "2-digit",
     month: "short",
     year: "numeric",

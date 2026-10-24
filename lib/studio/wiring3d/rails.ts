@@ -9,7 +9,7 @@
 
 import type { Connection } from "../connections";
 import { RAIL } from "./breadboard";
-import type { MatLayout } from "./layout";
+import type { MatLayout } from "./types";
 
 export function railNets(connections: Connection[], layout: Pick<MatLayout, "placements" | "breadboard">): Map<string, number> {
   const out = new Map<string, number>();

@@ -394,7 +394,7 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       // Same rule as /api/store-lead (422 invalid_phone), and the request is kept for the e2e.
       if (!isValidPhone(q.phone)) return false;
       try {
-        (window as unknown as { __g360LastQuote?: unknown }).__g360LastQuote = q;
+        window.__g360LastQuote = q;
       } catch {
         /* no window */
       }

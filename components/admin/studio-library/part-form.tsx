@@ -21,8 +21,9 @@ import { setClientLibrary } from "@/lib/studio/library";
 import { draftToPart, type FieldError, type PartDraft } from "@/lib/studio/library/form";
 import { CATEGORIES, FACES, LOOKS, PIN_ROLES, PIN_SIDES, PORT_KINDS, type LibraryPart } from "@/lib/studio/schema";
 import { SkuField } from "./sku-check";
+import { asLocale } from "@/lib/locale";
+import { BUCKETS } from "@/lib/storage/paths";
 
-const STL_BUCKET = "studio-models";
 const STL_MAX_BYTES = 20 * 1024 * 1024;
 
 const input =
@@ -122,9 +123,9 @@ export function StudioPartForm({ locale, initial, originalId, builders, readOnly
       }
       const supabase = createClient();
       const path = `${(d.id.trim() || "part").replace(/[^a-z0-9_]/g, "_")}/${Date.now()}.stl`;
-      const { error } = await supabase.storage.from(STL_BUCKET).upload(path, file, { contentType: "model/stl", upsert: false });
+      const { error } = await supabase.storage.from(BUCKETS.studioModels).upload(path, file, { contentType: "model/stl", upsert: false });
       if (error) throw error;
-      const { data } = supabase.storage.from(STL_BUCKET).getPublicUrl(path);
+      const { data } = supabase.storage.from(BUCKETS.studioModels).getPublicUrl(path);
       setD((x) => ({ ...x, modelKind: "stl", stlUrl: data.publicUrl }));
       setUpload({ state: "idle", size });
     } catch (e) {
@@ -414,7 +415,7 @@ export function StudioPartForm({ locale, initial, originalId, builders, readOnly
             <StudioViewer
               key={preview.key}
               components={[{ instanceId: "preview", partId: preview.part.id, label: preview.part.name.en }]}
-              ariaLabel={t("previewAria", { name: preview.part.name[locale === "ar" ? "ar" : "en"] })}
+              ariaLabel={t("previewAria", { name: preview.part.name[asLocale(locale)] })}
               autoRotate
             />
           </div>

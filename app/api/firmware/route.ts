@@ -4,6 +4,8 @@ import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini
 import { ProviderError } from "@/lib/prototyping/providers/types";
 import { FIRMWARE_SCHEMA, circuitForPrompt, cleanFirmware, findController } from "@/lib/prototyping/firmware";
 import type { Netlist } from "@/lib/prototyping/netlist";
+import { asLocale } from "@/lib/locale";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // Software › Code: write a starter Arduino-IDE sketch for the project's own
 // circuit (owner, 2026-09-29). Same gate as the other AI routes: the caller's
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { projectId?: string; locale?: string } | null;
   const projectId = body?.projectId;
   if (!projectId || !/^[0-9a-f-]{36}$/i.test(projectId)) return new Response(null, { status: 400 });
-  const locale = body?.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(body?.locale);
 
   const { data: project } = await supabase
     .from("projects")
@@ -33,11 +35,11 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (!project) return new Response(null, { status: 404 });
   const netlist = project.netlist as Netlist | null;
-  if (!netlist?.components?.length) return Response.json({ error: "no_circuit" }, { status: 409 });
-  if (!findController(netlist)) return Response.json({ error: "no_controller" }, { status: 409 });
+  if (!netlist?.components?.length) return jsonError("no_circuit", 409);
+  if (!findController(netlist)) return jsonError("no_controller", 409);
 
-  if (!geminiConfigured()) return Response.json({ error: "unavailable" }, { status: 503 });
-  if ((await quota(supabase, "gemini")).paused) return Response.json({ error: "paused" }, { status: 429 });
+  if (!geminiConfigured()) return jsonError("unavailable", 503);
+  if ((await quota(supabase, "gemini")).paused) return jsonError("paused", 429);
 
   const system =
     "You write firmware for small electronics prototypes in the Arduino IDE (C++). " +
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
   try {
     const res = await callGemini({ system, prompt, schema: FIRMWARE_SCHEMA, temperature: 0.2, timeoutMs: 100_000 });
     const firmware = cleanFirmware(res.raw, res.model);
-    await logUsage(supabase, {
+    await logUsage(supabase, { userId: user.id,
       provider: "gemini",
       model: res.model,
       projectId,
@@ -66,12 +68,12 @@ export async function POST(request: Request) {
       outcome: firmware ? "ok" : "error",
       errorCode: firmware ? null : "malformed",
     });
-    if (!firmware) return Response.json({ error: "failed" }, { status: 502 });
+    if (!firmware) return jsonError("failed", 502);
     const { error } = await supabase.from("projects").update({ firmware }).eq("id", projectId);
-    return Response.json({ firmware, saved: !error });
+    return jsonOk({ firmware, saved: !error });
   } catch (e) {
     const reason = e instanceof ProviderError ? e.reason : "unavailable";
-    await logUsage(supabase, { provider: "gemini", projectId, feature: "firmware", outcome: "error", errorCode: reason });
-    return Response.json({ error: reason === "paused" ? "paused" : "unavailable" }, { status: 502 });
+    await logUsage(supabase, { userId: user.id, provider: "gemini", projectId, feature: "firmware", outcome: "error", errorCode: reason });
+    return jsonError(reason === "paused" ? "paused" : "unavailable", 502);
   }
 }

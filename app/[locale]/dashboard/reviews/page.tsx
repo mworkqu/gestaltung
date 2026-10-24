@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Star } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import {
   REVIEW_STATUSES,
@@ -15,6 +13,7 @@ import {
 } from "@/lib/reviews/reviews";
 import { cn } from "@/lib/utils";
 import { setReviewStatus } from "./actions";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // Review moderation (P4-03, migration 0058): ratings and one-line comments from
 // delivered orders. Nothing is public until approved here; any later change by
@@ -35,9 +34,7 @@ export default async function ReviewsAdminPage({
   const sp = await searchParams;
   setRequestLocale(locale);
 
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
 
   const t = await getTranslations("Reviews");
   const isRtl = locale === "ar";

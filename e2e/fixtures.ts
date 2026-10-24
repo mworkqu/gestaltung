@@ -40,15 +40,20 @@ export function envVar(name: string): string | undefined {
   }
 }
 
-/** The Supabase host, from NEXT_PUBLIC_SUPABASE_URL. */
-function supabaseHost(): string | null {
+/** The Supabase project URL from NEXT_PUBLIC_SUPABASE_URL, or null when no env is configured. */
+export function supabaseUrl(): URL | null {
   const url = envVar("NEXT_PUBLIC_SUPABASE_URL");
   if (!url) return null;
   try {
-    return new URL(url).host;
+    return new URL(url);
   } catch {
     return null;
   }
+}
+
+/** The Supabase host, from NEXT_PUBLIC_SUPABASE_URL. */
+function supabaseHost(): string | null {
+  return supabaseUrl()?.host ?? null;
 }
 
 const SUPABASE_HOST = supabaseHost();

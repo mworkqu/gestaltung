@@ -10,6 +10,7 @@ import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
+import { TURNSTILE_HEADER } from "@/lib/turnstile";
 import { takePendingUpload } from "@/lib/design/pending-upload";
 import {
   ACCEPT_ATTR,
@@ -73,10 +74,23 @@ export function QuoteRequest({
   const [needsCheck, setNeedsCheck] = useState(false);
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
+  // Latest widget token, readable from inside handleSubmit after awaits.
+  const captchaRef = useRef<string | null>(null);
+  // The server demands a token from everyone but a signed-in, non-guest account.
   useEffect(() => {
     if (!turnstileActive(turnstileEnabled)) return;
-    void getCurrentUser().then((u) => setNeedsCheck(!u));
+    void getCurrentUser().then((u) => setNeedsCheck(!u || u.is_anonymous === true));
   }, [turnstileEnabled]);
+
+  // A token is single-use and ensureSession() may already have spent ours on
+  // the anonymous sign-in, so /api/design-quote gets the widget's next one.
+  async function freshCaptchaToken(): Promise<string | null> {
+    if (!needsCheck || !turnstileActive(turnstileEnabled)) return null;
+    for (let i = 0; i < 50 && !captchaRef.current; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return captchaRef.current;
+  }
 
   // Pick up the file the homepage dropzone handed off (client-only).
   useEffect(() => {
@@ -147,7 +161,10 @@ export function QuoteRequest({
           user = await ensureSession({ captchaToken: captcha });
         } finally {
           // Single-use token: a retry needs a fresh one.
-          if (captcha) setCaptchaReset((k) => k + 1);
+          if (captcha) {
+            captchaRef.current = null;
+            setCaptchaReset((k) => k + 1);
+          }
         }
         const supabase = createClient();
         const title = (file?.name.replace(/\.[^.]+$/, "") || name.trim() || t("projectDefaultName")).slice(0, 120);
@@ -191,9 +208,10 @@ export function QuoteRequest({
         }
       }
 
+      const apiToken = await freshCaptchaToken();
       const res = await fetch("/api/design-quote", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(apiToken ? { [TURNSTILE_HEADER]: apiToken } : {}) },
         body: JSON.stringify({
           locale,
           email: email.trim(),
@@ -422,7 +440,15 @@ export function QuoteRequest({
       </div>
 
       {needsCheck && (
-        <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="quote" />
+        <Turnstile
+          enabled={turnstileEnabled}
+          onToken={(tok) => {
+            captchaRef.current = tok;
+            setCaptcha(tok);
+          }}
+          resetKey={captchaReset}
+          action="quote"
+        />
       )}
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}

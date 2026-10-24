@@ -31,6 +31,7 @@ import {
   type Privacy,
   type YoutubeMeta,
 } from "@/lib/youtube-upload";
+import { isSuperAdminSession } from "@/lib/auth/guards";
 
 // D6: "Upload to YouTube" for one feature clip. super_admin only.
 //
@@ -69,7 +70,7 @@ const json = (status: number, body: Record<string, unknown>) =>
 
 export async function POST(request: Request) {
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return json(403, { ok: false, error: "forbidden" });
+  if (!isSuperAdminSession(session)) return json(403, { ok: false, error: "forbidden" });
 
   const body = (await request.json().catch(() => null)) as Body | null;
   const slug = typeof body?.slug === "string" ? body.slug : "";

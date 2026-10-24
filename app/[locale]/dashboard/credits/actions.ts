@@ -3,15 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { buildGrantNote, parseGrantReason, pickAmount } from "@/lib/credits/grant-reasons";
 import { createClient } from "@/lib/supabase/server";
+import { asLocale } from "@/lib/locale";
 
 // Manual credit grant (bank transfer / WhatsApp top-ups until online payment
 // exists). admin_grant() (0042) re-checks super_admin and the inputs.
 export async function grantCredits(formData: FormData) {
-  const locale = formData.get("locale") === "ar" ? "ar" : "en";
-  const s = await getSessionContext();
+  const locale = asLocale(formData.get("locale"));
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 
   const user = String(formData.get("user") ?? "");

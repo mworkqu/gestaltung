@@ -1,9 +1,9 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 import type { Locator, Page, Request } from "@playwright/test";
 
-import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, test, type Loc } from "./fixtures";
+import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, supabaseUrl, test, type Loc } from "./fixtures";
 
 // W1 (2026-10-11): a guest who signs in to an EXISTING account comes back to the
 // same Studio step and their work is claimed for the account.
@@ -31,17 +31,12 @@ const IDEA: Record<Loc, string> = {
 const GUEST_ID = "aaaaaaaa-0000-4000-8000-00000000e2e1";
 const MEMBER_ID = "bbbbbbbb-0000-4000-8000-00000000e2e2";
 
-function supabaseUrl(): URL {
-  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) {
-    const env = readFileSync(path.join(ROOT, ".env.local"), "utf8");
-    url = /^NEXT_PUBLIC_SUPABASE_URL=(.*)$/m.exec(env)?.[1]?.trim().replace(/^["']|["']$/g, "");
-  }
-  if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
-  return new URL(url);
-}
-
-const SUPA = supabaseUrl();
+// Without a Supabase URL (no .env.local in this checkout) these specs cannot
+// run: the app has no Supabase client to intercept. Skip the file instead of
+// crashing the whole run.
+const SUPA_OR_NULL = supabaseUrl();
+test.skip(!SUPA_OR_NULL, "NEXT_PUBLIC_SUPABASE_URL is not set");
+const SUPA = SUPA_OR_NULL ?? new URL("http://supabase.invalid");
 const STORAGE_KEY = `sb-${SUPA.hostname.split(".")[0]}-auth-token`;
 
 /** An unsigned, JWT-shaped token (never valid on any server). */

@@ -17,6 +17,8 @@
 import { packsFor, packSizeOf, type PackProduct } from "@/lib/store/pack";
 import { groupComponents } from "@/lib/studio/parts-group";
 import type { LibraryPart, StudioDoc } from "@/lib/studio/schema";
+import { asLocale } from "@/lib/locale";
+import { round2 } from "@/lib/format/money";
 
 /** One team of a class, with the Studio document of its project. */
 export type ClassTeamDoc = {
@@ -101,7 +103,6 @@ export type ClassPartsPlan = {
   goodsQar: number;
 };
 
-const money = (n: number) => Math.round(n * 100) / 100;
 
 function partName(part: LibraryPart | undefined, fallback: string, locale: "en" | "ar"): string {
   const name = part?.name?.[locale] || part?.name?.en;
@@ -126,7 +127,7 @@ export function classPartsPlan(
   prices: ReadonlyMap<string, number>,
   options: ClassPartsOptions,
 ): ClassPartsPlan {
-  const locale = options.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(options.locale);
   const { getPart, products } = options;
 
   // part id → summed need across the class, in first-seen order.
@@ -163,7 +164,7 @@ export function classPartsPlan(
     }
 
     const partCount = needs.reduce((n, x) => n + x.quantity, 0);
-    const goodsQar = money(
+    const goodsQar = round2(
       needs.reduce((s, x) => s + (x.sku ? (prices.get(x.sku) ?? 0) : 0) * x.quantity, 0),
     );
     teamRows.push({
@@ -202,7 +203,7 @@ export function classPartsPlan(
       packSize,
       pieces: bucket.pieces,
       packs,
-      lineTotalQar: money((price as number) * packs),
+      lineTotalQar: round2((price as number) * packs),
       teams: bucket.teams,
     });
   }
@@ -211,7 +212,7 @@ export function classPartsPlan(
     teams: teamRows,
     lines,
     weSource,
-    goodsQar: money(lines.reduce((s, l) => s + l.lineTotalQar, 0)),
+    goodsQar: round2(lines.reduce((s, l) => s + l.lineTotalQar, 0)),
   };
 }
 

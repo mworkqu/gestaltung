@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { VoltaatControls, VoltaatMapForm } from "@/components/admin/voltaat-sync";
 import { formatPrice } from "@/lib/parts/format";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { readPartsAdmin } from "@/lib/store/part-columns";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Voltaat price sync (Task 19g): switch, run now, mapping, mapped products and
 // the daily change report. super_admin only (store layout).
@@ -27,11 +30,12 @@ type Change = {
 
 export default async function VoltaatSyncPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("VoltaatSync");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), { dateStyle: "medium", timeStyle: "short" });
 
   const supabase = await createClient();
   const { data: sup } = await supabase.from("suppliers").select("id").eq("code", "voltaat").maybeSingle();
@@ -41,7 +45,7 @@ export default async function VoltaatSyncPage({ params }: { params: Promise<{ lo
     sup
       ? supabase
           .from("supplier_offers")
-          .select("id, part_id, supplier_url, retail_price, availability, last_checked_at, part:parts!supplier_offers_part_id_fkey(name, sku, unit_price, pricing_mode)")
+          .select("id, part_id, supplier_url, retail_price, availability, last_checked_at, part:parts!supplier_offers_part_id_fkey(name, sku, unit_price)")
           .eq("supplier_id", sup.id)
           .not("supplier_url", "is", null)
           .order("last_checked_at", { ascending: false })
@@ -62,7 +66,15 @@ export default async function VoltaatSyncPage({ params }: { params: Promise<{ lo
     last_checked_at: string | null;
     part: { name: string; sku: string; unit_price: number; pricing_mode: string } | null;
   };
-  const offers = (offersRes.data ?? []) as unknown as OfferRow[];
+  const offerRows = (offersRes.data ?? []) as unknown as OfferRow[];
+  // pricing_mode is not readable through the parts embed (0105): the admin view, by id.
+  const partIds = [...new Set(offerRows.map((o) => o.part_id))];
+  const modes = new Map<string, string>();
+  for (let i = 0; i < partIds.length; i += 200) {
+    const { data } = await readPartsAdmin((t) => supabase.from(t).select("id, pricing_mode").in("id", partIds.slice(i, i + 200)));
+    for (const r of (data ?? []) as { id: string; pricing_mode: string }[]) modes.set(r.id, r.pricing_mode);
+  }
+  const offers = offerRows.map((o) => (o.part ? { ...o, part: { ...o.part, pricing_mode: modes.get(o.part_id) ?? "markup" } } : o));
   const runs = runsRes.data ?? [];
 
   return (

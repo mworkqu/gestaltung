@@ -40,7 +40,7 @@ import type { BuiltMechPart } from "@/lib/studio/mech/build";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { MechPart, MechTemplate, StudioDoc } from "@/lib/studio/schema";
 import { fileSlug } from "@/lib/studio/client/steps";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import type { UnlockedProduct } from "../use-product";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 

@@ -1,4 +1,4 @@
-import { canUse, spend } from "@/lib/credits/server";
+import { canUse, serverWritesReady, spend, spendRefusal } from "@/lib/credits/server";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { buildWiring } from "@/lib/studio/netlist";
 import { emptyStudioDoc } from "@/lib/studio/schema";
@@ -6,12 +6,17 @@ import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
 import { creditDenied, WiringBody, wiringKey } from "@/lib/studio/server/http";
 import { studioRequest } from "@/lib/studio/server/context";
 import { classDocRefusal, classGuard } from "@/lib/schools/safe-parts";
+import { jsonError } from "@/lib/http";
 
 // POST /api/studio/wiring — the circuit for the chosen parts. No AI call: the
 // netlist and checks come from our rules (buildWiring). Credits follow the
 // existing rule (canUse/spend, migration 0052): every circuit costs 1 wiring
 // credit, admin free, guests are sent to sign in — exactly like /api/netlist.
 // Charged only AFTER the circuit was built; a failure never charges.
+// AI-05: no service key (spend_credit_for cannot run) → 503 unavailable before
+// the build, unless the caller is admin (never charged). The doc is saved only
+// AFTER a successful spend; a failed spend returns the refusal (spendRefusal:
+// 401 / 402 / 404 / 503) and neither returns nor saves the circuit.
 // Idempotent re-open: when spec + parts equal what is saved and checks exist,
 // the saved wiring is returned and nothing is charged.
 //
@@ -56,15 +61,21 @@ export async function POST(request: Request) {
 
   const access = await canUse(supabase, "wiring", project.id);
   const denied = creditDenied(access);
-  if (denied) return Response.json({ error: denied.error }, { status: denied.status });
+  if (denied) return jsonError(denied.error, denied.status);
+  // The spend needs the service client (0102).
+  if (access.role !== "admin" && !serverWritesReady()) return jsonError("unavailable", 503);
 
   let wiring: ReturnType<typeof buildWiring>;
   try {
     wiring = buildWiring(body.components.filter((c) => !c.auto), body.spec, getPart, body.locale);
   } catch (e) {
     console.error("[studio/wiring] buildWiring failed:", e instanceof Error ? e.message : e);
-    return Response.json({ error: "failed" }, { status: 500 });
+    return jsonError("failed", 500);
   }
+
+  const paid = await spend(supabase, ctx.userId, "wiring", project.id);
+  const refused = spendRefusal(paid, access.role);
+  if (refused) return jsonError(refused.error, refused.status);
 
   const saved = await updateDoc(supabase, project.id, (doc) => ({
     ...(doc ?? emptyStudioDoc(body.spec)),
@@ -73,8 +84,6 @@ export async function POST(request: Request) {
     netlist: wiring.netlist,
     checks: wiring.checks,
   }));
-
-  const paid = await spend(supabase, "wiring", project.id);
   return Response.json({
     components: wiring.components,
     netlist: wiring.netlist,

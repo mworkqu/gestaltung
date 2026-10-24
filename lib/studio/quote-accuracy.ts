@@ -13,6 +13,7 @@
 
 import { isTestRow } from "../admin/test-data";
 import { parseQuoteCalc, type QuoteCalc, type QuoteRule } from "./request-summary";
+import { round2 } from "@/lib/format/money";
 
 export const MIN_QUOTES = 3;
 /** Within ±5 % of the estimate on average = "no change needed". */
@@ -56,7 +57,6 @@ export function quotedRows(
 }
 
 const round1 =(n: number) => Math.round(n * 10) / 10;
-const round2 = (n: number) => Math.round(n * 100) / 100;
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
 export function quoteAccuracy(rows: readonly QuotedRow[], rule: QuoteRule): QuoteAccuracy {

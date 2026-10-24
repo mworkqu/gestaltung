@@ -12,6 +12,7 @@ import { pageMetadata } from "@/lib/seo";
 import { IDEATION, TIERS } from "@/lib/studio/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Ideation tokens (owner, 2026-10-18): balance, the optional Maker Pass, the
 // pay-per-use packs and the Fawran checkout (TokenShop), then the user's
@@ -34,7 +35,7 @@ export default async function TokensPage({ params }: { params: Promise<{ locale:
   const t = await getTranslations("Tokens");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const numLocale = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
+  const numLocale = intlTag(asLocale(locale));
   const date = new Intl.DateTimeFormat(numLocale, { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
 
   const user = await getAuthUser();

@@ -16,6 +16,9 @@ import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/parts/format";
 import { conversionPct, parseCohortFunnel, type CohortFunnelRow } from "@/lib/pricing/experiment";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
+import { DAY_MS } from "@/lib/format/date";
+import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
 
 // "Today" — the owner's first screen (owner, 2026-09-29: the dashboard was
 // confusing; audit #41). Only what needs doing, each with a count and a link:
@@ -30,8 +33,8 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
   const db = await createClient();
-  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
-  const monthAgo = new Date(Date.now() - 30 * 864e5).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * DAY_MS).toISOString();
+  const monthAgo = new Date(Date.now() - 30 * DAY_MS).toISOString();
   const count = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => r.count ?? 0, () => 0);
 
   const [
@@ -58,7 +61,7 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
       db
         .from("part_orders")
         .select("id", { count: "exact", head: true })
-        .in("status", ["pending", "confirmed", "processing", "paid", "sourcing"])
+        .in("status", OPEN_ORDER_STATUSES)
         .not("is_test", "is", true)
     ),
     count(db.from("demand_signals").select("id", { count: "exact", head: true }).eq("kind", "request").is("served_at", null)),
@@ -140,7 +143,7 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
   ];
 
   const when = (iso: string) =>
-    new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(
+    new Intl.DateTimeFormat(intlTag(asLocale(locale)), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(
       new Date(iso)
     );
 

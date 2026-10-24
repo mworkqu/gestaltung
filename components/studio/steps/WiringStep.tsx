@@ -21,7 +21,7 @@ import { STEP_ACCENT } from "@/lib/studio/palette";
 type Schematic = typeof import("@/lib/studio/schematic");
 import type { StudioDoc } from "@/lib/studio/schema";
 import { fileSlug } from "@/lib/studio/client/steps";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { accessReason, problemKey } from "./problem";
 

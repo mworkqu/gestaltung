@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Download, FolderOpen, Inbox, Mail, MessageCircle } from "lucide-react";
 
@@ -12,11 +11,12 @@ import { saveQuoteRule, setLeadStatus } from "./actions";
 import { QuoteAccuracySection } from "@/components/admin/quote-accuracy";
 import { quoteAccuracy, quotedRows } from "@/lib/studio/quote-accuracy";
 import { getQuoteRule, isMissingQuoteColumn } from "@/lib/studio/server/quote";
-import { getSessionContext } from "@/lib/auth/get-session";
 import { createClient } from "@/lib/supabase/server";
 import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Every enquiry the site captures — homepage callbacks and CAD quote requests
 // both land in `inquiries` via /api/store-lead and /api/design-quote. Read-only
@@ -60,9 +60,7 @@ export default async function LeadsPage({
 
   // RLS already restricts these rows to super_admin, but redirect rather than
   // render an empty table at a signed-in workshop or client.
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
 
   const t = await getTranslations("Leads");
   const tq = await getTranslations("LeadQuote");
@@ -147,7 +145,7 @@ export default async function LeadsPage({
       on ? "bg-panel text-heading shadow-neu-sm" : "text-mutedtext hover:text-heading"
     );
 
-  const dateFmt = new Intl.DateTimeFormat(isRtl ? "ar-QA-u-nu-latn" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     dateStyle: "medium",
     timeStyle: "short",
   });

@@ -13,12 +13,13 @@
 //    the caller simply builds as before. Reads give up after READ_TIMEOUT_MS.
 
 import type { PackedEnclosure } from "./protocol";
+import { DAY_MS } from "@/lib/format/date";
 
 export const GEOMETRY_CACHE_VERSION = "w6-1";
 const DB_NAME = "studio-geometry";
 const STORE = "enclosures";
 const MAX_ENTRIES = 4;
-const MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+const MAX_AGE_MS = 7 * DAY_MS;
 const READ_TIMEOUT_MS = 400;
 
 const NAMESPACE = `${GEOMETRY_CACHE_VERSION}:${process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? "local"}`;

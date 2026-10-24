@@ -12,8 +12,9 @@ import { validatedCall } from "@/lib/prototyping/ai-call";
 import { createServiceClient } from "@/lib/supabase/service";
 import { productById } from "./config";
 import { RECEIPT_SCHEMA, RECEIPT_SYSTEM, checkReceipt, cleanReceipt, type Receipt, type ReviewReason } from "./verify";
+import { BUCKETS } from "@/lib/storage/paths";
 
-export const PROOF_BUCKET = "payment-proofs";
+export const PROOF_BUCKET = BUCKETS.paymentProofs;
 const PROOF_MAX_BYTES = 8 * 1024 * 1024;
 
 export type PaymentRow = {
@@ -104,7 +105,11 @@ export async function submitProof(supabase: SupabaseClient, userId: string, paym
   if (r.ok) receipt = r.value;
 
   const verdict = receipt
-    ? checkReceipt(receipt, { amountQar: Number(payment.amount_qar), createdAt: new Date(payment.created_at) })
+    ? checkReceipt(receipt, {
+        amountQar: Number(payment.amount_qar),
+        createdAt: new Date(payment.created_at),
+        referenceCode: payment.reference_code,
+      })
     : { ok: false, reasons: ["model_unavailable" as const] };
 
   const { data: status, error: settleError } = await service.rpc("payment_settle", {

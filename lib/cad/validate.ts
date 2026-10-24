@@ -93,13 +93,18 @@ const PY_FORBIDDEN: [RegExp, string][] = [
   [/\b(os|sys|subprocess|socket|shutil|pathlib|importlib)\s*\./, "only cadquery and math may be used"],
   [/__\w+__/, "dunder names are not allowed"],
   [/\b(exportStep|exportStl|export|show_object)\s*\(|cq\.exporters\b/, "do not export or show: leave the final shape in `result`"],
+  // Mirrors the worker's file-reading attribute ban (services/cad-worker/app/sandbox.py, AI-03).
+  [
+    /\.\s*(parse_file|parseFile|read|readline|readlines|read_text|read_bytes|write|writelines|write_text|write_bytes|fromfile|tofile|loadtxt|genfromtxt|load|loads)\b/,
+    "file access is not allowed (parse_file, read, write, load …)",
+  ],
 ];
 
 /** The Python with comments and string contents blanked. */
 function stripPython(code: string): string {
   return code
     .replace(/("""|''')[\s\S]*?\1/g, '""')
-    .replace(/"(?:\.|[^"\\n])*"|'(?:\.|[^'\\n])*'/g, '""')
+    .replace(/"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g, '""')
     .replace(/#.*$/gm, "");
 }
 

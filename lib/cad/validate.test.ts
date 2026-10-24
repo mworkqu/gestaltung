@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SCAD_MAX_BYTES, cleanScad, stripScad, validateScad } from "./validate";
+import { SCAD_MAX_BYTES, cleanScad, stripScad, validateCadQuery, validateScad } from "./validate";
 
 const BOX = `// A box
 width = 40; // mm
@@ -61,5 +61,51 @@ describe("cleanScad / stripScad", () => {
 
   it("blanks comments and string contents", () => {
     expect(stripScad('a = "x(y"; // c\ncube(1); /* d */')).toBe('a = ""; \ncube(1);  ');
+  });
+});
+
+describe("validateCadQuery", () => {
+  const GOOD = [
+    "import cadquery as cq",
+    "import math",
+    "W = 60.0",
+    'body = cq.Workplane("XY").box(W, 40, 20).faces(">Z").shell(-2)',
+    "result = body",
+  ].join("\n");
+
+  it("an ordinary model passes", () => {
+    expect(validateCadQuery(GOOD)).toEqual([]);
+  });
+
+  it("rejects file-reading attribute chains (AI-03, mirrors the worker)", () => {
+    for (const attr of ["parse_file", "parseFile", "read_text", "read", "write_bytes", "load", "fromfile"]) {
+      const problems = validateCadQuery(`import cadquery as cq\nx = cq.selectors.Literal("x").${attr}("/etc/passwd")\nresult = 1\n`);
+      expect(problems.some((p) => p.includes("file access"))).toBe(true);
+    }
+  });
+
+  it("rejects a match class pattern with a dunder keyword", () => {
+    const code = "import cadquery as cq\nmatch 1:\n    case int(__class__=k):\n        pass\nresult = 1\n";
+    expect(validateCadQuery(code)).toContain("dunder names are not allowed");
+  });
+
+  it("blanks string literals containing the letter n (no false positive on banned words inside quotes)", () => {
+    // Before the fix the string class excluded the letter "n", so these were left unblanked.
+    const code = `${GOOD}\nlabel = "no open(x) or os.path in an engine note"\nother = 'an exec(y) mention'\n`;
+    expect(validateCadQuery(code)).toEqual([]);
+  });
+
+  it("an apostrophe inside a double-quoted string cannot hide real code (no false negative)", () => {
+    const code = `${GOOD}\nnote = "don't"; y = os.getcwd(); z = 'x'\n`;
+    expect(validateCadQuery(code)).toContain("only cadquery and math may be used");
+  });
+
+  it("still catches a banned attribute outside strings", () => {
+    const code = `${GOOD}\nnote = "an harmless string"\ndata = cq.importers.thing.read("x")\n`;
+    expect(validateCadQuery(code).some((p) => p.includes("file access"))).toBe(true);
+  });
+
+  it("does not flag names that only start like a banned one", () => {
+    expect(validateCadQuery(`${GOOD}\nreadable = body.loaded_value if False else 1\n`)).toEqual([]);
   });
 });

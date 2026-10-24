@@ -8,20 +8,16 @@ import type { Metadata, MetadataRoute } from "next";
 
 import { routing } from "@/i18n/routing";
 import { sizedImage } from "@/lib/store/image-url";
+import { asLocale, type Locale } from "@/lib/locale";
 
 export const SITE_URL = "https://gestaltung360.com";
 export const SITE_NAME = "Gestaltung360";
 
-export type SeoLocale = "en" | "ar";
+export type SeoLocale = Locale;
 
 const OG_LOCALE: Record<SeoLocale, string> = { en: "en_US", ar: "ar_QA" };
 
 export const OG_IMAGE_SIZE = { width: 1200, height: 630 } as const;
-
-/** "ar" stays "ar"; anything else is the default locale. */
-export function seoLocale(locale: string): SeoLocale {
-  return locale === "ar" ? "ar" : "en";
-}
 
 /** og:locale:alternate values: every locale except the current one. */
 function alternateOgLocales(locale: SeoLocale): string[] {
@@ -32,7 +28,7 @@ function alternateOgLocales(locale: SeoLocale): string[] {
 export function localizedPath(locale: string, path = ""): string {
   const trimmed = path.replace(/\/+$/, "");
   const clean = trimmed && !trimmed.startsWith("/") ? `/${trimmed}` : trimmed;
-  return `/${seoLocale(locale)}${clean}`;
+  return `/${asLocale(locale)}${clean}`;
 }
 
 /** Absolute, locale-specific URL of a page. `path` has no locale prefix. */
@@ -50,7 +46,7 @@ export function languageAlternates(path = ""): Record<string, string> {
 
 /** The generated brand card (app/[locale]/opengraph-image.tsx). */
 export function defaultOgImage(locale: string): string {
-  return `${SITE_URL}/${seoLocale(locale)}/opengraph-image`;
+  return `${SITE_URL}/${asLocale(locale)}/opengraph-image`;
 }
 
 /**
@@ -105,7 +101,7 @@ export type PageMetadataInput = {
  */
 export function pageMetadata(input: PageMetadataInput): Metadata {
   const { title, description, noindex } = input;
-  const locale = seoLocale(input.locale);
+  const locale = asLocale(input.locale);
 
   // Undefined keys are left out: a present-but-undefined `description` would
   // wipe the inherited one.
@@ -154,7 +150,7 @@ export function pageMetadata(input: PageMetadataInput): Metadata {
  * them all at the home page. Pages add their own through pageMetadata().
  */
 export function siteDefaults(input: { locale: string; title: string; description: string }): Metadata {
-  const locale = seoLocale(input.locale);
+  const locale = asLocale(input.locale);
   const image = defaultOgImage(locale);
   return {
     metadataBase: new URL(SITE_URL),

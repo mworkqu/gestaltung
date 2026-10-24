@@ -93,17 +93,41 @@ export const tierOf = (spec: Pick<ProductSpec, "actuators" | "understanding"> | 
 
 export const tierRank = (id: TierId) => TIERS.findIndex((t) => t.id === id);
 
+/** A stored tier id (idea_sessions.tier) as a Tier; unknown / missing → the base tier. */
+export const tierById = (id: string | null | undefined): Tier => TIERS.find((t) => t.id === id) ?? TIERS[0];
+
+/**
+ * The tier a chat turn is priced at (AI-06). The floor is the tier the SERVER
+ * last recorded for the project (idea_sessions.tier, written only by
+ * idea_token_charge from the model's own output); the card the client sends
+ * can only raise it, never lower it. With no stored tier yet (a new idea) the
+ * floor is the base tier, so an honest client pays exactly what it paid before:
+ * the tier of the card it shows (none → Explorers).
+ */
+export function chargeTier(storedTier: string | null | undefined, current: ProductSpec | null): Tier {
+  const stored = tierById(storedTier);
+  const claimed = tierOf(current);
+  return tierRank(claimed.id) > tierRank(stored.id) ? claimed : stored;
+}
+
 /**
  * What this chat turn costs before the model is called.
  *  - the project's first model turn = a new idea: newIdeaCost × tier (tier of the card, if any);
  *  - an edit turn: every N-th edit turn costs 1 × tier, the others are free.
+ * Tier = chargeTier(storedTier, current): the server-stored tier is the floor.
  */
-export function turnCost(opts: { started: boolean; editTurnsSoFar: number; current: ProductSpec | null }): {
+export function turnCost(opts: {
+  started: boolean;
+  editTurnsSoFar: number;
+  current: ProductSpec | null;
+  /** idea_sessions.tier from idea_token_status (server-written). */
+  storedTier?: string | null;
+}): {
   amount: number;
   edit: boolean;
   tier: Tier;
 } {
-  const tier = tierOf(opts.current);
+  const tier = chargeTier(opts.storedTier, opts.current);
   if (!opts.started) return { amount: IDEATION.newIdeaCost * tier.multiplier, edit: Boolean(opts.current), tier };
   if (!opts.current) return { amount: 0, edit: false, tier }; // still answering the first questions of the paid idea
   const n = IDEATION.turnsPerToken;

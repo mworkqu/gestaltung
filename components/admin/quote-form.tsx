@@ -10,11 +10,12 @@ import { useTranslations } from "next-intl";
 
 import type { SaveQuoteResult } from "@/app/[locale]/dashboard/leads/actions";
 import { parseFinalQuote, quoteDifference } from "@/lib/studio/request-summary";
+import { intlTag, asLocale } from "@/lib/locale";
 
 export type SaveQuoteAction = (input: { id: string; locale: string; finalQar: string; note: string }) => Promise<SaveQuoteResult>;
 
 function fmt(n: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { maximumFractionDigits: 2 }).format(n);
+  return new Intl.NumberFormat(intlTag(asLocale(locale)), { maximumFractionDigits: 2 }).format(n);
 }
 
 export function QuoteForm({

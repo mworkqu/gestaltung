@@ -12,12 +12,13 @@ import { Loader2, Plus, Save, X } from "lucide-react";
 
 import { saveHolidays } from "@/app/[locale]/dashboard/store/sourcing/actions";
 import { isIsoDate, QATAR_EXPECTED_HOLIDAYS, type Holidays } from "@/lib/store/working-days";
+import { intlTag, asLocale } from "@/lib/locale";
 
 const input =
   "rounded-lg border border-white/60 bg-surface px-2 py-1 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
 
 function label(iso: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  return new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     weekday: "short",
     day: "numeric",
     month: "long",

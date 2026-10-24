@@ -7,6 +7,11 @@ import { renderLeadEmail } from "@/lib/email/lead-email";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CAD_BUCKET, QUOTE_BUCKET } from "@/lib/design/constants";
+import { isAllowedQuoteStoragePath } from "@/lib/design/quote-paths";
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { readTurnstileToken } from "@/lib/turnstile";
+import { checkTurnstile, turnstileEnforced } from "@/lib/turnstile-server";
+import { asLocale } from "@/lib/locale";
 
 // Public "request a quote" endpoint for the custom-manufacturing flow. The
 // homepage dropzone → /design/quote uploads the CAD file straight to Storage,
@@ -18,6 +23,9 @@ import { CAD_BUCKET, QUOTE_BUCKET } from "@/lib/design/constants";
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 7; // 7 days
 
+// Per-IP brake (API-03): 10 quote requests per 10 minutes per server instance.
+const rate = createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
+
 const TECHNIQUE_LABELS: Record<string, string> = {
   "3d_printing": "3D printing",
   cnc_machining: "CNC machining",
@@ -26,7 +34,40 @@ const TECHNIQUE_LABELS: Record<string, string> = {
   not_sure: "Not sure — needs a recommendation",
 };
 
+type Db = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Cloudflare Turnstile (P2-08). Switch off or a key missing → always allowed
+ * (today's behaviour). Switch on → the x-turnstile-token header or the body's
+ * turnstileToken must pass, unless the caller is a signed-in, non-anonymous
+ * account (sign-up is itself behind the CAPTCHA; the form shows no widget to
+ * them). A guest session does not skip it.
+ */
+async function captchaPassed(
+  request: Request,
+  supabase: Db | null,
+  body: Record<string, unknown>,
+): Promise<boolean> {
+  if (!(await turnstileEnforced())) return true;
+  try {
+    const user = supabase ? (await supabase.auth.getUser()).data.user : null;
+    if (user && !user.is_anonymous) return true;
+  } catch {
+    // No usable session: fall through to the token check.
+  }
+  const token = readTurnstileToken(request.headers) ?? readTurnstileToken(body);
+  return (await checkTurnstile(request, token)).ok;
+}
+
 export async function POST(request: Request) {
+  const limit = rate.hit(clientIp(request.headers));
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } },
+    );
+  }
+
   let body: {
     email?: string;
     phone?: string;
@@ -40,11 +81,30 @@ export async function POST(request: Request) {
     /** "cad" = the file is on the customer's project (cad-files), else quote-uploads. */
     bucket?: string;
     project_id?: string | null;
+    /** Cloudflare Turnstile token (or send it in the x-turnstile-token header). */
+    turnstileToken?: string;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  }
+
+  // The caller's own cookie client: RLS applies to everything read with it.
+  // Null without Supabase env (the lead is then only emailed).
+  let supabase: Db | null = null;
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    try {
+      supabase = await createClient();
+    } catch {
+      supabase = null;
+    }
+  }
+  if (!(await captchaPassed(request, supabase, body as Record<string, unknown>))) {
+    return NextResponse.json({ error: "captcha_failed" }, { status: 403 });
   }
 
   const email = String(body.email ?? "").trim().slice(0, 160) || null;
@@ -52,15 +112,29 @@ export async function POST(request: Request) {
   const name = String(body.name ?? "").trim().slice(0, 120) || "Website visitor";
   const technique = String(body.technique ?? "").trim().slice(0, 40);
   const notes = String(body.message ?? "").trim().slice(0, 4000);
-  const locale = body.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(body.locale);
   const fileName = String(body.file_name ?? "").trim().slice(0, 200);
   const fileSize = Number(body.file_size) || 0;
-  const storagePath =
-    typeof body.storage_path === "string" && body.storage_path.trim()
-      ? body.storage_path.trim().slice(0, 400)
-      : null;
-
   const bucket = body.bucket === "cad" ? CAD_BUCKET : QUOTE_BUCKET;
+  const rawPath =
+    typeof body.storage_path === "string" && body.storage_path.trim() ? body.storage_path.trim() : null;
+
+  // API-04: the service role signs this path, so it must be a path our uploader
+  // wrote (for cad-files: the caller's own folder). Anything else is dropped as
+  // if the upload had failed: the lead is still saved, no link is minted.
+  let storagePath: string | null = null;
+  if (rawPath) {
+    let userId: string | null = null;
+    if (bucket === CAD_BUCKET && supabase) {
+      try {
+        userId = (await supabase.auth.getUser()).data.user?.id ?? null;
+      } catch {
+        userId = null;
+      }
+    }
+    if (isAllowedQuoteStoragePath(bucket, rawPath, userId)) storagePath = rawPath;
+    else console.warn("[design-quote] storage_path rejected for bucket", bucket);
+  }
   const projectId =
     typeof body.project_id === "string" && /^[0-9a-f-]{36}$/i.test(body.project_id) ? body.project_id : null;
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://gestaltung360.com";
@@ -68,13 +142,11 @@ export async function POST(request: Request) {
   // The id lives in the stored message (the admin card finds the project from
   // it); the card and the email show the project name, never the id.
   let projectName: string | null = null;
-  if (projectId) {
+  if (projectId && supabase) {
     try {
-      const svc = createServiceClient();
-      if (svc) {
-        const { data } = await svc.from("projects").select("name").eq("id", projectId).maybeSingle();
-        projectName = (data?.name as string | undefined) ?? null;
-      }
+      // The caller's RLS client (API-04): only a project they can read has a name.
+      const { data } = await supabase.from("projects").select("name").eq("id", projectId).maybeSingle();
+      projectName = (data?.name as string | undefined) ?? null;
     } catch {
       projectName = null;
     }
@@ -137,12 +209,8 @@ export async function POST(request: Request) {
 
   // 1) Save to inquiries (anon INSERT allowed by RLS). phone is NOT NULL, so we
   // store an empty string when only an email was given.
-  if (
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  ) {
+  if (supabase) {
     try {
-      const supabase = await createClient();
       const { error } = await supabase.from("inquiries").insert({
         name,
         phone: phone || "",

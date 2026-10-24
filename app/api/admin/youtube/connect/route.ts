@@ -4,6 +4,9 @@ import { getSessionContext } from "@/lib/auth/get-session";
 import { signState, STATE_TTL_MS } from "@/lib/integrations/crypto";
 import { youtubeConfig } from "@/lib/integrations/youtube-server";
 import { buildAuthUrl, redirectUriFor, STATE_COOKIE } from "@/lib/youtube-upload";
+import { asLocale } from "@/lib/locale";
+import { isSuperAdminSession } from "@/lib/auth/guards";
+import { emptyStatus } from "@/lib/http";
 
 // D6: start "Connect channel". super_admin only. Sets a signed, httpOnly state
 // cookie (CSRF) scoped to the callback path and sends the browser to Google's
@@ -12,11 +15,11 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
-  const locale = request.nextUrl.searchParams.get("locale") === "ar" ? "ar" : "en";
+  const locale = asLocale(request.nextUrl.searchParams.get("locale"));
   const back = (q: string) => NextResponse.redirect(new URL(`/${locale}/dashboard/store/youtube?${q}`, request.nextUrl.origin), 303);
 
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
+  if (!isSuperAdminSession(session)) return emptyStatus(403);
 
   const c = youtubeConfig();
   if (!c.ok) return back("yt=error&reason=setup");

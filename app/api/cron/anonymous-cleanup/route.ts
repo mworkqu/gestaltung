@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { isAuthorizedCron } from "@/lib/notifications/links";
+import { isAuthorizedCron } from "@/lib/auth/cron";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderOwnerEmail } from "@/lib/email/lead-email";
 import {
@@ -9,6 +9,8 @@ import {
   shouldEmail,
   summaryLine,
 } from "@/lib/cleanup/anonymous";
+import { isMissingFunction } from "@/lib/supabase/errors";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // Weekly anonymous-user cleanup (P2-09, FINDINGS #7): vercel.json cron, Sunday
 // 05:00 UTC. Reads store_settings.anonymous_cleanup ({enabled, dry_run, days};
@@ -24,16 +26,14 @@ export const maxDuration = 60;
 
 type RpcError = { code?: string; message?: string } | null;
 const missing = (e: RpcError) =>
-  !!e && (e.code === "PGRST202" || e.code === "42883" || /could not find the function/i.test(e.message ?? ""));
+  !!e && (isMissingFunction(e) || /could not find the function/i.test(e.message ?? ""));
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return Response.json({ error: "cron_secret_unset" }, { status: 500 });
-  if (!isAuthorizedCron(request.headers.get("authorization"), secret)) {
-    return new Response(null, { status: 401 });
+  if (!isAuthorizedCron(request.headers.get("authorization"), process.env.CRON_SECRET)) {
+    return jsonError("unauthorized", 401);
   }
   const db = createServiceClient();
-  if (!db) return Response.json({ error: "no_service_key" }, { status: 500 });
+  if (!db) return jsonError("no_service_key", 500);
 
   const { data: row, error: readError } = await db
     .from("store_settings")
@@ -42,12 +42,12 @@ export async function GET(request: Request) {
     .maybeSingle();
   if (readError) {
     console.error("[anonymous-cleanup] settings read failed:", readError.message);
-    return Response.json({ error: "settings_read_failed" }, { status: 500 });
+    return jsonError("settings_read_failed", 500);
   }
   const settings = parseCleanupSettings(row?.value);
   if (!settings.enabled) {
     console.log("[anonymous-cleanup] switched off — skipped");
-    return Response.json({ skipped: "disabled" });
+    return jsonOk({ skipped: "disabled" });
   }
 
   const { data, error } = await db.rpc("cleanup_anonymous_users", {
@@ -55,12 +55,12 @@ export async function GET(request: Request) {
     p_days: settings.days,
   });
   if (error) {
-    if (missing(error)) return Response.json({ error: "run_0055" }, { status: 500 });
+    if (missing(error)) return jsonError("run_0055", 500);
     console.error("[anonymous-cleanup] failed:", error.message);
     return Response.json({ error: "cleanup_failed", detail: error.message }, { status: 500 });
   }
   const result = parseCleanupResult(data);
-  if (!result) return Response.json({ error: "unexpected_result" }, { status: 500 });
+  if (!result) return jsonError("unexpected_result", 500);
 
   const line = summaryLine(result);
   console.log(`[anonymous-cleanup] ${line}`);

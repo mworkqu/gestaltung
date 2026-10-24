@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { clampSpec, clampUnderstanding, type ProductSpec } from "./schema";
 import { syncMovers } from "./ai/spec";
-import { IDEATION, countParts, tierOf, turnCost, turnsUntilCharge } from "./tiers";
+import { IDEATION, chargeTier, countParts, tierOf, turnCost, turnsUntilCharge } from "./tiers";
 import { callCostUsd } from "../ai/prices";
 
 const base = clampSpec({ name: "Plant buddy", oneLine: "Waters a plant", quantity: 1 });
@@ -58,6 +58,24 @@ describe("turnCost", () => {
     expect(costs.filter((c) => c > 0)).toEqual([1, 1]);
     expect(costs[n - 1]).toBe(1);
     expect(turnCost({ started: true, editTurnsSoFar: n - 1, current: withU(understanding(1, 4)) }).amount).toBe(2);
+  });
+  it("AI-06: a low-tier card from the client cannot lower the server-stored tier", () => {
+    const explorerCard = withU(understanding(1, 1));
+    expect(tierOf(explorerCard).id).toBe("explorer");
+    // Saved build is Engineers (×3); the client claims an Explorers card on the charging turn.
+    const lie = turnCost({ started: true, editTurnsSoFar: n - 1, current: explorerCard, storedTier: "engineer" });
+    expect(lie.tier.id).toBe("engineer");
+    expect(lie.amount).toBe(3);
+    // A new idea on a project with a stored Makers tier is not cheaper with a fake small card.
+    expect(turnCost({ started: false, editTurnsSoFar: 0, current: explorerCard, storedTier: "maker" }).amount).toBe(2);
+  });
+  it("AI-06: honest clients pay what they paid before (card tier ≥ stored tier)", () => {
+    const makerCard = withU(understanding(1, 4));
+    expect(turnCost({ started: true, editTurnsSoFar: n - 1, current: makerCard, storedTier: "maker" }).amount).toBe(2);
+    expect(turnCost({ started: true, editTurnsSoFar: n - 1, current: makerCard, storedTier: "explorer" }).amount).toBe(2);
+    expect(turnCost({ started: false, editTurnsSoFar: 0, current: null, storedTier: "explorer" }).amount).toBe(1);
+    expect(chargeTier(null, null).id).toBe("explorer");
+    expect(chargeTier("bogus", null).id).toBe("explorer");
   });
   it("turnsUntilCharge counts down to the charging turn", () => {
     expect(turnsUntilCharge(0)).toBe(n);

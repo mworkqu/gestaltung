@@ -2,6 +2,7 @@
 // test/cancel guards, the default list filter and "promised vs today".
 
 import { canTransition, normaliseOrderStatus, type OrderStatus } from "@/lib/orders/status";
+import { DAY_MS } from "@/lib/format/date";
 
 // ── Next step ───────────────────────────────────────────────────────────────
 
@@ -116,8 +117,6 @@ export type PromiseState =
   | { kind: "later"; days: number }
   | { kind: "today" }
   | { kind: "late"; days: number };
-
-const DAY_MS = 86_400_000;
 
 function dayNumber(iso: string): number | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);

@@ -6,9 +6,10 @@
 // fragment is not sent to any server, not put in Referer headers and not part
 // of analytics page_location.
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "@/lib/uuid";
 
-export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
+// Re-exported so existing imports keep working; the implementation is lib/uuid.ts.
+export { isUuid };
 
 /** `https://site/{locale}/projects/{id}#key={token}` */
 export function projectLinkUrl(siteUrl: string, locale: "en" | "ar", projectId: string, token: string): string {

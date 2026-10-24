@@ -11,6 +11,8 @@
 // OUTBOX_KINDS here and NOTIFICATION_KINDS in lib/email/templates/index.ts.
 
 import { redeemableUntil } from "@/lib/credits/redeem-window";
+import { asLocale } from "@/lib/locale";
+import { isEmailString } from "@/lib/email-address";
 
 export const ORDER_KINDS = [
   "order_confirmed",
@@ -135,10 +137,6 @@ export function isRetryable(row: Pick<OutboxRow, "status" | "attempts">): boolea
   return row.status === "queued" || row.status === "failed";
 }
 
-export function isPlausibleEmail(v: string | null | undefined): v is string {
-  return typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-}
-
 /**
  * What to do with one claimed row. Order matters: an owner-disabled kind is
  * skipped before anything else, then the user's opt-out, then a missing email.
@@ -151,10 +149,10 @@ export function decide(
 ): Decision {
   if (!isOutboxKind(row.kind)) return { skip: "unknown_kind" };
   if (!settings[row.kind]) return { skip: "disabled" };
-  if (isTransactional(row.kind)) return isPlausibleEmail(row.email) ? "send" : { skip: "no_email" };
+  if (isTransactional(row.kind)) return isEmailString(row.email) ? "send" : { skip: "no_email" };
   if (row.kind === "discount_ready" && discountWindow(row.payload, now).expired) return { skip: "expired" };
   if (prefs && (prefs.all_off || (prefs.unsubscribed_kinds ?? []).includes(row.kind))) return { skip: "unsubscribed" };
-  if (!isPlausibleEmail(row.email)) return { skip: "no_email" };
+  if (!isEmailString(row.email)) return { skip: "no_email" };
   if (!prefs?.token) return { skip: "no_token" };
   return "send";
 }
@@ -174,6 +172,4 @@ export function dedupeKey(row: Pick<OutboxRow, "user_id" | "kind" | "payload">):
   return ref ? `${row.user_id}:${row.kind}:${ref}` : null;
 }
 
-export function normaliseLocale(v: unknown): "en" | "ar" {
-  return v === "ar" ? "ar" : "en";
-}
+export { asLocale as normaliseLocale } from "@/lib/locale";

@@ -16,6 +16,7 @@ import { COLOURS, FINISHES, clampNum, type ClampLog, type Colour, type Finish } 
 import { ANCHORS, type Anchor } from "./forms/geometry";
 import { FORM_KINDS, FORM_PARAMS, type FormKind, type FormPart, type ParamDef } from "./forms/params";
 import { clampForm } from "./forms/clamp";
+import { ARCHETYPES, type Archetype } from "./archetype-names";
 
 export { ANCHORS, type Anchor } from "./forms/geometry";
 export { FORM_KINDS, type FormKind, type FormPart } from "./forms/params";
@@ -24,11 +25,8 @@ export { FORM_KINDS, type FormKind, type FormPart } from "./forms/params";
 // Enums
 // ---------------------------------------------------------------------------
 
-export const ARCHETYPES = [
-  "stake_device", "planter_insert", "desk_object", "lamp", "wall_mount", "handheld",
-  "wearable_band", "pet_feeder", "dispenser", "vehicle_mount", "outdoor_box", "tabletop_robot",
-] as const;
-export type Archetype = (typeof ARCHETYPES)[number];
+// ARCHETYPES / Archetype live in a leaf module (import-cycle break with ../schema).
+export { ARCHETYPES, type Archetype } from "./archetype-names";
 
 export const SCENES = ["plant_pot", "desk", "wall", "hand", "floor", "car_dash", "outdoor", "pet_bowl"] as const;
 export type Scene = (typeof SCENES)[number];
@@ -47,7 +45,6 @@ export const FEATURE_KINDS = ["grille", "light_slot", "texture_grip", "emboss_la
 export type FeatureKind = (typeof FEATURE_KINDS)[number];
 
 export const LINK_KINDS = ["tube", "cable"] as const;
-export type LinkKind = (typeof LINK_KINDS)[number];
 
 /**
  * How a body is hollowed. auto = the solver decides (the electronics host and

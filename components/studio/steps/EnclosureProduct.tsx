@@ -39,7 +39,7 @@ import { STEP_ACCENT } from "@/lib/studio/palette";
 import { FINISHES, type Finish, type StudioDoc, type StudioProduct } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
 import { useStudioLibrary } from "../StudioLibraryProvider";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { PRODUCT_FINISH_KEY, type ProductCard, type ProductPreviews, type UnlockedProduct } from "../use-product";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { ShareActions } from "./share";

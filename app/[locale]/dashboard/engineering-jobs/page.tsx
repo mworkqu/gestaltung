@@ -5,10 +5,15 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/navigation";
 import { ENGINEERING_BUCKET } from "@/lib/engineering/config";
+import { countOverdueJobs, jobDue } from "@/lib/engineering/view";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { setJobStatus } from "./actions";
 import { UploadResult } from "./upload-result";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { timeFormatter, DAY_MS } from "@/lib/format/date";
+import { isMissingFunction, isMissingRelation } from "@/lib/supabase/errors";
 
 // Engineering jobs queue (owner, 2026-10-18): STEP files and other work our
 // engineers deliver within hours. Table + RPC are migration 0091.
@@ -38,7 +43,6 @@ const VIEWS = ["open", "ready", "all"] as const;
 type View = (typeof VIEWS)[number];
 const KINDS = ["step_model", "pcb_gerber", "assembly", "cad_engineer"];
 const STATUSES = ["queued", "in_progress", "ready", "failed", "cancelled"];
-const MISSING = ["PGRST205", "42P01", "PGRST202", "42883"];
 
 export default async function EngineeringJobsPage({
   params,
@@ -48,19 +52,20 @@ export default async function EngineeringJobsPage({
   searchParams: Promise<{ view?: string; err?: string; done?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const sp = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("AdminJobs");
   const view: View = (VIEWS as readonly string[]).includes(sp.view ?? "") ? (sp.view as View) : "open";
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const loc = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
+  const loc = intlTag(asLocale(locale));
   const num = new Intl.NumberFormat(loc);
-  const timeFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Qatar" });
+  const timeFmt = timeFormatter(asLocale(locale));
 
   const supabase = await createClient();
   const now = Date.now();
-  const weekAgo = new Date(now - 7 * 86400000).toISOString();
+  const weekAgo = new Date(now - 7 * DAY_MS).toISOString();
   const monthStart = new Date(now);
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(0, 0, 0, 0);
@@ -89,12 +94,12 @@ export default async function EngineeringJobsPage({
   ]);
 
   const errors = [listRes.error, openRes.error, readyWeekRes.error, monthRes.error];
-  const migrationMissing = errors.some((e) => !!e && MISSING.includes(e.code ?? ""));
+  const migrationMissing = errors.some((e) => isMissingRelation(e) || isMissingFunction(e));
   const failed = errors.find((e) => !!e);
 
   const jobs = (listRes.data ?? []) as JobRow[];
   const openRows = (openRes.data ?? []) as { eta_at: string | null }[];
-  const overdue = openRows.filter((r) => r.eta_at && new Date(r.eta_at).getTime() < now).length;
+  const overdue = countOverdueJobs(openRows, now);
   const monthTokens = (monthRes.data ?? []).reduce((s, r) => s + Number(r.tokens ?? 0), 0);
 
   // Emails and project names for every job on screen.
@@ -145,11 +150,10 @@ export default async function EngineeringJobsPage({
   ];
 
   const dueText = (j: JobRow) => {
-    if (!j.eta_at || (j.status !== "queued" && j.status !== "in_progress")) return null;
-    const mins = Math.round((new Date(j.eta_at).getTime() - now) / 60000);
-    const abs = Math.abs(mins);
-    const text = `${num.format(Math.floor(abs / 60))} ${t("hShort")} ${num.format(abs % 60)} ${t("mShort")}`;
-    return mins < 0 ? { late: true, label: t("overdueBy", { time: text }) } : { late: false, label: t("dueIn", { time: text }) };
+    const due = jobDue(j, now);
+    if (!due) return null;
+    const text = `${num.format(due.hours)} ${t("hShort")} ${num.format(due.minutes)} ${t("mShort")}`;
+    return due.late ? { late: true, label: t("overdueBy", { time: text }) } : { late: false, label: t("dueIn", { time: text }) };
   };
   const kindLabel = (k: string) => (KINDS.includes(k) ? t(`kind_${k}`) : k);
   const statusLabel = (s: string) => (STATUSES.includes(s) ? t(`status_${s}`) : s);

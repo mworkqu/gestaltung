@@ -25,6 +25,7 @@ import {
   type LibraryPart,
 } from "../schema";
 import { hasTopPort, isPokeSensor, mountLift, POKE_OUT, worldBox, type LayoutResult, type Vec3 } from "../layout";
+import { round2 } from "@/lib/format/money";
 
 export { defaultEnclosureFor, templateFor } from "./shape-pick";
 
@@ -127,7 +128,6 @@ export function gripFillet(wall: number): number {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const r1 = (n: number) => Math.round(n * 100) / 100;
 
 export function resolveTemplate(t: EnclosureTemplate | string | undefined): BuildableTemplate {
   return (BUILDABLE_TEMPLATES as readonly string[]).includes(t ?? "") ? (t as BuildableTemplate) : "rounded_box";
@@ -268,14 +268,14 @@ function floorFor(tpl: BuildableTemplate, wall: number): number {
 }
 
 function stakeDims(W: number, H: number): StakeDims {
-  const arm = r1(clamp(0.16 * W, 6, 9));
+  const arm = round2(clamp(0.16 * W, 6, 9));
   const thick = STAKE.thick;
   return {
     arm,
     thick,
-    length: r1(clamp(1.3 * Math.max(W, H), STAKE.minLength, STAKE.maxLength)),
+    length: round2(clamp(1.3 * Math.max(W, H), STAKE.minLength, STAKE.maxLength)),
     peg: STAKE.socketDepth - 0.6,
-    socket: { arm: r1(arm + STAKE.fit), thick: r1(thick + 2 * STAKE.fit), depth: STAKE.socketDepth },
+    socket: { arm: round2(arm + STAKE.fit), thick: round2(thick + 2 * STAKE.fit), depth: STAKE.socketDepth },
   };
 }
 
@@ -310,7 +310,7 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     // The parts fit under the shoulder (z0); the dome on top is the lid.
     const z0 = Math.max(H - wall, 2 * wall + LIP.height + 6);
     const rise = Math.max(wall + 6, DOME_RISE[bias] * W);
-    dome = { z0: r1(z0), rise: r1(rise) };
+    dome = { z0: round2(z0), rise: round2(rise) };
     H = dome.z0 + dome.rise;
   }
 
@@ -366,20 +366,20 @@ function shapeDims(tpl: BuildableTemplate, spec: EnclosureSpec, need: Need): Enc
     template: tpl,
     requested: spec.template,
     shape,
-    W: r1(W),
-    D: r1(D),
-    H: r1(H),
-    innerW: r1(W - 2 * wall),
-    innerD: r1(D - 2 * wall),
-    innerH: r1(H - wall - floorZ),
+    W: round2(W),
+    D: round2(D),
+    H: round2(H),
+    innerW: round2(W - 2 * wall),
+    innerD: round2(D - 2 * wall),
+    innerH: round2(H - wall - floorZ),
     wall,
     clearance,
-    cornerRadius: r1(cornerRadius),
-    edgeFillet: r1(edgeFillet),
+    cornerRadius: round2(cornerRadius),
+    edgeFillet: round2(edgeFillet),
     floorZ,
-    splitZ: r1(splitZ),
+    splitZ: round2(splitZ),
     lidStyle,
-    ...(wedgeDeg !== undefined ? { wedgeDeg, frontH: r1(frontH!) } : {}),
+    ...(wedgeDeg !== undefined ? { wedgeDeg, frontH: round2(frontH!) } : {}),
     ...(tpl === "handheld_taper" ? { taper: { axis: W >= D ? ("x" as const) : ("y" as const), amount: TAPER_AMOUNT } } : {}),
     ...(dome ? { dome } : {}),
     ...(tpl === "stake_pod" ? { stake: stakeDims(W, H) } : {}),

@@ -5,6 +5,9 @@
 // Nothing here reads env or touches React, so it is unit-tested
 // (lib/videos.test.ts). The player is components/feature-video.tsx.
 
+import { asLocale } from "@/lib/locale";
+import { BUCKETS } from "@/lib/storage/paths";
+
 export const VIDEO_SLUGS = [
   "idea-to-kit",
   "file-to-part",
@@ -91,7 +94,7 @@ export const VIDEO_FILES = ["mp4", "webm", "jpg", "en.vtt", "ar.vtt"] as const;
 
 export type VideoFile = (typeof VIDEO_FILES)[number];
 
-export const VIDEO_BUCKET = "videos";
+export const VIDEO_BUCKET = BUCKETS.videos;
 
 export const VIDEO_CONTENT_TYPES: Record<VideoFile, string> = {
   mp4: "video/mp4",
@@ -194,6 +197,6 @@ export function videoJsonLd(opts: {
     contentUrl: src.mp4,
     uploadDate: opts.entry.uploadDate,
     duration: isoDuration(opts.entry.durationSeconds),
-    inLanguage: opts.locale === "ar" ? "ar" : "en",
+    inLanguage: asLocale(opts.locale),
   };
 }

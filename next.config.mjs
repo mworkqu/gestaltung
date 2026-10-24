@@ -1,15 +1,26 @@
 import { fileURLToPath } from "node:url";
 import createNextIntlPlugin from "next-intl/plugin";
 
+import { securityHeaders } from "./lib/security/headers.mjs";
+
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Pin the workspace root to this folder. Without it, Next picks the stray
-  // C:\Users\<user>\package-lock.json as root (the folder name has spaces and an
-  // em-dash, and there are multiple lockfiles), printing the "inferred workspace
-  // root" warning. Vercel builds from a clean checkout and are unaffected.
+  // Pin the file-tracing root to this folder. Next otherwise infers the root
+  // from the nearest lockfile and walks upward, so a stray package-lock.json in
+  // a parent directory (or several lockfiles) makes it trace from the wrong
+  // place and print the "inferred workspace root" warning. Vercel builds from a
+  // clean checkout and is unaffected.
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
+
+  // WEB-03: no X-Powered-By, and the security headers (CSP report-only for
+  // now) on every route. headers() applies at the edge, so static/ISR pages
+  // stay static.
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders() }];
+  },
 
   // P4-04: the case-study pages and the sitemap read content/case-studies at
   // ISR time (fs), so the markdown files must ship with those functions.

@@ -48,6 +48,7 @@ import type { Project, ProjectPart } from "@/lib/supabase/types";
 import { BriefChat } from "@/components/prototyping/brief-chat";
 import { ReadAloud } from "@/components/prototyping/read-aloud";
 import { BigButton } from "@/components/prototyping/client/step-card";
+import { asLocale, intlTag } from "@/lib/locale";
 
 /** Long enough that a fast analysis doesn't flash its progress. */
 const MIN_VISIBLE_MS = 400;
@@ -91,7 +92,7 @@ function specFor(p: Analysis["suggestedParts"][number], brief: string) {
  * Arabic keeps Western digits (owner decision 7a), hence the nu-latn extension.
  */
 function formatConsentDate(iso: string, locale: "en" | "ar") {
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  return new Intl.DateTimeFormat(intlTag(locale), {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -129,7 +130,7 @@ export function IdeaStage({
   const t = useTranslations("Prototyping");
   const tCheck = useTranslations("Turnstile");
   const tClient = useTranslations("ClientView");
-  const locale = useLocale() === "ar" ? "ar" : "en";
+  const locale = asLocale(useLocale());
   const [brief, setBrief] = useState(project.brief ?? "");
   const [savedBrief, setSavedBrief] = useState(project.brief ?? "");
   const [saveState, setSaveState] = useState<SaveState>("clean");
@@ -454,6 +455,7 @@ export function IdeaStage({
             canAnalyse={!running && brief.trim().length >= MIN_BRIEF_CHARS}
             analysed={analysed}
             initialOpen={startChat}
+            turnstileEnabled={turnstileEnabled}
           />
           {!analysed && brief.trim().length >= MIN_BRIEF_CHARS && (
             <BigButton
@@ -485,6 +487,7 @@ export function IdeaStage({
           onSave={() => void saveBrief()}
           state={saveState}
           projectId={project.id}
+          turnstileEnabled={turnstileEnabled}
         />
         {problem && (
           <p className="text-xs font-medium text-destructive">
@@ -549,6 +552,7 @@ export function IdeaStage({
             canAnalyse={!running && brief.trim().length >= MIN_BRIEF_CHARS}
             analysed={analysed}
             initialOpen={startChat}
+            turnstileEnabled={turnstileEnabled}
           />
           <ReadAloud text={brief} />
           <PrimaryButton

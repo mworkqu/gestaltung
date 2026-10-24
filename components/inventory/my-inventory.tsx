@@ -19,6 +19,7 @@ import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ClientInventoryItem, Part } from "@/lib/supabase/types";
+import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 
 // ── The client's own inventory ──────────────────────────────────────────────
 //
@@ -58,7 +59,7 @@ export function MyInventory() {
 
     const { data } = await createClient()
       .from("client_inventory_items")
-      .select("*, part:parts(*)")
+      .select(`*, part:parts(${PART_PUBLIC_COLUMNS})`)
       .order("created_at", { ascending: false });
     setRows((data ?? []) as Row[]);
   }, []);

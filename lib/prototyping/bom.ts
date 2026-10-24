@@ -22,38 +22,14 @@
 import type { Part } from "@/lib/supabase/types";
 import { BOM_GROUPS, type BomGroup } from "@/lib/store/attributes";
 import type { BomKind, BomLine } from "./analysis";
+import { bomNode, type Fulfilled, type LineOrigin, type LineStatus, type ProjectBom, type ProjectLine } from "./bom-types";
 import { packSizeOf, packsFor, type PackProduct } from "@/lib/store/pack";
+import { round2 } from "@/lib/format/money";
 
 export type { BomKind, BomLine };
 
-export type LineOrigin = "analysis" | "electronics" | "rule";
+export type { LineOrigin, Fulfilled, ProjectLine, ProjectBom, LineStatus };
 
-export type Fulfilled = { orderId: string; at: string; productId: string; sku: string; quantity: number };
-
-export type ProjectLine = BomLine & {
-  choice?: string | null;
-  origin?: LineOrigin;
-  /** Why a rule added this line ("current limit for LED1"). */
-  reason?: string;
-  fulfilled?: Fulfilled | null;
-};
-
-/** projects.bom (migrations 0023, 0025). */
-export type ProjectBom = {
-  lines: ProjectLine[];
-  analysedAt: string;
-  /** Line ids the client removed; rules and re-analysis never add them back. */
-  dismissed?: string[];
-  electronicsBuiltAt?: string;
-  /** The build route the electronics lines were built for. */
-  route?: "prototype" | "custom_pcb";
-  /** From our rules at build time: logic-level crossings, and assumptions made. */
-  levelFlags?: import("./electronics-rules").LevelFlag[];
-  assumptions?: string[];
-};
-
-/** How a line stands against the store and the client's inventory. */
-export type LineStatus = "matched" | "choose" | "not_stocked" | "have" | "fabrication" | "fulfilled";
 
 /** A store product exactly as public.parts holds it (tags 0023, attributes + pack size 0025). */
 export type Candidate = Part & {
@@ -282,9 +258,7 @@ export function replaceLines(
 export const mergeBom = (prev: ProjectBom | null | undefined, next: BomLine[]) =>
   replaceLines(prev, ["analysis"], next.map((l) => ({ ...l, origin: "analysis" as const })));
 
-/** Which tree node a line's rows appear under. */
-export const bomNode = (kind: BomKind) =>
-  kind === "electronics" ? "electronics.components" : kind === "mechanical" ? "mechanical.parts" : "bom";
+export { bomNode };
 
 /** Pieces per sold unit ("sold in packs of 10"): the stored pack size, else the one the name states (lib/store/pack). */
 export const packOf = (p: PackProduct | null | undefined) => packSizeOf(p);
@@ -359,7 +333,7 @@ export function bomCost(lines: ProjectLine[], matches: Map<string, LineMatch>) {
     }
   }
   return {
-    availableNow: Math.round(availableNow * 100) / 100,
+    availableNow: round2(availableNow),
     availableLines,
     notStocked,
     fabrication,
@@ -367,7 +341,7 @@ export function bomCost(lines: ProjectLine[], matches: Map<string, LineMatch>) {
     wePick,
     have,
     bought,
-    ordered: Math.round(ordered * 100) / 100,
+    ordered: round2(ordered),
     orderedPriced,
   };
 }

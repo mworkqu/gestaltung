@@ -1,26 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLinks, isAuthorizedCron, unsubscribeHeaders, unsubscribeUrl } from "./links";
-
-describe("isAuthorizedCron", () => {
-  it("rejects when the secret is unset or empty", () => {
-    expect(isAuthorizedCron("Bearer anything", undefined)).toBe(false);
-    expect(isAuthorizedCron("Bearer ", "")).toBe(false);
-    expect(isAuthorizedCron("Bearer undefined", undefined)).toBe(false);
-  });
-  it("rejects a missing header", () => {
-    expect(isAuthorizedCron(null, "s3cret")).toBe(false);
-    expect(isAuthorizedCron(undefined, "s3cret")).toBe(false);
-  });
-  it("rejects a wrong secret or scheme", () => {
-    expect(isAuthorizedCron("Bearer wrong", "s3cret")).toBe(false);
-    expect(isAuthorizedCron("Bearer s3cret2", "s3cret")).toBe(false);
-    expect(isAuthorizedCron("s3cret", "s3cret")).toBe(false);
-    expect(isAuthorizedCron("Basic s3cret", "s3cret")).toBe(false);
-  });
-  it("accepts the exact bearer secret", () => {
-    expect(isAuthorizedCron("Bearer s3cret", "s3cret")).toBe(true);
-  });
-});
+import { buildLinks, unsubscribeHeaders, unsubscribeUrl } from "./links";
 
 describe("links", () => {
   const token = "11111111-2222-4333-8444-555555555555";

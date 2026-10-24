@@ -5,10 +5,12 @@
 // function, kitDiscountQar; taking it from kit-plan.ts pulled in ./bom, and
 // through it lib/store/attributes.ts, lib/store/pack.ts and
 // lib/store/derive-attributes.ts - about 69 kB of source the home page never
-// runs. Everything here is pure, has no imports and is safe on the client.
+// runs. Everything here is pure and safe on the client (the one import, lib/format/money, is pure).
+
+import { round2 } from "@/lib/format/money";
 
 /** QAR rounded to the fils the cart shows. */
-export const money = (n: number) => Math.round(n * 100) / 100;
+export const money = round2;
 
 /** The kit discount in QAR for a goods sum, rounded the way the cart rounds it. */
 export function kitDiscountQar(goods: number, pct: number): number {

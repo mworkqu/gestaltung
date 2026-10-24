@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { AVAILABILITIES, type Supplier } from "@/lib/store/sourcing";
 import type { ColumnMapping } from "@/lib/sourcing/adapters/csv";
@@ -33,7 +33,7 @@ export type ImportPlan = {
 };
 
 async function requireAdmin() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 

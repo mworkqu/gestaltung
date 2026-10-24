@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { escapeHtml } from "@/lib/email";
 import { isOutboxKind, normaliseLocale } from "@/lib/notifications/decide";
 import { isUuid } from "@/lib/notifications/links";
+import type { Locale } from "@/lib/locale";
 
 // Unsubscribe from notification emails (0046), no login.
 //   GET  → small bilingual page with a POST button (mail scanners that
@@ -12,7 +13,6 @@ import { isUuid } from "@/lib/notifications/links";
 
 export const dynamic = "force-dynamic";
 
-type Locale = "en" | "ar";
 type Params = { token: string | null; kind: string | null; locale: Locale };
 
 const COPY = {

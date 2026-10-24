@@ -5,6 +5,7 @@ import { PriceListImport } from "@/components/admin/price-list-import";
 import type { ColumnMapping } from "@/lib/sourcing/adapters/csv";
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // Supplier price-list import (Task 19a). super_admin only (store layout).
 
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PriceImportPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("PriceImport");
   const isRtl = locale === "ar";

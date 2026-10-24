@@ -4,6 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { FeatureVideo, type FeatureVideoProps } from "@/components/feature-video";
 import { videoBase, videoEntry } from "@/lib/videos";
+import { asLocale } from "@/lib/locale";
 
 // For client components (the prototyping workspace, message scope "all"):
 // same as FeatureVideoSection, with the copy read in the browser.
@@ -38,7 +39,7 @@ export function FeatureVideoClient({
       ratio={ratio}
       size={size}
       posterOnly={posterOnly}
-      locale={locale === "ar" ? "ar" : "en"}
+      locale={asLocale(locale)}
       href={href}
     />
   );

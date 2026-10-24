@@ -2,6 +2,8 @@
 // Pure: turns what a project used and needs into priced lines and the amount
 // actually due — 0 while charging is off ("free during launch").
 
+import { round2 } from "@/lib/format/money";
+
 export type PaymentInput = {
   aiCalls: number;
   perCallQar: number;
@@ -21,7 +23,6 @@ export type PaymentSummary = {
   waivedQar: number;
 };
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export function paymentSummary(i: PaymentInput): PaymentSummary {
   const calls = Math.max(0, Math.trunc(i.aiCalls) || 0);

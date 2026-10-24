@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cleanWeights, DEFAULT_WEIGHTS, demandScore, draftCsv, estimatedUnits, groupDraft, orderQty, type RestockRow } from "./restock";
+import { cleanWeights, DEFAULT_WEIGHTS, demandScore, draftCsv, estimatedRevenue, estimatedUnits, groupDraft, orderQty, type RestockRow } from "./restock";
 
 const row = (over: Partial<RestockRow>): RestockRow => ({
   partId: "p",
@@ -35,6 +35,15 @@ describe("scoring", () => {
   it("orders at least the minimum order quantity", () => {
     expect(orderQty({ units: 3, moq: 10 })).toBe(10);
     expect(orderQty({ units: 0, moq: 1 })).toBe(1);
+  });
+});
+
+describe("estimatedRevenue", () => {
+  it("units x listed price, rounded to the fils", () => {
+    expect(estimatedRevenue(7, 12.5)).toBe(87.5);
+    expect(estimatedRevenue(3, 0.1)).toBe(0.3);
+    expect(estimatedRevenue(3, 3.333)).toBe(10);
+    expect(estimatedRevenue(0, 99)).toBe(0);
   });
 });
 

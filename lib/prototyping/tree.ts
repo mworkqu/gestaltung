@@ -18,7 +18,7 @@
 import { DISCIPLINES, type Discipline } from "./constants";
 import { detectDisciplines } from "./engine";
 import { disciplineOf, isConcept, type PartLike } from "./parts";
-import { bomNode } from "./bom";
+import { bomNode } from "./bom-types";
 import { factFocus, isCircuitRequirement, type Readiness, type Requirement, type Translate } from "./readiness";
 import { rowOf, type Spec } from "./spec";
 

@@ -13,11 +13,12 @@ import { addFromSupplier, searchSuppliers, type LookupResult } from "@/app/[loca
 import { formatValue, isAttrClass, fieldsOf } from "@/lib/store/attributes";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { landedCostQar, suggestedPriceQar, type LookupPricing } from "@/lib/sourcing/landed-cost";
 
 const input =
   "w-full rounded-lg border border-white/60 bg-surface px-2.5 py-1.5 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
 
-type Pricing = { usdToQar: number; overheadPct: Record<string, number>; markup: number };
+type Pricing = LookupPricing;
 
 export function SupplierLookup({
   locale,
@@ -103,9 +104,8 @@ export function SupplierLookup({
 function ResultRow({ r, locale, categories, pricing }: { r: LookupResult; locale: string; categories: string[]; pricing: Pricing }) {
   const t = useTranslations("SupplierLookup");
   const tD = useTranslations("Delivery");
-  const landed =
-    r.cost === null ? null : Math.round(r.cost * (r.currency === "QAR" ? 1 : pricing.usdToQar) * (1 + (pricing.overheadPct[r.supplierCode] ?? 0) / 100) * 100) / 100;
-  const suggested = landed === null ? "" : String(Math.max(1, Math.ceil(landed * (1 + pricing.markup / 100) * 2) / 2));
+  const landed = landedCostQar(r, pricing);
+  const suggested = landed === null ? "" : String(suggestedPriceQar(landed, pricing.markup));
   const [mode, setMode] = useState<"none" | "new" | "link">("none");
   const [category, setCategory] = useState(categories.includes("Components") ? "Components" : categories[0] ?? "Components");
   const [price, setPrice] = useState(suggested);

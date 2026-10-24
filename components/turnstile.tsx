@@ -19,6 +19,7 @@ import { Loader2, RotateCcw } from "lucide-react";
 import { useContactPhone } from "@/components/contact-phone-provider";
 import { TURNSTILE_FIELD, TURNSTILE_SCRIPT } from "@/lib/turnstile";
 import { cn } from "@/lib/utils";
+import { asLocale } from "@/lib/locale";
 
 type TurnstileApi = {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string | undefined;
@@ -113,7 +114,7 @@ export function Turnstile({ enabled, onToken, resetKey = 0, action, className }:
             sitekey: siteKey,
             size: "flexible",
             theme: "light",
-            language: locale === "ar" ? "ar" : "en",
+            language: asLocale(locale),
             ...(action ? { action } : {}),
             // We render our own hidden input (below) so there is exactly one.
             "response-field": false,

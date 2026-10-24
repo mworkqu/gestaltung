@@ -6,8 +6,9 @@ import { escapeHtml } from "@/lib/email";
 import { BRAND, renderBrandedEmail } from "@/lib/email/brand-layout";
 import { COMPANY } from "@/lib/company";
 import { CAD_GENERATIONS, CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
+import { intlTag, type Locale } from "@/lib/locale";
 
-export type NotificationLocale = "en" | "ar";
+export type NotificationLocale = Locale;
 
 export type NotificationLinks = {
   siteUrl: string;
@@ -55,9 +56,6 @@ export function optNum(v: unknown): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
-export const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
 // ─── wording helpers ────────────────────────────────────────────────────────
 
 export type CreditWord = "circuit" | "cad" | "any";
@@ -95,7 +93,7 @@ export function formatDate(value: unknown, locale: NotificationLocale): string |
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   try {
-    return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+    return new Intl.DateTimeFormat(intlTag(locale), {
       day: "numeric",
       month: "long",
       year: "numeric",

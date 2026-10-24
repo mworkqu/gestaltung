@@ -1,11 +1,13 @@
 import { callCostUsd } from "@/lib/ai/prices";
 import { DEFAULT_QAR_PER_USD } from "@/lib/pricing/fx";
 import { USAGE_PRICE_RULE } from "@/lib/pricing/usage-price";
+import { intlTag, asLocale } from "@/lib/locale";
+import { isMissingSchemaObject } from "@/lib/supabase/errors";
 
 // Shared helpers for the AI costs pages: pure formatting + cost fallbacks.
 
 export function usdFormatter(locale: string) {
-  const loc = locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB";
+  const loc = intlTag(asLocale(locale));
   const small = new Intl.NumberFormat(loc, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   const big = new Intl.NumberFormat(loc, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (v: number | null | undefined) => {
@@ -16,7 +18,7 @@ export function usdFormatter(locale: string) {
 
 /** True when the error means migration 0088 has not run yet. */
 export function needsMigration(error: { code?: string } | null | undefined) {
-  return !!error && ["PGRST202", "42883", "42703", "42P01", "PGRST205"].includes(error.code ?? "");
+  return isMissingSchemaObject(error);
 }
 
 export type CallRow = {
@@ -40,7 +42,8 @@ export function rowCost(r: CallRow): number | null {
   });
 }
 
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Re-exported so the admin pages keep their import path; the one definition is lib/uuid.ts.
+export { UUID_RE } from "@/lib/uuid";
 
 /** QAR per USD (the riyal is pegged); AI cost is stored in USD, revenue in QAR. */
 export const QAR_PER_USD = DEFAULT_QAR_PER_USD;
@@ -60,7 +63,7 @@ export function billableQar(costUsd: number | null | undefined): number | null {
 }
 
 export function qarFormatter(locale: string) {
-  const f = new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const f = new Intl.NumberFormat(intlTag(asLocale(locale)), { minimumFractionDigits: 0, maximumFractionDigits: 2 });
   return (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? "—" : `${f.format(v)} QAR`);
 }
 

@@ -23,6 +23,7 @@ import {
 
 import { createClient } from "@/lib/supabase/client";
 import { applyPrompt, BASE_FEATURES, drawSchematic, drawingBlocked } from "@/lib/prototyping/schematic";
+import { svgDataUri } from "@/lib/prototyping/svg-data-uri";
 import type { SchematicKind } from "@/lib/prototyping/constants";
 import { Tag } from "@/components/ui/tag";
 import {
@@ -313,12 +314,13 @@ export function SchematicsStage({
                   <p className="max-w-[46ch] text-sm text-heading">{shown.error}</p>
                 </div>
               ) : (
-                <div
-                  className="[&_svg]:h-auto [&_svg]:w-full"
-                  // Generated locally by lib/prototyping/schematic.ts from our own
-                  // template strings — no user HTML reaches this.
-                  dangerouslySetInnerHTML={{ __html: shown.svg ?? "" }}
-                />
+                // Stored revision SVG is read back from the database, which
+                // the project owner can write directly (audit WEB-01), so it is
+                // shown as an <img> data URI: nothing inside it can run.
+                shown.svg ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={svgDataUri(shown.svg)} alt={`${active.code} ${active.title}`} className="h-auto w-full" />
+                ) : null
               )}
             </div>
 

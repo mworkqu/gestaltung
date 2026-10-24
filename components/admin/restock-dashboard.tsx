@@ -16,6 +16,7 @@ import { useEditHref } from "@/components/admin/use-edit-href";
 import { formatPrice } from "@/lib/parts/format";
 import { draftCsv, groupDraft, orderQty, type RestockRow, type RestockWeights } from "@/lib/store/restock";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 const input =
   "w-full rounded-lg border border-white/60 bg-surface px-2 py-1 text-[12px] text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -47,7 +48,7 @@ export function RestockDashboard({
   const [receiving, setReceiving] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const money = (n: number | null) => (n === null ? "—" : formatPrice(n, locale));
-  const date = (s: string) => new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium" }).format(new Date(s));
+  const date = (s: string) => new Intl.DateTimeFormat(intlTag(asLocale(locale)), { dateStyle: "medium" }).format(new Date(s));
 
   const groups = useMemo(
     () => groupDraft(rows.filter((r) => picked[r.partId] !== undefined).map((r) => ({ row: r, qty: picked[r.partId] }))),
@@ -345,7 +346,11 @@ function MinimumEditor({ locale, supplierId, value, below, total }: { locale: st
 function WeightsEditor({ locale, initial }: { locale: string; initial: RestockWeights }) {
   const t = useTranslations("Restock");
   const router = useRouter();
-  const [w, setW] = useState(initial);
+  const keys = Object.keys(initial) as (keyof RestockWeights)[];
+  // The inputs hold strings while typing; numbers are made when saved (cleanWeights does the same Number()).
+  const [w, setW] = useState<Record<keyof RestockWeights, string>>(
+    () => Object.fromEntries(keys.map((k) => [k, String(initial[k])])) as Record<keyof RestockWeights, string>,
+  );
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
@@ -354,12 +359,12 @@ function WeightsEditor({ locale, initial }: { locale: string; initial: RestockWe
         {t("weightsTitle", { request: initial.request, bom: initial.bom_unmatched, cart: initial.add_to_cart, view: initial.view })}
       </summary>
       <div className="mt-3 flex flex-wrap items-end gap-3">
-        {(Object.keys(initial) as (keyof RestockWeights)[]).map((k) => (
+        {keys.map((k) => (
           <label key={k} className="block space-y-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-mutedtext">{t(`w_${k}`)}</span>
             <input
-              value={String(w[k])}
-              onChange={(e) => setW({ ...w, [k]: e.target.value as unknown as number })}
+              value={w[k]}
+              onChange={(e) => setW({ ...w, [k]: e.target.value })}
               inputMode="decimal"
               className={cn(input, "w-20 text-end")}
               dir="ltr"
@@ -371,7 +376,7 @@ function WeightsEditor({ locale, initial }: { locale: string; initial: RestockWe
           disabled={pending}
           onClick={() =>
             start(async () => {
-              const r = await saveRestockWeights(locale, w);
+              const r = await saveRestockWeights(locale, Object.fromEntries(keys.map((k) => [k, Number(w[k])])));
               setMsg(r.error ?? t("saved"));
               router.refresh();
             })

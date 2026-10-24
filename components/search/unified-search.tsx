@@ -9,6 +9,7 @@ import { formatPrice, partName } from "@/lib/parts/format";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/utils";
 import type { ClientInventoryItem, Part } from "@/lib/supabase/types";
+import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 
 // ── One search box, inventory first ─────────────────────────────────────────
 //
@@ -69,7 +70,7 @@ export function UnifiedSearch({
       const ids = [...new Set(inv.map((r) => r.product_id).filter((x): x is string => !!x))];
       const owned: Part[] = [];
       for (let i = 0; i < ids.length; i += 200) {
-        const { data } = await supabase.from("parts").select("*").in("id", ids.slice(i, i + 200));
+        const { data } = await supabase.from("parts").select(PART_PUBLIC_COLUMNS).in("id", ids.slice(i, i + 200));
         owned.push(...((data ?? []) as Part[]));
       }
       if (cancelled) return;
@@ -93,7 +94,7 @@ export function UnifiedSearch({
       const like = `%${q}%`;
       const { data } = await createClient()
         .from("parts")
-        .select("*")
+        .select(PART_PUBLIC_COLUMNS)
         .eq("is_published", true)
         .is("merged_into", null)
         .not("lead_time_class", "is", null)

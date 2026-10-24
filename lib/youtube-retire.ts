@@ -11,29 +11,22 @@
 // no I/O): unit-tested in lib/youtube-retire.test.ts.
 
 import { parseYoutube, type Youtube } from "@/lib/youtube";
-import type { YoutubeMeta } from "@/lib/youtube-upload";
+import {
+  RETIRE_REASON,
+  RETIRE_STATUS,
+  type RetireEntry,
+  type RetireReason,
+  type RetireStatus,
+  type YoutubeMeta,
+} from "@/lib/youtube-types";
 
 export const RETIRE_GRACE_HOURS = 48;
 export const RETIRE_MAX = 100;
 export const RETIRE_TITLE_MAX = 120;
 export const RETIRE_ERROR_MAX = 200;
 
-export const RETIRE_STATUS = ["queued", "deleted", "failed", "cancelled"] as const;
-export type RetireStatus = (typeof RETIRE_STATUS)[number];
-export const RETIRE_REASON = ["replaced", "manual"] as const;
-export type RetireReason = (typeof RETIRE_REASON)[number];
-
-export type RetireEntry = {
-  video_id: string;
-  title?: string;
-  reason: RetireReason;
-  queued_at: string;
-  delete_after: string;
-  status: RetireStatus;
-  deleted_at?: string;
-  error?: string;
-  replaced_by?: string;
-};
+export { RETIRE_STATUS, RETIRE_REASON };
+export type { RetireStatus, RetireReason, RetireEntry };
 
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 const iso = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v.slice(0, 40) : "");

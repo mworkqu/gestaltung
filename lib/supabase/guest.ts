@@ -15,7 +15,7 @@ import { requestTurnstileToken } from "@/lib/turnstile-client";
 // MAU: every anonymous user counts toward the project's monthly active users,
 // so a session is minted LAZILY — only when the visitor actually does something
 // that needs to be saved (starts a project, adds to a cart). Merely reading a
-// page never creates one. See FINDINGS.md for the cleanup rule that reaps
+// page never creates one. See docs/audit-history/FINDINGS.md for the cleanup rule that reaps
 // anonymous users who never went on to own anything.
 //
 // The client is loaded lazily (lib/supabase/lazy.ts): this module is imported

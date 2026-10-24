@@ -4,32 +4,29 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { isMissingQuoteColumn } from "@/lib/studio/server/quote";
 import { parseFinalQuote, QUOTE_RULE_KEY, validateQuoteRule, type QuoteRule } from "@/lib/studio/request-summary";
 import type { InquiryStatus } from "@/lib/supabase/types";
+import { asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
 
 const STATUSES: InquiryStatus[] = ["new", "contacted", "closed"];
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // The locale comes from a hidden form field (attacker-controllable). Pin it to a
 // known locale so it can never steer revalidatePath at a crafted path.
-function safeLocale(formData: FormData): "en" | "ar" {
-  return String(formData.get("locale")) === "ar" ? "ar" : "en";
-}
-
 // Move a lead through new -> contacted -> closed. RLS already limits updates to
 // super_admin; the role check here fails fast rather than leaning on the policy
 // alone, and pinning the status keeps a crafted form field out of the write.
 export async function setLeadStatus(formData: FormData) {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const id = String(formData.get("id") ?? "");
   const requested = String(formData.get("status") ?? "");
   const status = STATUSES.find((s) => s === requested);
   if (!id || !status) return;
 
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (!session || session.profile.role !== "super_admin") return;
 
   const supabase = await createClient();
@@ -49,9 +46,9 @@ export type SaveQuoteResult = { ok: true; finalQar: number } | { ok: false; erro
  * The client's request page then shows the quote instead of the range.
  */
 export async function saveLeadQuote(input: { id: string; locale: string; finalQar: string; note: string }): Promise<SaveQuoteResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
-  if (!UUID.test(input.id)) return { ok: false, error: "invalid" };
+  if (!UUID_RE.test(input.id)) return { ok: false, error: "invalid" };
   const finalQar = parseFinalQuote(input.finalQar);
   if (finalQar === null) return { ok: false, error: "invalid" };
   const note = String(input.note ?? "").trim();
@@ -67,7 +64,7 @@ export async function saveLeadQuote(input: { id: string; locale: string; finalQa
   if (error) return { ok: false, error: isMissingQuoteColumn(error) ? "run_0073" : "failed" };
   if (!data) return { ok: false, error: "failed" };
 
-  const locale = input.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(input.locale);
   revalidatePath(`/${locale}/dashboard/leads`);
   revalidatePath(`/${locale}/dashboard/leads/${input.id}`);
   const projectId = (data as { project_id?: string | null }).project_id;
@@ -80,7 +77,7 @@ export async function saveLeadQuote(input: { id: string; locale: string; finalQa
 export type SaveRuleResult = { ok: true; rule: QuoteRule } | { ok: false; error: "forbidden" | "invalid" | "failed"; bad?: (keyof QuoteRule)[] };
 
 export async function saveQuoteRule(input: { locale: string; base_qar: string; per_gram_qar: string; spread: string }): Promise<SaveRuleResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
   const checked = validateQuoteRule({ base_qar: input.base_qar, per_gram_qar: input.per_gram_qar, spread: input.spread });
   if (!checked.ok) return { ok: false, error: "invalid", bad: checked.bad };
@@ -92,7 +89,7 @@ export async function saveQuoteRule(input: { locale: string; base_qar: string; p
   if (error) return { ok: false, error: "failed" };
 
   revalidateStorefront();
-  const locale = input.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(input.locale);
   revalidatePath(`/${locale}/dashboard/leads`);
   return { ok: true, rule: checked.rule };
 }
@@ -100,15 +97,15 @@ export async function saveQuoteRule(input: { locale: string; base_qar: string; p
 // ── 0090: printed-STL order completed → CAD credits to the project's owner ──
 // Idempotent per lead (admin_reward_print). The result comes back in ?reward=.
 export async function rewardPrint(formData: FormData) {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const id = String(formData.get("id") ?? "");
   const project = String(formData.get("project") ?? "");
-  if (!UUID.test(id)) return;
-  const session = await getSessionContext();
+  if (!UUID_RE.test(id)) return;
+  const session = await getSessionContextCached();
   if (!session || session.profile.role !== "super_admin") return;
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("admin_reward_print", { p_lead: id, p_project: UUID.test(project) ? project : null });
+  const { data, error } = await supabase.rpc("admin_reward_print", { p_lead: id, p_project: UUID_RE.test(project) ? project : null });
   const result = error ? (/no_owner/.test(error.message) ? "no_owner" : /could not find the function|PGRST202/i.test(error.message) ? "run_0090" : "failed") : Number(data) > 0 ? "granted" : "already";
   revalidatePath(`/${locale}/dashboard/leads/${id}`);
   redirect(`/${locale}/dashboard/leads/${id}?reward=${result}`);

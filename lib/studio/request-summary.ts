@@ -26,6 +26,7 @@ import type { Locale } from "./client/api";
 import { MECH_NAMES } from "./mech/names";
 import { groupComponents, withQuantity } from "./parts-group";
 import type { LibraryPart, MechTemplate, StudioDoc } from "./schema";
+import { round2 } from "@/lib/format/money";
 
 export const ESTIMATE_SPREAD = 1.5;
 export const PRINT_BASE_QAR = 100;
@@ -73,13 +74,12 @@ export function parseQuoteRule(value: unknown): QuoteRule {
 export function validateQuoteRule(value: Record<string, unknown>): { ok: true; rule: QuoteRule } | { ok: false; bad: (keyof QuoteRule)[] } {
   const bad = RULE_KEYS.filter((k) => inLimit(value[k], k) === null);
   if (bad.length) return { ok: false, bad };
-  const rule = Object.fromEntries(RULE_KEYS.map((k) => [k, money(inLimit(value[k], k)!)])) as QuoteRule;
+  const rule = Object.fromEntries(RULE_KEYS.map((k) => [k, round2(inLimit(value[k], k)!)])) as QuoteRule;
   return { ok: true, rule };
 }
 
 export type PriceEstimate = { low: number; high: number };
 
-const money = (n: number) => Math.round(n * 100) / 100;
 const positive = (n: number) => (Number.isFinite(n) && n > 0 ? n : 0);
 
 /** Printing price: base + rate per gram of material (owner rule: QAR 100 + QAR 0.7/g). */
@@ -172,7 +172,7 @@ export function quoteBreakdown({
       name: lib?.name.en ?? c.label,
       name_ar: lib?.name.ar ?? c.label,
       sku: priced ? sku : null,
-      price_qar: priced ? money(price) : null,
+      price_qar: priced ? round2(price) : null,
       quantity: g.quantity,
     });
   }
@@ -200,14 +200,14 @@ export function quoteBreakdown({
         material: r.material,
         count: r.count,
         grams,
-        cost_qar: money(grams * rule.per_gram_qar),
+        cost_qar: round2(grams * rule.per_gram_qar),
       };
     });
   const printedGrams = printed.reduce((g, r) => g + r.grams, 0);
-  const gramsQar = money(printedGrams * rule.per_gram_qar);
-  const printQar = money(rule.base_qar + gramsQar);
-  partsQar = money(partsQar);
-  const subtotalQar = money(printQar + partsQar);
+  const gramsQar = round2(printedGrams * rule.per_gram_qar);
+  const printQar = round2(rule.base_qar + gramsQar);
+  partsQar = round2(partsQar);
+  const subtotalQar = round2(printQar + partsQar);
   return {
     rule,
     printed,
@@ -302,7 +302,7 @@ export function parseQuoteCalc(value: unknown): QuoteCalc | null {
         material: str(r.material) ?? "",
         count: num(r.count) ?? 1,
         grams,
-        cost_qar: num(r.cost_qar) ?? money(grams * rate),
+        cost_qar: num(r.cost_qar) ?? round2(grams * rate),
       },
     ];
   });
@@ -345,7 +345,7 @@ export function parseQuoteCalc(value: unknown): QuoteCalc | null {
 /** The owner's quote against the estimate: QAR difference and % of the midpoint (null when no estimate). */
 export function quoteDifference(finalQar: number, calc: Pick<QuoteCalc, "midpoint">): { qar: number; pct: number } | null {
   if (!Number.isFinite(finalQar) || calc.midpoint === null || !(calc.midpoint > 0)) return null;
-  const qar = money(finalQar - calc.midpoint);
+  const qar = round2(finalQar - calc.midpoint);
   return { qar, pct: Math.round((qar / calc.midpoint) * 1000) / 10 };
 }
 
@@ -358,7 +358,7 @@ export function parseFinalQuote(raw: unknown): number | null {
     .trim();
   if (!/^\d+(\.\d+)?$/.test(s)) return null;
   const n = Number(s);
-  return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? money(n) : null;
+  return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? round2(n) : null;
 }
 
 // ── The client page summary ────────────────────────────────────────────────

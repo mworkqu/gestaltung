@@ -3,6 +3,7 @@ import { getContactPhone } from "@/lib/contact-phone-server";
 import { escapeHtml } from "@/lib/email";
 import { commentFormHtml, renderRatingPage } from "@/lib/orders/rating-page";
 import { parseScore, ratingSecret, verifyRatingToken } from "@/lib/orders/rating";
+import { asLocale, type Locale } from "@/lib/locale";
 
 // One-tap rating from the "order delivered" email (P2-02).
 // GET /api/orders/rate?order=<id>&score=<1-5>&l=<en|ar>&t=<HMAC token>
@@ -17,7 +18,6 @@ import { parseScore, ratingSecret, verifyRatingToken } from "@/lib/orders/rating
 
 export const dynamic = "force-dynamic";
 
-type Locale = "en" | "ar";
 
 const COPY = {
   en: {
@@ -53,7 +53,7 @@ function page(locale: Locale, valid: Valid | null): Response {
 export async function GET(request: Request) {
   await getContactPhone(); // footer link of the rating page (sync peek)
   const url = new URL(request.url);
-  const locale: Locale = url.searchParams.get("l") === "ar" ? "ar" : "en";
+  const locale: Locale = asLocale(url.searchParams.get("l"));
   const order = url.searchParams.get("order");
   const token = url.searchParams.get("t");
   const score = parseScore(url.searchParams.get("score"));

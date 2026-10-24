@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { routing } from "@/i18n/routing";
 import { handleClaimGuest } from "@/lib/auth/claim-guest";
+import { callbackNextPath } from "@/lib/auth/next-path";
 import { claimGuestDeps } from "@/lib/auth/claim-guest-server";
 import { isLinkConflict, isOAuthProvider, oauthCallbackUrl, oauthScopes, type OAuthProvider } from "@/lib/auth/providers";
 
@@ -22,13 +23,6 @@ import { isLinkConflict, isOAuthProvider, oauthCallbackUrl, oauthScopes, type OA
 //    exchange has its work moved to the account (claim_guest_work, 0071), the
 //    same step the email sign-in does via /api/auth/claim-guest.
 export const dynamic = "force-dynamic";
-
-// Only same-site paths. Anything else falls back to "/".
-function safeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//") || raw.includes("\\")) return "/";
-  if (/[\u0000-\u001f\u007f]/.test(raw)) return "/";
-  return raw;
-}
 
 /**
  * True when the browser sent the PKCE code verifier that the exchange needs.
@@ -58,7 +52,8 @@ function signInError(origin: string, next: string, provider: OAuthProvider, reas
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
-  const next = safeNext(searchParams.get("next"));
+  // Locale-prefixed same-site path only (lib/auth/next-path.ts); "/" otherwise.
+  const next = callbackNextPath(searchParams.get("next"));
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;

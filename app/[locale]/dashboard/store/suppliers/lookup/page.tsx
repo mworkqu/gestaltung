@@ -7,6 +7,7 @@ import { digikeyConfigured } from "@/lib/sourcing/adapters/digikey";
 import { mouserConfigured } from "@/lib/sourcing/adapters/mouser";
 import { qarPerUnit } from "@/lib/pricing/fx";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // Find parts at Mouser and DigiKey (Task 19b). super_admin only (store layout).
 
@@ -17,6 +18,7 @@ const SUGGESTED_MARKUP_PCT = 40;
 
 export default async function SupplierLookupPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("SupplierLookup");
   const isRtl = locale === "ar";

@@ -11,6 +11,8 @@ import { loadDoc } from "@/lib/studio/server/doc";
 import { projectPreviewUrl } from "@/lib/studio/server/preview-url";
 import { getProjectQuote, getQuoteRule, linkedPrices } from "@/lib/studio/server/quote";
 import { createClient } from "@/lib/supabase/server";
+import { asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
 
 // W2 (2026-10-11): where "Get it made" lands. "Request received", the project
 // in plain words (name, case picture, parts, printed parts), a rough price
@@ -23,8 +25,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "StudioRequest" });
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function ProjectRequestPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
   setRequestLocale(locale);
-  if (!UUID.test(id)) notFound();
+  if (!UUID_RE.test(id)) notFound();
 
   const supabase = await createClient();
   const {
@@ -67,7 +67,7 @@ export default async function ProjectRequestPage({ params }: { params: Promise<{
     doc,
     projectName: row.name ?? "",
     getPart,
-    locale: locale === "ar" ? "ar" : "en",
+    locale: asLocale(locale),
     prices: priceBySku,
     rule: rule.rule,
   });

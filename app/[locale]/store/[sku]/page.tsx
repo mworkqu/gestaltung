@@ -43,6 +43,7 @@ import { GALLERY_SIZES, IMAGE_WIDTHS, sizedImage, sizedSrcSet } from "@/lib/stor
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+import { asLocale } from "@/lib/locale";
 
 // ISR (Phase G): each product page is rendered on its first visit per locale,
 // then served from the CDN and re-rendered at most every 5 minutes (prices,
@@ -109,7 +110,7 @@ export default async function PartDetailPage({
     // Before 0030 the RPC does not exist; fall through to 404 as before.
     const survivorSku = await getMergedRedirectSku(sku);
     if (survivorSku) {
-      permanentRedirect(`/${locale === "ar" ? "ar" : "en"}/store/${encodeURIComponent(survivorSku)}`);
+      permanentRedirect(`/${asLocale(locale)}/store/${encodeURIComponent(survivorSku)}`);
     }
     notFound();
   }

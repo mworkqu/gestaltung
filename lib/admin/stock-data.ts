@@ -17,6 +17,8 @@ import {
   type StockPart,
   type StockSignal,
 } from "@/lib/admin/stock-lists";
+import { readPartsAdmin } from "@/lib/store/part-columns";
+import { DAY_MS } from "@/lib/format/date";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -63,7 +65,7 @@ export type StockData = {
  * "Watch" and "Do not buy" are complete.
  */
 export async function loadStockData(db: Db, opts: { buyOnly?: boolean } = {}): Promise<StockData | null> {
-  const since = new Date(Date.now() - BUY_WINDOW_DAYS * 864e5).toISOString();
+  const since = new Date(Date.now() - BUY_WINDOW_DAYS * DAY_MS).toISOString();
 
   const sigRes = await fetchAllRows<SignalRow>((from, to) => {
     let q = db
@@ -88,12 +90,13 @@ export async function loadStockData(db: Db, opts: { buyOnly?: boolean } = {}): P
   if (opts.buyOnly) {
     const ids = [...new Set(signals.map((s) => s.partId))];
     for (const part of chunks(ids)) {
-      const { data } = await db.from("parts").select(PART_COLS).in("id", part).eq("is_published", true).is("merged_into", null);
+      const { data } = await readPartsAdmin((t) => db.from(t).select(PART_COLS).in("id", part).eq("is_published", true).is("merged_into", null));
       partRows.push(...((data ?? []) as PartRow[]));
     }
   } else {
-    const res = await fetchAllRows<PartRow>((from, to) =>
-      db.from("parts").select(PART_COLS).eq("is_published", true).is("merged_into", null).order("id").range(from, to)
+    // landed cost / pricing mode / preferred offer: the admin view (0105).
+    const res = await readPartsAdmin((t) =>
+      fetchAllRows<PartRow>((from, to) => db.from(t).select(PART_COLS).eq("is_published", true).is("merged_into", null).order("id").range(from, to))
     );
     if (res.error) return null;
     partRows = res.rows;

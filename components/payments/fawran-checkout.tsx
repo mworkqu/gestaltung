@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { PAYMENT_DETAILS } from "@/lib/company";
 import { loadSupabase } from "@/lib/supabase/lazy";
 import { cn } from "@/lib/utils";
+import { BUCKETS } from "@/lib/storage/paths";
 
 export type OpenPayment = { id: string; reference_code: string; amount_qar: number; product: string };
 type Result = { status: "approved" | "needs_review"; reasons: string[] };
@@ -54,7 +55,7 @@ export function FawranCheckout({
       if (!auth.user) throw new Error("sign_in");
       const ext = file.type === "image/png" ? "png" : "jpg";
       const path = `${auth.user.id}/${payment.id}-${Date.now()}.${ext}`;
-      const { error } = await db.storage.from("payment-proofs").upload(path, file, { contentType: file.type, upsert: false });
+      const { error } = await db.storage.from(BUCKETS.paymentProofs).upload(path, file, { contentType: file.type, upsert: false });
       if (error) throw error;
       const res = await fetch("/api/billing/proof", {
         method: "POST",

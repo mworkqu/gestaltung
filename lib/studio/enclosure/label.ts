@@ -13,6 +13,7 @@ import type { Vec3 } from "../layout";
 import { cutoutBox, type Cutout } from "./cutouts";
 import { labelSupport, layoutLabel, type LabelSkipReason, type Stroke } from "./label-font";
 import { insideSection, topAt, type EnclosureDims } from "./templates";
+import { round2 } from "@/lib/format/money";
 
 /** Raised height of the letters above the surface (mm). */
 export const LABEL_RAISE = 0.6;
@@ -119,7 +120,7 @@ export function planLabel(text: string | undefined, d: EnclosureDims, openings: 
       const plan: LabelPlan = {
         text: sup.text,
         surface,
-        cap: Math.round(cap * 100) / 100,
+        cap: round2(cap),
         r: lay.r,
         center: [u, v],
         width: lay.width,

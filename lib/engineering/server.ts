@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { stripServerOnly } from "@/lib/studio/product/private";
 import { createServiceClient } from "@/lib/supabase/service";
 import { STEP_JOB, type JobKind } from "./config";
 
@@ -39,12 +40,16 @@ export async function submitStepJob(
   // The snapshot is what the engineer works from: the Studio doc as it is now (RLS read as the user).
   const { data: project } = await supabase.from("projects").select("id, name, studio").eq("id", projectId).maybeSingle();
   if (!project) return { ok: false, error: "not_found" };
+  // The owner can SELECT their engineering_jobs row (0091), so the snapshot must
+  // never carry the private product models (DB-01 G1.2): they are added by the
+  // admin snapshot download at read time (service role), not stored here.
+  const studio = project.studio && typeof project.studio === "object" ? stripServerOnly(project.studio as Record<string, unknown>) : (project.studio ?? null);
   const { data, error } = await service.rpc("engineering_job_submit", {
     p_user: user.id,
     p_project: projectId,
     p_kind: STEP_JOB.kind,
     p_tokens: STEP_JOB.tokens,
-    p_snapshot: { name: project.name, studio: project.studio ?? null },
+    p_snapshot: { name: project.name, studio },
     p_note: note,
     p_eta_hours: STEP_JOB.etaHours.max,
     p_free: user.isAdmin,

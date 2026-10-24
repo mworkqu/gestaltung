@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { finalModel } from "@/lib/studio/product/private";
 import { findDesign } from "@/lib/studio/product/store";
 import { loadDocPrivate } from "@/lib/studio/server/doc";
-import { DesignRefQuery, isSuperAdmin, json } from "@/lib/studio/server/product";
+import { DesignRefQuery, isSuperAdmin, json, loadErrorStatus } from "@/lib/studio/server/product";
 
 // GET /api/studio/product/model?projectId&designId → 200 {model}
 // ONLY after "Create my CAD" (studio.product.unlockedId === designId — a field
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   if (!q.success) return json({ error: "bad_request" }, 400);
 
   const cur = await loadDocPrivate(supabase, q.data.projectId);
-  if (!cur.ok) return json({ error: cur.error }, cur.error === "not_found" ? 404 : 500);
+  if (!cur.ok) return json({ error: cur.error }, loadErrorStatus(cur.error));
   if (!cur.owned.product || !cur.owned.productPrivate) return json({ error: "not_found" }, 404);
   const found = findDesign({ product: cur.owned.product, priv: cur.owned.productPrivate }, q.data.designId);
   if (!found) return json({ error: "not_found" }, 404);

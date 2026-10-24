@@ -24,13 +24,29 @@ export function validateCheckoutEmail(email: string, payMethod: string): Checkou
   return isPlausibleEmail(e) ? null : "emailInvalid";
 }
 
-/** Server refusals (create_part_order / set_order_payment_method) → message key. */
-export type CheckoutRpcError = "cartBlocked" | "emailRequiredBank" | "totalZero" | "errorSubmit";
+/**
+ * Server refusals (create_part_order / set_order_payment_method) → message key.
+ * The 0103 (DB-10) order limits answer with their Checkout.* key directly:
+ * 'too_many_orders' (10 orders per hour per phone or email) →
+ * errorTooManyOrders, 'quantity_too_large' (> 1000 units on a line) →
+ * errorQtyCap, 'too_many_lines' (> 100 lines) → errorLineCap.
+ */
+export type CheckoutRpcError =
+  | "cartBlocked"
+  | "emailRequiredBank"
+  | "totalZero"
+  | "errorTooManyOrders"
+  | "errorQtyCap"
+  | "errorLineCap"
+  | "errorSubmit";
 
 export function checkoutRpcError(message: string | null | undefined): CheckoutRpcError {
   const m = message ?? "";
   if (m.includes("available on request only")) return "cartBlocked";
   if (m.includes("email is required for bank transfer")) return "emailRequiredBank";
   if (m.includes("order total must be greater than zero")) return "totalZero";
+  if (m.includes("too_many_orders")) return "errorTooManyOrders";
+  if (m.includes("quantity_too_large")) return "errorQtyCap";
+  if (m.includes("too_many_lines")) return "errorLineCap";
   return "errorSubmit";
 }

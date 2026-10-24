@@ -5,6 +5,7 @@ import { StockListsView } from "@/components/admin/stock-lists-view";
 import { loadStockData } from "@/lib/admin/stock-data";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // "What to buy" (P5-12): the Buy tile's target. Three plain lists, one order
 // list per supplier. super_admin only (store layout). The detailed ranked
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 export default async function StockPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("AdminStock");
   const isRtl = locale === "ar";

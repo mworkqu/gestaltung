@@ -5,6 +5,7 @@ import { loadFixParts } from "@/lib/admin/fix-data";
 import { OWN_STOCK_SUPPLIER_CODE } from "@/lib/admin/fix-groups";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // The Fix tile's target (D1): published products missing a photo, price,
 // supplier or delivery date, grouped by reason and supplier, with bulk fixes
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function FixPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("FixList");
   const isRtl = locale === "ar";

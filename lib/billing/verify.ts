@@ -5,6 +5,7 @@
 // transfer reference, whatever this says.
 
 import { FAWRAN_CHECK } from "./config";
+import { DAY_MS } from "@/lib/format/date";
 
 export type Receipt = {
   isTransferReceipt: boolean;
@@ -27,6 +28,7 @@ export type ReviewReason =
   | "date_future"
   | "date_unreadable"
   | "no_reference"
+  | "reference_mismatch"
   | "duplicate"
   | "model_unavailable";
 
@@ -75,21 +77,39 @@ export function cleanReceipt(raw: unknown): Receipt | null {
   };
 }
 
-/** Upper-case, no spaces/dashes/diacritics, Arabic alef forms folded — for "contains" matching. */
-export function fold(s: string): string {
-  return s
-    .normalize("NFKD")
+/** Arabic-Indic (U+0660-0669) and Eastern Arabic-Indic (U+06F0-06F9) digits → ASCII. */
+const asciiDigits = (s: string) =>
+  s.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (c) => String(c.charCodeAt(0) & 0xf));
+
+/**
+ * Upper-case, no spaces/dashes/diacritics, Arabic alef forms folded, Arabic-Indic
+ * digits mapped to ASCII — for "contains" matching.
+ */
+export function fold(s: string | null | undefined): string {
+  return asciiDigits((s ?? "").normalize("NFKD"))
     .replace(/[ً-ْٰ̀-ͯ]/g, "")
     .replace(/[أإآ]/g, "ا")
     .replace(/[\s\-_.]/g, "")
     .toUpperCase();
 }
 
-const DAY = 86_400_000;
-
+/**
+ * Decides whether a read receipt matches the payment. Pure.
+ *
+ * What the reference-code check (reference_mismatch) does: it stops a GENUINE
+ * receipt from being reused for a payment whose code it does not carry (an old
+ * transfer, or someone else's screenshot), and it stops lazy forgeries.
+ *
+ * What it does NOT do: it does not stop a forged or edited screenshot that
+ * includes the payer's own code. The code is not a secret (checkout shows it to
+ * the payer), so an image carrying it passes. Treat a pass as "plausible", not
+ * "verified". The real controls are owner-level and live outside this function:
+ * no auto-approval for service payments, per-user caps, and a unique
+ * transfer_ref (the SQL in payment_settle also refuses a reused image hash).
+ */
 export function checkReceipt(
   r: Receipt,
-  payment: { amountQar: number; createdAt: Date },
+  payment: { amountQar: number; createdAt: Date; referenceCode: string },
   now = new Date(),
 ): { ok: boolean; reasons: ReviewReason[] } {
   const reasons: ReviewReason[] = [];
@@ -101,12 +121,17 @@ export function checkReceipt(
   if (!who || !FAWRAN_CHECK.recipients.some((x) => who.includes(fold(x)))) reasons.push("recipient");
   const when = r.date ? new Date(r.date) : null;
   if (!when || Number.isNaN(when.getTime())) reasons.push("date_unreadable");
-  else if (when.getTime() > now.getTime() + DAY) reasons.push("date_future");
+  else if (when.getTime() > now.getTime() + DAY_MS) reasons.push("date_future");
   else if (
-    when.getTime() < now.getTime() - FAWRAN_CHECK.maxAgeDays * DAY ||
-    when.getTime() < payment.createdAt.getTime() - DAY
+    when.getTime() < now.getTime() - FAWRAN_CHECK.maxAgeDays * DAY_MS ||
+    when.getTime() < payment.createdAt.getTime() - DAY_MS
   )
     reasons.push("date_old");
   if (!r.transferRef) reasons.push("no_reference");
+  // The payer is told to write the payment's own code (GT-XXXXXX) in the
+  // transfer note. Without it a screenshot of any other transfer — or a forged
+  // one — could auto-approve this payment (audit API-01).
+  const code = fold(payment.referenceCode);
+  if (!code || !(fold(r.note).includes(code) || fold(r.transferRef).includes(code))) reasons.push("reference_mismatch");
   return { ok: reasons.length === 0, reasons };
 }

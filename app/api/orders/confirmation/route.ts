@@ -2,6 +2,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmail } from "@/lib/email";
 import { confirmationEmail, type OrderForEmail } from "@/lib/store/order-email";
 import { HOLIDAYS_KEY } from "@/lib/store/working-days";
+import { asLocale } from "@/lib/locale";
+import { claimConfirmation, confirmationAllowed, releaseConfirmation } from "@/lib/orders/confirmation-window";
+import { jsonOk } from "@/lib/http";
 
 // Order confirmation email with the promised date(s) (Task 18d). Called by
 // checkout right after create_part_order. A guest can't read their own order
@@ -16,23 +19,16 @@ export async function POST(request: Request) {
   const orderId = typeof body?.orderId === "string" && /^[0-9a-f-]{36}$/i.test(body.orderId) ? body.orderId : null;
   if (!orderId) return new Response(null, { status: 400 });
   // Both languages are always in the mail; the checkout language only decides which half leads.
-  const locale = body?.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(body?.locale);
 
   const db = createServiceClient();
-  if (!db) return Response.json({ sent: false, reason: "no_service_key" });
+  if (!db) return jsonOk({ sent: false, reason: "no_service_key" });
 
   const { data: order } = await db.from("part_orders").select("*").eq("id", orderId).maybeSingle();
-  if (!order || !order.customer_email || order.confirmation_emailed_at) return Response.json({ sent: false });
-  if (Date.now() - new Date(order.created_at).getTime() > 60 * 60 * 1000) return Response.json({ sent: false });
+  if (!confirmationAllowed(order, Date.now())) return jsonOk({ sent: false });
 
   // Claim it first so a double call can't send twice.
-  const { data: claimed } = await db
-    .from("part_orders")
-    .update({ confirmation_emailed_at: new Date().toISOString() })
-    .eq("id", orderId)
-    .is("confirmation_emailed_at", null)
-    .select("id");
-  if (!claimed?.length) return Response.json({ sent: false });
+  if (!(await claimConfirmation(db, orderId, new Date()))) return jsonOk({ sent: false });
 
   const { data: items } = await db
     .from("part_order_items")
@@ -53,6 +49,6 @@ export async function POST(request: Request) {
     { workingDays: Boolean(holidaysRow) },
   );
   const sent = await sendEmail({ to: [order.customer_email], ...mail });
-  if (!sent) await db.from("part_orders").update({ confirmation_emailed_at: null }).eq("id", orderId);
-  return Response.json({ sent });
+  if (!sent) await releaseConfirmation(db, orderId);
+  return jsonOk({ sent });
 }

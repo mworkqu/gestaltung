@@ -7,6 +7,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import { cleanOffer } from "@/lib/store/offer-clean";
 import { ON_REQUEST_KEY, OWN_STOCK_SUPPLIER_CODE, parseOnRequest } from "@/lib/admin/fix-groups";
+import { readPartsAdmin } from "@/lib/store/part-columns";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -158,8 +159,14 @@ export async function parkSupplierOffer(
     .eq("part_id", partId);
   if (up.error) return { ok: false, reason: "offerSave" };
 
-  const unpin = await db.from("parts").update({ pinned_offer_id: null }).eq("id", partId).eq("pinned_offer_id", offerId);
-  if (unpin.error) return { ok: false, reason: "recompute" };
+  // pinned_offer_id is not readable by sessions (0105), so it cannot be a
+  // filter of the update: read it through the admin view, then clear by id.
+  const pinned = await readPartsAdmin((t) => db.from(t).select("pinned_offer_id").eq("id", partId).maybeSingle());
+  if (pinned.error) return { ok: false, reason: "recompute" };
+  if ((pinned.data as { pinned_offer_id?: string | null } | null)?.pinned_offer_id === offerId) {
+    const unpin = await db.from("parts").update({ pinned_offer_id: null }).eq("id", partId);
+    if (unpin.error) return { ok: false, reason: "recompute" };
+  }
 
   const rpc = await db.rpc("refresh_part_sourcing", { p_part_id: partId });
   if (rpc.error) return { ok: false, reason: "recompute" };

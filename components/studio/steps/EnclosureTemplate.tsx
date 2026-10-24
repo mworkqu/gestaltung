@@ -48,7 +48,7 @@ import { COLOUR_HEX, STEP_ACCENT } from "@/lib/studio/palette";
 import { COLOURS, FINISHES, LIMITS, type EnclosureSpec, type MechPart, type StudioDoc } from "@/lib/studio/schema";
 import { fileSlug, looksLeftFromVersions } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { ShareActions } from "./share";
 import { accessReason, problemKey } from "./problem";

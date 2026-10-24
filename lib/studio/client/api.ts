@@ -7,6 +7,7 @@
 // name, AI consent, store products, phone) exactly like the rest of the site.
 
 import { loadSupabase } from "@/lib/supabase/lazy";
+import { captchaHeaders, guestCaptchaToken } from "@/components/prototyping/guest-captcha";
 import { CAD_BUCKET } from "@/lib/design/constants";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
 import { EMPTY_SPEC, hasAiConsent, type Spec } from "@/lib/prototyping/spec";
@@ -16,10 +17,12 @@ import type { ProductMockOptions } from "@/lib/studio/geometry/protocol";
 import { PROJECT_IMAGE_BUCKET } from "@/lib/projects/constants";
 import type { TokenInfo } from "@/lib/studio/server/tokens";
 import type { IdeaMessage } from "./steps";
+import type { Locale } from "@/lib/locale";
+import { safeFileName } from "@/lib/storage/paths";
 
 export type { TokenInfo };
 
-export type Locale = "en" | "ar";
+export type { Locale };
 
 export type Res<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
@@ -180,11 +183,11 @@ export function previewObject(path: string): { bucket: string; key: string } | n
   return rest.length ? { bucket, key: rest.join("/") } : null;
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<Res<T>> {
+async function postJson<T>(url: string, body: unknown, extraHeaders: Record<string, string> = {}): Promise<Res<T>> {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...extraHeaders },
       body: JSON.stringify(body),
     });
     const data = (await res.json().catch(() => ({}))) as T & { error?: string };
@@ -282,7 +285,7 @@ export function liveStudioApi(projectId: string): StudioApi {
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
       const out: string[] = [];
       for (const f of files) {
-        const safe = f.name.replace(/[^\w.-]+/g, "_").slice(0, 80) || "part.stl";
+        const safe = safeFileName(f.name, { fallback: "part.stl" });
         const path = `${uid}/${projectId}/print/${stamp}/${safe}`;
         const body = new Blob([f.data], { type: "model/stl" });
         const { error } = await (await db()).storage.from(CAD_BUCKET).upload(path, body, { contentType: "model/stl", upsert: false });
@@ -292,17 +295,23 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     async requestPrint(q) {
-      const r = await postJson<{ ok?: boolean }>("/api/store-lead", {
-        source: "print_request",
-        name: q.name,
-        phone: q.phone,
-        locale: q.locale,
-        projectId,
-        designName: q.designName,
-        items: q.parts.map((p) => ({ function: p.name, spec: `${p.material} · ${p.grams} g`, quantity: 1 })),
-        totalGrams: q.totalGrams,
-        files: q.files,
-      });
+      // A guest's request carries a Turnstile token while the switch is on (a no-op otherwise).
+      const token = await guestCaptchaToken();
+      const r = await postJson<{ ok?: boolean }>(
+        "/api/store-lead",
+        {
+          source: "print_request",
+          name: q.name,
+          phone: q.phone,
+          locale: q.locale,
+          projectId,
+          designName: q.designName,
+          items: q.parts.map((p) => ({ function: p.name, spec: `${p.material} · ${p.grams} g`, quantity: 1 })),
+          totalGrams: q.totalGrams,
+          files: q.files,
+        },
+        captchaHeaders(token),
+      );
       return r.ok;
     },
 
@@ -373,18 +382,23 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     async requestQuote(q) {
-      const r = await postJson<{ ok?: boolean }>("/api/store-lead", {
-        source: "studio_quote",
-        name: q.name,
-        phone: q.phone,
-        ...(q.email ? { email: q.email } : {}),
-        ...(q.note ? { note: q.note } : {}),
-        locale: q.locale,
-        projectId,
-        designName: q.designName,
-        items: q.items.map((name) => ({ function: name, quantity: 1 })),
-        ...(q.files?.length ? { files: q.files } : {}),
-      });
+      const token = await guestCaptchaToken();
+      const r = await postJson<{ ok?: boolean }>(
+        "/api/store-lead",
+        {
+          source: "studio_quote",
+          name: q.name,
+          phone: q.phone,
+          ...(q.email ? { email: q.email } : {}),
+          ...(q.note ? { note: q.note } : {}),
+          locale: q.locale,
+          projectId,
+          designName: q.designName,
+          items: q.items.map((name) => ({ function: name, quantity: 1 })),
+          ...(q.files?.length ? { files: q.files } : {}),
+        },
+        captchaHeaders(token),
+      );
       return r.ok;
     },
 

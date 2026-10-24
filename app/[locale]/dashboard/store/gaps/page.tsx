@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { TestBadge, TestDataToggle, showsTestData } from "@/components/admin/test-data-toggle";
 import { cn } from "@/lib/utils";
 import { gapKey, gapLabel } from "@/lib/admin/gap-key";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { isMissingColumn } from "@/lib/supabase/errors";
 
 // Sourcing gaps: every bill-of-materials line the store could not supply,
 // grouped by function with a count of projects asking for it. The restocking
@@ -35,13 +38,14 @@ export default async function SourcingGapsPage({
   searchParams: Promise<{ test?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const showTest = showsTestData((await searchParams).test);
   setRequestLocale(locale);
   const t = await getTranslations("SourcingGaps");
   const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -56,7 +60,7 @@ export default async function SourcingGapsPage({
   if (!showTest) query = query.eq("project.is_test", false);
   const { data, error } = await query;
   // 42703: is_test does not exist yet — migration 0031 has not run.
-  const needsMigration = error?.code === "42703";
+  const needsMigration = isMissingColumn(error);
   const gaps = (data ?? []) as unknown as Gap[];
 
   // Test gaps never merge into real demand: they get their own rows.

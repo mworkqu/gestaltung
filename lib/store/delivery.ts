@@ -6,6 +6,8 @@
 
 import type { LeadTimeClass } from "@/lib/store/sourcing";
 import { addWorkingDays, type Holidays } from "@/lib/store/working-days";
+import { asLocale, intlTag } from "@/lib/locale";
+import { addDays } from "@/lib/format/date";
 
 export const SHIPPING_TIERS = ["express", "standard", "economy"] as const;
 export type ShippingTier = (typeof SHIPPING_TIERS)[number];
@@ -64,7 +66,7 @@ export const LEAD_CLASS_DAYS: Record<LeadTimeClass, number> = {
 export function formatDeliveryDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return "";
   const d = new Date(`${iso}T12:00:00Z`);
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  return new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "numeric",
     month: "long",
     timeZone: "UTC",
@@ -92,12 +94,6 @@ export function splitByDatability<T extends DatableLine>(
   const toConfirm: T[] = [];
   for (const l of lines) (isOnRequest(l, onRequestIds) ? toConfirm : datable).push(l);
   return { datable, toConfirm };
-}
-
-function addDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 /** Today as an ISO date in UTC — what Postgres current_date is on Supabase. */

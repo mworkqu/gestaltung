@@ -12,6 +12,7 @@ import { Cpu, PencilRuler, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FawranCheckout, type OpenPayment } from "@/components/payments/fawran-checkout";
 import type { Quote, ServiceKind } from "@/lib/services/quote";
+import { round2 } from "@/lib/format/money";
 
 export type ServiceCard = { kind: ServiceKind; quote: Quote | null; ready: boolean; open: boolean };
 
@@ -42,7 +43,7 @@ export function ServicesPanel({ projectId, cards, signedIn }: { projectId: strin
     setBusy(null);
   }
 
-  const money = (n: number) => t("qar", { n: String(Math.round(n * 100) / 100) });
+  const money = (n: number) => t("qar", { n: String(round2(n)) });
 
   return (
     <section className="neu space-y-5 p-6" data-testid="engineer-services">

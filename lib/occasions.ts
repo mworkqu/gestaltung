@@ -20,6 +20,7 @@
 // validates with the same schema (validateOccasions).
 
 import { z } from "zod";
+import { asLocale, intlTag } from "@/lib/locale";
 
 export const OCCASIONS_KEY = "occasions";
 export const OCCASIONS_MAX = 12;
@@ -81,9 +82,6 @@ export function qatarToday(now: Date = new Date()): string {
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
-
-/** Does an occasion repeat every year (MM-DD) or apply to one span (YYYY-MM-DD)? */
-export const isYearly = (o: Pick<Occasion, "start">): boolean => isMonthDay(o.start);
 
 // ── Parse / validate ─────────────────────────────────────────────────────────
 
@@ -257,7 +255,7 @@ export function formatOccasionDate(value: string, locale: string): string {
   // 2024 is a leap year, so a yearly "02-29" formats.
   const d = new Date(`${yearly ? "2024-" : ""}${value}T12:00:00Z`);
   if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  return new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "numeric",
     month: "long",
     ...(yearly ? {} : { year: "numeric" as const }),

@@ -262,3 +262,81 @@ def test_non_string_code():
 def test_reasons_are_plain_english_with_line_numbers():
     reason = rejected("x = 1\ny = 2\nimport os\nresult = 1\n")
     assert reason.startswith("Line 3:")
+
+
+# ------------------------------------------------- match patterns (AI-03)
+# A class pattern's keyword names are attribute reads by name at runtime, so
+# they get the same rules as `.attr`.
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "object(__class__=k)",
+        "int(__dict__=k)",
+        "int(_private=k)",
+        "int(format=k)",
+        "int(parse_file=k)",
+        "int(real=1, __doc__=k)",
+    ],
+)
+def test_match_class_keyword_patterns_follow_attribute_rules(pattern):
+    code = f"x = 1\nmatch x:\n    case {pattern}:\n        pass\nresult = 1\n"
+    rejected(code, "not allowed")
+
+
+def test_match_class_dunder_keyword_rejected_even_with_allowed_class():
+    reason = rejected("import cadquery as cq\nmatch cq.Workplane():\n    case cq.Workplane(__class__=k):\n        pass\nresult = 1\n")
+    assert reason.startswith("Line 3:")
+
+
+@pytest.mark.parametrize(
+    "case",
+    ["{'__class__': k}", "{'_x': k}", "{'a': 1, **__rest__}", "{'format': k}"],
+)
+def test_match_mapping_keys_and_rest(case):
+    rejected(f"x = {{}}\nmatch x:\n    case {case}:\n        pass\nresult = 1\n", "not allowed")
+
+
+def test_plain_match_still_allowed():
+    ok(
+        "import cadquery as cq\nn = 2\nmatch n:\n    case 1:\n        w = 1\n"
+        "    case int(real=r) if r > 1:\n        w = r\n    case {'a': v}:\n        w = v\n"
+        "    case [a, *rest]:\n        w = a\n    case _:\n        w = 3\n"
+        "result = cq.Workplane().box(w, w, w)\n"
+    )
+
+
+# ------------------------------------------------- file reads (AI-03)
+
+
+@pytest.mark.parametrize(
+    "attr",
+    ["parse_file", "parseFile", "read", "readline", "readlines", "read_text", "read_bytes", "write",
+     "writelines", "write_text", "write_bytes", "fromfile", "tofile", "loadtxt", "genfromtxt", "load", "loads"],
+)
+def test_file_reading_attributes(attr):
+    rejected(f"import cadquery as cq\nx = cq.selectors.{attr}('/etc/passwd')\nresult = 1\n", "not allowed")
+
+
+def test_pyparsing_parse_file_chain_rejected():
+    code = (
+        "import cadquery as cq\n"
+        "try:\n"
+        "    cq.selectors.Literal('x').parse_file('/etc/passwd')\n"
+        "except Exception as e:\n"
+        "    leaked = e\n"
+        "result = 1\n"
+    )
+    reason = rejected(code, "parse_file", "not allowed")
+    assert reason.startswith("Line 3:")
+
+
+def test_ordinary_models_still_pass_after_file_rules():
+    ok(GOOD)
+    ok(
+        "import cadquery as cq\nimport cadhelpers\n"
+        "box = cadhelpers.open_box(60, 40, 25, 2)\n"
+        "lid = cq.Workplane('XY').rect(60, 40).extrude(2).edges('|Z').fillet(3)\n"
+        "result = box.union(lid.translate((0, 0, 30)))\n"
+    )

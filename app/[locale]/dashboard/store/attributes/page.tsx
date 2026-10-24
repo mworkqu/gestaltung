@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { AttributesEditor, type EditablePart } from "@/components/admin/attributes-editor";
 import { isComplete, type Attributes } from "@/lib/store/attributes";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // Product attributes: the data the BOM matcher needs to match "10 kΩ, 1/4 W,
 // ±5 %, through-hole" to a real product. Completeness per store category,
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AttributesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("StoreAttributes");
   const isRtl = locale === "ar";

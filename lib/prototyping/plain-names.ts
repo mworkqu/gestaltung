@@ -12,8 +12,9 @@
 
 import { humanPartName } from "./human-name";
 import { powerNets, type Netlist, type PinType } from "./netlist";
+import type { Locale } from "@/lib/locale";
 
-export type PlainLocale = "en" | "ar";
+export type PlainLocale = Locale;
 
 export type PlainKind =
   | "lampRelay"

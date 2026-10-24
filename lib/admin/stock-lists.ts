@@ -17,6 +17,8 @@ import {
   type RestockRow,
   type SignalCounts,
 } from "@/lib/store/restock";
+import { DAY_MS } from "@/lib/format/date";
+import { round2 } from "@/lib/format/money";
 
 export const BUY_WINDOW_DAYS = 30;
 
@@ -77,8 +79,6 @@ export type StockItem = {
 };
 
 export type StockLists = { buy: StockItem[]; watch: StockItem[]; dont: StockItem[] };
-
-const DAY_MS = 864e5;
 
 /** People behind a set of signals: distinct user ids, plus one per signal with no user. */
 export function peopleCount(signals: Pick<StockSignal, "userId">[]): number {
@@ -203,7 +203,7 @@ export function toRestockRow(item: StockItem): RestockRow {
     supplierUrl: part.supplierUrl,
     moq: part.moq,
     units,
-    estRevenue: Math.round(units * part.price * 100) / 100,
+    estRevenue: round2(units * part.price),
   };
 }
 

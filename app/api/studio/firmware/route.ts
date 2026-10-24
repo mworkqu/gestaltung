@@ -10,6 +10,7 @@ import { syncPinBlock } from "@/lib/studio/code-link";
 import { loadDoc, updateDoc } from "@/lib/studio/server/doc";
 import { FirmwareBody } from "@/lib/studio/server/http";
 import { studioRequest } from "@/lib/studio/server/context";
+import { jsonError } from "@/lib/http";
 
 // POST /api/studio/firmware — starter Arduino-IDE sketch for the board the
 // visitor actually chose (P5-14). Free, like /api/firmware: same consent,
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const saved = current.ok ? current.doc : null;
   const spec = saved?.spec ?? body.spec;
   const components = saved?.components.length ? saved.components : body.components;
-  if (!spec || !components.length) return Response.json({ error: "no_circuit" }, { status: 409 });
+  if (!spec || !components.length) return jsonError("no_circuit", 409);
 
   let netlist: Netlist;
   let w: ReturnType<typeof buildWiring>;
@@ -42,13 +43,13 @@ export async function POST(request: Request) {
     netlist = w.legacy as Netlist;
   } catch (e) {
     console.error("[studio/firmware] buildWiring failed:", e instanceof Error ? e.message : e);
-    return Response.json({ error: "no_circuit" }, { status: 409 });
+    return jsonError("no_circuit", 409);
   }
-  if (!netlist.components.length) return Response.json({ error: "no_circuit" }, { status: 409 });
-  if (!findController(netlist)) return Response.json({ error: "no_controller" }, { status: 409 });
+  if (!netlist.components.length) return jsonError("no_circuit", 409);
+  if (!findController(netlist)) return jsonError("no_controller", 409);
 
-  if (!geminiConfigured()) return Response.json({ error: "unavailable" }, { status: 503 });
-  if ((await quota(supabase, "gemini")).paused) return Response.json({ error: "paused" }, { status: 429 });
+  if (!geminiConfigured()) return jsonError("unavailable", 503);
+  if ((await quota(supabase, "gemini")).paused) return jsonError("paused", 429);
 
   // P5-17: the pin constants come from the SAME wiring the views draw. The model is
   // told to start with this exact block; the block is put back verbatim afterwards.
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
   try {
     const res = await callGemini({ system, prompt, schema: FIRMWARE_SCHEMA, temperature: 0.2, timeoutMs: 100_000 });
     const firmware = cleanFirmware(res.raw, res.model);
-    await logUsage(supabase, {
+    await logUsage(supabase, { userId: ctx.userId,
       provider: "gemini",
       model: res.model,
       projectId: project.id,
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
       outcome: firmware ? "ok" : "error",
       errorCode: firmware ? null : "malformed",
     });
-    if (!firmware) return Response.json({ error: "failed" }, { status: 502 });
+    if (!firmware) return jsonError("failed", 502);
     firmware.code = syncPinBlock(firmware.code, connections, getPart).code;
     const board = firmware.board || (findController(netlist)?.function ?? "").replace(/ microcontroller board$/, "");
     const stored = await updateDoc(supabase, project.id, (d) => (d ? { ...d, firmware: { board, code: firmware.code } } : null));
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     const reason = e instanceof ProviderError ? e.reason : "unavailable";
-    await logUsage(supabase, { provider: "gemini", projectId: project.id, feature: "studio", step: "firmware", outcome: "error", errorCode: reason });
-    return Response.json({ error: reason === "paused" ? "paused" : "unavailable" }, { status: 502 });
+    await logUsage(supabase, { userId: ctx.userId, provider: "gemini", projectId: project.id, feature: "studio", step: "firmware", outcome: "error", errorCode: reason });
+    return jsonError(reason === "paused" ? "paused" : "unavailable", 502);
   }
 }

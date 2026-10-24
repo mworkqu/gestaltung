@@ -1,12 +1,16 @@
 // Shared row/role types for the auth + multi-tenant layer (Stage 4).
 // Kept hand-written for now; can be replaced by generated Supabase types later.
 
-import type { ProjectBom } from "@/lib/prototyping/bom";
+import type { PaymentMethod } from "@/lib/company";
+import type { CadTier } from "@/lib/credits/classify";
+import type { ProjectBom } from "@/lib/prototyping/bom-types";
 import type { ProjectNetlist } from "@/lib/prototyping/netlist";
 import type { Discipline } from "@/lib/prototyping/constants";
 import type { PartSource } from "@/lib/prototyping/parts";
 import type { Spec } from "@/lib/prototyping/spec";
 import type { DisciplineState } from "@/lib/prototyping/tree";
+import type { ShippingTier } from "@/lib/store/delivery";
+import type { LeadTimeClass } from "@/lib/store/sourcing";
 
 export type Role = "super_admin" | "workshop" | "client";
 export type TenantType = "workshop" | "client";
@@ -26,6 +30,10 @@ export type Profile = {
   phone: string | null;
   locale: string;
   created_at: string;
+  // 0042 (copy of auth.users.email) and 0060 (price experiment cohort);
+  // optional for pre-migration rows.
+  email?: string | null;
+  price_cohort?: string | null;
 };
 
 export type InventoryItem = {
@@ -68,7 +76,7 @@ export type Part = {
   pricing_mode?: "markup" | "mirror";
   income_pct?: number | null;
   below_floor?: boolean;
-  lead_time_class?: "in_stock" | "3_5_days" | "1_2_weeks" | "2_4_weeks" | null;
+  lead_time_class?: LeadTimeClass | null;
   // 0030. Normalised name (trigger-maintained) and, on a merged duplicate, the
   // product it was merged into; absent before that migration.
   name_key?: string | null;
@@ -79,6 +87,29 @@ export type Part = {
   store_category_review?: boolean;
   // 0069. True while we hold the product ourselves in Lusail (the count stays admin-only).
   in_own_stock?: boolean;
+  // 0025. Free-form electronics attributes (jsonb, default {}) and pieces per
+  // listing (integer >= 1, default 1); optional for pre-migration rows.
+  attributes?: Record<string, unknown> | null;
+  pack_size?: number;
+  // 0028. Supplier-offer links and derived money, maintained by
+  // refresh_part_sourcing(); the two *_qar columns are admin-only data.
+  pinned_offer_id?: string | null;
+  preferred_offer_id?: string | null;
+  landed_cost_qar?: number | null;
+  expected_income_qar?: number | null;
+  // 0029. [{ web, thumb, path, drive_file_id }] (jsonb, default []); optional
+  // for pre-migration rows.
+  images?: { web: string; thumb: string; path: string | null; drive_file_id: string | null }[];
+  // 0031. Rows created by the e2e / test accounts; optional for pre-migration rows.
+  is_test?: boolean;
+  // 0041. Supplier datasheet link, supplier parameter table (jsonb rows, see
+  // lib/store/specs.ts) and the part this one is a backup for.
+  datasheet_url?: string | null;
+  specs?: unknown;
+  backup_for?: string | null;
+  // 0047. Arabic parameter table (jsonb) and when the Arabic details were written.
+  specs_ar?: unknown;
+  details_ar_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -106,17 +137,27 @@ export type PartOrder = {
   whatsapp_sent: boolean;
   created_at: string;
   updated_at: string;
-};
-
-export type PartOrderItem = {
-  id: string;
-  order_id: string;
-  part_id: string;
-  part_sku: string;
-  part_name: string;
-  quantity: number;
-  unit_price_qar: number;
-  line_total_qar: number;
+  // Columns added after 0011; all optional for pre-migration rows.
+  // 0025 / 0042: money taken off the order (numeric(10,2), default 0).
+  discount_qar?: number;
+  credit_discount_qar?: number;
+  // 0029: delivery quote recorded by create_part_order.
+  shipping_tier?: ShippingTier | null;
+  split_shipments?: boolean;
+  shipping_qar?: number;
+  handling_fee_qar?: number;
+  promised_date?: string | null;
+  early_promised_date?: string | null;
+  held_by?: string | null;
+  confirmation_emailed_at?: string | null;
+  delay_notified_at?: string | null;
+  // 0031 test flag, 0032 "date to be confirmed" lines, 0039 payment method.
+  is_test?: boolean;
+  has_on_request?: boolean;
+  payment_method?: PaymentMethod | null;
+  // 0097: school class the order was placed for and its per-team split.
+  class_id?: string | null;
+  class_breakdown?: { team_id: string; team_name: string; project_id: string | null }[] | null;
 };
 
 // A single line in the localStorage cart. Carries the snapshot needed to render
@@ -139,7 +180,7 @@ export type CartItem = {
   imageUrl: string | null;
   minOrderQty: number;
   /** 0028; null = available on request (orderable, date to be confirmed — 0032). */
-  leadTimeClass?: "in_stock" | "3_5_days" | "1_2_weeks" | "2_4_weeks" | null;
+  leadTimeClass?: LeadTimeClass | null;
   /** Pieces in one listing (lib/store/pack): "1 pack of 5". Absent on old snapshots = 1. */
   packSize?: number;
   quantity: number;
@@ -193,6 +234,22 @@ export type Project = {
   build_route?: "prototype" | "custom_pcb" | null;
   // 0040. Generated starter firmware (lib/prototyping/firmware.ts Firmware).
   firmware?: unknown;
+  // 0031 test flag; 0042 lifecycle + CAD credit state (status default 'active',
+  // free_wiring_used default false, cad_regens_remaining default 0); optional
+  // for pre-migration rows.
+  is_test?: boolean;
+  status?: "active" | "archived";
+  free_wiring_used?: boolean;
+  cad_tier?: CadTier | null;
+  cad_regens_remaining?: number;
+  // 0045. Guest recovery link: contact address, one-time token, when it was mailed.
+  contact_email?: string | null;
+  recovery_token?: string | null;
+  recovery_emailed_at?: string | null;
+  // 0068. The design-studio document (lib/studio/schema.ts StudioDoc, kept
+  // opaque here) and its optimistic-lock version (default 0).
+  studio?: unknown;
+  studio_version?: number;
   created_at: string;
   updated_at: string;
 };
@@ -209,13 +266,6 @@ export type ProjectBlock = {
   created_at: string;
 };
 
-export type ProjectMaterial = {
-  id: string;
-  project_id: string;
-  material: string;
-  created_at: string;
-};
-
 export type ProjectItem = {
   id: string;
   project_id: string;
@@ -228,16 +278,6 @@ export type ProjectItem = {
   created_at: string;
 };
 
-export type CartRow = {
-  id: string;
-  user_id: string;
-  product_id: string;
-  project_id: string | null;
-  quantity: number;
-  created_at: string;
-  updated_at: string;
-};
-
 export type ClientInventoryItem = {
   id: string;
   user_id: string;
@@ -246,6 +286,8 @@ export type ClientInventoryItem = {
   quantity: number;
   image_path: string | null;
   note: string | null;
+  // 0025 (jsonb, default {}); optional for pre-migration rows.
+  attributes?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 };

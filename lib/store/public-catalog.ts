@@ -45,6 +45,8 @@ import {
   UPSELL_COUNT,
   type UpsellPick,
 } from "@/lib/store/bought-together";
+import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
 
@@ -232,8 +234,8 @@ export function getPublishedPart(sku: string): Promise<Part | null> {
 async function publishedPart(sku: string): Promise<Part | null> {
   const supabase = createPublicClient();
   if (!supabase) return null;
-  // select("*"): specs_ar (0047) may not exist yet, so no named columns here.
-  const { data } = await supabase.from("parts").select("*").eq("sku", sku).eq("is_published", true).maybeSingle();
+  // Named public columns: anon may not select the cost / sourcing columns (0105).
+  const { data } = await supabase.from("parts").select(PART_PUBLIC_COLUMNS).eq("sku", sku).eq("is_published", true).maybeSingle();
   // Cost / income / sourcing internals never enter the cached public row (P2-07).
   return data ? withoutPrivateFields(data as Part) : null;
 }
@@ -511,7 +513,7 @@ const boughtTogether = async (sku: string, storeCategory: string | null): Promis
 export const REVIEWS_PER_SECTION = 6;
 let reviewsWarned = false;
 function reviewsFailed(what: string, error: { code?: string; message: string }): void {
-  if (error.code === "PGRST202" || error.code === "42P01" || error.code === "42883") return;
+  if (isMissingFunction(error) || error.code === "42P01") return;
   if (reviewsWarned) return;
   reviewsWarned = true;
   console.warn(`[store] ${what} failed: ${error.message}`);

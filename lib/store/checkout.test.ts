@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { checkoutRpcError, shouldRedirectEmptyCart, validateCheckoutEmail } from "@/lib/store/checkout";
@@ -39,6 +41,20 @@ describe("checkoutRpcError", () => {
     expect(checkoutRpcError("order total must be greater than zero")).toBe("totalZero");
     expect(checkoutRpcError("Hall effect sensor is available on request only")).toBe("cartBlocked");
     expect(checkoutRpcError("part not available")).toBe("errorSubmit");
+    // 0103 (DB-10) order limits, as PostgREST relays the raise text
+    expect(checkoutRpcError("too_many_orders")).toBe("errorTooManyOrders");
+    expect(checkoutRpcError("quantity_too_large")).toBe("errorQtyCap");
+    expect(checkoutRpcError("too_many_lines")).toBe("errorLineCap");
     expect(checkoutRpcError(undefined)).toBe("errorSubmit");
+  });
+});
+
+describe("checkout limit messages (0103 DB-10)", () => {
+  const load = (l: string) => JSON.parse(readFileSync(new URL(`../../messages/${l}.json`, import.meta.url), "utf8")).Checkout;
+  it("every new key exists in EN and AR", () => {
+    for (const l of ["en", "ar"]) {
+      const c = load(l);
+      for (const k of ["errorTooManyOrders", "errorQtyCap", "errorLineCap"]) expect(typeof c[k], `${l} ${k}`).toBe("string");
+    }
   });
 });

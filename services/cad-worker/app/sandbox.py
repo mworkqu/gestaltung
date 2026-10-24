@@ -1,7 +1,11 @@
 """Static checks on AI-written CadQuery code, before anything runs it.
 
-Layer 1 of the sandbox (see README.md). Pure: no cadquery import, no I/O, so
-the tests run on any Python and the runner can re-check inside the child.
+A filter, not the security boundary (see README.md): it turns away code that
+reaches for files, processes or interpreter internals, so honest-but-wrong
+model output fails early with a clear reason. The boundary is the runtime
+around it (child process, rlimits, network block, gVisor, zero-role service
+account, CAD_WORKER_TOKEN). Pure: no cadquery import, no I/O, so the tests run
+on any Python and the runner can re-check inside the child.
 
 The code may import only `cadquery`, `math` and our `cadhelpers`, must assign
 the final shape to `result`, and may not touch anything that reaches outside
@@ -36,11 +40,17 @@ BANNED_NAMES = frozenset(
 
 # Attributes that would reach cadquery's file I/O, its own code runner, the
 # raw OpenCascade bindings, or string formatting (which can read attributes
-# by name, bypassing these checks).
+# by name, bypassing these checks). The second group reads or writes files
+# through objects reachable from the cadquery package (pyparsing's
+# ParserElement.parse_file via cadquery.selectors, path / file / numpy
+# objects); CadQuery modelling never needs any of them (AI-03).
 BANNED_ATTRIBUTES = frozenset(
     {
         "cqgi", "occ_impl", "OCP", "exporters", "importers", "vis", "cq_directive",
         "save", "format", "format_map", "mro",
+        "parse_file", "parseFile", "read", "readline", "readlines", "read_text",
+        "read_bytes", "write", "writelines", "write_text", "write_bytes",
+        "fromfile", "tofile", "loadtxt", "genfromtxt", "load", "loads",
     }
 )
 # Attribute prefixes: file I/O methods (exportStl, importStep, ...) and
@@ -166,6 +176,17 @@ def validate(code: str) -> ast.Module:
         elif isinstance(node, (ast.MatchAs, ast.MatchStar)):
             if node.name:
                 _check_name(node.name, line)
+        elif isinstance(node, ast.MatchClass):
+            # `case C(attr=x)` reads subject.attr by name at runtime (AI-03):
+            # the keyword names are attributes and get the attribute rules.
+            for attr in node.kwd_attrs:
+                _check_attribute(attr, line)
+        elif isinstance(node, ast.MatchMapping):
+            if node.rest:
+                _check_name(node.rest, line)
+            for key in node.keys:
+                if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                    _check_attribute(key.value, line)
 
     if not _assigns_result(tree):
         raise Rejected(

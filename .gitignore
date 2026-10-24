@@ -63,3 +63,6 @@ Claude outputs/
 services/**/__pycache__/
 services/**/.pytest_cache/
 services/**/.venv/
+
+# FUSE temp files left by mounted-volume editors (a Word temp file was once committed)
+.fuse_hidden*

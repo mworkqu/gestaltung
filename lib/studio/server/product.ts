@@ -23,8 +23,9 @@ import { stableHash } from "../cache";
 import type { LayoutInput } from "../layout";
 import type { LibraryPart, ProductSpec, StudioComponent } from "../schema";
 import { ARCHETYPES } from "../product/schema";
+import { BUCKETS } from "@/lib/storage/paths";
 
-export const PREVIEW_BUCKET = "project-images";
+export const PREVIEW_BUCKET = BUCKETS.projectImages;
 export const PREVIEW_PREFIX = "studio-previews";
 export const GUEST_DESIGNS_PER_DAY = 3;
 /** 512 px renders are ~100–400 kB; the final 3/4 view is at most 1024 px. */
@@ -72,6 +73,16 @@ export function saveErrorStatus(error: string | undefined): number {
   if (error === "not_found" || error === "no_doc") return 404;
   if (error === "conflict" || error === "run_0068") return 409;
   return 503;
+}
+
+/**
+ * loadDocPrivate error → HTTP status. "service_unavailable" (no service-role
+ * key: the private models are service-only since 0100) → 503.
+ */
+export function loadErrorStatus(error: "not_found" | "failed" | "service_unavailable"): number {
+  if (error === "not_found") return 404;
+  if (error === "service_unavailable") return 503;
+  return 500;
 }
 
 /** The doc's parts as layout inputs (unknown library ids skipped). */

@@ -10,6 +10,7 @@ import { parseShowHidden } from "@/lib/orders/admin-rules";
 import { ListPagination } from "@/components/dashboard/list-pagination";
 import { paginate, parsePage, type SearchParamsLike } from "@/lib/admin/pagination";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function PartsOrdersPage({
   searchParams: Promise<SearchParamsLike>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const sp = await searchParams;
   setRequestLocale(locale);
 

@@ -28,27 +28,18 @@ import {
   type SpeechLang,
   type TranscribeError,
 } from "@/lib/prototyping/voice";
+import { captchaHeaders, guestCaptchaToken } from "@/components/prototyping/guest-captcha";
 import { GhostButton, SoftButton, selectClass } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
 
-// The Web Speech API is not in TypeScript's DOM lib; this is the part we use.
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-  onend: (() => void) | null;
-};
+// The Web Speech API is not in TypeScript's DOM lib; types/window.d.ts declares
+// the part we use.
+type Recognition = SpeechRecognitionLike;
 type RecognitionCtor = new () => Recognition;
 
 function recognitionCtor(): RecognitionCtor | null {
   if (typeof window === "undefined") return null;
-  const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+  return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 }
 
 const canRecord = () =>
@@ -114,7 +105,10 @@ export function Dictation({
   onBusy,
   onDone,
   projectId,
+  turnstileEnabled = false,
 }: {
+  /** P2-08 switch: a guest's voice note carries a Turnstile token while it is on. */
+  turnstileEnabled?: boolean;
   /** For metering: which project the voice note is billed to. */
   projectId?: string;
   value: string;
@@ -266,7 +260,13 @@ export function Dictation({
     body.append("language", whisperLang(lang));
     if (projectId) body.append("projectId", projectId);
     try {
-      const res = await fetch("/api/transcribe", { method: "POST", body, signal: ctrl.signal });
+      const token = await guestCaptchaToken(turnstileEnabled);
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body,
+        headers: captchaHeaders(token),
+        signal: ctrl.signal,
+      });
       const data = (await res.json().catch(() => ({}))) as { text?: string; error?: TranscribeError };
       if (!res.ok || !data.text) setFailure(data.error ?? "failed");
       // Appended to whatever is in the editor NOW, so typing meanwhile is kept.

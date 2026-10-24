@@ -6,9 +6,6 @@
 // retry around a block.
 
 import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
-import type { SupplierAdapter } from "@/lib/sourcing/types";
-
-export const voltaatAdapter: SupplierAdapter = { code: "voltaat", kind: "api" };
 
 export const VOLTAAT_BASE = "https://www.voltaat.com";
 export const USER_AGENT = "GestaltungPriceSync/1.0 (+https://gestaltung360.com; info@gestaltung360.com)";

@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { ensureOwnStockSupplier, parkSupplierOffer, setPartDelivery } from "@/lib/admin/fix-delivery";
 import { isMirror, parseShelfQty, shelfPlan } from "@/lib/admin/own-stock";
 import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 import { createClient } from "@/lib/supabase/server";
+import { readPartsAdmin } from "@/lib/store/part-columns";
 
 // "I bought these" on /dashboard/store/stock. Reuses the 0037 receipt flow
 // (mark_restock_received): it records the receipt, marks the product's open
@@ -17,7 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 export type BoughtLine = { partId: string; supplierId: string | null; qty: number };
 
 export async function markBought(locale: string, lines: BoughtLine[]): Promise<{ ok: true; count: number } | { error: string }> {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") return { error: "forbidden" };
   const clean = lines
     .map((l) => ({ partId: String(l.partId), supplierId: l.supplierId ? String(l.supplierId) : null, qty: Math.max(1, Math.trunc(Number(l.qty)) || 1) }))
@@ -65,7 +66,7 @@ export type ShelfResult =
   | { error: string };
 
 export async function setShelfUnits(locale: string, partId: string, qtyRaw: string | number): Promise<ShelfResult> {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") return { error: "forbidden" };
   const id = String(partId ?? "").trim();
   const qty = parseShelfQty(qtyRaw);
@@ -74,7 +75,7 @@ export async function setShelfUnits(locale: string, partId: string, qtyRaw: stri
   const supabase = await createClient();
   // The pricing mode decides whether our offer can win at all, so it is read
   // here rather than trusted from the page.
-  const part = await supabase.from("parts").select("pricing_mode, unit_price").eq("id", id).maybeSingle();
+  const part = await readPartsAdmin((t) => supabase.from(t).select("pricing_mode, unit_price").eq("id", id).maybeSingle());
   if (part.error || !part.data) return { error: part.error?.message ?? "notFound" };
 
   const set = await supabase.rpc("set_own_stock", { p_part: id, p_qty: qty });

@@ -26,6 +26,7 @@ import type { LibraryPart, StudioDoc } from "../schema";
 import { loadDoc } from "./doc";
 import { parseSchoolPricing, SCHOOL_PRICING_KEY } from "@/lib/schools/pricing";
 import { isClassProject } from "@/lib/schools/server";
+import { isMissingColumn } from "@/lib/supabase/errors";
 
 type PgError = { code?: string; message?: string; details?: string; hint?: string } | null;
 
@@ -35,7 +36,7 @@ const QUOTE_COLUMNS = ["project_id", "quote_calc", "final_quote_qar", "quote_not
 export function isMissingQuoteColumn(e: PgError): boolean {
   if (!e) return false;
   const text = `${e.message ?? ""} ${e.details ?? ""} ${e.hint ?? ""}`.toLowerCase();
-  return (e.code === "42703" || e.code === "PGRST204" || /column/.test(text)) && QUOTE_COLUMNS.some((c) => text.includes(c));
+  return (isMissingColumn(e) || e.code === "PGRST204" || /column/.test(text)) && QUOTE_COLUMNS.some((c) => text.includes(c));
 }
 
 export type RuleRead = { rule: QuoteRule; source: "settings" | "default" | "school" };

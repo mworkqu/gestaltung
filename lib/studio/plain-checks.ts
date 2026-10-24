@@ -35,7 +35,7 @@ import {
   symbolKind,
   type GetPart,
   type Locale,
-} from "./netlist";
+} from "./netlist-parts";
 
 export const CHECK_KEYS = [
   // Fixed for you

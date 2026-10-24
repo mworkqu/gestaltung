@@ -18,6 +18,7 @@
 //   4. part.pins3d (optional, owner-editable in the library data).
 
 import type { LibraryPart, Pin } from "../schema";
+import { round2 } from "@/lib/format/money";
 
 export type Vec3 = [number, number, number];
 export type Pin3d = { pos: Vec3; dir: Vec3 };
@@ -150,7 +151,7 @@ function pca9685Override(): Override {
     V_GND: at([24.5, -2.54, 9.7], PCA_UP),
   };
   for (let n = 0; n < 16; n++) {
-    const x = Math.round((-4 + (n - 7.5) * PITCH) * 100) / 100;
+    const x = round2(-4 + (n - 7.5) * PITCH);
     o[`CH${n}_GND`] = at([x, 10.16, 9], PCA_UP);
     o[`CH${n}_V`] = at([x, 7.62, 9], PCA_UP);
     o[`CH${n}_PWM`] = at([x, 5.08, 9], PCA_UP);
@@ -251,7 +252,7 @@ function derive(part: LibraryPart, rows: SlotRow[]): Pins3d {
     const [sx, sy] = SIDE_DIR[side];
     // Rows on this side of the board first (ties: params order).
     const order = rows
-      .map((r, i) => ({ i, score: Math.round((r.cx * sx + r.cy * sy) * 100) / 100 }))
+      .map((r, i) => ({ i, score: round2(r.cx * sx + r.cy * sy) }))
       .sort((a, b) => b.score - a.score || a.i - b.i)
       .map((x) => x.i);
     for (const pin of bySide.get(side)!) {

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import {
   BlockedError,
@@ -20,7 +20,7 @@ import { revalidateStorefront } from "@/lib/cache/storefront";
 // Voltaat's name, description or photos. super_admin only.
 
 async function requireAdmin() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 

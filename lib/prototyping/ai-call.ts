@@ -23,6 +23,8 @@ export type CallResult<T> =
 
 export async function validatedCall<T>(opts: {
   supabase: SupabaseClient;
+  /** The caller's verified user id (metering, 0101); looked up on `supabase` when absent. */
+  userId?: string | null;
   /** null = not tied to a project (billing: the Fawran proof check). */
   projectId: string | null;
   feature: CallFeature;
@@ -43,11 +45,11 @@ export async function validatedCall<T>(opts: {
   /** First model to ask (default GEMINI_MODEL). */
   model?: string;
 }): Promise<CallResult<T>> {
-  const { supabase, projectId, feature, step } = opts;
+  const { supabase, projectId, feature, step, userId } = opts;
   const caller = opts.caller ?? callGemini;
   if (!opts.caller && !geminiConfigured()) return { ok: false, error: "unavailable", problems: [] };
   if ((await quota(supabase, "gemini")).paused) {
-    await logUsage(supabase, { provider: "gemini", projectId, feature, step, outcome: "blocked", errorCode: "paused" });
+    await logUsage(supabase, { userId, provider: "gemini", projectId, feature, step, outcome: "blocked", errorCode: "paused" });
     return { ok: false, error: "paused", problems: [] };
   }
 
@@ -104,7 +106,7 @@ export async function validatedCall<T>(opts: {
       errors = [err.reason === "malformed" ? "the answer was not valid JSON" : err.message];
       if (e instanceof ProviderError && e.reason !== "malformed") {
         await record({ model, attempt, rawText, raw: null, parsed: null, outcome: "error", errors });
-        await logUsage(supabase, {
+        await logUsage(supabase, { userId,
           provider: "gemini", model, projectId, feature, step,
           promptTokens: usage?.input, completionTokens: usage?.output, totalTokens: usage?.total,
           latencyMs, outcome: "error", errorCode: e.reason,
@@ -112,7 +114,7 @@ export async function validatedCall<T>(opts: {
         return { ok: false, error: e.reason === "rate_limited" ? "rate_limited" : "unavailable", problems: errors };
       }
     }
-    await logUsage(supabase, {
+    await logUsage(supabase, { userId,
       provider: "gemini", model, projectId, feature, step,
       promptTokens: usage?.input, completionTokens: usage?.output, totalTokens: usage?.total,
       latencyMs, outcome: value ? "ok" : "error", errorCode: value ? null : "invalid",

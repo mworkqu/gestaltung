@@ -13,7 +13,7 @@ import { ImageDown, Loader2, MessageCircle } from "lucide-react";
 import type { ViewerApi } from "@/components/studio/viewer/types";
 import { downloadBlob } from "@/lib/studio/download";
 import { fileSlug } from "@/lib/studio/client/steps";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { linkCls } from "../ui";
 
 /** The project's Studio link (what the WhatsApp text points to). */

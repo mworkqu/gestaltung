@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { PROVIDERS, dayStart, guardThreshold, nextReset, providerLimits, type ProviderId } from "@/lib/ai/limits";
 import { cn } from "@/lib/utils";
-import { AI_PRICE_QAR } from "@/lib/credits/constants";
+import { CREDIT_QAR } from "@/lib/credits/constants";
 import { AiPricing } from "@/components/admin/ai-pricing";
 import { HealthLines } from "@/components/admin/health-lines";
 import { healthStatus } from "@/lib/admin/health-status";
@@ -11,6 +11,10 @@ import { SafetySettings, type CleanupRun } from "@/components/admin/safety-setti
 import { TURNSTILE_KEY, parseTurnstileSettings, turnstileEnv } from "@/lib/turnstile";
 import { CLEANUP_KEY, parseCleanupSettings } from "@/lib/cleanup/anonymous";
 import { GEMINI_FALLBACK_MODEL, GEMINI_MODEL } from "@/lib/prototyping/providers/gemini-client";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { DAY_MS } from "@/lib/format/date";
+import { isMissingColumn } from "@/lib/supabase/errors";
 
 // AI usage against the free allowances (migration 0023's ai_usage).
 //
@@ -38,15 +42,16 @@ const DAYS = 30;
 
 export default async function UsagePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("AiUsage");
   const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const num = new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB");
-  const pct = new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { style: "percent", maximumFractionDigits: 1 });
-  const dayFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { day: "2-digit", month: "short", timeZone: "UTC" });
-  const timeFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  const num = new Intl.NumberFormat(intlTag(asLocale(locale)));
+  const pct = new Intl.NumberFormat(intlTag(asLocale(locale)), { style: "percent", maximumFractionDigits: 1 });
+  const dayFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), { day: "2-digit", month: "short", timeZone: "UTC" });
+  const timeFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -55,7 +60,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
   });
 
   const supabase = await createClient();
-  const since = new Date(Date.now() - DAYS * 86400000);
+  const since = new Date(Date.now() - DAYS * DAY_MS);
   since.setUTCHours(0, 0, 0, 0);
   const { data, error } = await supabase
     .from("ai_usage")
@@ -115,7 +120,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
 
   // ── 30 days: calls per UTC day, all providers ──
   const days = Array.from({ length: DAYS }, (_, i) => {
-    const d = new Date(since.getTime() + (i + 1) * 86400000);
+    const d = new Date(since.getTime() + (i + 1) * DAY_MS);
     return { key: d.toISOString().slice(0, 10), date: d, calls: 0, tokens: 0 };
   });
   const dayIndex = new Map(days.map((d, i) => [d.key, i]));
@@ -222,7 +227,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
         </div>
       </section>
 
-      {pricing && <AiPricing locale={locale} perCall={Number(pricing.per_call_qar ?? AI_PRICE_QAR)} charging={Boolean(pricing.charging)} />}
+      {pricing && <AiPricing locale={locale} perCall={Number(pricing.per_call_qar ?? CREDIT_QAR)} charging={Boolean(pricing.charging)} />}
 
       <SafetySettings
         locale={locale}
@@ -238,7 +243,7 @@ export default async function UsagePage({ params }: { params: Promise<{ locale: 
       {error && (
         <p className="text-sm font-medium text-destructive">
           {/* 42703: is_test does not exist yet — migration 0031 has not run. */}
-          {error.code === "42703" ? tt("needsMigration") : t("notReady")}
+          {isMissingColumn(error) ? tt("needsMigration") : t("notReady")}
         </p>
       )}
 

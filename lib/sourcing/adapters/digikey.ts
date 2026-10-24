@@ -3,10 +3,8 @@
 // server-only). Gives price, stock, manufacturer lead time and full
 // parametric data — the source for our typed attributes.
 
-import type { SupplierAdapter, SupplierProduct } from "@/lib/sourcing/types";
+import type { SupplierProduct } from "@/lib/sourcing/types";
 import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
-
-export const digikeyAdapter: SupplierAdapter = { code: "digikey", kind: "api" };
 
 const API = "https://api.digikey.com";
 

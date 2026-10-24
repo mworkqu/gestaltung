@@ -7,6 +7,9 @@ import { ProjectExportButtons } from "@/components/admin/project-export-buttons"
 import { TestBadge, TestDataToggle, showsTestData } from "@/components/admin/test-data-toggle";
 import { cn } from "@/lib/utils";
 import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { isMissingColumn } from "@/lib/supabase/errors";
 
 // Every project on the platform, for diagnostics. super_admin only (layout +
 // RLS). Owner, created, status and last activity per project; filter by
@@ -36,6 +39,7 @@ export default async function AdminProjectsPage({
   searchParams: Promise<{ user?: string; test?: string; q?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const { user: userFilter, test, q } = await searchParams;
   const search = (q ?? "").trim().toLowerCase();
   const showTest = showsTestData(test);
@@ -44,7 +48,7 @@ export default async function AdminProjectsPage({
   const tt = await getTranslations("TestData");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -168,7 +172,7 @@ export default async function AdminProjectsPage({
       {projRes.error && (
         <p className="text-sm font-medium text-destructive">
           {/* 42703: is_test does not exist yet — migration 0031 has not run. */}
-          {projRes.error.code === "42703" ? tt("needsMigration") : t("error")}
+          {isMissingColumn(projRes.error) ? tt("needsMigration") : t("error")}
         </p>
       )}
 

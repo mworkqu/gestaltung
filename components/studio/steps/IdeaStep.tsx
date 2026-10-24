@@ -45,10 +45,11 @@ import { IDEATION } from "@/lib/studio/tiers";
 import type { TokenInfo } from "@/lib/studio/client/api";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { UnderstandingPanel } from "./UnderstandingPanel";
 import { Bar, MainButton, Problem, StepFrame } from "../ui";
 import { problemKey } from "./problem";
+import { intlTag, asLocale } from "@/lib/locale";
 
 const accent = STEP_ACCENT.idea;
 const FRESH_MS = 1600;
@@ -422,7 +423,7 @@ function TokenLine({ tokens }: { tokens: TokenInfo | null }) {
       {tokens.passUntil && (
         <p className="text-[11px] font-semibold text-heading" data-testid="studio-pass">
           {t("tokens.pass", {
-            date: new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { day: "numeric", month: "short" }).format(
+            date: new Intl.DateTimeFormat(intlTag(asLocale(locale)), { day: "numeric", month: "short" }).format(
               new Date(tokens.passUntil),
             ),
           })}

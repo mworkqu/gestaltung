@@ -10,12 +10,12 @@ import { DesignRefBody, json, saveErrorStatus } from "@/lib/studio/server/produc
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  const ctx = await studioRequest(request, DesignRefBody, { consent: false });
+  const ctx = await studioRequest(request, DesignRefBody, { consent: false, owner: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
 
   let missing = false;
-  const saved = await updateProductDoc(supabase, project.id, (s) => {
+  const saved = await updateProductDoc(supabase, ctx.userId, project.id, (s) => {
     if (!findDesign({ product: s.product, priv: s.priv }, body.designId)) {
       missing = true;
       return null;

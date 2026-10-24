@@ -9,6 +9,8 @@ import { parametersToAttributes } from "@/lib/sourcing/spec-map";
 import { qarPerUnit } from "@/lib/pricing/fx";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
 import type { SupplierProduct } from "@/lib/sourcing/types";
+import { isSuperAdminSession } from "@/lib/auth/guards";
+import { emptyStatus, jsonError, jsonOk } from "@/lib/http";
 
 // DigiKey / Mouser backups and datasheets (owner, 2026-09-29). super_admin.
 // POST { step }:
@@ -222,17 +224,17 @@ async function specs(db: Db) {
 
 export async function POST(request: Request) {
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
+  if (!isSuperAdminSession(session)) return emptyStatus(403);
   const { step, preview } = (await request.json().catch(() => ({}))) as { step?: string; preview?: boolean };
   const db = await createClient();
   const { error } = await db.from("parts").select("backup_for").limit(1);
-  if (error) return Response.json({ error: "run_migration_0041" }, { status: 409 });
+  if (error) return jsonError("run_migration_0041", 409);
   let result: unknown;
   if (step === "backups") result = await backups(db, preview === true);
   else if (step === "clear") result = await clear(db);
   else if (step === "specs") result = await specs(db);
-  else return Response.json({ error: "unknown_step" }, { status: 400 });
+  else return jsonError("unknown_step", 400);
   // Backups and specs add / edit published products: refresh the cached storefront.
   if (!(step === "backups" && preview === true)) revalidateStorefront();
-  return Response.json(result);
+  return jsonOk(result);
 }

@@ -1,10 +1,19 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { isAuthorizedCron } from "@/lib/auth/cron";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderOwnerEmail } from "@/lib/email/lead-email";
 import { dateChangeEmail, type OrderForEmail } from "@/lib/store/order-email";
-import { reviewPromise } from "@/lib/store/delivery";
+import {
+  orderUpdateFor,
+  planPromiseReview,
+  reportLine,
+  type CronShippingConfig,
+  type PromiseItemRow,
+  type PromiseOrder,
+} from "@/lib/store/delivery-promises";
 import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
 import { HOLIDAYS_KEY, parseHolidays } from "@/lib/store/working-days";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // Daily (vercel.json cron): for every open order whose promised date hasn't
 // passed, compare each item's lead-time class now with the one it was sold
@@ -27,20 +36,15 @@ export const maxDuration = 60;
 const OPEN = OPEN_ORDER_STATUSES.filter((s) => s !== "shipped");
 
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return new Response(null, { status: 401 });
+  if (!isAuthorizedCron(request.headers.get("authorization"), process.env.CRON_SECRET)) {
+    return jsonError("unauthorized", 401);
   }
   const db = createServiceClient();
-  if (!db) return Response.json({ error: "no_service_key" }, { status: 500 });
+  if (!db) return jsonError("no_service_key", 500);
 
   const today = new Date().toISOString().slice(0, 10);
   const { data: cfgRow } = await db.from("store_settings").select("value").eq("key", "shipping").maybeSingle();
-  const cfg = (cfgRow?.value ?? {}) as {
-    handling_days?: number;
-    buffer_days?: number;
-    tiers?: Record<string, { transit_days?: number }>;
-  };
+  const cfg = (cfgRow?.value ?? {}) as CronShippingConfig;
   // Qatar weekend + public holidays (0054), the same rule order_delivery_quote
   // uses; no row = calendar days, as the database does before 0054.
   const { data: holidaysRow } = await db.from("store_settings").select("value").eq("key", HOLIDAYS_KEY).maybeSingle();
@@ -59,23 +63,10 @@ export async function GET(request: Request) {
       .from("part_order_items")
       .select("id, part_id, part_name, lead_time_class, part:parts(lead_time_class)")
       .eq("order_id", order.id);
-    type Row = { id: string; part_name: string; lead_time_class: string | null; part: { lead_time_class: string | null } | null };
-    const rows = (items ?? []) as unknown as Row[];
-    const oldDate = order.promised_date as string;
-    const review = reviewPromise(
-      rows.map((r) => ({ sold: r.lead_time_class, current: r.part ? r.part.lead_time_class : r.lead_time_class })),
-      {
-        orderDate: String(order.created_at).slice(0, 10),
-        oldDate,
-        handlingDays: cfg.handling_days ?? 1,
-        transitDays: cfg.tiers?.[order.shipping_tier ?? "standard"]?.transit_days ?? 0,
-        bufferDays: cfg.buffer_days ?? 3,
-        holidays,
-      }
-    );
-    if (!review) continue;
-    const changed = review.changed.map((i) => rows[i]);
-    const newDate = review.newDate;
+    const rows = (items ?? []) as unknown as PromiseItemRow[];
+    const plan = planPromiseReview(order as PromiseOrder, rows, cfg, holidays);
+    if (!plan) continue;
+    const { changed, oldDate, newDate } = plan;
 
     let sent = false;
     if (order.customer_email) {
@@ -85,21 +76,12 @@ export async function GET(request: Request) {
       sent = await sendEmail({ to: [order.customer_email], ...mail });
     }
 
-    for (const r of changed) {
-      await db.from("part_order_items").update({ lead_time_class: r.part!.lead_time_class }).eq("id", r.id);
+    for (const u of plan.itemUpdates) {
+      await db.from("part_order_items").update({ lead_time_class: u.lead_time_class }).eq("id", u.id);
     }
-    await db
-      .from("part_orders")
-      .update({
-        ...(newDate && newDate !== oldDate ? { promised_date: newDate } : {}),
-        ...(newDate !== oldDate ? { delay_notified_at: new Date().toISOString() } : {}),
-      })
-      .eq("id", order.id);
+    await db.from("part_orders").update(orderUpdateFor(plan, new Date())).eq("id", order.id);
 
-    report.push(
-      `${String(order.id).slice(0, 8)} ${order.customer_name}: ${changed.map((c) => c.part_name).join(", ")} — ` +
-        `${oldDate} → ${newDate ?? "undated"}${order.customer_email ? (sent ? " (emailed)" : " (EMAIL FAILED)") : " (no email — contact on WhatsApp)"}`
-    );
+    report.push(reportLine(order, plan, order.customer_email ? (sent ? "sent" : "failed") : "no_address"));
   }
 
   if (report.length) {
@@ -112,5 +94,5 @@ export async function GET(request: Request) {
       }),
     });
   }
-  return Response.json({ checked: orders?.length ?? 0, affected: report });
+  return jsonOk({ checked: orders?.length ?? 0, affected: report });
 }

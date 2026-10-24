@@ -18,6 +18,7 @@
 // Pure and client-safe.
 
 import { humanName } from "./human-name";
+import { escapeXmlAttr } from "@/lib/text/escape";
 
 export const PIN_TYPES = [
   "power_in",
@@ -406,5 +407,4 @@ export const flaggedRefs = (flags: Flag[]) =>
   );
 
 /** XML-escape text for SVG output. */
-export const esc = (s: string) =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+export const esc = escapeXmlAttr;

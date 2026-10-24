@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import {
@@ -11,6 +11,7 @@ import {
   type SchoolPricing,
   type SchoolPricingError,
 } from "@/lib/schools/pricing";
+import { asLocale } from "@/lib/locale";
 
 // School prices: store_settings.school_pricing. super_admin only — checked here
 // and again by RLS (store_settings_write). Validated with the same schema the
@@ -21,7 +22,7 @@ export type SaveSchoolPricingResult =
   | { ok: false; errors: SchoolPricingError[]; message?: string };
 
 export async function saveSchoolPricing(locale: string, input: unknown): Promise<SaveSchoolPricingResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, errors: [], message: "forbidden" };
 
   const checked = validateSchoolPricing(input);
@@ -35,7 +36,7 @@ export async function saveSchoolPricing(locale: string, input: unknown): Promise
   if (error) return { ok: false, errors: [], message: error.code === "42P01" ? "run_migration" : error.message };
 
   revalidateStorefront();
-  const safeLocale = locale === "ar" ? "ar" : "en";
+  const safeLocale = asLocale(locale);
   revalidatePath(`/${safeLocale}/dashboard/store/schools`);
   revalidatePath(`/${safeLocale}/schools`);
   return { ok: true, value: checked.value };
