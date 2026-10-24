@@ -61,6 +61,17 @@
 -- RUN AFTER 0099 (and 0100-0104). Safe to re-run.
 --
 -- ROLLBACK (manual):
+--   -- The table grant alone restores the old behaviour (it covers every column).
+--   -- Clear section 1's per-column grants by name as well, so the privileges are
+--   -- back exactly as 0011 left them and a later table-level revoke is enough.
+--   do $$
+--   declare v_cols text;
+--   begin
+--     select string_agg(quote_ident(attname), ', ' order by attnum) into v_cols
+--       from pg_attribute
+--      where attrelid = 'public.parts'::regclass and attnum > 0 and not attisdropped;
+--     execute format('revoke select (%s) on table public.parts from anon, authenticated', v_cols);
+--   end $$;
 --   grant select on public.parts to anon, authenticated;
 --   drop view if exists public.parts_admin;
 --   drop policy if exists store_settings_select on public.store_settings;

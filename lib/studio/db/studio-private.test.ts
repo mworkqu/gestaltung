@@ -33,6 +33,7 @@ create table public.engineering_jobs (
   project_id uuid,
   user_id uuid not null,
   snapshot jsonb,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 alter table public.engineering_jobs enable row level security;
@@ -46,6 +47,7 @@ const JOB = "00000000-0000-4000-8000-0000000000e1";
 const JOB_CLEAN = "00000000-0000-4000-8000-0000000000e2";
 const JOB_ODD = "00000000-0000-4000-8000-0000000000e3";
 const OLD = "2026-01-01T00:00:00.000Z";
+const BACKUP = "engineering_jobs_snapshot_backup_2026_10";
 
 const product = { designs: [{ id: "d_aaaaaaaaaa", archetype: "box" }], chosenId: null, unlockedId: null, specHash: "h" };
 const productPrivate = { designs: [{ id: "d_aaaaaaaaaa", model: { bodies: [{ id: "b" }] }, source: "ai" }] };
@@ -140,6 +142,18 @@ describe("0100_studio_private", () => {
     expect(clean.s).toEqual({ name: "Lamp", studio: { spec: studio.spec, product } });
     const [odd] = await rows<{ s: unknown }>("select snapshot as s from public.engineering_jobs where id = $1", [JOB_ODD]);
     expect(odd.s).toEqual({ name: "Lamp", studio: [1, 2] });
+
+    // The strip was irreversible before 0100; the backup must hold the WHOLE pre-change snapshot.
+    // Exactly one row: only the job that carried productPrivate (not the clean or odd-shaped one),
+    // and the second applyTwice pass did not write it again (on conflict do nothing).
+    const backup = await rows<{ job_id: string; project_id: string; user_id: string; snapshot: unknown }>(
+      `select job_id, project_id, user_id, snapshot from public.${BACKUP}`,
+    );
+    expect(backup).toHaveLength(1);
+    expect(backup[0].job_id).toBe(JOB);
+    expect(backup[0].project_id).toBe(P);
+    expect(backup[0].user_id).toBe(OWNER);
+    expect(backup[0].snapshot).toEqual({ name: "Lamp", studio });
   });
 
   it("AFTER: the owner's SELECT of studio->'productPrivate' is null and the private table is denied", async () => {
@@ -147,6 +161,9 @@ describe("0100_studio_private", () => {
     expect(read.p).toBeNull();
     expect(await as(OWNER, () => fails("select * from public.project_studio_private"))).toMatch(/permission denied/);
     expect(await as(null, () => fails("select * from public.project_studio_private"))).toMatch(/permission denied/);
+    // The backup holds the very data being hidden; the base stub grants all on new tables, so this exercises the explicit revoke.
+    expect(await as(OWNER, () => fails(`select * from public.${BACKUP}`))).toMatch(/permission denied/);
+    expect(await as(null, () => fails(`select * from public.${BACKUP}`))).toMatch(/permission denied/);
   });
 
   it("AFTER: an owner PATCH cannot change product.unlockedId or store productPrivate; the rest saves and the version check holds", async () => {
@@ -218,5 +235,24 @@ describe("0100_studio_private", () => {
     expect(
       await as("service", () => fails("select public.studio_product_save($1, $2, 3, '{}'::jsonb, '{}'::jsonb)", [P, TEACHER])),
     ).toMatch(/not_owner/);
+  });
+
+  // Last on purpose: the rollback puts productPrivate back into the snapshot, which the stripped-state cases above forbid.
+  it("rollback from the 0100 header: service_role restores the stripped snapshot from the backup, productPrivate included", async () => {
+    const [before] = await rows<{ has: boolean }>("select snapshot #> '{studio,productPrivate}' is not null as has from public.engineering_jobs where id = $1", [JOB]);
+    expect(before.has).toBe(false);
+    await as("service", () =>
+      db.query(
+        `update public.engineering_jobs j
+            set snapshot = b.snapshot
+           from public.${BACKUP} b
+          where b.job_id = j.id`,
+      ),
+    );
+    const [job] = await rows<{ s: unknown }>("select snapshot as s from public.engineering_jobs where id = $1", [JOB]);
+    expect(job.s).toEqual({ name: "Lamp", studio });
+    // jobs that were never backed up are left alone
+    const [clean] = await rows<{ s: unknown }>("select snapshot as s from public.engineering_jobs where id = $1", [JOB_CLEAN]);
+    expect(clean.s).toEqual({ name: "Lamp", studio: { spec: studio.spec, product } });
   });
 });

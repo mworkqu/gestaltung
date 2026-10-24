@@ -13,8 +13,10 @@
 --          idea tokens). engineering_job_cancel itself is unchanged.
 --   DB-08  claim_guest_work (0071): drops the guest's idea_welcome row when the
 --          account already has one, so the claim no longer aborts.
---   DB-10  part_order_items: quantity <= 1000 per line, <= 100 lines per
---          order ('too_many_lines' / 'quantity_too_large'); part_orders: at
+--   DB-10  part_order_items: quantity <= 1000 per line, <= 300 lines per
+--          order ('too_many_lines' / 'quantity_too_large'), and a CLASS order
+--          (part_orders.class_id is not null, 0097) has no line cap at all;
+--          part_orders: at
 --          most 10 new orders per hour per customer phone or email
 --          ('too_many_orders'). The phone is matched on its last 8 digits (a
 --          Qatar mobile), so '+974 6666 0002', '0097466660002' and '66660002'
@@ -51,6 +53,13 @@
 -- RUN AFTER 0098 (still NOT RUN: refresh_part_sourcing is replaced on top of its 0098 body)
 -- and after 0099 (and 0100-0102). Safe to re-run (create or replace,
 -- drop … if exists before create trigger / add constraint, revoke/grant).
+--
+-- REQUIRES 0097 (part_orders.class_id) — also still NOT RUN. The class
+-- exemption in part_order_items_limits() reads part_orders.class_id, and
+-- plpgsql resolves that column only when the trigger first fires, so running
+-- 0103 before 0097 applies cleanly but then makes EVERY part_order_items
+-- insert fail with "column o.class_id does not exist". Run 0096 → 0097 → 0098
+-- → 0099 → 0100-0102 → 0103, in that order.
 --
 -- ROLLBACK (manual, one transaction):
 --   -- functions: re-run the bodies from the migrations named above:
@@ -338,7 +347,13 @@ begin
   if new.quantity > 1000 then
     raise exception 'quantity_too_large';
   end if;
-  if (select count(*) from public.part_order_items i where i.order_id = new.order_id) >= 100 then
+  -- 0103 (owner decision, 2026-10-24): 300 lines per order, and a class order
+  -- (part_orders.class_id is not null, 0097) is exempt from the line cap
+  -- altogether — a teacher orders for a whole class in one go. The per-line
+  -- quantity cap above still applies to class orders.
+  if not exists (select 1 from public.part_orders o
+                  where o.id = new.order_id and o.class_id is not null)
+     and (select count(*) from public.part_order_items i where i.order_id = new.order_id) >= 300 then
     raise exception 'too_many_lines';
   end if;
   return new;

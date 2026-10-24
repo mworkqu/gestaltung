@@ -18,7 +18,10 @@
 --      service role (server code) reads or writes it.
 --   2. Back-fills it from projects.studio->'productPrivate', then removes that
 --      key from projects.studio (updated_at is left as it was). Also removes
---      it from engineering_jobs.snapshot->'studio' (audit G1.2): before this
+--      it from engineering_jobs.snapshot->'studio' (audit G1.2) — but ONLY
+--      after copying every affected snapshot verbatim into
+--      public.engineering_jobs_snapshot_backup_2026_10 (step 2b, same
+--      transaction), because that jsonb edit is otherwise irreversible: before this
 --      commit lib/engineering/server.ts stored project.studio verbatim in the
 --      job snapshot ({name, studio}), which the job's owner can SELECT
 --      (0091), so every job submitted before 0100 still carried every private
@@ -45,8 +48,8 @@
 -- so nothing breaks — deploy the code first, then run this.
 --
 -- RUN AFTER 0099. Safe to re-run (create … if not exists / create or replace /
--- drop … if exists; the back-fill skips rows already copied; the clean-ups only
--- touch rows that still carry the key).
+-- drop … if exists; the back-fill and the snapshot backup skip rows already
+-- copied; the clean-ups only touch rows that still carry the key).
 --
 -- ROLLBACK (manual, one transaction; puts the models back into studio):
 --   update public.projects p
@@ -60,8 +63,22 @@
 --   drop table    if exists public.project_studio_private;
 -- (then redeploy the app commit before this one, or keep the current code: it
 --  falls back to studio.productPrivate when the table/function are missing).
--- The engineering_jobs.snapshot clean-up is not reversed: those models were
--- copies of the project's (now in project_studio_private), never needed there.
+--
+-- ROLLBACK of the engineering_jobs.snapshot clean-up (step 2b backed it up, so
+-- this IS reversible; same transaction as above if you want both):
+--   update public.engineering_jobs j
+--      set snapshot = b.snapshot
+--     from public.engineering_jobs_snapshot_backup_2026_10 b
+--    where b.job_id = j.id;
+--   -- or one job only:  … and j.id = '<job uuid>';
+-- public.engineering_jobs_snapshot_backup_2026_10 (job_id, project_id, user_id,
+-- created_at, snapshot, backed_up_at) holds the WHOLE pre-0100 snapshot of every
+-- job the clean-up touched. It is KEPT DELIBERATELY — nothing reads it, it is
+-- service-role-only (RLS on, no policies, anon/authenticated revoked), and the
+-- OWNER MAY DROP IT once satisfied that nothing needs restoring:
+--   drop table if exists public.engineering_jobs_snapshot_backup_2026_10;
+-- (It holds customer design data, so do not grant anything on it, and drop it
+--  rather than leaving it to rot once the migration is proven.)
 -- ============================================================================
 
 -- ── 1. The private table ────────────────────────────────────────────────────
@@ -104,6 +121,45 @@ begin
               where tgrelid = 'public.projects'::regclass
                 and tgname = 'projects_set_updated_at' and not tgisinternal) then
     alter table public.projects enable trigger projects_set_updated_at;
+  end if;
+end $$;
+
+-- ── 2b. Back up every snapshot we are about to edit (IRREVERSIBLE otherwise) ─
+-- The strip below is a jsonb edit: once it runs the private models in that
+-- snapshot are gone and the rollback note cannot bring them back. So the whole
+-- snapshot of every job the strip touches is copied here FIRST, in this same
+-- transaction, with the job's identity beside it so a row can be put back on
+-- the right job. No FK to engineering_jobs on purpose: a cascade from a deleted
+-- job must not take the backup with it.
+create table if not exists public.engineering_jobs_snapshot_backup_2026_10 (
+  job_id       uuid primary key,
+  project_id   uuid,
+  user_id      uuid not null,
+  created_at   timestamptz not null,
+  snapshot     jsonb,
+  backed_up_at timestamptz not null default now()
+);
+
+comment on table public.engineering_jobs_snapshot_backup_2026_10 is
+  'Pre-0100 engineering_jobs.snapshot of every job whose snapshot->studio carried productPrivate (customer design data). Kept deliberately so 0100 can be undone; the owner may drop it once satisfied. service_role only.';
+
+alter table public.engineering_jobs_snapshot_backup_2026_10 enable row level security;
+revoke all on table public.engineering_jobs_snapshot_backup_2026_10 from public, anon, authenticated;
+grant select, insert, update, delete on table public.engineering_jobs_snapshot_backup_2026_10 to service_role;
+
+insert into public.engineering_jobs_snapshot_backup_2026_10
+  (job_id, project_id, user_id, created_at, snapshot)
+select j.id, j.project_id, j.user_id, j.created_at, j.snapshot
+  from public.engineering_jobs j
+ where jsonb_typeof(j.snapshot -> 'studio') = 'object'
+   and j.snapshot -> 'studio' ? 'productPrivate'
+on conflict (job_id) do nothing;
+
+do $$
+begin
+  if has_table_privilege('anon', 'public.engineering_jobs_snapshot_backup_2026_10', 'select')
+     or has_table_privilege('authenticated', 'public.engineering_jobs_snapshot_backup_2026_10', 'select') then
+    raise exception '0100: anon/authenticated can still SELECT engineering_jobs_snapshot_backup_2026_10 (check grants to PUBLIC)';
   end if;
 end $$;
 

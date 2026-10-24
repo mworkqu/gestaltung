@@ -95,7 +95,9 @@ create table public.demand_signals (id uuid primary key default gen_random_uuid(
 create table public.part_orders (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid, customer_name text not null default 'c', customer_phone text not null, customer_email text,
-  payment_method text, created_at timestamptz not null default now()
+  payment_method text, created_at timestamptz not null default now(),
+  -- 0097: 0103's line cap exempts class orders, so the guard reads this column.
+  class_id uuid
 );
 create table public.part_order_items (
   id uuid primary key default gen_random_uuid(),
@@ -110,11 +112,11 @@ revoke all on function public.set_order_payment_method(uuid, text) from public;
 grant execute on function public.set_order_payment_method(uuid, text) to anon, authenticated;
 
 -- create_part_order's inserts, as the SECURITY DEFINER RPC makes them
-create function public.test_place_order(p_phone text, p_email text, p_qty integer, p_lines integer) returns uuid
+create function public.test_place_order(p_phone text, p_email text, p_qty integer, p_lines integer, p_class uuid default null) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare v_id uuid;
 begin
-  insert into public.part_orders (profile_id, customer_phone, customer_email) values (auth.uid(), p_phone, p_email) returning id into v_id;
+  insert into public.part_orders (profile_id, customer_phone, customer_email, class_id) values (auth.uid(), p_phone, p_email, p_class) returning id into v_id;
   for i in 1..p_lines loop insert into public.part_order_items (order_id, quantity) values (v_id, p_qty); end loop;
   return v_id;
 end $$;
@@ -318,11 +320,21 @@ describe("0103_guards_and_grants", () => {
       expect((await rows("select 1 from public.project_events where type = 'project_claimed'")).length).toBeGreaterThan(0);
     });
 
-    it("DB-10: quantity <= 1000, <= 100 lines, <= 10 orders per hour per phone/email", async () => {
+    it("DB-10: quantity <= 1000, <= 300 lines, <= 10 orders per hour per phone/email", async () => {
       await db.exec("delete from public.part_orders");
       expect(await as(null, () => fails("select public.test_place_order('+974 6666 0001', null, 1001, 1)"))).toMatch(/quantity_too_large/);
       expect(await as(null, () => fails("select public.test_place_order('+974 6666 0001', null, 1000, 1)"))).toBeNull();
-      expect(await as(null, () => fails("select public.test_place_order('+974 6666 0003', null, 1, 101)"))).toMatch(/too_many_lines/);
+      // Owner decision 2026-10-24 (DB-10c): the cap is 300 lines, not 100.
+      expect(await as(null, () => fails("select public.test_place_order('+974 6666 0003', null, 1, 101)"))).toBeNull();
+      expect(await as(null, () => fails("select public.test_place_order('+974 6666 0004', null, 1, 301)"))).toMatch(/too_many_lines/);
+      // ... and a class order is exempt from the line cap altogether: one teacher
+      // orders for every team in one go. The per-line quantity cap still applies.
+      expect(
+        await as(null, () => fails("select public.test_place_order('+974 6666 0005', null, 1, 301, gen_random_uuid())")),
+      ).toBeNull();
+      expect(
+        await as(null, () => fails("select public.test_place_order('+974 6666 0006', null, 1001, 1, gen_random_uuid())")),
+      ).toMatch(/quantity_too_large/);
       await db.exec("delete from public.part_orders");
       await tenOrders("+974 6666 0002");
       expect(await as(null, () => fails("select public.test_place_order('97466660002', null, 1, 1)"))).toMatch(/too_many_orders/);
