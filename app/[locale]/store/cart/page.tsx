@@ -21,6 +21,9 @@ import { arabicCountForm } from "@/lib/text/count";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClassOrderId, withClassOrder } from "@/lib/schools/client";
 
+/** Cart thumbnails loaded eagerly (the rows visible without scrolling). */
+const EAGER_THUMBS = 3;
+
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
 // Lines "available on request" can be checked out at their listed price; their
@@ -177,7 +180,7 @@ export default function CartPage() {
             );
           })}
 
-          {loose.map((item) => {
+          {loose.map((item, idx) => {
             const name = nameOf(item);
             return (
               <li key={item.rowId ?? item.sku} className="neu flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 p-3 sm:flex-nowrap sm:p-4">
@@ -192,7 +195,8 @@ export default function CartPage() {
                       width={64}
                       height={64}
                       alt={name}
-                      loading="lazy"
+                      // The first rows are on screen at once; lazy there showed grey squares.
+                      loading={idx < EAGER_THUMBS ? "eager" : "lazy"}
                       decoding="async"
                       className="h-full w-full object-contain"
                     />

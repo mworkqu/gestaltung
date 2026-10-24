@@ -500,7 +500,7 @@ const boughtTogether = async (sku: string, storeCategory: string | null): Promis
       together = inSkuOrder(((rows ?? []) as unknown as CardRow[]).map(toCard), ranked);
     }
     const fallback = together.length >= UPSELL_COUNT || !storeCategory ? [] : await getUpsellPool([storeCategory]);
-    return mergeBoughtTogether({ together, fallback, currentSku: sku });
+    return mergeBoughtTogether({ together, fallback, currentSku: sku, category: storeCategory });
 };
 
 // Approved customer reviews (P4-03, migration 0058). approved_reviews() and

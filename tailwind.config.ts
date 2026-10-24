@@ -113,8 +113,12 @@ const config: Config = {
         spring: "cubic-bezier(0.32, 0.72, 0, 1)",
       },
       keyframes: {
+        // Never fully transparent: a page opened in a background tab (or any
+        // context where the animation clock does not tick) sits on the first
+        // keyframe, and opacity 0 there left whole pages blank (QA F-038).
+        // Same idea as `rise` below, with a soft fade that stays readable.
         "fade-up": {
-          from: { opacity: "0", transform: "translateY(16px)" },
+          from: { opacity: "0.6", transform: "translateY(16px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         // Hero entry (close-out step 2): movement only, never opacity 0, so the

@@ -3,8 +3,9 @@
 // The Studio's save machinery, split out of StudioShell (R8). Owns the doc and
 // the refs async code reads (always the latest values):
 //
-//  * Local edits are saved with PUT + the version (debounced). A conflict
-//    means another tab saved first: we take its doc. The routes that write
+//  * Local edits are saved with PUT + the version (debounced). A conflict is
+//    retried once on the server's version; one that persists means another
+//    tab saved first: we take its doc. The routes that write
 //    themselves (pick / wiring / enclosure) return docVersion, which commit()
 //    adopts; pending edits are flushed BEFORE those calls so nothing is lost.
 //  * The first load runs here too (it fills the same refs); the shell decides
@@ -14,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { LoadResult, StudioApi } from "@/lib/studio/client/api";
-import { saveStatus, shouldWarnOnLeave, type SaveStatus } from "@/lib/studio/client/save-state";
+import { saveStatus, saveWithConflictRetry, shouldWarnOnLeave, type SaveStatus } from "@/lib/studio/client/save-state";
 
 const SAVE_DELAY_MS = 700;
 const RETRY_DELAY_MS = 8000;
@@ -73,11 +74,12 @@ export function useStudioSave({
       inFlight.current = true;
       failed.current = false;
       refreshStatus();
-      const r = await api.save(latest.current, version.current);
+      const r = await saveWithConflictRetry((d, v) => api.save(d, v), latest.current, version.current);
       inFlight.current = false;
       if (r.ok) version.current = r.version;
       else if (r.error === "conflict") {
-        // Someone saved first (another tab): theirs wins, ours is dropped.
+        // Still conflicting after the retry: another tab really did save first.
+        // Theirs wins, ours is dropped.
         version.current = r.version;
         if (r.doc) {
           latest.current = r.doc;
