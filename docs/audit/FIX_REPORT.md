@@ -3,9 +3,9 @@
 Branch: `fix/review-2026-10`, cut from `origin/main` 88a6473.
 Nothing is pushed, nothing is merged, nothing is deployed, no migration has been run.
 
-**Read §3.2, §3.3 and item 10 of §3 first — they are the three decisions this branch
-cannot make for you.** Then §4 (the migration order, which is load-bearing) and §5 (the
-Supabase settings only you can apply).
+**All three decisions are made and the code side of them is done** (§3.2, §3.3). What is
+left for you is settings, not code: §7a (shipping buffer, kit discount), §5 (the Supabase
+auth-email screens) and §4 — the migration order, which is load-bearing.
 
 ## 1. Summary
 
@@ -33,9 +33,12 @@ F-038 to F-043, F-045 to F-054.
 | F-037 | **One of three** | The 409 retry is fixed. The three.js-on-store and the `/projects/new` 404 could **not be reproduced** against this build; both are written up with the evidence rather than guessed at. |
 | F-044 | **Partial** | The estimate now shows in the dialog. The duplicated email could not be reproduced from the code, and the dialog reads the *default* quote rule because the saved one is server-side only. |
 
-**Three things need your decision before this merges** — §3.2 (the template
-enclosure gives no STL after the credit is spent), §3.3 (the delivery filter's
-labels), and the kit discount now applying to Studio parts (§3, item 10).
+**All three decisions are settled (2026-10-25)** and the first two are implemented:
+§3.2 the template enclosure now produces printable files; §3.3 the filter buckets are
+relabelled. The third — the kit discount — you chose to handle by lowering
+`kit_discount_pct` in settings rather than carving the Studio out in code, so there is
+nothing to change here. Two **settings** halves remain yours: the shipping handling/buffer
+days and that discount percentage, both in §7a.
 
 ## 2. Findings → status
 
@@ -162,6 +165,73 @@ still applies and is not repeated here. What **this** branch changes on top:
     in the page's language.
 15. **Project cards show a real part count and a "Quote requested" status** (F-043).
 
+### 3.2 The template enclosure now produces printable files — RESOLVED (2026-10-25)
+
+**This was the open decision. It is closed: both enclosure paths now export printable
+files, so the "paid a CAD credit and got nothing" case cannot happen.**
+
+The problem was that `three-bvh-csg`'s booleans were non-manifold at the source — the dome
+lid came back with 2,611 unbalanced edges out of 6,275 triangles — so once the STL export
+began refusing bodies it could not close, that path handed over nothing, after the credit
+had already been spent at the Enclosure step.
+
+You chose the long-term fix: rebuild it on the product kernel. What landed:
+
+- **The plan was kept; only the mesh engine changed.** Shapes, sizes, openings, label
+  placement and the settled layout are identical to before — the booleans are now
+  manifold-3d, the same kernel the product path uses, through a new shared
+  `lib/studio/geometry/kernel-core.ts`.
+- **This was the right call rather than routing templates through `solveProduct`.** The
+  kernel's `enclosure` form has no wedge angle, taper amount, dome rise, floor offset or
+  socket; `lantern` is round there and rounded-rect in the templates; and hex vents, grille
+  arcs, wall-plate keyholes and slanted louvres cannot be expressed as a `SolvedCutout`.
+  Forcing it would have changed the look of four templates and misplaced their cut-outs.
+  Sharing one *model* rather than one kernel is still possible later — the exact list of
+  missing parameters and cutter kinds is in §9.
+- **Measured, all nine templates**, plant-waterer fixture: every lid, base and spike
+  watertight, 0 bad edges, exactly one shell. `stake_pod` is 99.17 × 99.17 × 29.75 mm,
+  3 printable bodies, 132 g, **one plate** inside the MK4 bed. A sweep of **129 real vent
+  combinations** (5 patterns × 4 faces × 9 templates) is watertight throughout, and a ray
+  cast down each USB-C and cable-gland cut-out proves the opening really goes through.
+- **It is also 10–45× faster**: ~110 ms per case against 1–5 s for the CSG path.
+- **The old builder is gone** — `lib/studio/enclosure/build.ts`, 656 lines, deleted, with
+  every importer migrated. Net −1,056 / +284 lines. Two builders would have been a trap.
+- **The geometry cache version was bumped** (`w6-1` → `k1`), so an IndexedDB case saved by
+  the old builder can never be served again.
+
+Golden regression unchanged: the product path's kernel code is byte-identical, only moved.
+
+**What this means for the other two options I offered you:** they are moot. There is no
+longer a path that charges and cannot deliver, so there is nothing to refund and no warning
+copy to write.
+
+**Still worth doing before you merge:** a live click-through of Enclosure → Print on a
+phone. The enclosure worker reply is now async-after-WASM rather than synchronous, and
+while every caller already awaited it, that is the one change a browser would feel.
+
+### 3.3 The delivery filter's buckets — RESOLVED (2026-10-25)
+
+Making the filter honest (F-013) exposed that with the live settings — handling 1, transit
+2, buffer 3 — even an in-stock item arrives in about 8 days, so "3-5 days" matched nothing.
+
+You chose to relabel the buckets to the windows that are real:
+
+| label | range | what lands there today |
+|---|---|---|
+| Up to 2 weeks | <= 14 days | in-stock (~8), the 3-5-day class (~11) |
+| 2-4 weeks | 15-28 days | the 1-2-week class (~20) |
+| Over a month | > 28 days | the 2-4-week class (~34) — open-ended, so nothing falls outside every bucket |
+
+The `?stock=` values are unchanged, so every shared link still works; they are historical
+names now, and the code says so. `Delivery.lt_*` and `Sourcing.lt_*` were deliberately left
+alone — those name the supplier's lead class on the product page and in admin, where
+"3-5 days" still means exactly that. A test fails if any bucket is ever empty.
+
+**The other half is yours and is not code:** tightening handling and buffer so fulfilment is
+genuinely faster. The arithmetic is in §7a. Today's 1+2+3 puts an in-stock item at ~8 days;
+1+2+1 puts it at ~6. A buffer of 1 is the sensible floor — it is what absorbs a supplier
+being a day late without breaking a date already shown to a customer.
+
 ### 3.4 Things I could not reproduce, and did not "fix" blindly
 
 Three findings describe behaviour I could not make happen against this build. In each case
@@ -179,78 +249,6 @@ I have written down what I checked, rather than changing code to look responsive
 - **F-029, suggestions needing four characters.** The code already suggests from two, in
   both the route and the component. If the live site still needs four, the deployed build
   is older than this code.
-
-### 3.2 The template enclosure now offers no STL at all — and the credit is already spent
-
-This is the most important thing in this report. Please read it before you merge.
-
-Fixing F-003 meant refusing to hand over a file we know is broken. Running the new
-manifold check against the **legacy template enclosure** (the Dome / Puck / Box shapes
-with "Try another look") shows its meshes cannot be made printable at all: the dome lid
-comes back with **2,611 unbalanced edges out of 6,275 triangles**, the base 1,044 of 1,467.
-`three-bvh-csg`'s booleans are non-manifold at the source, and `manifold-3d` refuses the
-same mesh even after welding coincident vertices. That is now recorded as a test, not an
-aspiration.
-
-So on that path the Print step correctly withholds every file and sends the customer to the
-engineer quote. **But the CAD credit was already spent at the Enclosure step** — `cad_deliver`
-runs as soon as the 3D model is produced, and the Print step is free. The customer pays, sees
-a model on screen, and then cannot download anything.
-
-Before this change they paid and got a file with 297 loose shells that no slicer would
-print. So nothing has been taken away that was ever worth having — but a visible refusal
-after payment is a different kind of bad from a broken download, and it is your call.
-
-**Your options:**
-
-1. **Rebuild the template path on the product kernel.** The product kernel already builds
-   all eight templates (plus `stake_pod`) as the `enclosure` form kind, so the route is
-   "send the template path through the product kernel", not "repair the soup". It is a
-   stage of its own and was too large to land safely inside this review. *My recommendation
-   — it is the only option that ends with a printable file.*
-2. **Don't charge when nothing printable comes out**, or refund the credit. The honest
-   reading is that the credit buys the 3D model and the quote route, both of which are
-   still delivered — but if you tell customers a credit buys a downloadable model, option 2
-   is the minimum until option 1 lands.
-3. **Ship as it is** and let the engineer quote carry it. Defensible, since the old files
-   were worthless, but a customer who paid will notice.
-
-Which path real customers hit matters here, and I could not confirm it from the repo: the
-tester's downloads were named `lid_1`, `base_1`, `battery_clip_1`, `light_pipe_1`, which are
-the **template/mech** names — so the live site appears to serve the template path. The
-product path (which does export clean files: 7 bodies, all watertight, single-shell, 204 g,
-two plates inside the bed) is the default in this code. **Please confirm on the live site
-which one a customer actually gets** before deciding.
-
-### 3.3 The delivery filter now returns fewer things, and "3–5 days" may be empty
-
-The finding was that "3–5 days" listed products whose card said "Arrives by 2 November",
-eleven days out. That happened because the filter matched the supplier's lead class while
-the card showed the full computed date — lead time **plus** handling, transit and buffer.
-
-Filtering on the real date fixes the lie, but it exposes an uncomfortable fact: with the
-live shipping settings (handling 1 day, buffer 3 days, standard transit 2 days) even an
-**in-stock** product arrives in about 8 days. So:
-
-- "3–5 days" matches **nothing** — no product in the catalogue can arrive that fast.
-- In-stock products now appear under "1–2 weeks", which is where they actually land.
-- I made the slowest option open-ended, so a `2_4_weeks` product (about 34 days once
-  handling and buffer are added, past its own 28-day bound) is still reachable from a
-  filter instead of only from "All". A unit test pins that no product can fall outside
-  every option, however slow the settings get.
-
-I did not rename the options, because that is customer-facing copy and your decision.
-**You have three choices:**
-
-1. **Relabel the options** to the windows that are real — e.g. "About a week", "1–2 weeks",
-   "2–4 weeks or more". Honest, and the filter becomes useful again. *My recommendation.*
-2. **Lower handling and buffer** in Dashboard → Store → Suppliers until an in-stock item
-   really does arrive in 3–5 days. Only do this if the dates are genuinely achievable —
-   the whole point of the buffer is that you keep the promise.
-3. **Ship it as it is.** Honest, but one filter option is permanently empty, which looks
-   broken to a customer.
-
-Until you choose, option 1's wording is not written anywhere — nothing is renamed.
 
 ## 4. Migrations to run, in order
 
@@ -440,6 +438,7 @@ is done:
 | `node scripts/split-legal-draft.mjs --check` | OK — the generated legal files match the draft |
 | `npm run check:cycles` | no circular dependency (one was introduced by the F-013 work and fixed; `check:cycles` is part of the green bar for a reason) |
 | `npm run build` | passes |
+| Studio bundle (`scripts/studio-bundle-size.mjs`) | First load 197.6 kB gz unchanged. The enclosure rebuild took `three-bvh-csg`/`three-mesh-bvh` out of the graph: **worker 276.3 → 245.2 kB gz** (93.7 of it not shared, was 123.9) and the **no-Worker fallback 82.7 → 53.8 kB gz**. Studio-before-CAD is 484.3 against its 350 budget — still over, as it was before this branch. |
 | `npm run test:e2e` (`E2E_PORT=3100`) | 250 passed / 59 failed / 2 flaky / 65 skipped, against the audit baseline's 221 / 62 / — / 53 under the same no-Supabase condition. See §8c. |
 | Route table vs `origin/main` | **No static/ISR flag changed anywhere.** One new route, `/[locale]/confirm-email`. Shared First Load JS identical at 104 kB. |
 | First Load JS | `/[locale]` 149 kB, `/[locale]/store` 148 kB, `/[locale]/store/[sku]` 211 kB — all within 2 kB of baseline. `/[locale]/reset-password` **198 → 133 kB** (−65 kB: the page no longer pulls the Supabase browser client, because it does not authenticate on GET). `/[locale]/forgot-password` 201 → 228 kB. Note the baseline is `origin/main` *before* the audit's own 129 commits, so these deltas are the audit plus this branch, not this branch alone. |
@@ -506,6 +505,21 @@ structurally. It is also why the e2e suite's numbers look the way they do: it ru
 Supabase env, exactly as the audit's baseline did.
 
 ## 9. Follow-ups
+
+0. **`three-bvh-csg` is now used by test code only.** After the enclosure rebuild, nothing
+   in `app/`, `lib/` or `components/` imports it — only three tests, for
+   `computeMeshVolume`. Swap those for the repo's own `signedVolume` in
+   `lib/studio/mech/templates.ts` (mind the sign: it is signed, not absolute) and drop the
+   dependency. Leave `three-mesh-bvh` alone — nothing imports it directly, but it is reached
+   through `@react-three/drei` at runtime. Housekeeping, no user impact, so it was not done
+   inside this review.
+1. **If you ever want the two enclosure paths to share one MODEL** rather than just one
+   kernel, this is the exact work: add `wedgeDeg`/`frontH`, a taper amount, `dome.z0`/`rise`,
+   a floor offset and a socket to the kernel's `enclosure` form; make `lantern`
+   rounded-rect rather than round; and add four cutter kinds to `SolvedCutout` (hex vents,
+   grille arc slots, wall-plate keyholes, slanted chamfered louvres). Doing it without those
+   would change the look of `lantern`, `dome_base`, `soft_wedge` and `handheld_taper` and
+   misplace their cut-outs, which is why it was not attempted.
 
 1. **After 2026-10-31 (7 days after this deploys), remove the legacy link path.**
    `/api/auth/callback` still accepts `token_hash` + `type` so that reset emails already
