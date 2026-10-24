@@ -16,6 +16,7 @@
 // Dependencies are injected (http, build, render) so the loop logic is unit-tested
 // in node without WebGL or network; the e2e fixture swaps http for a mock.
 
+import { reasonOfDesignReply } from "@/lib/studio/product/failure";
 import { solveProduct, type SolvedProduct } from "../product/solve";
 import { clampProductModel, type Archetype, type ProductModel } from "../product/schema";
 import { binarySTL, printReadyPositions } from "../product/stl";
@@ -170,7 +171,9 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
   if (r.status === 402 || r.data.error === "no_tokens") return { designs: [], error: "no_tokens", ms: ms() };
   const regens = typeof r.data.regens === "number" ? r.data.regens : undefined;
   const raw = Array.isArray(r.data.designs) ? (r.data.designs as unknown[]).filter(isObj) : [];
-  if (r.status < 200 || r.status >= 300 || raw.length === 0) return { designs: [], error: "failed", ms: ms() };
+  if (r.status < 200 || r.status >= 300 || raw.length === 0) {
+    return { designs: [], error: "failed", reason: reasonOfDesignReply(r.status, raw.length), ms: ms() };
+  }
 
   const designs: ProductPreviewDesign[] = [];
   const list = raw.slice(0, 3);
@@ -190,7 +193,7 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
       designs.push({ id, archetype, why, previewPath: null, status: "failed" });
     }
   }
-  return { designs, ...(designs.some((d) => d.status === "ready") ? {} : { error: "failed" as const }), ms: ms(), ...(regens !== undefined ? { regens } : {}) };
+  return { designs, ...(designs.some((d) => d.status === "ready") ? {} : { error: "failed" as const, reason: "pictures" as const }), ms: ms(), ...(regens !== undefined ? { regens } : {}) };
 }
 
 /** After "Create my CAD": the unlocked model from the server, solved and built (geometry stays for the caller to pack). */

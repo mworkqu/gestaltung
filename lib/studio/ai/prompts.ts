@@ -221,12 +221,15 @@ export function specPrompt(opts: {
   idea: string;
   messages: ChatMessage[];
   locale: "en" | "ar";
+  /** F-047: the language of the visitor's newest message; the reply (not the card) mirrors it. Default = locale. */
+  replyLocale?: "en" | "ar";
   forceSpec: boolean;
   /** Makers / Engineers builds: a deeper electronics check on every turn (lib/studio/tiers.ts). */
   deep?: boolean;
   /** The card as it stands: the last user message is a change request on top of it (W3 refinement). */
   current?: ProductSpec | null;
 }): string {
+  const replyLang = (opts.replyLocale ?? opts.locale) === "ar" ? "Arabic" : "English";
   const history = opts.messages.length
     ? opts.messages
         .map((m) => `${m.role === "user" ? "User" : "You"}: ${m.text}${m.choices?.length ? ` [choices: ${m.choices.join(" | ")}]` : ""}`)
@@ -257,14 +260,16 @@ export function specPrompt(opts: {
         "A message that names a reference product to copy ('big robotic arm like a UR10') IS a change: rebuild for the desktop " +
         "version with that product's joint/motor count and a scaleNote when the real thing is far bigger.",
       ...(opts.deep ? [DEEP_CHECK] : []),
-      `Language for the reply, names, understanding and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+      `Language for names, understanding and features: ${opts.locale === "ar" ? "Arabic" : "English"}. ` +
+        `Language for reply ONLY: ${replyLang}, the language the user's newest message is written in.`,
     ].join("\n\n");
   }
   return [
     `Idea:\n${opts.idea || "(see the conversation)"}`,
     `Conversation so far:\n${history}`,
     ...(opts.deep ? [DEEP_CHECK] : []),
-    `Language for any question, reply and the spec text: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+    `Language for the spec text: ${opts.locale === "ar" ? "Arabic" : "English"}. ` +
+      `Language for any question and reply ONLY: ${replyLang}, the language the user wrote in.`,
     opts.forceSpec ? "Return the spec now." : "Ask the next question, or return the spec if you know enough.",
   ].join("\n\n");
 }

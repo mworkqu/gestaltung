@@ -19,6 +19,7 @@ import type { TokenInfo } from "@/lib/studio/server/tokens";
 import type { IdeaMessage } from "./steps";
 import type { Locale } from "@/lib/locale";
 import { safeFileName } from "@/lib/storage/paths";
+import { missingProjectError } from "./load-miss";
 
 export type { TokenInfo };
 
@@ -30,7 +31,7 @@ export type StudioProject = { name: string; consented: boolean; brief: string | 
 
 export type LoadResult =
   | { ok: true; project: StudioProject; doc: StudioDoc | null; version: number; persist: boolean }
-  | { ok: false; error: "sign_in" | "not_found" | "failed" };
+  | { ok: false; error: "sign_in" | "guest_gone" | "not_found" | "failed" };
 
 export type SaveResult =
   | { ok: true; version: number }
@@ -216,7 +217,7 @@ export function liveStudioApi(projectId: string): StudioApi {
       if (error) return { ok: false, error: "failed" };
       if (!project) {
         const { data: auth } = await (await db()).auth.getUser();
-        return { ok: false, error: auth.user ? "not_found" : "sign_in" };
+        return { ok: false, error: missingProjectError(auth.user) };
       }
       const row = project as { name: string | null; brief: string | null; spec: Spec | null };
       const info: StudioProject = {

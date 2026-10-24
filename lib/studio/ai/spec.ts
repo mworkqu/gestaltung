@@ -27,6 +27,7 @@ import { ACTUATOR_KINDS, BUILD_CLASSES, clampSpec, type BuildClass, type ClampLo
 import { chatGuardTurn, guardSpec, vagueTurn } from "./spec-guards";
 import { actuatorCountLabel, actuatorTotals, capStrongServos, setActuatorCount } from "../actuators";
 import { outcomeCached, specKey, type AiCache } from "./cache";
+import { newestUserText, replyLanguage, type ReplyLocale } from "./reply-language";
 import {
   CHANGED_ITEMS, CHANGED_MAX, CHOICE_MAX, MAX_QUESTIONS, QUESTION_MAX, REFINE_RESPONSE_SCHEMA, REPLY_MAX, SPEC_RESPONSE_SCHEMA, SPEC_SYSTEM,
   specPrompt,
@@ -199,32 +200,35 @@ export async function runSpecChat(opts: {
   const ctx = { idea: opts.idea, messages: opts.messages, locale: opts.locale };
   const current = opts.current ?? null;
 
-  const rules = ruleTurn(opts.idea, opts.messages, opts.locale, current);
+  // F-047: canned answers, the identity line and the fallback reply follow the visitor's language.
+  const replyLocale = replyLanguage(newestUserText(opts.idea, opts.messages), opts.locale);
+  const rules = ruleTurn(opts.idea, opts.messages, replyLocale, current);
   if (rules) return { ok: true, value: rules, source: "rules", clampLog: [], problems: [] };
 
   // The deep check changes the answer, so it is part of the cache key.
   const key = specKey({ idea: opts.idea, messages: opts.messages, locale: opts.locale, current }) + (opts.deep ? ":deep" : "");
-  return outcomeCached(opts.cache, key, () => modelTurn(opts, ctx, current));
+  return outcomeCached(opts.cache, key, () => modelTurn(opts, ctx, current, replyLocale));
 }
 
 async function modelTurn(
   opts: { call: StudioCall; idea: string; messages: ChatMessage[]; locale: "en" | "ar"; model?: string; deep?: boolean },
   ctx: { idea: string; messages: ChatMessage[]; locale: "en" | "ar" },
   current: ProductSpec | null,
+  replyLocale: ReplyLocale = opts.locale,
 ): Promise<Outcome<SpecTurn>> {
   const log: ClampLog = [];
   const mode: TurnMode = current ? "refine" : questionsAsked(opts.messages) >= MAX_QUESTIONS ? "force" : "ask";
   const r = await opts.call<SpecTurn>({
     step: "spec",
     system: SPEC_SYSTEM,
-    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, forceSpec: mode === "force", current, deep: opts.deep }),
+    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, replyLocale, forceSpec: mode === "force", current, deep: opts.deep }),
     ...(opts.model ? { model: opts.model } : {}),
     // 2026-10-18: once the card exists the whole understanding + spec come back on every turn.
     schema: mode === "refine" ? REFINE_RESPONSE_SCHEMA : SPEC_RESPONSE_SCHEMA,
     validate: (raw) => {
       // Only the accepted attempt's changes are kept.
       const attempt: ClampLog = [];
-      const res = validateTurn(raw, { mode, log: attempt, locale: opts.locale });
+      const res = validateTurn(raw, { mode, log: attempt, locale: replyLocale });
       if (res.value) log.splice(0, log.length, ...attempt);
       return res;
     },
@@ -243,7 +247,7 @@ async function modelTurn(
   if (current) {
     // The card with the visitor's own words applied ("add a buzzer"), never a blank one.
     const spec = guard(current, fallback);
-    const words = FALLBACK_REPLY[opts.locale];
+    const words = FALLBACK_REPLY[replyLocale];
     const value: SpecTurn = sameCard(spec, current)
       ? { kind: "reply", reply: words.same, changed: [] }
       : { kind: "reply", reply: words.updated, spec, changed: [] };

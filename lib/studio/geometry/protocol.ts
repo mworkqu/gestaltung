@@ -141,6 +141,8 @@ export type ProductPreviewError = "guest_limit" | "sign_in" | "no_tokens" | "no_
 export type ProductPreviewResult = {
   designs: ProductPreviewDesign[];
   error?: ProductPreviewError;
+  /** Why it failed, when the job can tell (F-009); only set together with error "failed". */
+  reason?: "network" | "setup" | "service" | "pictures";
   ms: number;
   /** Regenerations made on the project so far (set by the server on a regeneration; the first is free). */
   regens?: number;

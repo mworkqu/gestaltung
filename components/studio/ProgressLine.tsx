@@ -62,6 +62,7 @@ export function ProgressLine({
                 type="button"
                 onClick={() => onGo(i)}
                 disabled={!reachable || isCurrent}
+                aria-label={`${t("stepLabel", { n: i + 1, total: FLOW.length, name: t(`step_${step}`) })}${isDone ? ` ${t("stepDoneSr")}` : ""}`}
                 aria-current={isCurrent ? "step" : undefined}
                 aria-describedby={isFaded ? hintId : undefined}
                 data-faded={isFaded ? "true" : undefined}

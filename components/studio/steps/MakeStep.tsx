@@ -51,6 +51,8 @@ function BigOption({
       type="button"
       onClick={onClick}
       disabled={busy}
+      aria-label={title}
+      aria-busy={busy || undefined}
       className={
         primary
           ? "group flex w-full items-start gap-4 rounded-[24px] bg-cobalt p-5 text-start text-white shadow-[0_12px_28px_-12px_rgba(14,89,197,0.8)] transition-[transform,background-color] hover:bg-cobalt-hover active:scale-[0.99] disabled:opacity-70 sm:p-6"

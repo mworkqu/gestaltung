@@ -25,6 +25,7 @@ import { useStudioLibrary } from "./StudioLibraryProvider";
 import type { Locale, PrintFile, Profile, StudioApi } from "@/lib/studio/client/api";
 import type { StudioDoc } from "@/lib/studio/schema";
 import { groupComponents, withQuantity } from "@/lib/studio/parts-group";
+import { quoteBreakdown } from "@/lib/studio/request-summary";
 import { cn } from "@/lib/utils";
 
 /** Query flag on the sign-in return path: open the pop-up again on arrival. */
@@ -41,6 +42,7 @@ export function GetItMade({
   locale,
   autoOpen = false,
   productFiles,
+  prices,
   beforeLeave,
   onSent,
 }: {
@@ -51,6 +53,8 @@ export function GetItMade({
   autoOpen?: boolean;
   /** P5-16: the unlocked product's STLs (every printed body), uploaded with the request. */
   productFiles?: () => Promise<PrintFile[]>;
+  /** Store SKU -> listed QAR price, for the rough range shown before sending (F-044). */
+  prices: ReadonlyMap<string, number>;
   /** Save pending edits before the visitor leaves for the sign-in page. */
   beforeLeave: () => void;
   /** The lead went out: the shell records it on the doc and opens the quote page. */
@@ -198,6 +202,8 @@ export function GetItMade({
   }
 
   const busy = phase === "sending";
+  // The same single calculation the Request page uses; the owner's saved rule applies there, so say "rough".
+  const estimate = open ? quoteBreakdown({ doc, getPart, prices }).estimate : null;
 
   return (
     <>
@@ -374,6 +380,15 @@ export function GetItMade({
                       className={cn(field, "text-start")}
                     />
                   </Field>
+                )}
+                {estimate && (
+                  <div className="tile space-y-1 p-4" data-testid="studio-get-it-made-estimate">
+                    <p className="text-xs font-semibold text-mutedtext">{t("estimateLabel")}</p>
+                    <p className="text-base font-extrabold" dir="auto">
+                      {t("estimateRange", { low: String(estimate.low), high: String(estimate.high) })}
+                    </p>
+                    <p className="text-xs leading-relaxed text-mutedtext">{t("estimateNote")}</p>
+                  </div>
                 )}
                 <Field id="gim-note" label={t("noteLabel")}>
                   <textarea

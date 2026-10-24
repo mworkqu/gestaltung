@@ -14,6 +14,8 @@ import { useTranslations } from "next-intl";
 import { Check, Code2, Copy, RefreshCw } from "lucide-react";
 
 import { useStudioLibrary } from "../StudioLibraryProvider";
+import { AiWait } from "../AiWait";
+import { boardDisplayName } from "@/lib/studio/board-name";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { StudioFirmware } from "@/lib/studio/client/api";
@@ -112,7 +114,7 @@ export function CodeStep({
     );
   }
 
-  const board = firmware?.board || mcu?.name[ctx.locale] || "";
+  const board = boardDisplayName(firmware?.board, mcu?.name[ctx.locale]);
   const steps = extra?.steps?.filter(Boolean).slice(0, 6) ?? [];
 
   return (
@@ -180,6 +182,7 @@ export function CodeStep({
           <p className="text-sm font-medium" style={{ color: accent.ink }}>
             {t("codeWriting")}
           </p>
+          <AiWait kind="code" active={state === "writing"} className="text-sm" />
           <div className="space-y-2" aria-hidden>
             <Bar className="h-3.5 w-24" />
             {[0, 1, 2].map((i) => (

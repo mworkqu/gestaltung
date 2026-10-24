@@ -35,7 +35,9 @@ import { SaveIndicator } from "./SaveIndicator";
 import { Bar, MainButton } from "./ui";
 import { GET_IT_MADE_PARAM, GetItMade } from "./GetItMade";
 import { REQUEST_SENT_KEY } from "@/lib/studio/request-summary";
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { isGuestTokenGone } from "@/lib/studio/client/load-miss";
+import { pricesBySku } from "@/lib/studio/request-prices";
 import { cn } from "@/lib/utils";
 import { IdeaStep } from "./steps/IdeaStep";
 import { PartsStep } from "./steps/PartsStep";
@@ -55,7 +57,7 @@ export type { StudioCtx } from "./studio-ctx";
 
 type Loaded =
   | { state: "loading" }
-  | { state: "error"; error: "sign_in" | "not_found" | "failed" }
+  | { state: "error"; error: "sign_in" | "guest_gone" | "not_found" | "failed" }
   | { state: "ready"; project: StudioProject };
 
 type ShellProps = {
@@ -202,6 +204,8 @@ function StudioShellInner({
     [unlockedHash, latest],
   );
 
+  const quotePrices = useMemo(() => pricesBySku(products), [products]);
+
   // ── W2 "Get it made" ─────────────────────────────────────────────────────
   const router = useRouter();
   // Back from sign-in / sign-up with ?getItMade=1: reopen the pop-up once and drop the flag.
@@ -246,15 +250,20 @@ function StudioShellInner({
     );
   }
   if (loaded.state === "error") {
+    // F-025: with the guest token gone a retry can never work, so offer sign-in or a fresh start instead.
+    const guestGone = isGuestTokenGone(loaded.error);
     return (
       <div className="neu space-y-4 p-6 text-center sm:p-10" role="alert">
-        <p className="text-base font-semibold text-heading">
-          {loaded.error === "sign_in" ? t("signInNeeded") : t("loadFailed")}
-        </p>
-        {loaded.error === "sign_in" ? (
-          <AuthReturnLink className="inline-flex min-h-11 items-center font-semibold text-cobalt hover:text-cobalt-hover">
-            {t("signIn")}
-          </AuthReturnLink>
+        <p className="text-base font-semibold text-heading">{guestGone ? t("guestGone") : t("loadFailed")}</p>
+        {guestGone ? (
+          <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-6">
+            <AuthReturnLink className="inline-flex min-h-11 items-center font-semibold text-cobalt hover:text-cobalt-hover">
+              {t("signIn")}
+            </AuthReturnLink>
+            <Link href="/projects/new" className="inline-flex min-h-11 items-center font-semibold text-cobalt hover:text-cobalt-hover">
+              {t("startAgain")}
+            </Link>
+          </div>
         ) : (
           <MainButton onClick={() => window.location.reload()}>{t("tryAgain")}</MainButton>
         )}
@@ -388,6 +397,7 @@ function StudioShellInner({
           locale={locale}
           autoOpen={reopenGetItMade}
           productFiles={productFiles}
+          prices={quotePrices}
           beforeLeave={() => void flush()}
           onSent={onRequestSent}
         />

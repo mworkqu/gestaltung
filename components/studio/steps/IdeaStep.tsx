@@ -46,6 +46,7 @@ import type { TokenInfo } from "@/lib/studio/client/api";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../studio-ctx";
+import { AiWait } from "../AiWait";
 import { UnderstandingPanel } from "./UnderstandingPanel";
 import { Bar, MainButton, Problem, StepFrame } from "../ui";
 import { problemKey } from "./problem";
@@ -190,6 +191,8 @@ export function IdeaStep({
     if (started.current || !handoffIdea || doc) return;
     started.current = true;
     setIdea(handoffIdea);
+    // The brief that pre-filled the box is the message being sent: leave the input empty.
+    setInput("");
     void ask(handoffIdea, [], null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
   }, [handoffIdea]);
@@ -301,7 +304,7 @@ export function IdeaStep({
             )}
             {busy && (
               <div className="flex justify-start" data-testid="studio-typing">
-                <span className="inline-flex items-center gap-1 rounded-2xl rounded-es-md bg-surface px-3.5 py-3 shadow-neu-sm">
+                <span className="inline-flex items-center gap-2 rounded-2xl rounded-es-md bg-surface px-3.5 py-3 shadow-neu-sm">
                   <span className="sr-only">{t("thinking")}</span>
                   {[0, 1, 2].map((d) => (
                     <span
@@ -311,6 +314,7 @@ export function IdeaStep({
                       style={{ background: accent.base, animationDelay: `${d * 140}ms` }}
                     />
                   ))}
+                  <AiWait kind="idea" active={busy} className="ms-1 text-sm" />
                 </span>
               </div>
             )}
