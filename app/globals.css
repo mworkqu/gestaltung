@@ -77,6 +77,21 @@
       system-ui, sans-serif;
   }
 
+  /* F-035: Tailwind's font-sans stack is Latin-first, and next/font's
+     "Outfit Fallback" (a size-adjusted Arial) sits ahead of IBM Plex Sans
+     Arabic in it. Arial has Arabic glyphs, so any element that sets font-sans
+     itself (rtl:font-sans, header) drew Arabic in the
+     system face. Under RTL, or on Arabic-language text, put the Arabic family
+     first. Plex Arabic is the arabic subset only, so Latin letters and digits
+     still fall through to Outfit; font-mono stays Latin. No new font, weight
+     or request. */
+  html[dir="rtl"] .font-sans,
+  html .font-sans:lang(ar),
+  [lang="ar"]:not(html, .font-mono) {
+    font-family: var(--font-sans-ar), var(--font-sans), ui-sans-serif,
+      system-ui, sans-serif;
+  }
+
   /* Phones (P2-04): form controls are 16 px so iOS Safari does not zoom the
      page on focus, and at least 44 px tall. A checkbox or radio is tiny by
      nature, so the label that wraps it is the 44 px target. */
@@ -155,7 +170,10 @@
     @apply font-mono text-[10px] uppercase tracking-[0.18em];
   }
   html[dir="rtl"] .kicker {
-    @apply font-sans normal-case tracking-normal;
+    @apply normal-case tracking-normal;
+    /* Arabic family first (F-035); font-sans would put Latin Outfit first. */
+    font-family: var(--font-sans-ar), var(--font-sans), ui-sans-serif,
+      system-ui, sans-serif;
   }
 }
 

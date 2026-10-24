@@ -7,6 +7,11 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // F-053: the two stylesheets (~19 kB gzip) were render-blocking <link>s, two
+  // extra round trips before first paint. Inline them in the HTML instead. On a
+  // throttled link (400 kbps, 400 ms RTT) /en FCP went 2.7 s -> 0.9 s. Pages
+  // stay static/ISR. Cost: the CSS is no longer cached across hard loads.
+  experimental: { inlineCss: true },
   // Pin the file-tracing root to this folder. Next otherwise infers the root
   // from the nearest lockfile and walks upward, so a stray package-lock.json in
   // a parent directory (or several lockfiles) makes it trace from the wrong
