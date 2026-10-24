@@ -1,4 +1,4 @@
-import { studioCadTier } from "@/lib/credits/cad-cost";
+import { CAD_CHARGE_TIER } from "@/lib/credits/cad-cost";
 import { canUse, serverWritesReady, setCadCode } from "@/lib/credits/server";
 import { finalModel } from "@/lib/studio/product/private";
 import { applyUnlock, findDesign } from "@/lib/studio/product/store";
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   const { data: id, error: beginError } = await supabase.rpc("cad_begin", {
     p_project: project.id,
     p_request: `${REQUEST_PREFIX} ${cur.doc?.spec.name ?? "product"} (${found.pub.archetype})`.slice(0, 200),
-    p_tier: studioCadTier(cur.doc?.components.length ?? 0),
+    p_tier: CAD_CHARGE_TIER,
     p_parent: parentId,
   });
   if (beginError) {

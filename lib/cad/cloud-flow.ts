@@ -26,6 +26,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { recordUsage } from "@/lib/ai/usage";
+import { CAD_CHARGE_TIER } from "@/lib/credits/cad-cost";
 import { setCadCode } from "@/lib/credits/server";
 import { CAD_BUCKET } from "@/lib/design/constants";
 import { validatedCall } from "@/lib/prototyping/ai-call";
@@ -148,7 +149,8 @@ async function begin(ctx: Ctx, parentId: string | null): Promise<{ id: string } 
   const { data, error } = await ctx.supabase.rpc("cad_begin", {
     p_project: ctx.projectId,
     p_request: ctx.asked,
-    p_tier: ctx.tier,
+    // The charge is the published price; ctx.tier only describes the model (F-002).
+    p_tier: CAD_CHARGE_TIER,
     p_parent: parentId,
   });
   if (error) {

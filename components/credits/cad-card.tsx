@@ -15,7 +15,7 @@
 // shows them (CadCloudResult). Saved CadQuery versions re-open from those
 // files. `engineer` (super_admin's Engineer view) adds code, log and checks.
 
-import { cadCost } from "@/lib/credits/cad-cost";
+import { cadSessionCharge } from "@/lib/credits/cad-cost";
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useLocale, useTranslations } from "next-intl";
@@ -532,7 +532,7 @@ export function CadCard({
                 ? t("cadDialogIncluded", { tier: t(`tier_${dialog.tier}`), n: access.regens ?? 0 })
                 : access?.cost === "none"
                   ? t("cadDialogAdmin", { tier: t(`tier_${dialog.tier}`) })
-                  : t("cadDialogBody", { tier: t(`tier_${dialog.tier}`), n: cadCost(dialog.tier), qar: CREDIT_QAR, days: REDEEM_DAYS })}
+                  : t("cadDialogBody", { tier: t(`tier_${dialog.tier}`), n: cadSessionCharge(access?.cost).credits, qar: CREDIT_QAR, days: REDEEM_DAYS })}
             </p>
             <Link
               href="/pricing#credits"

@@ -1,4 +1,4 @@
-import { studioCadTier } from "@/lib/credits/cad-cost";
+import { CAD_CHARGE_TIER } from "@/lib/credits/cad-cost";
 import { canUse, serverWritesReady, setCadCode } from "@/lib/credits/server";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { applyShapePick, defaultEnclosureFor, rankShapes } from "@/lib/studio/enclosure/shape-pick";
@@ -68,8 +68,9 @@ export async function POST(request: Request) {
   const { data: id, error: beginError } = await supabase.rpc("cad_begin", {
     p_project: project.id,
     p_request: `${REQUEST_PREFIX} ${body.spec.name}`.slice(0, 200),
-    // 0090: CAD credits scale with how many parts the case holds (lib/credits/cad-cost.ts).
-    p_tier: studioCadTier(body.components.length),
+    // The published price is the contract: always the tier that costs
+    // PUBLISHED_CAD_CREDITS, never a complexity tier (lib/credits/cad-cost.ts).
+    p_tier: CAD_CHARGE_TIER,
     p_parent: parentId,
   });
   if (beginError) {

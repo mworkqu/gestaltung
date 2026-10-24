@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { canUse, serverWritesReady, setCadCode } from "@/lib/credits/server";
+import { CAD_CHARGE_TIER } from "@/lib/credits/cad-cost";
 import { classifyCadRequest } from "@/lib/credits/classify";
 import { CAD_SCHEMA, CAD_SYSTEM, cadPrompt } from "@/lib/cad/prompt";
 import { cleanScad, validateScad } from "@/lib/cad/validate";
@@ -132,7 +133,8 @@ export async function POST(request: Request) {
   const { data: id, error: beginError } = await supabase.rpc("cad_begin", {
     p_project: projectId,
     p_request: asked,
-    p_tier: tier,
+    // The charge is the published price, not the classified complexity (F-002).
+    p_tier: CAD_CHARGE_TIER,
     p_parent: parentId ?? null,
   });
   if (beginError) {
