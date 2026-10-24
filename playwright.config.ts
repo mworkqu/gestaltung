@@ -34,7 +34,13 @@ export default defineConfig({
   webServer: {
     command: `npm run start -- -p ${PORT}`,
     url: `${ORIGIN}/en`,
-    reuseExistingServer: true,
+    // NEVER reuse by default. A server started earlier keeps serving the build
+    // it booted with, so a rebuild does not reach it: the suite then tests OLD
+    // app code with CURRENT test code and reports confident nonsense. That cost
+    // a whole debugging session twice - once against another checkout on :3000,
+    // once against a server of ours left running on :3100. Opt in with
+    // E2E_REUSE=1 only when you know the server matches the build.
+    reuseExistingServer: process.env.E2E_REUSE === "1",
     // Turns on the test-only routes under /{locale}/e2e-fixtures (lib/e2e-fixtures.ts;
     // never reachable on Vercel). A server you started yourself needs E2E_FIXTURES=1 too.
     env: { E2E_FIXTURES: "1", PORT },
