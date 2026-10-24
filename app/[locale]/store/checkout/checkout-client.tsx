@@ -37,6 +37,7 @@ import {
   readOrderFields,
   type PlaceOrderError,
 } from "@/lib/store/place-order";
+import { checkoutPrefill, NO_PREFILL, type CheckoutPrefill } from "@/lib/store/checkout-prefill";
 import { useClassOrderId } from "@/lib/schools/client";
 import { CustomerFields, FieldLabel, fieldClass, monoClass } from "./customer-fields";
 import { OrderSummary } from "./order-summary";
@@ -91,6 +92,26 @@ export default function CheckoutClient() {
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // F-016: a signed-in customer's name, phone and email, read through the same
+  // studio profile reader "Get it made" uses (loaded on demand so the studio
+  // code stays out of the checkout bundle). The page is already force-dynamic,
+  // but a client read keeps it independent of that. Guests get empty fields.
+  const [prefill, setPrefill] = useState<CheckoutPrefill>(NO_PREFILL);
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const { liveStudioApi } = await import("@/lib/studio/client/api");
+        const p = await liveStudioApi("").profile();
+        if (alive) setPrefill(checkoutPrefill(p));
+      } catch {
+        // No profile: the form simply stays empty.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
   const bankTransfer = payMethod === "bank_transfer";
 
   // Fallback for the server redirect in page.tsx: if the cart turns out empty
@@ -183,6 +204,7 @@ export default function CheckoutClient() {
             bankTransfer={bankTransfer}
             emailError={emailError}
             onEmailInput={() => setEmailError(null)}
+            prefill={prefill}
           />
 
           <fieldset className="space-y-2">

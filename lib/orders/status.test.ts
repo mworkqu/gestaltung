@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import ar from "../../messages/ar.json";
+import en from "../../messages/en.json";
+
 import {
   ORDER_STATUSES,
   buildTimeline,
+  customerStatusKey,
   canTransition,
   needsPayment,
   nextStatuses,
@@ -127,4 +131,25 @@ describe("needsPayment", () => {
 
 it("orderShort = first 8 characters", () => {
   expect(orderShort("945ea389-1111-2222-3333-444444444444")).toBe("945ea389");
+});
+
+describe("customer wording for the first status (F-017)", () => {
+  it("shows confirmed (and legacy pending) as received, other statuses unchanged", () => {
+    expect(customerStatusKey("confirmed")).toBe("received");
+    expect(customerStatusKey("pending")).toBe("received");
+    expect(customerStatusKey("paid")).toBe("paid");
+    expect(customerStatusKey("processing")).toBe("sourcing");
+    expect(customerStatusKey("weird")).toBe("weird");
+  });
+  it("does not rename the stored status", () => {
+    expect(normaliseOrderStatus("confirmed")).toBe("confirmed");
+    expect(ORDER_STATUSES[0]).toBe("confirmed");
+  });
+  it("labels it Received in both languages; admin keeps Confirmed", () => {
+    expect(en.Orders.status_confirmed).toBe("Received");
+    expect(ar.Orders.status_confirmed).toBe("تم الاستلام");
+    expect(en.PartsDashboard.order_status_received).toBe("Received");
+    expect(ar.PartsDashboard.order_status_received).toBe("تم الاستلام");
+    expect(en.PartsDashboard.order_status_confirmed).toBe("Confirmed");
+  });
 });

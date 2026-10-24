@@ -35,6 +35,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { customerStatusKey } from "@/lib/orders/status";
 import {
   Check,
   ChevronDown,
@@ -899,7 +900,7 @@ function Row({
             <Tag variant={done.kind === "ordered" && done.status === "cancelled" ? "neutral" : "buy"}>
               <PackageCheck className="h-3 w-3" />
               {done.kind === "ordered"
-                ? t("bomOrdered", { id: done.ref, status: tO(`order_status_${done.status}`) })
+                ? t("bomOrdered", { id: done.ref, status: tO(`order_status_${customerStatusKey(done.status)}`) })
                 : done.kind === "delivered"
                   ? t("bomDelivered")
                   : t("bomBought")}

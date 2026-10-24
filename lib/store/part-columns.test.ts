@@ -31,6 +31,12 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const rel = (f: string) => relative(ROOT, f).split("\\").join("/");
 
+/** Walk and read once: both cases need every file, and doing it twice pushed
+ *  this file past vitest's 5 s default under a loaded full-suite run. */
+const sources: { name: string; text: string }[] = DIRS.flatMap((d) => walk(join(ROOT, d)))
+  .map((file) => ({ name: rel(file), text: readFileSync(file, "utf8") }))
+  .filter((f) => f.name !== SELF);
+
 // `.from("parts")` / `.from('parts')`, and the embed forms `parts(*)`,
 // `part:parts(*)`, `...parts(*)` inside another select.
 const FROM_PARTS = /\.from\(\s*(["'])parts\1\s*\)/;
@@ -50,10 +56,8 @@ function selectsWildcard(chain: string): boolean {
 
 function offenders(): string[] {
   const hits: string[] = [];
-  for (const file of DIRS.flatMap((d) => walk(join(ROOT, d)))) {
-    const name = rel(file);
-    if (name === SELF) continue;
-    const lines = readFileSync(file, "utf8").split("\n");
+  for (const { name, text } of sources) {
+    const lines = text.split("\n");
     lines.forEach((line, i) => {
       // A comment is prose about the rule, not a query.
       if (/^\s*(?:\/\/|\*|\/\*)/.test(line)) return;
@@ -68,8 +72,7 @@ function offenders(): string[] {
 
 describe("no wildcard read of parts (DB-09 / 0105)", () => {
   it("finds the parts call sites (guards against a broken walk)", () => {
-    const named = DIRS.flatMap((d) => walk(join(ROOT, d))).filter((f) => FROM_PARTS.test(readFileSync(f, "utf8")));
-    expect(named.length).toBeGreaterThan(20);
+    expect(sources.filter((f) => FROM_PARTS.test(f.text)).length).toBeGreaterThan(20);
   });
 
   it('no from("parts").select("*") and no parts(*) embed', () => {

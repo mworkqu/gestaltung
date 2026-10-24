@@ -37,6 +37,18 @@ export function normaliseOrderStatus(v: unknown): OrderStatus | null {
   return null;
 }
 
+/**
+ * Message-key suffix a CUSTOMER sees for a stored status (F-017). The stored
+ * value stays "confirmed" (the database and every rule key off it); only the
+ * wording changes: the order is "received" until we move it on. Admin screens
+ * keep the real status word and use the status itself as the key.
+ */
+export function customerStatusKey(v: unknown): string {
+  const s = normaliseOrderStatus(v);
+  if (s === "confirmed") return "received";
+  return s ?? (typeof v === "string" ? v : "");
+}
+
 export function isTerminal(status: OrderStatus): boolean {
   return status === "delivered" || status === "cancelled";
 }

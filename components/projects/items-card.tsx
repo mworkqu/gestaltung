@@ -20,7 +20,7 @@ import {
 import type { ItemStatus } from "@/lib/projects/item-status";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Tag } from "@/components/ui/tag";
-import { normaliseOrderStatus } from "@/lib/orders/status";
+import { customerStatusKey } from "@/lib/orders/status";
 import type { ItemWithPart } from "./use-project-data";
 
 export function ItemsCard({
@@ -246,7 +246,7 @@ function ItemStatusTags({ status }: { status: ItemStatus }) {
   const orderStatusLabel = (s: string | undefined) => {
     if (!s) return "";
     // Pre-0053 rows may say pending/processing: show them as confirmed/sourcing.
-    const key = `order_status_${normaliseOrderStatus(s) ?? s}`;
+    const key = `order_status_${customerStatusKey(s)}`;
     return tOrders.has(key) ? tOrders(key) : s;
   };
 

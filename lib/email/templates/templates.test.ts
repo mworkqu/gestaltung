@@ -109,8 +109,8 @@ describe("credits_order_delivered", () => {
   it("AR: order number and number agreement", () => {
     const o = renderNotification("credits_order_delivered", { locale: "ar", payload: payloads.credits_order_delivered, links });
     expect(o.text).toContain("A1B2C3D4");
-    expect(o.text).toContain("3 أرصدة توصيل");
-    expect(o.text).toContain("رصيد CAD واحدًا");
+    expect(o.text).toContain("3 أرصدة مخططات التوصيل");
+    expect(o.text).toContain("رصيد نموذج ثلاثي الأبعاد واحدًا");
   });
 });
 
@@ -129,7 +129,7 @@ describe("credits_admin_grant", () => {
 
   it("AR: amount and note", () => {
     const o = renderNotification("credits_admin_grant", { locale: "ar", payload: payloads.credits_admin_grant, links });
-    expect(o.text).toContain("حصلت على 5 أرصدة توصيل: Bank transfer 100 QAR");
+    expect(o.text).toContain("حصلت على 5 أرصدة مخططات التوصيل: Bank transfer 100 QAR");
   });
 
   it("escapes a malicious note", () => {
@@ -175,7 +175,7 @@ describe("first_circuit", () => {
     expect(en.text).toContain("Circuit credits: 2");
     expect(en.text).toContain("CAD credits: 1");
     const ar = renderNotification("first_circuit", { locale: "ar", payload: payloads.first_circuit, links });
-    expect(ar.text).toContain("أرصدة التوصيل: 2");
+    expect(ar.text).toContain("أرصدة مخططات التوصيل: 2");
   });
 
   it("omits the balance lines when the payload has none", () => {
@@ -234,11 +234,11 @@ describe("helpers", () => {
   });
 
   it("creditCount: Arabic agreement", () => {
-    expect(creditCount(1, "circuit", "ar", "gen")).toBe("رصيد توصيل واحد");
-    expect(creditCount(2, "circuit", "ar", "nom")).toBe("رصيدا توصيل");
-    expect(creditCount(2, "cad", "ar", "acc")).toBe("رصيدي CAD");
-    expect(creditCount(5, "circuit", "ar")).toBe("5 أرصدة توصيل");
-    expect(creditCount(12, "circuit", "ar")).toBe("12 رصيد توصيل");
+    expect(creditCount(1, "circuit", "ar", "gen")).toBe("رصيد مخطط توصيل واحد");
+    expect(creditCount(2, "circuit", "ar", "nom")).toBe("رصيدا مخطط توصيل");
+    expect(creditCount(2, "cad", "ar", "acc")).toBe("رصيدي نموذج ثلاثي الأبعاد");
+    expect(creditCount(5, "circuit", "ar")).toBe("5 أرصدة مخططات التوصيل");
+    expect(creditCount(12, "circuit", "ar")).toBe("12 رصيد مخططات التوصيل");
   });
 
   it("formatDate: Qatar time, Latin digits, null on junk", () => {
@@ -274,7 +274,7 @@ describe("order status emails", () => {
 
   it("EN wording per status", () => {
     const sub = (k: (typeof ORDER_KINDS)[number]) => renderNotification(k, { locale: "en", payload: payloads[k], links: orderLinks }).subject;
-    expect(sub("order_confirmed")).toBe("Order #1a2b3c4d confirmed");
+    expect(sub("order_confirmed")).toBe("Order #1a2b3c4d received");
     expect(sub("order_paid")).toBe("Payment received for order #1a2b3c4d");
     expect(sub("order_sourcing")).toBe("We are preparing order #1a2b3c4d");
     expect(sub("order_shipped")).toBe("Order #1a2b3c4d is on its way");

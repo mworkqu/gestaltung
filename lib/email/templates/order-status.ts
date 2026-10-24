@@ -14,8 +14,8 @@ type Copy = { subject: (o: string) => string; headline: (o: string) => string; b
 const COPY: Record<NotificationLocale, Record<OrderEmailStatus, Copy>> = {
   en: {
     confirmed: {
-      subject: (o) => (o ? `Order #${o} confirmed` : "Your order is confirmed"),
-      headline: (o) => (o ? `We have confirmed your order #${o}.` : "We have confirmed your order."),
+      subject: (o) => (o ? `Order #${o} received` : "We received your order"),
+      headline: (o) => (o ? `We have received your order #${o}.` : "We have received your order."),
       body: "We will message you on WhatsApp if anything needs your answer. You can follow every step on your order page.",
     },
     paid: {
@@ -46,8 +46,8 @@ const COPY: Record<NotificationLocale, Record<OrderEmailStatus, Copy>> = {
   },
   ar: {
     confirmed: {
-      subject: (o) => (o ? `تأكيد طلبك رقم ${o}` : "تأكيد طلبك"),
-      headline: (o) => (o ? `أكّدنا طلبك رقم ${o}.` : "أكّدنا طلبك."),
+      subject: (o) => (o ? `استلمنا طلبك رقم ${o}` : "استلمنا طلبك"),
+      headline: (o) => (o ? `استلمنا طلبك رقم ${o}.` : "استلمنا طلبك."),
       body: "سنراسلك على واتساب إذا احتاج أي شيء إلى ردّك. يمكنك متابعة كل خطوة في صفحة طلبك.",
     },
     paid: {
