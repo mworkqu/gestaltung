@@ -4,7 +4,7 @@
 // use while wiring (saved on the project), Copy and Print. Rows are linked to
 // the other views through the shared selection.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Code2, Copy, Printer } from "lucide-react";
 
@@ -33,6 +33,17 @@ export function PinListView({ doc, locale }: { doc: StudioDoc; locale: Locale })
   const { connections, selectedId, select, setHover, ticked, toggleTick, engineer, showInCode, getPart } = useWiringViews();
   const rows = useMemo(() => pinListRows(connections, getPart, locale), [connections, getPart, locale]);
   const [copied, setCopied] = useState(false);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Bring the wire picked in another tab into view. Keyed on the selection only, so it runs when the
+  // selection changes (or when the tab opens with one) and never on a re-render while the user scrolls.
+  useEffect(() => {
+    if (!selectedId) return;
+    const row = Array.from(listRef.current?.querySelectorAll<HTMLElement>("[data-connection]") ?? []).find(
+      (el) => el.dataset.connection === selectedId,
+    );
+    row?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
 
   useEffect(() => {
     if (!copied) return;
@@ -100,7 +111,7 @@ export function PinListView({ doc, locale }: { doc: StudioDoc; locale: Locale })
         {engineer && <span>{t("colEngineer")}</span>}
       </div>
 
-      <ul className="flex flex-col gap-2">
+      <ul ref={listRef} className="flex flex-col gap-2">
         {rows.map((r) => {
           const c = connections.find((x) => x.id === r.id)!;
           const isDone = ticked.has(r.key);
@@ -127,7 +138,7 @@ export function PinListView({ doc, locale }: { doc: StudioDoc; locale: Locale })
               onBlur={(e) => e.target === e.currentTarget && setHover(null)}
               className={cn(
                 "grid cursor-pointer grid-cols-[2.75rem_1fr] items-center gap-x-3 gap-y-1 rounded-2xl px-2 py-2 text-sm text-body outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-cobalt sm:gap-y-0",
-                sel ? "shadow-neu-inset ring-1 ring-cobalt/40" : "shadow-neu-sm",
+                sel ? "bg-cobalt/10 shadow-neu-inset ring-2 ring-cobalt" : "shadow-neu-sm",
                 isDone && "opacity-70",
                 cols,
               )}

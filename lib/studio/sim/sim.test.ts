@@ -53,6 +53,15 @@ describe("Plant Waterer", () => {
     expect(model.outputs.some((o) => o.partId === "motor_driver")).toBe(false);
   });
 
+  it("the threshold field starts at the number the simulation uses (F-041)", () => {
+    // TryItPanel shows inputs.thresholds[id] ?? threshold.value; both must be the model's 60, never blank.
+    expect(inputs.thresholds[soil.id]).toBe(soil.threshold!.value);
+    expect(Number.isFinite(inputs.thresholds[soil.id])).toBe(true);
+    const at = (v: number) => run(model, initialState(model, inputs), { ...inputs, values: { ...inputs.values, [soil.id]: 61 }, thresholds: { [soil.id]: v } }, 0.2);
+    expect(out(at(60), "pump").on).toBe(true);
+    expect(out(at(65), "pump").on).toBe(false);
+  });
+
   it("wet soil: everything off", () => {
     const s = initialState(model, inputs);
     expect(s.cause).toBe("soilWet");

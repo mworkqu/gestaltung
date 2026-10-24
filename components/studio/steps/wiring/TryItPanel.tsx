@@ -409,6 +409,47 @@ function JointPicker({
   );
 }
 
+/**
+ * The number the simulation really uses (SimInputs.thresholds, seeded from the model), editable.
+ * What is being typed is kept as a draft so "75" can be typed through "7" (which is below the
+ * minimum); the clamped value is what drives the simulation, and on blur the field shows it.
+ * shrink-0: inside the label's flex row a narrow column squeezed the field to nothing.
+ */
+function ThresholdInput({
+  id,
+  th,
+  value,
+  onCommit,
+  testId,
+}: {
+  id: string;
+  th: NonNullable<SimControl["threshold"]>;
+  value: number;
+  onCommit: (id: string, v: number) => void;
+  testId: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={th.min}
+      max={th.max}
+      step={th.step}
+      value={draft ?? String(value)}
+      onChange={(e) => {
+        setDraft(e.target.value);
+        const v = Number(e.target.value);
+        if (e.target.value.trim() !== "" && Number.isFinite(v)) onCommit(id, Math.max(th.min, Math.min(th.max, v)));
+      }}
+      onBlur={() => setDraft(null)}
+      data-testid={testId}
+      className="min-h-11 w-16 shrink-0 rounded-lg border border-slate-300 bg-white px-2 text-center text-sm font-semibold text-heading"
+      dir="ltr"
+    />
+  );
+}
+
 function Control({
   c,
   sim,
@@ -432,20 +473,12 @@ function Control({
   const thInput = th && c.kind !== "button" && c.kind !== "touch" && c.kind !== "knob" && c.kind !== "power" && (
     <label className="flex items-center gap-1.5 text-xs font-semibold text-body">
       <span>{t(`threshold.${thKey}`)}</span>
-      <input
-        type="number"
-        inputMode="numeric"
-        min={th.min}
-        max={th.max}
-        step={th.step}
+      <ThresholdInput
+        id={c.id}
+        th={th}
         value={threshold ?? th.value}
-        onChange={(e) => {
-          const v = Number(e.target.value);
-          if (Number.isFinite(v)) sim.setThreshold(c.id, Math.max(th.min, Math.min(th.max, v)));
-        }}
-        data-testid={`studio-sim-threshold-${c.kind}`}
-        className="min-h-11 w-16 rounded-lg border border-slate-300 bg-white px-2 text-center text-sm font-semibold text-heading"
-        dir="ltr"
+        onCommit={sim.setThreshold}
+        testId={`studio-sim-threshold-${c.kind}`}
       />
       <span>{th.unit === "h" ? ":00" : t(`unit.${th.unit}`)}</span>
     </label>

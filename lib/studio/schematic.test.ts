@@ -91,7 +91,9 @@ describe("renderSchematicSVG", () => {
     wellFormed(bat.svg);
     containsEverything(bat.svg, bat.w.components, bat.w.netlist.nets, getPart, "ar");
     expect(bat.svg).toContain(`direction="rtl"`);
-    expect(bat.svg).toContain(">VBAT</text>");
+    // Supply rails read as the pin list names them, not by the netlist's internal id (F-040).
+    expect(bat.svg).not.toContain(">VBAT</text>");
+    expect(bat.svg).toContain(" Battery +</text>"); // the Arabic part name, then the pin as the pin list prints it
     const uno = render(["arduino_uno", "pir_hcsr501", "oled_096_i2c", "button_6mm", "led_5mm", "dht22"], DEFAULT_SPEC, getPart, "en");
     wellFormed(uno.svg);
     containsEverything(uno.svg, uno.w.components, uno.w.netlist.nets, getPart, "en");
@@ -153,5 +155,29 @@ describe("renderSchematicSVG shared ids and colours (P5-17)", () => {
     expect(svg).toContain(WIRE_HEX.black);
     // Same input, same drawing; and passing the connections explicitly changes nothing.
     expect(renderSchematicSVG(w.components, w.netlist.nets, getPart, { locale: "en", connections })).toBe(svg);
+  });
+});
+
+describe("schematic supply names agree with the pin list (F-040)", () => {
+  it("every supply label is the pin list's wording for the feeding end; data-net keeps the net id", async () => {
+    const { buildConnections, supplyNetNames } = await import("./connections");
+    const { pinListRows } = await import("./pin-list");
+    const spec: ProductSpec = { ...DEFAULT_SPEC, power: "battery_usb" };
+    const w = buildWiring(comps("esp32_devkit", "cell_18650", "tp4056_usbc", "oled_096_i2c"), spec, getPart, "en");
+    const connections = buildConnections(w.components, w.netlist.nets, getPart, spec);
+    const svg = renderSchematicSVG(w.components, w.netlist.nets, getPart, { locale: "en", connections });
+    const rows = pinListRows(connections, getPart, "en");
+    const names = supplyNetNames(connections, getPart, "en");
+    expect(names.get("VBAT")).toBeDefined();
+    for (const [net, text] of names) {
+      // GND is drawn as the ground symbol (no text); a net named by its own pin ("3V3") is unchanged.
+      if (text === net || net === "GND") continue;
+      // The same words appear in some pin list row (as the board pin or the "goes to" end).
+      expect(rows.some((r) => `${r.toPart} ${r.partPin}` === text || r.boardPin === text), net).toBe(true);
+      expect(svg, net).toContain(`>${esc(text)}</text>`);
+      expect(svg, net).toContain(`data-net="${esc(net)}"`);
+    }
+    // A net already named by its pin ("3V3") is left alone.
+    expect(svg).toContain(">3V3</text>");
   });
 });

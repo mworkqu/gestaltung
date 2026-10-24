@@ -142,6 +142,26 @@ export function endName(e: Pick<ConnectionEnd, "part" | "partId" | "name">, getP
   return e.name?.[locale] ?? partName(getPart(e.partId), locale, e.part);
 }
 
+/**
+ * What people call a supply net: the pin list's own words for the end that feeds it
+ * ("USB-C battery charger board OUT+"), read from the shared connections so the
+ * schematic and the pin list cannot drift apart. A net named for its voltage ("3V3")
+ * keeps its name; nets with no wire here are absent (callers fall back
+ * to the raw net name).
+ */
+export function supplyNetNames(connections: readonly Connection[], getPart: GetPart, locale: Locale): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const c of connections) {
+    if ((c.role !== "power" && c.role !== "ground") || m.has(c.net)) continue;
+    // The feeding end is on a power part (battery, charger, converter) when there is one; else the hub.
+    const src = getPart(c.to.partId)?.category === "power" && getPart(c.from.partId)?.category !== "power" ? c.to : c.from;
+    // A net already named for its voltage ("5V", "3V3") is plain language; the internal ids (VSYS, VBAT…) are not.
+    const plain = /^\d+V\d*$/i.test(c.net) || src.label.toUpperCase() === c.net.toUpperCase();
+    m.set(c.net, plain ? c.net : `${endName(src, getPart, locale)} ${src.label}`);
+  }
+  return m;
+}
+
 /** Instance → own name (only instances that have one), from the connection ends. */
 export function instanceNames(connections: readonly Connection[], locale: Locale): Map<string, string> {
   const m = new Map<string, string>();
