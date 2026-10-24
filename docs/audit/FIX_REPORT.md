@@ -358,6 +358,35 @@ New, found while doing this work:
 
 ## 7. What you must do afterwards
 
+### 7a. The two settings halves of your decisions (2026-10-25)
+
+Both of these are **data, not code** — this branch cannot write to the database, so they are
+yours. Neither needs a deploy.
+
+**1. Shipping handling and buffer — Dashboard → Store → Suppliers.**
+The filter buckets are now "Up to 2 weeks" / "2–4 weeks" / "Over a month", measured on the
+computed arrival date. You asked to tighten processing so fulfilment is realistically
+faster. The arithmetic, so you can pick deliberately — arrival = lead class + handling +
+transit + buffer, the last three counted in Qatar working days:
+
+| handling + transit + buffer | in-stock arrives in | 3–5-day class | 1–2-week class |
+|---|---|---|---|
+| 1 + 2 + 3 (today) | ~8 days | ~11 | ~20 |
+| 1 + 2 + 1 | **~6 days** | ~9 | ~18 |
+| 1 + 2 + 0 | ~5 days | ~8 | ~17 |
+
+A buffer of 1 is the sensible floor: it is what absorbs a supplier being a day late without
+breaking the date already shown to the customer. **Only tighten to a window you can keep** —
+the whole value of this screen is that the date on the card is one you hit.
+
+**2. Kit discount — Dashboard → Store → Product attributes.**
+You chose to lower `kit_discount_pct` rather than carve the Studio out in code. Nothing in
+the code changes: the Studio now writes a real kit (that is what fixed F-006), so the
+percentage you set there applies to Studio kits and BOM kits alike. Lower it to whatever
+margin you are happy with across both, and watch a few real Studio kits before settling.
+
+### 7b. Everything else
+
 - Confirm `SUPABASE_SERVICE_ROLE_KEY` is set in **all three** Vercel environments
   (Production, Preview, Development). Many routes answer 503 without it, and the new startup
   warning is the only thing that will tell you.
@@ -370,7 +399,7 @@ New, found while doing this work:
 - **Fill `datasheet_url`** on the products that have one. The link is already gated correctly; the tester saw none because no product has the field set.
 - **Delete the QA test rows** in one pass — the list is §8.
 
-## 7b. Click-through screenshots
+## 7c. Click-through screenshots
 
 `review/fixes/screenshots/` holds 63 full-page screenshots — 17 pages × EN/AR × 1366 and
 375 px — produced by `node scripts/review-screenshots.mjs` against a local production
