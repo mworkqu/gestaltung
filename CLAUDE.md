@@ -28,7 +28,7 @@ Each tenant only ever sees their own data. The Super Admin sees everything.
 
 ## History
 
-The stage-by-stage log that used to live here (about 1,400 lines) is in `docs/history/` (`README.md` lists the files). It is a record, not rules. This file stays an index: new stage notes go to `docs/history/NN-*.md`, never here. Current state goes in a handoff, not in this file.
+The stage-by-stage log that used to live here (about 1,400 lines) is in `docs/history/CLAUDE-2026-10-full.md`, verbatim (`docs/history/README.md` lists what is there). It is a record, not rules. This file stays an index: new stage notes go to `docs/history/`, never here. Current state goes in a handoff, not in this file.
 
 ## Hard rules
 - Public storefront pages stay static/ISR: no `cookies()`, `headers()`, `searchParams` or `force-dynamic` there, and they call `setRequestLocale`. Public reads go through `lib/store/public-catalog.ts` (cookie-free client + `unstable_cache`). Cache expiry is 24 h (see Permanent notes).
@@ -280,7 +280,7 @@ Full run log, rules for new migrations and the next free number (0106): `docs/MI
 | `docs/MIGRATIONS.md` | Migration run log, rules for new migrations |
 | `docs/DECISIONS.md` | Owner decisions D1-D13 |
 | `docs/ENVIRONMENT.md` | Supabase / Vercel / GA ids, Node version, old Windows notes |
-| `docs/history/` | The old stage log (01-09) and `prompts/` (root prompt files), verbatim |
+| `docs/history/` | `CLAUDE-2026-10-full.md` (the whole pre-audit CLAUDE.md, every decision and owner rule) and `prompts/` (the old root prompt files), verbatim |
 | `docs/*.md` | Feature notes: AUTH_EMAILS, CAD_CLOUD, CUTOVER, IA_V2, ISR_WRITES, LIVE_RETEST, SOCIAL_SIGN_IN, SOURCING_ORDER, STUDIO_CAD, STUDIO_PRODUCT, STUDIO_SKU_LINKS, TEST_DATA_CLEANUP, TURNSTILE |
 | `DESIGN.md` | Design system (also read by the OG image and manifest code) |
 | `LEGAL_PAGES_DRAFT.md` | Owner's legal text; source of `content/legal/**` |
