@@ -230,7 +230,7 @@ async function modelTurn(
     },
   });
   const guard = (spec: ProductSpec, into: ClampLog) => {
-    const guarded = guardSpec(syncMovers(spec, into), ctx, into).spec;
+    const guarded = guardSpec(syncMovers(spec, into), { ...ctx, current }, into).spec;
     // Part F: a 4th strong servo would take the 5 A supply over budget (power rule).
     const capped = capStrongServos(guarded);
     if (capped !== guarded) into.push({ path: "actuators", from: guarded.actuators, to: capped.actuators });

@@ -347,9 +347,10 @@ export type PinConstant = {
   value: string;
   /**
    * What it names: a board pin (default), a servo driver channel (Part E, `const int
-   * SERVO_BASE = 0;`) or the servo driver's I2C address (`const uint8_t PCA9685_ADDR = 0x40;`).
+   * SERVO_BASE = 0;`), the servo driver's I2C address (`const uint8_t PCA9685_ADDR = 0x40;`)
+   * or a reading fact from the part library (F-010, `const int SOIL_DRY_PCT = 70;`).
    */
-  kind?: "pin" | "channel" | "address";
+  kind?: "pin" | "channel" | "address" | "reading";
   /** Connections this constant names (a bus pin can feed several parts). */
   connectionIds: string[];
   /** The first connection's wire, for the comment and the swatch. */
@@ -409,6 +410,15 @@ export function pinConstants(connections: Connection[], getPart: GetPart): PinCo
       colour: first.wireColour,
       comment: `${first.wireColour} wire → ${targets.join(", ")} (${ids.join(", ")})`,
     });
+    // F-010: the part's own reading facts, right under its pin, so the sketch compares against
+    // OUR numbers and the "higher = drier" direction is in the code, not in the model's memory.
+    const dev = getPart(first.to.partId);
+    for (const c of dev?.calibration?.constants ?? []) {
+      let name2 = `${base}_${c.suffix}`;
+      for (let n = 2; used.has(name2); n++) name2 = `${base}${n}_${c.suffix}`;
+      used.add(name2);
+      out.push({ name: name2, value: String(c.value), kind: "reading", connectionIds: ids, colour: first.wireColour, comment: c.comment });
+    }
   }
   return [...out, ...servoDriverConstants(connections, getPart, used)];
 }
@@ -462,15 +472,29 @@ function servoDriverConstants(connections: Connection[], getPart: GetPart, used:
 export const PIN_BLOCK_START = "// >>> PINS (from your wiring) >>>";
 export const PIN_BLOCK_END = "// <<< PINS <<<";
 
-/** The sketch's pin block: markers + one constant per line. */
-export function pinBlock(constants: PinConstant[]): string {
+/**
+ * The reading facts of the parts in this circuit (F-010), in the order their pins appear: one
+ * short English line each, written into the pin block so the sketch cannot read a sensor
+ * backwards. Deduplicated — two identical probes state their fact once.
+ */
+export function readingNotes(connections: Connection[], getPart: GetPart): string[] {
+  const out: string[] = [];
+  for (const c of connections) {
+    const note = getPart(c.to.partId)?.calibration?.note ?? getPart(c.from.partId)?.calibration?.note;
+    if (note && !out.includes(note)) out.push(note);
+  }
+  return out;
+}
+
+/** The sketch's pin block: markers + one constant per line (reading facts first, as comments). */
+export function pinBlock(constants: PinConstant[], notes: readonly string[] = []): string {
   const declOf = (c: PinConstant) => `const ${c.kind === "address" ? "uint8_t" : "int"} ${c.name} = ${c.value};`;
   const w = Math.max(0, ...constants.map((c) => declOf(c).length));
   const lines = constants.map((c) => {
     const decl = declOf(c);
     return `${decl.padEnd(w)}  // ${c.comment}`;
   });
-  return [PIN_BLOCK_START, ...lines, PIN_BLOCK_END].join("\n");
+  return [PIN_BLOCK_START, ...notes.map((n) => `// ${n}`), ...lines, PIN_BLOCK_END].join("\n");
 }
 
 export type PinBlockUpdate = { code: string; changed: boolean; removed: string[]; added: string[] };

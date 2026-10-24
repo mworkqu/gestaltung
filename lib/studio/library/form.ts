@@ -47,6 +47,8 @@ export type PartDraft = {
   stlUrl: string;
   /** Not edited on the form: kept as it was (JSON). */
   requires: string;
+  /** F-010 reading facts (JSON). Not edited on the form either: kept as it was. */
+  calibration?: string;
 };
 
 export type FieldErrorCode =
@@ -128,6 +130,7 @@ export function partToDraft(p: LibraryPart): PartDraft {
     params: p.model.kind === "procedural" ? JSON.stringify(p.model.params) : "{}",
     stlUrl: p.model.kind === "stl" ? p.model.url : "",
     requires: p.requires?.length ? JSON.stringify(p.requires) : "",
+    ...(p.calibration ? { calibration: JSON.stringify(p.calibration) } : {}),
   };
 }
 
@@ -241,6 +244,16 @@ export function draftToPart(d: PartDraft): DraftResult {
     }
   }
 
+  let calibration: LibraryPart["calibration"];
+  if (d.calibration?.trim()) {
+    try {
+      const c = JSON.parse(d.calibration) as unknown;
+      if (c && typeof c === "object" && !Array.isArray(c)) calibration = c as LibraryPart["calibration"];
+    } catch {
+      /* not editable on the form: drop an unreadable value */
+    }
+  }
+
   if (errors.length) return { ok: false, errors };
   const part: LibraryPart = {
     id,
@@ -256,6 +269,7 @@ export function draftToPart(d: PartDraft): DraftResult {
     ports,
     pins,
     power: Number.isFinite(supplyMA) && supplyMA > 0 ? { ...power, supplyMA } : power,
+    ...(calibration ? { calibration } : {}),
     ...(requires?.length ? { requires } : {}),
     clearance,
     ...(d.helper ? { helper: true } : {}),

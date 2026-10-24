@@ -272,7 +272,16 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       if (spec.actuators?.some((a) => a.kind === "servo")) {
         const ruled = enforcePick(
           { components: ROBOT_ARM_MODEL_PICK.map((partId) => ({ partId })) },
-          { spec, index: libraryIndexForAI(), locale, log: [], nameFor: (id, l) => getPart(id)?.name[l], pinsOf: (id) => getPart(id)?.pins },
+          {
+            spec,
+            index: libraryIndexForAI(),
+            locale,
+            log: [],
+            nameFor: (id, l) => getPart(id)?.name[l],
+            pinsOf: (id) => getPart(id)?.pins,
+            // F-046: same stock preference as /api/studio/pick, so the fixture shows the real list.
+            stockOf: (id) => (getPart(id)?.storeSkus.length ?? 0) > 0,
+          },
         ).components;
         let wired = ruled;
         try {

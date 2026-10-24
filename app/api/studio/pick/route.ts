@@ -40,6 +40,9 @@ export async function POST(request: Request) {
     locale: body.locale,
     nameFor: (id, locale) => getPart(id)?.name[locale],
     pinsOf: (id) => getPart(id)?.pins, // Part D: servo pin budget
+    // F-046: our code, never the model, prefers a part we can hand over. A linked store SKU is
+    // what "we have it" means here (docs/STUDIO_SKU_LINKS.md); parts without one are sourced.
+    stockOf: (id) => (getPart(id)?.storeSkus.length ?? 0) > 0,
     // Card items the model's index leaves out (the LED is a helper part): added by id.
     lookup: (id) => {
       const p = getPart(id);

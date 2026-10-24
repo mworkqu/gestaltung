@@ -46,6 +46,8 @@ export {
   HBRIDGE_DRIVER_IDS,
   isOnOffLoad,
   isHBridge,
+  isLowSideSwitch,
+  loadPath,
   driverSuits,
   BOOSTER_IDS,
   splitRef,

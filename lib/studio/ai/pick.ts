@@ -135,6 +135,50 @@ export function specParts(spec: ProductSpec): string[] {
   return ids;
 }
 
+// ── Stock preference (F-046) ───────────────────────────────────────────────
+// The picker chose a LiPo pack we cannot hand over ("We'll source this") while an 18650 cell
+// sat in stock at QAR 20. The MODEL never chooses a SKU: it proposes a function, and our code
+// then takes the part we can actually give for that same function. Groups are hand-checked
+// pairs of parts that do the same job in a kit, best-stocked-first is decided per circuit.
+
+export const EQUIVALENT_GROUPS: readonly (readonly string[])[] = [
+  // One rechargeable lithium cell on a USB charger. Both are 3.7 V, both charge on a TP4056.
+  ["cell_18650", "lipo_1000"],
+  // A small mono I2C screen: same driver, same wiring, a few millimetres apart.
+  ["oled_13_i2c", "oled_096_i2c"],
+];
+
+/** Is there a store product behind this part, i.e. can we hand it over today? */
+export type StockOf = (id: string) => boolean;
+
+/**
+ * Swaps a part we cannot supply for an equivalent we can. Nothing outside EQUIVALENT_GROUPS is
+ * ever swapped, and a group with nothing in stock is left exactly as the model proposed —
+ * which is what SOURCED_REASON then says on the part itself.
+ */
+export function preferStocked<T extends { partId: string; label: string }>(
+  list: T[],
+  opts: { byId: ReadonlyMap<string, PickIndexEntry>; stockOf: StockOf; log: ClampLog; name: (id: string) => string },
+): T[] {
+  return list.map((p) => {
+    if (opts.stockOf(p.partId)) return p;
+    const group = EQUIVALENT_GROUPS.find((g) => g.includes(p.partId));
+    const better = group?.find((id) => id !== p.partId && opts.byId.has(id) && opts.stockOf(id));
+    if (!better) return p;
+    opts.log.push({ path: "components.stock", from: p.partId, to: better });
+    return { ...p, partId: better, label: opts.name(better) };
+  });
+}
+
+/**
+ * Said on a part we keep although we cannot hand it over: the client sees WHY it is still here
+ * instead of an unexplained "We'll source this". Shown only when the part itself gave no reason.
+ */
+export const SOURCED_REASON: Record<"en" | "ar", string> = {
+  en: "We'll source this one: nothing we stock does this job.",
+  ar: "سنوفّر هذه القطعة بالطلب: لا تتوفر لدينا قطعة بديلة تؤدي نفس الوظيفة.",
+};
+
 /** Optional localized display name (e.g. getPart(id)?.name[locale]). */
 export type NameFor = (id: string, locale: "en" | "ar") => string | undefined;
 /**
@@ -160,7 +204,7 @@ function nameOf(entry: PickIndexEntry, locale: "en" | "ar", nameFor?: NameFor): 
 /** Model answer (any shape) → a rule-abiding parts list. Every change goes to `log`. */
 export function enforcePick(
   raw: unknown,
-  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf; lookup?: Lookup },
+  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf; lookup?: Lookup; stockOf?: StockOf },
 ): Picked {
   const { index, log, locale } = opts;
   const name = (e: PickIndexEntry) => cut(nameOf(e, locale, opts.nameFor), LABEL_MAX);
@@ -308,6 +352,18 @@ export function enforcePick(
     log.push({ path: "components.driver", from: "motor_driver", to: "mosfet_module" });
   }
 
+  // F-046: an in-stock equivalent beats one we would have to source. Last of the part rules,
+  // so parts added by the card and the actuator rules are covered too.
+  if (opts.stockOf) {
+    list = preferStocked(list, {
+      byId,
+      stockOf: opts.stockOf,
+      log,
+      name: (id) => name(byId.get(id) ?? opts.lookup?.(id) ?? { id, category: "" }),
+    });
+    list = enforceSinglePower(list, { spec: opts.spec, byId, log });
+  }
+
   // At most 12 kinds of part (identical parts are one slot), at most 8 of one part. The
   // leads go first again: the card and the actuator rules appended parts after them.
   hoistLeads();
@@ -337,12 +393,19 @@ export function enforcePick(
     if (kept.has(id) && reason && !reasons[id]) reasons[id] = reason;
   }
   for (const c of components) if (reasons[c.partId]) c.reason = reasons[c.partId];
+  // F-046: a part we could not swap for a stocked one says why it is still here.
+  if (opts.stockOf) {
+    for (const c of components) {
+      if (c.reason || opts.stockOf(c.partId)) continue;
+      c.reason = SOURCED_REASON[locale];
+    }
+  }
   return { components, reasons };
 }
 
 export function validatePick(
   raw: unknown,
-  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf; lookup?: Lookup },
+  opts: { spec: ProductSpec; index: readonly PickIndexEntry[]; locale: "en" | "ar"; log: ClampLog; nameFor?: NameFor; pinsOf?: PinsOf; lookup?: Lookup; stockOf?: StockOf },
 ): { value: Picked | null; errors: string[] } {
   if (!isObj(raw) || !Array.isArray(raw.components)) return { value: null, errors: ["the answer must be {components:[{partId,label}], reasons}"] };
   const ids = new Set(opts.index.map((e) => e.id));
@@ -362,6 +425,8 @@ export async function runPick(opts: {
   nameFor?: NameFor;
   pinsOf?: PinsOf;
   lookup?: Lookup;
+  /** F-046: is there a store product behind a part id? Without it no stock preference is applied. */
+  stockOf?: StockOf;
   /** W8: the same spec (and language, and library) is answered without a model call. */
   cache?: AiCache | null;
 }): Promise<Outcome<Picked>> {
@@ -376,6 +441,8 @@ async function pickWithModel(opts: {
   nameFor?: NameFor;
   pinsOf?: PinsOf;
   lookup?: Lookup;
+  /** F-046: is there a store product behind a part id? Without it no stock preference is applied. */
+  stockOf?: StockOf;
 }): Promise<Outcome<Picked>> {
   const log: ClampLog = [];
   const r = await opts.call<Picked>({
@@ -385,7 +452,7 @@ async function pickWithModel(opts: {
     schema: PICK_RESPONSE_SCHEMA,
     validate: (raw) => {
       const attempt: ClampLog = [];
-      const res = validatePick(raw, { spec: opts.spec, index: opts.index, locale: opts.locale, log: attempt, nameFor: opts.nameFor, pinsOf: opts.pinsOf, lookup: opts.lookup });
+      const res = validatePick(raw, { spec: opts.spec, index: opts.index, locale: opts.locale, log: attempt, nameFor: opts.nameFor, pinsOf: opts.pinsOf, lookup: opts.lookup, stockOf: opts.stockOf });
       if (res.value) log.splice(0, log.length, ...attempt);
       return res;
     },
@@ -394,6 +461,6 @@ async function pickWithModel(opts: {
   if (r.error === "paused" || r.error === "rate_limited") return { ok: false, error: r.error, clampLog: log, problems: r.problems };
   // invalid twice, or the provider is down: the minimal deterministic list.
   const fallback: ClampLog = [];
-  const value = enforcePick({ components: [] }, { spec: opts.spec, index: opts.index, locale: opts.locale, log: fallback, nameFor: opts.nameFor, pinsOf: opts.pinsOf, lookup: opts.lookup });
+  const value = enforcePick({ components: [] }, { spec: opts.spec, index: opts.index, locale: opts.locale, log: fallback, nameFor: opts.nameFor, pinsOf: opts.pinsOf, lookup: opts.lookup, stockOf: opts.stockOf });
   return { ok: true, value, source: "default", clampLog: fallback, problems: r.problems };
 }

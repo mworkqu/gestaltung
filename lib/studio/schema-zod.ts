@@ -144,6 +144,22 @@ export const LibraryPartSchema = z.object({
     /** Part D: power SOURCES only — the most current (mA) this supply can give (psu_5v_5a 5000). */
     supplyMA: z.number().positive().optional(),
   }),
+  /**
+   * Reading facts the firmware must not get backwards (F-010: the generated sketch read a
+   * capacitive soil probe as "low = dry", which waters a wet plant). They are DATA on the part,
+   * not prose in a prompt: `note` is handed to the model and written into the sketch, and
+   * `constants` are re-inserted into the generated pin block like the pin numbers are, so the
+   * thresholds the code compares against are ours. Percentages of the board's ADC range, so
+   * they hold on a 10-bit and a 12-bit board alike. Code-facing, English only.
+   */
+  calibration: z
+    .object({
+      note: z.string(),
+      constants: z.array(
+        z.object({ suffix: z.string().regex(/^[A-Z][A-Z0-9_]*$/), value: z.number(), comment: z.string() }),
+      ),
+    })
+    .optional(),
   requires: z.array(z.object({ id: z.string(), reason: z.string() })).optional(),
   clearance: z.number().nonnegative(),
   /** Internal helper parts (resistor, level shifter) are hidden from the picker and never shown as "a part to choose". */

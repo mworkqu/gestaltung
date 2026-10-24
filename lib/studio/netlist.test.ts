@@ -94,10 +94,14 @@ describe("buildNetlist (fixtures)", () => {
   it("puts a motor behind its driver, never straight on a board pin", () => {
     const get = lib(MINI_MCU, MOTOR, DRIVER);
     const w = buildWiring(comps("mini_mcu", "dc_motor"), spec, get, "en");
-    const motorNet = netOfPin(w.netlist.nets, "dc_motor_1.PLUS")!;
-    expect(motorNet.pins).toEqual(["mosfet_driver_1.OUT", "dc_motor_1.PLUS"]);
+    // F-007: a low-side switch module is a two-terminal load path — the load's + end sits on
+    // the rail that feeds the module's load-power pin, its return on the switched terminal.
+    expect(netOfPin(w.netlist.nets, "dc_motor_1.PLUS")?.pins).toContain("mosfet_driver_1.VCC");
+    expect(netOfPin(w.netlist.nets, "dc_motor_1.MINUS")?.pins).toEqual(["mosfet_driver_1.OUT", "dc_motor_1.MINUS"]);
+    expect(netNamed(w.netlist.nets, "GND")?.pins).not.toContain("dc_motor_1.MINUS");
     expect(netOfPin(w.netlist.nets, "mosfet_driver_1.IN")?.pins[0]).toBe("mini_mcu_1.G1");
     expect(hardRules(w.legacy).filter((f) => f.code === "inductive_on_gpio")).toEqual([]);
+    expect(hardRules(w.legacy).filter((f) => f.code === "load_return_on_ground")).toEqual([]);
     expect(sanityChecks(w.legacy).filter((f) => f.code === "unpowered")).toEqual([]);
   });
 

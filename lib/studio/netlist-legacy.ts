@@ -24,6 +24,7 @@ import {
   isConverter,
   isDriver,
   isInductive,
+  isLowSideSwitch,
   isMcu,
   isPowerRole,
   isPowerSource,
@@ -103,6 +104,21 @@ export function toLegacyNetlist(components: StudioComponent[], nets: Net[], getP
   const sp = servoPlan(components, {}, getPart);
   const supplyRail = servoSupplyRail(sp, entries);
   if (supplyRail) supplyRefs.add(supplyRail.ref);
+  // Nets a low-side switch's switched terminal drives (F-007): a load's return pin sitting on
+  // one of them is part of the load path, not a ground pin — the switch is in that wire.
+  const switchedNets = new Set<string>();
+  for (const e of entries) {
+    if (!isLowSideSwitch(e.p)) continue;
+    for (const pin of e.p.pins) {
+      if (pin.role !== "out") continue;
+      const net = netOf.get(ref(e.c.instanceId, pin.id));
+      if (net) switchedNets.add(net);
+    }
+  }
+  const onSwitchedNet = (r: string) => {
+    const net = netOf.get(r);
+    return !!net && switchedNets.has(net);
+  };
   const netHasSupply = (net: string | undefined) =>
     !!net && [...supplyRefs].some((r) => netOf.get(r) === net);
 
@@ -116,7 +132,7 @@ export function toLegacyNetlist(components: StudioComponent[], nets: Net[], getP
       const r = ref(inst, x.id);
       let type: PinType;
       if (passive) type = "passive";
-      else if (x.role === "gnd") type = "ground";
+      else if (x.role === "gnd") type = onSwitchedNet(r) ? "passive" : "ground";
       else if (supplyRail?.ref === r) type = "power_out";
       else if (isServoDriver(e.p) && x.role === "5v" && servoChannelOf(x.id) !== null) type = "power_out"; // feeds its servo
       else if (isMcu(e.p)) {
@@ -146,6 +162,7 @@ export function toLegacyNetlist(components: StudioComponent[], nets: Net[], getP
       pins,
       currentMa: e.p.power.mA,
       role: legacyRole(e.p),
+      ...(isLowSideSwitch(e.p) ? { switching: "low_side" as const } : {}),
     });
     if (isMcu(e.p)) {
       for (const pin of pins) {

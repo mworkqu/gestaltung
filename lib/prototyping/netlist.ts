@@ -46,6 +46,12 @@ export type NetComponent = {
   /** Typical draw in mA, as proposed by the model; used only for the supply checks. */
   currentMa?: number | null;
   role?: ComponentRole;
+  /**
+   * Set on a driver that switches the load's RETURN (a low-side MOSFET module). The load then
+   * belongs between the supply and the module's switched terminal; a return wired to ground
+   * bypasses the switch, so hardRules() refuses it.
+   */
+  switching?: "low_side";
 };
 export type Connection = { ref: string; pin: string };
 export type Net = { name: string; connections: Connection[] };
@@ -291,6 +297,7 @@ export function powerBudget(n: Netlist): RailBudget[] {
 
 export type HardFlag =
   | { code: "inductive_on_gpio"; ref: string; net: string; controller: string }
+  | { code: "load_return_on_ground"; ref: string; driver: string; net: string }
   | { code: "led_no_resistor"; ref: string }
   | { code: "shorted_supplies"; net: string; refs: string[] }
   | { code: "power_budget"; rail: string; drawMa: number; maxMa: number; refs: string[] };
@@ -307,6 +314,25 @@ export function hardRules(n: Netlist): HardFlag[] {
   // carry the current, and the coil's kick-back destroys it.
   for (const c of n.components.filter(isInductiveLoad)) {
     for (const d of gpioDrives(n, c)) flags.push({ code: "inductive_on_gpio", ref: c.ref, net: d.net, controller: d.controller });
+  }
+
+  // A load on a low-side switch whose return reaches ground on its own: the current never
+  // passes through the switch, so the load is permanently on (or dead) and the pin that is
+  // supposed to control it controls nothing. "Checked ✓" on this circuit would be a lie.
+  const { ground } = powerNets(n);
+  for (const sw of n.components.filter((c) => c.switching === "low_side")) {
+    const switched = sw.pins.filter((p) => p.type === "power_out").map((p) => p.id);
+    const loadRefs = new Set(
+      n.nets
+        .filter((net) => net.connections.some((k) => k.ref === sw.ref && switched.includes(k.pin)))
+        .flatMap((net) => net.connections.filter((k) => k.ref !== sw.ref).map((k) => k.ref)),
+    );
+    for (const net of n.nets) {
+      if (!ground.has(net.name)) continue;
+      for (const k of net.connections) {
+        if (loadRefs.has(k.ref)) flags.push({ code: "load_return_on_ground", ref: k.ref, driver: sw.ref, net: net.name });
+      }
+    }
   }
 
   // An LED with nothing limiting its current.
@@ -341,6 +367,11 @@ export function describeHard(f: HardFlag, n: Netlist, t: T): string {
   switch (f.code) {
     case "inductive_on_gpio":
       return t("hard_inductive_on_gpio", { ref: who(f.ref), net: f.net });
+    // Only our own Studio wiring marks a driver as low-side, and the Studio shows the plain
+    // line from lib/studio/plain-checks.ts instead of this text; the model's netlists never
+    // carry `switching`, so this branch exists for completeness. Key: Prototyping.hard_load_return_on_ground.
+    case "load_return_on_ground":
+      return t("hard_load_return_on_ground", { ref: who(f.ref), driver: who(f.driver), net: f.net });
     case "led_no_resistor":
       return t("hard_led_no_resistor", { ref: who(f.ref) });
     case "shorted_supplies":
@@ -396,6 +427,7 @@ export const flaggedRefs = (flags: Flag[]) =>
       switch (f.code) {
         case "unpowered":
         case "inductive_on_gpio":
+        case "load_return_on_ground":
         case "led_no_resistor":
           return [f.ref];
         case "floating":

@@ -91,6 +91,24 @@ export const HBRIDGE_DRIVER_IDS = ["motor_driver"] as const;
  */
 export const isOnOffLoad = (p: LibraryPart) => tagged(p, ["pump", "fan", "solenoid", "relay_coil", "coil"]);
 export const isHBridge = (p: LibraryPart) => tagged(p, ["h-bridge", "h_bridge", "motor_driver"]);
+/**
+ * A low-side switch module (IRF520 / AO3400 MOSFET board): the MOSFET sits in the load's
+ * RETURN, so the module's switched terminal IS that return. The load belongs between the
+ * supply V+ and that terminal; a return wired to GND instead bypasses the switch, and the
+ * load runs permanently (QA 2026-10, F-007).
+ */
+export const isLowSideSwitch = (p: LibraryPart) =>
+  isDriver(p) && !isHBridge(p) && tagged(p, ["low_side", "mosfet", "transistor"]) && p.pins.some((x) => x.role === "out");
+/**
+ * The two ends of a two-terminal load: the pin that goes to the supply and the return the
+ * switch interrupts. Null for anything with more than two pins (it is not a plain load).
+ */
+export function loadPath(p: LibraryPart): { supply: Pin; ret: Pin } | null {
+  if (p.pins.length !== 2) return null;
+  const ret = p.pins.find((x) => x.role === "gnd");
+  const supply = p.pins.find((x) => x !== ret);
+  return ret && supply ? { supply, ret } : null;
+}
 /** Does this driver suit that load? (MOSFET for on/off loads, H-bridge for motors.) */
 export const driverSuits = (driver: LibraryPart, load: LibraryPart) => (isOnOffLoad(load) ? !isHBridge(driver) : isHBridge(driver));
 export const BOOSTER_IDS = ["boost_5v"] as const;

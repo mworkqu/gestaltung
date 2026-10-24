@@ -14,8 +14,10 @@ import {
   isButton,
   isDriver,
   isInductive,
+  isLowSideSwitch,
   isMcu,
   isPowerRole,
+  loadPath,
   isPowerSource,
   isSeriesHelper,
   isShifter,
@@ -203,13 +205,28 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
   const loadTarget = (l: Entry) =>
     l.p.pins.find((x) => x.role === "in" || x.role === "gpio" || x.role === "pwm") ?? l.p.pins.find((x) => isPowerRole(x.role));
 
+  /**
+   * Loads switched by a LOW-SIDE module (F-007): the module interrupts the load's return, so
+   * the load is a two-terminal path V+ → load → switched terminal. Its return must never
+   * reach GND on its own, or the MOSFET switches nothing and the load runs permanently.
+   */
+  const lowSide = new Map<string, { driver: Entry; supply: Pin; ret: Pin }>();
+  for (const [inst, d] of driverOf) {
+    if (!isLowSideSwitch(d.p)) continue;
+    const load = entries.find((x) => x.c.instanceId === inst);
+    const path = load ? loadPath(load.p) : null;
+    if (path) lowSide.set(inst, { driver: d, ...path });
+  }
+
   // Peripherals and helpers: power pins and grounds.
   for (const e of entries) {
     if (isMcu(e.p) || isPowerSource(e.p)) continue;
-    const driven = driverOf.has(e.c.instanceId) ? loadTarget(e) : undefined;
+    const ls = lowSide.get(e.c.instanceId);
+    const driven = ls ? ls.ret : driverOf.has(e.c.instanceId) ? loadTarget(e) : undefined;
     for (const pin of e.p.pins) {
       const r = ref(e.c.instanceId, pin.id);
-      if (pin === driven || servoSkip(e, pin)) continue;
+      // A low-side load's own two pins are wired below, as one path through the switch.
+      if (pin === driven || (ls && pin === ls.supply) || servoSkip(e, pin)) continue;
       if (pin.role === "gnd") nb.add("GND", r);
       else if (isPowerRole(pin.role)) {
         const rail = railFor(pin, e.p, plan, mcuLogic);
@@ -221,6 +238,25 @@ export function buildNetlist(components: StudioComponent[], spec: ProductSpec, g
 
   const peripherals = entries.filter((e) => isPeripheral(e) && !claimed.has(e.c.instanceId) && !onDriver.has(e.c.instanceId));
   const codes = netCodes(peripherals);
+
+  // The low-side load path: the load's supply end joins the rail that feeds the module's own
+  // load-power pin, its return end goes to the module's switched terminal (never to GND).
+  for (const [inst, ls] of lowSide) {
+    const vPlus = ls.driver.p.pins.find((x) => isPowerRole(x.role));
+    const railNet = vPlus ? nb.netOf(ref(ls.driver.c.instanceId, vPlus.id)) : undefined;
+    if (railNet) nb.add(railNet, ref(inst, ls.supply.id));
+    else unconnected.push(ref(inst, ls.supply.id));
+    const out = ls.driver.p.pins.find((x) => x.role === "out");
+    if (!out) {
+      unconnected.push(ref(inst, ls.ret.id));
+      continue;
+    }
+    const code = codes.get(inst)?.code ?? "LOAD";
+    const net = nb.fresh(`${code}_${labelCode(ls.ret.label.split(/[\s(/]/)[0] || ls.ret.id)}`);
+    nb.add(net, ref(ls.driver.c.instanceId, out.id));
+    nb.add(net, ref(inst, ls.ret.id));
+  }
+
   const busy = {
     i2c: peripherals.some((e) => e.p.pins.some((x) => x.role === "i2c_sda" || x.role === "i2c_scl")),
     spi: peripherals.some((e) => e.p.pins.some((x) => x.role.startsWith("spi_"))),
