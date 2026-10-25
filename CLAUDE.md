@@ -111,12 +111,22 @@ Full text: `docs/DECISIONS.md` (D1-D13, owner site review 2026-10-03).
 
 ## PENDING MIGRATIONS (run in order if not already done)
 Check Supabase → Table Editor to confirm which tables exist before running.
-**Run order is load-bearing: 0096, 0097, 0098, 0099, then 0100-0105.** 0103's order-line
+**Run order is load-bearing: 0096, 0097, 0098, 0099, then 0100-0106.** 0103's order-line
 guard reads `part_orders.class_id`, which comes from 0097; plpgsql resolves that column when
 the trigger first fires, so applying 0103 before 0097 succeeds and then makes every
 `part_order_items` insert fail — checkout dies silently. See `docs/audit/FIX_REPORT.md` §4,
 which also records that the run status of 0096/0097 disagrees between two copies of this
 file and must be confirmed in Supabase first.
+- 0106_idea_charge_telemetry.sql — NOT RUN. Ideation-charge telemetry (owner, 2026-10-25): `idea_charge_telemetry`
+  (one row per priced decision, `stage` 'quoted' = the checkpoint was shown at that price, 'charged' = approved and
+  taken, so quoted minus charged is how often a price is declined; estimated vs charged vs what the model really
+  consumed; super-admin read only, no session may write a row directly), `idea_charge_claim()` (writes the quote and
+  later the charge; its unique `(project_id, idea_key)` is the replay guard for "this message starts a different
+  product" and keeps a repeatedly shown quote to one row), `idea_charge_fill()` (what was really charged and
+  consumed; never fills a quote) and `admin_idea_charge_summary(days)`. Run AFTER 0105;
+  safe to re-run. Touches nothing in the money path (`idea_token_charge` from 0088 is untouched). Until it runs, the
+  Studio charges exactly as it does with it — a missing claim only means nothing is recorded (one warning per call
+  in the server log), so the owner cannot yet compare the agreed deduction with the provider cost.
 - 0100_studio_private.sql — NOT RUN. Audit DB-01: public.project_studio_private (service_role only; the Studio
   product models, back-filled from projects.studio.productPrivate, which is then removed — updated_at kept), trigger
   projects_guard_studio_server_keys (anon/authenticated writes cannot store productPrivate or change studio.product;
@@ -265,7 +275,7 @@ file and must be confirmed in Supabase first.
   metered or recorded)
 - 0024_project_diagnostics.sql — analysis_runs + project_events + event triggers (RUN AFTER 0023; the
   export's raw responses and event log are empty until it runs)
-Full run log, rules for new migrations and the next free number (0106): `docs/MIGRATIONS.md`.
+Full run log, rules for new migrations and the next free number (0107): `docs/MIGRATIONS.md`.
 
 ## PERMANENT NOTES
 - STOREFRONT CACHE EXPIRY = 24 h since 2026-10-16 (was 5 min; it blew the Hobby ISR-write allowance). Wherever older notes say "or wait 5 min", read "or wait for the daily 06:00 Qatar purge": any Dashboard → Store save or cron sync still purges at once. Store listings WITH a search query are not cached at all (lib/store/public-catalog.ts getStoreListing).

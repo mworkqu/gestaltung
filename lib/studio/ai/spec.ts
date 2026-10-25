@@ -39,8 +39,13 @@ export type SpecTurn =
   | { kind: "question"; question: string; choices: string[] }
   /** The first card (before it existed); `reply` only when there is something to say (scope honesty). */
   | { kind: "spec"; spec: ProductSpec; reply?: string }
-  /** Part A: a turn once the card exists. No `spec` = the card is untouched. */
-  | { kind: "reply"; reply: string; spec?: ProductSpec; changed: string[]; diff?: string[] };
+  /**
+   * Part A: a turn once the card exists. No `spec` = the card is untouched.
+   * `newProduct` is the model's HINT that the message replaces the product with a
+   * different one; lib/studio/identity.ts only trusts it when its own reading of the
+   * identity fields agrees, and the price still comes from our code.
+   */
+  | { kind: "reply"; reply: string; spec?: ProductSpec; changed: string[]; diff?: string[]; newProduct?: boolean };
 
 /** How a turn is asked: a question may come back, the spec is due, or the card exists (refine). */
 export type TurnMode = "ask" | "force" | "refine";
@@ -152,7 +157,19 @@ export function validateTurn(
     opts.log.push(...turnLog);
     const diff = (Array.isArray(raw.diff) ? raw.diff : []).map((d) => cut(d, 100)).filter(Boolean).slice(0, 8);
     if (!spec) return { value: { kind: "reply", reply, changed: [], ...(diff.length ? { diff } : {}) }, errors: [] };
-    return { value: { kind: "reply", reply, spec, changed: cleanChanged(raw.changed), ...(diff.length ? { diff } : {}) }, errors: [] };
+    // Anything but a literal true is read as "same product" (free).
+    const newProduct = raw.newProduct === true;
+    return {
+      value: {
+        kind: "reply",
+        reply,
+        spec,
+        changed: cleanChanged(raw.changed),
+        ...(diff.length ? { diff } : {}),
+        ...(newProduct ? { newProduct } : {}),
+      },
+      errors: [],
+    };
   }
   if (spec) {
     const reply = cleanReply(raw.reply, locale, turnLog);
@@ -241,7 +258,16 @@ async function modelTurn(
     return capped;
   };
   const last = [...opts.messages].reverse().find((m) => m.role === "user")?.text ?? "";
-  if (r.ok) return { ok: true, value: finish(r.value, current, guard, log, last, opts.locale), source: "model", clampLog: log, problems: [] };
+  if (r.ok)
+    return {
+      ok: true,
+      value: finish(r.value, current, guard, log, last, opts.locale),
+      source: "model",
+      clampLog: log,
+      problems: [],
+      model: r.model,
+      spend: r.spend,
+    };
   if (r.error !== "invalid") return { ok: false, error: r.error, clampLog: log, problems: r.problems };
   const fallback: ClampLog = [];
   if (current) {
@@ -294,6 +320,12 @@ export function keepCardFields(spec: ProductSpec, current: ProductSpec, lastUser
   if (current.buildClass && !spec.buildClass) {
     log.push({ path: "buildClass", from: null, to: current.buildClass });
     out = { ...out, buildClass: current.buildClass };
+  }
+  // The scope is what the tier (and so the price) is classified from: a refine turn that
+  // simply forgets the field must not read as "the build got simpler".
+  if (current.scope && !spec.scope) {
+    log.push({ path: "scope", from: null, to: "kept" });
+    out = { ...out, scope: current.scope };
   }
   if (current.understanding && !spec.understanding) {
     log.push({ path: "understanding", from: null, to: "kept" });
@@ -359,6 +391,7 @@ function finish(
     return { kind: "reply", reply: turn.reply, changed: [] };
   }
   const spec = guard(keepCardFields(turn.spec, current, lastUser, log), log);
+  // No change to the card at all: there is nothing to charge for, hint or no hint.
   if (sameCard(spec, current)) return { kind: "reply", reply: turn.reply, changed: [] };
   // The model changed the card but named nothing: at least say the new motor count.
   return { ...turn, spec, changed: turn.changed.length ? turn.changed : countLabels(current, spec, locale) };

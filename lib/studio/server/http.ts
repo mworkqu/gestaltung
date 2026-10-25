@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { CanUse } from "@/lib/credits/constants";
 import { ProductSpecSchema, StudioComponentSchema, StudioDocSchema, clampSpec, type ProductSpec } from "../schema";
+import { TIER_IDS } from "../tiers";
 import { asLocale } from "@/lib/locale";
 import { isMissingFunction } from "@/lib/supabase/errors";
 
@@ -30,6 +31,12 @@ export const SpecBody = z.object({
       const r = ProductSpecSchema.safeParse(v);
       return r.success ? r.data : clampSpec(v);
     }),
+  /**
+   * The tier the visitor approved in the checkpoint modal. It only ALLOWS a charge:
+   * the amount is derived server-side from the tiers (lib/studio/tiers.ts chargePlan),
+   * and a value below the tier the server classified simply pauses again.
+   */
+  approveTier: z.enum(TIER_IDS).optional(),
 });
 
 export const PickBody = z.object({

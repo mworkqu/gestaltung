@@ -6,7 +6,7 @@ import { z } from "zod";
 // Type-only (erased): product/schema.ts imports the schema barrel, a value import would be a cycle.
 import type { Archetype } from "./product/archetype-names";
 import {
-  ACTUATOR_KINDS, ACTUATOR_LOADS, BUILD_CLASSES, CATEGORIES, COLOURS, ENCLOSURE_TEMPLATES,
+  ACTUATOR_KINDS, ACTUATOR_LOADS, BUILD_CLASSES, CATEGORIES, COLOURS, CONTROLLER_BUSES, ENCLOSURE_TEMPLATES,
   ENVIRONMENTS, FACES, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, LOOKS, MATERIALS,
   MECH_TEMPLATES, MOVER_KINDS, OUTPUTS, PIN_ROLES, PIN_SIDES, PLACEMENTS, PORT_KINDS, POWERS,
   SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
@@ -51,6 +51,33 @@ export type Understanding = z.infer<typeof UnderstandingSchema>;
 export type UnderstandingPart = z.infer<typeof UnderstandingPartSchema>;
 export type UnderstandingMover = z.infer<typeof UnderstandingMoverSchema>;
 
+/**
+ * 2026-10-25: the engineering scope of the build — the facts the understanding's part
+ * lists cannot show, returned by the model on the SAME turn as the card (no second AI
+ * call). It describes the DESIGN only: lib/studio/tiers.ts maps it onto a tier and the
+ * tier onto a price, so nothing in here is money and nothing in here is trusted from
+ * the browser (the stored tier is a floor the client can only raise).
+ */
+export const BuildScopeSchema = z.object({
+  /** Microcontrollers that run their own firmware (0 on a logic / cad build). */
+  controllers: z.number().int().min(0).max(LIMITS.scope.controllersMax),
+  /** Only when two or more controllers talk to EACH OTHER: the protocol between them. */
+  controllerBus: z.enum(CONTROLLER_BUSES).optional(),
+  /** Coordinated motion axes (a 4-axis machine = 4). */
+  axes: z.number().int().min(0).max(LIMITS.scope.axesMax).optional(),
+  /** Beyond the hobby class (STM32, Teensy, FPGA, a single-board computer). */
+  highEndController: z.boolean().optional(),
+  /** A custom printed circuit board is part of the deliverable (not a breadboard or a module). */
+  customPcb: z.boolean().optional(),
+  /** Production firmware architecture, not a starter sketch. */
+  productionFirmware: z.boolean().optional(),
+  /** Mechanics and electronics as one integrated package (sealed, gasketed, load-bearing). */
+  integratedEnclosure: z.boolean().optional(),
+  /** Several voltage rails, high current, or mains power. */
+  complexPower: z.boolean().optional(),
+});
+export type BuildScope = z.infer<typeof BuildScopeSchema>;
+
 export const ProductSpecSchema = z.object({
   name: z.string().min(LIMITS.name.min).max(LIMITS.name.max),
   oneLine: z.string().max(LIMITS.oneLine.max),
@@ -69,6 +96,8 @@ export const ProductSpecSchema = z.object({
   actuators: z.array(ActuatorSchema).max(LIMITS.actuators.max).optional(),
   /** 2026-10-18: the "Our understanding" panel. Absent on cards made before it. */
   understanding: UnderstandingSchema.optional(),
+  /** 2026-10-25: the engineering scope the tier is classified from. Absent = read as a one-controller build. */
+  scope: BuildScopeSchema.optional(),
   /**
    * 2026-10-20: what kind of build this is. Absent on cards made before it, which
    * are read as "mcu" (buildClassOf() in lib/studio/build-class.ts). The user can

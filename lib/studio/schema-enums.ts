@@ -26,6 +26,14 @@ export const STYLES = ["rounded", "soft_tech", "rugged", "minimal"] as const;
 /** The understanding panel's movers (2026-10-18): linear_actuator has no spec.actuators kind (understanding only). */
 export const MOVER_KINDS = ["servo", "linear_actuator", "motor", "pump", "stepper"] as const;
 
+/**
+ * 2026-10-25: the protocol two or more CONTROLLERS use to talk to each other
+ * (spec.scope.controllerBus). A bus that only reads sensors on one board is not
+ * one of these — it is a Tier 2 signal in lib/studio/tiers.ts.
+ */
+export const CONTROLLER_BUSES = ["i2c", "spi", "uart", "can"] as const;
+export type ControllerBus = (typeof CONTROLLER_BUSES)[number];
+
 export const CATEGORIES = [
   "mcu", "power", "sensor", "display", "input", "output", "actuator", "connector", "logic",
 ] as const;
@@ -122,6 +130,11 @@ export const LIMITS = {
   actuators: { max: 4, countMin: 1, countMax: 8, roleMax: 40 },
   /** "Our understanding" panel (2026-10-18): goal, how it works, the parts it needs. */
   understanding: { goal: 220, how: 600, name: 50, purpose: 100, items: 6, countMax: 8 },
+  /**
+   * 2026-10-25: spec.scope — the engineering facts the part lists cannot express.
+   * The model reports them; lib/studio/tiers.ts turns them into a tier and a price.
+   */
+  scope: { controllersMax: 8, axesMax: 12 },
   widthToDepth: { min: 0.5, max: 2.5 },
   cornerRadius: { min: 3, max: 20 },
   edgeFillet: { min: 1, max: 6 },

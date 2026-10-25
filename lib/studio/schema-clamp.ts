@@ -4,14 +4,14 @@
 // Import from "./schema".
 
 import {
-  ACTUATOR_LOADS, BUILD_CLASSES, COLOURS, ENCLOSURE_TEMPLATES, ENVIRONMENTS, FEET, FINISHES,
+  ACTUATOR_LOADS, BUILD_CLASSES, COLOURS, CONTROLLER_BUSES, ENCLOSURE_TEMPLATES, ENVIRONMENTS, FEET, FINISHES,
   HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MATERIALS, MECH_TEMPLATES, MOVER_KINDS, OUTPUTS,
   PLACEMENTS, POWERS, SIDE_VENT_FACES, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
-  type ActuatorKind, type BuildClass, type EnclosureTemplate, type MechTemplate,
+  type ActuatorKind, type BuildClass, type ControllerBus, type EnclosureTemplate, type MechTemplate,
   type MoverKind, type Placement,
 } from "./schema-enums";
 import type {
-  Actuator, EnclosureSpec, MechPart, ProductSpec, Understanding, UnderstandingMover,
+  Actuator, BuildScope, EnclosureSpec, MechPart, ProductSpec, Understanding, UnderstandingMover,
   UnderstandingPart,
 } from "./schema-zod";
 import { DEFAULT_ENCLOSURE, DEFAULT_SPEC, MECH_PARAMS } from "./schema-defaults";
@@ -130,6 +130,54 @@ export function clampActuators(v: unknown, log: ClampLog = []): Actuator[] {
   return out;
 }
 
+/**
+ * Any value → a valid BuildScope, or undefined when the model said nothing usable.
+ *
+ * The keys are written in a FIXED order (and false / absent flags are dropped), so two
+ * equal scopes stringify the same way and sameCard() in ai/spec.ts does not read a
+ * reordered object as a change. The money rules never read this object directly:
+ * lib/studio/tiers.ts classifies it, and the stored tier stays a floor, so a scope
+ * invented by a client can only ever ask for a HIGHER tier (and then needs approval).
+ */
+export function clampScope(v: unknown, log: ClampLog = []): BuildScope | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (!isObj(v)) {
+    log.push({ path: "scope", from: v, to: null });
+    return undefined;
+  }
+  const S = LIMITS.scope;
+  const flag = (x: unknown, path: string): boolean | undefined => {
+    if (x === undefined || x === null || x === false || x === "false") return undefined;
+    if (x === true || x === "true") return true;
+    log.push({ path: `scope.${path}`, from: x, to: null });
+    return undefined;
+  };
+  const int = (x: unknown, max: number, path: string): number | undefined => {
+    if (x === undefined || x === null || x === "") return undefined;
+    return clampNum(x, 0, max, 0, `scope.${path}`, log, { int: true });
+  };
+  const rawBus = typeof v.controllerBus === "string" ? v.controllerBus.trim().toLowerCase() : "";
+  const controllerBus = rawBus ? (CONTROLLER_BUSES as readonly string[]).find((b) => b === rawBus) : undefined;
+  if (v.controllerBus !== undefined && v.controllerBus !== null && v.controllerBus !== "" && !controllerBus) {
+    log.push({ path: "scope.controllerBus", from: v.controllerBus, to: null });
+  }
+  const controllers = int(v.controllers, S.controllersMax, "controllers");
+  const axes = int(v.axes, S.axesMax, "axes");
+  const out: BuildScope = {
+    controllers: controllers ?? 1,
+    ...(controllerBus ? { controllerBus: controllerBus as ControllerBus } : {}),
+    ...(axes === undefined ? {} : { axes }),
+    ...(flag(v.highEndController, "highEndController") ? { highEndController: true } : {}),
+    ...(flag(v.customPcb, "customPcb") ? { customPcb: true } : {}),
+    ...(flag(v.productionFirmware, "productionFirmware") ? { productionFirmware: true } : {}),
+    ...(flag(v.integratedEnclosure, "integratedEnclosure") ? { integratedEnclosure: true } : {}),
+    ...(flag(v.complexPower, "complexPower") ? { complexPower: true } : {}),
+  };
+  // Nothing but a defaulted controller count: no information, so no scope.
+  if (controllers === undefined && Object.keys(out).length === 1) return undefined;
+  return out;
+}
+
 /** Any value → a valid ProductSpec. quantity is always 1 on this site. */
 export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   const o = isObj(input) ? input : {};
@@ -159,6 +207,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
   const scaleNote = typeof o.scaleNote === "string" && o.scaleNote.trim() ? clampStr(o.scaleNote, LIMITS.scaleNote.max, "", "scaleNote", log) : "";
   const actuators = clampActuators(o.actuators, log);
   const understanding = clampUnderstanding(o.understanding, log);
+  const scope = clampScope(o.scope, log);
   // clampSpec rebuilds the spec field by field, so a field missing from this
   // list is silently dropped. buildClass MUST survive: losing it turns a
   // "no microcontroller" build back into an mcu one, which is the exact bug
@@ -183,6 +232,7 @@ export function clampSpec(input: unknown, log: ClampLog = []): ProductSpec {
     ...(scaleNote ? { scaleNote } : {}),
     ...(actuators.length ? { actuators } : {}),
     ...(understanding ? { understanding } : {}),
+    ...(scope ? { scope } : {}),
     ...(buildClass ? { buildClass: buildClass as BuildClass } : {}),
     quantity: 1,
   };

@@ -2,12 +2,12 @@
 
 Run log, rules for new migrations, and the next free number. Files are in `supabase/migrations/` (92 files in this worktree). Run status is copied from the pre-audit `CLAUDE.md` (`docs/history/CLAUDE-2026-10-full.md`, "Pending migrations" and the stage log) and from the SQL file headers; nothing here was checked against the live database.
 
-**Next free number: 0106.**
+**Next free number: 0107.**
 
 ## Rules for a new migration
 
 1. Never edit an applied migration. Write a new file.
-2. Number it from 0106 upward. Before committing, re-run `ls supabase/migrations`: a parallel session can take your number.
+2. Number it from 0107 upward. Before committing, re-run `ls supabase/migrations`: a parallel session can take your number.
 3. Make it idempotent (safe to re-run; `on conflict do nothing` for seeds, so owner edits survive).
 4. Put a rollback note in the header (every file from 0088 on has a `Rollback:` section, 0100-0105 included).
 5. Add a PGlite test. Pattern: `lib/schools/db/schools-migration.test.ts`.
@@ -26,9 +26,10 @@ Run log, rules for new migrations, and the next free number. Files are in `supab
 | 0102_credits_server_spend.sql | NOT RUN (audit DB-04 / DB-06). Service-only `spend_credit_for` and `cad_set_code_for`; `spend_credit` and `cad_set_code` revoked from sessions. |
 | 0103_guards_and_grants.sql | NOT RUN (audit DB-07 to DB-22, API-02). Job refunds per token kind, guest-claim fix, order caps, revokes, admin-only columns, inquiry limits and more. Needs 0098 first. |
 | 0104_quote_upload_path.sql | NOT RUN. The quote-uploads insert policy requires `<uuid>/<name>`. |
+| 0106_idea_charge_telemetry.sql | NOT RUN. Ideation-charge telemetry (owner, 2026-10-25): `idea_charge_telemetry` (estimated vs charged vs the provider tokens and USD that turn really consumed, plus `stage` 'quoted'/'charged' so declined checkpoints are countable; super-admin read only), `idea_charge_claim()` / `idea_charge_fill()` (the project's own owner writes its rows; the unique `(project_id, idea_key)` is the replay guard for a "different product" charge and keeps a repeated quote to one row) and `admin_idea_charge_summary(days)`. Run after 0105; safe to re-run. Nothing in the money path changes — until it runs the Studio charges the same and only records nothing. Test: `lib/studio/db/idea-telemetry-migration.test.ts`. |
 | 0105_parts_cost_private.sql | NOT RUN. Column-level SELECT on `parts` without the cost columns, `parts_admin` view, internal `store_settings` keys hidden. Needs the matching app commit deployed first; after it, place one small test order and open Dashboard -> Store once. |
 
-0100-0105 were added by the 2026-10 audit branch (`docs/audit/FINAL_REPORT.md` section 5 has the check queries). Run order: 0098, then 0100-0105, in numeric order.
+0100-0105 were added by the 2026-10 audit branch (`docs/audit/FINAL_REPORT.md` section 5 has the check queries). Run order: 0098, then 0100-0106, in numeric order.
 
 ### Listed as pending in `CLAUDE.md`, no run mark recorded
 
@@ -141,6 +142,7 @@ RUN dates are the owner's, as recorded in the pre-audit `CLAUDE.md`. "No record"
 | 0098_commission_floor | Commission floor | NOT RUN |
 | 0099_analysis_request_hash | Remembers which request each analysis answered | No record (header: run after 0095) |
 | 0100 to 0105 | Audit migrations | NOT RUN (see above) |
+| 0106_idea_charge_telemetry | Ideation charges: quoted vs charged vs actual, admin read only | NOT RUN |
 
 ## Gaps in the numbering
 

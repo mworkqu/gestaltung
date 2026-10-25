@@ -15,13 +15,14 @@ import { STORE_CARD_COLUMNS, type StoreCardPart } from "@/lib/store/catalog";
 import type { EnclosureSpec, MechPart, Net, ProductSpec, StudioCheck, StudioComponent, StudioDoc } from "@/lib/studio/schema";
 import type { ProductMockOptions } from "@/lib/studio/geometry/protocol";
 import { PROJECT_IMAGE_BUCKET } from "@/lib/projects/constants";
-import type { TokenInfo } from "@/lib/studio/server/tokens";
+import type { ApprovalAsk, TokenInfo } from "@/lib/studio/server/tokens";
+import type { TierId } from "@/lib/studio/tiers";
 import type { IdeaMessage } from "./steps";
 import type { Locale } from "@/lib/locale";
 import { safeFileName } from "@/lib/storage/paths";
 import { missingProjectError } from "./load-miss";
 
-export type { TokenInfo };
+export type { ApprovalAsk, TokenInfo };
 
 export type { Locale };
 
@@ -47,6 +48,14 @@ export type SpecReply = (
   | { question: string; choices: string[] }
   | { spec: ProductSpec; reply?: string }
   | { reply: string; spec?: ProductSpec; changed: string[] }
+  /**
+   * The tier checkpoint (2026-10-25): this turn would move the build into a higher
+   * tier, so nothing was charged and the new card is withheld. Show `tokens` as the
+   * exact cost and either send the same turn again with `approveTier: ask.tier`, or
+   * stay in the current tier and keep the scope simple.
+   */
+  // `spec?: never` keeps `data.spec` readable across the whole union.
+  | { needsApproval: ApprovalAsk; reply?: string; spec?: never }
 ) & { tokens?: TokenInfo };
 export type PickReply = { components: StudioComponent[]; docVersion: number | null };
 export type WiringReply = {
@@ -114,7 +123,14 @@ export interface StudioApi {
   /** Ideation token balance + tier (migration 0088); null before it runs or in the mock. */
   tokens?(): Promise<TokenInfo | null>;
   /** `current` = the card already shown: the last user message refines it (W3). */
-  spec(body: { idea: string; messages: IdeaMessage[]; locale: Locale; current?: ProductSpec | null }): Promise<Res<SpecReply>>;
+  spec(body: {
+    idea: string;
+    messages: IdeaMessage[];
+    locale: Locale;
+    current?: ProductSpec | null;
+    /** The tier the visitor approved in the checkpoint modal; the server prices it, not us. */
+    approveTier?: TierId | null;
+  }): Promise<Res<SpecReply>>;
   pick(spec: ProductSpec, locale: Locale): Promise<Res<PickReply>>;
   wiring(spec: ProductSpec, components: StudioComponent[], locale: Locale): Promise<Res<WiringReply>>;
   enclosure(
@@ -253,7 +269,15 @@ export function liveStudioApi(projectId: string): StudioApi {
       }
     },
 
-    spec: ({ idea, messages, locale, current }) => postJson("/api/studio/spec", { projectId, locale, idea, messages, current: current ?? null }),
+    spec: ({ idea, messages, locale, current, approveTier }) =>
+      postJson("/api/studio/spec", {
+        projectId,
+        locale,
+        idea,
+        messages,
+        current: current ?? null,
+        ...(approveTier ? { approveTier } : {}),
+      }),
     async tokens() {
       try {
         const res = await fetch(`/api/studio/tokens?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
