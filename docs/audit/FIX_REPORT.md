@@ -105,7 +105,7 @@ days and that discount percentage, both in §7a.
 | F-045 FQBN in the Code step | **Fixed** | "Arduino Nano", from the library part's display name, falling back to a tidied FQBN segment. |
 | F-047 Arabic message, English reply | **Fixed** | The reply and the question mirror the visitor's language; the card, features and change labels stay in the page language. |
 | F-048 Chat input not cleared | **Fixed** | Cleared on send. |
-| F-008, F-023 Ideation tokens | **Not done** | Explaining tokens in three places and removing the optimistic deduction. Not started. |
+| F-008, F-023 Ideation tokens | **Being rebuilt (2026-10-25)** | Rather than only adding copy, the owner chose to rebuild the model: three complexity tiers, Tier 1 free, costs quoted upfront and fixed once agreed. See §3.5. |
 
 ### Phase C — password reset and email confirmation
 
@@ -231,6 +231,45 @@ alone — those name the supplier's lead class on the product page and in admin,
 genuinely faster. The arithmetic is in §7a. Today's 1+2+3 puts an in-stock item at ~8 days;
 1+2+1 puts it at ~6. A buffer of 1 is the sensible floor — it is what absorbs a supplier
 being a day late without breaking a date already shown to a customer.
+
+### 3.5 The ideation-token model, rebuilt (owner decision, 2026-10-25)
+
+F-008 said tokens are a second currency only one page explains; F-023 said the counter
+deducts optimistically and tells people they are broke mid-turn. Rather than paper over
+both with copy, the owner replaced the model.
+
+**Three tiers, classified from the project's scope, not from a separate AI pass:**
+
+| tier | what it is | cost |
+|---|---|---|
+| 1 — basic / educational | one controller, ≤ 2 sensors, ≤ 2 movers, ≤ 2 axes | **free** |
+| 2 — mechatronics / multi-axis | several coordinated axes, a higher-end controller, or more than one controller talking over a bus | 7 tokens |
+| 3 — advanced / turnkey | custom PCB, production firmware, integrated packaging, complex power | 14 tokens |
+
+**Refining the same idea is always free, however many turns.** Tokens are charged only when
+a turn moves the project up a tier, or starts a genuinely different product — and both pause
+and quote the exact cost before anything is deducted, with the option to decline and carry
+on refining. Once agreed, exactly that amount is charged even if the model's real usage
+differs; estimated-vs-actual is recorded for unit economics (migration **0106**, NOT RUN).
+
+**Decided here, and worth knowing because each will look like a bug to someone:**
+
+1. **Tier 3 is reached by integration signals only, never by part count.** A ten-sensor build
+   with no integration signal is deliberately Tier 2 at 7 tokens; the old config put
+   "anything bigger" in the top tier. Integration is what makes a project expensive to think
+   about. *Owner, 2026-10-25.*
+2. **Tier 1 narrows from 3 sensors to 2**, so a three-sensor build that ideates free today
+   becomes Tier 2.
+3. **The price is presentation, not economics.** "QAR 10 with 80% off" resolves to the
+   **QAR 2 that is already charged today**. No pack price moves and no customer pays more.
+4. **There is no Stripe and no card gateway.** Tokens are paid by Fawran, bank transfer or
+   cash through migration 0089, with a human approving the receipt. The one place amounts
+   live is `lib/billing/config.ts`.
+5. **Tier 2 = 7 and Tier 3 = 14** were not in the spec; they come from the owner's own
+   2026-10-23 decision recorded in CLAUDE.md, and are tunable in one place.
+6. **The new-product check is deliberately biased toward free.** It fires only when the
+   model's hint and our own reading of the identity fields agree, because a false positive
+   charges someone who was only refining, while a false negative costs one free turn.
 
 ### 3.4 Things I could not reproduce, and did not "fix" blindly
 
