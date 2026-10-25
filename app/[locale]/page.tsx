@@ -27,6 +27,7 @@ import { YoutubeLinks } from "@/components/marketing/youtube-links";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
+import { tokenCopyParams } from "@/lib/billing/config";
 import { VIDEOS, videoBase, videoJsonLd } from "@/lib/videos";
 
 // ISR (Phase G): static per locale, re-rendered at most every 5 minutes, or at
@@ -183,6 +184,7 @@ export default async function Home({
             <ChoiceHead icon={<Lightbulb className="h-4 w-4" />} title={t("choiceIdeaTitle")} text={t("choiceIdeaText")} />
             {/* P1-05: where the wiring comes from. */}
             <p className="text-[11px] leading-relaxed text-mutedtext">{t("choiceIdeaDatasheet")}</p>
+            <p className="text-[11px] leading-relaxed text-mutedtext">{t("choiceIdeaTokens", tokenCopyParams())}</p>
             <div className="mt-auto space-y-2">
               <TrackClick event="path_chosen" params={{ path: "plan" }}>
                 <Button asChild size="lg" className="w-full rounded-2xl">

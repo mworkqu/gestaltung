@@ -1,9 +1,27 @@
 import { describe, expect, it } from "vitest";
 
-import { MAKER_PASS, TOKEN_PACKS, TOKEN_PRICE_QAR, productById } from "./config";
+import {
+  MAKER_PASS,
+  TOKEN_BASE_PRICE_QAR,
+  TOKEN_LAUNCH_DISCOUNT,
+  TOKEN_PACKS,
+  TOKEN_PRICE_QAR,
+  effectiveTokenPrice,
+  productById,
+  tokenCopyParams,
+} from "./config";
 import { checkReceipt, cleanReceipt, fold, type Receipt } from "./verify";
 
 describe("billing config", () => {
+  it("token price: base QAR 10 with an 80% launch discount is an effective QAR 2", () => {
+    expect(TOKEN_BASE_PRICE_QAR).toBe(10);
+    expect(TOKEN_LAUNCH_DISCOUNT).toEqual({ active: true, pct: 80 });
+    expect(TOKEN_PRICE_QAR).toBe(2);
+    expect(effectiveTokenPrice(TOKEN_BASE_PRICE_QAR, TOKEN_LAUNCH_DISCOUNT)).toBe(2);
+    // Switching the discount off puts the price back to the base; the copy params follow.
+    expect(effectiveTokenPrice(10, { active: false, pct: 80 })).toBe(10);
+    expect(tokenCopyParams()).toMatchObject({ tokenPrice: "2", base: "10", discount: "80", promo: "on", tier2: "7", tier3: "14" });
+  });
   it("the Maker Pass is always 2x what its price buys pay-per-use", () => {
     expect(MAKER_PASS.monthlyTokens).toBe(2 * Math.floor(MAKER_PASS.qar / TOKEN_PRICE_QAR));
     expect(MAKER_PASS.rolloverCap).toBe(2 * MAKER_PASS.monthlyTokens);

@@ -7,7 +7,46 @@
 // route reads them from here when it creates a payment row, and the grant
 // uses what that row recorded.
 
-export const TOKEN_PRICE_QAR = 2;
+import { TIERS } from "@/lib/studio/tiers";
+
+/** The list price of one ideation token, before any discount. */
+export const TOKEN_BASE_PRICE_QAR = 10;
+
+/** The launch discount on ideation tokens (owner, 2026-10-25). Set `active: false` to end it: every price and sentence follows. */
+export const TOKEN_LAUNCH_DISCOUNT = { active: true, pct: 80 } as const;
+
+/** The price after the discount (the base when the discount is off). Pure, so the switch-off case is testable. */
+export function effectiveTokenPrice(base: number, discount: { active: boolean; pct: number }): number {
+  return discount.active ? (base * (100 - discount.pct)) / 100 : base;
+}
+
+/** What one token costs a user today. Packs and the Maker Pass derive from this. */
+export const TOKEN_PRICE_QAR = effectiveTokenPrice(TOKEN_BASE_PRICE_QAR, TOKEN_LAUNCH_DISCOUNT);
+
+/**
+ * Every number the token sentences interpolate, as the strings next-intl wants.
+ * `promo` is "on" | "off" for an ICU select, so the "launch discount" wording
+ * disappears by itself when the discount is switched off. Tier costs come from
+ * lib/studio/tiers.ts, never from the copy.
+ */
+export function tokenCopyParams(): {
+  tokenPrice: string;
+  base: string;
+  discount: string;
+  promo: "on" | "off";
+  tier2: string;
+  tier3: string;
+} {
+  const upfront = (level: 2 | 3) => String(TIERS.find((t) => t.level === level)?.upfront ?? 0);
+  return {
+    tokenPrice: String(TOKEN_PRICE_QAR),
+    base: String(TOKEN_BASE_PRICE_QAR),
+    discount: String(TOKEN_LAUNCH_DISCOUNT.pct),
+    promo: TOKEN_LAUNCH_DISCOUNT.active ? "on" : "off",
+    tier2: upfront(2),
+    tier3: upfront(3),
+  };
+}
 
 export type TokenPack = { id: string; tokens: number; qar: number };
 

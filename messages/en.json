@@ -1078,7 +1078,8 @@
     "founders3Text": "One studio, one price, one person on WhatsApp. Replies within one working day.",
     "studentsTitle": "School & student projects",
     "studentsText": "Science fair, exam project or a first robot: the same tool, written for a school budget.",
-    "studentsCta": "See how it works for schools"
+    "studentsCta": "See how it works for schools",
+    "choiceIdeaTokens": "Basic projects are free to plan. Multi-axis, multi-controller or turnkey builds need ideation tokens: {tier2} or {tier3}, at QAR {tokenPrice} a token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}}. We always quote the cost first, and nothing is deducted until you approve."
   },
   "DesignQuote": {
     "metaTitle": "Get a free quote | Gestaltung360",
@@ -3426,10 +3427,19 @@
     "faq6A": "Any project you have not archived. Maker allows {n} at a time; archive one to start another.",
     "tokensKicker": "Ideation tokens",
     "tokensTitle": "Pay per idea, no subscription needed",
-    "tokensIntro": "New accounts start with {welcome} free tokens. A new idea costs {idea}; edits cost 1 token every {every} messages.",
-    "tokensPayg": "Pay-per-use: QAR {each} per token, never expire.",
+    "tokensIntro": "New accounts start with {welcome} free tokens. Basic projects are free to ideate and refine. Mechatronics builds cost {tier2} tokens and advanced or turnkey builds {tier3}, quoted before anything is deducted.",
+    "tokensPayg": "Pay-per-use: QAR {tokenPrice} per token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}}. Tokens never expire.",
     "tokensPass": "Optional Maker Pass: QAR {qar} a month for {tokens} tokens (2× the tokens).",
-    "tokensCta": "See token packs"
+    "tokensCta": "See token packs",
+    "faq7Q": "What are ideation tokens, and when do I need them?",
+    "faq7A": "Ideation tokens pay for the chat that shapes your idea. Basic projects are free to ideate. Multi-axis, multi-controller or turnkey builds need tokens: {tier2} or {tier3}, at QAR {tokenPrice} a token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}}. We always quote the cost first, and nothing is deducted until you approve. Refining the same idea stays free.",
+    "tcHeading": "How tokens and credits work",
+    "tcIntro": "You can spend two different things here. They pay for two different steps, so they never overlap.",
+    "tcTokensTitle": "Ideation tokens: the chat",
+    "tcTokensText": "Tokens pay for the chat where you shape your idea. A basic project costs nothing. A bigger build (several axes or controllers, or turnkey) costs {tier2} or {tier3} tokens, quoted before anything is deducted. New accounts get {welcome} tokens.",
+    "tcCreditsTitle": "Credits: the drawings",
+    "tcCreditsText": "A credit pays for one output: a wiring diagram or a 3D model. Spend one, then order the parts from us within {days} days and it comes back as a QAR {price} discount.",
+    "tcFlow": "In short: tokens decide what to build, credits draw it."
   },
   "Turnstile": {
     "loading": "Loading the verification check…",
@@ -4649,24 +4659,25 @@
       "buildClassNote": "This decides which steps matter most. Steps we grey out stay open if you want them."
     },
     "tiers": {
-      "explorer": "Explorers",
-      "maker": "Makers",
-      "engineer": "Engineers",
+      "explorer": "Basic",
+      "maker": "Mechatronics",
+      "engineer": "Advanced / turnkey",
       "level": "{tier} level",
-      "explorer_blurb": "Starter build: 1 controller, up to 3 sensors, up to 2 servos or small actuators.",
-      "maker_blurb": "Bigger build: up to 6 sensors and 4 servos or actuators. Tokens cost ×{m}.",
-      "engineer_blurb": "Advanced build: more parts than a Makers build. Tokens cost ×{m}."
+      "explorer_blurb": "One controller, up to 2 sensors, up to 2 motors or actuators. Free to ideate and refine.",
+      "maker_blurb": "Several coordinated axes, a higher-end controller, or more than one controller talking over a bus.",
+      "engineer_blurb": "A custom circuit board, production firmware, fully integrated packaging or a complex power system."
     },
     "tokens": {
       "balance": "Ideation tokens: {n}",
       "admin": "Ideation tokens: unlimited (admin)",
-      "rule": "New idea: {idea} · edits: {cost} every {every} messages · next in {next}",
-      "tierUp": "Your build grew to the {tier} level. Ideation tokens now cost ×{m}.",
-      "tierDown": "Your build is back to the {tier} level. Ideation tokens cost ×{m}.",
+      "rule": "Basic projects are free · Mechatronics {tier2} tokens · Advanced / turnkey {tier3} tokens · refining stays free",
+      "tierUp": "Your build grew to the {tier} level.",
+      "tierDown": "Your build is back to the {tier} level.",
       "empty": "You've used your ideation tokens. Get more to keep going: pay-per-use packs or the Maker Pass.",
       "contact": "Get tokens",
       "pass": "Maker Pass until {date}",
-      "get": "Get tokens"
+      "get": "Get tokens",
+      "explain": "Basic projects are free to ideate. Multi-axis, multi-controller or turnkey builds need ideation tokens: {tier2} or {tier3}, at QAR {tokenPrice} a token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}}. We always quote the cost first, and nothing is deducted until you approve."
     },
     "engineeringView": "Engineering view",
     "partsOnRequestPlus": "+ {form, select, one {1 part priced on request} other {{count} parts priced on request}}",
@@ -4676,7 +4687,25 @@
     "fadedTitle": "Probably not needed for this build",
     "fadedContinue": "Skip to the next step",
     "fadedLogic": "This build is pure logic chips — there is no firmware to write and no sealed case to print.",
-    "fadedCad": "This build is mainly a printed part — there is no circuit to wire and no code to write."
+    "fadedCad": "This build is mainly a printed part — there is no circuit to wire and no code to write.",
+    "tierAsk_escalation": "This change moves your project up to {tier}. It costs {n} tokens.",
+    "tierAsk_newProduct": "This looks like a different product. Starting it costs {n} tokens.",
+    "tierAsk_approve": "Start it — {n} tokens",
+    "tierAsk_keep": "Keep refining what I have",
+    "tierAsk_free": "Refining your idea stays free.",
+    "tierAsk_why": "Why it costs more",
+    "tierAsk_quoted": "Nothing is charged until you approve. That amount is all you pay.",
+    "tierWhy_sensors": "more than 2 sensors",
+    "tierWhy_movers": "more than 2 motors or actuators",
+    "tierWhy_controllers": "more than one controller board",
+    "tierWhy_controller_bus": "the controllers talk to each other over a bus",
+    "tierWhy_axes": "motion on several coordinated axes",
+    "tierWhy_high_end_controller": "a higher-end controller",
+    "tierWhy_custom_pcb": "a custom circuit board",
+    "tierWhy_production_firmware": "production firmware",
+    "tierWhy_integrated_enclosure": "fully integrated packaging",
+    "tierWhy_complex_power": "a complex power system",
+    "tierAsk_short": "This needs {n} tokens and you have {balance}. You can get more tokens, or keep refining what you have, which stays free."
   },
   "StudioLibrary": {
     "pageTitle": "Studio parts",
@@ -4898,7 +4927,7 @@
     "metaTitle": "Ideation tokens",
     "kicker": "Pay as you go",
     "title": "Ideation tokens",
-    "intro": "Tokens pay for new ideas and edits in the Studio. Buy only what you use, or get the optional Maker Pass for twice the tokens.",
+    "intro": "Tokens pay for bigger projects in the Studio. Buy only what you use, or get the optional Maker Pass for twice the tokens.",
     "balanceTitle": "Your balance",
     "total": "{n} tokens",
     "passTokens": "Maker Pass tokens: {n}",
@@ -4918,12 +4947,12 @@
     "packsTitle": "Pay-per-use packs",
     "packLine": "{tokens} tokens",
     "packPrice": "QAR {qar}",
-    "packEach": "QAR {each} per token · never expire",
+    "packEach": "QAR {tokenPrice} per token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}} · never expire",
     "packBuy": "Buy",
     "costsTitle": "What things cost",
-    "costIdea": "A new idea: {n} token",
-    "costEdits": "Edits: 1 token every {every} messages",
-    "costTiers": "Bigger builds cost more per charge: Makers ×{maker}, Engineers ×{engineer}.",
+    "costIdea": "Basic projects: free, with no limit on refining",
+    "costEdits": "Mechatronics (several axes or controllers): {n} tokens",
+    "costTiers": "Advanced / turnkey (custom board, production firmware, integrated packaging): {n} tokens",
     "checkoutTitle": "Pay with Fawran",
     "checkoutFor": "For: {product}",
     "step1": "Send exactly QAR {qar} by Fawran to {alias}.",
@@ -4971,7 +5000,8 @@
     "reason_model_unavailable": "our checker is busy right now",
     "earnTitle": "Earn tokens back",
     "earnOrder": "Every delivered parts order gives you {n} ideation tokens back.",
-    "earnPrint": "Every finished print order gives you {n} CAD credit."
+    "earnPrint": "Every finished print order gives you {n} CAD credit.",
+    "costQuote": "Refining the same idea is always free. When a change would cost tokens, you see the exact amount first and can decline. Once you approve, that is all we charge."
   },
   "AdminPayments": {
     "kicker": "Admin · Payments",

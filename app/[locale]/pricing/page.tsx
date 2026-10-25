@@ -26,7 +26,7 @@ import { MessagesScope } from "@/components/i18n/messages-scope";
 import { InvitePrice } from "@/components/pricing/invite-price";
 import { getContactPhone } from "@/lib/contact-phone-server";
 import { CAD_GENERATIONS, ORDER_DELIVERED_CREDITS, PROJECT_LIMIT } from "@/lib/credits/constants";
-import { MAKER_PASS, TOKEN_PRICE_QAR } from "@/lib/billing/config";
+import { MAKER_PASS, tokenCopyParams } from "@/lib/billing/config";
 import { metaFor } from "@/lib/meta";
 import { IDEATION } from "@/lib/studio/tiers";
 import type { Plan } from "@/lib/pricing/defaults";
@@ -146,6 +146,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     );
   };
 
+  const tokenCopy = tokenCopyParams();
+  const welcome = String(IDEATION.welcomeTokens);
   const creditCards: { icon: LucideIcon; title: string; text: string }[] = [
     { icon: CircuitBoard, title: t("creditCostTitle"), text: t("creditCostText", { n: formatQar(CAD_GENERATIONS) }) },
     { icon: ListChecks, title: t("creditFreeTitle"), text: t("creditFreeText") },
@@ -226,6 +228,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
       }),
     },
     { q: t("faq6Q"), a: t("faq6A", { n: makerProjects }) },
+    { q: t("faq7Q"), a: t("faq7A", tokenCopy) },
   ];
 
   return (
@@ -355,6 +358,25 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
           </li>
         </ul>
 
+        {/* Two currencies, one plain explanation (F-008). */}
+        <div className="space-y-4">
+          <div className="max-w-2xl space-y-1">
+            <h3 className="title-card">{t("tcHeading")}</h3>
+            <p className="text-sm leading-relaxed text-body">{t("tcIntro")}</p>
+          </div>
+          <div className="grid gap-5 md:grid-cols-2">
+            <div className="min-w-0 tile">
+              <h4 className="title-card">{t("tcTokensTitle")}</h4>
+              <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t("tcTokensText", { ...tokenCopy, welcome })}</p>
+            </div>
+            <div className="min-w-0 tile">
+              <h4 className="title-card">{t("tcCreditsTitle")}</h4>
+              <p className="mt-2 text-sm leading-relaxed text-mutedtext">{t("tcCreditsText", { days, price })}</p>
+            </div>
+          </div>
+          <p className="text-sm font-semibold leading-relaxed text-heading">{t("tcFlow")}</p>
+        </div>
+
         <p className="neu-inset px-5 py-4 text-sm font-semibold leading-relaxed text-heading sm:text-base">
           {t("lossLine", { price })}
         </p>
@@ -368,7 +390,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             {t("tokensTitle")}
           </h2>
           <p className="text-sm leading-relaxed text-body sm:text-base">
-            {t("tokensIntro", { welcome: String(IDEATION.welcomeTokens), idea: String(IDEATION.newIdeaCost), every: String(IDEATION.turnsPerToken) })}
+            {t("tokensIntro", { ...tokenCopy, welcome })}
           </p>
         </div>
         <ul className="grid gap-5 md:grid-cols-2">
@@ -376,7 +398,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
               <Coins className="h-5 w-5" strokeWidth={1.5} aria-hidden />
             </span>
-            <p className="mt-4 text-sm leading-relaxed text-heading">{t("tokensPayg", { each: String(TOKEN_PRICE_QAR) })}</p>
+            <p className="mt-4 text-sm leading-relaxed text-heading">{t("tokensPayg", tokenCopy)}</p>
           </li>
           <li className="min-w-0 tile ring-2 ring-cobalt/50">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-cobalt shadow-neu-sm">
