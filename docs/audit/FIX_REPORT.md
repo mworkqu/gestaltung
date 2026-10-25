@@ -296,10 +296,10 @@ each one before moving on. 0100 and 0105 need the app commit **deployed** first.
 
 | # | File | Check it ran (read-only, SQL editor) |
 |---|---|---|
-| 0098 | `0098_commission_floor.sql` (pre-existing, still NOT RUN — 0103 builds on it) | `select value from store_settings where key = 'commission_floor_pct';` |
+| 0098 | `0098_commission_floor.sql` — **already RUN** (probed live 2026-10-26: the key is present, and nothing else in the repo seeds it; 0103 and 0105 only read it). 0103's prerequisite is satisfied. | `select value from store_settings where key = 'commission_floor_pct';` |
 | 0100 | `0100_studio_private.sql` (deploy the app first) | `select to_regclass('public.project_studio_private') is not null;` → true; then `select count(*) from public.engineering_jobs_snapshot_backup_2026_10;` |
-| 0101 | `0101_ai_usage_server_only.sql` | `select has_function_privilege('authenticated','public.log_ai_usage(text,text,uuid,text,integer,integer,integer,numeric,integer,text,text,integer,integer,text,numeric)','execute');` → false |
-| 0102 | `0102_credits_server_spend.sql` | `select has_function_privilege('authenticated','public.spend_credit(text,uuid)','execute');` → false |
+| 0101 | `0101_ai_usage_server_only.sql` **(deploy the app first)** — it revokes `log_ai_usage` from `authenticated`, and today's code logs with the caller's own client. Soft: `logUsage` only warns, so AI keeps working, but cost tracking goes blind. | `select has_function_privilege('authenticated','public.log_ai_usage(text,text,uuid,text,integer,integer,integer,numeric,integer,text,text,integer,integer,text,numeric)','execute');` → false |
+| 0102 | `0102_credits_server_spend.sql` **(deploy the app first — HARD)** — it revokes `spend_credit` from `authenticated`, and `origin/main` calls it on the user's own client; only this branch moves to `spend_credit_for` on the service client. Run early and every wiring diagram and 3D model fails until the deploy lands. | `select has_function_privilege('authenticated','public.spend_credit(text,uuid)','execute');` → false |
 | 0103 | `0103_guards_and_grants.sql` (needs 0098 first) | `select count(*) from pg_trigger where tgname in ('part_order_items_limits','part_orders_rate_limit','projects_guard_admin_columns','inquiries_guard_insert');` → 4 |
 | 0104 | `0104_quote_upload_path.sql` | `select with_check from pg_policies where policyname = 'quote_uploads_insert';` contains the path regex |
 | 0105 | `0105_parts_cost_private.sql` (deploy the app first) | `select has_column_privilege('anon','public.parts','landed_cost_qar','select');` → false |
@@ -309,11 +309,14 @@ Smoke test after each: open the site and the dashboard once. After **0105** spec
 place one small test order and open Dashboard → Store, to confirm the admin still reads
 prices through `parts_admin`.
 
-**A conflict you need to settle before running anything.** The pre-audit `CLAUDE.md`
-records 0096 and 0097 as **RUN ✔ 2026-10-21, verified by live probe**, while the main
-checkout's working copy of `CLAUDE.md` lists them as NOT RUN. `docs/MIGRATIONS.md` follows
-the verified-by-probe record. Please confirm in Supabase first, because 0097 replaces
-`create_part_order` and refuses to apply unless exactly one copy of it is left.
+**That conflict is settled (probed live, 2026-10-26, read-only, public key only).** 0096
+and 0097 **have run**: `school_classes` and `class_teams` exist (anon gets `42501`, which is
+what 0096 intends), and `part_orders.class_id` / `.class_breakdown` both resolve. 0097
+having applied also means its own guard passed, so exactly one `create_part_order` was left
+behind. Everything through 0099 is in place; 0100 is not (`PGRST205`), and 0105 is not —
+`parts.landed_cost_qar` and `.income_pct` are still readable by `anon` today. The full probe
+table, and the one query the anon key could not answer, are in
+[PR_AND_DEPLOY.md](PR_AND_DEPLOY.md) step 2.
 
 ## 5. Supabase dashboard checklist — auth emails
 

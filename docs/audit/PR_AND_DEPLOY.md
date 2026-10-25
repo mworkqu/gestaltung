@@ -101,29 +101,70 @@ not explained. One run against a deployed preview with the real env would settle
 
 Nothing in the app requires new SQL to boot. Before 0100–0106 run, the new behaviour
 degrades quietly: the tier checkpoint still quotes and charges through the existing 0088
-`idea_token_charge`, and the telemetry write is best-effort.
+`idea_token_charge`, and the telemetry write is best-effort. Batch 1 below may go before or
+after this step; batch 2 must wait for it.
 
-### Step 2 — settle one conflict before any SQL
+### Step 2 — settled: the database is further ahead than the docs said
 
-`CLAUDE.md` disagrees with itself about **0096 / 0097**: the pre-audit copy records them as
-run and verified by probe, the main checkout's copy lists them as NOT RUN. Confirm in
-Supabase first — 0097 replaces `create_part_order` and refuses to apply unless exactly one
-copy of it is left.
+Checked live on 2026-10-26 with the PUBLIC anon key, read-only (no writes, no service-role
+key, no secrets printed). Each row is a schema probe through PostgREST: a missing column
+answers `42703`, a missing table `PGRST205`, and a table that exists but denies the anon
+role answers `42501` — which is itself proof the object is there.
+
+| migration | probe | live answer | verdict |
+|---|---|---|---|
+| 0094 | `store_settings.fx_to_qar` | `USD: 3.72` | **run** |
+| 0095 | `suppliers.rank` | column resolves | **run** |
+| 0096 | `school_classes`, `class_teams` | `42501 permission denied` (exists, anon correctly has nothing) | **run** |
+| 0097 | `part_orders.class_id`, `.class_breakdown` | both resolve | **run** |
+| 0098 | `store_settings.commission_floor_pct` | row present | **run** |
+| 0099 | `analysis_runs.request_hash` | column resolves | **run** |
+| 0100 | `project_studio_private` | `PGRST205 not found` | not run |
+| 0105 | `parts.landed_cost_qar`, `.income_pct` | **readable by anon** | not run — the leak is open |
+
+So the `CLAUDE.md` conflict is settled: **0096 and 0097 have run**, and the
+"0098 still NOT RUN" line in FIX_REPORT §4 was wrong — it has run too. Nothing else in the
+repo seeds `commission_floor_pct` (0103 and 0105 only read it), so that probe is decisive.
+0097 having applied also means its own guard passed, i.e. exactly one `create_part_order`
+was left behind.
+
+**What the anon key could NOT answer:** the function overloads themselves. PostgREST's
+schema document needs a secret key, and I would not use one for a read. If you want the
+list in your own hands, run this in the SQL editor — read-only:
+
+```sql
+select p.oid::regprocedure as signature
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.proname = 'create_part_order'
+order by 1;
+```
+
+Expect exactly one row.
 
 ### Step 3 — run the SQL, in this order, checking each
 
 Full per-file verification queries are in FIX_REPORT §4.
 
-| order | file | note |
+**Batch 1 — safe to run NOW, before the deploy (2 files):**
+
+| order | file | why it is safe now |
 |---|---|---|
-| 1 | `0098_commission_floor.sql` | pre-existing, still not run; **0103 builds on it** |
-| 2 | `0100_studio_private.sql` | **deploy first** |
-| 3 | `0101_ai_usage_server_only.sql` | |
-| 4 | `0102_credits_server_spend.sql` | |
-| 5 | `0103_guards_and_grants.sql` | **needs 0098**; see the trap below |
-| 6 | `0104_quote_upload_path.sql` | |
-| 7 | `0105_parts_cost_private.sql` | **deploy first**; closes a live leak |
-| 8 | `0106_idea_charge_telemetry.sql` | this branch's only own migration; optional, last |
+| 1 | `0103_guards_and_grants.sql` | both prerequisites are already in place (0097 ✓, 0098 ✓). Its guards do not reject anything the live app does: the projects guard silently forces `is_test`/`tenant_id` rather than raising, and the raising limits are 10 orders/hour per phone or email, quantity ≤ 1000, ≤ 300 lines per order. It keeps EXECUTE for `authenticated` on `offer_landed_cost_qar` and moves the admin check inside the function, so the dashboard keeps working. |
+| 2 | `0104_quote_upload_path.sql` | the new path rule is `<uuid>/<filename>` case-insensitively, and the live app already uploads exactly that — `${crypto.randomUUID()}/${sanitize(file.name)}`, with the same `sanitize()` on both branches. |
+
+**Batch 2 — ONLY after the app is deployed (4 files):**
+
+| order | file | what it breaks if run early |
+|---|---|---|
+| 3 | `0100_studio_private.sql` | as documented |
+| 4 | `0101_ai_usage_server_only.sql` | **soft.** Revokes `log_ai_usage` from `authenticated`; today's code logs with the caller's own client. Logging stops, so cost tracking goes blind — but `logUsage` only `console.warn`s, so AI keeps working. Quota reads are unaffected (`ai_usage_totals` keeps `authenticated`). |
+| 5 | `0102_credits_server_spend.sql` | **HARD — customer-facing.** Revokes `spend_credit` from `authenticated`. Today's `lib/credits/server.ts` calls it on the user's own client; only this branch moves it to `spend_credit_for` on the service client. A permission error is not the "function missing" case the code tolerates, so `spend()` returns `failed` and **every wiring diagram and 3D model stops working** until the deploy lands. |
+| 6 | `0105_parts_cost_private.sql` | as documented; closes the cost/margin leak |
+| 7 | `0106_idea_charge_telemetry.sql` | this branch's only own migration; optional, last |
+
+**This corrects an earlier version of this plan**, which said only 0100 and 0105 needed the
+deploy first. 0101 and 0102 do too, and 0102 is the dangerous one: it was checked by reading
+what `origin/main` actually ships, not by trusting the migration headers.
 
 **The 0103 trap.** 0103 reads `part_orders.class_id`, which comes from 0097. Applying 0103
 before 0097 succeeds and then breaks **every** `part_order_items` insert — i.e. checkout.
