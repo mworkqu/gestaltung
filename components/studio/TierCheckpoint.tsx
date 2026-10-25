@@ -29,18 +29,29 @@ export function TierCheckpoint({
 }) {
   const t = useTranslations("Studio");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const approveRef = useRef<HTMLButtonElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const open = ask !== null;
+
+  // Admins have no balance cap; an unknown balance (null) is not "too little", the server decides.
+  const short = ask !== null && ask.balance !== null && ask.balance < ask.tokens;
 
   useEffect(() => {
     const d = dialogRef.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      d.showModal();
+      // Focus the button by hand. React's `autoFocus` prop does not render an
+      // `autofocus` ATTRIBUTE, so showModal() has nothing to honour and parks focus
+      // on the dialog element itself - a keyboard user has to tab in from nowhere.
+      // Focus what they most likely want: approving when they can afford it,
+      // carrying on refining when they cannot. The `!d.open` guard means a later
+      // change to `short` never steals focus from someone already reading this.
+      (short ? keepRef.current : approveRef.current)?.focus();
+    }
     if (!open && d.open) d.close();
-  }, [open]);
-
-  // Admins have no balance cap; an unknown balance (null) is not "too little", the server decides.
-  const short = ask !== null && ask.balance !== null && ask.balance < ask.tokens;
+  }, [open, short]);
   const n = String(ask?.tokens ?? 0);
   const title = !ask
     ? ""
@@ -106,7 +117,7 @@ export function TierCheckpoint({
             <button
               type="button"
               onClick={onKeep}
-              autoFocus={short}
+              ref={keepRef}
               data-testid="studio-tier-keep"
               className={`${primary} text-cobalt shadow-neu-sm hover:text-cobalt-hover`}
             >
@@ -116,7 +127,7 @@ export function TierCheckpoint({
               <button
                 type="button"
                 onClick={onApprove}
-                autoFocus
+                ref={approveRef}
                 data-testid="studio-tier-approve"
                 className={`${primary} bg-cobalt text-white hover:bg-cobalt-hover`}
               >

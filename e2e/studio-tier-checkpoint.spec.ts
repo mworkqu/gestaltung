@@ -106,10 +106,18 @@ for (const locale of LOCALES) {
     await expect(keep).toBeFocused();
     expect((await keep.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
-    // Tab never leaves the dialog.
-    for (let i = 0; i < 4; i++) {
+    // Tab never reaches the page behind. A native modal really does trap focus, but
+    // Chromium parks on <body> for one frame as it wraps round the top layer (measured:
+    // keep -> body -> "Get tokens" -> keep), and <body> itself holds nothing focusable.
+    // So the check is "never an element outside the dialog", not "always inside it" -
+    // the stricter wording failed on the wrap frame while the trap was working.
+    for (let i = 0; i < 6; i++) {
       await page.keyboard.press("Tab");
-      expect(await page.evaluate(() => Boolean(document.activeElement?.closest("dialog")))).toBe(true);
+      const at = await page.evaluate(() => {
+        const a = document.activeElement;
+        return { inDialog: Boolean(a?.closest("dialog")), isBody: a === document.body, text: (a?.textContent ?? "").trim().slice(0, 40) };
+      });
+      expect(at.inDialog || at.isBody, `Tab escaped to: ${at.text}`).toBe(true);
     }
     await keep.click();
     await expect(ask).toBeHidden();

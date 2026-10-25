@@ -129,6 +129,40 @@ describe("withStudioCache · spec", () => {
     expect(specCacheKey("p2", { idea: "x", locale: "en", current: s, messages: [{ role: "user", text: "hi" }] })).not.toBe(a);
   });
 
+  // The tier checkpoint, caught by e2e on 2026-10-25: approving sends the SAME turn
+  // again with `approveTier`. When the cache ignored that field it answered from the
+  // pause it had just stored, so the request never left the browser - nothing was
+  // charged, the card never changed, and the modal looked like a dead button.
+  it("approving a tier checkpoint is a different question from the pause", () => {
+    const base = { idea: "x", locale: "en", current: spec(), messages: [{ role: "user", text: "add a custom pcb" }] };
+    const asked = specCacheKey("p", base);
+    expect(specCacheKey("p", { ...base, approveTier: "maker" })).not.toBe(asked);
+    expect(specCacheKey("p", { ...base, approveTier: "engineer" })).not.toBe(specCacheKey("p", { ...base, approveTier: "maker" }));
+    // Not approving anything is still the same question as before.
+    expect(specCacheKey("p", { ...base, approveTier: null })).toBe(asked);
+  });
+
+  it("a checkpoint is never kept: it is a question, and its balance goes stale", async () => {
+    let calls = 0;
+    const api = withStudioCache({
+      mode: "mock",
+      projectId: "p1",
+      async spec(): Promise<Res<SpecReply>> {
+        calls++;
+        return {
+          ok: true,
+          data: {
+            needsApproval: { kind: "escalation", fromTier: "explorer", fromLevel: 1, tier: "maker", level: 2, tokens: 7, balance: 10, reasons: [] },
+          },
+        } as Res<SpecReply>;
+      },
+    } as unknown as StudioApi);
+    const body = { idea: "x", messages: [], locale: "en" as const, current: spec() };
+    await api.spec(body);
+    await api.spec(body);
+    expect(calls, "the quote must be asked for again, not replayed from the cache").toBe(2);
+  });
+
   it("pick keys differ by project, spec and language", () => {
     const k = pickCacheKey("p", spec(), "en");
     expect(pickCacheKey("p", spec(), "en")).toBe(k);
