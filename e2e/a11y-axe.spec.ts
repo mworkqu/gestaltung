@@ -41,8 +41,14 @@ const ALLOWED: Allowed[] = (
     ["store", "en"],
     ["checkout", "en"],
     ["studio-fixture", "en"],
-    // No "product" entry: without Supabase env the store list is empty, so the
-    // product scan has never actually run. Add one only from a real result.
+    // Added 2026-10-25 from a real result: with Supabase env the scan finally ran
+    // and found the SAME header tagline as the pages above - "Product design &
+    // fabrication, Lusail, Qatar", 9px text-faint, measured 2.28:1 where AA wants
+    // 4.5:1. It is on every page, so it is the token decision, not this page.
+    // The other thing it found, the "Arrives by" badge at 4.47:1, was NOT a token
+    // decision and is fixed in components/parts/arrival-badge.tsx instead.
+    ["product", "en"],
+    // No ["product","ar"]: the Arabic page passes, like the other Arabic pages.
   ] as [string, Loc][]
 ).map(([page, locale]) => ({
   rule: "color-contrast",
@@ -95,6 +101,15 @@ function describeViolations(list: Awaited<ReturnType<typeof scan>>["unexpected"]
 }
 
 test.describe("axe-core: serious and critical violations", () => {
+  // Scan the SETTLED page. `animate-fade-up` starts at opacity 0.6 (never 0, see
+  // F-038), so for 0.7s after load any text inside it is ~40% faded and axe scores
+  // it near 3:1 - a violation that no reader ever sees. That is what made `home
+  // [ar]` flaky: it only has an animated section while an occasion banner is live
+  // (one is, 25 Oct - 5 Dec), and the settled text measures 5.19:1 and 6.74:1.
+  // app/globals.css turns both entry animations off under reduced motion, so this
+  // measures what a reader actually reads instead of a frame mid-fade.
+  test.use({ reducedMotion: "reduce" });
+
   test.skip(({ isMobile }) => isMobile, "one viewport is enough for axe; the desktop project runs it");
 
   for (const locale of LOCALES) {

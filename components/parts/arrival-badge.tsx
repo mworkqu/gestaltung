@@ -26,7 +26,9 @@ export function ArrivalBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700",
+        // emerald-800, not -700: measured 4.47:1 on the tinted background, just under
+        // the 4.5:1 AA needs at this size (axe, product page, 2026-10-25).
+        "inline-flex items-center whitespace-nowrap rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-800",
         className
       )}
     >
