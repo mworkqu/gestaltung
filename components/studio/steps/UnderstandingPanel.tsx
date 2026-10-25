@@ -81,12 +81,17 @@ export function UnderstandingPanel({
         {spec && (
           <span
             className="inline-flex items-center gap-1.5 rounded-full bg-panel px-3 py-1.5 text-xs font-bold text-heading shadow-neu-sm"
-            title={t(`tiers.${tier.id}_blurb`, { m: String(tier.multiplier) })}
+            title={t(`tiers.${tier.id}_blurb`)}
             data-testid="studio-tier-badge"
           >
             <Gauge className="h-3.5 w-3.5" style={{ color: accent.ink }} strokeWidth={2} aria-hidden />
+            {/*
+              The bare "×2" that used to sit here was the old per-turn multiplier. It
+              still multiplies 3D redesigns, but beside the build tier it read as "your
+              chat costs double", which is no longer true: an idea is paid for once,
+              upfront, and refining it is free. The cost lives in the token line.
+            */}
             {t("tiers.level", { tier: t(`tiers.${tier.id}`) })}
-            {tier.multiplier > 1 && <span className="font-mono text-mutedtext">×{tier.multiplier}</span>}
           </span>
         )}
       </div>
