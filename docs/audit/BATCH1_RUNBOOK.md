@@ -14,6 +14,28 @@ that does not depend on you reading your own query output back to me.
 
 ---
 
+## Which copy to paste — this matters
+
+There are TWO copies of these files on your machine. Use the repo ones:
+
+```
+PASTE THIS   <repo>/supabase/migrations/0103_guards_and_grants.sql
+NOT THIS     <repo>/review/gestaltung-audit-reports-2026-10/proposed-migrations/0103_guards_and_grants.sql
+```
+
+The `review/…/proposed-migrations/` folder is the audit's original proposal from
+2026-10-23. The branch re-reviewed it, so three of the six files now differ in content
+(ignoring line endings): **0100 by 66 lines, 0103 by 21, 0105 by 11**. 0101, 0102 and 0104
+are identical either way.
+
+For batch 1 the difference is not cosmetic. The audit's 0103 caps every order at **100
+line items**; the repo's raises that to **300** and exempts class orders from the line cap
+entirely, because a teacher orders for a whole class in one go. Paste the audit's copy and
+you would quietly cap school orders at 100 lines.
+
+The repo copy is also the one this plan was analysed against, and the only one in PR #4 —
+`review/` is git-ignored, so those originals are not in the pull request at all.
+
 ## Step 1 — `0103_guards_and_grants.sql`
 
 Supabase → SQL editor → paste the **whole file** → Run.
