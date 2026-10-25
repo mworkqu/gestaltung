@@ -41,12 +41,14 @@ import {
   answersFrom, cardRows, changedRows, forModel, historyFrom, sameSpec, type CardRow, type IdeaMessage,
 } from "@/lib/studio/client/steps";
 import { STEP_ACCENT } from "@/lib/studio/palette";
-import { IDEATION } from "@/lib/studio/tiers";
-import type { TokenInfo } from "@/lib/studio/client/api";
+import { type TierId } from "@/lib/studio/tiers";
+import { tokenCopyParams } from "@/lib/billing/config";
+import type { ApprovalAsk, TokenInfo } from "@/lib/studio/client/api";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
 import type { StudioCtx } from "../studio-ctx";
 import { AiWait } from "../AiWait";
+import { TierCheckpoint } from "../TierCheckpoint";
 import { UnderstandingPanel } from "./UnderstandingPanel";
 import { Bar, MainButton, Problem, StepFrame } from "../ui";
 import { problemKey } from "./problem";
@@ -93,6 +95,15 @@ export function IdeaStep({
   const [outOfTokens, setOutOfTokens] = useState(false);
   /** Shown once after the turn that moved the build to another tier (never stored, never sent to the AI). */
   const [tierNotice, setTierNotice] = useState<{ dir: "up" | "down"; tier: TokenInfo["tier"]; m: number } | null>(null);
+  /**
+   * The tier checkpoint: the server answered "this turn costs tokens" and withheld the new card.
+   * `turn` is what to resend on approval; nothing is charged until then.
+   */
+  const [paused, setPaused] = useState<{
+    ask: ApprovalAsk;
+    reply: string;
+    turn: { idea: string; history: IdeaMessage[]; current: ProductSpec | null };
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const started = useRef(false);
@@ -102,12 +113,12 @@ export function IdeaStep({
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   };
 
-  async function ask(nextIdea: string, history: IdeaMessage[], current: ProductSpec | null) {
+  async function ask(nextIdea: string, history: IdeaMessage[], current: ProductSpec | null, approveTier?: TierId) {
     setBusy(true);
     setProblem(null);
     setOutOfTokens(false);
     setTierNotice(null);
-    const r = await ctx.api.spec({ idea: nextIdea, messages: forModel(history), locale: ctx.locale, current });
+    const r = await ctx.api.spec({ idea: nextIdea, messages: forModel(history), locale: ctx.locale, current, approveTier: approveTier ?? null });
     setBusy(false);
     if (!r.ok) {
       if (r.error === "no_tokens") {
@@ -118,6 +129,12 @@ export function IdeaStep({
       return;
     }
     const data = r.data;
+    if ("needsApproval" in data) {
+      // Nothing was charged: the balance is the server's current one, the new card is withheld.
+      if (data.tokens) setTokens(data.tokens);
+      setPaused({ ask: data.needsApproval, reply: data.reply?.trim() ?? "", turn: { idea: nextIdea, history, current } });
+      return;
+    }
     if (data.tokens) {
       setTokens(data.tokens);
       if (data.tokens.tierChange) setTierNotice({ dir: data.tokens.tierChange, tier: data.tokens.tier, m: data.tokens.multiplier });
@@ -137,6 +154,23 @@ export function IdeaStep({
       const changedLabels = "changed" in data ? data.changed : [];
       setMessages([...history, { role: "assistant", text: reply, note: true, ...(updated ? { changed: changedLabels } : {}) }]);
     }
+    focusInput();
+  }
+
+  /** Approve: the same turn again with the quoted tier (the server answers from its cache and charges the quote). */
+  function approvePaused() {
+    if (!paused) return;
+    const { ask: a, turn } = paused;
+    setPaused(null);
+    void ask(turn.idea, turn.history, turn.current, a.tier);
+  }
+
+  /** Keep refining: nothing spent, the previous card stays; the AI's note (if any) joins the chat. */
+  function keepPaused() {
+    if (!paused) return;
+    const { reply, turn } = paused;
+    setPaused(null);
+    if (reply) setMessages([...turn.history, { role: "assistant", text: reply, note: true }]);
     focusInput();
   }
 
@@ -261,7 +295,7 @@ export function IdeaStep({
 
         {/* The chat: the side column on desktop (sticky), under the understanding on phones. */}
         <div className="min-w-0 space-y-3 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1" data-testid="studio-idea-chat">
-          <TokenLine tokens={tokens} />
+          <TokenLine tokens={tokens} pending={busy} />
           <div
             ref={logRef}
             role="log"
@@ -401,22 +435,34 @@ export function IdeaStep({
           )}
         </div>
       </div>
+      <TierCheckpoint ask={paused?.ask ?? null} onApprove={approvePaused} onKeep={keepPaused} />
     </StepFrame>
   );
 }
 
-/** "Ideation tokens: 4" + the rule (new idea 1, edits 1 per N messages, × tier). Hidden before 0088 runs. */
-function TokenLine({ tokens }: { tokens: TokenInfo | null }) {
+/**
+ * "Ideation tokens: 4" + the tier rule. Hidden before 0088 runs.
+ * F-023: the number is only ever what the SERVER last said. While a turn is in flight it stays
+ * as it was (never an optimistic deduction, never a red 0 + "Get tokens" for the 25-100 s an
+ * AI turn takes); an unknown balance shows "…" instead of falling back to 0.
+ */
+function TokenLine({ tokens, pending }: { tokens: TokenInfo | null; pending: boolean }) {
   const t = useTranslations("Studio");
   const locale = useLocale();
   if (!tokens) return null;
-  const low = !tokens.admin && (tokens.balance ?? 0) <= 1;
+  const known = tokens.balance !== null;
+  const low = !tokens.admin && !pending && known && (tokens.balance ?? 0) <= 1;
   return (
-    <div className="space-y-1 rounded-2xl bg-panel px-3.5 py-2.5 shadow-neu-sm" data-testid="studio-tokens" data-balance={tokens.balance ?? ""}>
+    <div
+      className="space-y-1 rounded-2xl bg-panel px-3.5 py-2.5 shadow-neu-sm"
+      data-testid="studio-tokens"
+      data-balance={tokens.balance ?? ""}
+      aria-busy={pending}
+    >
       <p className="flex items-center gap-2 text-sm font-bold text-heading">
         <Coins className="h-4 w-4 shrink-0" style={{ color: accent.ink }} strokeWidth={2} aria-hidden />
         <span className={cn(low && "text-destructive")}>
-          {tokens.admin ? t("tokens.admin") : t("tokens.balance", { n: String(tokens.balance ?? 0) })}
+          {tokens.admin ? t("tokens.admin") : known ? t("tokens.balance", { n: String(tokens.balance) }) : "…"}
         </span>
         {!tokens.admin && (
           <Link href="/tokens" className="ms-auto text-xs font-semibold text-cobalt underline-offset-2 hover:underline" data-testid="studio-get-tokens">
@@ -433,13 +479,15 @@ function TokenLine({ tokens }: { tokens: TokenInfo | null }) {
           })}
         </p>
       )}
-      <p className="text-[11px] leading-snug text-mutedtext">
-        {t("tokens.rule", {
-          idea: String(IDEATION.newIdeaCost * tokens.multiplier),
-          cost: String(tokens.multiplier),
-          every: String(tokens.turnsPerToken),
-          next: String(tokens.nextChargeIn),
-        })}
+      {/*
+        One line of rule, one of explanation, both priced from lib/billing/config.ts:
+        the amounts are never written into the copy, so changing the tier costs or
+        ending the launch discount needs no message edit. F-008 asks for this
+        sentence in three places; this is the Studio one.
+      */}
+      <p className="text-[11px] leading-snug text-mutedtext">{t("tokens.rule", tokenCopyParams())}</p>
+      <p className="text-[11px] leading-snug text-mutedtext" data-testid="studio-tokens-explain">
+        {t("tokens.explain", tokenCopyParams())}
       </p>
     </div>
   );

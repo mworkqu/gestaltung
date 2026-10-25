@@ -17,7 +17,8 @@ import { ROBOT_ARM_MODEL_PICK, ROBOT_ARM_REPLY, robotArmSpec } from "@/lib/studi
 import { applyActuatorRules } from "@/lib/studio/ai/actuator-rules";
 import { chatGuardTurn, guardSpec, userTexts, vagueTurn, WORDS } from "@/lib/studio/ai/spec-guards";
 import { clampSpec, type ProductSpec, type StudioComponent } from "@/lib/studio/schema";
-import type { EngineerDesign, Locale, ProductApi, StudioApi } from "./api";
+import type { EngineerDesign, Locale, ProductApi, StudioApi, TokenInfo } from "./api";
+import { tierById, type TierId, type TierReason } from "@/lib/studio/tiers";
 import { mockOptionsFromUrl } from "./product";
 import { forModel, sameSpec } from "./steps";
 import { applyCardColours, cardItems } from "@/lib/studio/card-parts";
@@ -190,7 +191,20 @@ function mockUnderstood(spec: ProductSpec, locale: Locale): ProductSpec {
   };
 }
 
+/** Scripted tier jumps for the e2e checkpoint (see spec()). */
+const CHECKPOINTS: { re: RegExp; tier: "maker" | "engineer"; level: 2 | 3; tokens: number; reasons: TierReason[] }[] = [
+  { re: /custom pcb|لوحة مخصصة/i, tier: "maker", level: 2, tokens: 7, reasons: ["custom_pcb", "sensors"] },
+  { re: /turnkey|جاهز للتسليم/i, tier: "engineer", level: 3, tokens: 14, reasons: ["production_firmware", "integrated_enclosure"] },
+];
+
 export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"): StudioApi {
+  // 10 tokens: enough for the 7-token jump, not for the 14-token one. Only an approved checkpoint spends any.
+  let balance = 10;
+  let tier: TierId = "explorer";
+  const tokenState = (): TokenInfo => {
+    const t = tierById(tier);
+    return { balance, admin: false, charged: 0, tier, level: t.level, upfront: t.upfront, multiplier: t.multiplier, turnsPerToken: 5, nextChargeIn: 5 };
+  };
   return {
     mode: "mock",
     projectId,
@@ -201,8 +215,31 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
     async save(_doc, version) {
       return { ok: true, version: version + 1 };
     },
-    async spec({ messages, locale, idea, current }) {
+    async spec({ messages, locale, idea, current, approveTier }) {
       await wait(250);
+      // The tier checkpoint, scripted for the e2e: "custom pcb" moves the card to Makers (7),
+      // "turnkey" to Engineers (14 — more than the 5 welcome tokens, so the modal has no
+      // approve button). Nothing is charged until the same turn comes back with approveTier.
+      const lastUser = [...messages].reverse().find((m) => m.role === "user")?.text ?? "";
+      const jump = current ? CHECKPOINTS.find((c) => c.re.test(lastUser)) : undefined;
+      if (jump && approveTier !== jump.tier) {
+        return {
+          ok: true,
+          data: {
+            needsApproval: {
+              kind: "escalation",
+              fromTier: "explorer",
+              fromLevel: 1,
+              tier: jump.tier,
+              level: jump.level,
+              tokens: jump.tokens,
+              balance,
+              reasons: jump.reasons,
+            },
+            tokens: tokenState(),
+          },
+        };
+      }
       // The same deterministic guards as the server (lib/studio/ai/spec.ts), so the e2e
       // sees the real vague-idea question, function words and placement.
       const turn = { idea, messages: forModel(messages), locale };
@@ -216,6 +253,12 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
         const last = [...turn.messages].reverse().find((m) => m.role === "user")?.text.trim() ?? "";
         if (ASKS.test(last)) return { ok: true, data: { reply: MOCK_REPLY[locale].answer, changed: [] } };
         let next = guardSpec(current, turn).spec;
+        if (jump) {
+          // Approved: spend exactly the quote, as the server does, and apply the change.
+          balance -= jump.tokens;
+          tier = jump.tier;
+          next = { ...next, features: [...next.features, jump.tier === "maker" ? "Custom PCB" : "Turnkey build"].slice(0, 8) };
+        }
         // Part B: "make it 4 joints" / "2 pumps" sets that count on the card.
         const asked = actuatorCountIn(last);
         if (asked) next = setActuatorCount(next, asked.kind, asked.count);
@@ -234,7 +277,7 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
           asked && actuatorTotals(next).find((a) => a.kind === asked.kind)?.count === asked.count
             ? [actuatorCountLabel(asked.kind, asked.count, locale)]
             : mockChanged(current, next, locale);
-        return { ok: true, data: { reply: MOCK_REPLY[locale].done, spec: next, changed } };
+        return { ok: true, data: { reply: MOCK_REPLY[locale].done, spec: next, changed, ...(jump ? { tokens: tokenState() } : {}) } };
       }
       // Part F: an industrial arm ("big robotic arm like ur10") gets the desktop version at once,
       // with the scale note and the reply that says so (as the real model does on its first card).
@@ -263,7 +306,7 @@ export function mockStudioApi(projectId = "00000000-0000-4000-8000-000000000000"
       };
     },
     async tokens() {
-      return { balance: 5, admin: false, charged: 0, tier: "explorer", multiplier: 1, turnsPerToken: 5, nextChargeIn: 5 };
+      return tokenState();
     },
     async pick(spec, locale) {
       await wait(300);
