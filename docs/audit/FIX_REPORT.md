@@ -554,6 +554,52 @@ migration, write or paid API call was possible at any point — not by policy, b
 structurally. It is also why the e2e suite's numbers look the way they do: it runs without
 Supabase env, exactly as the audit's baseline did.
 
+## 8d. Where this stopped (2026-10-25, paused mid-verification)
+
+Everything in sections 3.5 and 10 is committed on `fix/review-2026-10`, and the
+working tree is clean. Nothing is pushed.
+
+**Green, re-measured after the last code change:** `tsc` clean · `npm run lint`
+0 errors (219 pre-existing warnings) · `npx vitest run` 4,067 passed (309 files) ·
+parity 5,326/5,326 · no circular dependencies · `npm run build` passes.
+
+**NOT finished: the end-to-end suite.** It ran for 33 minutes against a fresh
+production server on port 3400 and was stopped before it printed a summary, so
+there is no pass/fail count for this branch yet. While it ran, `test-results/`
+collected retry folders for four tests:
+
+| spec | note |
+|---|---|
+| `dashboard-nav` — old dashboard URLs still answer | retried; also present in earlier runs |
+| `home-w7` — AR search, add to cart updates the badge | retried on desktop AND mobile-375 |
+| `studio-wiring-views` — hover previews the wire (en, mobile-375) | retried |
+| `studio` — idea to enclosure (en + ar, mobile-375) | retried; the heaviest specs in the suite |
+
+A retry folder is not proof of a final failure, and none of these four touch the
+tier model, the checkpoint modal or the token copy. They are most likely the
+known flakies (the summary before this change recorded 2 flaky), but **that is a
+guess, not a measurement** — do not record a green e2e bar until the suite has
+actually finished.
+
+**To resume, from this worktree:**
+
+```
+npm run build
+E2E_PORT=3400 npx playwright test
+```
+
+Run it in the background and give it 45–60 minutes. `reuseExistingServer` is off
+by default on purpose (§8c), so it boots its own server; the one from the stopped
+run was killed, and port 3400 is free. If the four tests above fail again, check
+them against `origin/main` before blaming this change.
+
+**Then, to close the branch out:** re-read §9, and decide whether the untracked
+`review/` folders belong in git — `review/fixes/screenshots` (16 MB),
+`review/fixes/build` (2.2 MB), `review/qa` (54 MB, your input pack) and
+`review/gestaltung-audit-reports-2026-10` (4.5 MB) are all on disk and all
+untracked. I left them out rather than put 77 MB into the repository without
+asking.
+
 ## 9. Follow-ups
 
 0. **`three-bvh-csg` is now used by test code only.** After the enclosure rebuild, nothing
