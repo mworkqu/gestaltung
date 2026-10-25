@@ -9,7 +9,7 @@ import { defaultMechParts, layoutBounds, mechSummary } from "../ai/mech-default"
 import { placeMechParts } from "../mech/place";
 import type { LibraryPart, StudioComponent } from "../schema";
 import { cutoutBox, type Cutout } from "./cutouts";
-import { planEnclosure } from "./build";
+import { planEnclosure } from "./plan";
 import { topAt } from "./templates";
 import { ALL_TEMPLATES, spec } from "./test-fixtures";
 

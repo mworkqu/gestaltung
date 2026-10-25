@@ -50,6 +50,35 @@ const config = [
     },
   },
   {
+    // Code-health ratchet (REFACTOR_PLAN R2, R8, R9). These are warnings on
+    // purpose: today's hot spots (studio geometry, StudioShell, long admin
+    // pages) exceed them, and `npm run lint` must stay green. As each hot spot
+    // is split, lower the thresholds (complexity 25 -> 15, max-lines-per-function
+    // 200 -> 120) and, once a rule reports 0, promote it to "error" so it cannot
+    // regress. Tests are exempt from the size rules.
+    files: ["**/*.{ts,tsx,mjs}"],
+    rules: {
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      complexity: ["warn", 25],
+      "max-lines-per-function": ["warn", { max: 200, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    files: ["**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "e2e/**"],
+    rules: {
+      "@typescript-eslint/consistent-type-imports": "warn",
+    },
+  },
+  {
+    files: ["**/*.test.{ts,tsx}", "e2e/**", "scripts/**"],
+    rules: {
+      complexity: "off",
+      "max-lines-per-function": "off",
+      "no-console": "off",
+    },
+  },
+  {
     // Tailwind reads its config through CommonJS, so the plugin import
     // has to stay a require().
     files: ["tailwind.config.ts"],

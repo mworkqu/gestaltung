@@ -87,6 +87,39 @@ export function StepFrame({
 }
 
 /** A plain one-line problem under a button. */
+/**
+ * A short message about something that just happened ("Added 5 parts · 2 we'll
+ * source"), read out by screen readers and gone after a few seconds. It is not
+ * a dialog: it never takes focus, and the words it carries are also on the page.
+ */
+export function Toast({ children, onClose, ms = 6000 }: { children: React.ReactNode; onClose: () => void; ms?: number }) {
+  const t = useTranslations("Studio");
+  useEffect(() => {
+    const t = setTimeout(onClose, ms);
+    return () => clearTimeout(t);
+  }, [onClose, ms]);
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 motion-safe:animate-rise"
+      data-testid="studio-toast"
+    >
+      <p className="pointer-events-auto flex max-w-[90vw] items-center gap-3 rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white shadow-neu">
+        <span className="min-w-0">{children}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t("close")}
+          className="-me-2 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-white/15"
+        >
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </p>
+    </div>
+  );
+}
+
 export function Problem({ children }: { children: React.ReactNode }) {
   return (
     <p role="alert" className="text-sm font-medium text-destructive">

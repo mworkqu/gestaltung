@@ -16,9 +16,11 @@
 // Dependencies are injected (http, build, render) so the loop logic is unit-tested
 // in node without WebGL or network; the e2e fixture swaps http for a mock.
 
+import { reasonOfDesignReply } from "@/lib/studio/product/failure";
 import { solveProduct, type SolvedProduct } from "../product/solve";
 import { clampProductModel, type Archetype, type ProductModel } from "../product/schema";
 import { binarySTL, printReadyPositions } from "../product/stl";
+import { platePlan } from "./mesh-check";
 import type { LayoutInput } from "../layout";
 import type { BuiltProduct } from "./product-kernel";
 import type {
@@ -169,7 +171,9 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
   if (r.status === 402 || r.data.error === "no_tokens") return { designs: [], error: "no_tokens", ms: ms() };
   const regens = typeof r.data.regens === "number" ? r.data.regens : undefined;
   const raw = Array.isArray(r.data.designs) ? (r.data.designs as unknown[]).filter(isObj) : [];
-  if (r.status < 200 || r.status >= 300 || raw.length === 0) return { designs: [], error: "failed", ms: ms() };
+  if (r.status < 200 || r.status >= 300 || raw.length === 0) {
+    return { designs: [], error: "failed", reason: reasonOfDesignReply(r.status, raw.length), ms: ms() };
+  }
 
   const designs: ProductPreviewDesign[] = [];
   const list = raw.slice(0, 3);
@@ -189,7 +193,7 @@ export async function runProductPreview(input: ProductPreviewInput, emit: (e: Pr
       designs.push({ id, archetype, why, previewPath: null, status: "failed" });
     }
   }
-  return { designs, ...(designs.some((d) => d.status === "ready") ? {} : { error: "failed" as const }), ms: ms(), ...(regens !== undefined ? { regens } : {}) };
+  return { designs, ...(designs.some((d) => d.status === "ready") ? {} : { error: "failed" as const, reason: "pictures" as const }), ms: ms(), ...(regens !== undefined ? { regens } : {}) };
 }
 
 /** After "Create my CAD": the unlocked model from the server, solved and built (geometry stays for the caller to pack). */
@@ -208,10 +212,35 @@ export async function loadUnlockedProduct(
 
 const fileSafe = (s: string) => s.replace(/[^\w.-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "part";
 
-/** STL per printable piece (print pose, on the bed) + one plate file with every piece side by side. */
+const extentOf = (pos: Float32Array) => {
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (let k = 0; k < pos.length; k += 3) {
+    if (pos[k] < minX) minX = pos[k];
+    if (pos[k] > maxX) maxX = pos[k];
+    if (pos[k + 1] < minY) minY = pos[k + 1];
+    if (pos[k + 1] > maxY) maxY = pos[k + 1];
+    if (pos[k + 2] < minZ) minZ = pos[k + 2];
+    if (pos[k + 2] > maxZ) maxZ = pos[k + 2];
+  }
+  return { minX, minY, w: maxX - minX, d: maxY - minY, h: maxZ - minZ };
+};
+
+/**
+ * STL per printable piece (print pose, on the bed) + one file per BED.
+ *
+ * F-003: a piece whose mesh failed the manifold check is NOT written. It comes
+ * back in `unclosed`, so the Print step says "we could not close this model"
+ * instead of handing over a file a slicer cannot fill. Plates are packed inside
+ * the MK4 envelope (250 x 210 mm) and split across beds as needed - the old
+ * single "all parts" file grew to 406 mm and fitted no printer.
+ */
 export function productStlFiles(built: BuiltProduct, name: string): ProductStlResult {
   const base = fileSafe(name);
-  const printable = built.pieces.filter((p) => p.printable);
+  const wanted = built.pieces.filter((p) => p.printable);
+  // A printable body must be closed AND one piece; anything else is refused.
+  const closed = (p: (typeof wanted)[number]) => p.watertight && p.shells === 1;
+  const unclosed = wanted.filter((p) => !closed(p)).map((p) => ({ id: p.id, role: p.role, shells: p.shells }));
+  const printable = wanted.filter(closed);
   const files: ProductStlFile[] = printable.map((p) => {
     const positions = printReadyPositions(p.positions, p.print.matrix);
     return {
@@ -225,40 +254,46 @@ export function productStlFiles(built: BuiltProduct, name: string): ProductStlRe
       data: binarySTL({ positions, indices: p.indices }, p.id),
     };
   });
-  if (!printable.length) return { files, combined: null };
-  // Plate: every piece in its print pose, left to right with a 10 mm gap.
-  const parts = printable.map((p) => printReadyPositions(p.positions, p.print.matrix));
-  let total = 0;
-  let tris = 0;
-  for (let i = 0; i < parts.length; i++) {
-    total += parts[i].length;
-    tris += printable[i].indices.length;
-  }
-  const positions = new Float32Array(total);
-  const indices = new Uint32Array(tris);
-  let x = 0;
-  let vo = 0;
-  let io = 0;
-  for (let i = 0; i < parts.length; i++) {
-    const pos = parts[i];
-    let minX = Infinity;
-    let maxX = -Infinity;
-    for (let k = 0; k < pos.length; k += 3) {
-      if (pos[k] < minX) minX = pos[k];
-      if (pos[k] > maxX) maxX = pos[k];
+  if (!printable.length) return { files, plates: [], combined: null, unclosed, tooBig: [] };
+
+  const posed = printable.map((p) => printReadyPositions(p.positions, p.print.matrix));
+  const extents = posed.map(extentOf);
+  const plan = platePlan(extents.map((e) => ({ w: e.w, d: e.d, h: e.h })));
+  const plates = plan.plates.map((plate, pi) => {
+    let verts = 0;
+    let tris = 0;
+    for (const it of plate.items) {
+      verts += posed[it.index].length;
+      tris += printable[it.index].indices.length;
     }
-    const shift = x - minX;
-    for (let k = 0; k < pos.length; k += 3) {
-      positions[vo + k] = pos[k] + shift;
-      positions[vo + k + 1] = pos[k + 1];
-      positions[vo + k + 2] = pos[k + 2];
+    const positions = new Float32Array(verts);
+    const indices = new Uint32Array(tris);
+    let vo = 0;
+    let io = 0;
+    for (const it of plate.items) {
+      const pos = posed[it.index];
+      const e = extents[it.index];
+      const dx = it.x - (e.minX + e.w / 2);
+      const dy = it.y - (e.minY + e.d / 2);
+      for (let k = 0; k < pos.length; k += 3) {
+        positions[vo + k] = pos[k] + dx;
+        positions[vo + k + 1] = pos[k + 1] + dy;
+        positions[vo + k + 2] = pos[k + 2];
+      }
+      const idx = printable[it.index].indices;
+      const vBase = vo / 3;
+      for (let k = 0; k < idx.length; k++) indices[io + k] = idx[k] + vBase;
+      vo += pos.length;
+      io += idx.length;
     }
-    const idx = printable[i].indices;
-    const vBase = vo / 3;
-    for (let k = 0; k < idx.length; k++) indices[io + k] = idx[k] + vBase;
-    vo += pos.length;
-    io += idx.length;
-    x += maxX - minX + 10;
-  }
-  return { files, combined: { name: `${base}-all-parts.stl`, data: binarySTL({ positions, indices }, "all-parts") } };
+    const suffix = plan.plates.length > 1 ? `-plate-${pi + 1}` : "-all-parts";
+    return { name: `${base}${suffix}.stl`, data: binarySTL({ positions, indices }, `plate-${pi + 1}`), w: plate.w, d: plate.d };
+  });
+  return {
+    files,
+    plates,
+    combined: plates[0] ? { name: plates[0].name, data: plates[0].data } : null,
+    unclosed,
+    tooBig: plan.tooBig.map((i) => printable[i].id),
+  };
 }

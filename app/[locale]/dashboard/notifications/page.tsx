@@ -5,6 +5,8 @@ import { NotificationTestForm } from "@/components/admin/notification-test-form"
 import { NOTIFICATION_KINDS } from "@/lib/email/templates";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { asLocale, intlTag } from "@/lib/locale";
 
 // Notification log (Phase I): the notification_outbox rows the cron drainer
 // sends, newest first, plus a "send test to me" form. super_admin only (layout).
@@ -42,13 +44,14 @@ export default async function NotificationsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const { status } = await searchParams;
   const t = await getTranslations("Notifications");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const date = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleString(isRtl ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short" }) : "—";
+    iso ? new Date(iso).toLocaleString(intlTag(asLocale(locale)), { dateStyle: "medium", timeStyle: "short" }) : "—";
 
   const filter = (STATUSES as readonly string[]).includes(status ?? "") ? status! : "all";
 
@@ -79,7 +82,7 @@ export default async function NotificationsPage({
         <p className="mt-1 max-w-[70ch] text-sm text-mutedtext">{t("intro")}</p>
       </div>
 
-      <NotificationTestForm kinds={[...NOTIFICATION_KINDS]} defaultLocale={locale === "ar" ? "ar" : "en"} />
+      <NotificationTestForm kinds={[...NOTIFICATION_KINDS]} defaultLocale={asLocale(locale)} />
 
       {notReady && <p className="text-sm font-medium text-destructive">{t("needsMigration")}</p>}
 

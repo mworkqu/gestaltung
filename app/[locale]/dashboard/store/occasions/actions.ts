@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { draftsToInput, OCCASIONS_KEY, validateOccasions, type OccasionDraft, type OccasionError } from "@/lib/occasions";
+import { asLocale } from "@/lib/locale";
 
 // Seasonal campaigns (P3-07): store_settings.occasions. super_admin only —
 // checked here and again by RLS (store_settings_write). The rows are validated
@@ -16,7 +17,7 @@ export type SaveOccasionsResult =
   | { ok: false; errors: OccasionError[]; message?: string };
 
 export async function saveOccasions(locale: string, drafts: OccasionDraft[]): Promise<SaveOccasionsResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, errors: [], message: "forbidden" };
 
   const checked = validateOccasions(draftsToInput(Array.isArray(drafts) ? drafts : []));
@@ -29,7 +30,7 @@ export async function saveOccasions(locale: string, drafts: OccasionDraft[]): Pr
   if (error) return { ok: false, errors: [], message: error.message };
 
   revalidateStorefront();
-  const safeLocale = locale === "ar" ? "ar" : "en";
+  const safeLocale = asLocale(locale);
   revalidatePath(`/${safeLocale}/dashboard/store/occasions`);
   return { ok: true, count: checked.value.length };
 }

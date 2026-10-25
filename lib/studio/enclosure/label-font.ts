@@ -4,7 +4,7 @@
 //
 // Every stroke becomes one rounded capsule (label.ts). Strokes that meet are
 // shortened at the shared point so NO two capsules touch: the lid + label union in
-// build.ts is then a single CSG step on disjoint closed solids (robust and fast).
+// the kernel is then one boolean on disjoint closed solids (robust and fast).
 // Pure + deterministic.
 
 import { LIMITS } from "../schema";

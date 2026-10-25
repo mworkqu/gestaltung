@@ -15,13 +15,14 @@ import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { AccessNote } from "@/components/credits/access-note";
 import { track } from "@/lib/analytics";
 import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import { buildConnections } from "@/lib/studio/connections";
 import { downloadBlob, exportSVG } from "@/lib/studio/download";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 type Schematic = typeof import("@/lib/studio/schematic");
 import type { StudioDoc } from "@/lib/studio/schema";
 import { fileSlug } from "@/lib/studio/client/steps";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { accessReason, problemKey } from "./problem";
 
@@ -95,11 +96,13 @@ export function WiringStep({
   const svg = useMemo(() => {
     if (!drawn || !sch) return "";
     try {
-      return sch.renderSchematicSVG(doc.components, doc.netlist.nets, getPart, { locale, title: doc.spec.name });
+      // The same wires the other three views draw (WiringViewsProvider builds them the same way).
+      const connections = buildConnections(doc.components, doc.netlist.nets, getPart, doc.spec);
+      return sch.renderSchematicSVG(doc.components, doc.netlist.nets, getPart, { locale, title: doc.spec.name, connections });
     } catch {
       return "";
     }
-  }, [drawn, sch, doc.components, doc.netlist.nets, doc.spec.name, locale, getPart]);
+  }, [drawn, sch, doc.components, doc.netlist.nets, doc.spec, locale, getPart]);
   const summary = useMemo(() => {
     if (!sch) return "";
     try {

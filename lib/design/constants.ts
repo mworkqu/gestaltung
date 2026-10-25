@@ -1,13 +1,15 @@
+import { BUCKETS } from "@/lib/storage/paths";
+
 // Storage bucket for public "request a quote" file uploads (see migration
 // 0012_quote_uploads.sql). Private bucket; the browser uploads directly with the
 // anon key, the server mints signed download URLs with the service-role key.
-export const QUOTE_BUCKET = "quote-uploads";
+export const QUOTE_BUCKET = BUCKETS.quoteUploads;
 
 // Storage bucket for CAD files attached to a project (see migration
 // 0005_jobs.sql, which created it). The jobs pipeline that originally wrote to
 // it is gone; the bucket and its contents are kept, and its policies are
 // rescoped from tenant paths to <user_id>/… when project attachments land.
-export const CAD_BUCKET = "cad-files";
+export const CAD_BUCKET = BUCKETS.cadFiles;
 
 // ── Accepted CAD formats ──────────────────────────────────────────────────
 // Shared by every CAD entry point: the homepage dropzone, the public quote

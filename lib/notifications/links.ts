@@ -1,8 +1,8 @@
-// Pure helpers for the notification emails: links and cron auth.
+// Pure helpers for the notification emails: links (and a cron-auth re-export).
 
-import { timingSafeEqual } from "node:crypto";
 import { peekContactPhone } from "@/lib/contact-phone-server";
 import { ratingUrls } from "@/lib/orders/rating";
+import { isUuid } from "@/lib/uuid";
 
 export type NotificationLinks = {
   siteUrl: string;
@@ -17,8 +17,6 @@ export type NotificationLinks = {
   unsubscribeUrl: string;
   whatsappUrl: string;
 };
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** One-click / confirmation link: /api/notifications/unsubscribe?token=…&kind=…&locale=… */
 export function unsubscribeUrl(siteUrl: string, token: string, kind: string, locale: "en" | "ar"): string {
@@ -44,8 +42,8 @@ export function buildLinks(opts: {
 }): NotificationLinks {
   const base = opts.siteUrl.replace(/\/+$/, "");
   const loc = `${base}/${opts.locale}`;
-  const pid = typeof opts.projectId === "string" && UUID.test(opts.projectId) ? opts.projectId : null;
-  const oid = typeof opts.orderId === "string" && UUID.test(opts.orderId) ? opts.orderId : null;
+  const pid = isUuid(opts.projectId) ? opts.projectId : null;
+  const oid = isUuid(opts.orderId) ? opts.orderId : null;
   const rating = oid && opts.ratingSecret ? ratingUrls(base, oid, opts.ratingSecret, opts.locale) : [];
   return {
     siteUrl: base,
@@ -67,19 +65,8 @@ export function unsubscribeHeaders(url: string): Record<string, string> {
   };
 }
 
-/**
- * Cron auth: the Authorization header must be exactly `Bearer <secret>`.
- * An unset/empty secret never authorizes (the route then refuses to run).
- */
-export function isAuthorizedCron(header: string | null | undefined, secret: string | null | undefined): boolean {
-  if (!secret) return false;
-  if (!header) return false;
-  const want = Buffer.from(`Bearer ${secret}`);
-  const got = Buffer.from(header);
-  if (want.length !== got.length) return false;
-  return timingSafeEqual(want, got);
-}
+// Cron auth lives in lib/auth/cron.ts; re-exported so existing imports keep working.
+export { isAuthorizedCron } from "@/lib/auth/cron";
 
-export function isUuid(v: unknown): v is string {
-  return typeof v === "string" && UUID.test(v);
-}
+// Re-exported so existing imports keep working; the implementation is lib/uuid.ts.
+export { isUuid };

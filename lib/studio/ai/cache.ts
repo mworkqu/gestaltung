@@ -25,7 +25,8 @@ export async function outcomeCached<T>(
   if (!cache) return make();
   const hit = cache.get(key) as Outcome<T> | undefined;
   // A copy: callers may adjust what they get, the stored answer stays as the model gave it.
-  if (hit) return structuredClone(hit);
+  // `cached`: the answer is the model's, but nothing was consumed on THIS turn (telemetry).
+  if (hit) return hit.ok ? { ...structuredClone(hit), cached: true } : structuredClone(hit);
   const out = await make();
   if (out.ok && out.source === "model") cache.set(key, structuredClone(out));
   return out;

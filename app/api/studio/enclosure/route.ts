@@ -1,5 +1,5 @@
-import { studioCadTier } from "@/lib/credits/cad-cost";
-import { canUse } from "@/lib/credits/server";
+import { CAD_CHARGE_TIER } from "@/lib/credits/cad-cost";
+import { canUse, serverWritesReady, setCadCode } from "@/lib/credits/server";
 import { studioLibrary } from "@/lib/studio/library/remote";
 import { applyShapePick, defaultEnclosureFor, rankShapes } from "@/lib/studio/enclosure/shape-pick";
 import { emptyStudioDoc, type EnclosureSpec } from "@/lib/studio/schema";
@@ -10,6 +10,7 @@ import {
   cadRpcError, callErrorStatus, creditDenied, EnclosureBody, rpcMissing, versionFromRegens,
 } from "@/lib/studio/server/http";
 import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // POST /api/studio/enclosure — the enclosure look ("Draw it" / "Try another
 // look"). The model only returns EnclosureSpec JSON; the browser builds the
@@ -18,8 +19,11 @@ import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context
 // Credits reuse the CAD flow exactly (0043): 1 CAD credit covers 3 versions,
 // charged when the FIRST result is delivered; failures never charge.
 //   canUse("cad") → 401/402 · cad_begin (pending row; parent = the previous
-//   studio generation for versions 2–3) · model call · cad_set_code (the JSON
-//   in the code column) · cad_deliver right away (spends) · on failure cad_fail.
+//   studio generation for versions 2–3) · model call · cad_set_code_for (the
+//   JSON in the code column, written by the server through the service client
+//   with the verified user id — 0102 / audit G-C1) · cad_deliver right away
+//   (spends) · on failure cad_fail. No service key → 503 {error: "unavailable"}
+//   before cad_begin and the model call.
 // Version 4+ = a new credit, decided by canUse/spend_credit as for /api/cad.
 // Missing cad RPCs (pre-0043) → 503, fail closed.
 // A model failure falls back to a safe default look that is NOT delivered and
@@ -39,7 +43,9 @@ export async function POST(request: Request) {
 
   const access = await canUse(supabase, "cad", project.id);
   const denied = creditDenied(access);
-  if (denied) return Response.json({ error: denied.error }, { status: denied.status });
+  if (denied) return jsonError(denied.error, denied.status);
+  // No service key → the look could not be stored: refuse before any model call.
+  if (!serverWritesReady()) return jsonError("unavailable", 503);
 
   const current = await loadDoc(supabase, project.id);
   const previous: EnclosureSpec[] = current.ok && current.doc ? current.doc.enclosureVersions ?? (current.doc.enclosure ? [current.doc.enclosure] : []) : [];
@@ -62,22 +68,23 @@ export async function POST(request: Request) {
   const { data: id, error: beginError } = await supabase.rpc("cad_begin", {
     p_project: project.id,
     p_request: `${REQUEST_PREFIX} ${body.spec.name}`.slice(0, 200),
-    // 0090: CAD credits scale with how many parts the case holds (lib/credits/cad-cost.ts).
-    p_tier: studioCadTier(body.components.length),
+    // The published price is the contract: always the tier that costs
+    // PUBLISHED_CAD_CREDITS, never a complexity tier (lib/credits/cad-cost.ts).
+    p_tier: CAD_CHARGE_TIER,
     p_parent: parentId,
   });
   if (beginError) {
-    if (rpcMissing(beginError)) return Response.json({ error: "needs_migration" }, { status: 503 });
+    if (rpcMissing(beginError)) return jsonError("needs_migration", 503);
     const e = cadRpcError(beginError.message);
     if (e.status === 500) console.error("[studio/enclosure] cad_begin failed:", beginError.message);
-    return Response.json({ error: e.error }, { status: e.status });
+    return jsonError(e.error, e.status);
   }
   const generationId = id as string;
   const fail = (why: string) => supabase.rpc("cad_fail", { p_id: generationId, p_error: why.slice(0, 500) });
 
   const bbox = safeBbox(body.bbox);
   const r = await runEnclosure({
-    call: studioCall(supabase, project.id),
+    call: studioCall(supabase, project.id, ctx.userId),
     spec: body.spec,
     components: body.components.map((c) => {
       const part = getPart(c.partId);
@@ -94,34 +101,30 @@ export async function POST(request: Request) {
   });
   if (!r.ok) {
     await fail(r.error);
-    return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });
+    return jsonError(r.error, callErrorStatus(r.error));
   }
   logClamp("enclosure", project.id, r.clampLog, r.source, r.problems);
 
   if (r.source === "default") {
     // Not the model's work: shown, not delivered, not charged.
     await fail(`default: ${r.problems.join("; ")}`);
-    return Response.json({ enclosure: r.value, version: null, versionsLeft: null, generationId: null, fallback: true });
+    return jsonOk({ enclosure: r.value, version: null, versionsLeft: null, generationId: null, fallback: true });
   }
 
   // The first look follows a strong shape rule (a plant idea gets a pot-friendly shape).
   const look = applyShapePick(r.value, body.spec, previous);
-  const { error: codeError } = await supabase.rpc("cad_set_code", {
-    p_id: generationId,
-    p_scad: JSON.stringify(look),
-    p_model: r.model ?? "gemini",
-  });
-  if (codeError) {
-    console.error("[studio/enclosure] cad_set_code failed:", codeError.message);
-    await fail(`not saved: ${codeError.message}`);
-    return Response.json({ error: "failed" }, { status: 500 });
+  const stored = await setCadCode(supabase, ctx.userId, generationId, JSON.stringify(look), r.model ?? "gemini");
+  if (!stored.ok) {
+    console.error("[studio/enclosure] cad_set_code_for failed:", stored.message);
+    await fail(`not saved: ${stored.message}`);
+    return stored.error === "unavailable" ? jsonError("unavailable", 503) : jsonError("failed", 500);
   }
   const { data: delivered, error: deliverError } = await supabase.rpc("cad_deliver", { p_id: generationId });
   if (deliverError) {
     // The row stays pending and nothing is spent (as on the cad paths).
     const e = cadRpcError(deliverError.message);
     if (e.status === 500) console.error("[studio/enclosure] cad_deliver failed:", deliverError.message);
-    return Response.json({ error: e.error }, { status: e.status });
+    return jsonError(e.error, e.status);
   }
   const d = (delivered ?? {}) as { charged?: boolean; regens?: number };
   const { version, versionsLeft } = versionFromRegens(d.regens);

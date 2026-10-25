@@ -29,7 +29,7 @@ import type * as THREE from "three";
 import { Download, Eye, Layers, Loader2, Sparkles } from "lucide-react";
 
 import { AccessNote } from "@/components/credits/access-note";
-import { cadCost, studioCadTier } from "@/lib/credits/cad-cost";
+import { cadSessionCharge } from "@/lib/credits/cad-cost";
 import { StudioViewer, type ViewerApi } from "@/components/studio/viewer/ViewerLazy";
 import type { ViewerExtraObject } from "@/components/studio/viewer/types";
 import { track } from "@/lib/analytics";
@@ -37,7 +37,7 @@ import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
 import { arabicCountForm } from "@/lib/text/count";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { downloadBlob } from "@/lib/studio/download";
-import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/plan";
 import { labelSupport } from "@/lib/studio/enclosure/label-font";
 import { shapeReason, shapeVariants } from "@/lib/studio/enclosure/shape-pick";
 import { shapeOf, stableJson } from "@/lib/studio/geometry/key";
@@ -48,7 +48,8 @@ import { COLOUR_HEX, STEP_ACCENT } from "@/lib/studio/palette";
 import { COLOURS, FINISHES, LIMITS, type EnclosureSpec, type MechPart, type StudioDoc } from "@/lib/studio/schema";
 import { fileSlug, looksLeftFromVersions } from "@/lib/studio/client/steps";
 import { cn } from "@/lib/utils";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
+import { AiWait } from "../AiWait";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { ShareActions } from "./share";
 import { accessReason, problemKey } from "./problem";
@@ -72,6 +73,11 @@ export type EnclosureTemplateProps = {
   onNext: () => void;
   /** P5-16: a line above the case when the product pictures could not be made here. */
   note?: ReactNode;
+  /**
+   * F-009: a standard case for these parts, drawn by the worker when the AI pictures failed and
+   * the visitor has not drawn a case yet. Display only: it is never saved and costs no credit.
+   */
+  previewEnclosure?: EnclosureSpec;
 };
 
 /**
@@ -79,7 +85,7 @@ export type EnclosureTemplateProps = {
  * step: projects that already have a case, browsers that cannot draw the product
  * pictures, and a product pipeline that failed (never a blank screen).
  */
-export function EnclosureTemplateFlow({ ctx, doc, beforeServer, onEnclosure, onNext, note }: EnclosureTemplateProps) {
+export function EnclosureTemplateFlow({ ctx, doc, beforeServer, onEnclosure, onNext, note, previewEnclosure }: EnclosureTemplateProps) {
   const { getPart } = useStudioLibrary();
   const t = useTranslations("Studio");
   const { locale } = ctx;
@@ -312,8 +318,10 @@ export function EnclosureTemplateFlow({ ctx, doc, beforeServer, onEnclosure, onN
   }
 
   const enclosure = doc.enclosure;
-  // 0090: a new CAD session costs 1–3 CAD credits by complexity (the parts the case holds).
-  const credits = cadCost(studioCadTier(doc.components.length));
+  // The label's number IS the spend: one call, the published price (F-002).
+  const credits = cadSessionCharge(access?.cost).credits;
+  // "Try another look" past the included versions starts a new paid session.
+  const newSessionCredits = cadSessionCharge("credit").credits;
   const drawLabel =
     access?.cost === "none" ? t("drawItFree") : access?.cost === "included" ? t("drawItIncluded") : t("drawItCredit", { n: credits });
   const anotherLabel =
@@ -321,7 +329,7 @@ export function EnclosureTemplateFlow({ ctx, doc, beforeServer, onEnclosure, onN
       ? t("anotherLook")
       : access?.cost === "none"
         ? t("anotherLook")
-        : t("anotherLookCredit", { n: credits });
+        : t("anotherLookCredit", { n: newSessionCredits });
 
   return (
     <StepFrame
@@ -364,7 +372,7 @@ export function EnclosureTemplateFlow({ ctx, doc, beforeServer, onEnclosure, onN
         <StudioViewer
           components={viewerComponents}
           layout={layout.layout}
-          enclosure={enclosure}
+          enclosure={enclosure ?? previewEnclosure}
           xray={xray}
           extraObjects={extraObjects}
           explode={apart ? explode : 0}
@@ -465,6 +473,7 @@ export function EnclosureTemplateFlow({ ctx, doc, beforeServer, onEnclosure, onN
       )}
 
       {!enclosure && busy && <EnclosureSkeleton label={t("drawingIt")} />}
+      <AiWait kind="enclosure" active={busy} className="text-sm" />
 
       {enclosure && (
         <div className="space-y-4 motion-safe:animate-rise">

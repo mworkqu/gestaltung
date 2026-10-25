@@ -10,7 +10,7 @@ import { unstable_cache } from "next/cache";
 import { createPublicClient } from "@/lib/supabase/public";
 import { parseShippingSettings, type ShippingSettings } from "@/lib/store/delivery";
 import { SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
-import { getHolidays } from "@/lib/store/public-catalog";
+import { getHolidays } from "@/lib/store/holidays";
 
 const readShippingValue = unstable_cache(
   async (): Promise<unknown> => {

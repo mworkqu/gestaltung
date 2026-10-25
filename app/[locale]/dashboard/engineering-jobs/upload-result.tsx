@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ENGINEERING_BUCKET, ENGINEERING_MAX_BYTES } from "@/lib/engineering/config";
 import { loadSupabase } from "@/lib/supabase/lazy";
 import { markJobReady } from "./actions";
+import { safeFileName } from "@/lib/storage/paths";
 
 type Labels = {
   file: string;
@@ -16,8 +17,6 @@ type Labels = {
   tooBig: string;
   failed: string;
 };
-
-const safeName = (n: string) => n.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^\.+/, "").slice(0, 80) || "file";
 
 export function UploadResult({ jobId, locale, labels }: { jobId: string; locale: string; labels: Labels }) {
   const router = useRouter();
@@ -37,7 +36,7 @@ export function UploadResult({ jobId, locale, labels }: { jobId: string; locale:
     setError(null);
     try {
       const supabase = await loadSupabase();
-      const path = `jobs/${jobId}/${Date.now()}-${safeName(file.name)}`;
+      const path = `jobs/${jobId}/${Date.now()}-${safeFileName(file.name)}`;
       const up = await supabase.storage.from(ENGINEERING_BUCKET).upload(path, file, { upsert: false });
       if (up.error) throw new Error("upload");
       const res = await markJobReady({ jobId, path, name: file.name, note, locale });

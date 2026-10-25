@@ -4,7 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 
 import { noFreeCircuit, type RawCanUse } from "./constants";
-import { canUse, spend } from "./server";
+
+// spend() runs spend_credit_for on the service client (0102); the tests hand
+// it the queue-backed fake below.
+const service: { client: SupabaseClient | null } = { client: null };
+vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => service.client }));
+
+const { canUse, serverWritesReady, setCadCode, spend } = await import("./server");
 
 // Owner rule (2026-10-09, migration 0052): the parts list is the only free AI
 // step; every circuit costs 1 wiring credit, the first one on a project too.
@@ -65,27 +71,83 @@ describe("canUse (server gate)", () => {
 });
 
 describe("spend (server)", () => {
+  const session = () => fakeClient([]);
+  const useService = (answers: Parameters<typeof fakeClient>[0]) => {
+    const f = fakeClient(answers);
+    service.client = f.client;
+    return f;
+  };
+
   it("charges the first circuit when the pre-0052 database marks it free", async () => {
-    const { client, rpc } = fakeClient([
+    const { rpc } = useService([
       { data: { charged: false, cost: "free", balance: 1 } },
       { data: { charged: true, cost: "credit", balance: 0 } },
     ]);
-    const r = await spend(client, "wiring", "p1");
+    const r = await spend(session().client, "u1", "wiring", "p1");
     expect(rpc).toHaveBeenCalledTimes(2);
     expect(r).toEqual({ ok: true, charged: true, cost: "credit", balance: 0 });
   });
 
-  it("calls spend_credit once after 0052 (already charged)", async () => {
-    const { client, rpc } = fakeClient([{ data: { charged: true, cost: "credit", balance: 3 } }]);
-    const r = await spend(client, "wiring", "p1");
+  it("calls spend_credit_for once on the service client with the verified user (0102)", async () => {
+    const { rpc } = useService([{ data: { charged: true, cost: "credit", balance: 3 } }]);
+    const s = session();
+    const r = await spend(s.client, "u1", "wiring", "p1");
     expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("spend_credit_for", { p_user: "u1", p_step: "wiring", p_project: "p1" });
+    expect(s.rpc).not.toHaveBeenCalled();
     expect(r).toMatchObject({ ok: true, charged: true });
   });
 
   it("does not retry CAD spends", async () => {
-    const { client, rpc } = fakeClient([{ data: { charged: false, cost: "included", balance: 0 } }]);
-    await spend(client, "cad", "p1");
+    const { rpc } = useService([{ data: { charged: false, cost: "included", balance: 0 } }]);
+    await spend(session().client, "u1", "cad", "p1");
     expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("before 0102 (no spend_credit_for) falls back to spend_credit on the session", async () => {
+    useService([{ error: { code: "PGRST202", message: "Could not find the function public.spend_credit_for" } }]);
+    const s = fakeClient([{ data: { charged: true, cost: "credit", balance: 0 } }]);
+    const r = await spend(s.client, "u1", "wiring", "p1");
+    expect(s.rpc).toHaveBeenCalledWith("spend_credit", { p_step: "wiring", p_project: "p1" });
+    expect(r).toMatchObject({ ok: true, charged: true });
+  });
+
+  it("no service key → unavailable, nothing called", async () => {
+    service.client = null;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const s = session();
+    expect(await spend(s.client, "u1", "wiring", "p1")).toEqual({ ok: false, error: "unavailable" });
+    expect(s.rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("setCadCode (server, 0102 / G-C1)", () => {
+  it("stores the code through cad_set_code_for on the service client with the verified user", async () => {
+    const f = fakeClient([{ data: null }]);
+    service.client = f.client;
+    const s = fakeClient([]);
+    expect(serverWritesReady()).toBe(true);
+    expect(await setCadCode(s.client, "u1", "g1", "cube();", "gemini")).toEqual({ ok: true });
+    expect(f.rpc).toHaveBeenCalledWith("cad_set_code_for", { p_user: "u1", p_id: "g1", p_scad: "cube();", p_model: "gemini" });
+    expect(s.rpc).not.toHaveBeenCalled();
+  });
+
+  it("before 0102 falls back to cad_set_code on the session; other errors → failed", async () => {
+    service.client = fakeClient([{ error: { code: "PGRST202", message: "Could not find the function public.cad_set_code_for" } }]).client;
+    const s = fakeClient([{ data: null }]);
+    expect(await setCadCode(s.client, "u1", "g1", "cube();", null)).toEqual({ ok: true });
+    expect(s.rpc).toHaveBeenCalledWith("cad_set_code", { p_id: "g1", p_scad: "cube();", p_model: null });
+    service.client = fakeClient([{ error: { code: "P0001", message: "not_found" } }]).client;
+    expect(await setCadCode(fakeClient([]).client, "u1", "g1", "cube();", null)).toEqual({ ok: false, error: "failed", message: "not_found" });
+  });
+
+  it("no service key → unavailable, nothing called", async () => {
+    service.client = null;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const s = fakeClient([]);
+    expect(serverWritesReady()).toBe(false);
+    expect(await setCadCode(s.client, "u1", "g1", "cube();", null)).toMatchObject({ ok: false, error: "unavailable" });
+    expect(s.rpc).not.toHaveBeenCalled();
   });
 });
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateStorefront } from "@/lib/cache/storefront";
 import { extractVideoId, validateYoutube, YOUTUBE_KEY, type YoutubeDraft, type YoutubeError } from "@/lib/youtube";
@@ -11,6 +11,7 @@ import { runRetirements, type RetireSummary } from "@/lib/integrations/youtube-r
 import { readYoutubeIntegration, saveYoutubeRow, updateYoutubeMeta, youtubeConfig } from "@/lib/integrations/youtube-server";
 import { cancelRetire, queueRetire, type QueueOutcome } from "@/lib/youtube-retire";
 import { GOOGLE_REVOKE_URL } from "@/lib/youtube-upload";
+import { asLocale } from "@/lib/locale";
 
 // YouTube links (P4-05): store_settings.youtube. super_admin only — checked here
 // and again by RLS (store_settings_write). The draft is validated with the same
@@ -21,7 +22,7 @@ export type SaveYoutubeResult =
   | { ok: false; errors: YoutubeError[]; message?: string };
 
 export async function saveYoutube(locale: string, draft: YoutubeDraft): Promise<SaveYoutubeResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, errors: [], message: "forbidden" };
 
   const checked = validateYoutube(draft);
@@ -34,7 +35,7 @@ export async function saveYoutube(locale: string, draft: YoutubeDraft): Promise<
   if (error) return { ok: false, errors: [], message: error.message };
 
   revalidateStorefront();
-  const safeLocale = locale === "ar" ? "ar" : "en";
+  const safeLocale = asLocale(locale);
   revalidatePath(`/${safeLocale}/dashboard/store/youtube`);
   return { ok: true, count: checked.value.videos.length };
 }
@@ -46,7 +47,7 @@ export async function saveYoutube(locale: string, draft: YoutubeDraft): Promise<
 export type DisconnectResult = { ok: true } | { ok: false; error: "forbidden" | "migration" | "db" };
 
 export async function disconnectYoutube(locale: string): Promise<DisconnectResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
 
   const read = await readYoutubeIntegration();
@@ -67,7 +68,7 @@ export async function disconnectYoutube(locale: string): Promise<DisconnectResul
   const err = await saveYoutubeRow(read.db, read.meta, { refresh_token_enc: null, scopes: null, connected_at: null });
   if (err) return { ok: false, error: "db" };
 
-  revalidatePath(`/${locale === "ar" ? "ar" : "en"}/dashboard/store/youtube`);
+  revalidatePath(`/${asLocale(locale)}/dashboard/store/youtube`);
   return { ok: true };
 }
 
@@ -85,7 +86,7 @@ const revalidateYoutubePages = () => {
 };
 
 export async function queueRetireAction(input: { link: string; title?: string }): Promise<RetireActionResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
 
   const id = extractVideoId(input?.link);
@@ -106,7 +107,7 @@ export async function queueRetireAction(input: { link: string; title?: string })
 }
 
 export async function cancelRetireAction(videoId: string): Promise<RetireActionResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
 
   const read = await readYoutubeIntegration();
@@ -120,7 +121,7 @@ export async function cancelRetireAction(videoId: string): Promise<RetireActionR
 export type DeleteNowResult = { ok: true; summary: RetireSummary } | { ok: false; error: "forbidden" };
 
 export async function deleteRetireNowAction(videoId: string): Promise<DeleteNowResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (session?.profile.role !== "super_admin") return { ok: false, error: "forbidden" };
 
   const summary = await runRetirements({ onlyIds: [String(videoId)] });

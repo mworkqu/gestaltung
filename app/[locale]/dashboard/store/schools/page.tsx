@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { SchoolPricingEditor } from "@/components/admin/school-pricing-editor";
 import { parseSchoolPricing, SCHOOL_PRICING_KEY } from "@/lib/schools/pricing";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // School prices (store_settings.school_pricing): what a teacher is quoted on
 // /schools and on their class page. super_admin only (the store layout redirects
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SchoolsSettingsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("SchoolsAdmin");
 

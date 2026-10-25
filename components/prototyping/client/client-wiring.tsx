@@ -31,6 +31,7 @@ import { safetyNote } from "@/lib/prototyping/plain-safety";
 import { setFact, EMPTY_SPEC, type Spec } from "@/lib/prototyping/spec";
 import { renderWiring, wiringProducts, type WiringProduct } from "@/lib/prototyping/wiring-svg";
 import type { Project } from "@/lib/supabase/types";
+import { asLocale } from "@/lib/locale";
 
 type Problem = "failed" | "busy";
 
@@ -50,7 +51,7 @@ export function ClientWiring({
   patchProject: (changes: Partial<Project>) => PromiseLike<{ error: unknown }>;
 }) {
   const t = useTranslations("ClientView");
-  const locale = useLocale() === "ar" ? "ar" : "en";
+  const locale = asLocale(useLocale());
   const access = useCanUse("wiring", project.id);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);

@@ -6,12 +6,12 @@ import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TokenShop } from "@/components/tokens/token-shop";
 import { getAuthUser } from "@/lib/auth/get-session";
 import { signInHref } from "@/lib/auth/next-path";
-import { MAKER_PASS, TOKEN_PACKS, TOKEN_PRICE_QAR } from "@/lib/billing/config";
+import { MAKER_PASS, TOKEN_PACKS, TOKEN_PRICE_QAR, tokenCopyParams } from "@/lib/billing/config";
 import { REWARDS_DEFAULT } from "@/lib/credits/cad-cost";
 import { pageMetadata } from "@/lib/seo";
-import { IDEATION, TIERS } from "@/lib/studio/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Ideation tokens (owner, 2026-10-18): balance, the optional Maker Pass, the
 // pay-per-use packs and the Fawran checkout (TokenShop), then the user's
@@ -34,7 +34,7 @@ export default async function TokensPage({ params }: { params: Promise<{ locale:
   const t = await getTranslations("Tokens");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const numLocale = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
+  const numLocale = intlTag(asLocale(locale));
   const date = new Intl.DateTimeFormat(numLocale, { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
 
   const user = await getAuthUser();
@@ -52,7 +52,7 @@ export default async function TokensPage({ params }: { params: Promise<{ locale:
   }
   const passUntil = status?.pass_until ? new Date(status.pass_until) : null;
   const payg = Math.floor(MAKER_PASS.qar / TOKEN_PRICE_QAR);
-  const mult = (id: string) => String(TIERS.find((x) => x.id === id)?.multiplier ?? 1);
+  const tokenCopy = tokenCopyParams();
   const productName = (p: Payment) =>
     p.product === MAKER_PASS.id ? t("product_maker_pass", { days: String(p.days ?? MAKER_PASS.days) }) : t("product_tokens", { n: String(p.tokens) });
 
@@ -120,9 +120,10 @@ export default async function TokensPage({ params }: { params: Promise<{ locale:
           <section className="neu space-y-4 p-6">
             <h2 className="text-base font-bold text-heading">{t("costsTitle")}</h2>
             <ul className="space-y-1.5 text-sm text-body">
-              <li>{t("costIdea", { n: String(IDEATION.newIdeaCost) })}</li>
-              <li>{t("costEdits", { every: String(IDEATION.turnsPerToken) })}</li>
-              <li>{t("costTiers", { maker: mult("maker"), engineer: mult("engineer") })}</li>
+              <li>{t("costIdea")}</li>
+              <li>{t("costEdits", { n: tokenCopy.tier2 })}</li>
+              <li>{t("costTiers", { n: tokenCopy.tier3 })}</li>
+              <li>{t("costQuote")}</li>
             </ul>
             <h2 className="pt-2 text-base font-bold text-heading">{t("earnTitle")}</h2>
             <ul className="space-y-1.5 text-sm text-body">
@@ -130,7 +131,7 @@ export default async function TokensPage({ params }: { params: Promise<{ locale:
               <li>{t("earnPrint", { n: String(REWARDS_DEFAULT.print_cad_credits) })}</li>
             </ul>
             <h2 className="pt-2 text-base font-bold text-heading">{t("packsTitle")}</h2>
-            <p className="text-xs text-mutedtext">{t("packEach", { each: String(TOKEN_PRICE_QAR) })}</p>
+            <p className="text-xs text-mutedtext">{t("packEach", tokenCopy)}</p>
           </section>
         </div>
 

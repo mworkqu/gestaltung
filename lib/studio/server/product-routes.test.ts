@@ -54,13 +54,36 @@ function studioDoc(): StudioDoc {
   };
 }
 
-function setup(user: FakeDb["user"], opts: { owner?: string; consent?: boolean; credits?: "ok" | "none" | "sign_in" | "admin" } = {}) {
+type Tables = Record<string, Record<string, unknown>[]>;
+
+/** Emulates 0100 studio_product_save on the shared fake tables. */
+function productSave(tables: Tables, a: Record<string, unknown>) {
+  const target = tables.projects.find((r) => r.id === a.p_project);
+  const admin = tables.profiles.some((p) => p.id === a.p_user && p.role === "super_admin");
+  if (!target || (target.user_id !== a.p_user && !admin)) return { error: { message: "not_owner" } };
+  const row = tables.projects.find((r) => r.id === a.p_project && r.studio_version === a.p_version);
+  if (!row) return { data: null };
+  const studio = structuredClone(a.p_studio) as Record<string, unknown>;
+  delete studio.productPrivate;
+  row.studio = studio;
+  row.studio_version = Number(a.p_version) + 1;
+  const hit = tables.project_studio_private.find((r) => r.project_id === a.p_project);
+  if (hit) hit.product_private = structuredClone(a.p_private);
+  else tables.project_studio_private.push({ project_id: a.p_project, product_private: structuredClone(a.p_private) });
+  return { data: row.studio_version };
+}
+
+function setup(
+  user: FakeDb["user"],
+  opts: { owner?: string; consent?: boolean; credits?: "ok" | "none" | "sign_in" | "admin"; pre0100?: boolean } = {},
+) {
   const tables = {
     projects: [
       { id: P, user_id: opts.owner ?? user?.id, spec: opts.consent === false ? null : consent, brief: g.idea, studio: studioDoc(), studio_version: 1 },
       { id: OTHER, user_id: "someone-else", spec: consent, brief: "x", studio: studioDoc(), studio_version: 1 },
     ],
     profiles: [{ id: ADMIN.id, role: "super_admin" }, { id: USER.id, role: "client" }],
+    project_studio_private: [] as Record<string, unknown>[],
     ai_rate_limits: [] as Record<string, unknown>[],
     analysis_runs: [] as Record<string, unknown>[],
     cad_generations: [] as Record<string, unknown>[],
@@ -82,7 +105,15 @@ function setup(user: FakeDb["user"], opts: { owner?: string; consent?: boolean; 
       cad_fail: () => ({ data: null }),
     },
   });
-  state.service = fakeSupabase({ tables, user: null });
+  // The service client (RLS bypassed) with 0100's studio_product_save: doc +
+  // private models in one step, same version check as the page save.
+  state.service = fakeSupabase({
+    tables,
+    user: null,
+    bypassRls: true,
+    missingTables: opts.pre0100 ? ["project_studio_private"] : [],
+    rpc: opts.pre0100 ? {} : { studio_product_save: (a) => productSave(tables, a) },
+  });
   state.gemini = false;
   state.answers = [];
 }
@@ -91,6 +122,11 @@ const post = (body: unknown, ip = "1.2.3.4") =>
   new Request("http://x/api", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": ip }, body: JSON.stringify(body) });
 const get = (qs: string) => new Request(`http://x/api?${qs}`);
 const studioOf = (id = P) => state.main.db.tables.projects.find((r) => r.id === id)!.studio as Record<string, unknown> & StudioDoc;
+/** The private models: project_studio_private since 0100 (studio.productPrivate before it). */
+const privOf = (id = P) =>
+  (state.main.db.tables.project_studio_private.find((r) => r.project_id === id)?.product_private ?? studioOf(id).productPrivate) as {
+    designs: { id: string; score?: number; loops?: number; best?: { score: number } }[];
+  };
 
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]).toString("base64");
 const images = { front: PNG, side: PNG, iso: PNG };
@@ -124,7 +160,8 @@ describe("POST /design", () => {
     expect(new Set(body.designs.map((d) => d.archetype)).size).toBe(3);
     const stored = studioOf();
     expect(stored.product!.designs.map((d) => d.id)).toEqual(body.designs.map((d) => d.id));
-    expect((stored.productPrivate as { designs: { id: string }[] }).designs).toHaveLength(3);
+    expect(stored.productPrivate).toBeUndefined(); // 0100: never in projects.studio
+    expect(privOf().designs).toHaveLength(3);
     // The page never sees the models.
     const page = (await (await docGet(get(`projectId=${P}`))).json()) as { doc: Record<string, unknown> };
     expect(page.doc.productPrivate).toBeUndefined();
@@ -241,7 +278,7 @@ describe("POST /check", () => {
     expect(r.score).toBe(5);
     expect(r.changed).toBe(true);
     expect(r.model.bodies[0].colour).toBe("coral");
-    const priv = (studioOf().productPrivate as { designs: { id: string; score: number; loops: number; best: { score: number } }[] }).designs.find((d) => d.id === id)!;
+    const priv = privOf().designs.find((d) => d.id === id)!;
     expect(priv).toMatchObject({ score: 5, loops: 1, best: { score: 5 } });
     // quota / outage → skipped quota, model kept
     state.answers = [];
@@ -319,7 +356,7 @@ describe("POST /unlock + GET /model", () => {
     const r = await docPut(new Request("http://x/api", { method: "PUT", body: JSON.stringify({ projectId: P, doc: forged, version: page.version }) }));
     expect(r.status).toBe(200);
     expect(studioOf().product!.unlockedId).toBeNull();
-    expect((studioOf().productPrivate as { designs: unknown[] }).designs).toHaveLength(1);
+    expect(privOf().designs).toHaveLength(1);
     expect((await getModel(get(`projectId=${P}&designId=${id}`))).status).toBe(403);
     // A stale version is still a conflict (and the answer is page-safe).
     const stale = await docPut(new Request("http://x/api", { method: "PUT", body: JSON.stringify({ projectId: P, doc: page.doc, version: page.version }) }));
@@ -335,5 +372,67 @@ describe("POST /unlock + GET /model", () => {
     const e = (await (await engineer(get(`projectId=${P}`))).json()) as { productPrivate: { designs: { id: string; issues: unknown[] }[] } };
     expect(e.productPrivate.designs[0].id).toBe(id);
     expect(Array.isArray(e.productPrivate.designs[0].issues)).toBe(true);
+  });
+});
+
+describe("0100 private storage (audit DB-01)", () => {
+  it("product writes go through the service client; the user client never writes the models", async () => {
+    const id = await designOne();
+    expect(state.service!.db.rpcCalls.map((c) => c.fn)).toContain("studio_product_save");
+    expect(studioOf().productPrivate).toBeUndefined();
+    expect(privOf().designs.map((d) => d.id)).toEqual([id]);
+    expect(state.main.db.rpcCalls.some((c) => c.fn === "studio_product_save")).toBe(false);
+  });
+
+  it("before 0100 runs (no function / table) the old studio.productPrivate storage still works", async () => {
+    setup(USER, { pre0100: true });
+    const id = await designOne();
+    expect((studioOf().productPrivate as { designs: { id: string }[] }).designs.map((d) => d.id)).toEqual([id]);
+    expect((await unlock(post({ projectId: P, designId: id }))).status).toBe(200);
+    expect((await getModel(get(`projectId=${P}&designId=${id}`))).status).toBe(200);
+  });
+
+  it("no service key → 503 service_unavailable, nothing charged", async () => {
+    const id = await designOne();
+    state.service = null;
+    const m = await getModel(get(`projectId=${P}&designId=${id}`));
+    expect(m.status).toBe(503);
+    expect(await m.json()).toEqual({ error: "service_unavailable" });
+    const u = await unlock(post({ projectId: P, designId: id }));
+    expect(u.status).toBe(503);
+    expect(state.main.db.rpcCalls.some((c) => c.fn === "cad_deliver")).toBe(false);
+    expect((await design(post({ projectId: P, count: 1 }))).status).toBe(503);
+  });
+});
+
+describe("product writes: owner or super_admin only (DB-01 G1.3)", () => {
+  const TEACHER = { id: "ffffffff-ffff-4fff-8fff-ffffffffffff", is_anonymous: false };
+
+  it("a class teacher who can READ the team project cannot design / choose / unlock it", async () => {
+    const id = await designOne(); // the owner (USER) designs first
+    const before = JSON.stringify({ s: studioOf(), p: privOf() });
+    state.main.db.tables.projects[0].class_teacher = TEACHER.id;
+    state.main.db.user = TEACHER;
+    expect((await design(post({ projectId: P, count: 1 }))).status).toBe(404);
+    expect((await choose(post({ projectId: P, designId: id }))).status).toBe(404);
+    expect((await unlock(post({ projectId: P, designId: id }))).status).toBe(404);
+    expect(state.main.db.rpcCalls.some((c) => c.fn === "cad_deliver")).toBe(false);
+    expect(JSON.stringify({ s: studioOf(), p: privOf() })).toBe(before);
+  });
+
+  it("the service save itself refuses a non-owner (defence in depth)", async () => {
+    const { updateProductDoc } = await import("@/lib/studio/server/doc");
+    await designOne();
+    state.main.db.tables.projects[0].class_teacher = TEACHER.id;
+    state.main.db.user = TEACHER;
+    const r = await updateProductDoc(state.main.client as never, TEACHER.id, P, (s) => s);
+    expect(r).toMatchObject({ saved: false, error: "not_found" });
+    expect(state.service!.db.rpcCalls.filter((c) => c.fn === "studio_product_save" && c.args.p_user === TEACHER.id)).toEqual([]);
+  });
+
+  it("a super_admin may still write any project", async () => {
+    await designOne();
+    state.main.db.user = ADMIN;
+    expect((await design(post({ projectId: P, count: 1 }))).status).toBe(200);
   });
 });

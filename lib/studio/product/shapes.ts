@@ -85,10 +85,6 @@ export function eulerFromMatrix(m: number[]): Vec3 {
   return [deg(rx), deg(ry), deg(rz)];
 }
 
-export function isIdentityRotation(rot: Vec3 | undefined): boolean {
-  return !rot || (Math.abs(rot[0]) < 1e-9 && Math.abs(rot[1]) < 1e-9 && Math.abs(rot[2]) < 1e-9);
-}
-
 export type Box3 = { min: Vec3; max: Vec3 };
 
 /** The axis-aligned box of a local box [min, max] after rotation `m` and translation `t`. */
@@ -104,10 +100,6 @@ export function transformBox(b: Box3, m: number[], t: Vec3): Box3 {
     }
   }
   return { min: r3v(min), max: r3v(max) };
-}
-
-export function boxSize(b: Box3): Vec3 {
-  return [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
 }
 
 /** Overlap depth of two boxes per axis (negative = gap). */
@@ -169,11 +161,6 @@ export function superellipseOutline(w: number, d: number, n: number, segments = 
     out.push([(w / 2) * Math.sign(c) * Math.pow(Math.abs(c), 2 / n), (d / 2) * Math.sign(s) * Math.pow(Math.abs(s), 2 / n)]);
   }
   return out;
-}
-
-/** Stadium (pill): a rounded rectangle whose short ends are full half-circles. */
-export function stadiumOutline(w: number, d: number): Vec2[] {
-  return rrectOutline(w, d, Math.min(w, d) / 2 - 1e-3, 16);
 }
 
 // ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Loader2, Send } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { asLocale } from "@/lib/locale";
 
 const field =
   "rounded-lg border border-white/60 bg-surface px-2.5 py-1.5 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -57,7 +58,7 @@ export function NotificationTestForm({ kinds, defaultLocale }: { kinds: string[]
         </label>
         <label className="flex flex-col gap-1 text-[11px] text-mutedtext">
           {t("testLocale")}
-          <select value={locale} onChange={(e) => setLocale(e.target.value === "ar" ? "ar" : "en")} className={field}>
+          <select value={locale} onChange={(e) => setLocale(asLocale(e.target.value))} className={field}>
             <option value="en">English</option>
             <option value="ar">العربية</option>
           </select>

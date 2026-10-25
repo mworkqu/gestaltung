@@ -9,6 +9,7 @@ import {
   linesUsing,
   pinBlock,
   pinConstants,
+  readingNotes,
   replacePinBlock,
   PIN_BLOCK_END,
   PIN_BLOCK_START,
@@ -40,7 +41,7 @@ export function hasPinBlock(code: string): boolean {
 export function syncPinBlock(code: string, connections: Connection[], getPart: GetPart): PinSync {
   const constants = pinConstants(connections, getPart);
   if (!constants.length && !hasPinBlock(code)) return { code, changed: false, removed: [], added: [], constants };
-  const r = replacePinBlock(code, pinBlock(constants));
+  const r = replacePinBlock(code, pinBlock(constants, readingNotes(connections, getPart)));
   return { ...r, constants };
 }
 

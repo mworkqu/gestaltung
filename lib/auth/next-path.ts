@@ -59,6 +59,29 @@ export function afterAuthPath(raw: unknown, locale: string, fallback = "/dashboa
   return safeNextPath(raw, locale) ?? `/${locale}${fallback}`;
 }
 
+/**
+ * `next` for /api/auth/callback (email links and social sign-in), as a safe
+ * "/{locale}/…" path, or "/" when it is missing or unsafe (the callback then
+ * lands on the site root, as before). The locale is taken from the path itself.
+ *
+ * Unlike safeNextPath this lets exactly `/{locale}/reset-password` through: the
+ * password-recovery email link comes back through the callback with that
+ * target (components/auth/forgot-password-form.tsx), and the callback is the
+ * one place where it is legitimate. No query or hash is kept for it.
+ */
+export function callbackNextPath(raw: unknown): string {
+  if (typeof raw !== "string") return "/";
+  const value = raw.trim();
+  const locale = localeOf(value.split(/[?#]/, 1)[0]);
+  if (!locale) return "/";
+  const safe = safeNextPath(value, locale);
+  if (safe) return safe;
+  if (value === `/${locale}/reset-password` || value === `/${locale}/reset-password/`) {
+    return `/${locale}/reset-password`;
+  }
+  return "/";
+}
+
 function authHref(page: "sign-in" | "sign-up", locale: string, currentPath: string | null | undefined): string {
   const base = `/${locale}/${page}`;
   const next = safeNextPath(currentPath ?? null, locale);

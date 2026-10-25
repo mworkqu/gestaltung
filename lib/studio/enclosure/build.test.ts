@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { computeMeshVolume } from "three-bvh-csg";
 import { describe, expect, it } from "vitest";
 import { layoutComponents } from "../layout";
-import { buildEnclosure } from "./build";
+import { buildEnclosure } from "../geometry/job";
 import { cutoutsFor } from "./cutouts";
 import { enclosureDims } from "./templates";
 import { exportObjectsSTL, exportSTL, exportSVG } from "../export";
@@ -19,12 +19,12 @@ function setup(list = typical()) {
 
 const tris = (m: THREE.Mesh) => (m.geometry.index ? m.geometry.index.count : m.geometry.getAttribute("position").count) / 3;
 
-describe("buildEnclosure", () => {
+describe("the template case (built by the kernel)", () => {
   for (const template of TEMPLATES) {
-    it(`builds base + lid matching dims: ${template}`, () => {
+    it(`builds base + lid matching dims: ${template}`, async () => {
       const { lr, parts } = setup();
       const s = spec({ template, vents: { pattern: "slots", face: "+x", count: 8 }, feet: "rubber_4" });
-      const { base, lid, meta } = buildEnclosure(s, lr, parts);
+      const { base, lid, meta } = await buildEnclosure(s, lr, parts);
       expect(base.name).toBe("enclosure_base");
       expect(lid.name).toBe("enclosure_lid");
       expect(base).not.toBe(lid);
@@ -49,12 +49,12 @@ describe("buildEnclosure", () => {
     });
   }
 
-  it("is fast enough for a typical box", () => {
+  it("is fast enough for a typical box", async () => {
     const { lr, parts } = setup();
-    buildEnclosure(spec(), lr, parts); // warm-up
+    await buildEnclosure(spec(), lr, parts); // warm-up
     // This process's CPU time (each test file runs in its own process), so parallel suites don't skew it.
     const c0 = process.cpuUsage();
-    const { meta } = buildEnclosure(spec({ vents: { pattern: "holes", face: "-z", count: 12 }, feet: "ring" }), lr, parts);
+    const { meta } = await buildEnclosure(spec({ vents: { pattern: "holes", face: "-z", count: 12 }, feet: "ring" }), lr, parts);
     const c = process.cpuUsage(c0);
     const ms = (c.user + c.system) / 1000;
     console.info(`[enclosure] rounded_box: ${ms.toFixed(0)} ms, ${meta.triangles} triangles, ${meta.cutouts.length} cutouts, ${meta.vents.length} vents`);
@@ -78,9 +78,9 @@ describe("buildEnclosure", () => {
     for (const c of cuts.filter((x) => x.face === "+z")) expect(c.center[2] + c.depth / 2).toBeGreaterThan(d.H);
   });
 
-  it("stake_pod: a socket in the floor and a printable spike", () => {
+  it("stake_pod: a socket in the floor and a printable spike", async () => {
     const { lr, parts } = setup();
-    const { base, meta } = buildEnclosure(spec({ template: "stake_pod", feet: "rubber_4" }), lr, parts);
+    const { base, meta } = await buildEnclosure(spec({ template: "stake_pod", feet: "rubber_4" }), lr, parts);
     const d = meta.dims;
     expect(d.stake).toBeTruthy();
     const k = d.stake!;
@@ -135,10 +135,10 @@ describe("buildEnclosure", () => {
     expect(d.edgeFillet).toBeGreaterThan(box.edgeFillet);
   });
 
-  it("handles a tiny part and a very tall part", () => {
+  it("handles a tiny part and a very tall part", async () => {
     for (const list of [items(["t1", P.tiny]), items(["t1", P.tall])]) {
       const { lr, parts } = setup(list);
-      const { base, lid } = buildEnclosure(spec({ template: "pill" }), lr, parts);
+      const { base, lid } = await buildEnclosure(spec({ template: "pill" }), lr, parts);
       expect(tris(base)).toBeGreaterThan(0);
       expect(tris(lid)).toBeGreaterThan(0);
     }
@@ -156,9 +156,9 @@ describe("buildEnclosure", () => {
 });
 
 describe("export", () => {
-  it("writes binary and ASCII STL and SVG blobs", () => {
+  it("writes binary and ASCII STL and SVG blobs", async () => {
     const { lr, parts } = setup();
-    const { base, lid } = buildEnclosure(spec({ feet: "rubber_4" }), lr, parts);
+    const { base, lid } = await buildEnclosure(spec({ feet: "rubber_4" }), lr, parts);
     const bin = exportSTL(base) as ArrayBuffer;
     expect(bin.byteLength).toBeGreaterThan(84);
     const own = exportSTL(base, true, { children: false }) as ArrayBuffer;

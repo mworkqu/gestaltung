@@ -35,6 +35,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { customerStatusKey } from "@/lib/orders/status";
 import {
   Check,
   ChevronDown,
@@ -82,6 +83,7 @@ import { cn } from "@/lib/utils";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { track } from "@/lib/analytics";
+import { captchaHeaders, guestCaptchaToken } from "@/components/prototyping/guest-captcha";
 import { AlsoUseful } from "@/components/prototyping/also-useful";
 import { MIN_ALSO_USEFUL } from "@/lib/store/also-useful-relevance";
 
@@ -204,9 +206,11 @@ function QuoteRequest({
     setState("sending");
     try {
       // The route writes the message (items, note, project link and name).
+      // A guest's request carries a Turnstile token while the switch is on (a no-op otherwise).
+      const token = await guestCaptchaToken();
       const res = await fetch("/api/store-lead", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...captchaHeaders(token) },
         body: JSON.stringify({
           name: String(f.get("name") ?? "").trim(),
           phone: profilePhone || typedPhone,
@@ -896,7 +900,7 @@ function Row({
             <Tag variant={done.kind === "ordered" && done.status === "cancelled" ? "neutral" : "buy"}>
               <PackageCheck className="h-3 w-3" />
               {done.kind === "ordered"
-                ? t("bomOrdered", { id: done.ref, status: tO(`order_status_${done.status}`) })
+                ? t("bomOrdered", { id: done.ref, status: tO(`order_status_${customerStatusKey(done.status)}`) })
                 : done.kind === "delivered"
                   ? t("bomDelivered")
                   : t("bomBought")}

@@ -5,6 +5,8 @@ import { isUuid } from "@/lib/projects/recovery";
 import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini-client";
 import { ProviderError } from "@/lib/prototyping/providers/types";
 import { createClient } from "@/lib/supabase/server";
+import { asLocale } from "@/lib/locale";
+import { jsonOk } from "@/lib/http";
 
 // Names a project created from the chat (P1-11 / CC-1). The workspace calls
 // this once when it opens with ?start=chat and the project is still called
@@ -16,7 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const none = () => Response.json({ name: null });
+const none = () => jsonOk({ name: null });
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as { projectId?: unknown; locale?: unknown } | null;
   const projectId = isUuid(body?.projectId) ? (body?.projectId as string) : null;
-  const locale = body?.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(body?.locale);
   if (!projectId) return none();
 
   const { data: project } = await supabase
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
     call: async ({ system, prompt }) => {
       try {
         const res = await callGemini({ system, prompt, schema: NAME_SCHEMA, temperature: 0.3, timeoutMs: 30_000 });
-        await logUsage(supabase, {
+        await logUsage(supabase, { userId: user.id,
           provider: "gemini",
           model: res.model,
           projectId,
@@ -61,7 +63,7 @@ export async function POST(request: Request) {
         return res.raw;
       } catch (e) {
         const reason = e instanceof ProviderError ? e.reason : "unavailable";
-        await logUsage(supabase, { provider: "gemini", projectId, feature: "analyse", outcome: "error", errorCode: reason });
+        await logUsage(supabase, { userId: user.id, provider: "gemini", projectId, feature: "analyse", outcome: "error", errorCode: reason });
         throw e;
       }
     },
@@ -76,5 +78,5 @@ export async function POST(request: Request) {
     .eq("name", DEFAULT_PROJECT_NAME)
     .select("id");
   if (error || !updated?.length) return none();
-  return Response.json({ name });
+  return jsonOk({ name });
 }

@@ -16,7 +16,9 @@ import { useTranslations } from "next-intl";
 
 import type { EnclosureSpec, Finish, StudioDoc, StudioProduct } from "@/lib/studio/schema";
 import { servoPlan } from "@/lib/studio/servo-plan";
-import type { StudioCtx } from "../StudioShell";
+import { canRetry } from "@/lib/studio/product/failure";
+import { defaultEnclosureFor } from "@/lib/studio/enclosure/shape-pick";
+import type { StudioCtx } from "../studio-ctx";
 import { useStudioLibrary } from "../StudioLibraryProvider";
 import type { ProductPreviews, UnlockedProduct } from "../use-product";
 import { Bar } from "../ui";
@@ -96,11 +98,24 @@ export function EnclosureStep({
         beforeServer={beforeServer}
         onEnclosure={onEnclosure}
         onNext={onNext}
+        // F-009: until a case is drawn, show a standard one built by the worker instead of an empty box.
+        previewEnclosure={flow === "fallback" && !doc.enclosure ? defaultEnclosureFor(doc.spec) : undefined}
         note={
           flow === "fallback" ? (
-            <p className="text-sm text-mutedtext" data-testid="studio-product-fallback">
-              {t("product.fallbackNote")}
-            </p>
+            <div className="space-y-2 text-sm text-mutedtext" role="status" data-testid="studio-product-fallback">
+              <p>{t("product.fallbackNote")}</p>
+              {previews.failure && <p data-testid="studio-product-fail-reason">{t(`product.fail_${previews.failure}`)}</p>}
+              {previews.failure && canRetry(previews.failure) && (
+                <button
+                  type="button"
+                  onClick={previews.retry}
+                  data-testid="studio-product-retry"
+                  className="inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-cobalt shadow-neu-sm hover:text-cobalt-hover"
+                >
+                  {t("product.retry")}
+                </button>
+              )}
+            </div>
           ) : null
         }
       />

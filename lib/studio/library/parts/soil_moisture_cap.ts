@@ -40,5 +40,16 @@ export const soilMoistureCap: LibraryPart = {
     { id: "GND", label: "GND", role: "gnd", voltage: 0, side: "right" },
   ],
   power: { vMin: 3.3, vMax: 5.5, logicV: 5, mA: 5 },
+  // The one fact a sketch gets backwards (F-010): a CAPACITIVE probe outputs a HIGHER voltage
+  // as the soil dries (a resistive one is the other way round). The two percentages are of the
+  // board's own ADC range, not raw counts, so they hold on a 10-bit and a 12-bit board; they
+  // are a starting point the builder trims in their own soil, which the comments say.
+  calibration: {
+    note: "Capacitive soil probe: the reading goes UP as the soil dries out (dry = high, wet = low).",
+    constants: [
+      { suffix: "DRY_PCT", value: 70, comment: "at or above this share of the ADC range the soil is dry — calibrate in your own soil" },
+      { suffix: "WET_PCT", value: 45, comment: "at or below this share the soil is freshly watered — calibrate in your own soil" },
+    ],
+  },
   clearance: 2,
 };

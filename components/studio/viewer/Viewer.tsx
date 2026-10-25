@@ -40,7 +40,7 @@ import { getPart } from "@/lib/studio/library";
 import { layoutResultOf } from "@/lib/studio/layout";
 import { contentOffsetOf, placePart } from "@/lib/studio/placement";
 import { footprint, PLATE_LIFT, PLATE_T, platePlacements } from "@/lib/studio/plate";
-import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/plan";
 import { enclosureKey } from "@/lib/studio/geometry/key";
 import { enclosureMeshes, getEnclosureGeometry, warmGeometryWorker } from "@/lib/studio/geometry/client";
 import { BASE_DROP_MM, explodeFrame, explodeOffset, type ExplodeFrame, type Vec3 } from "@/lib/studio/explode";

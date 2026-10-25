@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 import { layoutComponents, rotateXY } from "../layout";
 import { getPart } from "../library";
 import { MECH_TEMPLATES, clampMechParts, type LibraryPart, type MechPart, type StudioComponent } from "../schema";
-import { buildEnclosure } from "../enclosure/build";
+import { buildEnclosure } from "../geometry/job";
 import { pointInCavity } from "../enclosure/templates";
 import { spec } from "../enclosure/test-fixtures";
 import { defaultMechParts, mechSummary } from "../ai/mech-default";
 import { explodeOffset, type ExplodeFrame } from "../explode";
-import { exportSTL, plateSTL, printableSTL } from "../export";
+import { exportSTL, platesSTL, printableSTL } from "../export";
+import { MK4_BED } from "../geometry/mesh-check";
 import { getCadBackend } from "../cad-adapter";
 import { buildMechParts, defaultMaterial } from "./build";
 import { dimsFromLayout, placeMechParts } from "./place";
@@ -19,11 +20,11 @@ const lib = (id: string) => {
   return p;
 };
 
-function scene(ids: [string, string][] = [["u1", "arduino_uno"], ["m1", "pir_hcsr501"], ["b1", "cell_18650"], ["k1", "button_6mm"], ["l1", "led_5mm"]]) {
+async function scene(ids: [string, string][] = [["u1", "arduino_uno"], ["m1", "pir_hcsr501"], ["b1", "cell_18650"], ["k1", "button_6mm"], ["l1", "led_5mm"]]) {
   const list = ids.map(([instanceId, partId]) => ({ instanceId, part: lib(partId) }));
   const lr = layoutComponents(list, { clearance: 2 });
   const parts = new Map<string, LibraryPart>(list.map((i) => [i.instanceId, i.part]));
-  const enc = buildEnclosure(spec(), lr, parts);
+  const enc = await buildEnclosure(spec(), lr, parts);
   const components: StudioComponent[] = ids.map(([instanceId, partId]) => ({ instanceId, partId }) as StudioComponent);
   const summary = mechSummary({
     components,
@@ -47,8 +48,8 @@ const all = (): MechPart[] =>
   );
 
 describe("placeMechParts", () => {
-  it("puts a standoff exactly under every real mount hole, inside the cavity", () => {
-    const { lr, parts, enc, mech } = scene();
+  it("puts a standoff exactly under every real mount hole, inside the cavity", async () => {
+    const { lr, parts, enc, mech } = await scene();
     const d = enc.meta.dims;
     const placed = placeMechParts(mech, lr, parts, d);
     for (const instanceId of ["u1", "m1"]) {
@@ -72,8 +73,8 @@ describe("placeMechParts", () => {
     }
   });
 
-  it("gives every part a non-zero, reversible explode vector", () => {
-    const { lr, parts, enc } = scene();
+  it("gives every part a non-zero, reversible explode vector", async () => {
+    const { lr, parts, enc } = await scene();
     const FRAME: ExplodeFrame = { centre: [0, 0, 0], H: enc.meta.H, tallest: 10, layers: 1, span: 50 };
     const placed = placeMechParts(all(), lr, parts, enc.meta.dims);
     for (const p of placed) {
@@ -96,8 +97,8 @@ describe("placeMechParts", () => {
     expect(by("wall_bracket").position[1]).toBeLessThan(-enc.meta.D / 2);
   });
 
-  it("puts button extender / light pipe on top of their part and the cable clip in the cavity", () => {
-    const { lr, parts, enc } = scene();
+  it("puts button extender / light pipe on top of their part and the cable clip in the cavity", async () => {
+    const { lr, parts, enc } = await scene();
     const d = enc.meta.dims;
     const mech = all();
     const placed = placeMechParts(mech, lr, parts, d);
@@ -110,8 +111,8 @@ describe("placeMechParts", () => {
     expect(pointInCavity(d, clip.position)).toBe(true);
   });
 
-  it("is deterministic and works without an enclosure", () => {
-    const { lr, parts, mech } = scene();
+  it("is deterministic and works without an enclosure", async () => {
+    const { lr, parts, mech } = await scene();
     const d = dimsFromLayout(lr);
     expect(placeMechParts(mech, lr, parts, d)).toEqual(placeMechParts(mech, lr, parts, d));
     expect(placeMechParts(all(), lr, new Map(), d).every((p) => p.position.every(Number.isFinite))).toBe(true);
@@ -119,8 +120,8 @@ describe("placeMechParts", () => {
 });
 
 describe("buildMechParts", () => {
-  it("builds every template with real grams, names and STL", () => {
-    const { lr, parts, enc } = scene();
+  it("builds every template with real grams, names and STL", async () => {
+    const { lr, parts, enc } = await scene();
     const built = buildMechParts(all(), lr, parts, { base: enc.base, lid: enc.lid, dims: enc.meta.dims });
     expect(built.length).toBe(MECH_TEMPLATES.length);
     for (const b of built) {
@@ -143,28 +144,28 @@ describe("buildMechParts", () => {
     expect(g("base").object.children.length).toBe(0);
   });
 
-  it("falls back to template lid/base without an enclosure", () => {
-    const { lr, parts } = scene();
+  it("falls back to template lid/base without an enclosure", async () => {
+    const { lr, parts } = await scene();
     const built = buildMechParts(all(), lr, parts);
     const lid = built.find((b) => b.template === "lid")!;
     expect(lid.volumeMm3).toBeGreaterThan(0);
     expect(lid.object.position.z).toBeGreaterThan(0);
   });
 
-  it("picks materials", () => {
+  it("picks materials", async () => {
     expect(defaultMaterial("light_pipe", "PLA")).toBe("PETG");
     expect(defaultMaterial("button_extender", "PLA")).toBe("TPU");
     expect(defaultMaterial("cable_clip", undefined)).toBe("TPU");
     expect(defaultMaterial("standoff", "PLA", "outdoor")).toBe("PETG");
     expect(defaultMaterial("standoff", "PLA", "indoor")).toBe("PLA");
     expect(defaultMaterial("standoff", "TPU", "outdoor")).toBe("TPU");
-    const { lr, parts } = scene();
+    const { lr, parts } = await scene();
     const built = buildMechParts(all(), lr, parts, undefined, { environment: "outdoor" });
     expect(built.find((b) => b.template === "base")!.printable.material).toBe("PETG");
   });
 
-  it("default mech list for real parts builds end to end", () => {
-    const { lr, parts, enc, mech } = scene();
+  it("default mech list for real parts builds end to end", async () => {
+    const { lr, parts, enc, mech } = await scene();
     expect(mech.some((m) => m.template === "battery_clip")).toBe(true);
     const built = buildMechParts(mech, lr, parts, { base: enc.base, lid: enc.lid, dims: enc.meta.dims });
     expect(built.length).toBe(mech.length);
@@ -185,8 +186,8 @@ describe("boards stand on their standoffs (P5-14)", () => {
     ["uno + pir + cell + button + led", [["u1", "arduino_uno"], ["m1", "pir_hcsr501"], ["b1", "cell_18650"], ["k1", "button_6mm"], ["l1", "led_5mm"]]],
   ];
   for (const [label, ids] of cases) {
-    it(`standoff top == board underside ±0.2 mm (${label})`, () => {
-      const { lr, parts, enc, mech } = scene(ids);
+    it(`standoff top == board underside ±0.2 mm (${label})`, async () => {
+      const { lr, parts, enc, mech } = await scene(ids);
       const d = enc.meta.dims;
       // Where the parts stand in THIS case (poke-through sensors lifted), as the viewer shows them.
       const shown = { ...lr, layout: enc.meta.layout };
@@ -213,8 +214,8 @@ describe("boards stand on their standoffs (P5-14)", () => {
 });
 
 describe("print files (P5-14)", () => {
-  it("one STL per part rests on the bed; the plate holds every part", () => {
-    const { lr, parts, enc, mech } = scene();
+  it("one STL per part rests on the bed; the plate holds every part", async () => {
+    const { lr, parts, enc, mech } = await scene();
     const built = buildMechParts(mech, { ...lr, layout: enc.meta.layout }, parts, { base: enc.base, lid: enc.lid, dims: enc.meta.dims });
     // Moving the object (exploded view) never changes its file.
     const lid = built.find((b) => b.template === "lid")!;
@@ -223,9 +224,16 @@ describe("print files (P5-14)", () => {
     const b = new Uint8Array(printableSTL(lid.object));
     expect(b).toEqual(a);
     const tris = (buf: ArrayBuffer) => new DataView(buf).getUint32(80, true);
-    const plate = plateSTL(built.map((x) => x.object));
+    // F-003: parts are packed onto printer BEDS now, so the whole set can take
+    // more than one plate; together the plates must still hold every triangle.
+    const out = platesSTL(built.map((x) => x.object));
     const sum = built.reduce((n, x) => n + tris(printableSTL(x.object)), 0);
-    expect(tris(plate)).toBe(sum);
-    expect(plate.byteLength).toBe(84 + 50 * sum);
+    expect(out.tooBig).toEqual([]);
+    expect(out.plates.reduce((n, p) => n + tris(p.data), 0)).toBe(sum);
+    for (const p of out.plates) {
+      expect(p.data.byteLength).toBe(84 + 50 * tris(p.data));
+      expect(p.w).toBeLessThanOrEqual(MK4_BED.x);
+      expect(p.d).toBeLessThanOrEqual(MK4_BED.y);
+    }
   });
 });

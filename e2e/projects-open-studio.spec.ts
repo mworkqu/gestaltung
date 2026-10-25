@@ -1,7 +1,4 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
-import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, test } from "./fixtures";
+import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, supabaseUrl, test } from "./fixtures";
 
 // 2026-10-12: a product project (made with "Plan a product") opens straight in the
 // Studio from My projects; a drawing / store list project keeps the project page.
@@ -11,22 +8,17 @@ import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, test } from 
 // run before the write guard. Nothing is written anywhere. (The server-side redirect of
 // /projects/<id> needs a real session; its rule is unit-tested in lib/projects/href.test.ts.)
 
-const ROOT = path.resolve(__dirname, "..");
 const MEMBER_ID = "bbbbbbbb-0000-4000-8000-00000000e2e3";
 const PRODUCT_ID = "11111111-0000-4000-8000-00000000e2e4";
 const CONSENT_ID = "22222222-0000-4000-8000-00000000e2e5";
 const DRAWING_ID = "33333333-0000-4000-8000-00000000e2e6";
 
-function supabaseUrl(): URL {
-  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) {
-    const env = readFileSync(path.join(ROOT, ".env.local"), "utf8");
-    url = /^NEXT_PUBLIC_SUPABASE_URL=(.*)$/m.exec(env)?.[1]?.trim().replace(/^["']|["']$/g, "");
-  }
-  if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
-  return new URL(url);
-}
-const SUPA = supabaseUrl();
+// Without a Supabase URL (no .env.local in this checkout) these specs cannot
+// run: the app has no Supabase client to intercept. Skip the file instead of
+// crashing the whole run.
+const SUPA_OR_NULL = supabaseUrl();
+test.skip(!SUPA_OR_NULL, "NEXT_PUBLIC_SUPABASE_URL is not set");
+const SUPA = SUPA_OR_NULL ?? new URL("http://supabase.invalid");
 const STORAGE_KEY = `sb-${SUPA.hostname.split(".")[0]}-auth-token`;
 
 function fakeSession(id: string) {

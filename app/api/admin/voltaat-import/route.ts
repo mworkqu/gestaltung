@@ -4,6 +4,8 @@ import { partKey } from "@/lib/parts/part-key";
 import { BlockedError, handleFromUrl, robotsAllows, variantFromUrl, VoltaatClient } from "@/lib/sourcing/adapters/voltaat";
 import { buildImportRows } from "@/lib/sourcing/voltaat-catalogue";
 import { revalidateStorefront } from "@/lib/cache/storefront";
+import { isSuperAdminSession } from "@/lib/auth/guards";
+import { emptyStatus, jsonError } from "@/lib/http";
 
 // Import Voltaat's catalogue into our store (owner decision 2026-09-28).
 // Reads the public catalogue once (robots.txt checked, 5 s between requests),
@@ -15,12 +17,12 @@ export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
+  if (!isSuperAdminSession(session)) return emptyStatus(403);
   const body = (await request.json().catch(() => ({}))) as { publish?: boolean };
   const supabase = await createClient();
 
   const { data: sup } = await supabase.from("suppliers").select("id").eq("code", "voltaat").single();
-  if (!sup) return Response.json({ error: "no_voltaat_supplier" }, { status: 500 });
+  if (!sup) return jsonError("no_voltaat_supplier", 500);
 
   // What we already follow, and product identities we already sell.
   const mappedKeys = new Set<string>();
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
   let raw;
   try {
     const robots = await client.robots();
-    if (!robotsAllows(robots, "/products.json?limit=250&page=1")) return Response.json({ error: "robots_disallow" }, { status: 409 });
+    if (!robotsAllows(robots, "/products.json?limit=250&page=1")) return jsonError("robots_disallow", 409);
     raw = await client.rawCatalogue();
   } catch (e) {
     return Response.json({ error: e instanceof BlockedError ? e.message : "fetch_failed", requests: client.requests }, { status: 502 });

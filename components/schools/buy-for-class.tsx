@@ -27,6 +27,7 @@ import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/components/parts/cart-provider";
 import { requestSchoolInvoice, type ClassActionError } from "@/app/[locale]/schools/classes/actions";
+import { asLocale } from "@/lib/locale";
 
 /** One cart line, already priced and pack-rounded on the server. */
 export type ClassCartRow = {
@@ -76,7 +77,7 @@ export function BuyForClass({
       }
       setState("added");
       // The class parameter is what gives the order free Economy delivery.
-      router.push(`/${locale === "ar" ? "ar" : "en"}/store/cart?class=${encodeURIComponent(classId)}`);
+      router.push(`/${asLocale(locale)}/store/cart?class=${encodeURIComponent(classId)}`);
     });
 
   return (

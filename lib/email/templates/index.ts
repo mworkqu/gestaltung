@@ -9,6 +9,8 @@ import { render as discountReady } from "./discount-ready";
 import { render as engineeringJobReady } from "./engineering-job-ready";
 import { orderStatusRenderer } from "./order-status";
 import type { NotificationLinks, NotificationLocale, Rendered } from "./layout";
+import { asLocale } from "@/lib/locale";
+import { DAY_MS } from "@/lib/format/date";
 
 export type { NotificationLinks } from "./layout";
 
@@ -55,7 +57,7 @@ export function renderNotification(
 ): Rendered {
   const p = args.payload;
   const payload = p && typeof p === "object" && !Array.isArray(p) ? p : {};
-  return RENDERERS[kind]({ locale: args.locale === "ar" ? "ar" : "en", payload, links: args.links });
+  return RENDERERS[kind]({ locale: asLocale(args.locale), payload, links: args.links });
 }
 
 /** The order id the sample payloads (and the admin test send) use. */
@@ -82,8 +84,8 @@ export function samplePayload(kind: NotificationKind): Record<string, unknown> {
       return {
         ref: "sample",
         amount_qar: 20,
-        earned_at: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString().slice(0, 10),
-        valid_until: new Date(Date.now() + 28 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+        earned_at: new Date(Date.now() - 2 * DAY_MS).toISOString().slice(0, 10),
+        valid_until: new Date(Date.now() + 28 * DAY_MS).toISOString().slice(0, 10),
       };
     case "engineering_job_ready":
       return { ref: "sample", job_kind: "step_model", project_id: "00000000-0000-0000-0000-000000000000", project_name: "Plant monitor" };

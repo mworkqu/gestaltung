@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { cleanAttributes, isAttrClass, type Attributes } from "@/lib/store/attributes";
 import { deriveAttributes } from "@/lib/store/derive-attributes";
@@ -13,7 +13,7 @@ import { revalidatePart, revalidateStorefront } from "@/lib/cache/storefront";
 // again by RLS (parts and store_settings writes are super_admin).
 
 async function requireAdmin() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 

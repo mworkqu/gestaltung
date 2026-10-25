@@ -8,9 +8,10 @@ import { ExternalLink } from "lucide-react";
 
 import type { QuoteCalc } from "@/lib/studio/request-summary";
 import { withQuantity } from "@/lib/studio/parts-group";
+import { intlTag, asLocale } from "@/lib/locale";
 
 function fmt(n: number, locale: string, digits = 2): string {
-  return new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { minimumFractionDigits: 0, maximumFractionDigits: digits }).format(n);
+  return new Intl.NumberFormat(intlTag(asLocale(locale)), { minimumFractionDigits: 0, maximumFractionDigits: digits }).format(n);
 }
 
 export async function QuoteCalcCard({ calc, locale }: { calc: QuoteCalc; locale: string }) {
@@ -19,7 +20,7 @@ export async function QuoteCalcCard({ calc, locale }: { calc: QuoteCalc; locale:
   const q = (n: number) => fmt(n, locale);
   const unpriced = calc.components.filter((c) => c.price_qar === null).length;
   const date = calc.computed_at
-    ? new Intl.DateTimeFormat(ar ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Qatar" }).format(new Date(calc.computed_at))
+    ? new Intl.DateTimeFormat(intlTag(asLocale(locale)), { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Qatar" }).format(new Date(calc.computed_at))
     : null;
 
   const row = "flex items-baseline justify-between gap-3 py-1.5";

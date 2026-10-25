@@ -4,7 +4,9 @@ import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { GRANT_REASONS, QUICK_AMOUNTS, mailtoLink, recentUse } from "@/lib/credits/grant-reasons";
+import { isStillRedeemable } from "@/lib/credits/redeem-window";
 import { grantCredits } from "./actions";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // AI credits admin (0042): find a user → balances → grant → their ledger;
 // plus AI calls per day per step from ai_usage_log. super_admin only (layout).
@@ -50,6 +52,7 @@ export default async function CreditsAdminPage({
   searchParams: Promise<{ q?: string; user?: string; granted?: string; err?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const { q, user: userId, granted, err } = await searchParams;
   const t = await getTranslations("Credits");
@@ -273,7 +276,7 @@ export default async function CreditsAdminPage({
                       {l.redeemed_order_id
                         ? t("redeemedOn", { order: l.redeemed_order_id.slice(0, 8) })
                         : l.redeemable_until
-                          ? new Date(l.redeemable_until) > new Date()
+                          ? isStillRedeemable(l.redeemable_until)
                             ? t("redeemableUntil", { date: date(l.redeemable_until) })
                             : t("expired")
                           : "—"}

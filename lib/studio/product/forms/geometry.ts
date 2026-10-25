@@ -37,15 +37,6 @@ export const ANCHOR_NORMAL: Record<Anchor, Vec3> = {
   right: [1, 0, 0],
 };
 
-export const OPPOSITE: Record<Anchor, Anchor> = {
-  top: "bottom",
-  bottom: "top",
-  front: "back",
-  back: "front",
-  left: "right",
-  right: "left",
-};
-
 export type Frame = {
   /** Local bounding box size [x, y, z] (mm). */
   size: Vec3;

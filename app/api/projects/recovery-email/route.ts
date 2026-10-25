@@ -5,6 +5,8 @@ import { projectLinkEmail } from "@/lib/projects/link-email";
 import { isUuid, projectLinkUrl, siteUrlFor } from "@/lib/projects/recovery";
 import { isPlausibleEmail } from "@/lib/store/shipping";
 import { createClient } from "@/lib/supabase/server";
+import { asLocale } from "@/lib/locale";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 // D6: the optional email on /projects/new. Called once, right after the
 // project is created, by the session that created it. project_recovery_begin
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
   } | null;
   const projectId = isUuid(body?.projectId) ? (body?.projectId as string) : null;
   const email = typeof body?.email === "string" ? body.email.trim().slice(0, 254) : "";
-  const locale = body?.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(body?.locale);
   if (!projectId || !isPlausibleEmail(email)) {
     return NextResponse.json({ sent: false, reason: "bad_request" }, { status: 400 });
   }
@@ -36,7 +38,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase.rpc("project_recovery_begin", { p_project: projectId, p_email: email });
   if (error) {
-    const missing = error.code === "PGRST202" || error.code === "42883";
+    const missing = isMissingFunction(error);
     if (!missing) console.error("[recovery-email] project_recovery_begin failed", error);
     return NextResponse.json({ sent: false, reason: missing ? "not_ready" : "error" });
   }

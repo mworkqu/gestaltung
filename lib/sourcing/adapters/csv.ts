@@ -5,9 +5,7 @@
 
 import { parseCsv } from "@/lib/parts/sheet-import";
 import type { Availability } from "@/lib/store/sourcing";
-import type { AdapterRowError, SourcedOffer, SupplierAdapter } from "@/lib/sourcing/types";
-
-export const csvAdapter: SupplierAdapter = { code: "csv", kind: "file" };
+import type { AdapterRowError, SourcedOffer } from "@/lib/sourcing/types";
 
 export const OFFER_FIELDS = [
   "supplierSku",

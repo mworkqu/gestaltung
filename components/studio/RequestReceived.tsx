@@ -11,6 +11,7 @@ import { MECH_NAMES } from "@/lib/studio/mech/names";
 import { COLOUR_HEX } from "@/lib/studio/palette";
 import type { RequestSummary } from "@/lib/studio/request-summary";
 import type { Colour, MechTemplate } from "@/lib/studio/schema";
+import { asLocale, intlTag } from "@/lib/locale";
 
 const ROUND = new Set(["puck", "dome_base", "lantern", "pill"]);
 
@@ -58,9 +59,9 @@ export async function RequestReceived({
 }) {
   const t = await getTranslations({ locale, namespace: "StudioRequest" });
   const tS = await getTranslations({ locale, namespace: "Studio" });
-  const lang = locale === "ar" ? "ar" : "en";
+  const lang = asLocale(locale);
   const sentOn = summary.requestedAt
-    ? new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Qatar" }).format(
+    ? new Intl.DateTimeFormat(intlTag(asLocale(locale)), { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Qatar" }).format(
         new Date(summary.requestedAt),
       )
     : null;
@@ -151,7 +152,8 @@ export async function RequestReceived({
                 <>
                   <ul className="space-y-1.5 text-sm" data-testid="studio-request-printed">
                     {summary.printed.map((r) => {
-                      const name = MECH_NAMES[r.template as MechTemplate]?.[lang] ?? r.template;
+                      const own = lang === "ar" ? r.name_ar : r.name;
+                      const name = MECH_NAMES[r.template as MechTemplate]?.[lang] ?? own ?? r.template;
                       return (
                         <li key={`${r.template}:${r.material}`} className="flex items-baseline justify-between gap-3">
                           <span className="min-w-0 text-heading">

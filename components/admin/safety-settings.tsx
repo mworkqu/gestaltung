@@ -7,6 +7,7 @@ import { Loader2, Save } from "lucide-react";
 import { saveCleanupSettings, saveTurnstileSwitch } from "@/app/[locale]/dashboard/usage/actions";
 import { CLEANUP_MIN_DAYS, type CleanupSettings } from "@/lib/cleanup/anonymous";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Dashboard → AI usage & pricing (super_admin): the Turnstile switch (P2-08)
 // and the weekly guest-account cleanup (P2-09) with its last five runs.
@@ -47,7 +48,7 @@ export function SafetySettings({
   const [clPending, startCl] = useTransition();
 
   const date = (iso: string) =>
-    new Date(iso).toLocaleString(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+    new Date(iso).toLocaleString(intlTag(asLocale(locale)), { dateStyle: "medium", timeStyle: "short" });
   const keyBadge = (set: boolean) => (
     <span
       className={cn(

@@ -17,6 +17,7 @@
 import { LOOK_HEX } from "./palette";
 import { symbolKind } from "./netlist";
 import type { LibraryPart, Pin } from "./schema";
+import { round2 } from "@/lib/format/money";
 
 export const PITCH_MM = 2.54;
 /** Body never smaller than this (mm) so labels and a pin row fit. */
@@ -134,7 +135,7 @@ export function drawing2d(p: LibraryPart): Drawing2D {
         id: pin.id,
         edge: e,
         x: e === "left" ? 0 : w,
-        y: round((h - (list.length - 1) * PITCH_MM) / 2 + i * PITCH_MM),
+        y: round2((h - (list.length - 1) * PITCH_MM) / 2 + i * PITCH_MM),
       });
     });
   }
@@ -146,8 +147,8 @@ export function drawing2d(p: LibraryPart): Drawing2D {
   const params = procParams(p);
   const bands = Array.isArray(params.bands) ? (params.bands as unknown[]).filter((b): b is string => typeof b === "string") : undefined;
   return {
-    w: round(w),
-    h: round(h),
+    w: round2(w),
+    h: round2(h),
     colour,
     textColour: textOn(colour),
     accent: p.look.accent,
@@ -158,4 +159,3 @@ export function drawing2d(p: LibraryPart): Drawing2D {
   };
 }
 
-const round = (n: number) => Math.round(n * 100) / 100;

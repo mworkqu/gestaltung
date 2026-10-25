@@ -6,7 +6,7 @@
 // subtracts from the shell.
 
 import type { EnclosureSpec, LayoutItem, LibraryPart, PortKind, VentFace } from "../schema";
-import { openingSize, rotateFace, rotateXY, type Vec3 } from "../layout";
+import { isExternalPart, openingSize, rotateFace, rotateXY, type Vec3 } from "../layout";
 import { exitDistance, innerTopAt, insideSection, topRange, type EnclosureDims } from "./templates";
 
 export type CutoutShape = "rrect" | "circle" | "hex" | "grille" | "arc" | "keyhole";
@@ -15,7 +15,7 @@ export type Cutout = {
   id: string;
   instanceId: string | null;
   portIndex: number | null;
-  kind: PortKind | "vent" | "keyhole";
+  kind: PortKind | "vent" | "keyhole" | "lead";
   face: VentFace;
   /** Centre of the cutting prism (enclosure space). */
   center: Vec3;
@@ -154,6 +154,57 @@ export function cutoutsFor(layout: LayoutItem[], parts: Map<string, LibraryPart>
       });
     });
   }
+  return out;
+}
+
+/**
+ * F-005: every part the case does NOT hold still has to get in somewhere.
+ *
+ * The soil probe sits in the soil and the pump sits in the water, each on a
+ * lead, so the shell needs one cable gland per external part. Without this the
+ * case was a closed cylinder with no way to reach the probe or the pump — which
+ * is exactly what the tester found.
+ *
+ * `layout` is what the case holds; `parts` is every part of the product, so the
+ * external ones are the difference. Glands go on the back wall (-y), spread
+ * along it, just above the floor.
+ */
+export const LEAD_HOLE_D = 5;
+
+export function leadCutouts(layout: LayoutItem[], parts: Map<string, LibraryPart>, dims: EnclosureDims): Cutout[] {
+  const held = new Set(layout.map((l) => l.instanceId));
+  const outside = [...parts.entries()]
+    .filter(([id, part]) => !held.has(id) && isExternalPart(part))
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  if (!outside.length) return [];
+  const d = LEAD_HOLE_D;
+  const z = Math.min(dims.floorZ + d / 2 + 1.5, Math.max(dims.floorZ + d / 2 + 1.5, dims.splitZ - d / 2 - 1));
+  const pitch = d + 3;
+  const span = pitch * (outside.length - 1);
+  const out: Cutout[] = [];
+  outside.forEach(([id], i) => {
+    const x = -span / 2 + i * pitch;
+    // Stay inside the wall of a round shell: pull the gland in if the chord runs out.
+    const safeX = insideSection(dims, x, -dims.D / 2 + dims.wall + 0.5, dims.wall) ? x : 0;
+    const reach = exitDistance(dims, safeX, 0, 0, -1) + 2;
+    const depth = Math.max(dims.wall + 2, reach - 0.3);
+    out.push({
+      id: `lead:${id}`,
+      instanceId: id,
+      portIndex: null,
+      kind: "lead",
+      face: "-y",
+      center: [safeX, -(reach - depth / 2), z],
+      normal: [0, -1, 0],
+      u: [1, 0, 0],
+      v: [0, 0, 1],
+      w: d,
+      h: d,
+      radius: d / 2,
+      depth,
+      shape: "circle",
+    });
+  });
   return out;
 }
 
@@ -381,7 +432,7 @@ export function ventCutouts(
   const faces: VentFace[] = dims.template === "lantern" && isSide(face) ? SIDE_FACES : [face];
   const blocks = [...avoid.map(cutoutBox), ...keepOut];
   const out: Cutout[] = [];
-  // Around a lantern the count is shared out (half per side keeps the band airy and the CSG quick).
+  // Around a lantern the count is shared out (half per side keeps the band airy and the build quick).
   const perFace = faces.length > 1 ? Math.max(2, Math.ceil(count / 2)) : count;
   let n = 0;
   for (const f of faces) {

@@ -8,6 +8,8 @@
 // Not wired into checkout yet: credits are still QAR 20 each. Use this when a
 // per-use cost is tracked and shown.
 
+import { CREDIT_QAR } from "@/lib/format/money";
+
 export type UsagePriceRule = {
   multiplier: number;
   office_tax_pct: number;
@@ -19,7 +21,7 @@ export const USAGE_PRICE_RULE: UsagePriceRule = {
   multiplier: 10,
   office_tax_pct: 12,
   round_to_qar: 10,
-  minimum_qar: 20,
+  minimum_qar: CREDIT_QAR,
 };
 
 /** Client price in QAR for something that cost us `costQar`. */

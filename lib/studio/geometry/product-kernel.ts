@@ -16,9 +16,30 @@
 //
 // Pure function of (manifold module, solved product): no three.js, no DOM.
 
-import type { CrossSection, Manifold, ManifoldToplevel, Mat4, SimplePolygon } from "manifold-3d";
+import type { Manifold, ManifoldToplevel } from "manifold-3d";
+import {
+  Arena,
+  LATHE_SEGMENTS,
+  basisFor,
+  cavity,
+  cs,
+  frameMat,
+  latheSolid,
+  meshArrays,
+  prism,
+  rr,
+  slabSolid,
+  sweep,
+  union,
+  type K,
+  type Mode,
+  type Shape,
+  type Slab,
+} from "./kernel-core";
 import { COLOUR_HEX } from "../palette";
-import { estGrams, type Colour } from "../schema";
+import { type Colour } from "../schema";
+import { gramsFromVolume } from "../weight";
+import { checkPrintable } from "./mesh-check";
 import { grilleHoles } from "../enclosure/cutouts";
 import {
   NOZZLE_FLANGE,
@@ -71,8 +92,17 @@ export type BuiltPiece = {
   print: PrintPlan;
   /** Full explode offset (body + piece). */
   explode: Vec3;
-  /** manifold-3d says the mesh is a closed, oriented 2-manifold. */
+  /**
+   * F-003: closed and consistently wound, checked twice — manifold-3d's own
+   * status AND an independent edge-balance check over the exact arrays we would
+   * write into the STL.
+   */
   watertight: boolean;
+  /**
+   * Connected components of the exported mesh. A PRINTABLE piece must have
+   * exactly 1; a bought body may legitimately be several (the probe's two pins).
+   */
+  shells: number;
 };
 
 export type BuiltLink = {
@@ -95,70 +125,8 @@ export type BuiltProduct = {
 };
 
 // ---------------------------------------------------------------------------
-// Memory: every WASM object is tracked and freed after the build
+// Form → shape
 // ---------------------------------------------------------------------------
-
-class Arena {
-  private items: { delete(): void }[] = [];
-  t<T extends { delete(): void }>(x: T): T {
-    this.items.push(x);
-    return x;
-  }
-  free() {
-    for (const x of this.items) {
-      try {
-        x.delete();
-      } catch {
-        /* already freed */
-      }
-    }
-    this.items = [];
-  }
-}
-
-type K = { mf: ManifoldToplevel; a: Arena };
-
-const poly = (pts: Vec2[]): SimplePolygon => pts.map(([x, y]) => [x, y]);
-
-function cs(k: K, contours: Vec2[][]): CrossSection {
-  return k.a.t(new k.mf.CrossSection(contours.map(poly), "NonZero"));
-}
-
-function union(k: K, list: Manifold[]): Manifold {
-  if (list.length === 0) return k.a.t(k.mf.Manifold.cube([0.001, 0.001, 0.001]));
-  if (list.length === 1) return list[0];
-  return k.a.t(k.mf.Manifold.union(list));
-}
-
-/** Column-major Mat4 taking +x → u, +y → v, +z → n, origin → t. */
-function frameMat(u: Vec3, v: Vec3, n: Vec3, t: Vec3): Mat4 {
-  return [u[0], u[1], u[2], 0, v[0], v[1], v[2], 0, n[0], n[1], n[2], 0, t[0], t[1], t[2], 1];
-}
-
-// ---------------------------------------------------------------------------
-// Shapes
-// ---------------------------------------------------------------------------
-
-const LATHE_SEGMENTS = 96;
-/** Widest flat ceiling left inside a lathed shell (mm); the rest of the roof is a 45° tent. */
-export const ROOF_BRIDGE = 40;
-
-type Slab = {
-  type: "slab";
-  h: number;
-  fillet: number;
-  chamfer: number;
-  /** Outline at height share t ∈ [0, 1], inset by `inset` mm. */
-  outline: (inset: number, t: number) => Vec2[];
-  /** soft_wedge: front height share (top slants down to the front). */
-  wedge?: number;
-};
-type Lathe = { type: "lathe"; outline: Vec2[]; segments: number };
-type Shape = Slab | Lathe | { type: "custom" };
-
-function rr(w: number, d: number, r: number): Vec2[] {
-  return rrectOutline(Math.max(0.2, w), Math.max(0.2, d), Math.max(0, Math.min(r, w / 2 - 0.05, d / 2 - 0.05)));
-}
 
 function shapeOf(f: FormPart, joints: { top: boolean; bottom: boolean }): Shape {
   const top = (x: number) => (joints.top ? 0 : x);
@@ -217,99 +185,9 @@ function shapeOf(f: FormPart, joints: { top: boolean; bottom: boolean }): Shape 
   }
 }
 
-/** Convex hull of rounded slices: 45° bottom chamfer, rounded top fillet. */
-function slabSolid(k: K, s: Slab, inset: number, z0: number, z1: number, fillet: number, chamfer: number): Manifold {
-  const slices: [number, number][] = [];
-  if (chamfer > 0.05) slices.push([z0, inset + chamfer], [z0 + chamfer, inset]);
-  else slices.push([z0, inset]);
-  if (fillet > 0.05) {
-    slices.push([z1 - fillet, inset]);
-    const steps = 6;
-    for (let i = 1; i <= steps; i++) {
-      const a = ((i / steps) * Math.PI) / 2;
-      slices.push([z1 - fillet + fillet * Math.sin(a), inset + fillet * (1 - Math.cos(a))]);
-    }
-  } else slices.push([z1, inset]);
-  const pts: Vec3[] = [];
-  for (const [z, i] of slices) {
-    const t = Math.min(1, Math.max(0, z / s.h));
-    for (const [x, y] of s.outline(i, t)) {
-      let zz = z;
-      if (s.wedge !== undefined) {
-        const d = Math.max(1e-6, maxY(s) * 2);
-        const share = s.wedge + (1 - s.wedge) * Math.min(1, Math.max(0, (y + d / 2) / d));
-        zz = z <= 0 ? z : z * share;
-      }
-      pts.push([x, y, zz]);
-    }
-  }
-  return k.a.t(k.mf.Manifold.hull(pts));
-}
-
-function maxY(s: Slab): number {
-  return Math.max(...s.outline(0, 0).map((p) => p[1]));
-}
-
-/** A lathed outline (half, (r, z)) as a full mirrored silhouette in (x, z). */
-function silhouette(half: Vec2[]): Vec2[] {
-  const right = half.filter(([r]) => r > 1e-6);
-  return [...right, ...[...right].reverse().map(([r, z]) => [-r, z] as Vec2)];
-}
-
-function latheSolid(k: K, s: Lathe): Manifold {
-  return k.a.t(cs(k, [silhouette(s.outline)]).revolve(s.segments));
-}
-
-type Mode = "closed" | "open_top" | "open_bottom";
-
-/** The hollow inside a shell, `inset` mm in from the outside. */
-function cavity(k: K, s: Shape, inset: number, mode: Mode): Manifold | null {
-  if (s.type === "lathe") {
-    const outer = cs(k, [silhouette(s.outline)]);
-    let inner = k.a.t(outer.offset(-inset, "Round", 2, 32));
-    if (inner.isEmpty()) return null;
-    const zTop = Math.max(...s.outline.map((p) => p[1]));
-    const right = s.outline.filter(([r]) => r > 1e-6);
-    const rTop = right[right.length - 1][0];
-    const rBot = right[0][0];
-    const B = 400;
-    if (mode !== "open_top") {
-      // 45° tent roof: the inside slopes at 45° at most, except a flat bridge of at most
-      // ROOF_BRIDGE mm across the very top (a short bridge prints cleanly on an MK4).
-      const zc = zTop - inset * Math.SQRT2 + ROOF_BRIDGE / 2;
-      inner = k.a.t(inner.intersect(cs(k, [[[-B, -B], [B, -B], [B, zc - B], [0, zc], [-B, zc - B]]])));
-    }
-    if (mode === "open_top" && rTop - inset > 1) {
-      const ro = rTop - inset;
-      inner = k.a.t(inner.add(cs(k, [[[-ro, zTop - inset - 1], [ro, zTop - inset - 1], [ro, zTop + 5], [-ro, zTop + 5]]])));
-    }
-    if (mode === "open_bottom" && rBot - inset > 1) inner = k.a.t(inner.add(cs(k, [[[-(rBot - inset), -5], [rBot - inset, -5], [rBot - inset, inset + 1], [-(rBot - inset), inset + 1]]])));
-    if (inner.isEmpty()) return null;
-    return k.a.t(inner.revolve(s.segments));
-  }
-  if (s.type === "slab") {
-    const w0 = Math.min(...s.outline(inset, 0).map((p) => p[0]));
-    if (!Number.isFinite(w0) || -w0 < 1) return null;
-    const z0 = mode === "open_bottom" ? -5 : inset;
-    const z1 = mode === "open_top" ? s.h + 5 : s.h - inset;
-    if (z1 - z0 < 1) return null;
-    const fillet = mode === "open_top" ? 0 : Math.max(0, s.fillet - inset);
-    return slabSolid(k, s, inset, z0, z1, fillet, 0);
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------------
 // Custom forms
 // ---------------------------------------------------------------------------
-
-/** A smooth tube along a polyline: hulls of consecutive spheres, unioned. */
-function sweep(k: K, path: Vec3[], radius: number, segs = 16): Manifold {
-  const balls = path.map((p) => k.a.t(k.a.t(k.mf.Manifold.sphere(radius, segs)).translate(p)));
-  const parts: Manifold[] = [];
-  for (let i = 1; i < balls.length; i++) parts.push(k.a.t(k.mf.Manifold.hull([balls[i - 1], balls[i]])));
-  return union(k, parts.length ? parts : balls);
-}
 
 function customSolid(k: K, f: FormPart): Manifold {
   const { Manifold: M } = k.mf;
@@ -441,19 +319,6 @@ function solidOf(k: K, f: FormPart, shape: Shape): Manifold {
 // Cut-outs, pockets, features
 // ---------------------------------------------------------------------------
 
-function basisFor(n: Vec3): { u: Vec3; v: Vec3 } {
-  if (Math.abs(n[2]) > 0.7) return { u: [1, 0, 0], v: v3.norm(v3.cross(n, [1, 0, 0])) };
-  const u = v3.norm([-n[1], n[0], 0]);
-  return { u, v: v3.norm(v3.cross(n, u)) };
-}
-
-function prism(k: K, c: { center: Vec3; normal: Vec3; w: number; h: number; depth: number; round: boolean }): Manifold {
-  const n = v3.norm(c.normal);
-  const { u, v } = basisFor(n);
-  const section = c.round ? cs(k, [ellipseOutline(c.w, c.w, 32)]) : cs(k, [rr(c.w, c.h, Math.min(1, c.w / 2 - 0.1, c.h / 2 - 0.1))]);
-  const m = k.a.t(section.extrude(c.depth, 0, 0, [1, 1], true));
-  return k.a.t(m.transform(frameMat(u, v, n, c.center)));
-}
 
 function cutoutSolid(k: K, c: SolvedCutout): Manifold {
   if (c.grille) {
@@ -533,9 +398,10 @@ function oppositeFace(f: string): "top" | "bottom" | "front" | "back" | "left" |
 // Bodies → pieces
 // ---------------------------------------------------------------------------
 
+/** Grams of one body — the ONE weight calculation (lib/studio/weight.ts). */
 function gramsFor(volume: number, material: ProductMaterial): number {
-  if (material === "aluminium") return 0;
-  return estGrams(volume, material === "resin_clear" ? "PETG" : material);
+  if (material === "aluminium") return 0; // bought, not printed
+  return gramsFromVolume(volume, material === "resin_clear" ? "PETG" : material);
 }
 
 type RawPiece = { piece: SolvedPiece; m: Manifold };
@@ -617,46 +483,6 @@ function buildBody(k: K, b: SolvedBody): RawPiece[] {
   ];
 }
 
-function meshArrays(k: K, m: Manifold): { positions: Float32Array; normals: Float32Array; indices: Uint32Array } {
-  const withN = k.a.t(m.calculateNormals(0, 40));
-  const mesh = withN.getMesh();
-  const np = mesh.numProp;
-  const vp = mesh.vertProperties;
-  const n = vp.length / np;
-  const positions = new Float32Array(n * 3);
-  const normals = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    positions[i * 3] = vp[i * np];
-    positions[i * 3 + 1] = vp[i * np + 1];
-    positions[i * 3 + 2] = vp[i * np + 2];
-    if (np >= 6) {
-      normals[i * 3] = vp[i * np + 3];
-      normals[i * 3 + 1] = vp[i * np + 4];
-      normals[i * 3 + 2] = vp[i * np + 5];
-    }
-  }
-  const indices = new Uint32Array(mesh.triVerts);
-  if (np < 6) faceNormals(positions, indices, normals);
-  return { positions, normals, indices };
-}
-
-/** Fallback: area-weighted vertex normals. */
-function faceNormals(p: Float32Array, idx: Uint32Array, out: Float32Array) {
-  for (let t = 0; t < idx.length; t += 3) {
-    const [a, b, c] = [idx[t], idx[t + 1], idx[t + 2]];
-    const ab: Vec3 = [p[b * 3] - p[a * 3], p[b * 3 + 1] - p[a * 3 + 1], p[b * 3 + 2] - p[a * 3 + 2]];
-    const ac: Vec3 = [p[c * 3] - p[a * 3], p[c * 3 + 1] - p[a * 3 + 1], p[c * 3 + 2] - p[a * 3 + 2]];
-    const nn = v3.cross(ab, ac);
-    for (const v of [a, b, c]) for (let q = 0; q < 3; q++) out[v * 3 + q] += nn[q];
-  }
-  for (let i = 0; i < out.length; i += 3) {
-    const l = Math.hypot(out[i], out[i + 1], out[i + 2]) || 1;
-    out[i] /= l;
-    out[i + 1] /= l;
-    out[i + 2] /= l;
-  }
-}
-
 /**
  * Build every printable piece and every tube of a solved product. `mf` is an initialised
  * manifold-3d module (product-job.ts loadManifold()). Never mutates `solved`.
@@ -668,10 +494,16 @@ export function buildProductMeshes(mf: ManifoldToplevel, solved: SolvedProduct):
     const pieces: BuiltPiece[] = [];
     for (const b of solved.bodies) {
       for (const raw of buildBody(k, b)) {
-        const world = k.a.t(k.a.t(raw.m.rotate(b.rotation)).translate(b.position));
+        // F-003: `union` collapses the body's CSG result into ONE solid before
+        // export — a body built from several overlapping primitives (shell +
+        // fused wall + snap lip) must leave here as a single closed mesh, not as
+        // the stack it was cut from.
+        const placed = k.a.t(k.a.t(raw.m.rotate(b.rotation)).translate(b.position));
+        const world = union(k, [placed]);
         const status = world.status();
         const arrays = meshArrays(k, world);
         const volume = Math.abs(world.volume());
+        const check = checkPrintable({ positions: arrays.positions, indices: arrays.indices });
         pieces.push({
           id: raw.piece.id,
           bodyId: b.id,
@@ -688,7 +520,8 @@ export function buildProductMeshes(mf: ManifoldToplevel, solved: SolvedProduct):
           printable: b.printable,
           print: raw.piece.print,
           explode: v3.add(b.explode, raw.piece.explode),
-          watertight: status === "NoError" && !world.isEmpty(),
+          watertight: status === "NoError" && !world.isEmpty() && check.watertight,
+          shells: check.shells,
         });
       }
     }

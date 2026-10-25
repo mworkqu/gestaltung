@@ -2,6 +2,7 @@ import { setRequestLocale, getTranslations } from "next-intl/server";
 
 import { PartForm } from "@/components/parts/part-form";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function NewPartPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");

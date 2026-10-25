@@ -6,7 +6,7 @@
 // small, and our clamp*() helpers enforce the real limits anyway.
 
 import {
-  ACTUATOR_KINDS, ACTUATOR_LOADS, BUILD_CLASSES, MOVER_KINDS, COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
+  ACTUATOR_KINDS, ACTUATOR_LOADS, BUILD_CLASSES, CONTROLLER_BUSES, MOVER_KINDS, COLOURS, ENVIRONMENTS, FEET, FINISHES, HEIGHT_BIASES, INPUTS, LIDS, LIMITS, MECH_PARAMS,
   MECH_TEMPLATES, MATERIALS, OUTPUTS, PHASE_TEMPLATES, PLACEMENTS, POWERS, SIZE_HINTS, STYLES, USES, VENT_FACES, VENT_PATTERNS,
   type EnclosureTemplate, type MechTemplate, type ProductSpec,
 } from "../schema";
@@ -95,6 +95,21 @@ export const SPEC_SYSTEM =
   "EMPTY and list the gate chips themselves (e.g. 'AND gate (7408)') in the understanding, with the breadboard, the switches " +
   "and the LEDs. Never put a breadboard or a power module in the controller slot. " +
   "Keep spec.buildClass on every later turn unless the user asks for the other shape. " +
+  // 2026-10-25: the engineering facts the part lists cannot show. Our code turns them into the price.
+  "Always set spec.scope — the engineering facts the parts list cannot show, so we know how involved the " +
+  "build is: controllers (how many microcontrollers run their OWN firmware: 1 for a normal build, 0 when " +
+  "there is no microcontroller, more only when the design really needs separate boards), controllerBus " +
+  "(ONLY when two or more controllers talk to each other — i2c, spi, uart or can; a bus used only to read " +
+  "sensors on one board is NOT this, leave it out), axes (coordinated motion axes: a 4-axis machine is 4, " +
+  "a pan-tilt head 2, nothing that moves 0), highEndController (true only when a hobby board such as an " +
+  "Arduino or ESP32 is not enough and it needs an STM32, Teensy, FPGA or a single-board computer), customPcb " +
+  "(true when a custom printed circuit board is part of what we deliver — a breadboard or a ready-made " +
+  "module is not), productionFirmware (true only for production firmware architecture: bootloader, " +
+  "over-the-air updates, a tested state machine — a starter sketch is not), integratedEnclosure (true when " +
+  "the mechanics and the electronics are one integrated package: sealed, gasketed or load-bearing — a box " +
+  "with the parts inside is not) and complexPower (true for several voltage rails, high current or mains power). " +
+  "Report what the design honestly needs and nothing more; leave a flag out when it does not apply. " +
+  "Never mention prices, tokens, tiers or levels, and never argue for or against a bigger build. " +
   "Use Western digits (0-9) in Arabic too.";
 
 const U = LIMITS.understanding;
@@ -135,6 +150,41 @@ export const UNDERSTANDING_SCHEMA = {
   required: ["goal", "howItWorks", "sensors", "actuators", "outputs"],
 };
 
+/**
+ * 2026-10-25: how involved the build is, in facts about the DESIGN. The model fills it
+ * on the same turn as the card (no extra call); lib/studio/tiers.ts decides the tier and
+ * the price from it. Nothing here is money, and the model is told so.
+ */
+export const BUILD_SCOPE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    controllers: {
+      type: "INTEGER",
+      description: `Microcontrollers that run their own firmware: 1 normally, 0 with no microcontroller, at most ${LIMITS.scope.controllersMax}`,
+    },
+    controllerBus: enumOf(
+      CONTROLLER_BUSES,
+      "Only when TWO OR MORE controllers talk to each other: the protocol between them. A bus used only to read sensors is not this — leave it out.",
+    ),
+    axes: { type: "INTEGER", description: `Coordinated motion axes (a 4-axis machine = 4), 0–${LIMITS.scope.axesMax}` },
+    highEndController: {
+      type: "BOOLEAN",
+      description: "true only when a hobby board (Arduino, ESP32) is not enough: STM32, Teensy, FPGA or a single-board computer",
+    },
+    customPcb: { type: "BOOLEAN", description: "true when a custom printed circuit board is part of the deliverable (not a breadboard or a module)" },
+    productionFirmware: {
+      type: "BOOLEAN",
+      description: "true only for production firmware architecture (bootloader, over-the-air updates, a tested state machine), not a starter sketch",
+    },
+    integratedEnclosure: {
+      type: "BOOLEAN",
+      description: "true when mechanics and electronics are one integrated package (sealed, gasketed, load-bearing), not a box with parts in it",
+    },
+    complexPower: { type: "BOOLEAN", description: "true for several voltage rails, high current, or mains power" },
+  },
+  required: ["controllers"],
+};
+
 export const PRODUCT_SPEC_SCHEMA = {
   type: "OBJECT",
   properties: {
@@ -173,9 +223,13 @@ export const PRODUCT_SPEC_SCHEMA = {
         'on a breadboard, no microcontroller and no code at all; "cad" = the deliverable is a printed part, little or no electronics.',
     ),
     understanding: UNDERSTANDING_SCHEMA,
+    scope: BUILD_SCOPE_SCHEMA,
     quantity: { type: "INTEGER", description: "Always 1" },
   },
-  required: ["name", "oneLine", "use", "power", "environment", "features", "inputs", "outputs", "sizeHint", "style", "understanding", "quantity"],
+  required: [
+    "name", "oneLine", "use", "power", "environment", "features", "inputs", "outputs", "sizeHint", "style",
+    "understanding", "scope", "quantity",
+  ],
 };
 
 export const SPEC_RESPONSE_SCHEMA = {
@@ -204,8 +258,14 @@ export const REFINE_RESPONSE_SCHEMA = {
     spec: PRODUCT_SPEC_SCHEMA,
     reply: SPEC_RESPONSE_SCHEMA.properties.reply,
     changed: SPEC_RESPONSE_SCHEMA.properties.changed,
+    newProduct: {
+      type: "BOOLEAN",
+      description:
+        "true ONLY when the newest message replaces the product with a DIFFERENT product (what it IS changed). " +
+        "false for a change to features, parts, size, power, materials or looks, and false whenever you are unsure.",
+    },
   },
-  required: ["diff", "spec", "reply", "changed"],
+  required: ["diff", "spec", "reply", "changed", "newProduct"],
 };
 
 export type ChatMessage = { role: "user" | "assistant"; text: string; choices?: string[] };
@@ -221,12 +281,15 @@ export function specPrompt(opts: {
   idea: string;
   messages: ChatMessage[];
   locale: "en" | "ar";
+  /** F-047: the language of the visitor's newest message; the reply (not the card) mirrors it. Default = locale. */
+  replyLocale?: "en" | "ar";
   forceSpec: boolean;
   /** Makers / Engineers builds: a deeper electronics check on every turn (lib/studio/tiers.ts). */
   deep?: boolean;
   /** The card as it stands: the last user message is a change request on top of it (W3 refinement). */
   current?: ProductSpec | null;
 }): string {
+  const replyLang = (opts.replyLocale ?? opts.locale) === "ar" ? "Arabic" : "English";
   const history = opts.messages.length
     ? opts.messages
         .map((m) => `${m.role === "user" ? "User" : "You"}: ${m.text}${m.choices?.length ? ` [choices: ${m.choices.join(" | ")}]` : ""}`)
@@ -246,25 +309,32 @@ export function specPrompt(opts: {
         "2. Diff: work out what the newest message, read together with everything said before, changes about the goal, " +
         "how it works, the controller, the sensors, the movers (servos, small linear actuators, motors, pumps) and the outputs. " +
         "Earlier requests that still hold stay applied. Put each change in diff (empty when nothing changes).\n" +
-        "3. Rebuild the FULL understanding from the goal down, then the FULL spec from that understanding. Never patch only the " +
+        "3. Rebuild the FULL understanding from the goal down, then the FULL spec (including spec.scope) from that " +
+        "understanding. Never patch only the " +
         "field the last message names: if the goal or how it works changes, re-think every part — add the parts the new behaviour " +
         "needs and drop the parts that no longer serve it. A count change ('4 servos', 'two sensors') changes that part's count " +
         "and spec.actuators to match.\n" +
-        "4. Return {diff, spec (with spec.understanding), reply, changed}. changed = short labels the user sees (e.g. 'Now 4 servos'). " +
+        "4. Return {diff, spec (with spec.understanding), reply, changed, newProduct}. changed = short labels the user sees (e.g. 'Now 4 servos'). " +
         "When the message is only a question ('what is UR10', 'who made you') or small talk, return the current understanding and spec " +
         "copied exactly, diff and changed empty, and answer in reply. " +
         "Copy the wording of everything that did not change exactly, so only real changes show. " +
         "A message that names a reference product to copy ('big robotic arm like a UR10') IS a change: rebuild for the desktop " +
-        "version with that product's joint/motor count and a scaleNote when the real thing is far bigger.",
+        "version with that product's joint/motor count and a scaleNote when the real thing is far bigger.\n" +
+        "5. newProduct: true ONLY when the newest message throws the current product away and asks for a DIFFERENT product " +
+        "(what the thing IS changed: 'actually make it a robot arm' after a plant waterer). false for everything else, " +
+        "including a bigger or smaller version of the same product and any change to its features, parts, sensors, size, " +
+        "power, materials or looks. Adding a part is never a new product. When you are not sure, answer false.",
       ...(opts.deep ? [DEEP_CHECK] : []),
-      `Language for the reply, names, understanding and features: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+      `Language for names, understanding and features: ${opts.locale === "ar" ? "Arabic" : "English"}. ` +
+        `Language for reply ONLY: ${replyLang}, the language the user's newest message is written in.`,
     ].join("\n\n");
   }
   return [
     `Idea:\n${opts.idea || "(see the conversation)"}`,
     `Conversation so far:\n${history}`,
     ...(opts.deep ? [DEEP_CHECK] : []),
-    `Language for any question, reply and the spec text: ${opts.locale === "ar" ? "Arabic" : "English"}.`,
+    `Language for the spec text: ${opts.locale === "ar" ? "Arabic" : "English"}. ` +
+      `Language for any question and reply ONLY: ${replyLang}, the language the user wrote in.`,
     opts.forceSpec ? "Return the spec now." : "Ask the next question, or return the spec if you know enough.",
   ].join("\n\n");
 }

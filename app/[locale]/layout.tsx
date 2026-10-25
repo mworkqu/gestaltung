@@ -101,6 +101,7 @@ export default async function LocaleLayout({
   // or requested before that. Unset locally / in previews = never loads.
   const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
   const phone = await getContactPhone();
+  const tNav = await getTranslations({ locale, namespace: "Nav" });
 
   return (
     <html
@@ -109,6 +110,17 @@ export default async function LocaleLayout({
       className={`${sans.variable} ${mono.variable} ${sansArabic.variable}`}
     >
       <body className="min-h-screen bg-background font-sans text-body">
+        {/*
+          F-034: the first focusable element on every page, off-screen until it
+          takes focus. A keyboard visitor would otherwise tab the whole header
+          on every page before reaching the content.
+        */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-xl focus:bg-panel focus:px-5 focus:text-sm focus:font-semibold focus:text-heading focus:shadow-neu-sm"
+        >
+          {tNav("skipToContent")}
+        </a>
         {/*
           Every product photo is hotlinked from the Shopify CDN (lib/store/image-url.ts),
           so the first one pays a cold DNS + TCP + TLS handshake to a second host - about
@@ -126,7 +138,9 @@ export default async function LocaleLayout({
                 <HeaderGate>
                   <Header locale={locale as Locale} />
                 </HeaderGate>
-                <main className="flex-1">{children}</main>
+                <main id="main-content" tabIndex={-1} className="flex-1">
+                  {children}
+                </main>
                 {/* P1-04: trust block above the footer; hidden where the header is hidden and on /trust. */}
                 <TrustGate>
                   <TrustBlock />

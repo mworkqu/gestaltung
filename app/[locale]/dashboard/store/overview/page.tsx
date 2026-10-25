@@ -9,6 +9,9 @@ import { productSpecs } from "@/lib/store/specs";
 import { hideProduct } from "./actions";
 import { StoreTranslate } from "@/components/admin/store-translate";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { readPartsAdmin } from "@/lib/store/part-columns";
+import { DAY_MS } from "@/lib/format/date";
 
 // Sourcing overview (owner, 2026-09-29): every product in plain groups —
 // where it comes from and whether customers can see it — with what to act on
@@ -48,22 +51,26 @@ const LIMIT = 40;
 
 export default async function SourcingOverviewPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("SourcingOverview");
   const db = await createClient();
 
-  const { rows, error } = await fetchAllRows<P>((from, to) =>
-    db
-      .from("parts")
-      .select("id, sku, name, name_ar, description, unit_price, lead_time_class, below_floor, income_pct, image_url, specs, datasheet_url, backup_for")
-      .eq("is_published", true)
-      .is("merged_into", null)
-      .order("id")
-      .range(from, to)
+  // below_floor / income_pct: the admin view (0105).
+  const { rows, error } = await readPartsAdmin((t) =>
+    fetchAllRows<P>((from, to) =>
+      db
+        .from(t)
+        .select("id, sku, name, name_ar, description, unit_price, lead_time_class, below_floor, income_pct, image_url, specs, datasheet_url, backup_for")
+        .eq("is_published", true)
+        .is("merged_into", null)
+        .order("id")
+        .range(from, to)
+    )
   );
   if (error) return <p className="text-sm font-medium text-destructive">{t("needsMigration")}</p>;
 
-  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * DAY_MS).toISOString();
   const { data: runs } = await db
     .from("supplier_sync_runs")
     .select("supplier_code, started_at, changes")

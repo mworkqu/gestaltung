@@ -1,4 +1,4 @@
-/** @type {import('postcss-load-config').Config} */
+// PostCSS plugins for Tailwind. Shape follows postcss-load-config's Config.
 const config = {
   plugins: {
     tailwindcss: {},

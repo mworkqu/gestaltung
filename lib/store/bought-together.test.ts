@@ -74,6 +74,7 @@ describe("mergeBoughtTogether", () => {
       together: [card("A"), card("B"), card("C"), card("D")],
       fallback: [card("F1")],
       currentSku: "X",
+      category: "Sensors",
     });
     expect(skus(r.parts)).toEqual(["A", "B", "C"]);
     expect(r.source).toBe("together");
@@ -84,6 +85,7 @@ describe("mergeBoughtTogether", () => {
       together: [],
       fallback: [card("late", { lead_time_class: "2_4_weeks" }), card("X"), card("S1"), card("S2")],
       currentSku: "X",
+      category: "Sensors",
     });
     expect(skus(r.parts)).toEqual(["S1", "S2", "late"]);
     expect(r.source).toBe("category");
@@ -94,13 +96,14 @@ describe("mergeBoughtTogether", () => {
       together: [card("A")],
       fallback: [card("A"), card("F1"), card("F2"), card("F3")],
       currentSku: "X",
+      category: "Sensors",
     });
     expect(skus(r.parts)).toEqual(["A", "F1", "F2"]);
     expect(r.source).toBe("category");
   });
 
   it("keeps 'together' when fewer than three were bought together and nothing else is available", () => {
-    const r = mergeBoughtTogether({ together: [card("A"), card("B")], fallback: [card("X")], currentSku: "X" });
+    const r = mergeBoughtTogether({ together: [card("A"), card("B")], fallback: [card("X")], currentSku: "X", category: "Sensors" });
     expect(skus(r.parts)).toEqual(["A", "B"]);
     expect(r.source).toBe("together");
   });
@@ -110,12 +113,40 @@ describe("mergeBoughtTogether", () => {
       together: [card("X"), card("A"), card("A")],
       fallback: [card("X"), card("A"), card("B")],
       currentSku: "X",
+      category: "Sensors",
     });
     expect(skus(r.parts)).toEqual(["A", "B"]);
   });
 
+  it("never tops up with a product from another store category", () => {
+    const r = mergeBoughtTogether({
+      together: [],
+      fallback: [card("hdmi", { category: "Cables and connectors" }), card("drawer", { category: "Tools and accessories" })],
+      currentSku: "X",
+      category: "Sensors",
+    });
+    expect(r.parts).toEqual([]);
+  });
+
+  it("does not top up from the catch-all category, nor without a category", () => {
+    const pool = [card("a", { category: "Tools and accessories" }), card("b", { category: "Tools and accessories" })];
+    expect(mergeBoughtTogether({ together: [], fallback: pool, currentSku: "X", category: "Tools and accessories" }).parts).toEqual([]);
+    expect(mergeBoughtTogether({ together: [], fallback: pool, currentSku: "X", category: null }).parts).toEqual([]);
+  });
+
+  it("still shows real co-purchases from another category", () => {
+    const r = mergeBoughtTogether({
+      together: [card("cable", { category: "Cables and connectors" })],
+      fallback: [],
+      currentSku: "X",
+      category: "Power",
+    });
+    expect(skus(r.parts)).toEqual(["cable"]);
+    expect(r.source).toBe("together");
+  });
+
   it("returns an empty list when there is nothing at all", () => {
-    expect(mergeBoughtTogether({ together: [], fallback: [], currentSku: "X" })).toEqual({ parts: [], source: "category" });
+    expect(mergeBoughtTogether({ together: [], fallback: [], currentSku: "X", category: "Sensors" })).toEqual({ parts: [], source: "category" });
   });
 });
 

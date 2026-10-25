@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { UUID_RE } from "../ai-costs/format";
+import { asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
 
 // Admin payment controls. admin_payment_review / admin_pass_expire (0089)
 // re-check super_admin and the status transition; we only pass the intent.
@@ -19,12 +20,12 @@ function back(locale: string, view: string, err: string | null) {
 }
 
 async function guard() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 
 export async function reviewPayment(formData: FormData) {
-  const locale = formData.get("locale") === "ar" ? "ar" : "en";
+  const locale = asLocale(formData.get("locale"));
   const view = String(formData.get("view") ?? "review");
   await guard();
 
@@ -41,7 +42,7 @@ export async function reviewPayment(formData: FormData) {
 }
 
 export async function expirePass(formData: FormData) {
-  const locale = formData.get("locale") === "ar" ? "ar" : "en";
+  const locale = asLocale(formData.get("locale"));
   const view = String(formData.get("view") ?? "review");
   await guard();
 

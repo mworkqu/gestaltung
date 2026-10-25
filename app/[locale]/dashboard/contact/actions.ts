@@ -1,6 +1,6 @@
 "use server";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateContactPhone } from "@/lib/cache/storefront";
 import { CONTACT_PHONE_KEY, parseContactPhoneInput } from "@/lib/contact-phone";
@@ -12,7 +12,7 @@ import { CONTACT_PHONE_KEY, parseContactPhoneInput } from "@/lib/contact-phone";
 // revalidateStorefront() + revalidatePath("/", "layout") pair threw the whole
 // store away for a phone number (Vercel ISR writes).
 export async function saveContactPhone(locale: string, raw: string): Promise<{ ok: true; e164: string } | { error: string }> {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
   const e164 = parseContactPhoneInput(raw);
   if (!e164) return { error: "invalid" };

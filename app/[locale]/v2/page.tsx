@@ -25,6 +25,7 @@ import { categoryLabel } from "@/lib/store/category-label";
 import { v2PageMetadata } from "@/lib/site-v2-server";
 import { VIDEOS, homeVideoSlug, videoBase, videoJsonLd } from "@/lib/videos";
 import { cn } from "@/lib/utils";
+import { tokenCopyParams } from "@/lib/billing/config";
 
 // v2 home (P3-03, plan 5.2). Same ISR rule as the v1 home: static per locale,
 // re-rendered at most every 5 minutes. Nothing per-visitor is rendered here
@@ -140,6 +141,7 @@ export default async function HomeV2({ params }: { params: Promise<{ locale: str
                 text={t("choiceIdeaText")}
               />
               <p className="text-[11px] leading-relaxed text-mutedtext">{t("choiceIdeaDatasheet")}</p>
+              <p className="text-[11px] leading-relaxed text-mutedtext">{t("choiceIdeaTokens", tokenCopyParams())}</p>
               <div className="mt-auto space-y-2">
                 <TrackClick event="path_chosen" params={{ path: "plan" }}>
                   <Button asChild size="lg" className="w-full rounded-2xl">

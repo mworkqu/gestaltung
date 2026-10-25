@@ -4,6 +4,7 @@ import {
   activeFilterCount,
   emptyState,
   hasActiveFilters,
+  LEAD_FILTER_OPTIONS,
   leadClassesFor,
   parseStoreParams,
   resolveSort,
@@ -13,6 +14,8 @@ import {
   storeQuery,
   STORE_URL_PARAMS,
 } from "@/lib/store/catalog";
+import { arrivesByDate } from "@/lib/store/delivery";
+import { LEAD_TIME_CLASSES } from "@/lib/store/sourcing";
 import { readFileSync } from "node:fs";
 
 describe("parseStoreParams", () => {
@@ -104,11 +107,54 @@ describe("activeFilterCount (badge on the mobile Filters button)", () => {
   });
 });
 
-describe("leadClassesFor (delivery-time options → lead_time_class)", () => {
-  it("maps by each class's upper bound in days", () => {
-    expect(leadClassesFor("3_5_days")).toEqual(["in_stock", "3_5_days"]);
-    expect(leadClassesFor("1_2_weeks")).toEqual(["1_2_weeks"]);
-    expect(leadClassesFor("2_4_weeks")).toEqual(["2_4_weeks"]);
+describe("leadClassesFor (delivery-time options → lead_time_class, by computed arrival date)", () => {
+  // Calendar-day settings (no holidays row): arrival = today + lead + 1 + 2 + 3.
+  const slow = { handlingDays: 1, bufferDays: 3, standardTransitDays: 2 };
+  const today = "2026-10-03";
+
+  // The buckets are "Up to 2 weeks" (<= 14 days), "2-4 weeks" (15-28) and
+  // "Over a month" (> 28), measured on the COMPUTED arrival date. The option
+  // values are the old lead-class names, kept so shared ?stock= links survive.
+  it("a product that arrives in 11 days is in the first bucket, not judged by its lead class (F-013)", () => {
+    expect(arrivesByDate("3_5_days", slow, today)).toBe("2026-10-14");
+    expect(leadClassesFor("3_5_days", slow, today)).toContain("3_5_days");
+  });
+
+  it("matches the date the card shows: each class lands in the bucket holding its arrival", () => {
+    // in_stock 8 days, 3_5_days 11, 1_2_weeks 20, 2_4_weeks 34.
+    expect(leadClassesFor("3_5_days", slow, today)).toEqual(["in_stock", "3_5_days"]);
+    expect(leadClassesFor("1_2_weeks", slow, today)).toEqual(["1_2_weeks"]);
+    // Open-ended, so a product past 28 days is still reachable from a filter
+    // rather than only from "All".
+    expect(leadClassesFor("2_4_weeks", slow, today)).toEqual(["2_4_weeks"]);
+  });
+
+  it("no bucket is empty with the live settings: the point of the relabel", () => {
+    for (const o of LEAD_FILTER_OPTIONS) expect(leadClassesFor(o, slow, today).length).toBeGreaterThan(0);
+  });
+
+  it("no product falls outside every option, however slow the settings", () => {
+    const verySlow = { handlingDays: 5, bufferDays: 10, standardTransitDays: 7 };
+    const covered = LEAD_FILTER_OPTIONS.flatMap((o) => leadClassesFor(o, verySlow, today));
+    for (const c of LEAD_TIME_CLASSES) expect(covered).toContain(c);
+  });
+
+  it("faster settings move products up a bucket, which is the owner's lever", () => {
+    // handling 1 + transit 2 + buffer 1: in_stock 6, 3_5_days 9, 1_2_weeks 18.
+    const fast = { handlingDays: 1, bufferDays: 1, standardTransitDays: 2 };
+    expect(leadClassesFor("3_5_days", fast, today)).toEqual(["in_stock", "3_5_days"]);
+    expect(leadClassesFor("1_2_weeks", fast, today)).toEqual(["1_2_weeks"]);
+    expect(leadClassesFor("2_4_weeks", fast, today)).toEqual(["2_4_weeks"]);
+  });
+
+  it("every option is a disjoint range: no class is in two options", () => {
+    const all = LEAD_FILTER_OPTIONS.flatMap((o) => leadClassesFor(o, slow, today));
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("without shipping settings (no card shows a date) it falls back to the class's own range", () => {
+    expect(leadClassesFor("3_5_days", null, today)).toEqual(["in_stock", "3_5_days", "1_2_weeks"]);
+    expect(leadClassesFor("1_2_weeks", undefined, today)).toEqual(["2_4_weeks"]);
   });
 });
 

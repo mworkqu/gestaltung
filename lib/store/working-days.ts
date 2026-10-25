@@ -9,6 +9,8 @@
 // it is a working day, else the next one (roll forward). Dates are ISO
 // "YYYY-MM-DD" strings, handled in UTC (no time zone drift).
 
+import { addDays } from "@/lib/format/date";
+
 export const HOLIDAYS_KEY = "holidays";
 
 export type Holidays = {
@@ -87,12 +89,6 @@ export function parseHolidays(raw: unknown): Holidays {
 export function isoWeekday(iso: string): number {
   const day = new Date(`${iso}T00:00:00Z`).getUTCDay();
   return day === 0 ? 7 : day;
-}
-
-function addDays(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
 }
 
 /** The weekend to apply: all seven days would make every date impossible → default (as SQL). */

@@ -2,6 +2,8 @@ import { type NextRequest, type NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 import { hasSupabaseAuthCookie } from "./auth-cookie";
+import { supabaseCookieOptions } from "./cookie-options";
+import { supabaseEnv } from "./env";
 
 // Refreshes the Supabase auth session and writes any rotated auth cookies onto
 // the response that next-intl already produced. We DON'T create our own
@@ -17,16 +19,16 @@ export async function updateSession(
   request: NextRequest,
   response: NextResponse
 ): Promise<NextResponse> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
   // Defensive no-op: if Supabase isn't configured, don't take down the public
   // marketing site — just hand back next-intl's response untouched.
-  if (!url || !anonKey) return response;
+  const env = supabaseEnv();
+  if (!env) return response;
+  const { url, anonKey } = env;
 
   if (!hasSupabaseAuthCookie(request.cookies.getAll().map((c) => c.name))) return response;
 
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: supabaseCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();

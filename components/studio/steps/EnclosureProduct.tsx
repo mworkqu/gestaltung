@@ -26,7 +26,7 @@ import { useTranslations } from "next-intl";
 import { Coins, Layers, Loader2, RefreshCw, Sparkles } from "lucide-react";
 
 import { AccessNote } from "@/components/credits/access-note";
-import { cadCost, studioCadTier } from "@/lib/credits/cad-cost";
+import { cadSessionCharge } from "@/lib/credits/cad-cost";
 import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { ProductViewer, ProductViewerLoading, preloadProductViewer } from "@/components/studio/viewer/ProductViewerLazy";
 import type { ViewerApi } from "@/components/studio/viewer/types";
@@ -39,7 +39,7 @@ import { STEP_ACCENT } from "@/lib/studio/palette";
 import { FINISHES, type Finish, type StudioDoc, type StudioProduct } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
 import { useStudioLibrary } from "../StudioLibraryProvider";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { PRODUCT_FINISH_KEY, type ProductCard, type ProductPreviews, type UnlockedProduct } from "../use-product";
 import { Bar, linkCls, MainButton, Problem, StepFrame } from "../ui";
 import { ShareActions } from "./share";
@@ -168,7 +168,7 @@ export function EnclosureProduct({
       ? t("product.createCadNoCost")
       : access?.cost === "included"
         ? t("product.createCadIncluded")
-        : t("product.createCad", { n: cadCost(studioCadTier(doc.components.length)) });
+        : t("product.createCad", { n: cadSessionCharge(access?.cost).credits });
   const progress = previews.stage ? t(`product.progress_${previews.stage}`) : running ? t("product.progress_designing") : "";
 
   // ── After "Create my CAD": the product in 3D ─────────────────────────────

@@ -28,6 +28,7 @@
 
 import type { LibraryPart } from "../schema";
 import { pins3dFor, slotRows, PITCH, type Vec3 } from "./pins3d";
+import { round2 } from "@/lib/format/money";
 
 export type Rot = 0 | 90 | 180 | 270;
 
@@ -327,14 +328,14 @@ export function plugFor(part: LibraryPart, first?: string): PlugSet | null {
         h: part.dims.z,
       };
     } else {
-      const ys = [...new Set(ids.map((id) => Math.round(rp(id)[1] * 100) / 100))].sort((a, c) => a - c);
+      const ys = [...new Set(ids.map((id) => round2(rp(id)[1])))].sort((a, c) => a - c);
       if (ys.length !== 2) return null;
       const pair = ACROSS.find(([s]) => Math.abs(ys[1] - ys[0] - s) < 0.3);
       if (!pair) return null;
       const [, lo, hi] = pair;
       out = {
         kind: "module",
-        pins: ids.map((id) => ({ id, dc: dcOf(id), row: Math.round(rp(id)[1] * 100) / 100 === ys[0] ? lo : hi })),
+        pins: ids.map((id) => ({ id, dc: dcOf(id), row: round2(rp(id)[1]) === ys[0] ? lo : hi })),
         rotZ: rot,
         tilt: 0,
         offset: [0, 0, 0],

@@ -8,6 +8,7 @@ import { Link } from "@/i18n/navigation";
 import { ENGINEERING_BUCKET, ENGINEERING_MAX_BYTES, RETURN_EXTENSIONS } from "@/lib/engineering/config";
 import { loadSupabase } from "@/lib/supabase/lazy";
 import { cn } from "@/lib/utils";
+import { safeFileName } from "@/lib/storage/paths";
 
 // Full STEP file panel (Engineers level): request, follow, download, send back.
 // A full STEP file of the whole project is generated for the user by our engineers.
@@ -106,7 +107,7 @@ export function StepPanel({
     if (file.size > ENGINEERING_MAX_BYTES) return setError("too_big");
     setBusy(id);
     try {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(-80);
+      const safe = safeFileName(file.name);
       const path = `${userId}/${id}/${Date.now()}-${safe}`;
       const supabase = await loadSupabase();
       const up = await supabase.storage.from(ENGINEERING_BUCKET).upload(path, file, { upsert: false });

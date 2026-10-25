@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { emptyStudioDoc } from "../schema";
-import { saveStatus, shouldWarnOnLeave, stepChangeSave } from "./save-state";
+import type { SaveResult } from "./api";
+import { saveStatus, saveWithConflictRetry, shouldWarnOnLeave, stepChangeSave } from "./save-state";
 import { FLOW } from "./steps";
 
 describe("studio autosave rules (D4)", () => {
@@ -39,5 +40,35 @@ describe("studio autosave rules (D4)", () => {
     expect(shouldWarnOnLeave("saving", true)).toBe(true);
     expect(shouldWarnOnLeave("failed", true)).toBe(true);
     expect(shouldWarnOnLeave("saving", false)).toBe(false);
+  });
+});
+
+describe("saveWithConflictRetry", () => {
+  const doc = emptyStudioDoc();
+  const conflict = (version: number): SaveResult => ({ ok: false, error: "conflict", doc: null, version });
+
+  it("saves once when there is no conflict", async () => {
+    const save = vi.fn(async () => ({ ok: true, version: 4 }) as SaveResult);
+    expect(await saveWithConflictRetry(save, doc, 3)).toEqual({ ok: true, version: 4 });
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries once on the server's version after a 409 and keeps our doc", async () => {
+    const save = vi.fn<(d: typeof doc, v: number) => Promise<SaveResult>>();
+    save.mockResolvedValueOnce(conflict(7)).mockResolvedValueOnce({ ok: true, version: 8 });
+    expect(await saveWithConflictRetry(save, doc, 3)).toEqual({ ok: true, version: 8 });
+    expect(save.mock.calls).toEqual([[doc, 3], [doc, 7]]);
+  });
+
+  it("gives up after one retry so the caller can adopt the other writer's doc", async () => {
+    const save = vi.fn(async () => conflict(9));
+    expect(await saveWithConflictRetry(save, doc, 3)).toEqual(conflict(9));
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry other failures", async () => {
+    const save = vi.fn(async () => ({ ok: false, error: "failed" }) as SaveResult);
+    await saveWithConflictRetry(save, doc, 3);
+    expect(save).toHaveBeenCalledTimes(1);
   });
 });

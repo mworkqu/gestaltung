@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
 import { ideaStatus, tokenInfo } from "@/lib/studio/server/tokens";
 import { ProductSpecSchema } from "@/lib/studio/schema";
+import { requireUser } from "@/lib/auth/guards";
+import { jsonOk } from "@/lib/http";
 
 // GET /api/studio/tokens?projectId=… — the ideation token line beside the
 // Studio chat: balance, tier of the saved card, turns until the next edit
@@ -10,16 +11,14 @@ import { ProductSpecSchema } from "@/lib/studio/schema";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "sign_in" }, { status: 401 });
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  const { supabase } = auth;
 
   const raw = new URL(request.url).searchParams.get("projectId") ?? "";
   const projectId = /^[0-9a-f-]{36}$/i.test(raw) ? raw : null;
   const status = await ideaStatus(supabase, projectId);
-  if (!status) return Response.json({ tokens: null });
+  if (!status) return jsonOk({ tokens: null });
 
   let spec = null;
   if (projectId) {
@@ -27,5 +26,5 @@ export async function GET(request: Request) {
     const parsed = ProductSpecSchema.safeParse((data?.studio as { spec?: unknown } | null)?.spec);
     spec = parsed.success ? parsed.data : null;
   }
-  return Response.json({ tokens: tokenInfo({ status, spec }) });
+  return jsonOk({ tokens: tokenInfo({ status, spec }) });
 }

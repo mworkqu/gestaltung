@@ -39,6 +39,7 @@ import {
   nextCloudStep,
   repairMessages,
   resetCloudAuth,
+  vercelOidcToken,
   type BuildOutcome,
   type BuildResult,
 } from "./cloud";
@@ -324,10 +325,35 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
     expect(calls.credentials).toHaveLength(0);
   });
 
-  it("prefers the token passed from the request header over the env var", async () => {
+  it("never uses a caller-supplied token as the STS subject (AI-04)", async () => {
     const g = googleFetch();
-    await buildOnce(req, { fetchImpl: g.impl, oidcToken: "from-header" });
-    expect(JSON.parse(String(g.calls[0].init.body)).subjectToken).toBe("from-header");
+    // A caller-supplied token is no longer part of BuildOpts; a stale caller passing one must stay inert.
+    const stale = { fetchImpl: g.impl, oidcToken: "attacker-token" };
+    await buildOnce(req, stale);
+    const subject = JSON.parse(String(g.calls[0].init.body)).subjectToken;
+    expect(subject).toBe(VERCEL_JWT);
+    expect(JSON.stringify(g.calls.map((c) => c.init.body))).not.toContain("attacker-token");
+  });
+
+  it("reads the token from Vercel's request context before the env var", async () => {
+    const key = Symbol.for("@vercel/request-context");
+    const g = globalThis as unknown as Record<symbol, unknown>;
+    g[key] = { get: () => ({ headers: { "x-vercel-oidc-token": " from-context " } }) };
+    try {
+      expect(vercelOidcToken()).toBe("from-context");
+    } finally {
+      delete g[key];
+    }
+    expect(vercelOidcToken()).toBe(VERCEL_JWT);
+  });
+
+  it("caller-supplied token with no platform token anywhere → down, Google never called (AI-04)", async () => {
+    vi.stubEnv("VERCEL_OIDC_TOKEN", "");
+    const g = googleFetch();
+    const stale = { fetchImpl: g.impl, oidcToken: "attacker-token" };
+    const r = await buildOnce(req, stale);
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+    expect(g.calls).toHaveLength(0);
   });
 
   it("caches the ID token until 5 minutes before it expires", async () => {

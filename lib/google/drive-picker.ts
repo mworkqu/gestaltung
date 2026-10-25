@@ -9,11 +9,52 @@
 // Needs NEXT_PUBLIC_GOOGLE_CLIENT_ID, NEXT_PUBLIC_GOOGLE_API_KEY and
 // NEXT_PUBLIC_GOOGLE_APP_ID (the Cloud project number).
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+// There is no @types/google.picker in the project, so this is the part of the
+// Google API loader / Identity Services / Picker surface this file calls.
+type PickerDoc = { id: string; name: string; mimeType: string };
+type PickerResponse = { action: string; docs?: PickerDoc[] };
+type PickerInstance = { setVisible(visible: boolean): void };
+type PickerBuilderInstance = {
+  addView(view: unknown): PickerBuilderInstance;
+  setOAuthToken(token: string): PickerBuilderInstance;
+  setDeveloperKey(key: string | undefined): PickerBuilderInstance;
+  setAppId(id: string | undefined): PickerBuilderInstance;
+  setOrigin(origin: string): PickerBuilderInstance;
+  setCallback(callback: (data: PickerResponse) => void): PickerBuilderInstance;
+  enableFeature(feature: string): PickerBuilderInstance;
+  build(): PickerInstance;
+};
+type DocsViewInstance = {
+  setIncludeFolders(include: boolean): DocsViewInstance;
+  setSelectFolderEnabled(enabled: boolean): DocsViewInstance;
+};
+type TokenResponse = { access_token?: string; expires_in?: number; error?: string };
+type TokenClient = { requestAccessToken(overrides?: { prompt?: string }): void };
+type GoogleApi = {
+  accounts: {
+    oauth2: {
+      initTokenClient(config: {
+        client_id: string | undefined;
+        scope: string;
+        callback: (res: TokenResponse) => void;
+        error_callback: (e: { type?: string }) => void;
+      }): TokenClient;
+    };
+  };
+  picker: {
+    DocsView: new (viewId: string) => DocsViewInstance;
+    PickerBuilder: new () => PickerBuilderInstance;
+    ViewId: { DOCS_IMAGES: string };
+    Action: { PICKED: string; CANCEL: string };
+    Feature: { MULTISELECT_ENABLED: string };
+  };
+};
+type GapiApi = { load(api: string, callback: () => void): void };
+
 declare global {
   interface Window {
-    gapi?: any;
-    google?: any;
+    gapi?: GapiApi;
+    google?: GoogleApi;
   }
 }
 
@@ -42,7 +83,9 @@ let ready: Promise<void> | null = null;
 function loadApis() {
   ready ??= (async () => {
     await Promise.all([loadScript("https://apis.google.com/js/api.js"), loadScript("https://accounts.google.com/gsi/client")]);
-    await new Promise<void>((resolve) => window.gapi.load("picker", () => resolve()));
+    const gapi = window.gapi;
+    if (!gapi) throw new Error("gapi_not_loaded");
+    await new Promise<void>((resolve) => gapi.load("picker", () => resolve()));
   })();
   return ready;
 }
@@ -52,15 +95,17 @@ let token: { value: string; expires: number } | null = null;
 function getToken(): Promise<string> {
   if (token && token.expires > Date.now() + 60_000) return Promise.resolve(token.value);
   return new Promise((resolve, reject) => {
-    const client = window.google.accounts.oauth2.initTokenClient({
+    const google = window.google;
+    if (!google) return reject(new Error("google_not_loaded"));
+    const client = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
       scope: SCOPE,
-      callback: (res: { access_token?: string; expires_in?: number; error?: string }) => {
+      callback: (res) => {
         if (!res.access_token) return reject(new Error(res.error ?? "no token"));
         token = { value: res.access_token, expires: Date.now() + (res.expires_in ?? 3600) * 1000 };
         resolve(res.access_token);
       },
-      error_callback: (e: { type?: string }) => reject(new Error(e?.type ?? "oauth")),
+      error_callback: (e) => reject(new Error(e?.type ?? "oauth")),
     });
     client.requestAccessToken({ prompt: token ? "" : "consent" });
   });
@@ -72,6 +117,7 @@ export async function pickDriveImages(multiple: boolean): Promise<{ files: Picke
   await loadApis();
   const accessToken = await getToken();
   const g = window.google;
+  if (!g) throw new Error("google_not_loaded");
   return new Promise((resolve) => {
     const view = new g.picker.DocsView(g.picker.ViewId.DOCS_IMAGES).setIncludeFolders(true).setSelectFolderEnabled(false);
     let builder = new g.picker.PickerBuilder()
@@ -80,11 +126,11 @@ export async function pickDriveImages(multiple: boolean): Promise<{ files: Picke
       .setDeveloperKey(API_KEY)
       .setAppId(APP_ID)
       .setOrigin(window.location.protocol + "//" + window.location.host)
-      .setCallback((data: any) => {
+      .setCallback((data) => {
         if (data.action === g.picker.Action.PICKED) {
           resolve({
             token: accessToken,
-            files: (data.docs ?? []).map((d: any) => ({ id: d.id, name: d.name, mimeType: d.mimeType })),
+            files: (data.docs ?? []).map((d) => ({ id: d.id, name: d.name, mimeType: d.mimeType })),
           });
         } else if (data.action === g.picker.Action.CANCEL) resolve(null);
       });

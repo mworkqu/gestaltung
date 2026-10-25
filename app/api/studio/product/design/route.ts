@@ -4,9 +4,7 @@ import { pickArchetypes, runProductDesign } from "@/lib/studio/product/ai/design
 import { addDesigns, applyRegen } from "@/lib/studio/product/store";
 import { studioCall, logClamp, studioRequest } from "@/lib/studio/server/context";
 import { loadDocPrivate, updateProductDoc } from "@/lib/studio/server/doc";
-import {
-  DesignBody, guestDesignLimit, json, newDesignId, partsOf, productSpecHash, saveErrorStatus, serviceLimitStore,
-} from "@/lib/studio/server/product";
+import { DesignBody, guestDesignLimit, json, newDesignId, partsOf, productSpecHash, saveErrorStatus, serviceLimitStore, loadErrorStatus } from "@/lib/studio/server/product";
 import { ideaCharge, ideaStatus, tokenInfo } from "@/lib/studio/server/tokens";
 import { regenCost, tierOf } from "@/lib/studio/tiers";
 import { geminiConfigured } from "@/lib/prototyping/providers/gemini-client";
@@ -29,12 +27,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
-  const ctx = await studioRequest(request, DesignBody, { consent: true });
+  const ctx = await studioRequest(request, DesignBody, { consent: true, owner: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project, userId, isAnonymous } = ctx;
 
   const cur = await loadDocPrivate(supabase, project.id);
-  if (!cur.ok) return json({ error: cur.error }, cur.error === "not_found" ? 404 : 500);
+  if (!cur.ok) return json({ error: cur.error }, loadErrorStatus(cur.error));
   if (!cur.available) return json({ error: "run_0068" }, 409);
   if (!cur.doc || cur.doc.components.length === 0) return json({ error: "no_parts" }, 409);
   const doc = cur.doc;
@@ -63,7 +61,7 @@ export async function POST(request: Request) {
   const brief = (row as { brief?: string | null } | null)?.brief ?? null;
 
   const run = await runProductDesign({
-    call: geminiConfigured() ? studioCall(supabase, project.id) : null,
+    call: geminiConfigured() ? studioCall(supabase, project.id, ctx.userId) : null,
     spec: doc.spec,
     parts,
     archetypes,
@@ -78,7 +76,7 @@ export async function POST(request: Request) {
   const specHash = productSpecHash(doc.spec, doc.components);
   // A regeneration the model answered counts (and is charged); a fallback to the defaults is neither.
   const counted = isRegen && run.source === "model";
-  const saved = await updateProductDoc(supabase, project.id, (s) => {
+  const saved = await updateProductDoc(supabase, ctx.userId, project.id, (s) => {
     const added = addDesigns({ product: s.product, priv: s.priv }, designs, specHash);
     return { doc: s.doc, ...(counted ? applyRegen(added) : added) };
   });

@@ -26,6 +26,7 @@ import {
   type WorkProjectRow,
 } from "@/lib/home/your-work";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Signed-in "Your work" strip at the top of the v2 home (P3-05 / WF-33).
 //
@@ -115,7 +116,7 @@ async function loadYourWork(userId: string): Promise<Data | null> {
   };
 }
 
-export function YourWorkStrip() {
+function YourWorkStrip() {
   const { ready, user } = useAuth();
   const userId = ready ? (user?.id ?? null) : null;
   const [view, setView] = useState<View>({ phase: "none" });
@@ -169,13 +170,13 @@ function Strip({ data }: { data: Data }) {
 
   const date = useMemo(
     () =>
-      new Intl.DateTimeFormat(isRtl ? "ar-QA-u-nu-latn" : "en-GB", {
+      new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
         day: "numeric",
         month: "short",
         year: "numeric",
         timeZone: "Asia/Qatar",
       }),
-    [isRtl]
+    [locale]
   );
   const arrow = cn("h-4 w-4 shrink-0", isRtl && "-scale-x-100");
 

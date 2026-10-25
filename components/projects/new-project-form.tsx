@@ -12,6 +12,7 @@ import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { isPlausibleEmail } from "@/lib/store/shipping";
 import { Button } from "@/components/ui/button";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
+import { captchaHeaders, guestCaptchaToken } from "@/components/prototyping/guest-captcha";
 import { PROJECT_IMAGE_BUCKET, DRAWING_ATTACHMENT_ACCEPT } from "@/lib/projects/constants";
 import { attachmentExt, checkDrawingAttachment } from "@/lib/projects/drawing-attachment";
 import { formatQar } from "@/lib/pricing/plans";
@@ -178,9 +179,11 @@ export function NewProjectForm({
             : "\n\nPhoto/sketch: attached to the project."
           : "";
         // Best-effort: the project exists either way.
+        // The session is a guest's now: the lead needs a fresh Turnstile token while the switch is on.
+        const leadToken = await guestCaptchaToken(turnstileEnabled);
         await fetch("/api/store-lead", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...captchaHeaders(leadToken) },
           body: JSON.stringify({
             source: "drawing_request",
             name: trimmed,

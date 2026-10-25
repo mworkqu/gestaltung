@@ -17,6 +17,7 @@ import { MessageCircleQuestion, Plus, Sparkles, X } from "lucide-react";
 
 import { PrimaryButton, SoftButton } from "@/components/prototyping/ui";
 import { ChatConsent, ChatInput, ChatMessages } from "@/components/prototyping/chat-thread";
+import { captchaHeaders, guestCaptchaToken } from "@/components/prototyping/guest-captcha";
 import { chatStorageKey, parseHandoff, type ChatHandoff, type ChatMsg } from "@/lib/projects/create-from-chat";
 
 type Msg = ChatMsg;
@@ -46,6 +47,7 @@ export function BriefChat({
   analysed = false,
   initialOpen = false,
   initialThread,
+  turnstileEnabled = false,
 }: {
   projectId: string;
   brief: string;
@@ -66,6 +68,8 @@ export function BriefChat({
   initialOpen?: boolean;
   /** The first turn, when the caller already has it (else read from sessionStorage). */
   initialThread?: ChatHandoff | null;
+  /** P2-08 switch: a guest's message carries a Turnstile token while it is on. */
+  turnstileEnabled?: boolean;
 }) {
   const t = useTranslations("Prototyping");
   const locale = useLocale();
@@ -77,6 +81,7 @@ export function BriefChat({
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState(false);
+  const [captchaFailed, setCaptchaFailed] = useState(false);
   const [ticked, setTicked] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   // StrictMode runs effects twice; the handoff is read (and removed) once.
@@ -105,13 +110,16 @@ export function BriefChat({
   async function send(next: Msg[]) {
     setBusy(true);
     setError(false);
+    setCaptchaFailed(false);
     try {
+      const token = await guestCaptchaToken(turnstileEnabled);
       const res = await fetch("/api/brief-chat", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...captchaHeaders(token) },
         body: JSON.stringify({ projectId, locale, brief, messages: next }),
       });
       const data = (await res.json().catch(() => ({}))) as { reply?: string; done?: boolean; addition?: string; error?: string };
+      if (res.status === 403 && data.error === "captcha_failed") setCaptchaFailed(true);
       if (!res.ok || !data.reply) throw new Error(data.error ?? "failed");
       setMsgs([...next, { role: "assistant", text: data.reply }]);
       if (data.done && data.addition) setAddition(data.addition);
@@ -143,6 +151,7 @@ export function BriefChat({
     setAddition(null);
     setAdded(false);
     setError(false);
+    setCaptchaFailed(false);
   }
 
   return (
@@ -175,7 +184,7 @@ export function BriefChat({
                   </PrimaryButton>
                 </div>
               )}
-              <ChatMessages msgs={msgs} busy={busy} error={error} />
+              <ChatMessages msgs={msgs} busy={busy} error={error} captchaFailed={captchaFailed} />
               {addition && (
                 <div className="space-y-2 rounded-xl border-s-4 border-emerald-500 bg-emerald-50/60 p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700">{t("chatAddition")}</p>

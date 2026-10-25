@@ -2,13 +2,15 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { getPart as codePart } from "@/lib/studio/library";
 import { draftToPart, parseCommaList, plainCheck, type FieldError, type PartDraft } from "@/lib/studio/library/form";
 import { checkLibraryPart } from "@/lib/studio/library/merge";
 import { STUDIO_LIBRARY_TAG } from "@/lib/studio/library/remote";
 import { LibraryPartSchema, type LibraryPart } from "@/lib/studio/schema";
+import { asLocale } from "@/lib/locale";
+import { isMissingRelation } from "@/lib/supabase/errors";
 
 // Studio library admin (P5-15c). super_admin only — checked here and again by
 // RLS on studio_parts (0070). Every save runs the same checks the Studio runs
@@ -20,10 +22,8 @@ export type SaveResult =
   | { ok: true; id: string }
   | { ok: false; fieldErrors?: FieldError[]; checks?: string[]; message?: "forbidden" | "run_0070" | "failed" };
 
-const MISSING = new Set(["42P01", "PGRST205"]);
-
 async function admin() {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   return session?.profile.role === "super_admin";
 }
 
@@ -33,7 +33,7 @@ function refresh(locale: string) {
   } catch {
     /* outside a request */
   }
-  const l = locale === "ar" ? "ar" : "en";
+  const l = asLocale(locale);
   revalidatePath(`/${l}/dashboard/studio-library`);
 }
 
@@ -43,7 +43,7 @@ async function upsert(part: LibraryPart, enabled?: boolean): Promise<SaveResult>
   if (enabled !== undefined) row.enabled = enabled;
   const { error } = await supabase.from("studio_parts").upsert(row, { onConflict: "id" });
   if (error) {
-    if (MISSING.has(error.code ?? "")) return { ok: false, message: "run_0070" };
+    if (isMissingRelation(error)) return { ok: false, message: "run_0070" };
     console.error("[studio-library] save failed:", error.code, error.message);
     return { ok: false, message: "failed" };
   }
@@ -72,7 +72,7 @@ export async function savePart(locale: string, draft: PartDraft, originalId: str
 async function currentPart(id: string): Promise<{ part: LibraryPart | null; missingTable: boolean }> {
   const supabase = await createClient();
   const { data, error } = await supabase.from("studio_parts").select("data").eq("id", id).maybeSingle();
-  if (error && MISSING.has(error.code ?? "")) return { part: null, missingTable: true };
+  if (error && isMissingRelation(error)) return { part: null, missingTable: true };
   if (data) {
     const parsed = LibraryPartSchema.safeParse({ ...(data.data as object), id });
     if (parsed.success) return { part: parsed.data, missingTable: false };
@@ -98,7 +98,7 @@ export async function setPartEnabled(locale: string, id: string, enabled: boolea
   if (!(await admin())) return { ok: false, message: "forbidden" };
   const supabase = await createClient();
   const { error } = await supabase.from("studio_parts").update({ enabled }).eq("id", id);
-  if (error) return { ok: false, message: MISSING.has(error.code ?? "") ? "run_0070" : "failed" };
+  if (error) return { ok: false, message: isMissingRelation(error) ? "run_0070" : "failed" };
   refresh(locale);
   return { ok: true, id };
 }
@@ -108,7 +108,7 @@ export async function resetPart(locale: string, id: string): Promise<SaveResult>
   if (!(await admin())) return { ok: false, message: "forbidden" };
   const supabase = await createClient();
   const { error } = await supabase.from("studio_parts").delete().eq("id", id);
-  if (error) return { ok: false, message: MISSING.has(error.code ?? "") ? "run_0070" : "failed" };
+  if (error) return { ok: false, message: isMissingRelation(error) ? "run_0070" : "failed" };
   refresh(locale);
   return { ok: true, id };
 }

@@ -42,6 +42,40 @@ async function toParts(page: Page, locale: (typeof LOCALES)[number]) {
   await page.getByRole("button", { name: msg(locale, "Studio", "looksRight") }).click();
   await expect(page.getByTestId("studio-shell")).toHaveAttribute("data-step", "parts");
   await expect(page.getByTestId("studio-parts-list").locator("li").first()).toBeVisible();
+  await settled(page);
+}
+
+/**
+ * Wait until the parts list stops being replaced.
+ *
+ * The rows arrive, then the step settles and the list is rendered again. The
+ * popover's open state is held by instanceId (`popFor` in PartsStep), so a
+ * popover opened inside that window is dropped when the new list arrives - the
+ * row it belonged to is no longer the same row. A person cannot tap within
+ * ~200ms of the list appearing, but a test can, and then the popover vanishes
+ * mid-assertion ("element is not attached to the DOM").
+ *
+ * Measured on 2026-10-25: identical on this branch and on origin/main - opening
+ * immediately loses the popover on BOTH, and opening on a settled list keeps it
+ * on both. So this is the test racing the app, not a change in the app. The
+ * product side (keep `popFor` when the instance survives the re-render) is a
+ * follow-up in FIX_REPORT, not something to change under a test deadline.
+ */
+async function settled(page: Page) {
+  const list = page.getByTestId("studio-parts-list");
+  let last = "";
+  await expect(async () => {
+    const now = await list.innerHTML();
+    const same = now === last;
+    last = now;
+    expect(same, "the parts list is still being replaced").toBe(true);
+  }).toPass({ timeout: 15_000, intervals: [250, 250, 250] });
+  // The pointer is still wherever the last click left it, and a row opens its
+  // popover on mouse enter. Once we wait for the list to settle, that stale
+  // position lands on a row and the popover is open before the test has asked
+  // for it - so park the pointer off the rows, which is what "closed by
+  // default" assumes.
+  await page.mouse.move(0, 0);
 }
 
 for (const locale of LOCALES) {

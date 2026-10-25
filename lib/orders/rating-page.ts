@@ -6,8 +6,9 @@
 import { escapeHtml } from "@/lib/email";
 import { peekContactPhone } from "@/lib/contact-phone-server";
 import { REVIEW_COMMENT_MAX } from "@/lib/reviews/comment";
+import type { Locale } from "@/lib/locale";
 
-export type RatingLocale = "en" | "ar";
+export type RatingLocale = Locale;
 
 const SHELL_COPY = {
   en: { help: "Questions? Message us on WhatsApp.", home: "Back to the website" },

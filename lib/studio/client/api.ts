@@ -7,6 +7,7 @@
 // name, AI consent, store products, phone) exactly like the rest of the site.
 
 import { loadSupabase } from "@/lib/supabase/lazy";
+import { captchaHeaders, guestCaptchaToken } from "@/components/prototyping/guest-captcha";
 import { CAD_BUCKET } from "@/lib/design/constants";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
 import { EMPTY_SPEC, hasAiConsent, type Spec } from "@/lib/prototyping/spec";
@@ -14,12 +15,16 @@ import { STORE_CARD_COLUMNS, type StoreCardPart } from "@/lib/store/catalog";
 import type { EnclosureSpec, MechPart, Net, ProductSpec, StudioCheck, StudioComponent, StudioDoc } from "@/lib/studio/schema";
 import type { ProductMockOptions } from "@/lib/studio/geometry/protocol";
 import { PROJECT_IMAGE_BUCKET } from "@/lib/projects/constants";
-import type { TokenInfo } from "@/lib/studio/server/tokens";
+import type { ApprovalAsk, TokenInfo } from "@/lib/studio/server/tokens";
+import type { TierId } from "@/lib/studio/tiers";
 import type { IdeaMessage } from "./steps";
+import type { Locale } from "@/lib/locale";
+import { safeFileName } from "@/lib/storage/paths";
+import { missingProjectError } from "./load-miss";
 
-export type { TokenInfo };
+export type { ApprovalAsk, TokenInfo };
 
-export type Locale = "en" | "ar";
+export type { Locale };
 
 export type Res<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
@@ -27,7 +32,7 @@ export type StudioProject = { name: string; consented: boolean; brief: string | 
 
 export type LoadResult =
   | { ok: true; project: StudioProject; doc: StudioDoc | null; version: number; persist: boolean }
-  | { ok: false; error: "sign_in" | "not_found" | "failed" };
+  | { ok: false; error: "sign_in" | "guest_gone" | "not_found" | "failed" };
 
 export type SaveResult =
   | { ok: true; version: number }
@@ -43,6 +48,14 @@ export type SpecReply = (
   | { question: string; choices: string[] }
   | { spec: ProductSpec; reply?: string }
   | { reply: string; spec?: ProductSpec; changed: string[] }
+  /**
+   * The tier checkpoint (2026-10-25): this turn would move the build into a higher
+   * tier, so nothing was charged and the new card is withheld. Show `tokens` as the
+   * exact cost and either send the same turn again with `approveTier: ask.tier`, or
+   * stay in the current tier and keep the scope simple.
+   */
+  // `spec?: never` keeps `data.spec` readable across the whole union.
+  | { needsApproval: ApprovalAsk; reply?: string; spec?: never }
 ) & { tokens?: TokenInfo };
 export type PickReply = { components: StudioComponent[]; docVersion: number | null };
 export type WiringReply = {
@@ -110,7 +123,14 @@ export interface StudioApi {
   /** Ideation token balance + tier (migration 0088); null before it runs or in the mock. */
   tokens?(): Promise<TokenInfo | null>;
   /** `current` = the card already shown: the last user message refines it (W3). */
-  spec(body: { idea: string; messages: IdeaMessage[]; locale: Locale; current?: ProductSpec | null }): Promise<Res<SpecReply>>;
+  spec(body: {
+    idea: string;
+    messages: IdeaMessage[];
+    locale: Locale;
+    current?: ProductSpec | null;
+    /** The tier the visitor approved in the checkpoint modal; the server prices it, not us. */
+    approveTier?: TierId | null;
+  }): Promise<Res<SpecReply>>;
   pick(spec: ProductSpec, locale: Locale): Promise<Res<PickReply>>;
   wiring(spec: ProductSpec, components: StudioComponent[], locale: Locale): Promise<Res<WiringReply>>;
   enclosure(
@@ -180,11 +200,11 @@ export function previewObject(path: string): { bucket: string; key: string } | n
   return rest.length ? { bucket, key: rest.join("/") } : null;
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<Res<T>> {
+async function postJson<T>(url: string, body: unknown, extraHeaders: Record<string, string> = {}): Promise<Res<T>> {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...extraHeaders },
       body: JSON.stringify(body),
     });
     const data = (await res.json().catch(() => ({}))) as T & { error?: string };
@@ -213,7 +233,7 @@ export function liveStudioApi(projectId: string): StudioApi {
       if (error) return { ok: false, error: "failed" };
       if (!project) {
         const { data: auth } = await (await db()).auth.getUser();
-        return { ok: false, error: auth.user ? "not_found" : "sign_in" };
+        return { ok: false, error: missingProjectError(auth.user) };
       }
       const row = project as { name: string | null; brief: string | null; spec: Spec | null };
       const info: StudioProject = {
@@ -249,7 +269,15 @@ export function liveStudioApi(projectId: string): StudioApi {
       }
     },
 
-    spec: ({ idea, messages, locale, current }) => postJson("/api/studio/spec", { projectId, locale, idea, messages, current: current ?? null }),
+    spec: ({ idea, messages, locale, current, approveTier }) =>
+      postJson("/api/studio/spec", {
+        projectId,
+        locale,
+        idea,
+        messages,
+        current: current ?? null,
+        ...(approveTier ? { approveTier } : {}),
+      }),
     async tokens() {
       try {
         const res = await fetch(`/api/studio/tokens?projectId=${encodeURIComponent(projectId)}`, { cache: "no-store" });
@@ -282,7 +310,7 @@ export function liveStudioApi(projectId: string): StudioApi {
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
       const out: string[] = [];
       for (const f of files) {
-        const safe = f.name.replace(/[^\w.-]+/g, "_").slice(0, 80) || "part.stl";
+        const safe = safeFileName(f.name, { fallback: "part.stl" });
         const path = `${uid}/${projectId}/print/${stamp}/${safe}`;
         const body = new Blob([f.data], { type: "model/stl" });
         const { error } = await (await db()).storage.from(CAD_BUCKET).upload(path, body, { contentType: "model/stl", upsert: false });
@@ -292,17 +320,23 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     async requestPrint(q) {
-      const r = await postJson<{ ok?: boolean }>("/api/store-lead", {
-        source: "print_request",
-        name: q.name,
-        phone: q.phone,
-        locale: q.locale,
-        projectId,
-        designName: q.designName,
-        items: q.parts.map((p) => ({ function: p.name, spec: `${p.material} · ${p.grams} g`, quantity: 1 })),
-        totalGrams: q.totalGrams,
-        files: q.files,
-      });
+      // A guest's request carries a Turnstile token while the switch is on (a no-op otherwise).
+      const token = await guestCaptchaToken();
+      const r = await postJson<{ ok?: boolean }>(
+        "/api/store-lead",
+        {
+          source: "print_request",
+          name: q.name,
+          phone: q.phone,
+          locale: q.locale,
+          projectId,
+          designName: q.designName,
+          items: q.parts.map((p) => ({ function: p.name, spec: `${p.material} · ${p.grams} g`, quantity: 1 })),
+          totalGrams: q.totalGrams,
+          files: q.files,
+        },
+        captchaHeaders(token),
+      );
       return r.ok;
     },
 
@@ -373,18 +407,23 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     async requestQuote(q) {
-      const r = await postJson<{ ok?: boolean }>("/api/store-lead", {
-        source: "studio_quote",
-        name: q.name,
-        phone: q.phone,
-        ...(q.email ? { email: q.email } : {}),
-        ...(q.note ? { note: q.note } : {}),
-        locale: q.locale,
-        projectId,
-        designName: q.designName,
-        items: q.items.map((name) => ({ function: name, quantity: 1 })),
-        ...(q.files?.length ? { files: q.files } : {}),
-      });
+      const token = await guestCaptchaToken();
+      const r = await postJson<{ ok?: boolean }>(
+        "/api/store-lead",
+        {
+          source: "studio_quote",
+          name: q.name,
+          phone: q.phone,
+          ...(q.email ? { email: q.email } : {}),
+          ...(q.note ? { note: q.note } : {}),
+          locale: q.locale,
+          projectId,
+          designName: q.designName,
+          items: q.items.map((name) => ({ function: name, quantity: 1 })),
+          ...(q.files?.length ? { files: q.files } : {}),
+        },
+        captchaHeaders(token),
+      );
       return r.ok;
     },
 

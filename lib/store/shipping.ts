@@ -13,6 +13,7 @@
 // subtotal reaches the threshold. Free means 0, also for a split order.
 
 import type { FreeShippingQuote, ShippingTier, TierQuote } from "@/lib/store/delivery";
+import { round2 } from "@/lib/format/money";
 
 export type FreeShippingConfig = Pick<FreeShippingQuote, "threshold_qar" | "tiers">;
 
@@ -80,7 +81,7 @@ export function minDeliveryFrom(tiers: Tiers | null | undefined): number | null 
 export function freeDeliveryGap(goodsQar: number, fs: FreeShippingConfig | null | undefined): number | null {
   const cfg = activeFreeShipping(fs);
   if (!cfg) return null;
-  const missing = Math.round((cfg.threshold_qar - goodsQar) * 100) / 100;
+  const missing = round2(cfg.threshold_qar - goodsQar);
   return missing <= 0 ? 0 : Math.ceil(missing);
 }
 
@@ -89,7 +90,5 @@ export function qarAmount(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
-/** something@something.something, no spaces — same as public.is_plausible_email. */
-export function isPlausibleEmail(email: string | null | undefined): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email ?? "").trim());
-}
+/** something@something.something, no spaces — same as public.is_plausible_email (lib/email-address.ts). */
+export { isPlausibleEmail } from "@/lib/email-address";

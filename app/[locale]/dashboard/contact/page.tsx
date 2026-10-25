@@ -3,6 +3,8 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ContactInfoEditor } from "@/components/admin/contact-info-editor";
 import { COMPANY_ADDRESS } from "@/lib/company";
 import { getContactPhone } from "@/lib/contact-phone-server";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { asLocale } from "@/lib/locale";
 
 // Dashboard → Settings → Contact info: the one phone number (WhatsApp + calls)
 // shown across the website and in emails. Email and address are listed for
@@ -11,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ContactInfoPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("ContactInfo");
   const phone = await getContactPhone();
@@ -33,7 +36,7 @@ export default async function ContactInfoPage({ params }: { params: Promise<{ lo
           </div>
           <div>
             <dt className="text-xs text-mutedtext">{t("address")}</dt>
-            <dd className="text-heading">{COMPANY_ADDRESS[locale === "ar" ? "ar" : "en"]}</dd>
+            <dd className="text-heading">{COMPANY_ADDRESS[asLocale(locale)]}</dd>
           </div>
         </dl>
         <p className="text-xs text-mutedtext">{t("otherNote")}</p>

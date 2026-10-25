@@ -19,7 +19,7 @@
 
 import { esc } from "@/lib/prototyping/netlist";
 import { NET_COLOURS } from "./palette";
-import { buildConnections, instanceNames, netColourMap, WIRE_HEX, WIRE_OUTLINE, type Connection, type WireColour } from "./connections";
+import { buildConnections, instanceNames, netColourMap, supplyNetNames, WIRE_HEX, WIRE_OUTLINE, type Connection, type WireColour } from "./connections";
 import type { LibraryPart, Net, Pin, ProductSpec, StudioComponent } from "./schema";
 import {
   isMcu,
@@ -179,6 +179,9 @@ export function renderSchematicSVG(
   const conns = opts.connections ?? buildConnections(components, nets, getPart);
   const shared = netColourMap(conns);
   const ownNames = instanceNames(conns, locale);
+  // Supply rails are named as the pin list names their source, not by the netlist's internal id.
+  const railWords = supplyNetNames(conns, getPart, locale);
+  const shown = (net: string) => railWords.get(net) ?? net;
   const connOfNet = new Map<string, string>(); // net → first connection id (the hook for click / hover)
   for (const c of conns) if (!connOfNet.has(c.net)) connOfNet.set(c.net, c.id);
   // The far half of a wire through a series helper is the same wire: same colour, same id.
@@ -314,7 +317,7 @@ export function renderSchematicSVG(
   }
   for (const ch of chains) {
     const slots = ch.els.map((el) => Math.ceil(Math.max(60, textW(plainName(el.e.p, locale), 11) + 10)));
-    const endW = ch.end.type === "label" && ch.end.net ? textW(ch.end.net, 11, true) + 26 : ch.end.type === "power" ? textW(ch.end.net ?? "", 11, true) + 22 : 24;
+    const endW = ch.end.type === "label" && ch.end.net ? textW(ch.end.net, 11, true) + 26 : ch.end.type === "power" ? textW(shown(ch.end.net ?? ""), 11, true) + 22 : 24;
     const w = STUB + slots.reduce((s, x) => s + x, 0) + endW;
     const last = ch.els[ch.els.length - 1].e.p;
     const colSide = sideOfMcuPin.get(ch.mcuPin) ?? (DEFAULT_LEFT.has(last.category) ? "L" : "R");
@@ -412,7 +415,7 @@ export function renderSchematicSVG(
       if (it.kind !== "box") continue;
       for (const p of it.outer) {
         const net = netOf.get(`${it.e.c.instanceId}.${p.id}`)?.name;
-        const sym = !net ? 14 : net === "GND" ? 20 : textW(net, 11, true) + 18;
+        const sym = !net ? 14 : net === "GND" ? 20 : textW(shown(net), 11, true) + 18;
         w = Math.max(w, STUB + sym + 6);
       }
     }
@@ -506,7 +509,7 @@ export function renderSchematicSVG(
     return s;
   };
   const powerSym = (x: number, y: number, dir: Dir, net: string, c: string) => {
-    const t = esc(net);
+    const t = esc(shown(net));
     if (dir === "U")
       return `<path d="M${f(x - 9)} ${f(y)}H${f(x + 9)}" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><text x="${f(x)}" y="${f(y - 5)}" text-anchor="middle" font-family="${MONO}" font-size="11" font-weight="700" fill="${c}">${t}</text>`;
     if (dir === "D")

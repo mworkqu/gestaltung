@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-import { createClient } from "@/lib/supabase/server";
-import { canUse } from "@/lib/credits/server";
+import { canUse, serverWritesReady, setCadCode } from "@/lib/credits/server";
+import { CAD_CHARGE_TIER } from "@/lib/credits/cad-cost";
 import { classifyCadRequest } from "@/lib/credits/classify";
 import { CAD_SCHEMA, CAD_SYSTEM, cadPrompt } from "@/lib/cad/prompt";
 import { cleanScad, validateScad } from "@/lib/cad/validate";
@@ -10,12 +10,20 @@ import { cloudConfigured } from "@/lib/cad/cloud";
 import { logCloudFallback, runCloudCad } from "@/lib/cad/cloud-flow";
 import { resolveCadEngine } from "@/lib/cad/engine";
 import { getCadEngineSetting, loadProjectBoards } from "@/lib/cad/engine-server";
+import { asLocale } from "@/lib/locale";
+import { isMissingFunction } from "@/lib/supabase/errors";
+import { requireUser } from "@/lib/auth/guards";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // Mechanical › 3D model (CAD): Gemini writes ONE OpenSCAD file; the browser
 // renders it (lib/cad/render.ts) and only then calls cad_deliver, which is
 // where the credit is spent (migration 0043). This route never charges:
 //   canUse("cad") → cad_begin (pending row, re-checks the rules) → model call,
-//   validated statically with one retry → cad_set_code, or cad_fail.
+//   validated statically with one retry → cad_set_code_for, or cad_fail.
+// The code is stored by the SERVER (setCadCode: cad_set_code_for on the
+// service client with the verified user id, 0102 / audit G-C1); without a
+// service key the route answers 503 {error: "unavailable"} before cad_begin
+// and before any model call.
 // parentId = refine that version (request = the change), or with repair =
 // rebuild it after the browser's OpenSCAD failed (request = its error output).
 // Before 0043 runs, cad_begin is missing and the route answers
@@ -47,27 +55,27 @@ type CadAnswer = { scad: string; summary: string; dimensions: { x: number; y: nu
 
 type RpcError = { code?: string; message?: string } | null;
 const missing = (e: RpcError) =>
-  !!e && (e.code === "PGRST202" || e.code === "42883" || /could not find the function/i.test(e.message ?? ""));
+  !!e && (isMissingFunction(e) || /could not find the function/i.test(e.message ?? ""));
 
 const STATUS: Record<string, number> = { sign_in: 401, no_credits: 402, not_found: 404, too_many_failed: 429 };
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return Response.json({ error: "sign_in" }, { status: 401 });
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  const { user, supabase } = auth;
 
   const parsed = Body.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
+  if (!parsed.success) return jsonError("bad_request", 400);
   const { projectId, parentId, repair } = parsed.data;
-  const locale = parsed.data.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(parsed.data.locale);
 
   const access = await canUse(supabase, "cad", projectId);
   if (!access.allowed) {
     const reason = access.reason ?? "not_ready";
-    return Response.json({ error: reason }, { status: STATUS[reason] ?? 503 });
+    return jsonError(reason, STATUS[reason] ?? 503);
   }
+  // No service key → the code could not be stored: refuse before any model call.
+  if (!serverWritesReady()) return jsonError("unavailable", 503);
 
   // The version being refined or repaired: the caller's own row (RLS).
   let previous: { scad: string; request: string } | null = null;
@@ -78,11 +86,11 @@ export async function POST(request: Request) {
       .eq("id", parentId)
       .eq("project_id", projectId)
       .maybeSingle();
-    if (error) return Response.json({ error: "needs_migration" }, { status: 501 });
-    if (!data?.scad) return Response.json({ error: "not_found" }, { status: 404 });
+    if (error) return jsonError("needs_migration", 501);
+    if (!data?.scad) return jsonError("not_found", 404);
     previous = { scad: data.scad, request: data.request };
   }
-  if (repair && !previous) return Response.json({ error: "bad_request" }, { status: 400 });
+  if (repair && !previous) return jsonError("bad_request", 400);
 
   // A repair keeps the version's own request as its label; the error output only goes to the model.
   const asked = repair && previous ? previous.request : parsed.data.request;
@@ -93,7 +101,7 @@ export async function POST(request: Request) {
   const setting = await getCadEngineSetting();
   let engine = repair ? "browser" : resolveCadEngine(setting.mode, access.role === "admin");
   if (engine === "cloud" && !cloudConfigured()) {
-    await logCloudFallback(supabase, projectId, "not_configured");
+    await logCloudFallback(supabase, projectId, "not_configured", user.id);
     engine = "browser";
   }
   let fallback = false;
@@ -112,33 +120,35 @@ export async function POST(request: Request) {
       locale,
       minWallMm: setting.minWallMm,
       boards: await loadProjectBoards(supabase, projectId),
-      // Keyless Google auth (Vercel OIDC → Workload Identity Federation).
-      oidcToken: request.headers.get("x-vercel-oidc-token"),
+      // Keyless Google auth reads the Vercel OIDC token from the platform's
+      // request context / env inside lib/cad/cloud.ts, never from this request (AI-04).
     });
-    if (cloud.kind === "delivered") return Response.json(cloud.body);
-    if (cloud.kind === "error") return Response.json({ error: cloud.error }, { status: cloud.status });
+    if (cloud.kind === "delivered") return jsonOk(cloud.body);
+    if (cloud.kind === "error") return jsonError(cloud.error, cloud.status);
     // Worker down twice: tell the admin, then the existing browser path below.
-    await logCloudFallback(supabase, projectId, cloud.reason);
+    await logCloudFallback(supabase, projectId, cloud.reason, user.id);
     fallback = true;
   }
 
   const { data: id, error: beginError } = await supabase.rpc("cad_begin", {
     p_project: projectId,
     p_request: asked,
-    p_tier: tier,
+    // The charge is the published price, not the classified complexity (F-002).
+    p_tier: CAD_CHARGE_TIER,
     p_parent: parentId ?? null,
   });
   if (beginError) {
-    if (missing(beginError)) return Response.json({ error: "needs_migration" }, { status: 501 });
+    if (missing(beginError)) return jsonError("needs_migration", 501);
     const code = Object.keys(STATUS).find((c) => beginError.message?.includes(c));
     if (!code) console.error("[cad] cad_begin failed:", beginError.message);
-    return Response.json({ error: code ?? "failed" }, { status: code ? STATUS[code] : 500 });
+    return jsonError(code ?? "failed", code ? STATUS[code] : 500);
   }
   const generationId = id as string;
   // A new model sets the project's tier (0042); a failure here changes nothing else.
   if (!parentId) await supabase.rpc("set_cad_request", { p_project: projectId, p_tier: tier });
 
   const result = await validatedCall<CadAnswer>({
+    userId: user.id,
     supabase,
     projectId,
     feature: "cad",
@@ -170,15 +180,11 @@ export async function POST(request: Request) {
     return Response.json({ error: result.error }, { status });
   }
 
-  const { error: codeError } = await supabase.rpc("cad_set_code", {
-    p_id: generationId,
-    p_scad: result.value.scad,
-    p_model: result.model,
-  });
-  if (codeError) {
-    console.error("[cad] cad_set_code failed:", codeError.message);
-    await supabase.rpc("cad_fail", { p_id: generationId, p_error: `not saved: ${codeError.message}` });
-    return Response.json({ error: "failed" }, { status: 500 });
+  const stored = await setCadCode(supabase, user.id, generationId, result.value.scad, result.model);
+  if (!stored.ok) {
+    console.error("[cad] cad_set_code_for failed:", stored.message);
+    await supabase.rpc("cad_fail", { p_id: generationId, p_error: `not saved: ${stored.message}` });
+    return stored.error === "unavailable" ? jsonError("unavailable", 503) : jsonError("failed", 500);
   }
 
   return Response.json({

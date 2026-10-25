@@ -1,0 +1,20 @@
+- 7851a71 Apply audit 2026-10 proposed changes (see review/gestaltung-audit-reports-2026-10/proposed-code-changes/COMMITS.txt)
+- d1a4c52 Phase A repair: restore the docs the audit diff could not carry
+- ec2053f Phase A re-review of the audit's migrations 0100/0102/0103/0105
+- 8bdb1cc F-001, F-026: Terms say what is true, and the missing Studio.cat_logic key
+- d844e2b Phase C part 1: auth emails carry a token hash and a code, not a spent link
+- 560cbb6 F-013, F-014: the delivery filter means what it says; no slower tier at the same price
+- 8637ef6 F-020, F-038, F-049, F-054: relevant suggestions, readable pages, lighter store
+- 2320323 Phase C part 2: reset and confirm verify on submit, never on GET
+- 2ea3a64 F-015, F-016, F-017, F-036, F-050: say the right thing about money and orders
+- 633b984 F-007, F-010, F-011, F-012, F-046, F-052: the Studio's engineering output is checkable
+- 2fed4cf F-035, F-053: Arabic renders in Plex, and the home page paints in under a second
+- eee175c F-021, F-022, F-029-F-034, F-051: accessible names, a skip link, and an honest quote receipt
+- e8f9a5a F-006: "Add all to cart" writes every stocked part, in one insert
+- 1b36c60 F-003, F-004, F-005, F-027, F-042: printable meshes, one weight, a case shaped around the parts
+- 65aa449 Phase D: axe findings fixed, the 404 title actually works, e2e can pick its port
+- f052f1b F-019: /ar shows the spec table in English rather than hiding it
+- 1629778 F-002: charge the price the site publishes, and make the two impossible to diverge
+- ef58a2f F-039, F-040, F-041: the wiring views agree, and the Try-it field works
+- 10523ed F-009, F-024, F-025, F-028, F-032, F-043, F-044, F-045, F-047, F-048: the Studio explains itself
+- 15762f0 e2e: the two new specs actually pass now

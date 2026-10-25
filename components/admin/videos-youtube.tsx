@@ -37,6 +37,7 @@ import {
   type UploadMeta,
   type UploadRecord,
 } from "@/lib/youtube-upload";
+import { asLocale, intlTag } from "@/lib/locale";
 
 export type ClipView = {
   slug: string;
@@ -152,7 +153,7 @@ export function VideosYoutube({
                   {t("disconnect")}
                 </button>
               ) : (
-                <a href={`/api/admin/youtube/connect?locale=${locale === "ar" ? "ar" : "en"}`} className={primaryBtn}>
+                <a href={`/api/admin/youtube/connect?locale=${asLocale(locale)}`} className={primaryBtn}>
                   <Link2 className="h-4 w-4" aria-hidden />
                   {t("connect")}
                 </a>
@@ -240,7 +241,7 @@ function ClipRow({
   const tags = splitTags(tagsText);
   const canUpload = connected && !!quota && quota.remaining >= uploadCost && !busy && !otherUploading && clip.sizeBytes !== null;
   const id = `clip-${clip.slug}`;
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium" });
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), { dateStyle: "medium" });
 
   const copy = async (what: "title" | "description") => {
     try {
@@ -500,7 +501,7 @@ function RetireLog({ locale, entries, graceHours }: { locale: string; entries: R
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     dateStyle: "medium",
     timeStyle: "short",
     timeZone: "Asia/Qatar",

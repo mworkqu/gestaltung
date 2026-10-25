@@ -100,8 +100,9 @@ export function leadInSentence(label: string, locale: string): string {
 
 /**
  * parts columns that are the business's own numbers or sourcing internals
- * (0028). The anon product read uses select("*") (column sets differ between
- * migrations), so the cached public row drops these before anything renders.
+ * (0028). Since 0105 anon / sessions cannot SELECT them at all (public reads
+ * name PART_PUBLIC_COLUMNS, lib/store/part-columns.ts); the cached public row
+ * still drops them, in case a row ever arrives with them.
  */
 export const PRIVATE_PART_FIELDS = [
   "landed_cost_qar",

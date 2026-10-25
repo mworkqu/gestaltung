@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { loadDocPrivate } from "@/lib/studio/server/doc";
-import { isSuperAdmin, json } from "@/lib/studio/server/product";
+import { isSuperAdmin, json, loadErrorStatus } from "@/lib/studio/server/product";
 
 // GET /api/studio/product/engineer?projectId → super_admin only:
 //   200 {product, productPrivate}  (every design's ProductModel JSON, source,
@@ -21,6 +21,6 @@ export async function GET(request: Request) {
   if (!projectId.success) return json({ error: "bad_request" }, 400);
 
   const cur = await loadDocPrivate(supabase, projectId.data);
-  if (!cur.ok) return json({ error: cur.error }, cur.error === "not_found" ? 404 : 500);
+  if (!cur.ok) return json({ error: cur.error }, loadErrorStatus(cur.error));
   return json({ product: cur.owned.product, productPrivate: cur.owned.productPrivate ?? { designs: [] } });
 }

@@ -21,6 +21,9 @@ import {
   type DetailsResult,
   type DetailsSource,
 } from "@/lib/store/translate-details";
+import { isMissingColumn } from "@/lib/supabase/errors";
+import { isSuperAdminSession } from "@/lib/auth/guards";
+import { emptyStatus, jsonError, jsonOk } from "@/lib/http";
 
 // Store clean-up (owner, 2026-09-29). super_admin only. POST { step }:
 //  - "dedupe": the Voltaat import made one product per option (CW / CCW
@@ -252,7 +255,7 @@ async function translateDetails(db: Db, force: boolean, after: string | null) {
     const { data, error } = await query(DETAILS_COLS).order("sku").limit(DETAILS_FETCH);
     if (error) {
       // 42703 = column does not exist → 0047 not run yet.
-      if (error.code === "42703" || /specs_ar|details_ar_at/.test(error.message)) return { error: "run_0047" };
+      if (isMissingColumn(error) || /specs_ar|details_ar_at/.test(error.message)) return { error: "run_0047" };
       return { error: error.message };
     }
     const rows = (data ?? []) as unknown as DetailsRow[];
@@ -336,7 +339,7 @@ async function translateDetails(db: Db, force: boolean, after: string | null) {
 
 export async function POST(request: Request) {
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
+  if (!isSuperAdminSession(session)) return emptyStatus(403);
   const body = (await request.json().catch(() => ({}))) as { step?: string; force?: unknown; after?: unknown };
   const { step } = body;
   const db = await createClient();
@@ -348,8 +351,8 @@ export async function POST(request: Request) {
   else if (step === "translate_details") {
     const after = typeof body.after === "string" && body.after.length <= 200 ? body.after : null;
     result = await translateDetails(db, body.force === true, after);
-  } else return Response.json({ error: "unknown_step" }, { status: 400 });
+  } else return jsonError("unknown_step", 400);
   // Every step edits published products: refresh the cached storefront.
   revalidateStorefront();
-  return Response.json(result);
+  return jsonOk(result);
 }

@@ -15,6 +15,7 @@ import { dataTable } from "@/lib/email/brand-layout";
 import { digikeyConfigured, digikeyPart } from "@/lib/sourcing/adapters/digikey";
 import { mouserConfigured, mouserPart } from "@/lib/sourcing/adapters/mouser";
 import type { SupplierProduct } from "@/lib/sourcing/types";
+import { DAY_MS } from "@/lib/format/date";
 
 type Code = "mouser" | "digikey";
 
@@ -77,7 +78,7 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       .eq("supplier_id", sup.id)
       .eq("active", true)
       .not("supplier_sku", "is", null)
-      .or(`last_checked_at.is.null,last_checked_at.lt.${new Date(Date.now() - STALE_AFTER_DAYS * 86400_000).toISOString()}`)
+      .or(`last_checked_at.is.null,last_checked_at.lt.${new Date(Date.now() - STALE_AFTER_DAYS * DAY_MS).toISOString()}`)
       .order("last_checked_at", { ascending: true, nullsFirst: true })
       .limit(cfg.maxPerRun);
     type Row = {

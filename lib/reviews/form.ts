@@ -2,6 +2,8 @@
 // HTML form (application/x-www-form-urlencoded) or JSON. Pure parsing, so the
 // route stays thin and this is testable.
 
+import { asLocale } from "@/lib/locale";
+
 export const REVIEW_BODY_MAX_BYTES = 4096;
 
 export type ReviewBody = {
@@ -42,7 +44,7 @@ export function parseReviewBody(contentType: string | null, raw: string): Review
     order: get("order"),
     score: get("score"),
     comment: get("comment"),
-    locale: get("l") === "ar" ? "ar" : "en",
+    locale: asLocale(get("l")),
     token: get("t"),
   };
 }

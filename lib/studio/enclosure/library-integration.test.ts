@@ -2,8 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 import { LIBRARY } from "../library";
-import { isPokeSensor, layoutComponents, worldBox } from "../layout";
-import { buildEnclosure } from "./build";
+import { isExternalPart, isPokeSensor, layoutComponents, worldBox } from "../layout";
+import { buildEnclosure } from "../geometry/job";
 import { innerTopAt, insideSection } from "./templates";
 import { ALL_TEMPLATES, spec } from "./test-fixtures";
 
@@ -14,17 +14,21 @@ describe("real library", () => {
   const parts = new Map(list.map((i) => [i.instanceId, i.part]));
 
   for (const template of TEMPLATES) {
-    it(`builds an enclosure around every library part: ${template}`, () => {
+    it(`builds an enclosure around every library part: ${template}`, async () => {
       const lr = layoutComponents(list, { clearance: 2 });
       const t0 = performance.now();
-      const { base, lid, meta } = buildEnclosure(spec({ template, feet: "rubber_4" }), lr, parts);
+      const { base, lid, meta } = await buildEnclosure(spec({ template, feet: "rubber_4" }), lr, parts);
       const ms = performance.now() - t0;
       console.info(`[enclosure] library/${template}: ${meta.W}×${meta.D}×${meta.H} mm, ${ms.toFixed(0)} ms, ${meta.triangles} tris, ${meta.cutouts.length} cutouts`);
       expect(base.geometry.getAttribute("position").count).toBeGreaterThan(0);
       expect(lid.geometry.getAttribute("position").count).toBeGreaterThan(0);
       expect(meta.triangles).toBeLessThan(60000);
       const placed = new Set(lr.layout.map((i) => i.instanceId));
-      expect(meta.cutouts.length).toBe(list.filter((i) => placed.has(i.instanceId)).reduce((n, i) => n + i.part.ports.length, 0));
+      // One opening per port of a part INSIDE, plus one cable gland per part
+      // the case does not hold (F-005: the soil probe and the pump sit outside).
+      const ports = list.filter((i) => placed.has(i.instanceId)).reduce((n, i) => n + i.part.ports.length, 0);
+      const leads = list.filter((i) => !placed.has(i.instanceId) && isExternalPart(i.part)).length;
+      expect(meta.cutouts.length).toBe(ports + leads);
       const d = meta.dims;
       for (const it of lr.layout) {
         // Poke-through domes (the PIR) leave the cavity through the lid on purpose.

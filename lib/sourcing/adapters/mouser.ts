@@ -3,10 +3,8 @@
 // few and explicit. Mouser's API carries few parameters, so specifications
 // mostly come from DigiKey; Mouser gives price, stock and lead time.
 
-import type { SupplierAdapter, SupplierProduct } from "@/lib/sourcing/types";
+import type { SupplierProduct } from "@/lib/sourcing/types";
 import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
-
-export const mouserAdapter: SupplierAdapter = { code: "mouser", kind: "api" };
 
 const BASE = "https://api.mouser.com/api/v1/search";
 

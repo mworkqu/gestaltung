@@ -26,6 +26,7 @@ import {
 import type { ProductStage, ProductWhy } from "@/lib/studio/geometry/protocol";
 import type { Archetype } from "@/lib/studio/product/schema";
 import { productSpecHash } from "@/lib/studio/product/spec-hash";
+import type { ProductFailure } from "@/lib/studio/product/failure";
 import type { LibraryPart, StudioDoc, StudioProduct, StudioProductDesign } from "@/lib/studio/schema";
 
 /** Where the visitor's finish for the printed bodies is kept (doc.answers). */
@@ -61,6 +62,10 @@ export type ProductPreviews = {
   regens: number;
   /** The designs (and pictures) to keep in the doc. */
   choose(designId: string): void;
+  /** F-009: why no pictures could be made (null while there is no failure). */
+  failure: ProductFailure | null;
+  /** F-009: draw the pictures again after a failure. */
+  retry(): void;
 };
 
 type ProductUpdate = (prev: StudioProduct | undefined) => StudioProduct;
@@ -94,6 +99,7 @@ export function useProductPreviews({
   const [stage, setStage] = useState<ProductStage | null>(null);
   const [cards, setCards] = useState<ProductCard[]>([]);
   const [cardsKey, setCardsKey] = useState("");
+  const [failure, setFailure] = useState<ProductFailure | null>(null);
   const runId = useRef(0);
   const startedKey = useRef<string | null>(null);
   const [regensSeen, setRegensSeen] = useState(0);
@@ -117,6 +123,7 @@ export function useProductPreviews({
       const runKey = productSpecHash(d.spec, d.components);
       const live = () => runId.current === id;
       setPhase("running");
+      setFailure(null);
       setStage("designing");
       setCards([]);
       setCardsKey(runKey);
@@ -157,11 +164,17 @@ export function useProductPreviews({
           setPhase(result.error === "guest_limit" ? "guest_limit" : result.error === "sign_in" ? "sign_in" : result.error === "no_tokens" ? "no_tokens" : "ready");
           return;
         }
-        if (result.error === "no_render") setPhase(got.length ? "ready" : "unsupported");
+        if (result.error === "no_render") {
+          setPhase(got.length ? "ready" : "unsupported");
+          if (!got.length) setFailure("browser");
+        }
         else if (result.error === "guest_limit") setPhase("guest_limit");
         else if (result.error === "sign_in") setPhase("sign_in");
         else if (result.error === "no_tokens") setPhase("no_tokens");
-        else setPhase(ready.length ? "ready" : "failed");
+        else {
+          setPhase(ready.length ? "ready" : "failed");
+          if (!ready.length) setFailure(result.reason ?? "service");
+        }
         if (!ready.length) return;
         // Keep the page-safe part in the doc (pictures, why, status). The first design is chosen.
         const byId = new Map(got.map((c) => [c.id, c]));
@@ -187,7 +200,10 @@ export function useProductPreviews({
           if (previous.length) {
             setCards(previous);
             setPhase("ready");
-          } else setPhase("unsupported");
+          } else {
+            setPhase("unsupported");
+            setFailure("worker");
+          }
         }
       }
     },
@@ -200,6 +216,7 @@ export function useProductPreviews({
     if (!productPreviewSupported()) {
       startedKey.current = key;
       setPhase("unsupported");
+      setFailure("browser");
       return;
     }
     startedKey.current = key;
@@ -252,6 +269,11 @@ export function useProductPreviews({
     [cards, phase, run],
   );
 
+  const retry = useCallback(() => {
+    if (phase === "running") return;
+    void run([]);
+  }, [phase, run]);
+
   const choose = useCallback(
     (designId: string) => {
       onProduct((prev) => ({
@@ -275,6 +297,8 @@ export function useProductPreviews({
     regens: Math.max(regensSeen, doc?.product?.regens ?? 0),
     tryAnother,
     choose,
+    failure,
+    retry,
   };
 }
 

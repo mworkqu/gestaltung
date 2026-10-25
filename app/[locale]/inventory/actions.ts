@@ -6,16 +6,13 @@ import { getTranslations } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { getSessionContext } from "@/lib/auth/get-session";
+import { asLocale } from "@/lib/locale";
 
 export type ItemFormState = { error?: string };
 
 // The locale comes from a hidden form field, i.e. attacker-controllable. Pin it
 // to a known locale so it can never steer redirect() to a crafted path (e.g.
 // a "//evil.example" locale producing a protocol-relative open redirect).
-function safeLocale(formData: FormData): "en" | "ar" {
-  return String(formData.get("locale")) === "ar" ? "ar" : "en";
-}
-
 type ParsedItem = {
   values: {
     sku: string;
@@ -85,7 +82,7 @@ export async function createItem(
   _prev: ItemFormState,
   formData: FormData
 ): Promise<ItemFormState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const t = await getTranslations({ locale, namespace: "Inventory" });
 
   const session = await getSessionContext();
@@ -122,7 +119,7 @@ export async function updateItem(
   _prev: ItemFormState,
   formData: FormData
 ): Promise<ItemFormState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const id = String(formData.get("id") ?? "");
   const t = await getTranslations({ locale, namespace: "Inventory" });
 
@@ -150,7 +147,7 @@ export async function updateItem(
 }
 
 export async function deleteItem(formData: FormData): Promise<void> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const id = String(formData.get("id") ?? "");
 
   const session = await getSessionContext();

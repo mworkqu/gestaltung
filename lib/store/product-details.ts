@@ -74,7 +74,14 @@ export function productDetailsForLocale(part: ProductDetailsInput, locale: strin
 
   const arText = (part.description_ar ?? "").trim();
   const description = arText ? tidyDescription(arText, [part.name, part.name_ar]).text : null;
-  const specs = specRows(part.specs_ar);
+  const arSpecs = specRows(part.specs_ar);
+  // F-019: the spec TABLE falls back to the English rows under the Arabic
+  // heading when specs_ar is empty. It is structured data - mostly numbers and
+  // units ("5V", "16 MHz", "ATmega328P") - so showing it is more use than
+  // hiding the whole table, and the page still says underneath that this
+  // section is not translated yet. The DESCRIPTION keeps the old rule: raw
+  // English supplier prose never appears on /ar.
+  const specs = arSpecs.length > 0 ? arSpecs : en.specs;
   return {
     description,
     specs,
@@ -84,7 +91,9 @@ export function productDetailsForLocale(part: ProductDetailsInput, locale: strin
     plainDescription: plain(description),
     untranslated: {
       description: !description && !!en.description,
-      specs: specs.length === 0 && en.specs.length > 0,
+      // True while the Arabic rows are missing, even though `specs` now carries
+      // the English ones: the page uses this to keep saying so under the table.
+      specs: arSpecs.length === 0 && en.specs.length > 0,
     },
   };
 }

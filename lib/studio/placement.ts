@@ -7,7 +7,7 @@
 // same sense as layout.ts rotateXY). Without a case the offset is 0.
 
 import type { LayoutItem } from "./schema";
-import { rotateXY, type Vec3 } from "./layout";
+import type { Vec3 } from "./layout";
 
 export type PartPlacement = {
   /** Group position (mm, Z-up content frame). */
@@ -29,10 +29,4 @@ export function placePart(item: Pick<LayoutItem, "pos" | "rotZ">, offset: Vec3 =
     position: [item.pos[0] + offset[0], item.pos[1] + offset[1], item.pos[2] + offset[2]],
     rotationZ: (item.rotZ * Math.PI) / 180,
   };
-}
-
-/** A part-local point (models/types.ts frame) in the content frame. */
-export function partPointToContent(item: Pick<LayoutItem, "pos" | "rotZ">, local: Vec3, offset: Vec3 = ZERO): Vec3 {
-  const [rx, ry] = rotateXY(local[0], local[1], item.rotZ);
-  return [item.pos[0] + rx + offset[0], item.pos[1] + ry + offset[1], item.pos[2] + local[2] + offset[2]];
 }

@@ -6,8 +6,9 @@ import { escapeHtml } from "@/lib/email";
 import { BRAND, renderBrandedEmail } from "@/lib/email/brand-layout";
 import { COMPANY } from "@/lib/company";
 import { CAD_GENERATIONS, CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
+import { intlTag, type Locale } from "@/lib/locale";
 
-export type NotificationLocale = "en" | "ar";
+export type NotificationLocale = Locale;
 
 export type NotificationLinks = {
   siteUrl: string;
@@ -55,9 +56,6 @@ export function optNum(v: unknown): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
-export const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
 // ─── wording helpers ────────────────────────────────────────────────────────
 
 export type CreditWord = "circuit" | "cad" | "any";
@@ -66,8 +64,8 @@ export type ArCase = "nom" | "acc" | "gen";
 
 /**
  * "3 circuit credits", "1 CAD credit", Arabic with number agreement:
- * 1 → "رصيد توصيل واحد", 2 → "رصيدا توصيل" (رصيدي in object/prepositional use),
- * 3-10 → "N أرصدة توصيل", 11+ → "N رصيد توصيل". `any` = credits of unspecified kind.
+ * 1 → "رصيد مخطط توصيل واحد", 2 → "رصيدا مخطط توصيل" (رصيدي in object/prepositional use),
+ * 3-10 → "N أرصدة مخططات التوصيل", 11+ → "N رصيد مخططات التوصيل". `any` = credits of unspecified kind.
  */
 export function creditCount(n: number, word: CreditWord, locale: NotificationLocale, arCase: ArCase = "acc"): string {
   const count = Math.max(0, Math.round(n));
@@ -75,8 +73,17 @@ export function creditCount(n: number, word: CreditWord, locale: NotificationLoc
     const noun = word === "circuit" ? "circuit credit" : word === "cad" ? "CAD credit" : "credit";
     return `${count} ${noun}${count === 1 ? "" : "s"}`;
   }
-  const tail = word === "circuit" ? " توصيل" : word === "cad" ? " CAD" : "";
-  if (count === 0) return `لا أرصدة${tail}`;
+  // "توصيل" alone also means delivery, and "CAD" is untranslated, so the kind
+  // is spelled out: wiring-diagram credits / 3D-model credits (F-050). The
+  // noun after the credit is singular for 1-2 and plural from 3.
+  const plural = count >= 3;
+  const tail =
+    word === "circuit"
+      ? plural ? " مخططات التوصيل" : " مخطط توصيل"
+      : word === "cad"
+        ? plural ? " النماذج ثلاثية الأبعاد" : " نموذج ثلاثي الأبعاد"
+        : "";
+  if (count === 0) return `لا أرصدة${tail ? ` ${word === "circuit" ? "مخططات التوصيل" : "النماذج ثلاثية الأبعاد"}` : ""}`;
   if (count === 1) return `رصيد${tail} واحد${arCase === "acc" ? "ًا" : ""}`;
   if (count === 2) return `${arCase === "nom" ? "رصيدا" : "رصيدي"}${tail}`;
   if (count <= 10) return `${count} أرصدة${tail}`;
@@ -95,7 +102,7 @@ export function formatDate(value: unknown, locale: NotificationLocale): string |
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   try {
-    return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+    return new Intl.DateTimeFormat(intlTag(locale), {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -126,7 +133,7 @@ const COPY = {
     brandStrip: `${COMPANY.legalNameAr} · س.ت ${COMPANY.crNumber}`,
     howTitle: "كيف تستخدم أرصدتك",
     how: [
-      `كل رسم للدائرة (مخطط التوصيل والمخطط الكهربائي) يكلّف رصيد توصيل واحدًا، وقائمة القطع مجانية. رصيد CAD الواحد يغطي جلسة نموذج ثلاثي الأبعاد بحتى ${CAD_GENERATIONS} نسخ.`,
+      `كل رسم للدائرة (مخطط التوصيل والمخطط الكهربائي) يكلّف رصيد مخطط توصيل واحدًا، وقائمة القطع مجانية. رصيد النموذج ثلاثي الأبعاد الواحد يغطي جلسة نموذج ثلاثي الأبعاد بحتى ${CAD_GENERATIONS} نسخ.`,
       `كل رصيد تستخدمه يعود إليك كخصم ${CREDIT_QAR} ر.ق على أي طلب معنا (قطع، طباعة ثلاثية الأبعاد، قص ليزر أو CNC) خلال ${REDEEM_DAYS} يومًا، ويُطبَّق عند إتمام الطلب. لا تُستردّ الأرصدة نقدًا أبدًا.`,
     ],
     howLink: "تعرّف على كيفية عمل الأرصدة",

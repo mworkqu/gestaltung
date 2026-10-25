@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached, requireSuperAdmin } from "@/lib/auth/guards";
 import { STOCK_STATUSES } from "@/lib/parts/constants";
 import { isDuplicateProductError } from "@/lib/parts/part-key";
 import { parseSheet, type ExistingPart, type SkippedRow } from "@/lib/parts/sheet-import";
@@ -13,15 +13,15 @@ import type { StockStatus } from "@/lib/supabase/types";
 import { revalidatePart, revalidateStorefront } from "@/lib/cache/storefront";
 import { isStoreCategory, type StoreCategory } from "@/lib/store/store-categories";
 import { returnToOrCatalog } from "@/lib/admin/return-to";
+import { fetchWithinAllowList } from "@/lib/net/safe-fetch";
+import { readPartsAdmin } from "@/lib/store/part-columns";
+import { asLocale } from "@/lib/locale";
+import { isMissingColumn } from "@/lib/supabase/errors";
 
 export type PartFormState = { error?: string };
 
 // The locale comes from a hidden form field (attacker-controllable). Pin it to a
 // known locale so it can never steer redirect() to a crafted path.
-function safeLocale(formData: FormData): "en" | "ar" {
-  return String(formData.get("locale")) === "ar" ? "ar" : "en";
-}
-
 type ParsedPart = {
   sku: string;
   name: string;
@@ -140,12 +140,10 @@ export async function createPart(
   _prev: PartFormState,
   formData: FormData
 ): Promise<PartFormState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const t = await getTranslations({ locale, namespace: "PartsDashboard" });
 
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
 
   const parsed = await parsePart(formData, t);
   if ("error" in parsed) return { error: parsed.error };
@@ -168,13 +166,11 @@ export async function updatePart(
   _prev: PartFormState,
   formData: FormData
 ): Promise<PartFormState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const id = String(formData.get("id") ?? "");
   const t = await getTranslations({ locale, namespace: "PartsDashboard" });
 
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
   if (!id) return { error: t("error_unknown") };
 
   const parsed = await parsePart(formData, t);
@@ -183,7 +179,7 @@ export async function updatePart(
   const supabase = await createClient();
   // The row as it stands, to see whether this edit can change a listing.
   // select("*") so it still works before a migration adds a column.
-  const { data: before } = await supabase.from("parts").select("*").eq("id", id).maybeSingle();
+  const { data: before } = await readPartsAdmin((t) => supabase.from(t).select("*").eq("id", id).maybeSingle());
   const { data: after, error } = await supabase.from("parts").update(parsed).eq("id", id).select("sku").maybeSingle();
 
   if (error) {
@@ -212,13 +208,11 @@ export async function updatePart(
 // 23514 when ON DELETE SET NULL empties product_id); say so
 // instead of silently doing nothing.
 export async function deletePart(formData: FormData): Promise<PartFormState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const id = String(formData.get("id") ?? "");
   const t = await getTranslations({ locale, namespace: "PartsDashboard" });
 
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
   if (!id) return { error: t("error_unknown") };
 
   const supabase = await createClient();
@@ -266,7 +260,7 @@ export async function importPartsFromSheet(
   locale: "en" | "ar",
   csvUrl: string
 ): Promise<ImportResult> {
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (!session || session.profile.role !== "super_admin") {
     return { error: "auth" };
   }
@@ -281,29 +275,23 @@ export async function importPartsFromSheet(
     return { error: "bad_url" };
   }
   if (url.protocol !== "https:") return { error: "bad_url" };
-  const host = url.hostname.toLowerCase();
-  const hostOk =
-    host === "docs.google.com" ||
-    host.endsWith(".google.com") ||
-    host.endsWith(".googleusercontent.com");
-  if (!hostOk) return { error: "bad_host" };
+  // Every redirect hop is re-checked against the same list (API-08): Google
+  // hosts include open redirectors, so following blindly would defeat it.
+  const isSheetHost = (host: string) =>
+    host === "docs.google.com" || host.endsWith(".google.com") || host.endsWith(".googleusercontent.com");
+  if (!isSheetHost(url.hostname.toLowerCase())) return { error: "bad_host" };
 
-  // Fetch the CSV with a timeout and a size cap.
-  let text: string;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
-    const res = await fetch(url.toString(), {
-      signal: controller.signal,
-      cache: "no-store",
-      redirect: "follow",
-    });
-    clearTimeout(timer);
-    if (!res.ok) return { error: "fetch_failed" };
-    text = (await res.text()).slice(0, 2_000_000); // ~2MB cap
-  } catch {
-    return { error: "fetch_failed" };
-  }
+  // Fetch the CSV with a timeout, at most 3 redirects and a 2 MB byte cap
+  // (streamed: the body is abandoned once it passes the cap).
+  const res = await fetchWithinAllowList(url, {
+    allowHost: isSheetHost,
+    maxBytes: 2_000_000,
+    maxRedirects: 3,
+    timeoutMs: 12_000,
+    init: { cache: "no-store" },
+  });
+  if (!res.ok) return { error: "fetch_failed" };
+  const text = new TextDecoder().decode(res.body);
 
   const supabase = await createClient();
   const existing = await loadExistingParts(supabase);
@@ -362,7 +350,7 @@ async function loadExistingParts(
       .order("id")
       .range(from, from + PAGE - 1);
     if (error) {
-      if (withMerged && error.code === "42703") {
+      if (withMerged && isMissingColumn(error)) {
         withMerged = false;
         rows.length = 0;
         from = 0;
@@ -389,25 +377,19 @@ async function loadExistingParts(
 // (0030) can never be published — the parts_normalise trigger forces it back
 // to draft — so refuse up front and name the product to publish instead.
 export async function togglePublished(formData: FormData): Promise<PartFormState> {
-  const locale = safeLocale(formData);
+  const locale = asLocale(formData.get("locale"));
   const id = String(formData.get("id") ?? "");
   const next = formData.get("is_published") === "true";
   const t = await getTranslations({ locale, namespace: "PartsDashboard" });
 
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
   if (!id) return { error: t("error_unknown") };
 
   const supabase = await createClient();
 
   if (next) {
     // select("*") so this still works before 0030 (no merged_into column).
-    const { data: row, error: readError } = await supabase
-      .from("parts")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
+    const { data: row, error: readError } = await readPartsAdmin((t) => supabase.from(t).select("*").eq("id", id).maybeSingle());
     if (readError) return { error: t("error_unknown") };
     const mergedInto = (row as { merged_into?: string | null } | null)?.merged_into ?? null;
     if (mergedInto) {

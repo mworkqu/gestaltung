@@ -12,9 +12,9 @@
 import { MIN_BRIEF_CHARS } from "./constants";
 import { isMakeable, partNeeds, type PartContext, type PartLike } from "./parts";
 import { isAnalysed, rowOf, type Spec } from "./spec";
-import type { BomKind, LineStatus } from "./bom";
+import type { LineStatus } from "./bom-types";
 import { describeHard, hardFlagId, hardRules, type Netlist } from "./netlist";
-import { isStandardFact } from "./analysis";
+import { isStandardFact, type BomKind } from "./analysis";
 import { humanName } from "./human-name";
 
 /** Which area of the workspace a requirement belongs to. */

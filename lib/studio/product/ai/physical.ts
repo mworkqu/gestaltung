@@ -20,6 +20,7 @@ import { needsOf } from "../archetypes";
 import { formFrame } from "../forms/geometry";
 import { ARCHETYPE_SCENE, clampBody, clampProductModel, type Archetype, type ProductModel } from "../schema";
 import { solveProduct, type SolverIssue } from "../solve";
+import { round2 } from "@/lib/format/money";
 
 export type PhysicalResult = {
   model: ProductModel;
@@ -292,7 +293,7 @@ export function lensSize(model: ProductModel): ProductModel {
     const b = out.bodies.find((x) => x.id === f.id)!;
     if (b.form.kind !== "rounded_extrude") continue;
     const r = Math.min(b.form.r, Math.min(f.w, f.d) / 2 - 0.01);
-    b.form = { ...b.form, w: Math.round(f.w * 10) / 10, d: Math.round(f.d * 10) / 10, h: f.h, r: Math.max(1, Math.round(r * 100) / 100), fillet: Math.min(b.form.fillet, Math.max(1, f.h / 2)) };
+    b.form = { ...b.form, w: Math.round(f.w * 10) / 10, d: Math.round(f.d * 10) / 10, h: f.h, r: Math.max(1, round2(r)), fillet: Math.min(b.form.fillet, Math.max(1, f.h / 2)) };
   }
   return out;
 }

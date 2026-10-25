@@ -23,9 +23,9 @@ import { useStudioLibrary } from "../StudioLibraryProvider";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 import type { StudioDoc } from "@/lib/studio/schema";
 import type { StoreCardPart } from "@/lib/store/catalog";
-import type { StudioCtx } from "../StudioShell";
+import type { StudioCtx } from "../studio-ctx";
 import { Problem, StepFrame } from "../ui";
-import { storeLines, useAddAllToCart } from "../use-studio-cart";
+import { studioKitPlan, useStudioCart } from "../use-studio-cart";
 import { pictureShareSource, ShareActions, type ShareSource } from "./share";
 import { PartsPicturePane } from "./PartsStep";
 
@@ -51,6 +51,8 @@ function BigOption({
       type="button"
       onClick={onClick}
       disabled={busy}
+      aria-label={title}
+      aria-busy={busy || undefined}
       className={
         primary
           ? "group flex w-full items-start gap-4 rounded-[24px] bg-cobalt p-5 text-start text-white shadow-[0_12px_28px_-12px_rgba(14,89,197,0.8)] transition-[transform,background-color] hover:bg-cobalt-hover active:scale-[0.99] disabled:opacity-70 sm:p-6"
@@ -97,7 +99,7 @@ export function MakeStep({
   const t = useTranslations("Studio");
   const tSafe = useTranslations("SchoolSafety");
   const router = useRouter();
-  const cart = useAddAllToCart(ctx.api.mode === "live" ? ctx.projectId : null);
+  const cart = useStudioCart(ctx.api.mode === "live" ? ctx.projectId : null);
   const viewer = useRef<ShareSource | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
@@ -126,8 +128,7 @@ export function MakeStep({
   );
 
   async function orderParts() {
-    const { lines } = storeLines(doc.components, products, getPart);
-    const ok = await cart.addAll(lines);
+    const ok = await cart.add(studioKitPlan(doc.components, products, getPart));
     if (ok) router.push("/store/cart");
   }
 

@@ -1,35 +1,36 @@
 "use client";
 
-// Store products for the Studio's parts, and "Add all to cart". Part D: each
-// product goes in once with the packs its parts need (6 servos = 6 pieces →
-// packsFor(6), raised to the minimum order). Parts without a store product are
-// "We'll source this".
+// Store products for the Studio's parts, and "Add all to cart" (F-006).
+//
+// The plan is worked out once in lib/studio/kit-plan (every part with a
+// listing, helper parts and pack listings included, packs per line), and the
+// cart writes it in ONE statement: addKit for a project, addAll without one.
+// It used to be a client loop calling addItem per line — each add did a session
+// read, a lookup, an insert and a full cart reload, so a cut-off loop left a
+// half-filled cart with no rollback (the P5-02 kit bug, which this path never
+// picked up). The toast counts come back from the written plan, never from the
+// list we meant to add.
 
 import { useCallback, useState } from "react";
 
 import { useCart } from "@/components/parts/cart-provider";
 import { getPart as codeGetPart } from "@/lib/studio/library";
-import type { LibraryPart } from "@/lib/studio/schema";
-
-type GetPart = (id: string) => LibraryPart | undefined;
-import type { StudioComponent } from "@/lib/studio/schema";
+import { addedCounts, kitRowsFor, productForPart, type GetLibraryPart, type StudioKitPlan } from "@/lib/studio/kit-plan";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { packsFor } from "@/lib/store/pack";
-import { skusFor } from "@/lib/studio/variants";
+
+export { studioKitPlan, addedToCartLine } from "@/lib/studio/kit-plan";
+export type { StudioKitPlan, StudioKitRow } from "@/lib/studio/kit-plan";
 
 /** The store product sold for a library part (first published SKU), if any. */
 export function productFor(
   partId: string,
   products: Map<string, StoreCardPart>,
-  getPart: GetPart = codeGetPart,
+  getPart: GetLibraryPart = codeGetPart,
   /** The component's colour: its own listing first (a green LED → the green LED pack). */
   variant?: string | null,
 ): StoreCardPart | null {
-  for (const sku of skusFor(getPart(partId), variant)) {
-    const p = products.get(sku);
-    if (p) return p;
-  }
-  return null;
+  return productForPart(partId, products, getPart, variant);
 }
 
 /** Store listings to buy for `need` pieces of a part (packs, at least the minimum order). */
@@ -38,43 +39,30 @@ export const orderQty = (p: StoreCardPart, need = 1) => packsFor(need, p);
 /** Price of `need` pieces of a part: unit price × the listings it takes. */
 export const linePrice = (p: StoreCardPart, need = 1) => Number(p.unit_price ?? 0) * orderQty(p, need);
 
-export type StoreLine = { product: StoreCardPart; /** pieces the parts need */ need: number; /** listings to add */ qty: number };
+/** What the cart received: the counts the toast shows. */
+export type AddedCounts = { added: number; sourced: number };
 
-/** One line per store product (identical parts summed), and the total of those. */
-export function storeLines(
-  components: StudioComponent[],
-  products: Map<string, StoreCardPart>,
-  getPart: GetPart = codeGetPart,
-) {
-  const byId = new Map<string, StoreLine>();
-  for (const c of components) {
-    const p = productFor(c.partId, products, getPart, c.variant);
-    if (!p) continue;
-    const line = byId.get(p.id);
-    if (line) line.need++;
-    else byId.set(p.id, { product: p, need: 1, qty: 1 });
-  }
-  const lines = [...byId.values()].map((l) => ({ ...l, qty: orderQty(l.product, l.need) }));
-  const total = lines.reduce((s, l) => s + Number(l.product.unit_price ?? 0) * l.qty, 0);
-  return { lines, total };
-}
-
-export function useAddAllToCart(projectId: string | null) {
-  const { addItem } = useCart();
+export function useStudioCart(projectId: string | null) {
+  const { addKit, addAll } = useCart();
   const [state, setState] = useState<"idle" | "adding" | "added" | "failed">("idle");
-  const addAll = useCallback(
-    async (lines: StoreLine[]): Promise<boolean> => {
-      if (!lines.length) return true;
+  const [counts, setCounts] = useState<AddedCounts | null>(null);
+
+  const add = useCallback(
+    async (plan: StudioKitPlan): Promise<boolean> => {
+      if (!plan.rows.length) return true;
       setState("adding");
-      let ok = true;
-      for (const l of lines) {
-        // One at a time: each add reloads the cart.
-        if (!(await addItem(l.product, l.qty, projectId))) ok = false;
-      }
+      const rows = kitRowsFor(plan);
+      // One insert for every row, with the kit removed again if it fails, so
+      // the cart either holds the whole plan or nothing of it.
+      const ok = projectId ? (await addKit(projectId, rows)) !== null : await addAll(rows);
+      if (ok) setCounts(addedCounts(rows, plan));
       setState(ok ? "added" : "failed");
       return ok;
     },
-    [addItem, projectId],
+    [addKit, addAll, projectId],
   );
-  return { state, addAll };
+
+  const dismiss = useCallback(() => setCounts(null), []);
+
+  return { state, counts, add, dismiss };
 }

@@ -1,18 +1,17 @@
 // Raised label (EnclosureSpec.label): where it goes and its geometry.
 //
-// planLabel() is pure maths (tests + build.ts): it picks the surface (the lid top;
+// planLabel() is pure maths (tests + the plan): it picks the surface (the lid top;
 // the front (-y) face of a lantern's upper band), the biggest cap height from 8 down
 // to 4 mm that fits, and the free spot nearest the preferred point that keeps ≥ 3 mm
-// from every opening on that surface. labelGeometry() turns the plan into rounded
-// capsules raised LABEL_RAISE mm above the surface (and dipping into it), which
-// build.ts unions into the lid mesh — so the label is part of the lid's STL.
+// from every opening on that surface. labelCapsules() turns the plan into rounded
+// capsules raised LABEL_RAISE mm above the surface (and dipping into it), which the
+// kernel unions into the shell — so the label is part of the lid's STL.
 
-import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Vec3 } from "../layout";
 import { cutoutBox, type Cutout } from "./cutouts";
 import { labelSupport, layoutLabel, type LabelSkipReason, type Stroke } from "./label-font";
 import { insideSection, topAt, type EnclosureDims } from "./templates";
+import { round2 } from "@/lib/format/money";
 
 /** Raised height of the letters above the surface (mm). */
 export const LABEL_RAISE = 0.6;
@@ -119,7 +118,7 @@ export function planLabel(text: string | undefined, d: EnclosureDims, openings: 
       const plan: LabelPlan = {
         text: sup.text,
         surface,
-        cap: Math.round(cap * 100) / 100,
+        cap: round2(cap),
         r: lay.r,
         center: [u, v],
         width: lay.width,
@@ -143,43 +142,45 @@ function labelBox(d: EnclosureDims, surface: LabelSurface, r: Rect): { min: Vec3
 }
 
 /** Surface point + outward normal for label-space (u, v). */
-function surfacePoint(plan: LabelPlan, d: EnclosureDims, u: number, v: number): { p: THREE.Vector3; n: THREE.Vector3 } {
+function surfacePoint(plan: LabelPlan, d: EnclosureDims, u: number, v: number): { p: Vec3; n: Vec3 } {
   const [cu, cv] = plan.center;
   if (plan.surface === "front") {
-    return { p: new THREE.Vector3(cu + u, -d.D / 2, cv + v), n: new THREE.Vector3(0, -1, 0) };
+    return { p: [cu + u, -d.D / 2, cv + v], n: [0, -1, 0] };
   }
   const x = cu + u;
   const y = cv + v;
   const e = 0.05;
   const gx = (topAt(d, y, x + e) - topAt(d, y, x - e)) / (2 * e);
   const gy = (topAt(d, y + e, x) - topAt(d, y - e, x)) / (2 * e);
-  return { p: new THREE.Vector3(x, y, topAt(d, y, x)), n: new THREE.Vector3(-gx, -gy, 1).normalize() };
+  return { p: [x, y, topAt(d, y, x)], n: norm([-gx, -gy, 1]) };
 }
 
-/** Rounded capsules for every stroke (one merged geometry; the capsules never touch each other). */
-export function labelGeometry(plan: LabelPlan, d: EnclosureDims): THREE.BufferGeometry {
-  const parts = plan.strokes.map((s) => {
+function norm(v: Vec3): Vec3 {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+}
+
+/** One raised stroke: a capsule from `a` to `b` of radius `r`, in enclosure space. */
+export type LabelCapsule = { a: Vec3; b: Vec3; r: number };
+
+/**
+ * The raised letters as capsules (the kernel unions them onto the outer shell, so the
+ * label ends up in the lid's own mesh). Each stroke sits LABEL_RAISE mm proud of the
+ * surface and dips into it; strokes that meet are shortened so no two capsules touch.
+ */
+export function labelCapsules(plan: LabelPlan, d: EnclosureDims): LabelCapsule[] {
+  return plan.strokes.map((s) => {
     const A = surfacePoint(plan, d, s.a[0], s.a[1]);
     const B = surfacePoint(plan, d, s.b[0], s.b[1]);
-    const n = A.n.clone().add(B.n).normalize();
-    const off = n.clone().multiplyScalar(LABEL_RAISE - plan.r);
-    const a = A.p.clone().add(off);
-    const b = B.p.clone().add(off);
-    const axis = b.clone().sub(a);
-    const length = axis.length();
-    // Few segments: the strokes are under 1.5 mm wide, facets do not show.
-    const g = new THREE.CapsuleGeometry(plan.r, Math.max(1e-3, length), 1, 6);
-    g.deleteAttribute("uv");
-    // Capsule axis = local y; it has a ring vertex on local +x → turn that vertex to the
-    // surface normal so the top of every stroke is exactly LABEL_RAISE above the surface.
-    const y = length > 1e-6 ? axis.normalize() : new THREE.Vector3(1, 0, 0).cross(n).normalize();
-    if (y.lengthSq() < 0.5) y.set(0, 1, 0).cross(n).normalize();
-    const x = n.clone().sub(y.clone().multiplyScalar(n.dot(y))).normalize();
-    const z = x.clone().cross(y);
-    g.applyMatrix4(new THREE.Matrix4().makeBasis(x, y, z));
-    const mid = a.clone().add(b).multiplyScalar(0.5);
-    g.translate(mid.x, mid.y, mid.z);
-    return g;
+    const n = norm([A.n[0] + B.n[0], A.n[1] + B.n[1], A.n[2] + B.n[2]]);
+    // The capsule's own radius already reaches `r` above its axis, so the axis sits
+    // LABEL_RAISE − r out from the surface.
+    const k = LABEL_RAISE - plan.r;
+    const off: Vec3 = [n[0] * k, n[1] * k, n[2] * k];
+    return {
+      a: [A.p[0] + off[0], A.p[1] + off[1], A.p[2] + off[2]] as Vec3,
+      b: [B.p[0] + off[0], B.p[1] + off[1], B.p[2] + off[2]] as Vec3,
+      r: plan.r,
+    };
   });
-  return mergeGeometries(parts)!;
 }

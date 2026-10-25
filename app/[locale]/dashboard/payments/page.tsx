@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { needsPaymentsMigration, qarFormatter, type RevenueRow } from "../ai-costs/format";
 import { expirePass, reviewPayment } from "./actions";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { dayFormatter, timeFormatter } from "@/lib/format/date";
+import { BUCKETS } from "@/lib/storage/paths";
 
 // Payments admin (owner, 2026-10-18): the review queue for Fawran proofs the
 // automatic check could not settle, an audit list of the auto-approved ones
@@ -49,17 +53,18 @@ export default async function PaymentsPage({
   searchParams: Promise<{ view?: string; err?: string; done?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const sp = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("AdminPayments");
   const view: View = (VIEWS as readonly string[]).includes(sp.view ?? "") ? (sp.view as View) : "review";
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const loc = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
+  const loc = intlTag(asLocale(locale));
   const num = new Intl.NumberFormat(loc);
   const qar = qarFormatter(locale);
-  const timeFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Qatar" });
-  const dayFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
+  const timeFmt = timeFormatter(asLocale(locale));
+  const dayFmt = dayFormatter(asLocale(locale));
 
   const supabase = await createClient();
   let q = supabase
@@ -104,7 +109,7 @@ export default async function PaymentsPage({
     payments
       .filter((p) => p.proof_path)
       .map(async (p) => {
-        const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(p.proof_path as string, 600);
+        const { data } = await supabase.storage.from(BUCKETS.paymentProofs).createSignedUrl(p.proof_path as string, 600);
         if (data?.signedUrl) proofUrl.set(p.id, data.signedUrl);
       }),
   );

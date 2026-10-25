@@ -27,6 +27,7 @@ import { ACTUATOR_KINDS, BUILD_CLASSES, clampSpec, type BuildClass, type ClampLo
 import { chatGuardTurn, guardSpec, vagueTurn } from "./spec-guards";
 import { actuatorCountLabel, actuatorTotals, capStrongServos, setActuatorCount } from "../actuators";
 import { outcomeCached, specKey, type AiCache } from "./cache";
+import { newestUserText, replyLanguage, type ReplyLocale } from "./reply-language";
 import {
   CHANGED_ITEMS, CHANGED_MAX, CHOICE_MAX, MAX_QUESTIONS, QUESTION_MAX, REFINE_RESPONSE_SCHEMA, REPLY_MAX, SPEC_RESPONSE_SCHEMA, SPEC_SYSTEM,
   specPrompt,
@@ -38,8 +39,13 @@ export type SpecTurn =
   | { kind: "question"; question: string; choices: string[] }
   /** The first card (before it existed); `reply` only when there is something to say (scope honesty). */
   | { kind: "spec"; spec: ProductSpec; reply?: string }
-  /** Part A: a turn once the card exists. No `spec` = the card is untouched. */
-  | { kind: "reply"; reply: string; spec?: ProductSpec; changed: string[]; diff?: string[] };
+  /**
+   * Part A: a turn once the card exists. No `spec` = the card is untouched.
+   * `newProduct` is the model's HINT that the message replaces the product with a
+   * different one; lib/studio/identity.ts only trusts it when its own reading of the
+   * identity fields agrees, and the price still comes from our code.
+   */
+  | { kind: "reply"; reply: string; spec?: ProductSpec; changed: string[]; diff?: string[]; newProduct?: boolean };
 
 /** How a turn is asked: a question may come back, the spec is due, or the card exists (refine). */
 export type TurnMode = "ask" | "force" | "refine";
@@ -151,7 +157,19 @@ export function validateTurn(
     opts.log.push(...turnLog);
     const diff = (Array.isArray(raw.diff) ? raw.diff : []).map((d) => cut(d, 100)).filter(Boolean).slice(0, 8);
     if (!spec) return { value: { kind: "reply", reply, changed: [], ...(diff.length ? { diff } : {}) }, errors: [] };
-    return { value: { kind: "reply", reply, spec, changed: cleanChanged(raw.changed), ...(diff.length ? { diff } : {}) }, errors: [] };
+    // Anything but a literal true is read as "same product" (free).
+    const newProduct = raw.newProduct === true;
+    return {
+      value: {
+        kind: "reply",
+        reply,
+        spec,
+        changed: cleanChanged(raw.changed),
+        ...(diff.length ? { diff } : {}),
+        ...(newProduct ? { newProduct } : {}),
+      },
+      errors: [],
+    };
   }
   if (spec) {
     const reply = cleanReply(raw.reply, locale, turnLog);
@@ -199,51 +217,63 @@ export async function runSpecChat(opts: {
   const ctx = { idea: opts.idea, messages: opts.messages, locale: opts.locale };
   const current = opts.current ?? null;
 
-  const rules = ruleTurn(opts.idea, opts.messages, opts.locale, current);
+  // F-047: canned answers, the identity line and the fallback reply follow the visitor's language.
+  const replyLocale = replyLanguage(newestUserText(opts.idea, opts.messages), opts.locale);
+  const rules = ruleTurn(opts.idea, opts.messages, replyLocale, current);
   if (rules) return { ok: true, value: rules, source: "rules", clampLog: [], problems: [] };
 
   // The deep check changes the answer, so it is part of the cache key.
   const key = specKey({ idea: opts.idea, messages: opts.messages, locale: opts.locale, current }) + (opts.deep ? ":deep" : "");
-  return outcomeCached(opts.cache, key, () => modelTurn(opts, ctx, current));
+  return outcomeCached(opts.cache, key, () => modelTurn(opts, ctx, current, replyLocale));
 }
 
 async function modelTurn(
   opts: { call: StudioCall; idea: string; messages: ChatMessage[]; locale: "en" | "ar"; model?: string; deep?: boolean },
   ctx: { idea: string; messages: ChatMessage[]; locale: "en" | "ar" },
   current: ProductSpec | null,
+  replyLocale: ReplyLocale = opts.locale,
 ): Promise<Outcome<SpecTurn>> {
   const log: ClampLog = [];
   const mode: TurnMode = current ? "refine" : questionsAsked(opts.messages) >= MAX_QUESTIONS ? "force" : "ask";
   const r = await opts.call<SpecTurn>({
     step: "spec",
     system: SPEC_SYSTEM,
-    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, forceSpec: mode === "force", current, deep: opts.deep }),
+    prompt: specPrompt({ idea: opts.idea, messages: opts.messages, locale: opts.locale, replyLocale, forceSpec: mode === "force", current, deep: opts.deep }),
     ...(opts.model ? { model: opts.model } : {}),
     // 2026-10-18: once the card exists the whole understanding + spec come back on every turn.
     schema: mode === "refine" ? REFINE_RESPONSE_SCHEMA : SPEC_RESPONSE_SCHEMA,
     validate: (raw) => {
       // Only the accepted attempt's changes are kept.
       const attempt: ClampLog = [];
-      const res = validateTurn(raw, { mode, log: attempt, locale: opts.locale });
+      const res = validateTurn(raw, { mode, log: attempt, locale: replyLocale });
       if (res.value) log.splice(0, log.length, ...attempt);
       return res;
     },
   });
   const guard = (spec: ProductSpec, into: ClampLog) => {
-    const guarded = guardSpec(syncMovers(spec, into), ctx, into).spec;
+    const guarded = guardSpec(syncMovers(spec, into), { ...ctx, current }, into).spec;
     // Part F: a 4th strong servo would take the 5 A supply over budget (power rule).
     const capped = capStrongServos(guarded);
     if (capped !== guarded) into.push({ path: "actuators", from: guarded.actuators, to: capped.actuators });
     return capped;
   };
   const last = [...opts.messages].reverse().find((m) => m.role === "user")?.text ?? "";
-  if (r.ok) return { ok: true, value: finish(r.value, current, guard, log, last, opts.locale), source: "model", clampLog: log, problems: [] };
+  if (r.ok)
+    return {
+      ok: true,
+      value: finish(r.value, current, guard, log, last, opts.locale),
+      source: "model",
+      clampLog: log,
+      problems: [],
+      model: r.model,
+      spend: r.spend,
+    };
   if (r.error !== "invalid") return { ok: false, error: r.error, clampLog: log, problems: r.problems };
   const fallback: ClampLog = [];
   if (current) {
     // The card with the visitor's own words applied ("add a buzzer"), never a blank one.
     const spec = guard(current, fallback);
-    const words = FALLBACK_REPLY[opts.locale];
+    const words = FALLBACK_REPLY[replyLocale];
     const value: SpecTurn = sameCard(spec, current)
       ? { kind: "reply", reply: words.same, changed: [] }
       : { kind: "reply", reply: words.updated, spec, changed: [] };
@@ -290,6 +320,12 @@ export function keepCardFields(spec: ProductSpec, current: ProductSpec, lastUser
   if (current.buildClass && !spec.buildClass) {
     log.push({ path: "buildClass", from: null, to: current.buildClass });
     out = { ...out, buildClass: current.buildClass };
+  }
+  // The scope is what the tier (and so the price) is classified from: a refine turn that
+  // simply forgets the field must not read as "the build got simpler".
+  if (current.scope && !spec.scope) {
+    log.push({ path: "scope", from: null, to: "kept" });
+    out = { ...out, scope: current.scope };
   }
   if (current.understanding && !spec.understanding) {
     log.push({ path: "understanding", from: null, to: "kept" });
@@ -355,6 +391,7 @@ function finish(
     return { kind: "reply", reply: turn.reply, changed: [] };
   }
   const spec = guard(keepCardFields(turn.spec, current, lastUser, log), log);
+  // No change to the card at all: there is nothing to charge for, hint or no hint.
   if (sameCard(spec, current)) return { kind: "reply", reply: turn.reply, changed: [] };
   // The model changed the card but named nothing: at least say the new motor count.
   return { ...turn, spec, changed: turn.changed.length ? turn.changed : countLabels(current, spec, locale) };

@@ -2,7 +2,10 @@
 //
 // Same credit rules as the browser path, through the SAME 0043 functions:
 //   cad_begin   opens a pending row (credit_can_use + the 24 h cap)
-//   cad_set_code stores the code once the worker has actually run it
+//   cad_set_code_for stores the code once the worker has actually run it
+//               (the server, through the service client with the verified
+//               user id — 0102 / audit G-C1; POST /api/cad refuses with 503
+//               before this runs when the service key is missing)
 //   cad_deliver spends (spend_credit: 1 cad credit = 3 versions, admin free) —
 //               called here, by the server, only after the files are saved
 //   cad_fail    on any failure: nothing is spent
@@ -22,6 +25,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { recordUsage } from "@/lib/ai/usage";
+import { CAD_CHARGE_TIER } from "@/lib/credits/cad-cost";
+import { setCadCode } from "@/lib/credits/server";
 import { CAD_BUCKET } from "@/lib/design/constants";
 import { validatedCall } from "@/lib/prototyping/ai-call";
 import { CADQUERY_SCHEMA, CADQUERY_SYSTEM, cadQueryPrompt } from "./prompt";
@@ -51,8 +57,6 @@ type Ctx = {
   locale: "en" | "ar";
   minWallMm: number;
   boards: Footprint[];
-  /** The request's x-vercel-oidc-token header (keyless Google auth); optional. */
-  oidcToken?: string | null;
 };
 
 export type CloudReply =
@@ -81,29 +85,35 @@ const fail = (supabase: SupabaseClient, id: string, error: string) =>
   );
 
 /** The admin's signal that the cloud worker was skipped: one ai_usage row (no new table). */
-export async function logCloudFallback(supabase: SupabaseClient, projectId: string, reason: string) {
+export async function logCloudFallback(supabase: SupabaseClient, projectId: string, reason: string, userId?: string) {
   console.warn(`[cad] cloud worker unavailable (${reason}); using the browser engine`);
-  const { error } = await supabase.rpc("log_ai_usage", {
-    p_provider: "cad-worker",
-    p_model: null,
-    p_project: projectId,
-    p_feature: "cad",
-    p_prompt_tokens: null,
-    p_completion_tokens: null,
-    p_total_tokens: null,
-    p_audio_seconds: null,
-    p_latency_ms: null,
-    p_outcome: "error",
-    p_error_code: `fallback_browser:${reason}`.slice(0, 60),
-    p_remaining_requests: null,
-    p_remaining_tokens: null,
-  });
-  if (error) console.warn(`[cad] fallback not recorded: ${error.message}`);
+  // Server-side logging (0101): service client + the session's verified user id.
+  await recordUsage(
+    supabase,
+    {
+      p_provider: "cad-worker",
+      p_model: null,
+      p_project: projectId,
+      p_feature: "cad",
+      p_prompt_tokens: null,
+      p_completion_tokens: null,
+      p_total_tokens: null,
+      p_audio_seconds: null,
+      p_latency_ms: null,
+      p_outcome: "error",
+      p_error_code: `fallback_browser:${reason}`.slice(0, 60),
+      p_remaining_requests: null,
+      p_remaining_tokens: null,
+    },
+    { p_step: null, p_cost_usd: null },
+    userId,
+  );
 }
 
 async function writeCode(ctx: Ctx, request: string, previous: Ctx["previous"], buildError: string | null) {
   return validatedCall<CqAnswer>({
     supabase: ctx.supabase,
+    userId: ctx.userId,
     projectId: ctx.projectId,
     feature: "cad",
     system: CADQUERY_SYSTEM,
@@ -139,7 +149,8 @@ async function begin(ctx: Ctx, parentId: string | null): Promise<{ id: string } 
   const { data, error } = await ctx.supabase.rpc("cad_begin", {
     p_project: ctx.projectId,
     p_request: ctx.asked,
-    p_tier: ctx.tier,
+    // The charge is the published price; ctx.tier only describes the model (F-002).
+    p_tier: CAD_CHARGE_TIER,
     p_parent: parentId,
   });
   if (error) {
@@ -151,9 +162,9 @@ async function begin(ctx: Ctx, parentId: string | null): Promise<{ id: string } 
 }
 
 async function setCode(ctx: Ctx, id: string, code: string, model: string | null): Promise<boolean> {
-  const { error } = await ctx.supabase.rpc("cad_set_code", { p_id: id, p_scad: code, p_model: model });
-  if (error) console.error("[cad] cad_set_code failed:", error.message);
-  return !error;
+  const stored = await setCadCode(ctx.supabase, ctx.userId, id, code, model);
+  if (!stored.ok) console.error("[cad] cad_set_code_for failed:", stored.message);
+  return stored.ok;
 }
 
 /** Save the files, then deliver (spend). Files are removed again if delivery fails. */
@@ -224,8 +235,7 @@ export async function runCloudCad(ctx: Ctx): Promise<CloudReply> {
   }
   const code1 = first.value.code;
   const b1 = await buildWithRetry(
-    { code: code1, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) },
-    { oidcToken: ctx.oidcToken }
+    { code: code1, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) }
   );
   if (b1.kind === "down") {
     // No code stored: our own outage never counts against the caller's cap.
@@ -253,8 +263,7 @@ export async function runCloudCad(ctx: Ctx): Promise<CloudReply> {
     return { kind: "error", error: cloudFailureCode(b1), status: 502 };
   }
   let b2 = await buildWithRetry(
-    { code: second.value.code, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) },
-    { oidcToken: ctx.oidcToken }
+    { code: second.value.code, minWallMm: ctx.minWallMm, mustContainBox: mustContainBox(ctx.boards) }
   );
   if (b2.kind === "result" && !(await setCode(ctx, b.id, second.value.code, second.model))) {
     b2 = { kind: "result", result: { ...b2.result, ok: false, error: "not saved" } };

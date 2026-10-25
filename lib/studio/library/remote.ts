@@ -10,6 +10,7 @@ import { createPublicClient } from "@/lib/supabase/public";
 import type { LibraryPart } from "../schema";
 import { LIBRARY, makeLibrary, type StudioLibrary } from "./index";
 import { mergeLibrary, type MergeResult, type StudioPartRow } from "./merge";
+import { isMissingRelation } from "@/lib/supabase/errors";
 
 export const STUDIO_LIBRARY_TAG = "studio-library";
 export const STUDIO_LIBRARY_REVALIDATE = 300;
@@ -27,7 +28,7 @@ export const getStudioPartRows = unstable_cache(
         .limit(1000);
       if (error) {
         // 42P01 / PGRST205 = table not created yet (pre-0070): silent.
-        if (error.code !== "42P01" && error.code !== "PGRST205") {
+        if (!isMissingRelation(error)) {
           console.warn("[studio-library] read failed:", error.code, error.message);
         }
         return null;

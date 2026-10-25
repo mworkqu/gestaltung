@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { SheetImportForm } from "@/components/parts/sheet-import-form";
 import { SHEET_COLUMNS } from "@/lib/parts/sheet-import";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { asLocale } from "@/lib/locale";
 
 // "Store filling": import the catalog from a Google Sheet. super_admin only
 // (the parent dashboard/parts layout enforces it). The STORE catalog (`parts`)
@@ -18,6 +20,7 @@ export default async function StoreImportPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
 
   const t = await getTranslations("PartsDashboard");
@@ -56,7 +59,7 @@ export default async function StoreImportPage({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         {/* Import form */}
         <div className="neu space-y-6 p-6">
-          <SheetImportForm locale={locale === "ar" ? "ar" : "en"} defaultUrl={defaultUrl} />
+          <SheetImportForm locale={asLocale(locale)} defaultUrl={defaultUrl} />
         </div>
 
         {/* How-to + columns */}

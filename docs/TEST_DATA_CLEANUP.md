@@ -73,6 +73,24 @@ Guest cart of the demo guest (a66920e9…): already empty. No rows with is_test 
 
 - Guest project `17eee324-310d-4eed-b297-a72a1f9fab51` (Studio plant waterer, `record.mjs idea-to-kit-en`) and one guest cart line (soil moisture sensor, `store-to-door-en`). Nothing ordered; quote and drawing-request takes not submitted.
 
+## Live-site QA run (2026-10-22, `review/qa/REPORT.md` section 11)
+
+The QA tester walked the live site and left these rows. Nothing has been deleted; no SQL
+was run. The order is the only one that needs a status change rather than a delete.
+
+| Type | Identifier | Account / contact | Note |
+|---|---|---|---|
+| Order | `3a939b38-a527-4dc3-901b-c3f89806179f` (shown as #3a939b38) | techshack.orders@gmail.com, +974 3366 4265, name "TEST QA - please cancel" | COD, Lusail, Standard, QAR 56.00. **Cancel it** rather than deleting it, so the order history stays intact. |
+| Project | `719b2ec2-a300-4f6f-a7b8-ebcff6412d18` "TEST QA - Balcony Plant Waterer" | Account A | Idea text starts "TEST QA -". Used 1 wiring + 2 CAD credits. |
+| Get-it-made request | on project `719b2ec2-a300-4f6f-a7b8-ebcff6412d18` | Account A | Notes "TEST - please ignore. QA test request, no quote needed." Goes with the project. |
+| Guest project | `6cc3bf2f-98dd-48c6-9b3e-dca2e6829ce3` "Auto Desk Lamp" | guest | Idea starts "TEST QA -". |
+| Drawing request | `bc67437f-d774-47d8-a142-fab7ca944a4b` "TEST QA - حامل جداري (طلب رسم تجريبي)" | techshack.orders+qa-b@gmail.com, +974 3366 4265 | Sketch `test-sketch.png`, tier simple. |
+| Quote request | no reference was shown on screen; file `test-bracket.stl`, name "TEST QA - please ignore" | techshack.orders+qa-b@gmail.com | Method "Not sure". Find it by name or by the file name. |
+| Contact message | "TEST - please ignore. رسالة تجريبية..." (name "TEST QA - please ignore") | techshack.orders+qa-b@gmail.com | Saved through `/api/store-lead`. |
+
+The cart was emptied by the tester and no accounts were created, so there is nothing to do
+for either.
+
 ## Already deleted
 
 - Crash-repro project `6b5907f2-c957-43f9-bce8-42e73beeff33` "TEST crash repro — delete" (created 2026-10-09): already deleted by the owner. No action.

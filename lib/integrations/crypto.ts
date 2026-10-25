@@ -15,6 +15,7 @@
 // lib/integrations/crypto.test.ts. Server-only in practice (node:crypto).
 
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { asLocale } from "@/lib/locale";
 
 const VERSION = "v1";
 
@@ -72,7 +73,7 @@ const mac = (body: string, key: Buffer) => createHmac("sha256", stateKey(key)).u
 
 /** A fresh signed state for the given UI locale. */
 export function signState(locale: string, key: Buffer, now: number = Date.now()): string {
-  const payload: StatePayload = { n: b64u(randomBytes(16)), t: now, l: locale === "ar" ? "ar" : "en" };
+  const payload: StatePayload = { n: b64u(randomBytes(16)), t: now, l: asLocale(locale) };
   const body = b64u(Buffer.from(JSON.stringify(payload), "utf8"));
   return `${body}.${mac(body, key)}`;
 }

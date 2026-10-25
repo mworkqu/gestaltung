@@ -11,21 +11,12 @@ import { whatsappLink } from "@/lib/contact-phone";
 import { createClient } from "@/lib/supabase/server";
 import { getSchoolPricing } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
+import { isMissing } from "./missing";
 
 // Private: the teacher's own classes. The layout holds the auth gate and
 // force-dynamic.
 
 type ClassRow = { id: string; name: string; school_name: string; join_code: string; archived: boolean };
-
-type PgError = { code?: string; message?: string } | null;
-
-/** The relation or function does not exist yet (0096 not run). */
-function isMissing(e: PgError): boolean {
-  if (!e) return false;
-  const code = e.code ?? "";
-  if (code === "42P01" || code === "PGRST202" || code === "PGRST205" || code === "42883") return true;
-  return /could not find the (?:function|table)|does not exist/i.test(e.message ?? "");
-}
 
 export default async function SchoolClassesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

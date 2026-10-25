@@ -24,19 +24,11 @@ import { studioLibrary } from "@/lib/studio/library/remote";
 import { linkedPrices } from "@/lib/studio/server/quote";
 import { parseStudioDoc, type StudioDoc } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
+import { asLocale } from "@/lib/locale";
+import { isMissing } from "../missing";
 
 type ClassRow = { id: string; name: string; school_name: string; join_code: string; archived: boolean };
 type TeamRow = { id: string; team_name: string; project_id: string };
-
-type PgError = { code?: string; message?: string } | null;
-
-/** The relation or function does not exist yet (0096 not run). */
-function isMissing(e: PgError): boolean {
-  if (!e) return false;
-  const code = e.code ?? "";
-  if (code === "42P01" || code === "PGRST202" || code === "PGRST205" || code === "42883") return true;
-  return /could not find the (?:function|table)|does not exist/i.test(e.message ?? "");
-}
 
 const money = (n: number) => n.toFixed(2);
 
@@ -44,7 +36,7 @@ export default async function ClassPage({ params }: { params: Promise<{ locale: 
   const { locale, id } = await params;
   setRequestLocale(locale);
 
-  const lang = locale === "ar" ? "ar" : "en";
+  const lang = asLocale(locale);
   const isRtl = lang === "ar";
   const supabase = await createClient();
 

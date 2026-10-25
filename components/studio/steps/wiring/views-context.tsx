@@ -52,11 +52,6 @@ export function useWiringViews(): WiringViews {
   return v;
 }
 
-/** For components that may render outside the provider (e.g. the Code step's preview). */
-export function useOptionalWiringViews(): WiringViews | null {
-  return useContext(Ctx);
-}
-
 export function WiringViewsProvider({
   doc,
   getPart,

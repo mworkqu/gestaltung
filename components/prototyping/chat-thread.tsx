@@ -20,11 +20,14 @@ export function ChatMessages({
   msgs,
   busy,
   error,
+  captchaFailed = false,
 }: {
   msgs: ChatMsg[];
   busy: boolean;
   /** Shows the chat's failure line (Prototyping.chatFailed). */
   error: boolean;
+  /** The server refused the Turnstile check: shows Prototyping.chatCaptchaFailed instead. */
+  captchaFailed?: boolean;
 }) {
   const t = useTranslations("Prototyping");
   return (
@@ -48,7 +51,9 @@ export function ChatMessages({
           {t("chatThinking")}
         </p>
       )}
-      {error && <p className="text-[12px] font-medium text-destructive">{t("chatFailed")}</p>}
+      {error && (
+        <p className="text-[12px] font-medium text-destructive">{captchaFailed ? t("chatCaptchaFailed") : t("chatFailed")}</p>
+      )}
     </>
   );
 }
@@ -141,9 +146,12 @@ export function ChatConsent({
   const t = useTranslations("Prototyping");
   return (
     <div className="space-y-1">
-      <label className="flex items-start gap-2 text-[12px] leading-relaxed text-heading">
+      {/* F-032: an explicit id / for / aria-labelledby, so the box is named by its sentence, never by its value ("on"). */}
+      <label htmlFor={`${id}-box`} className="flex items-start gap-2 text-[12px] leading-relaxed text-heading">
         <input
+          id={`${id}-box`}
           type="checkbox"
+          aria-labelledby={`${id}-label`}
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
           disabled={disabled}

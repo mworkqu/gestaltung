@@ -9,6 +9,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Square, Volume2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { asLocale } from "@/lib/locale";
 
 export function ReadAloud({ text, className }: { text: string; className?: string }) {
   const t = useTranslations("Prototyping");
@@ -35,7 +36,7 @@ export function ReadAloud({ text, className }: { text: string; className?: strin
     synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = locale === "ar" ? "ar-SA" : "en-GB";
-    const voice = synth.getVoices().find((v) => v.lang.toLowerCase().startsWith(locale === "ar" ? "ar" : "en"));
+    const voice = synth.getVoices().find((v) => v.lang.toLowerCase().startsWith(asLocale(locale)));
     if (voice) u.voice = voice;
     u.rate = 0.95;
     u.onend = () => setSpeaking(false);

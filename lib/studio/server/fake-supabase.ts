@@ -16,6 +16,10 @@ export type FakeDb = {
   rpc: Record<string, (args: Record<string, unknown>) => RpcAnswer>;
   rpcCalls: { fn: string; args: Record<string, unknown> }[];
   uploads: { bucket: string; path: string; bytes: number }[];
+  /** A service-role client: RLS is not applied. */
+  bypassRls?: boolean;
+  /** Tables that do not exist yet (a migration not run): every query answers PGRST205. */
+  missingTables?: string[];
 };
 
 const isAdmin = (db: FakeDb) => {
@@ -24,8 +28,9 @@ const isAdmin = (db: FakeDb) => {
 };
 
 function visible(db: FakeDb, table: string, row: Row): boolean {
-  if (table !== "projects") return true;
-  return !!db.user && (row.user_id === db.user.id || isAdmin(db));
+  if (table !== "projects" || db.bypassRls) return true;
+  // `class_teacher` emulates projects_select_class_teacher (0096): read-only visibility.
+  return !!db.user && (row.user_id === db.user.id || isAdmin(db) || row.class_teacher === db.user.id);
 }
 
 function pickCols(row: Row, cols: string): Row {
@@ -98,6 +103,8 @@ class Query implements PromiseLike<{ data: unknown; error: unknown }> {
   }
 
   private run(): { data: unknown; error: unknown } {
+    if (this.db.missingTables?.includes(this.table))
+      return { data: null, error: { code: "PGRST205", message: `Could not find the table 'public.${this.table}' in the schema cache` } };
     const rows = (this.db.tables[this.table] ??= []);
     if (this.op === "insert" || this.op === "upsert") {
       for (const p of Array.isArray(this.payload) ? this.payload : [this.payload!]) {
@@ -133,6 +140,8 @@ export function fakeSupabase(init: Partial<FakeDb> & { tables?: Record<string, R
     rpc: init.rpc ?? {},
     rpcCalls: [],
     uploads: [],
+    bypassRls: init.bypassRls ?? false,
+    missingTables: init.missingTables ?? [],
   };
   const client = {
     auth: { getUser: async () => ({ data: { user: db.user }, error: null }) },

@@ -7,12 +7,13 @@
 // is false, i.e. today's behaviour: no class, no safety mode.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 type RpcError = { code?: string; message?: string } | null;
 
 /** The function does not exist yet (0096 not run). */
 const missing = (e: RpcError) =>
-  !!e && (e.code === "PGRST202" || e.code === "42883" || /could not find the function/i.test(e.message ?? ""));
+  !!e && (isMissingFunction(e) || /could not find the function/i.test(e.message ?? ""));
 
 let warned = false;
 

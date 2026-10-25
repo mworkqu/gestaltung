@@ -26,6 +26,7 @@ import type { Locale } from "./client/api";
 import { MECH_NAMES } from "./mech/names";
 import { groupComponents, withQuantity } from "./parts-group";
 import type { LibraryPart, MechTemplate, StudioDoc } from "./schema";
+import { round2 } from "@/lib/format/money";
 
 export const ESTIMATE_SPREAD = 1.5;
 export const PRINT_BASE_QAR = 100;
@@ -73,13 +74,12 @@ export function parseQuoteRule(value: unknown): QuoteRule {
 export function validateQuoteRule(value: Record<string, unknown>): { ok: true; rule: QuoteRule } | { ok: false; bad: (keyof QuoteRule)[] } {
   const bad = RULE_KEYS.filter((k) => inLimit(value[k], k) === null);
   if (bad.length) return { ok: false, bad };
-  const rule = Object.fromEntries(RULE_KEYS.map((k) => [k, money(inLimit(value[k], k)!)])) as QuoteRule;
+  const rule = Object.fromEntries(RULE_KEYS.map((k) => [k, round2(inLimit(value[k], k)!)])) as QuoteRule;
   return { ok: true, rule };
 }
 
 export type PriceEstimate = { low: number; high: number };
 
-const money = (n: number) => Math.round(n * 100) / 100;
 const positive = (n: number) => (Number.isFinite(n) && n > 0 ? n : 0);
 
 /** Printing price: base + rate per gram of material (owner rule: QAR 100 + QAR 0.7/g). */
@@ -143,6 +143,49 @@ export type QuoteBreakdown = {
 };
 
 /**
+ * The printed rows the estimate is priced from (F-004).
+ *
+ * `doc.printed` is what the Print step BUILT: one row per identical body with
+ * grams from the real mesh volume (lib/studio/weight.ts), including product
+ * bodies, which never appear in `doc.mech`. Only rows we could actually close
+ * are priced — a body we refused to export is not a file we can print.
+ *
+ * Older docs (saved before the Print step stored that list) fall back to
+ * `doc.mech`, whose estGrams now comes from the same one function.
+ */
+export function printedRows(doc: StudioDoc | null, rule: QuoteRule = DEFAULT_QUOTE_RULE): BreakdownPrinted[] {
+  const priced = (template: string, name: string, name_ar: string, material: string, count: number, gramsRaw: number): BreakdownPrinted => {
+    const grams = Math.round(positive(gramsRaw));
+    return { template, name, name_ar, material, count, grams, cost_qar: round2(grams * rule.per_gram_qar) };
+  };
+
+  const built = doc?.printed;
+  if (built) {
+    return built.rows
+      .filter((r) => r.printable)
+      .map((r) => priced(r.key, r.name.en, r.name.ar, r.material, r.count, r.grams));
+  }
+
+  const rows = new Map<string, { template: string; material: string; count: number; grams: number }>();
+  for (const m of doc?.mech ?? []) {
+    const key = `${m.template}:${m.printable.material}`;
+    const row = rows.get(key);
+    if (row) {
+      row.count += 1;
+      row.grams += m.printable.estGrams;
+    } else rows.set(key, { template: m.template, material: m.printable.material, count: 1, grams: m.printable.estGrams });
+  }
+  const FIRST = ["base", "lid"];
+  const rank = (r: { template: string }) => (FIRST.includes(r.template) ? FIRST.indexOf(r.template) : FIRST.length);
+  return [...rows.values()]
+    .sort((a, b) => rank(a) - rank(b))
+    .map((r) => {
+      const names = MECH_NAMES[r.template as MechTemplate];
+      return priced(r.template, names?.en ?? r.template, names?.ar ?? r.template, r.material, r.count, r.grams);
+    });
+}
+
+/**
  * The single price calculation. `prices` maps a store SKU to its listed QAR
  * price (published products only). A part counts as priced when its FIRST
  * linked SKU has a price.
@@ -172,42 +215,17 @@ export function quoteBreakdown({
       name: lib?.name.en ?? c.label,
       name_ar: lib?.name.ar ?? c.label,
       sku: priced ? sku : null,
-      price_qar: priced ? money(price) : null,
+      price_qar: priced ? round2(price) : null,
       quantity: g.quantity,
     });
   }
 
-  const rows = new Map<string, { template: string; material: string; count: number; grams: number }>();
-  for (const m of doc?.mech ?? []) {
-    const key = `${m.template}:${m.printable.material}`;
-    const row = rows.get(key);
-    if (row) {
-      row.count += 1;
-      row.grams += m.printable.estGrams;
-    } else rows.set(key, { template: m.template, material: m.printable.material, count: 1, grams: m.printable.estGrams });
-  }
-  const FIRST = ["base", "lid"];
-  const rank = (r: { template: string }) => (FIRST.includes(r.template) ? FIRST.indexOf(r.template) : FIRST.length);
-  const printed = [...rows.values()]
-    .sort((a, b) => rank(a) - rank(b))
-    .map((r): BreakdownPrinted => {
-      const grams = Math.round(positive(r.grams));
-      const names = MECH_NAMES[r.template as MechTemplate];
-      return {
-        template: r.template,
-        name: names?.en ?? r.template,
-        name_ar: names?.ar ?? r.template,
-        material: r.material,
-        count: r.count,
-        grams,
-        cost_qar: money(grams * rule.per_gram_qar),
-      };
-    });
+  const printed = printedRows(doc, rule);
   const printedGrams = printed.reduce((g, r) => g + r.grams, 0);
-  const gramsQar = money(printedGrams * rule.per_gram_qar);
-  const printQar = money(rule.base_qar + gramsQar);
-  partsQar = money(partsQar);
-  const subtotalQar = money(printQar + partsQar);
+  const gramsQar = round2(printedGrams * rule.per_gram_qar);
+  const printQar = round2(rule.base_qar + gramsQar);
+  partsQar = round2(partsQar);
+  const subtotalQar = round2(printQar + partsQar);
   return {
     rule,
     printed,
@@ -302,7 +320,7 @@ export function parseQuoteCalc(value: unknown): QuoteCalc | null {
         material: str(r.material) ?? "",
         count: num(r.count) ?? 1,
         grams,
-        cost_qar: num(r.cost_qar) ?? money(grams * rate),
+        cost_qar: num(r.cost_qar) ?? round2(grams * rate),
       },
     ];
   });
@@ -345,7 +363,7 @@ export function parseQuoteCalc(value: unknown): QuoteCalc | null {
 /** The owner's quote against the estimate: QAR difference and % of the midpoint (null when no estimate). */
 export function quoteDifference(finalQar: number, calc: Pick<QuoteCalc, "midpoint">): { qar: number; pct: number } | null {
   if (!Number.isFinite(finalQar) || calc.midpoint === null || !(calc.midpoint > 0)) return null;
-  const qar = money(finalQar - calc.midpoint);
+  const qar = round2(finalQar - calc.midpoint);
   return { qar, pct: Math.round((qar / calc.midpoint) * 1000) / 10 };
 }
 
@@ -358,14 +376,18 @@ export function parseFinalQuote(raw: unknown): number | null {
     .trim();
   if (!/^\d+(\.\d+)?$/.test(s)) return null;
   const n = Number(s);
-  return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? money(n) : null;
+  return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? round2(n) : null;
 }
 
 // ── The client page summary ────────────────────────────────────────────────
 
 /** `name` already carries the quantity ("MG996R servo × 3"). */
 export type SummaryPart = { id: string; name: string; priced: boolean; quantity: number };
-export type SummaryPrinted = { template: string; material: string; count: number; grams: number };
+/**
+ * `name` / `name_ar` carry the plain name the Print step built (a product body
+ * is not a mech template, so the page can no longer name it from `template`).
+ */
+export type SummaryPrinted = { template: string; name: string; name_ar: string; material: string; count: number; grams: number };
 
 export type RequestSummary = {
   name: string;
@@ -406,7 +428,7 @@ export function requestSummary({
       priced: c.price_qar !== null,
       quantity: c.quantity,
     })),
-    printed: b.printed.map((r) => ({ template: r.template, material: r.material, count: r.count, grams: r.grams })),
+    printed: b.printed.map((r) => ({ template: r.template, name: r.name, name_ar: r.name_ar, material: r.material, count: r.count, grams: r.grams })),
     printedGrams: b.printedGrams,
     enclosure: e ? { template: e.template, colour: e.colour, finish: e.finish } : null,
     partsQar: b.partsQar,

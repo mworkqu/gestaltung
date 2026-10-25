@@ -67,3 +67,26 @@ export function powerBudget(doc: StudioDoc, getPart: GetPart): PowerBudget {
   }
   return { drawMA: Math.round(draw), supplyMA: supply > 0 ? supply : null, ok: supply > 0 ? draw <= supply : null };
 }
+
+// ── Engineering jobs (admin queue) ───────────────────────────────────────────
+
+/** Job statuses still being worked on; only these have a due time. */
+export const OPEN_JOB_STATUSES: readonly string[] = ["queued", "in_progress"];
+
+/** Open jobs whose ETA has passed (rows come from an open-status query). */
+export function countOverdueJobs(rows: readonly { eta_at: string | null }[], now: number): number {
+  return rows.filter((r) => r.eta_at && new Date(r.eta_at).getTime() < now).length;
+}
+
+export type JobDue = { late: boolean; hours: number; minutes: number };
+
+/**
+ * Time to an open job's ETA in whole minutes (rounded), split into hours and
+ * minutes; `late` once it has passed. null when the job has no ETA or is not open.
+ */
+export function jobDue(job: { eta_at: string | null; status: string }, now: number): JobDue | null {
+  if (!job.eta_at || !OPEN_JOB_STATUSES.includes(job.status)) return null;
+  const mins = Math.round((new Date(job.eta_at).getTime() - now) / 60000);
+  const abs = Math.abs(mins);
+  return { late: mins < 0, hours: Math.floor(abs / 60), minutes: abs % 60 };
+}

@@ -6,6 +6,7 @@ import { renderLeadEmail } from "@/lib/email/lead-email";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { CAD_BUCKET } from "@/lib/design/constants";
+import { ProjectCadBody, projectCadRate } from "@/lib/projects/route-bodies";
 
 // Notifies the owner that a CAD file has been attached to a project, so it can
 // be quoted by hand. There is no method detection and no workshop dispatch —
@@ -16,28 +17,21 @@ import { CAD_BUCKET } from "@/lib/design/constants";
 // Best-effort, like /api/store-lead and /api/design-quote: it reports success
 // if EITHER the row saved or the email sent, so a missing key never loses a
 // request.
+//
+// The body is zod-parsed with the same cuts as before (AI-10), and each user
+// may notify at most 5 times per 10 minutes (AI-11): 429 with Retry-After.
 
 const SIGNED_URL_TTL = 60 * 60 * 24 * 7; // 7 days
 
-export async function POST(request: Request) {
-  let body: {
-    project_id?: string;
-    storage_path?: string;
-    file_name?: string;
-    file_size?: number;
-    locale?: string;
-  };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
-  }
+/** The lead's name / email, within the inquiries length limits (0103: name 120, email 160). */
+function leadContact(email: string | undefined) {
+  return { name: (email ?? "Project owner").slice(0, 120), email: email ? email.slice(0, 160) : null };
+}
 
-  const projectId = String(body.project_id ?? "").trim();
-  const storagePath = String(body.storage_path ?? "").trim().slice(0, 400);
-  const fileName = String(body.file_name ?? "").trim().slice(0, 200);
-  const fileSize = Number(body.file_size) || 0;
-  const locale = body.locale === "ar" ? "ar" : "en";
+export async function POST(request: Request) {
+  const parsed = ProjectCadBody.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  const { projectId, storagePath, fileName, fileSize, locale } = parsed.data;
 
   if (!projectId || !storagePath || !fileName) {
     return NextResponse.json({ error: "missing_fields" }, { status: 422 });
@@ -53,6 +47,14 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  }
+
+  const rate = projectCadRate.hit(user.id);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
+    );
   }
 
   const { data: project } = await supabase
@@ -102,9 +104,8 @@ export async function POST(request: Request) {
 
   try {
     const { error } = await supabase.from("inquiries").insert({
-      name: user.email ?? "Project owner",
+      ...leadContact(user.email),
       phone: "",
-      email: user.email ?? null,
       message,
       locale,
       status: "new",

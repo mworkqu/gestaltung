@@ -2,8 +2,10 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { RestockDashboard, type SummaryExtras } from "@/components/admin/restock-dashboard";
-import { cleanWeights, demandScore, estimatedUnits, type RestockRow, type SignalCounts } from "@/lib/store/restock";
+import { cleanWeights, demandScore, estimatedRevenue, estimatedUnits, type RestockRow, type SignalCounts } from "@/lib/store/restock";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { readPartsAdmin } from "@/lib/store/part-columns";
 
 // Restock dashboard (Task 20): what to order next, ranked by open demand.
 // super_admin only (store layout).
@@ -14,6 +16,7 @@ type SummaryProduct = { part_id: string; views: number; carts: number; requests:
 
 export default async function RestockPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("Restock");
   const isRtl = locale === "ar";
@@ -49,10 +52,12 @@ export default async function RestockPage({ params }: { params: Promise<{ locale
     preferred_offer_id: string | null;
   }[] = [];
   for (let i = 0; i < ids.length; i += 200) {
-    const { data } = await supabase
-      .from("parts")
-      .select("id, sku, name, unit_price, landed_cost_qar, expected_income_qar, income_pct, lead_time_class, preferred_offer_id")
-      .in("id", ids.slice(i, i + 200));
+    const { data } = await readPartsAdmin((t) =>
+      supabase
+        .from(t)
+        .select("id, sku, name, unit_price, landed_cost_qar, expected_income_qar, income_pct, lead_time_class, preferred_offer_id")
+        .in("id", ids.slice(i, i + 200))
+    );
     parts.push(...((data ?? []) as typeof parts));
   }
   const offerIds = parts.map((p) => p.preferred_offer_id).filter((x): x is string => !!x);
@@ -88,7 +93,7 @@ export default async function RestockPage({ params }: { params: Promise<{ locale
         supplierUrl: (o?.supplier_url as string | null) ?? null,
         moq: Number(o?.moq ?? 1),
         units,
-        estRevenue: Math.round(units * Number(p.unit_price) * 100) / 100,
+        estRevenue: estimatedRevenue(units, Number(p.unit_price)),
       } satisfies RestockRow;
     })
     .filter((r): r is RestockRow => !!r)

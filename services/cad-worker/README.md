@@ -57,7 +57,16 @@ It may import only `cadquery`, `math` and `cadhelpers` (`app/cadhelpers.py`:
 
 ## Sandbox (the code is AI-written)
 
-1. **Static check** (`app/sandbox.py`, pure, unit-tested): source ≤ 20 KB and
+The security boundary is the runtime: the child process, its resource limits,
+the network block, Cloud Run's gVisor sandbox, a service account with no
+roles, and `--no-allow-unauthenticated` / `CAD_WORKER_TOKEN` (layers 2–6 and
+the paragraph below the list). The static check (layer 1) is a denylist
+filter, not a boundary: it rejects code that reaches for files, processes or
+interpreter internals so most bad output fails early with a clear reason, but
+it cannot prove code safe and must never be the only thing between model code
+and anything that matters.
+
+1. **Static check** (`app/sandbox.py`, pure, unit-tested; a filter): source ≤ 20 KB and
    ≤ 8,000 AST nodes; imports only `cadquery` / `math` / `cadhelpers` (no
    submodules, no `*`, no relative); no `exec eval compile open input
    __import__ globals locals vars getattr setattr delattr breakpoint type
@@ -67,7 +76,11 @@ It may import only `cadquery`, `math` and `cadhelpers` (`app/cadhelpers.py`:
    `_x` attributes; no frame/code attributes (`f_*`, `gi_*`, `tb_*`, `co_*` ...);
    no cadquery file I/O or code runner (`export*`, `import*`, `save`,
    `exporters`, `importers`, `cqgi`, `occ_impl`, `OCP`); no `.format` (it reads
-   attributes by name); no classes, `with`, `global`, async. Must assign `result`.
+   attributes by name); no file-reading attributes reachable through cadquery's
+   dependencies (`parse_file`/`parseFile`, `read*`, `write*`, `load(s)`,
+   `fromfile`, `tofile`, `loadtxt`, `genfromtxt`); `match` class-pattern keyword
+   names and mapping-pattern keys get the attribute rules (they are attribute
+   reads by name); no classes, `with`, `global`, async. Must assign `result`.
    Lambdas are allowed.
 2. **Child process** (`app/executor.py` → `python -I app/runner.py`): fresh
    temp working dir (always deleted), minimal environment (no secrets, no
@@ -82,7 +95,7 @@ It may import only `cadquery`, `math` and `cadhelpers` (`app/cadhelpers.py`:
    hook that returns only the three allowed modules.
 6. **Files are written by the runner**, never by model code (cadquery exporters).
 
-True isolation comes from Cloud Run's gVisor sandbox plus these layers. Run
+True isolation comes from Cloud Run's gVisor sandbox plus layers 2–6. Run
 the service with a dedicated service account that has **no roles** (so the
 metadata server hands out a useless token), `--no-allow-unauthenticated` or
 `CAD_WORKER_TOKEN`, and `--concurrency` equal to `CAD_MAX_CONCURRENT_BUILDS`.

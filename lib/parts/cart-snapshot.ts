@@ -6,10 +6,11 @@
 // Pure helpers over a Storage-like object, so the rules are unit-tested.
 
 import type { CartItem } from "@/lib/supabase/types";
+import { DAY_MS } from "@/lib/format/date";
 
 export const CART_SNAPSHOT_KEY = "gestaltung:cart-snapshot:v1";
 /** Older than this is not worth showing, even as a placeholder. */
-export const CART_SNAPSHOT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const CART_SNAPSHOT_MAX_AGE_MS = 7 * DAY_MS;
 
 export type CartSnapshot = {
   userId: string;

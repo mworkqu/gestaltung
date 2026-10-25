@@ -6,7 +6,7 @@ import { useRouter as useNextRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
-import { useRouter } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { authAltHref, returnsToProject } from "@/lib/auth/next-path";
 import { createClient } from "@/lib/supabase/client";
 import { isGuest } from "@/lib/supabase/guest";
@@ -15,9 +15,15 @@ import { AuthShell, authFieldClass } from "@/components/auth/auth-shell";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { PhoneInput } from "@/components/phone-input";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { cn } from "@/lib/utils";
 import { SocialSignIn } from "@/components/auth/social-sign-in";
 import type { OAuthProvider } from "@/lib/auth/providers";
+
+// `{{ .RedirectTo }}` for the confirm-signup and change-email templates: our
+// own locale page, never Supabase's single-use verify URL. The page there
+// verifies nothing until its button is pressed (docs/AUTH_EMAILS.md).
+const confirmEmailUrl = (locale: string) => `${window.location.origin}/${locale}/confirm-email`;
 
 // turnstileEnabled (P2-08): the store_settings switch from the server page.
 // Off (default) = no widget and the exact same signUp call as before. The guest
@@ -70,6 +76,7 @@ export function SignUpForm({
 
     const supabase = createClient();
     const metadata = { full_name: fullName, phone, locale };
+    const emailRedirectTo = confirmEmailUrl(locale);
 
     // If they got here as a guest, UPGRADE that anonymous user instead of
     // creating a second one. updateUser keeps the same auth.uid(), so the
@@ -82,11 +89,7 @@ export function SignUpForm({
     let hasSession = false;
 
     if (isGuest(existing)) {
-      const { error: linkError } = await supabase.auth.updateUser({
-        email,
-        password,
-        data: metadata,
-      });
+      const { error: linkError } = await supabase.auth.updateUser({ email, password, data: metadata }, { emailRedirectTo });
       if (linkError) {
         setError(linkError.message);
         setLoading(false);
@@ -106,7 +109,7 @@ export function SignUpForm({
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: captcha ? { data: metadata, captchaToken: captcha } : { data: metadata },
+        options: { data: metadata, emailRedirectTo, ...(captcha ? { captchaToken: captcha } : {}) },
       });
       // The token is single-use: get a fresh one for any next attempt.
       if (captcha) setCaptchaReset((k) => k + 1);
@@ -237,7 +240,7 @@ export function SignUpForm({
             name="password"
             type="password"
             required
-            minLength={6}
+            minLength={MIN_PASSWORD_LENGTH}
             autoComplete="new-password"
             placeholder={t("passwordPlaceholder")}
             className={authFieldClass}
@@ -259,6 +262,20 @@ export function SignUpForm({
           {loading && <Loader2 className="animate-spin" />}
           {t("signUpSubmit")}
         </Button>
+        <p className="text-center text-xs leading-relaxed text-mutedtext">
+          {t.rich("signUpTerms", {
+            terms: (chunks) => (
+              <Link href="/terms" className="font-semibold underline underline-offset-2 hover:text-cobalt">
+                {chunks}
+              </Link>
+            ),
+            privacy: (chunks) => (
+              <Link href="/privacy" className="font-semibold underline underline-offset-2 hover:text-cobalt">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
       </form>
     </AuthShell>
   );

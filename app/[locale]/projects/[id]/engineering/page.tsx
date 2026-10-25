@@ -20,6 +20,8 @@ import { tierOf } from "@/lib/studio/tiers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
 
 // Engineering view (owner, 2026-10-18): the whole project as an engineer reads
 // it: parts, connections, power, checks; and for Engineers-level projects the
@@ -27,8 +29,6 @@ import { cn } from "@/lib/utils";
 // file request. Read under the visitor's own session (RLS), guests included.
 
 export const dynamic = "force-dynamic";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -58,7 +58,7 @@ export default async function EngineeringPage({ params }: { params: Promise<{ lo
   const isRtl = locale === "ar";
   const lang: "en" | "ar" = isRtl ? "ar" : "en";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const when = new Intl.DateTimeFormat(isRtl ? "ar-QA-u-nu-latn" : "en-GB", {
+  const when = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "numeric",
     month: "short",
     hour: "2-digit",
@@ -70,7 +70,7 @@ export default async function EngineeringPage({ params }: { params: Promise<{ lo
   const supabase = await createClient();
   type ProjectRow = { name: string | null; studio: unknown };
   let project: ProjectRow | null = null;
-  if (user && UUID.test(id)) {
+  if (user && UUID_RE.test(id)) {
     const { data } = await supabase.from("projects").select("name, studio").eq("id", id).maybeSingle();
     project = (data as ProjectRow | null) ?? null;
   }

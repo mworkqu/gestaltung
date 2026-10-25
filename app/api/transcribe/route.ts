@@ -1,6 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { logUsage, quota } from "@/lib/ai/usage";
+import { rateLimited, routeRate, transcribeLimiters } from "@/lib/prototyping/ai-route-guard";
 import { MAX_AUDIO_BYTES, WHISPER_LANGUAGES, type TranscribeError } from "@/lib/prototyping/voice";
+import { clientIp } from "@/lib/rate-limit";
+import { readTurnstileToken } from "@/lib/turnstile";
+import { checkTurnstile } from "@/lib/turnstile-server";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // Voice note → text, for the brief editor only.
 //
@@ -15,12 +20,20 @@ import { MAX_AUDIO_BYTES, WHISPER_LANGUAGES, type TranscribeError } from "@/lib/
 // Metered (lib/ai): every call is logged to ai_usage with the audio length
 // and Groq's x-ratelimit-remaining-* headers, and the daily guard stops calls
 // at the configured share of the free allowance.
+//
+// Guests pass Turnstile while the store_settings switch is on (token in the
+// x-turnstile-token header or the cf-turnstile-response form field), and every
+// caller has a per-user (guests: also per-IP) rate limit (AI-09). Groq gets
+// GROQ_TIMEOUT_MS, inside maxDuration (AI-14).
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const GROQ_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 // large-v3 rather than turbo: noticeably better on Arabic, still free.
 const MODEL = process.env.GROQ_WHISPER_MODEL?.trim() || "whisper-large-v3";
+// Upstream budget for one transcription; leaves room for metering inside maxDuration.
+const GROQ_TIMEOUT_MS = 45_000;
 
 const fail = (error: TranscribeError, status: number) => Response.json({ error }, { status });
 
@@ -37,6 +50,17 @@ export async function POST(request: Request) {
   if (!key) return fail("not_configured", 503);
 
   const form = await request.formData().catch(() => null);
+  if (user.is_anonymous) {
+    const token = readTurnstileToken(request.headers) ?? readTurnstileToken(form);
+    if (!(await checkTurnstile(request, token)).ok) return jsonError("captcha_failed", 403);
+  }
+  const rate = routeRate(transcribeLimiters, {
+    userId: user.id,
+    anonymous: user.is_anonymous === true,
+    ip: clientIp(request.headers),
+  });
+  if (!rate.allowed) return rateLimited(rate.retryAfterSec);
+
   const audio = form?.get("audio");
   if (!(audio instanceof File) || audio.size === 0) return fail("empty", 400);
   if (audio.size > MAX_AUDIO_BYTES) return fail("too_large", 413);
@@ -48,7 +72,7 @@ export async function POST(request: Request) {
   const projectId = /^[0-9a-f-]{36}$/i.test(projectRaw) ? projectRaw : null;
 
   if ((await quota(supabase, "groq")).paused) {
-    await logUsage(supabase, { provider: "groq", model: MODEL, projectId, feature: "transcribe", outcome: "blocked", errorCode: "paused" });
+    await logUsage(supabase, { userId: user.id, provider: "groq", model: MODEL, projectId, feature: "transcribe", outcome: "blocked", errorCode: "paused" });
     return fail("paused", 429);
   }
   const upstream = new FormData();
@@ -65,7 +89,7 @@ export async function POST(request: Request) {
       const v = res?.headers.get(name);
       return v != null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : null;
     };
-    return logUsage(supabase, {
+    return logUsage(supabase, { userId: user.id,
       provider: "groq",
       model: MODEL,
       projectId,
@@ -84,7 +108,8 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { authorization: `Bearer ${key}` },
       body: upstream,
-      signal: request.signal,
+      // The browser's cancel still stops Groq; so does our own time budget.
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(GROQ_TIMEOUT_MS)]),
     });
     if (res.status === 429) {
       await meter(res, "error", "rate_limited");
@@ -100,11 +125,12 @@ export async function POST(request: Request) {
     const seconds = typeof data.duration === "number" ? Math.round(data.duration * 100) / 100 : undefined;
     await meter(res, "ok", null, seconds);
     if (!text) return fail("empty", 422);
-    return Response.json({ text });
+    return jsonOk({ text });
   } catch (e) {
     if (request.signal.aborted) return new Response(null, { status: 499 });
-    console.warn("[transcribe] request failed:", e);
-    await meter(null, "error", "network");
+    const timedOut = e instanceof Error && e.name === "TimeoutError";
+    console.warn("[transcribe] request failed:", timedOut ? "timed out" : e);
+    await meter(null, "error", timedOut ? "timeout" : "network");
     return fail("failed", 502);
   }
 }

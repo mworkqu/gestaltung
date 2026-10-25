@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowLeft, Mail, MessageCircle } from "lucide-react";
 
@@ -9,7 +9,6 @@ import { Link } from "@/i18n/navigation";
 import { leadKind, leadProjectId } from "@/lib/admin/lead-kind";
 import { REWARDS_DEFAULT } from "@/lib/credits/cad-cost";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
-import { getSessionContext } from "@/lib/auth/get-session";
 import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
 import { parseQuoteCalc } from "@/lib/studio/request-summary";
 import { projectPreviewUrl } from "@/lib/studio/server/preview-url";
@@ -17,6 +16,9 @@ import { createClient } from "@/lib/supabase/server";
 import type { Inquiry } from "@/lib/supabase/types";
 
 import { rewardPrint, saveLeadQuote } from "../actions";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
 
 // W2b (2026-10-11): one enquiry in full. For a Studio "Get it made" request:
 // "How we calculated" (the snapshot stored with the lead) and "Your quote
@@ -25,8 +27,6 @@ import { rewardPrint, saveLeadQuote } from "../actions";
 // lead still shows, with "Run migration 0073 first".
 
 export const dynamic = "force-dynamic";
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function LeadDetailPage({
   params,
@@ -38,11 +38,9 @@ export default async function LeadDetailPage({
   const { locale, id } = await params;
   const { reward } = await searchParams;
   setRequestLocale(locale);
-  if (!UUID.test(id)) notFound();
+  if (!UUID_RE.test(id)) notFound();
 
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
 
   const supabase = await createClient();
   const { data } = await supabase.from("inquiries").select("*").eq("id", id).maybeSingle();
@@ -63,7 +61,7 @@ export default async function LeadDetailPage({
   const isPrint = (lead.message ?? "").toLowerCase().startsWith("print request:");
   const rewardProject = lead.project_id ?? leadProjectId(lead.message);
   const tr = await getTranslations("PrintReward");
-  const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+  const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), { dateStyle: "medium", timeStyle: "short" });
 
   return (
     <div className="space-y-6" data-testid="lead-detail">

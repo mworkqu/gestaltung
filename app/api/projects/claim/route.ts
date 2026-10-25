@@ -4,6 +4,8 @@ import { sendEmail } from "@/lib/email";
 import { projectLinkEmail } from "@/lib/projects/link-email";
 import { isUuid, projectLinkUrl, siteUrlFor } from "@/lib/projects/recovery";
 import { createClient } from "@/lib/supabase/server";
+import { asLocale } from "@/lib/locale";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
 // D6: open an emailed project link (/{locale}/projects/{id}#key={key}) in
 // another browser. The page makes sure there is a session (a guest gets an
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
   } | null;
   const projectId = isUuid(body?.projectId) ? (body?.projectId as string) : null;
   const key = isUuid(body?.key) ? (body?.key as string) : null;
-  const locale = body?.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(body?.locale);
   if (!projectId || !key) return NextResponse.json({ ok: false, reason: "invalid" }, { status: 400 });
 
   const supabase = await createClient();
@@ -34,7 +36,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase.rpc("claim_project", { p_project: projectId, p_token: key });
   if (error) {
-    const missing = error.code === "PGRST202" || error.code === "42883";
+    const missing = isMissingFunction(error);
     if (!missing) console.error("[claim] claim_project failed", error);
     return NextResponse.json({ ok: false, reason: missing ? "not_ready" : "error" });
   }

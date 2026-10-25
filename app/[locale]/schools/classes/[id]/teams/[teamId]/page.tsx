@@ -15,19 +15,11 @@ import { studioLibrary } from "@/lib/studio/library/remote";
 import { linkedPrices } from "@/lib/studio/server/quote";
 import { parseStudioDoc, type StudioDoc } from "@/lib/studio/schema";
 import { cn } from "@/lib/utils";
+import { asLocale } from "@/lib/locale";
+import { isMissing } from "../../../missing";
 
 type TeamRow = { id: string; class_id: string; team_name: string; project_id: string };
 type CommentRow = { id: string; body: string; created_at: string };
-
-type PgError = { code?: string; message?: string } | null;
-
-/** The relation or function does not exist yet (0096 not run). */
-function isMissing(e: PgError): boolean {
-  if (!e) return false;
-  const code = e.code ?? "";
-  if (code === "42P01" || code === "PGRST202" || code === "PGRST205" || code === "42883") return true;
-  return /could not find the (?:function|table)|does not exist/i.test(e.message ?? "");
-}
 
 export default async function ClassTeamPage({
   params,
@@ -37,7 +29,7 @@ export default async function ClassTeamPage({
   const { locale, id, teamId } = await params;
   setRequestLocale(locale);
 
-  const lang = locale === "ar" ? "ar" : "en";
+  const lang = asLocale(locale);
   const isRtl = lang === "ar";
   const supabase = await createClient();
 

@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { leadsDashboardUrl, renderOwnerEmail } from "@/lib/email/lead-email";
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+import { readTurnstileToken } from "@/lib/turnstile";
+import { checkTurnstile } from "@/lib/turnstile-server";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // Demand signals (Task 18b): view, add_to_cart, request, zero_search.
 // Written through public.record_demand() (SECURITY DEFINER; stamps the
@@ -12,10 +16,32 @@ export const dynamic = "force-dynamic";
 const KINDS = new Set(["view", "add_to_cart", "request", "zero_search"]);
 const UUID = /^[0-9a-f-]{36}$/i;
 
+// Per-IP brakes (API-03), per server instance. The product "view" beacon fires
+// on every product page, so the beacon limit is generous (a shared campus or
+// office IP must not trip it); "request" emails the owner, so it is tight.
+const beaconRate = createRateLimiter({ limit: 300, windowMs: 10 * 60 * 1000 });
+const requestRate = createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
+
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const kind = typeof body?.kind === "string" ? body.kind : "";
   if (!KINDS.has(kind)) return new Response(null, { status: 400 });
+
+  const limit = (kind === "request" ? requestRate : beaconRate).hit(clientIp(request.headers));
+  if (!limit.allowed) {
+    return new Response(null, { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } });
+  }
+
+  // Cloudflare Turnstile (P2-08) on the branch that emails the owner. Switch
+  // off or a key missing → not checked (today's behaviour). Token from the
+  // x-turnstile-token header or body.turnstileToken. The beacons are never
+  // challenged.
+  if (kind === "request") {
+    const token = readTurnstileToken(request.headers) ?? readTurnstileToken(body);
+    if (!(await checkTurnstile(request, token)).ok) {
+      return jsonError("captcha_failed", 403);
+    }
+  }
 
   const str = (k: string, max: number) => (typeof body?.[k] === "string" ? (body[k] as string).slice(0, max) : null);
   const partId = str("partId", 36);
@@ -32,7 +58,7 @@ export async function POST(request: Request) {
   if (kind === "request" && !partId) {
     const item = str("searchTerm", 200)?.trim() ?? "";
     const email = str("email", 200)?.trim() ?? "";
-    if (!item || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return Response.json({ error: "email" }, { status: 400 });
+    if (!item || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return jsonError("email", 400);
     const { error: recErr } = await supabase.rpc("record_demand", {
       p_kind: "zero_search",
       p_source_page: str("sourcePage", 300),
@@ -56,8 +82,8 @@ export async function POST(request: Request) {
       html: mail.html,
       text: mail.text,
     });
-    if (!emailed && recErr) return Response.json({ error: "failed" }, { status: 500 });
-    return Response.json({ ok: true, emailed });
+    if (!emailed && recErr) return jsonError("failed", 500);
+    return jsonOk({ ok: true, emailed });
   }
   const { error } = await supabase.rpc("record_demand", {
     p_kind: kind,
@@ -70,7 +96,7 @@ export async function POST(request: Request) {
   });
   if (error) {
     const bad = error.message.includes("email required");
-    return Response.json({ error: bad ? "email" : "failed" }, { status: bad ? 400 : 500 });
+    return jsonError(bad ? "email" : "failed", bad ? 400 : 500);
   }
 
   if (kind === "request" && partId) {
@@ -96,5 +122,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return Response.json({ ok: true });
+  return jsonOk({ ok: true });
 }

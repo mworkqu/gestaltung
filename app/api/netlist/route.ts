@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { buildElectronics } from "@/lib/prototyping/electronics-build";
-import { canUse, spend } from "@/lib/credits/server";
+import { canUse, serverWritesReady, spend, spendRefusal, undoUnpaidCircuit } from "@/lib/credits/server";
+import { asLocale } from "@/lib/locale";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // POST /api/netlist — redraw the circuit for the electronics lines already in
 // the bill of materials, then re-derive the rule lines (passives, level
@@ -16,6 +18,10 @@ import { canUse, spend } from "@/lib/credits/server";
 // are sent to sign in; every circuit costs 1 wiring credit, the first one on a
 // project too (owner, 2026-10-09, 0052) — charged only after a circuit was saved.
 // Without a credit the answer is 402 no_credits (the UI shows AccessNote).
+// AI-05: no service key (spend_credit_for cannot run) → 503 unavailable BEFORE
+// the model call, unless the caller is admin (never charged). If the spend
+// fails after the build, the circuit is NOT returned and the project's bom +
+// netlist are put back as they were (spendRefusal: 401 / 402 / 404 / 503).
 //
 // Test hook (never active in production): NETLIST_TEST_BREAK=1 points one
 // connection at a component that does not exist, on every attempt.
@@ -33,7 +39,7 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as { projectId?: unknown; locale?: unknown } | null;
   const projectId = typeof body?.projectId === "string" ? body.projectId : null;
-  const locale = body?.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(body?.locale);
   if (!projectId) return new Response(null, { status: 400 });
 
   const { data: project, error } = await supabase
@@ -41,12 +47,14 @@ export async function POST(request: Request) {
     .select("id, brief, spec, bom, netlist, build_route")
     .eq("id", projectId)
     .maybeSingle();
-  if (error) return Response.json({ error: "not_ready" }, { status: 409 });
+  if (error) return jsonError("not_ready", 409);
   if (!project) return new Response(null, { status: 404 });
 
   const access = await canUse(supabase, "wiring", project.id);
   if (!access.allowed)
-    return Response.json({ error: access.reason ?? "no_credits" }, { status: access.reason === "sign_in" ? 401 : 402 });
+    return jsonError(access.reason ?? "no_credits", access.reason === "sign_in" ? 401 : 402);
+  // The spend needs the service client (0102): refuse before paying for a model call.
+  if (access.role !== "admin" && !serverWritesReady()) return jsonError("unavailable", 503);
 
   const r = await buildElectronics({ supabase, project, locale, relist: false });
   if (!r.ok)
@@ -55,6 +63,12 @@ export async function POST(request: Request) {
       { status: r.error === "no_electronics" ? 422 : r.error === "paused" || r.error === "rate_limited" ? 429 : 502 }
     );
   if (r.circuit === "failed") return Response.json({ error: "invalid", problems: r.problems.slice(0, 6) }, { status: 422 });
-  const paid = await spend(supabase, "wiring", project.id);
-  return Response.json({ netlist: r.netlist, charged: paid.ok ? paid.charged : false, cost: access.cost });
+  const paid = await spend(supabase, user.id, "wiring", project.id);
+  const refused = spendRefusal(paid, access.role);
+  if (refused) {
+    // Not paid: undo buildElectronics' save (the new circuit and the rule lines derived from it).
+    await undoUnpaidCircuit(supabase, project, "netlist");
+    return jsonError(refused.error, refused.status);
+  }
+  return jsonOk({ netlist: r.netlist, charged: paid.ok ? paid.charged : false, cost: access.cost });
 }

@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 
 import type { StoreCardPart } from "@/lib/store/catalog";
-import { Link } from "@/i18n/navigation";
+import { HoverPrefetchLink } from "@/components/parts/hover-prefetch-link";
 import { formatPrice, partName, partImageUrl } from "@/lib/parts/format";
 import { CARD_SIZES, IMAGE_WIDTHS, sizedImage, sizedSrcSet } from "@/lib/store/image-url";
 import { arrivesByDate, type ShippingSettings } from "@/lib/store/delivery";
@@ -59,9 +59,10 @@ export async function PartCard({
 
   return (
     <div className="neu flex min-w-0 flex-col overflow-hidden max-sm:rounded-2xl">
-      <Link
+      <HoverPrefetchLink
         href={`/store/${part.sku}`}
         className="block aspect-square overflow-hidden bg-panel"
+        aria-label={name}
       >
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -80,17 +81,17 @@ export async function PartCard({
         ) : (
           <GearPlaceholder className="h-full w-full" />
         )}
-      </Link>
+      </HoverPrefetchLink>
 
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4">
-        <Link
+        <HoverPrefetchLink
           href={`/store/${part.sku}`}
           className="line-clamp-2 break-words max-md:min-h-11 text-[13px] font-semibold leading-snug text-heading transition-colors hover:text-cobalt sm:text-sm"
           title={name}
           aria-label={name}
         >
           <IsolatedTitle text={shownName} locale={locale} />
-        </Link>
+        </HoverPrefetchLink>
 
         <div>
           <ArrivalBadge

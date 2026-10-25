@@ -61,21 +61,39 @@ describe("productDetailsForLocale", () => {
     expect(d.untranslated).toEqual({ description: false, specs: false });
   });
 
-  it("ar with a description only hides the English specs", () => {
+  // F-019: the spec TABLE falls back to the English rows under the Arabic
+  // heading when specs_ar is empty. It is structured data - numbers and units -
+  // so showing it beats hiding it, and the page still says it is untranslated.
+  // The DESCRIPTION keeps the old rule and never falls back (next test).
+  it("ar without specs_ar shows the English spec rows, still marked untranslated", () => {
     const d = productDetailsForLocale({ ...english, description_ar: "لوحة لمشاريع إنترنت الأشياء." }, "ar");
     expect(d.description).toBe("لوحة لمشاريع إنترنت الأشياء.");
-    expect(d.specs).toEqual([]);
+    expect(d.specs).toEqual([
+      { name: "Operating voltage", value: "3.3V" },
+      { name: "Flash", value: "4 MB" },
+    ]);
     expect(d.untranslated).toEqual({ description: false, specs: true });
   });
 
-  it("ar with nothing shows no English at all", () => {
+  it("ar prefers specs_ar when it exists, and is then not marked untranslated", () => {
+    const d = productDetailsForLocale(
+      { ...english, description_ar: "لوحة.", specs_ar: [{ name: "جهد التشغيل", value: "3.3 فولت" }] },
+      "ar"
+    );
+    expect(d.specs).toEqual([{ name: "جهد التشغيل", value: "3.3 فولت" }]);
+    expect(d.untranslated.specs).toBe(false);
+  });
+
+  it("ar with nothing shows no English prose", () => {
     const d = productDetailsForLocale(english, "ar");
     expect(d.description).toBeNull();
-    expect(d.specs).toEqual([]);
     expect(d.plainDescription).toBeNull();
     expect(d.untranslated).toEqual({ description: true, specs: true });
-    const shown = JSON.stringify([d.description, d.specs, d.links.map((l) => l.label)]);
-    expect(shown).not.toMatch(/Operating|Wi-Fi|Datasheet|IoT/);
+    // The English PROSE must never reach /ar - that rule is unchanged. Only the
+    // spec table may fall back (previous test), and with no specs here there is
+    // nothing to fall back to.
+    const shown = JSON.stringify([d.description, d.links.map((l) => l.label)]);
+    expect(shown).not.toMatch(/Wi-Fi|Datasheet|IoT/);
   });
 
   it("ar with no English source has nothing to flag", () => {

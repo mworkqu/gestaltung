@@ -14,16 +14,16 @@
 // buys nothing and changes no price.
 
 import { useEffect, useState } from "react";
+import { UUID_RE } from "@/lib/uuid";
 
 export const CLASS_ORDER_PARAM = "class";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The `class` query parameter, when it looks like an id. */
 export function classOrderIdFrom(search: string): string | null {
   try {
     const raw = new URLSearchParams(search).get(CLASS_ORDER_PARAM);
-    return raw && UUID.test(raw) ? raw.toLowerCase() : null;
+    return raw && UUID_RE.test(raw) ? raw.toLowerCase() : null;
   } catch {
     return null;
   }

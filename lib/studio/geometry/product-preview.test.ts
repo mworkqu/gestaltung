@@ -46,6 +46,7 @@ function fakeBuilt(solved: SolvedProduct): BuiltProduct {
     print: { pose: "upright" as never, matrix: [1, 0, 0, 0, 1, 0, 0, 0, 1], size: [10, 10, 10] as [number, number, number], fits: true, overhangDeg: 0 },
     explode: [0, 0, 5] as [number, number, number],
     watertight: true,
+    shells: 1,
   };
   return { hash: solved.hash, pieces: [piece, { ...piece, id: "stake", bodyId: "stake", role: "stake" as const }], links: [], electronics: [], bbox: solved.bbox, ms: 1 };
 }

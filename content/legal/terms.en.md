@@ -1,10 +1,10 @@
-**Last updated: 3 October 2026**
+**Last updated: 24 October 2026**
 
 **1. Acceptance.** By using gestaltung360.com or placing an order, you accept these terms. If you do not accept them, do not use the site.
 
 **2. Who may order.** You must be 18 or older. Children under 18 may not order.
 
-**3. What we offer.** (a) An online store for electronics, sensors, motors, 3D-printing supplies and hardware. (b) Custom manufacturing from your files (3D printing, CNC, laser cutting, EDM) through partners. (c) A paid CAD drawing service with fixed tiers, delivered as STEP or IGES. (d) A free "Turn an idea into a product" planning tool.
+**3. What we offer.** (a) An online store for electronics, sensors, motors, 3D-printing supplies and hardware. (b) Custom manufacturing from your files (3D printing, CNC, laser cutting, EDM) in our Lusail studio; larger CNC or sheet-metal jobs are quoted case by case. (c) A paid CAD drawing service with fixed tiers, delivered as STEP or IGES. (d) A "Turn an idea into a product" planning tool (the parts list is free; wiring diagrams and 3D models cost credits).
 
 **4. Orders.** An order is binding once we confirm it on WhatsApp. Until then it is a request only.
 

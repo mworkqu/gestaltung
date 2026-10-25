@@ -1,7 +1,6 @@
-import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // AI usage is super_admin only (ai_usage RLS agrees: only super_admin reads).
 export const dynamic = "force-dynamic";
@@ -15,8 +14,6 @@ export default async function UsageLayout({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const session = await getSessionContext();
-  if (!session) redirect(`/${locale}/sign-in`);
-  if (session.profile.role !== "super_admin") redirect(`/${locale}/dashboard`);
+  await requireSuperAdmin(locale);
   return <>{children}</>;
 }

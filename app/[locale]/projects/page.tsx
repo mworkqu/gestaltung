@@ -8,6 +8,7 @@ import { ProjectList } from "@/components/projects/project-list";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MessagesScope } from "@/components/i18n/messages-scope";
+import { studioCardFacts, type StudioCardFacts } from "@/lib/projects/studio-facts";
 import { chosenPreviewPath, previewUrls } from "@/lib/studio/server/preview-url";
 
 export async function generateMetadata({
@@ -47,9 +48,17 @@ export default async function ProjectsPage({
 
   // Chosen Studio design pictures (P5-16), signed with the visitor's own session.
   const previews: Record<string, string> = {};
+  const facts: Record<string, StudioCardFacts> = {};
   if (user) {
-    const { data } = await supabase.from("projects").select("id, product:studio->product").eq("user_id", user.id);
-    const rows = ((data ?? []) as { id: string; product?: Parameters<typeof chosenPreviewPath>[0] }[]).map((r) => ({ id: r.id, path: chosenPreviewPath(r.product) }));
+    const { data } = await supabase
+      .from("projects")
+      .select("id, product:studio->product, components:studio->components, answers:studio->answers")
+      .eq("user_id", user.id);
+    type StudioRow = { id: string; product?: Parameters<typeof chosenPreviewPath>[0]; components?: unknown; answers?: unknown };
+    const all = (data ?? []) as StudioRow[];
+    // Only projects that have a Studio doc: the others keep the legacy part tallies.
+    for (const r of all) if (Array.isArray(r.components)) facts[r.id] = studioCardFacts(r.components, r.answers);
+    const rows = all.map((r) => ({ id: r.id, path: chosenPreviewPath(r.product) }));
     const urls = await previewUrls(supabase, rows.map((r) => r.path));
     for (const r of rows) if (r.path && urls.has(r.path)) previews[r.id] = urls.get(r.path)!;
   }
@@ -76,7 +85,7 @@ export default async function ProjectsPage({
         </Button>
       </header>
 
-      <ProjectList previews={previews} previewAlt={tp("alt")} />
+      <ProjectList previews={previews} previewAlt={tp("alt")} facts={facts} />
     </div>
     </MessagesScope>
   );

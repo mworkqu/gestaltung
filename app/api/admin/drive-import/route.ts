@@ -1,7 +1,9 @@
-import sharp from "sharp";
-
 import { getSessionContext } from "@/lib/auth/get-session";
+import { readCapped } from "@/lib/net/safe-fetch";
+import { isRasterContentType, storeImage } from "@/lib/store/store-image";
 import { createClient } from "@/lib/supabase/server";
+import { isSuperAdminSession } from "@/lib/auth/guards";
+import { emptyStatus, jsonOk } from "@/lib/http";
 
 // Copies Google Drive images (picked in the admin) into Supabase Storage
 // (Task 17b). Never hotlinks Drive. For each file: download with the owner's
@@ -9,6 +11,8 @@ import { createClient } from "@/lib/supabase/server";
 // thumbnail (400 px WebP), upload both to the public `product-images` bucket
 // (0029), and return their URLs with the Drive file id for traceability.
 // super_admin only (checked here and by the bucket policy).
+// Raster images only and a streamed byte cap (WEB-05 / API-08): storeImage
+// checks magic bytes and sharp's format before processing; SVG is refused.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,7 +23,7 @@ const ID = /^[A-Za-z0-9_-]{10,200}$/;
 
 export async function POST(request: Request) {
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
+  if (!isSuperAdminSession(session)) return emptyStatus(403);
 
   const body = (await request.json().catch(() => null)) as {
     token?: unknown;
@@ -33,7 +37,6 @@ export async function POST(request: Request) {
   if (!token || !files.length) return new Response(null, { status: 400 });
 
   const supabase = await createClient();
-  const bucket = supabase.storage.from("product-images");
 
   const results = await Promise.all(
     files.map(async (f) => {
@@ -43,37 +46,20 @@ export async function POST(request: Request) {
           cache: "no-store",
         });
         if (!res.ok) return { name: f.name, error: `drive_${res.status}` };
-        const type = res.headers.get("content-type") ?? "";
-        if (!type.startsWith("image/")) return { name: f.name, error: "not_image" };
-        const buf = Buffer.from(await res.arrayBuffer());
-        if (buf.length > MAX_BYTES) return { name: f.name, error: "too_large" };
+        if (!isRasterContentType(res.headers.get("content-type"))) {
+          await res.body?.cancel().catch(() => {});
+          return { name: f.name, error: "not_image" };
+        }
+        const bytes = await readCapped(res, MAX_BYTES);
+        if (!bytes) return { name: f.name, error: "too_large" };
 
-        const base = sharp(buf, { failOn: "none" }).rotate();
-        const [web, thumb] = await Promise.all([
-          base.clone().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer(),
-          base.clone().resize({ width: 400, height: 400, fit: "inside", withoutEnlargement: true }).webp({ quality: 72 }).toBuffer(),
-        ]);
-
-        const stem = `drive/${f.id}/${Date.now()}`;
-        const up = await Promise.all([
-          bucket.upload(`${stem}-web.webp`, web, { contentType: "image/webp", upsert: true, cacheControl: "31536000" }),
-          bucket.upload(`${stem}-thumb.webp`, thumb, { contentType: "image/webp", upsert: true, cacheControl: "31536000" }),
-        ]);
-        const failed = up.find((u) => u.error);
-        if (failed) return { name: f.name, error: `storage: ${failed.error!.message}` };
-
-        return {
-          name: f.name,
-          drive_file_id: f.id,
-          path: `${stem}-web.webp`,
-          web: bucket.getPublicUrl(`${stem}-web.webp`).data.publicUrl,
-          thumb: bucket.getPublicUrl(`${stem}-thumb.webp`).data.publicUrl,
-        };
+        const img = await storeImage(supabase, Buffer.from(bytes), `drive/${f.id}/${Date.now()}`, f.id);
+        return { name: f.name, ...img };
       } catch (e) {
         return { name: f.name, error: e instanceof Error ? e.message : "failed" };
       }
     })
   );
 
-  return Response.json({ results });
+  return jsonOk({ results });
 }

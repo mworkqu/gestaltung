@@ -3,12 +3,13 @@ import { Check, Circle, X } from "lucide-react";
 
 import type { TimelineStep } from "@/lib/orders/status";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 // Server component: the order's steps (confirmed → paid → sourcing → shipped →
 // delivered, or ending in cancelled), reached ones ticked and dated.
 export async function OrderTimeline({ steps, locale }: { steps: TimelineStep[]; locale: string }) {
   const t = await getTranslations("Orders");
-  const date = new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  const date = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "numeric",
     month: "short",
     year: "numeric",

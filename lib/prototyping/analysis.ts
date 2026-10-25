@@ -37,6 +37,14 @@ export type BomLine = {
   group?: string;
 };
 
+/** A logic-level crossing found by the electronics rules (stored in projects.bom.levelFlags). */
+export type LevelFlag = {
+  net: string;
+  direction: "high_to_low" | "low_to_high";
+  drivers: string[];
+  receivers: string[];
+};
+
 export const BUILD_ROUTES = ["prototype", "custom_pcb"] as const;
 export type BuildRoute = (typeof BUILD_ROUTES)[number];
 

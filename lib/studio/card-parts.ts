@@ -112,6 +112,19 @@ const INPUT_ENUM: Record<string, string> = { button: "button", knob: "knob" };
 
 const ruleFor = (rules: Rule[], text: string) => rules.find((r) => r.re.test(text));
 
+/**
+ * Promises the library cannot answer with ANY part, checked before the rules. A float switch is
+ * not a slide switch and a water-level probe is not a soil probe: the tester's card mapped its
+ * tank sensor onto one of those, so the promise looked satisfied by a part that cannot sense a
+ * water level at all. These lines are never turned into a part, and always reported (F-011).
+ */
+const NO_PART_RE: RegExp[] = [
+  /float\s*(?:switch|sensor|valve)?|water\s*level|liquid\s*level|tank\s*(?:level|empty|full|sensor)|level\s*(?:switch|sensor|probe)|عوّ?ام|منسوب\s*الماء|مستوى\s*الماء/i,
+];
+
+/** Does this card line ask for something no library part can be? */
+export const unmappable = (text: string) => NO_PART_RE.some((re) => re.test(text));
+
 /** An output that is a light (an LED or a light ring), for the "3 lights" tally. */
 export const isLight = (name: string) => {
   const r = ruleFor(OUTPUT_RULES, name);
@@ -140,11 +153,13 @@ export function cardItems(spec: ProductSpec): CardItem[] {
   else if (cls === "mcu" && (u?.controller ?? "").trim()) put("controller", controllerIds(u!.controller), 1);
   for (const s of u?.sensors ?? []) {
     const t = `${s.name} ${s.purpose ?? ""}`;
+    if (unmappable(t)) continue; // never a stand-in part for a promise nothing can keep
     const r = ruleFor(SENSOR_RULES, t) ?? ruleFor(GATE_RULES, t);
     if (r) put(r.key, r.ids, s.count);
   }
   for (const o of u?.outputs ?? []) {
     const t = `${o.name} ${o.purpose ?? ""}`;
+    if (unmappable(t)) continue;
     const r = ruleFor(OUTPUT_RULES, o.name) ?? ruleFor(OUTPUT_RULES, t) ?? ruleFor(GATE_RULES, t);
     if (r) put(r.key, r.ids, o.count, r.key === "led" ? coloursIn(t) : []);
   }
@@ -225,6 +240,65 @@ const CARD_IDS = new Set(
 export function offCard(spec: ProductSpec, partId: string): boolean {
   if (!spec.understanding || !CARD_IDS.has(partId)) return false;
   return !cardItems(spec).some((i) => i.ids.includes(partId));
+}
+
+// ── Promises nothing can keep (F-011) ──────────────────────────────────────
+// The understanding card told the tester "a float switch or sensor detects when the tank is
+// empty"; no such part exists in the library, so cardItems() quietly left it out and the Parts
+// step counted itself done with the promise unkept. Every "Includes" line must map to at least
+// one part, so a line we cannot map is reported instead of dropped.
+
+export type UnmetPromise = {
+  kind: "sensor" | "output" | "actuator";
+  /** The card's own words ("Float switch"). */
+  name: string;
+  /** The card's own purpose line, when it wrote one. */
+  purpose?: string;
+};
+
+/**
+ * Card lines the library has no part for. `inLibrary` lets a caller check against the library
+ * actually in use (the class-safe one, the owner's edits), so a line whose part exists in code
+ * but not in this library counts as unmet too.
+ */
+export function unmetPromises(spec: ProductSpec, inLibrary: (id: string) => boolean = () => true): UnmetPromise[] {
+  const u = spec.understanding;
+  if (!u) return [];
+  const out: UnmetPromise[] = [];
+  const add = (kind: UnmetPromise["kind"], name: string, purpose: string | undefined, ids: readonly string[] | undefined) => {
+    if (ids?.some(inLibrary) && !unmappable(`${name} ${purpose ?? ""}`)) return;
+    out.push({ kind, name, ...(purpose?.trim() ? { purpose: purpose.trim() } : {}) });
+  };
+  for (const s of u.sensors) {
+    const t = `${s.name} ${s.purpose ?? ""}`;
+    add("sensor", s.name, s.purpose, (ruleFor(SENSOR_RULES, t) ?? ruleFor(GATE_RULES, t))?.ids);
+  }
+  for (const o of u.outputs) {
+    const t = `${o.name} ${o.purpose ?? ""}`;
+    add("output", o.name, o.purpose, (ruleFor(OUTPUT_RULES, o.name) ?? ruleFor(OUTPUT_RULES, t) ?? ruleFor(GATE_RULES, t))?.ids);
+  }
+  for (const a of u.actuators) add("actuator", a.name, a.purpose, MOVER_IDS[a.kind]);
+  return out;
+}
+
+/** "Float switch — detects when the tank is empty", for a code comment or an engineer note. */
+export const promiseLine = (p: UnmetPromise) => (p.purpose ? `${p.name} — ${p.purpose}` : p.name);
+
+const PROMISE_SKIP = new Set(
+  "the a an and or of to for with when that this it its into from shows show detect detects sensor light module board part".split(" "),
+);
+
+/**
+ * Spec features that ask for one of those unmet promises ("Tank empty light" and "Float switch
+ * — detects when the tank is empty" share "tank" and "empty"), so the sketch can name the
+ * feature the client recognises, not only the part line.
+ */
+export function featuresBlockedBy(spec: ProductSpec, unmet: readonly UnmetPromise[]): string[] {
+  if (!unmet.length) return [];
+  const words = (s: string) =>
+    s.toLowerCase().split(/[^a-z0-9؀-ۿ]+/).filter((w) => w.length >= 4 && !PROMISE_SKIP.has(w));
+  const theirs = new Set(unmet.flatMap((p) => words(promiseLine(p))));
+  return spec.features.filter((f) => words(f).some((w) => theirs.has(w)));
 }
 
 export type Missing = { key: string; want: number; have: number };

@@ -4,7 +4,8 @@ import type { LeadTimeClass } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
 
 const STYLES: Record<LeadTimeClass | "on_request", string> = {
-  in_stock: "bg-emerald-500/10 text-emerald-700",
+  // emerald-800: the -700 pair measured 4.47:1, just under AA (see arrival-badge).
+  in_stock: "bg-emerald-500/10 text-emerald-800",
   "3_5_days": "bg-sky-500/10 text-sky-700",
   "1_2_weeks": "bg-indigo-500/10 text-indigo-700",
   "2_4_weeks": "bg-violet-500/10 text-violet-700",

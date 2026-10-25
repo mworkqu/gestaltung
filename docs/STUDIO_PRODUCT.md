@@ -22,7 +22,9 @@ SolvedProduct ─► worker "product" request ─► BuiltProduct (pieces, tubes
 | `lib/studio/product/archetypes.ts` | `rankArchetypes(spec)`, `archetypeFor(spec)`, `archetypeDefault(archetype, spec, parts)`, `defaultProductFor(spec, parts, { archetype? })`, `productVariants(spec, parts, current, n = 3)` ("Try another"), `needsOf(spec, parts)`, `archetypeWhyKey(a)` |
 | `lib/studio/product/solve.ts` | `solveProduct(model, parts, { spec?, log? }) → SolvedProduct`, `solvedHash()`, `MK4_BED`, output types |
 | `lib/studio/product/stl.ts` | `pieceSTL(piece)`, `printReadyPositions(positions, matrix)`, `binarySTL(mesh)`, `meshIsWatertight(mesh)` |
-| `lib/studio/geometry/product-kernel.ts` | `buildProductMeshes(mf, solved) → BuiltProduct`, `measureOverlaps(mf, solved, minVolume)`, `productTransferables()` |
+| `lib/studio/geometry/kernel-core.ts` | the kernel's primitives, shared by both model paths: `Arena`, `cs`, `union`, `frameMat`, `rr`, `Slab` / `Lathe` / `Shape`, `slabSolid`, `latheSolid`, `cavity` (45° tent roof), `prism`, `sweep`, `meshArrays` |
+| `lib/studio/geometry/product-kernel.ts` | `buildProductMeshes(mf, solved) → BuiltProduct`, `measureOverlaps(mf, solved, minVolume)`, `productTransferables()`, `shapeOf(form)` |
+| `lib/studio/geometry/enclosure-kernel.ts` | the TEMPLATE path on the same kernel: `buildEnclosureCase(mf, plan) → { base, lid, spike, checks }` from `EnclosureDims` + the plan's cut-outs (F-003 / FIX_REPORT §3.2) |
 | `lib/studio/geometry/product-job.ts` | worker side: `buildProduct(solved)` (cache by hash, 6), `getBuiltProduct(hash)`, `packProduct(built, withGeometry)`, `handleProductRequest(req)` |
 | `lib/studio/geometry/manifold-loader.ts` | `loadManifold()` — the only import of `manifold-3d` (lazy) |
 | `lib/studio/geometry/client.ts` | `getProductGeometry(solved, { geometry? }) → ProductGeometry`, `productKey()` |
@@ -91,7 +93,7 @@ Main thread: `getProductGeometry(solved, { geometry })` (lib/studio/geometry/cli
 - Overlap checks in the solver are on bounding boxes (with exemptions for parent/child contact, button stems and halo rings); the true check is `measureOverlaps()` (solid intersection) in tests. Tubes / cables are not checked against bodies.
 - Overhang is judged on the outside surface; insides are built printable by construction (tent roofs ≤ 40 mm bridge, flat tops printed upside down), not measured.
 - A flat child on a sloped side face (a loft that leans) can dig in slightly; defaults avoid it.
-- `emboss_label` is accepted but not built (the enclosure label path stays on the old template builder). The water-level "window" is a thin groove, not a clear insert.
+- `emboss_label` is accepted but not built on a product body (the raised name is built on the TEMPLATE path: `enclosure/label.ts` `labelCapsules()` → `geometry/enclosure-kernel.ts`). The water-level "window" is a thin groove, not a clear insert.
 - The stacked-layer snap lip adds 3 mm above a cup's top; the piece's print size in `print.size` does not include it.
 - `rationale` of archetype defaults is English only (see Archetypes).
 - manifold-3d 3.5.4 (Apache-2.0, 541 kB WASM, 206 kB gzip) loads only in the worker on the first product build. next.config.mjs maps its `node:module` import to an empty module for client bundles.

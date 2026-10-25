@@ -12,6 +12,8 @@
 //      service_role only), which re-checks all of it and is idempotent.
 // Nothing here trusts a user id sent by the browser.
 
+import { isMissingFunction as isMissingFunctionCode } from "@/lib/supabase/errors";
+
 export type ClaimUser = { id: string; is_anonymous?: boolean | null };
 
 export type ClaimRpcResult =
@@ -76,7 +78,7 @@ export async function handleClaimGuest(body: unknown, deps: ClaimDeps): Promise<
 
 /** PostgREST / Postgres "function does not exist" (migration not run yet). */
 export function isMissingFunction(e: { code?: string; message?: string } | null | undefined): boolean {
-  return !!e && (e.code === "PGRST202" || e.code === "42883" || /could not find the function/i.test(e.message ?? ""));
+  return !!e && (isMissingFunctionCode(e) || /could not find the function/i.test(e.message ?? ""));
 }
 
 /**

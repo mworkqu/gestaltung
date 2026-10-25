@@ -59,7 +59,9 @@ describe("studioChecks (real library)", () => {
     const spec: ProductSpec = { ...DEFAULT_SPEC, power: "battery_usb" };
     const w = buildWiring(comps("esp32_devkit", "cell_18650", "tp4056_usbc", "oled_096_i2c"), spec, getPart, "en");
     expect(w.checks.filter((c) => !c.ok)).toEqual([]);
-    expect(w.checks[0]).toEqual({ id: "ok_battery_usb", ok: true, plain: "Everything runs from the battery, and it charges over USB." });
+    expect(w.checks).toContainEqual({ id: "ok_battery_usb", ok: true, plain: "Everything runs from the battery, and it charges over USB." });
+    // F-052: the charger feeds the board's 5 V pin, so USB must not be plugged in at the same time.
+    expect(w.checks).toContainEqual({ id: "usb_backfeed", ok: true, plain: CHECK_TEXT.usb_backfeed.en });
   });
 
   it("asks for a charger, and adds a 5 V booster for a part the battery can't feed", () => {

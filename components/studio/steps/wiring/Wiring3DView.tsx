@@ -91,6 +91,7 @@ import { LABEL_SIZE, pinLabelLayout, type Box as LabelBox } from "@/lib/studio/w
 import { SimStatus, TryItPanel, useSim } from "./TryItPanel";
 import type { SimOutput } from "@/lib/studio/sim/model";
 import type { SimState } from "@/lib/studio/sim/step";
+import { isRtl } from "@/lib/locale";
 
 const accent = STEP_ACCENT.wiring;
 const BG = "linear-gradient(180deg, #f4f7fb 0%, #e6ebf2 100%)";
@@ -249,7 +250,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
   };
 
   const fallback = (
-    <div className="flex h-full items-center justify-center p-6 text-center text-sm font-semibold text-body" dir={locale === "ar" ? "rtl" : "ltr"}>
+    <div className="flex h-full items-center justify-center p-6 text-center text-sm font-semibold text-body" dir={isRtl(locale) ? "rtl" : "ltr"}>
       {t("noWebgl")}
     </div>
   );
@@ -322,7 +323,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
                 else tagRefs.current.delete(tg.id);
               }}
               aria-hidden
-              dir={locale === "ar" ? "rtl" : "ltr"}
+              dir={isRtl(locale) ? "rtl" : "ltr"}
               data-testid="studio-wiring-3d-tag"
               className="pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-md border border-slate-900/[0.07] bg-white/95 px-2 py-[3px] text-[11px] font-semibold leading-tight text-heading shadow-[0_1px_4px_rgba(15,23,42,0.16)] transition-opacity duration-150 md:text-xs"
               style={{ opacity: 0, willChange: "transform" }}
@@ -344,7 +345,7 @@ export function Wiring3DView({ doc, locale }: { doc: StudioDoc; locale: Locale }
         )}
 
         {webgl && (
-          <div className="absolute right-3 top-3 flex flex-wrap justify-end gap-2" dir={locale === "ar" ? "rtl" : "ltr"}>
+          <div className="absolute right-3 top-3 flex flex-wrap justify-end gap-2" dir={isRtl(locale) ? "rtl" : "ltr"}>
             {moved && (
               <button
                 type="button"
@@ -402,7 +403,7 @@ function EndLabel({ refEl, colour, text, locale }: { refEl: RefObject<HTMLDivEle
     <div
       ref={refEl}
       aria-hidden
-      dir={locale === "ar" ? "rtl" : "ltr"}
+      dir={isRtl(locale) ? "rtl" : "ltr"}
       className="pointer-events-none absolute left-0 top-0 whitespace-nowrap rounded-full bg-white/95 px-3 py-1.5 text-sm font-bold text-heading shadow-neu-sm"
       style={{ opacity: 0, borderInlineStart: `5px solid ${WIRE_HEX[colour]}`, willChange: "transform" }}
     >
@@ -1106,8 +1107,7 @@ function Scene(p: SceneProps) {
   // Test hook (e2e fixture pages only): where each part sits on screen, computed on demand.
   useEffect(() => {
     if (!window.location.pathname.includes("/e2e-fixtures/")) return;
-    const w = window as unknown as { __wiring3dParts?: () => { id: string; board: boolean; size: number; x: number; y: number }[] };
-    w.__wiring3dParts = () => {
+    window.__wiring3dParts = () => {
       const g = contentRef.current;
       const r = gl.domElement.getBoundingClientRect();
       if (!g) return [];
@@ -1117,14 +1117,13 @@ function Scene(p: SceneProps) {
         return { id: pl.instanceId, board: pl.board, size: pl.w * pl.d * pl.h, x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
       });
     };
-    const wc = window as unknown as { __wiring3dCamera?: () => { dist: number; min: number; max: number } };
-    wc.__wiring3dCamera = () => {
+    window.__wiring3dCamera = () => {
       const c = get().controls as unknown as { target: THREE.Vector3; minDistance: number; maxDistance: number } | null;
       return { dist: c ? camera.position.distanceTo(c.target) : -1, min: c?.minDistance ?? -1, max: c?.maxDistance ?? -1 };
     };
     return () => {
-      delete w.__wiring3dParts;
-      delete wc.__wiring3dCamera;
+      delete window.__wiring3dParts;
+      delete window.__wiring3dCamera;
     };
   }, [gl, camera, lifts, get]);
 

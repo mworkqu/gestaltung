@@ -7,15 +7,16 @@ import { getPart } from "@/lib/studio/library";
 import { emptyDraft, partToDraft, type PartDraft } from "@/lib/studio/library/form";
 import { BUILDERS } from "@/lib/studio/models";
 import { LibraryPartSchema } from "@/lib/studio/schema";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { isMissingRelation } from "@/lib/supabase/errors";
 
 // Add (/dashboard/studio-library/new) or edit one Studio library part (P5-15c).
 // Editing a code part with no row yet pre-fills from code. Read-only before 0070.
 export const dynamic = "force-dynamic";
 
-const MISSING = new Set(["42P01", "PGRST205"]);
-
 export default async function StudioPartPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("StudioLibrary");
   const isNew = id === "new";
@@ -24,7 +25,7 @@ export default async function StudioPartPage({ params }: { params: Promise<{ loc
   const supabase = await createClient();
   const probe = await supabase.from("studio_parts").select("id, data").eq("id", isNew ? "__none__" : id).maybeSingle();
   const readOnly = !!probe.error;
-  if (probe.error && !MISSING.has(probe.error.code ?? "")) console.error("[studio-library] read failed:", probe.error.code, probe.error.message);
+  if (probe.error && !isMissingRelation(probe.error)) console.error("[studio-library] read failed:", probe.error.code, probe.error.message);
 
   let draft: PartDraft = emptyDraft();
   if (!isNew) {

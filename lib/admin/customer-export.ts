@@ -16,6 +16,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { callCostUsd } from "@/lib/ai/prices";
 import { normalizePhone } from "@/lib/phone";
 import { redactKeys } from "@/lib/admin/project-export";
+import { round2 } from "@/lib/format/money";
+import { LEAD_LIMIT, loadCustomerBundle, type CustomerSection } from "@/lib/admin/customer-data";
 
 export const CUSTOMER_EXPORT_VERSION = 1;
 
@@ -71,7 +73,7 @@ export function totalPaidQar(input: PaidInput): number {
   const fromOrders = (input.orders ?? [])
     .filter((o) => o.status !== "cancelled")
     .reduce((s, o) => s + money(o.total_qar), 0);
-  return Math.round((fromPayments + fromOrders) * 100) / 100;
+  return round2(fromPayments + fromOrders);
 }
 
 /** The newest of a set of timestamps, or null when there is nothing to show. */
@@ -149,8 +151,23 @@ export function aiUsageByModel(rows: AiUsageLike[]): AiModelSummary[] {
   return [...by.values()].sort((a, b) => b.costUsd - a.costUsd || b.calls - a.calls);
 }
 
-/** Rows we read per customer, in the order the page shows them. */
-const LEAD_LIMIT = 4000;
+/** The export's wording for a section that could not be read (`_notes`). */
+const SECTION_LABEL: Record<CustomerSection, string> = {
+  profile: "profile",
+  projects: "projects",
+  orders: "part orders",
+  leads: "leads",
+  ledger: "credits ledger",
+  payments: "payments",
+  pass: "idea pass",
+  sessions: "idea sessions",
+  usage: "ai usage",
+  jobs: "engineering jobs",
+  cad: "cad generations",
+  signals: "demand signals",
+  outbox: "notification outbox",
+  items: "order items",
+};
 
 export async function buildCustomerExport(
   db: SupabaseClient,
@@ -158,44 +175,16 @@ export async function buildCustomerExport(
   opts: { service: SupabaseClient | null; exportedBy: string }
 ): Promise<Row | null> {
   const notes: string[] = [];
-  const soft = async <T>(label: string, q: PromiseLike<{ data: T | null; error: { message: string } | null }>): Promise<T | null> => {
-    const { data, error } = await q;
-    if (error) {
-      notes.push(`${label}: not readable (${error.message})`);
-      return null;
-    }
-    return data;
-  };
-
-  const profile = await soft<Row>(
-    "profile",
-    db.from("profiles").select("*").eq("id", userId).maybeSingle()
-  );
-
-  const [projects, orders, leadRows, ledger, payments, pass, sessions, usage, jobs, cad, signals, outbox] = await Promise.all([
-    soft<Row[]>("projects", db.from("projects").select("*").eq("user_id", userId).order("created_at", { ascending: false })),
-    soft<Row[]>("part orders", db.from("part_orders").select("*").eq("profile_id", userId).order("created_at", { ascending: false })),
-    // inquiries has no user_id: read them all (super_admin may) and match here.
-    soft<Row[]>("leads", db.from("inquiries").select("*").order("created_at", { ascending: false }).limit(LEAD_LIMIT)),
-    soft<Row[]>("credits ledger", db.from("credits_ledger").select("*").eq("user_id", userId).order("created_at", { ascending: false })),
-    soft<Row[]>("payments", db.from("payments").select("*").eq("user_id", userId).order("created_at", { ascending: false })),
-    soft<Row>("idea pass", db.from("idea_passes").select("*").eq("user_id", userId).maybeSingle()),
-    soft<Row[]>("idea sessions", db.from("idea_sessions").select("*").eq("user_id", userId).order("updated_at", { ascending: false })),
-    soft<Row[]>("ai usage", db.from("ai_usage").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(20000)),
-    soft<Row[]>("engineering jobs", db.from("engineering_jobs").select("*").eq("user_id", userId).order("created_at", { ascending: false })),
-    soft<Row[]>("cad generations", db.from("cad_generations").select("*").eq("user_id", userId).order("created_at", { ascending: false })),
-    soft<Row[]>("demand signals", db.from("demand_signals").select("*").eq("user_id", userId).order("created_at", { ascending: false })),
-    soft<Row[]>("notification outbox", db.from("notification_outbox").select("*").eq("user_id", userId).order("created_at", { ascending: false })),
-  ]);
+  const { profile, projects, orders, leadRows, ledger, payments, pass, sessions, usage, jobs, cad, signals, outbox, items } =
+    await loadCustomerBundle(db, userId, {
+      onError: (section, error) => notes.push(`${SECTION_LABEL[section]}: not readable (${error.message})`),
+    });
 
   // Nothing at all under this id, not even a profile row: there is no customer.
+  // (No orders also means the order-items read never ran.)
   if (!profile && !projects?.length && !orders?.length && !payments?.length) return null;
 
   const projectIds = (projects ?? []).map((p) => String(p.id));
-  const orderIds = (orders ?? []).map((o) => String(o.id));
-  const items = orderIds.length
-    ? await soft<Row[]>("order items", db.from("part_order_items").select("*").in("order_id", orderIds))
-    : [];
 
   const identity: CustomerIdentity = {
     email: (profile?.email as string | null) ?? null,

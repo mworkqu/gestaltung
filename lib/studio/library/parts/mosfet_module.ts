@@ -3,7 +3,9 @@ import type { LibraryPart } from "../../schema";
 // Logic-level MOSFET switch module (AO3400 / D4184 style, flyback diode on board): lets a
 // 3.3 V or 5 V pin switch a pump, fan or one-way motor on and off (PWM for speed). The
 // wiring prefers it for loads that only switch on/off; a motor that must reverse keeps the
-// H-bridge (motor_driver). Store: the IRF520 MOSFET driver module (best with a 5 V board such
+// H-bridge (motor_driver). It is a LOW-SIDE switch: the MOSFET sits in the load's return, so
+// the load goes between VIN (the load supply) and OUT, and its return is never wired to GND.
+// Store: the IRF520 MOSFET driver module (best with a 5 V board such
 // as the Arduino Uno; on a 3.3 V board a logic-level module switches harder loads better).
 export const mosfetModule: LibraryPart = {
   id: "mosfet_module",
@@ -14,7 +16,7 @@ export const mosfetModule: LibraryPart = {
   },
   category: "actuator",
   storeSkus: ["VLT-32033979334758"],
-  tags: ["driver", "module", "mosfet", "switch", "transistor", "pump", "fan", "on_off", "pwm", "flyback", "diode", "actuator"],
+  tags: ["driver", "module", "mosfet", "low_side", "switch", "transistor", "pump", "fan", "on_off", "pwm", "flyback", "diode", "actuator"],
   dims: { x: 22, y: 16, z: 8 },
   model: {
     kind: "procedural",
@@ -38,7 +40,7 @@ export const mosfetModule: LibraryPart = {
     { id: "VIN", label: "VIN (load power, 5 V for the pump)", role: "5v", side: "bottom" },
     { id: "GND", label: "GND", role: "gnd", voltage: 0, side: "bottom" },
     { id: "SIG", label: "SIG (on / off, PWM)", role: "pwm", voltage: 3.3, side: "bottom" },
-    { id: "OUT", label: "OUT (to pump or motor)", role: "out", side: "top" },
+    { id: "OUT", label: "OUT (switched return of the pump or motor)", role: "out", side: "top" },
   ],
   power: { vMin: 3, vMax: 24, logicV: 3.3, mA: 5 },
   clearance: 1.5,

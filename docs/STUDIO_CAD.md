@@ -11,7 +11,9 @@
 
 ### What exists
 
-`lib/studio/cad-adapter.ts`: `CadBackend` (`buildEnclosure`, `buildMechPart`), `BrowserCadBackend` (three.js + three-bvh-csg; the only implementation), `CadQueryBackend` (stub that throws "not enabled"), `parseStudioCadSetting`, `getCadBackend(setting)`.
+`lib/studio/cad-adapter.ts`: `CadBackend` (`buildEnclosure`, `buildMechPart`), `BrowserCadBackend` (the only implementation: the plan in TypeScript, the mesh from the manifold-3d kernel in the Studio geometry worker), `CadQueryBackend` (stub that throws "not enabled"), `parseStudioCadSetting`, `getCadBackend(setting)`.
+
+**2026-10 (FIX_REPORT §3.2):** the browser enclosure is no longer built with three-bvh-csg, whose booleans were non-manifold at the source (the dome lid: 2,611 unbalanced edges out of 6,275 triangles), so the Print step had no file to hand over. `lib/studio/enclosure/build.ts` is gone; the plan (`enclosure/plan.ts`) is unchanged and the mesh comes from `lib/studio/geometry/enclosure-kernel.ts` through the shared primitives in `geometry/kernel-core.ts` — the same ones the product kernel uses. Every body is watertight, one shell, consistently wound (`lib/studio/review-print-template.test.ts`). The request below is unchanged: the server still cuts what `plan` says.
 `lib/studio/cad-setting.ts`: `getStudioCadSetting()` reads `store_settings.studio_cad` (cookie-free anon client, `unstable_cache`, tag `store-settings`). Missing row, malformed value or read error gives `"browser"`; any other value gives `"browser"` plus a `console.warn`.
 
 ### Request: `POST /studio/build` (future)

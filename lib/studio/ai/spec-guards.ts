@@ -14,8 +14,8 @@
 //  * the visitor's latest words win ("make it solar" after "plug it in").
 
 import { LIMITS, clampSpec, DEFAULT_SPEC, type ClampLog, type Output, type Placement, type ProductSpec } from "../schema";
+import type { Locale } from "@/lib/locale";
 
-type Locale = "en" | "ar";
 type Msg = { role: "user" | "assistant"; text: string };
 
 /** Card rows the guards (or the model) filled in. */
@@ -155,6 +155,66 @@ const FEATURE: Record<string, { en: string; ar: string; has: RegExp }> = {
   solar: { en: "Solar charging", ar: "شحن بالطاقة الشمسية", has: /solar|شمس/i },
 };
 
+// ── Features the visitor never asked for (F-012) ───────────────────────────
+// A long brief came back with "Motion sensor" and "Shows information on a small screen", and
+// those features then became parts. A feature line is kept only when our own rules added it,
+// or when the visitor's OWN words — anywhere in the conversation, not just the last message —
+// name the thing it talks about, or when they said yes to it in chat.
+
+/** One function a feature line can name: how it reads in the line, and how the visitor says it. */
+type Concept = { has: RegExp; said?: RegExp | RegExp[] };
+
+const CONCEPTS: Concept[] = [
+  { has: /pump|irrigat|sprinkl|\bwater(?:ing|s|ed)?\b|مضخ|سقي|ري/i, said: [WORDS.pump, WORDS.waterAction] },
+  { has: /valve|solenoid|صمام|محبس/i, said: WORDS.valve },
+  { has: /soil|moist|تربة|رطوبة/i, said: /soil|moist|\bdry\b|thirst|تربة|رطوبة|جاف|عطش/i },
+  { has: /tank|\blevel\b|float|reservoir|خزان|منسوب|عوام/i, said: /tank|\blevel\b|float|empty|refill|خزان|فارغ|منسوب|عوام/i },
+  { has: /motion|\bpir\b|movement|presence|حركة/i, said: WORDS.motion },
+  { has: /temperat|thermo|humid|weather|حرار|الطقس/i, said: WORDS.temperature },
+  { has: /screen|display|\blcd\b|\boled\b|شاشة|يعرض/i, said: WORDS.screen },
+  { has: /\blights?\b|\bleds?\b|lamp|glow|indicator|ضوء|أضواء|إضاءة|مصباح|ليد/i },
+  { has: /beep|buzz|alarm|siren|sound|audio|speaker|صوت|صفارة|إنذار|سماعة/i },
+  { has: /solar|شمس/i, said: WORDS.solar },
+  { has: /batter|rechargeable|cordless|بطارية/i, said: WORDS.battery },
+  { has: /wi-?fi|bluetooth|\bapp\b|phone|cloud|online|remotely|واي ?فاي|بلوتوث|تطبيق|هاتف/i },
+  { has: /camera|photo|كاميرا/i },
+  { has: /\bsd\b|logging|logger|data log|تسجيل/i },
+  { has: /schedul|timer|clock|\brtc\b|جدول|مؤقت|ساعة/i, said: /schedul|timer|clock|every|hour|daily|minute|جدول|مؤقت|ساعة|كل/i },
+  { has: /distance|ultrason|sonar|مسافة/i },
+  { has: /motor|servo|rotat|\bmoves?\b|محرك|سيرفو/i },
+  { has: /button|\bswitch\b|knob|dial|زر|مفتاح|مقبض/i },
+  { has: /accel|gyro|tilt|\bimu\b|ميل/i },
+  { has: /weight|load cell|وزن/i },
+];
+
+/** "yes", "do it", "نعم" — a reply that adopts whatever the assistant just offered. */
+const AFFIRM =
+  /^(?:yes|yeah|yep|yup|sure|ok|okay|fine|great|perfect|do it|please do|go ahead|sounds good|that works|نعم|أجل|ايوه|أيوه|تمام|حسنا|حسناً|موافق|اوك|أوك|اعمله|افعلها)\b/i;
+
+const matches = (re: RegExp | RegExp[], text: string) => (Array.isArray(re) ? re.some((x) => x.test(text)) : re.test(text));
+
+/** The visitor said yes to a message of ours that named this concept. */
+function confirmedInChat(c: Concept, messages: readonly Msg[]): boolean {
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (m.role !== "assistant" || !matches(c.said ?? c.has, m.text.toLowerCase())) continue;
+    const reply = messages.slice(i + 1).find((x) => x.role === "user");
+    if (reply && AFFIRM.test(reply.text.trim())) return true;
+  }
+  return false;
+}
+
+/**
+ * Is this feature line the visitor's own? A line that names no function we know of is kept
+ * (we cannot judge it); a line that names one is kept only when they asked for that function.
+ */
+export function featureSaidByUser(feature: string, texts: readonly string[], messages: readonly Msg[]): boolean {
+  const named = CONCEPTS.filter((c) => c.has.test(feature));
+  if (!named.length) return true;
+  const joined = texts.join("\n");
+  return named.every((c) => matches(c.said ?? c.has, joined) || confirmedInChat(c, messages));
+}
+
 export type Actuator = "pump" | "valve" | null;
 
 /** The water actuator the visitor's words ask for. */
@@ -188,7 +248,8 @@ export type Guarded = { spec: ProductSpec; touched: Set<CardSlot> };
  */
 export function guardSpec(
   input: ProductSpec,
-  ctx: { idea: string; messages: readonly Msg[]; locale: Locale },
+  /** `current` = the card as it stands, so only features the model has just ADDED are judged. */
+  ctx: { idea: string; messages: readonly Msg[]; locale: Locale; current?: ProductSpec | null },
   log: ClampLog = [],
 ): Guarded {
   const texts = userTexts(ctx.idea, ctx.messages);
@@ -196,8 +257,11 @@ export function guardSpec(
   const touched = new Set<CardSlot>();
   const s: ProductSpec = { ...input, features: [...input.features], inputs: [...input.inputs], outputs: [...input.outputs] };
   const addFeatures: string[] = [];
+  /** The functions OUR rules decided this idea needs: their lines are ours, never dropped. */
+  const ours: RegExp[] = [];
   const feature = (key: keyof typeof FEATURE) => {
     const f = FEATURE[key];
+    ours.push(f.has);
     if (!s.features.some((x) => f.has.test(x)) && !addFeatures.some((x) => f.has.test(x))) addFeatures.push(f[ctx.locale]);
     touched.add("senses");
   };
@@ -276,6 +340,19 @@ export function guardSpec(
   if (s.power !== before) log.push({ path: "power", from: before, to: s.power });
   if (said || actuator || worn) touched.add("power");
 
+  // F-012: drop any feature the model has just added that the visitor's own words never asked
+  // for. What is already on the card stays (they have seen it and can take it off), and so does
+  // anything our own rules put there.
+  if (texts.length) {
+    const already = new Set(ctx.current?.features ?? []);
+    const kept = s.features.filter(
+      (f) => already.has(f) || ours.some((re) => re.test(f)) || featureSaidByUser(f, texts, ctx.messages),
+    );
+    if (kept.length !== s.features.length) {
+      log.push({ path: "features.notAsked", from: s.features.filter((f) => !kept.includes(f)), to: null });
+      s.features = kept;
+    }
+  }
   s.features = [...addFeatures, ...s.features].slice(0, LIMITS.features.max);
   if (addFeatures.length) log.push({ path: "features", from: input.features, to: s.features });
   // clampSpec() rebuilds the object field by field; buildClass (2026-10-20) is carried

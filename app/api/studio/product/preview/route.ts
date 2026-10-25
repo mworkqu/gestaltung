@@ -1,7 +1,7 @@
 import { applyPreview, findDesign } from "@/lib/studio/product/store";
 import { studioRequest } from "@/lib/studio/server/context";
 import { loadDocPrivate, updateProductDoc } from "@/lib/studio/server/doc";
-import { PREVIEW_MAX_BYTES, PreviewBody, decodePng, json, saveErrorStatus, uploadPreview } from "@/lib/studio/server/product";
+import { PREVIEW_MAX_BYTES, PreviewBody, decodePng, json, saveErrorStatus, uploadPreview, loadErrorStatus } from "@/lib/studio/server/product";
 
 // POST /api/studio/product/preview {projectId, designId, png (base64, 3/4 view in scene, ≤ 1024 px)}
 //   → 200 {previewPath}
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
-  const ctx = await studioRequest(request, PreviewBody, { consent: false });
+  const ctx = await studioRequest(request, PreviewBody, { consent: false, owner: true });
   if (ctx instanceof Response) return ctx;
   const { supabase, body, project } = ctx;
 
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (!png) return json({ error: "bad_image" }, 400);
 
   const cur = await loadDocPrivate(supabase, project.id);
-  if (!cur.ok) return json({ error: cur.error }, cur.error === "not_found" ? 404 : 500);
+  if (!cur.ok) return json({ error: cur.error }, loadErrorStatus(cur.error));
   if (!cur.owned.product || !cur.owned.productPrivate) return json({ error: "not_found" }, 404);
   if (!findDesign({ product: cur.owned.product, priv: cur.owned.productPrivate }, body.designId)) return json({ error: "not_found" }, 404);
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const up = await uploadPreview(project.id, body.designId, png);
   if (!up.ok) return json({ error: up.error }, 503);
 
-  const saved = await updateProductDoc(supabase, project.id, (s) => {
+  const saved = await updateProductDoc(supabase, ctx.userId, project.id, (s) => {
     const next = applyPreview({ product: s.product, priv: s.priv }, body.designId, up.path);
     return { doc: s.doc, ...next };
   });

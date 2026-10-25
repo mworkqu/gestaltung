@@ -11,10 +11,9 @@
 // discount_ready email when the payload has no valid_until.
 
 import { REDEEM_DAYS, type CreditKind } from "./constants";
+import { DAY_MS } from "@/lib/format/date";
 
 export type LedgerRow = { id: string; kind: CreditKind | string; delta: number; created_at: string };
-
-const DAY_MS = 24 * 3600 * 1000;
 
 const byTime = (a: LedgerRow, b: LedgerRow) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 
@@ -36,6 +35,11 @@ export function redeemableUntil(earnedAt: string | Date): Date {
   return new Date(t + REDEEM_DAYS * DAY_MS);
 }
 
+/** A spend's redeemable_until is still ahead of `now` (an unreadable date counts as over). */
+export function isStillRedeemable(until: string | Date, now: Date = new Date()): boolean {
+  return new Date(until).getTime() > now.getTime();
+}
+
 /**
  * What spend_credit writes for a spend made now: the earn date (falls back to
  * `now` when the ledger has no unit left, like the SQL), the end of the window
@@ -48,5 +52,5 @@ export function spendWindow(
 ): { earnedAt: string; redeemableUntil: string; redeemable: boolean } {
   const earnedAt = nextEarnedAt(rows, kind) ?? now.toISOString();
   const until = redeemableUntil(earnedAt);
-  return { earnedAt, redeemableUntil: until.toISOString(), redeemable: until.getTime() > now.getTime() };
+  return { earnedAt, redeemableUntil: until.toISOString(), redeemable: isStillRedeemable(until, now) };
 }

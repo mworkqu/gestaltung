@@ -118,17 +118,23 @@ function newest(lines: StatusOrderLine[]): StatusOrderLine {
 
 // ── Project-level summary for the /projects cards ───────────────────────────
 
-export type ProjectStatusKind = "ordered" | "in_cart" | "planning";
+export type ProjectStatusKind = "ordered" | "quote_requested" | "in_cart" | "planning";
 
-/** Ordered if any live order carries the project, else in cart, else planning. */
+/**
+ * Ordered if any live order carries the project, else "Quote requested" once a Studio
+ * "Get it made" request was sent (F-043), else in cart, else planning.
+ */
 export function deriveProjectStatus({
   hasLiveOrder,
   hasCartLine,
+  quoteRequested = false,
 }: {
   hasLiveOrder: boolean;
   hasCartLine: boolean;
+  quoteRequested?: boolean;
 }): ProjectStatusKind {
   if (hasLiveOrder) return "ordered";
+  if (quoteRequested) return "quote_requested";
   if (hasCartLine) return "in_cart";
   return "planning";
 }

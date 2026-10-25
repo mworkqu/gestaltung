@@ -5,6 +5,8 @@
 // in any copy: "a full STEP file will be generated for you".
 // Phase 4 adds the paid engineer services (assembly, cad_engineer, pcb_gerber).
 
+import { BUCKETS } from "@/lib/storage/paths";
+
 export type JobKind = "step_model" | "pcb_gerber" | "assembly" | "cad_engineer";
 export type JobStatus = "queued" | "in_progress" | "ready" | "failed" | "cancelled";
 
@@ -23,7 +25,7 @@ export const STEP_JOB = {
   etaHours: { min: 1, max: 3 },
 };
 
-export const ENGINEERING_BUCKET = "engineering-files";
+export const ENGINEERING_BUCKET = BUCKETS.engineeringFiles;
 /** Result files and edited files sent back: up to 100 MB. */
 export const ENGINEERING_MAX_BYTES = 100 * 1024 * 1024;
 /** File types we take back for manufacturing. */

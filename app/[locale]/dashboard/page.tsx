@@ -4,7 +4,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { AdminHome } from "@/components/dashboard/admin-home";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +21,7 @@ export default async function DashboardPage({
 
   // The layout already gates auth; this is belt-and-suspenders + gives us the
   // session for the profile/tenant read below.
-  const session = await getSessionContext();
+  const session = await getSessionContextCached();
   if (!session) {
     redirect(`/${locale}/sign-in`);
   }

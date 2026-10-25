@@ -35,7 +35,7 @@ import {
   symbolKind,
   type GetPart,
   type Locale,
-} from "./netlist";
+} from "./netlist-parts";
 
 export const CHECK_KEYS = [
   // Fixed for you
@@ -46,6 +46,7 @@ export const CHECK_KEYS = [
   // Needs attention
   "led_no_resistor",
   "inductive_on_gpio",
+  "load_return_on_ground",
   "shorted_supplies",
   "power_budget",
   "unpowered",
@@ -58,6 +59,8 @@ export const CHECK_KEYS = [
   "no_battery",
   "battery_unwanted",
   "no_charger",
+  // A caution, not a fault: shown in "What we checked" beside the reassurances (F-052)
+  "usb_backfeed",
   // Reassurances
   "ok_battery",
   "ok_battery_usb",
@@ -98,6 +101,10 @@ export const CHECK_TEXT: Record<CheckKey, Record<Locale, string>> = {
   inductive_on_gpio: {
     en: "{name} needs a driver board so it can't damage the main board.",
     ar: "يحتاج {name} إلى لوحة تشغيل حتى لا يُتلف اللوحة الرئيسية.",
+  },
+  load_return_on_ground: {
+    en: "{name} would run all the time: its return wire belongs on the switch.",
+    ar: "سيعمل {name} طول الوقت: يجب أن يعود سلكه إلى المفتاح.",
   },
   shorted_supplies: {
     en: "Two power sources are joined together; they must be kept apart.",
@@ -146,6 +153,10 @@ export const CHECK_TEXT: Record<CheckKey, Record<Locale, string>> = {
   no_charger: {
     en: "Add a charger so the battery can be refilled safely.",
     ar: "أضف شاحنًا لتُعاد تعبئة البطارية بأمان.",
+  },
+  usb_backfeed: {
+    en: "Unplug USB while the power board feeds the 5 V pin.",
+    ar: "افصل USB أثناء تغذية لوحة الطاقة لمنفذ 5 فولت.",
   },
   ok_battery: {
     en: "Everything runs safely from the battery.",
@@ -286,6 +297,7 @@ export function studioChecks(
   for (const f of hard) {
     if (f.code === "led_no_resistor") push("led_no_resistor", f.ref);
     else if (f.code === "inductive_on_gpio") push("inductive_on_gpio", f.ref);
+    else if (f.code === "load_return_on_ground") push("load_return_on_ground", f.ref);
     else if (f.code === "shorted_supplies") push("shorted_supplies");
     else if (f.code === "power_budget") push("power_budget");
   }
@@ -398,6 +410,21 @@ export function studioChecks(
     }
   }
 
+  // F-052: the board is fed on its own 5 V / VIN pin by a power part, and USB may be plugged in
+  // at the same time to program it — two supplies on one pin. One plain caution, always shown.
+  let backfeed = false;
+  if (mcu) {
+    for (const pin of mcu.p.pins) {
+      if (pin.role !== "5v" && pin.role !== "vin") continue;
+      const net = netOf.get(`${mcu.c.instanceId}.${pin.id}`);
+      if (!net) continue;
+      if (net.pins.some((r) => {
+        const e = byInst.get(splitRef(r)[0]);
+        return !!e && e !== mcu && isPowerSource(e.p);
+      })) backfeed = true;
+    }
+  }
+
   // 4. Reassurances: the most relevant three that hold.
   const has = (...keys: CheckKey[]) => issues.some((x) => keys.includes(x.id.split(":")[0] as CheckKey));
   const ok: CheckKey[] = [];
@@ -414,10 +441,12 @@ export function studioChecks(
   if (mcu && entries.length > 1 && !has("pins_out")) ok.push("ok_pins");
   if (nets.some((n) => n.name === "GND")) ok.push("ok_ground");
 
-  const okLines = ok.slice(0, servoLine ? 2 : 3).map((key) => ({ id: key, ok: true, plain: checkText(key, locale) }));
+  const extras = (servoLine && !has("power_budget") ? 1 : 0) + (backfeed ? 1 : 0);
+  const okLines = ok.slice(0, Math.max(1, 3 - extras)).map((key) => ({ id: key, ok: true, plain: checkText(key, locale) }));
   return [
     ...issues,
     ...(servoLine && !has("power_budget") ? [{ id: "ok_servos", ok: true, plain: servoLine }] : []),
+    ...(backfeed ? [{ id: "usb_backfeed", ok: true, plain: checkText("usb_backfeed", locale) }] : []),
     ...okLines,
   ];
 }

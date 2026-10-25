@@ -16,6 +16,7 @@ import type { LineLink } from "@/lib/studio/code-link";
 import type { GetPart, Locale } from "@/lib/studio/netlist";
 import { wireWords, WireSwatch } from "../wiring/SelectedWire";
 import { linkCls } from "../../ui";
+import { isRtl } from "@/lib/locale";
 
 const WireSnippet = dynamic(() => import("./WireSnippet"), {
   ssr: false,
@@ -231,7 +232,7 @@ export function CodeLines({
           aria-label={t("code.previewTitle")}
           data-testid="studio-wire-preview"
           data-connection={c.id}
-          dir={locale === "ar" ? "rtl" : "ltr"}
+          dir={isRtl(locale) ? "rtl" : "ltr"}
           className="fixed z-50 space-y-2 rounded-2xl border border-[#d6dde8] bg-surface p-3 shadow-neu"
           style={{ top: open.top, bottom: open.bottom, left: open.left, width: open.width }}
           onMouseEnter={cancelClose}

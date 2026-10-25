@@ -16,6 +16,7 @@
 // defaults identical to the 0096 seed.
 
 import { z } from "zod";
+import { round2 } from "@/lib/format/money";
 
 export const SCHOOL_PRICING_KEY = "school_pricing";
 
@@ -74,7 +75,7 @@ export function validateSchoolPricing(
 /** QAR per credit in a pack, for the "works out at …" line. Rounded to fils. */
 export function perCreditQar(pack: SchoolCreditPack): number {
   if (pack.credits <= 0) return 0;
-  return Math.round((pack.qar / pack.credits) * 100) / 100;
+  return round2(pack.qar / pack.credits);
 }
 
 /**
@@ -84,5 +85,5 @@ export function perCreditQar(pack: SchoolCreditPack): number {
  */
 export function schoolPrintPrice(grams: number, rule: SchoolPrintRule): number {
   const g = Number.isFinite(grams) && grams > 0 ? grams : 0;
-  return Math.round((rule.base_qar + rule.per_gram_qar * g) * 100) / 100;
+  return round2(rule.base_qar + rule.per_gram_qar * g);
 }

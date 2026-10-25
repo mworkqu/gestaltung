@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
 
-import { expect, expectLocale, LOCALES, msg, test, type Loc } from "./fixtures";
+import { expect, expectLocale, LOCALES, msg, supabaseUrl, test, type Loc } from "./fixtures";
 
 // W8 — speed pass, all behind mocks (Supabase is PRODUCTION: nothing is written).
 //
@@ -120,16 +120,12 @@ function JSON_CARD(locale: Loc, key: string): string {
 
 // ── Sign-in ───────────────────────────────────────────────────────────────────
 
-function supabaseUrl(): URL {
-  let url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) {
-    const env = readFileSync(path.join(ROOT, ".env.local"), "utf8");
-    url = /^NEXT_PUBLIC_SUPABASE_URL=(.*)$/m.exec(env)?.[1]?.trim().replace(/^["']|["']$/g, "");
-  }
-  if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
-  return new URL(url);
-}
-const SUPA = supabaseUrl();
+// Without a Supabase URL (no .env.local in this checkout) these specs cannot
+// run: the app has no Supabase client to intercept. Skip the file instead of
+// crashing the whole run.
+const SUPA_OR_NULL = supabaseUrl();
+test.skip(!SUPA_OR_NULL, "NEXT_PUBLIC_SUPABASE_URL is not set");
+const SUPA = SUPA_OR_NULL ?? new URL("http://supabase.invalid");
 const STORAGE_KEY = `sb-${SUPA.hostname.split(".")[0]}-auth-token`;
 const isSupabase = (u: URL) => u.host === SUPA.host;
 const GUEST_ID = "aaaaaaaa-0000-4000-8000-00000000e2e3";

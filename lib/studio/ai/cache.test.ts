@@ -41,7 +41,9 @@ describe("runPick with a cache", () => {
     const a = await run(spec());
     const b = await run(spec());
     expect(m.prompts).toHaveLength(1);
-    expect(b).toEqual(a);
+    // The same answer, flagged as a cache hit (the route reads that: nothing was
+    // consumed on this turn, so the charge telemetry records no provider spend).
+    expect(b).toEqual({ ...a, cached: true });
     await run(spec({ power: "battery_usb" }));
     expect(m.prompts).toHaveLength(2);
     // Back to the first card: cached, no third call.
@@ -94,7 +96,7 @@ describe("runSpecChat with a cache", () => {
     const a = await run("a plant watering monitor for my desk");
     const b = await run("a plant watering monitor for my desk");
     expect(m.prompts).toHaveLength(1);
-    expect(b).toEqual(a);
+    expect(b).toEqual({ ...a, cached: true });
     await run("a plant watering monitor for my desk", [{ role: "user", text: "make it solar" }]);
     expect(m.prompts).toHaveLength(2);
   });

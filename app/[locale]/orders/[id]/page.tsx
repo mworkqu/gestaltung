@@ -16,6 +16,7 @@ import { OrderStatusPill } from "@/components/orders/order-status-pill";
 import { OrderTimeline } from "@/components/orders/order-timeline";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; id: string }> }) {
   const { locale, id } = await params;
@@ -79,7 +80,7 @@ export default async function OrderPage({ params }: { params: Promise<{ locale: 
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
   const ref = orderShort(order.id);
-  const placed = new Intl.DateTimeFormat(isRtl ? "ar-QA-u-nu-latn" : "en-GB", {
+  const placed = new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     day: "numeric",
     month: "long",
     year: "numeric",

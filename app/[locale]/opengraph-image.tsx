@@ -98,7 +98,7 @@ function arabicCard(textPng: string) {
           }}
         />
         {/* Arabic text, pre-rendered by scripts/make-og-ar.mjs (transparent, full size) */}
-        {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+        {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <img src={textPng} width={1200} height={630} style={{ position: "absolute", left: 0, top: 0 }} />
         {/* Logo mark, top right */}
         <svg width="96" height="96" viewBox="0 0 48 48" fill="none" style={{ position: "absolute", left: 1024, top: 72 }}>

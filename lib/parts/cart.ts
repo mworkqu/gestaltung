@@ -1,13 +1,19 @@
-// Guest cart helpers. State lives entirely in localStorage (no auth, no DB
-// table). All functions are pure transforms over a CartItem[] except the
-// read/save pair that touch storage. Items are keyed by SKU (unique per part).
+// Cart line helpers. The live cart is the `cart_items` table, read and written
+// by components/parts/cart-provider.tsx; this module is what that provider
+// shares with the rest of the storefront:
+//  - toCartItem: build a display line (CartItem) from a part row.
+//  - getCart / saveCart: the legacy localStorage cart (CART_KEY). The provider
+//    reads it once to migrate old guest carts into cart_items, then clears it.
+//  - cartItemCount / cartTotal: totals over a CartItem[].
+// (The last server read is cached separately in cart-snapshot.ts.) Items are
+// keyed by SKU (unique per part).
 
-import type { CartItem, Part } from "@/lib/supabase/types";
+import type { CartItem } from "@/lib/supabase/types";
 import { CART_KEY } from "@/lib/parts/storage-keys";
 import type { LeadTimeClass } from "@/lib/store/sourcing";
 import { packSizeOf } from "@/lib/store/pack";
 
-// A minimal shape (Part or a cart-stored snapshot) that addToCart accepts.
+// A minimal shape (a Part row or a cart-stored snapshot) that toCartItem accepts.
 // stock_status is admin-only and deliberately not carried into the cart
 // (owner decision 4b): the storefront speaks in lead times only.
 type PartLike = {
@@ -56,39 +62,6 @@ export function saveCart(items: CartItem[]): void {
   } catch {
     // Quota or privacy mode — fail silently; the cart just won't persist.
   }
-}
-
-// Add `qty` of a part. If it's already in the cart, increase the quantity.
-export function addToCart(
-  items: CartItem[],
-  part: Part,
-  qty: number
-): CartItem[] {
-  const quantity = Math.max(part.min_order_qty, Math.trunc(qty) || part.min_order_qty);
-  const existing = items.find((i) => i.sku === part.sku);
-  if (existing) {
-    return items.map((i) =>
-      i.sku === part.sku ? { ...i, quantity: i.quantity + quantity } : i
-    );
-  }
-  return [...items, toCartItem(part, quantity)];
-}
-
-// Set an absolute quantity, clamped to the item's minimum order quantity.
-export function updateCartQty(
-  items: CartItem[],
-  sku: string,
-  qty: number
-): CartItem[] {
-  return items.map((i) =>
-    i.sku === sku
-      ? { ...i, quantity: Math.max(i.minOrderQty, Math.trunc(qty) || i.minOrderQty) }
-      : i
-  );
-}
-
-export function removeFromCart(items: CartItem[], sku: string): CartItem[] {
-  return items.filter((i) => i.sku !== sku);
 }
 
 export function cartItemCount(items: CartItem[]): number {

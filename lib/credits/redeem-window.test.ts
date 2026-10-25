@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { nextEarnedAt, redeemableUntil, spendWindow, type LedgerRow } from "./redeem-window";
+import { isStillRedeemable, nextEarnedAt, redeemableUntil, spendWindow, type LedgerRow } from "./redeem-window";
 
 // Mirrors public.credit_next_earned_at + spend_credit (0053): FIFO over the
 // earn rows, window = earned_at + 30 days.
@@ -64,5 +64,17 @@ describe("redemption window", () => {
       redeemableUntil: "2026-11-04T00:00:00.000Z",
       redeemable: true,
     });
+  });
+});
+
+describe("isStillRedeemable", () => {
+  const now = new Date("2026-10-22T12:00:00Z");
+  it("open while the end is ahead of now, closed at or after it", () => {
+    expect(isStillRedeemable("2026-10-22T12:00:01Z", now)).toBe(true);
+    expect(isStillRedeemable("2026-10-22T12:00:00Z", now)).toBe(false);
+    expect(isStillRedeemable(new Date("2026-10-01T00:00:00Z"), now)).toBe(false);
+  });
+  it("an unreadable date counts as over", () => {
+    expect(isStillRedeemable("not a date", now)).toBe(false);
   });
 });

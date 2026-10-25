@@ -4,7 +4,11 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { COST_MULTIPLIER, QAR_PER_USD, UUID_RE, needsMigration, qarFormatter, rowCost, usdFormatter, type CallRow, type RevenueRow } from "../format";
+import { COST_MULTIPLIER, QAR_PER_USD, billableQar, needsMigration, qarFormatter, rowCost, usdFormatter, type CallRow, type RevenueRow } from "../format";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
+import { dayFormatter } from "@/lib/format/date";
 
 // One user's AI cost: projects (with ideation tokens used), per-model totals
 // and the latest calls. Costs are the stored ai_usage.cost_usd, or the paid
@@ -35,16 +39,17 @@ function add(a: Agg, r: UsageRow) {
 
 export default async function AiCostsUserPage({ params }: { params: Promise<{ locale: string; userId: string }> }) {
   const { locale, userId } = await params;
+  await requireSuperAdmin(locale);
   if (!UUID_RE.test(userId)) notFound();
   setRequestLocale(locale);
   const t = await getTranslations("AiCosts");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const loc = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
+  const loc = intlTag(asLocale(locale));
   const num = new Intl.NumberFormat(loc);
   const usd = usdFormatter(locale);
   const qar = qarFormatter(locale);
-  const dayFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
+  const dayFmt = dayFormatter(asLocale(locale));
   const timeFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Asia/Qatar" });
 
   const supabase = await createClient();
@@ -141,7 +146,7 @@ export default async function AiCostsUserPage({ params }: { params: Promise<{ lo
     { label: t("tokensIn"), value: num.format(all.tin) },
     { label: t("tokensOut"), value: num.format(all.tout) },
     { label: t("totalCost"), value: cost(all) },
-    { label: t("billable"), value: qar(all.cost * COST_MULTIPLIER * QAR_PER_USD) },
+    { label: t("billable"), value: qar(billableQar(all.cost)) },
     { label: t("ideaUsed"), value: num.format(ideaTotal) },
     { label: t("ideaBalance"), value: num.format(balance) },
     { label: t("revenue"), value: qar(Number(rev?.revenue_qar ?? 0)) },

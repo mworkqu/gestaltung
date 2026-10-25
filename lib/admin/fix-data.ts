@@ -15,6 +15,7 @@ import {
   type SupplierBucket,
   type Why,
 } from "@/lib/admin/fix-groups";
+import { readPartsAdmin } from "@/lib/store/part-columns";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -77,11 +78,14 @@ export async function loadOnRequest(db: Db): Promise<Set<string> | null> {
 export async function loadFixParts(db: Db, opts: { ids?: string[] } = {}): Promise<FixItem[] | null> {
   const ids = opts.ids;
   if (ids && ids.length === 0) return [];
-  const parts = await fetchAllRows<Row>((from, to) => {
-    let q = db.from("parts").select(PART_COLS).eq("is_published", true).is("merged_into", null);
-    if (ids) q = q.in("id", ids);
-    return q.order("id").range(from, to);
-  });
+  // pricing_mode: the admin view (0105).
+  const parts = await readPartsAdmin((t) =>
+    fetchAllRows<Row>((from, to) => {
+      let q = db.from(t).select(PART_COLS).eq("is_published", true).is("merged_into", null);
+      if (ids) q = q.in("id", ids);
+      return q.order("id").range(from, to);
+    })
+  );
   if (parts.error) return null;
   const offers = await fetchAllRows<OfferRow>((from, to) => {
     let q = db.from("supplier_offers").select(OFFER_COLS);

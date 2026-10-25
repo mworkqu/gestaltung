@@ -14,7 +14,8 @@ import { GearPlaceholder } from "@/components/parts/gear-placeholder";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { RequestItemButton } from "@/components/parts/request-item-button";
 import { DemandBeacon } from "@/components/parts/demand-beacon";
-import { arrivesByDate, formatDeliveryDate, SHIPPING_TIERS, type DeliveryQuote } from "@/lib/store/delivery";
+import { arrivesByDate, formatDeliveryDate, type DeliveryQuote } from "@/lib/store/delivery";
+import { displayedTiers, pricedTiers, selectableTier } from "@/lib/store/checkout-totals";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { canRequestItem, showMinOrder } from "@/lib/store/product-display";
 import { minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
@@ -43,6 +44,7 @@ import { GALLERY_SIZES, IMAGE_WIDTHS, sizedImage, sizedSrcSet } from "@/lib/stor
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+import { asLocale } from "@/lib/locale";
 
 // ISR (Phase G): each product page is rendered on its first visit per locale,
 // then served from the CDN and re-rendered at most every 5 minutes (prices,
@@ -109,7 +111,7 @@ export default async function PartDetailPage({
     // Before 0030 the RPC does not exist; fall through to 404 as before.
     const survivorSku = await getMergedRedirectSku(sku);
     if (survivorSku) {
-      permanentRedirect(`/${locale === "ar" ? "ar" : "en"}/store/${encodeURIComponent(survivorSku)}`);
+      permanentRedirect(`/${asLocale(locale)}/store/${encodeURIComponent(survivorSku)}`);
     }
     notFound();
   }
@@ -150,6 +152,12 @@ export default async function PartDetailPage({
   const backup = backupLine(source);
   // Cheapest tier at its normal price (0044); shown beside the date.
   const deliveryFrom = minDeliveryFrom(quote?.tiers);
+  // Same-price tiers: only the faster is shown (F-014). The headline stays on
+  // Standard unless Standard is hidden, then on the tier shown at its price.
+  const offered = pricedTiers(quote, part.unit_price * part.min_order_qty, false);
+  const shownTiers = displayedTiers(offered);
+  const headlineTier = selectableTier("standard", offered, shownTiers);
+  const headlineDate = quote?.tiers?.[headlineTier]?.date ?? standardDate;
   const deliveryFromLine =
     deliveryFrom !== null ? tDelivery("deliveryFrom", { min: qarAmount(deliveryFrom) }) : null;
 
@@ -266,16 +274,18 @@ export default async function PartDetailPage({
               {deliveryFromLine && <p className="text-sm font-medium text-heading">{deliveryFromLine}</p>}
             </div>
           ) : (
-            standardDate && (
+            headlineDate && (
               <div className="rounded-xl bg-panel p-3 text-sm shadow-neu-inset">
                 <p className="font-semibold text-heading">
-                  {tDelivery("arrivesBy", { date: formatDeliveryDate(standardDate, locale) })}
-                  <span className="font-normal text-mutedtext"> · {tDelivery("tier_standard")}</span>
+                  {tDelivery("arrivesBy", { date: formatDeliveryDate(headlineDate, locale) })}
+                  <span className="font-normal text-mutedtext"> · {tDelivery(`tier_${headlineTier}`)}</span>
                   {deliveryFromLine && <span className="font-normal text-body"> · {deliveryFromLine}</span>}
                 </p>
                 {quote && (
                   <p className="mt-1 text-xs text-mutedtext">
-                    {SHIPPING_TIERS.filter((k) => k !== "standard" && quote.tiers[k]?.date)
+                    {shownTiers
+                      .map((t) => t.tier)
+                      .filter((k) => k !== headlineTier && quote.tiers[k]?.date)
                       .map((k) => `${tDelivery(`tier_${k}`)}: ${formatDeliveryDate(quote.tiers[k]!.date, locale)}`)
                       .join(" · ")}
                   </p>
@@ -362,7 +372,13 @@ export default async function PartDetailPage({
                   </a>
                 )}
               </div>
-              {specRows.length === 0 && untranslated.specs && !untranslated.description && notTranslated}
+              {/*
+                F-019: the table itself now falls back to the English rows (see
+                lib/store/product-details.ts), so this note sits UNDER it rather
+                than replacing it - the reader gets the numbers and still knows
+                the section is awaiting translation.
+              */}
+              {untranslated.specs && !untranslated.description && notTranslated}
               {specRows.length > 0 && (
                 <div className="neu overflow-x-auto">
                   <table className="w-full text-sm">

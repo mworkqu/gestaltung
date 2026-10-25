@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createClient } from "@/lib/supabase/server";
 import { OccasionsEditor } from "@/components/admin/occasions-editor";
 import { OCCASIONS_KEY, toDrafts } from "@/lib/occasions";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // Seasonal store campaigns (P3-07 / WF-08): the Occasions editor. super_admin
 // only (the store layout redirects everyone else). Reads store_settings.occasions
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OccasionsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("Occasions");
 

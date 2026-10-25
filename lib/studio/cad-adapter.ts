@@ -1,7 +1,7 @@
 // CAD backend seam for the Design Studio.
 //
-// Today every model is built in the browser (three.js + three-bvh-csg, see
-// lib/studio/enclosure/build.ts). The inputs are deliberately small JSON objects
+// Today every model is built in the browser (three.js + the manifold-3d kernel in
+// the Studio geometry worker). The inputs are deliberately small JSON objects
 // — EnclosureSpec, LayoutResult and MechPart[] (lib/studio/schema.ts) — so a
 // server backend can take over without changing them.
 //
@@ -23,7 +23,7 @@ import type { LayoutInput, LayoutResult } from "./layout";
 import type { ProductModel } from "./product/schema";
 import { solveProduct, type SolvedProduct } from "./product/solve";
 import type { ProductGeometry } from "./geometry/client";
-import { buildEnclosure, type EnclosureMeta } from "./enclosure/build";
+import type { EnclosureMeta } from "./enclosure/plan";
 import { buildMechGeometry } from "./mech/templates";
 
 export type CadEnclosure = { base: THREE.Mesh; lid: THREE.Mesh; meta: EnclosureMeta };
@@ -62,8 +62,11 @@ export class BrowserCadBackend implements CadBackend {
     return { solved, geometry };
   }
 
+  /** Built in the Studio geometry worker (manifold-3d), cached by shape key. */
   async buildEnclosure(enc: EnclosureSpec, layout: LayoutResult, parts: Map<string, LibraryPart>): Promise<CadEnclosure> {
-    return buildEnclosure(enc, layout, parts);
+    const { getEnclosureGeometry, enclosureMeshes } = await import("./geometry/client");
+    const g = await getEnclosureGeometry(enc, layout, parts, { persist: false });
+    return { ...enclosureMeshes(g), meta: g.meta };
   }
 
   /** One printable part in its own local coords (placement: lib/studio/mech/build.ts). */

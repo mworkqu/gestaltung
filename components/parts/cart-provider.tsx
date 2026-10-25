@@ -19,6 +19,8 @@ import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { loadSupabase } from "@/lib/supabase/lazy";
 import { trackDemand } from "@/lib/store/demand-client";
 import { kitDiscountQar } from "@/lib/prototyping/kit-money";
+import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
+import { round2 } from "@/lib/format/money";
 
 // ── The cart ────────────────────────────────────────────────────────────────
 //
@@ -144,12 +146,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const linesQuery = (async () => {
       const full = await supabase
         .from("cart_items")
-        .select("id, quantity, project_id, kit_id, bom_lines, part:parts(*), project:projects(name)")
+        .select(`id, quantity, project_id, kit_id, bom_lines, part:parts(${PART_PUBLIC_COLUMNS}), project:projects(name)`)
         .order("created_at", { ascending: true });
       const res = full.error
         ? await supabase
             .from("cart_items")
-            .select("id, quantity, project_id, part:parts(*)")
+            .select(`id, quantity, project_id, part:parts(${PART_PUBLIC_COLUMNS})`)
             .order("created_at", { ascending: true })
         : full;
       return { full, res };
@@ -479,7 +481,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       itemCount: cartItemCount(items),
       subtotalQar: subtotal,
       kitDiscountQar: discount,
-      totalQar: Math.round((subtotal - discount) * 100) / 100,
+      totalQar: round2(subtotal - discount),
       kitDiscountPct,
       ready,
       stale,

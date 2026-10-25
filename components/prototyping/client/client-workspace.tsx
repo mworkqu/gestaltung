@@ -32,6 +32,7 @@ import { isAnalysed, type Spec } from "@/lib/prototyping/spec";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { createClient } from "@/lib/supabase/client";
 import type { Project, ProjectPart } from "@/lib/supabase/types";
+import { asLocale } from "@/lib/locale";
 
 export function ClientWorkspace({
   project,
@@ -75,7 +76,7 @@ export function ClientWorkspace({
   reloadMatches: () => Promise<void>;
 }) {
   const t = useTranslations("ClientView");
-  const locale = useLocale() === "ar" ? "ar" : "en";
+  const locale = asLocale(useLocale());
   const { items: cartItems, kitDiscountPct } = useCart();
   const [findState, setFindState] = useState<"idle" | "working" | "failed">("idle");
 

@@ -26,10 +26,11 @@ import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { formatPrice, partName } from "@/lib/parts/format";
 import { arabicCountForm } from "@/lib/text/count";
 import { cn } from "@/lib/utils";
-import type { StoreSearchResponse, StoreSuggestion } from "@/lib/store/search-suggest";
+import { SUGGEST_MIN_CHARS, type StoreSearchResponse, type StoreSuggestion } from "@/lib/store/search-suggest";
 
 const DEBOUNCE_MS = 200;
-const MIN_CHARS = 2;
+// One threshold for the box and the route, so they cannot disagree (F-029).
+const MIN_CHARS = SUGGEST_MIN_CHARS;
 
 type State = { q: string; results: StoreSuggestion[]; total: number };
 
@@ -286,11 +287,13 @@ function SuggestRow({
       onPointerEnter={onHover}
       className={cn("flex items-center gap-3 px-3 py-2", active && "bg-panel")}
     >
-      <Link href={`/store/${p.sku}`} tabIndex={-1} onClick={onPick} className="flex min-w-0 flex-1 items-center gap-3">
+      <Link href={`/store/${p.sku}`} tabIndex={-1} aria-label={name} onClick={onPick} className="flex min-w-0 flex-1 items-center gap-3">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-panel">
           {p.thumb ? (
+            // Eager on purpose: at most six rows, and a lazy image inside the scrolling
+            // dropdown stayed blank until scrolled (F-029).
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={p.thumb} alt="" width={48} height={48} loading="lazy" decoding="async" className="h-full w-full object-contain" />
+            <img src={p.thumb} alt="" width={48} height={48} decoding="async" className="h-full w-full object-contain" />
           ) : null}
         </span>
         <span className="min-w-0 flex-1">

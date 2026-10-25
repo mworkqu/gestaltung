@@ -2,7 +2,9 @@
 // the 0058 RPCs (approved_reviews, approved_review_count) and the reviews
 // table; anything malformed is dropped rather than rendered.
 
-export type ReviewLocale = "en" | "ar";
+import { asLocale, intlTag, type Locale } from "@/lib/locale";
+
+export type ReviewLocale = Locale;
 export type ReviewStatus = "pending" | "approved" | "rejected";
 export const REVIEW_STATUSES: readonly ReviewStatus[] = ["pending", "approved", "rejected"];
 
@@ -52,7 +54,7 @@ function parseOne(v: unknown): ApprovedReview | null {
     score,
     comment: str(r.comment),
     firstName: str(r.first_name),
-    locale: r.locale === "ar" ? "ar" : "en",
+    locale: asLocale(r.locale),
     createdAt,
   };
 }
@@ -113,7 +115,7 @@ export function pickHomeReviews(reviews: readonly ApprovedReview[], limit = HOME
 export function formatReviewDate(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", {
+  return new Intl.DateTimeFormat(intlTag(asLocale(locale)), {
     dateStyle: "medium",
     timeZone: "Asia/Qatar",
   }).format(d);

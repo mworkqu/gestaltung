@@ -1,8 +1,6 @@
-import { redirect } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
-import { getAuthUser, getSessionContext } from "@/lib/auth/get-session";
-import { guestRedirect } from "@/lib/auth/guest-redirect";
+import { requireSignedIn } from "@/lib/auth/guards";
 import { DashboardNav, type NavGroup } from "@/components/dashboard/dashboard-nav";
 import { DashboardTabs } from "@/components/dashboard/dashboard-tabs";
 import { adminNavGroups, adminTabSets } from "@/components/dashboard/admin-nav-groups";
@@ -29,16 +27,10 @@ export default async function DashboardLayout({
   const { locale } = await params;
   setRequestLocale(locale);
 
-  // Single auth gate for every /dashboard/* route. A guest (anonymous session)
-  // has no dashboard: send them to their projects (D5).
-  const user = await getAuthUser();
-  const guestTarget = guestRedirect({ user, path: `/${locale}/dashboard` });
-  if (guestTarget) redirect(guestTarget);
-
-  const session = await getSessionContext(user);
-  if (!session) {
-    redirect(`/${locale}/sign-in`);
-  }
+  // Auth gate for every /dashboard/* route. A guest (anonymous session) has no
+  // dashboard: send them to their projects (D5). Admin pages check the role
+  // again themselves (requireSuperAdmin); the reads are cached per request.
+  const session = await requireSignedIn(locale);
 
   const t = await getTranslations("DashboardNav");
   const isClient = session.profile.role === "client";

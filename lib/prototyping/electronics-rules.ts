@@ -31,8 +31,8 @@
 //
 // Pure. Text comes through the injected `t`, so lines read in either language.
 
-import type { BuildRoute } from "./analysis";
-import type { ProjectLine } from "./bom";
+import type { BuildRoute, LevelFlag } from "./analysis";
+import type { ProjectLine } from "./bom-types";
 import {
   DEFAULT_LOAD_MA,
   crossValidate,
@@ -50,12 +50,7 @@ import { CLASSES, formatValue, type AttrClass } from "@/lib/store/attributes";
 
 type T = (key: string, params?: Record<string, string | number>) => string;
 
-export type LevelFlag = {
-  net: string;
-  direction: "high_to_low" | "low_to_high";
-  drivers: string[];
-  receivers: string[];
-};
+export type { LevelFlag };
 
 /** A rule line, with the netlist refs it buys (bomId of each is this line's id). */
 export type RuleLine = ProjectLine & { refs?: string[] };

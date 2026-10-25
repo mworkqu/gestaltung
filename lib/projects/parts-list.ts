@@ -30,6 +30,7 @@ import {
   type ProjectLine,
   type ScoredCandidate,
 } from "@/lib/prototyping/bom";
+import { round2 } from "@/lib/format/money";
 
 export type PartStatus = "to_buy" | "in_cart" | "ordered" | "delivered" | "have";
 
@@ -150,5 +151,5 @@ export function projectCartTotal(items: ReadonlyArray<CartLike>, projectId: stri
   }
   let total = loose;
   for (const sum of kits.values()) total += sum - kitDiscountQar(sum, kitDiscountPct);
-  return Math.round(total * 100) / 100;
+  return round2(total);
 }

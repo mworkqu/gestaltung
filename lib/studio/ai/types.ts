@@ -7,7 +7,7 @@
 // orchestrator then falls back to a SAFE DEFAULT. Clamp logs are returned for
 // the server console / admin only — never put them in a response body.
 
-import type { CallResult } from "@/lib/prototyping/ai-call";
+import type { CallResult, CallSpend } from "@/lib/prototyping/ai-call";
 import type { ClampLog } from "../schema";
 
 /** product = the AI product designer, vision = its picture check (P5-16). */
@@ -33,7 +33,18 @@ export type StudioCall = <T>(req: StudioCallRequest<T>) => Promise<CallResult<T>
 
 /** A result the route can return: from the model, the safe default, or our own rules (no model call). */
 export type Outcome<T> =
-  | { ok: true; value: T; source: "model" | "default" | "rules"; clampLog: ClampLog; problems: string[]; model?: string | null }
+  | {
+      ok: true;
+      value: T;
+      source: "model" | "default" | "rules";
+      clampLog: ClampLog;
+      problems: string[];
+      model?: string | null;
+      /** What the model call really consumed (0106 telemetry); absent when no model was called. */
+      spend?: CallSpend;
+      /** This answer came from the in-memory cache, so nothing was consumed this turn. */
+      cached?: boolean;
+    }
   /** paused = daily guard; the route answers 429 and never falls back. */
   | { ok: false; error: "paused" | "rate_limited" | "unavailable"; clampLog: ClampLog; problems: string[] };
 

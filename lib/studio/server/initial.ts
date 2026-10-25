@@ -9,13 +9,13 @@ import { createClient } from "@/lib/supabase/server";
 import { hasAiConsent, type Spec } from "@/lib/prototyping/spec";
 import type { LoadResult } from "@/lib/studio/client/api";
 import { loadDoc } from "./doc";
+import { UUID_RE } from "@/lib/uuid";
 
 export type StudioInitial = Extract<LoadResult, { ok: true }>;
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function loadStudioInitial(projectId: string): Promise<StudioInitial | null> {
-  if (!UUID.test(projectId)) return null;
+  if (!UUID_RE.test(projectId)) return null;
   try {
     const supabase = await createClient();
     const {

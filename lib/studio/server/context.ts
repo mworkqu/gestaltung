@@ -17,6 +17,7 @@ import { validatedCall } from "@/lib/prototyping/ai-call";
 import { hasAiConsent, type Spec } from "@/lib/prototyping/spec";
 import type { ClampLog } from "../schema";
 import type { StudioCall, StudioStep } from "../ai/types";
+import { isSuperAdmin } from "./product";
 
 export const STUDIO_TEMPERATURE = 0.2;
 
@@ -32,7 +33,10 @@ export type StudioCtx<T> = {
 export async function studioRequest<S extends z.ZodTypeAny>(
   request: Request,
   schema: S,
-  opts: { consent: boolean },
+  /** owner: refuse (404) anyone but the project's owner or a super_admin — for
+   *  routes that write with the service role (product routes, 0100 / DB-01):
+   *  a class teacher can SEE a team project under RLS but must not change it. */
+  opts: { consent: boolean; owner?: boolean },
 ): Promise<StudioCtx<z.output<S>> | Response> {
   const supabase = await createClient();
   const {
@@ -44,19 +48,22 @@ export async function studioRequest<S extends z.ZodTypeAny>(
   if (!parsed.success) return Response.json({ error: "bad_request" }, { status: 400 });
   const body = parsed.data as z.output<S> & { projectId: string };
 
-  const { data: project, error } = await supabase.from("projects").select("id, spec").eq("id", body.projectId).maybeSingle();
+  const { data: project, error } = await supabase.from("projects").select("id, spec, user_id").eq("id", body.projectId).maybeSingle();
   if (error) return Response.json({ error: "not_ready" }, { status: 409 });
   if (!project) return Response.json({ error: "not_found" }, { status: 404 });
-  const row = project as { id: string; spec: Spec | null };
+  const { user_id: ownerId, ...row } = project as { id: string; spec: Spec | null; user_id?: string | null };
+  if (opts.owner && ownerId !== user.id && !(await isSuperAdmin(supabase, user.id)))
+    return Response.json({ error: "not_found" }, { status: 404 });
   if (opts.consent && !hasAiConsent(row.spec)) return Response.json({ error: "consent" }, { status: 403 });
 
   return { supabase, userId: user.id, isAnonymous: user.is_anonymous === true, body, project: row };
 }
 
-export function studioCall(supabase: SupabaseClient, projectId: string): StudioCall {
+export function studioCall(supabase: SupabaseClient, projectId: string, userId?: string): StudioCall {
   return (req) =>
     validatedCall({
       supabase,
+      userId,
       projectId,
       feature: "studio",
       step: req.step,

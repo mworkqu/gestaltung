@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ENGINEER_SERVICES_KEY, EngineerServicesSchema } from "@/lib/services/quote";
-import { UUID_RE } from "../ai-costs/format";
+import { asLocale } from "@/lib/locale";
+import { UUID_RE } from "@/lib/uuid";
 
 // Admin controls for engineering jobs. admin_engineering_job_set (0091)
 // re-checks super_admin and the status transition; we only pass the intent.
@@ -19,13 +20,13 @@ function back(locale: string, view: string, err: string | null) {
 }
 
 async function guard() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 
 /** "Start" (in_progress) and "Mark failed" (refunds the tokens). */
 export async function setJobStatus(formData: FormData) {
-  const locale = formData.get("locale") === "ar" ? "ar" : "en";
+  const locale = asLocale(formData.get("locale"));
   const view = String(formData.get("view") ?? "open");
   await guard();
 
@@ -56,7 +57,7 @@ export async function markJobReady(input: {
   locale: string;
 }): Promise<{ ok: boolean }> {
   await guard();
-  const locale = input.locale === "ar" ? "ar" : "en";
+  const locale = asLocale(input.locale);
   if (!UUID_RE.test(input.jobId)) return { ok: false };
   if (!input.path.startsWith(`jobs/${input.jobId}/`) || input.path.includes("..")) return { ok: false };
 
@@ -74,7 +75,7 @@ export async function markJobReady(input: {
 
 // ── 0092: engineer service prices (store_settings 'engineer_services') ──────
 export async function saveServicePrices(formData: FormData) {
-  const locale = formData.get("locale") === "ar" ? "ar" : "en";
+  const locale = asLocale(formData.get("locale"));
   await guard();
   const num = (k: string) => Number(String(formData.get(k) ?? "").trim());
   const value = {

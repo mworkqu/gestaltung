@@ -4,8 +4,11 @@ import { z } from "zod";
 
 import type { CanUse } from "@/lib/credits/constants";
 import { ProductSpecSchema, StudioComponentSchema, StudioDocSchema, clampSpec, type ProductSpec } from "../schema";
+import { TIER_IDS } from "../tiers";
+import { asLocale } from "@/lib/locale";
+import { isMissingFunction } from "@/lib/supabase/errors";
 
-const Locale = z.unknown().optional().transform((v): "en" | "ar" => (v === "ar" ? "ar" : "en"));
+const LocaleField = z.unknown().optional().transform(asLocale);
 const ProjectId = z.string().uuid();
 
 /** Any spec-like value → a valid ProductSpec (quantity is always 1). */
@@ -16,7 +19,7 @@ const SpecIn = z.unknown().transform((v): ProductSpec => {
 
 export const SpecBody = z.object({
   projectId: ProjectId,
-  locale: Locale,
+  locale: LocaleField,
   idea: z.string().max(4000).optional().default(""),
   messages: z.array(z.unknown()).max(64).optional().default([]),
   /** W3 refinement: the spec card already shown (any shape → a valid spec), or nothing. */
@@ -28,17 +31,23 @@ export const SpecBody = z.object({
       const r = ProductSpecSchema.safeParse(v);
       return r.success ? r.data : clampSpec(v);
     }),
+  /**
+   * The tier the visitor approved in the checkpoint modal. It only ALLOWS a charge:
+   * the amount is derived server-side from the tiers (lib/studio/tiers.ts chargePlan),
+   * and a value below the tier the server classified simply pauses again.
+   */
+  approveTier: z.enum(TIER_IDS).optional(),
 });
 
 export const PickBody = z.object({
   projectId: ProjectId,
-  locale: Locale,
+  locale: LocaleField,
   spec: SpecIn,
 });
 
 export const WiringBody = z.object({
   projectId: ProjectId,
-  locale: Locale,
+  locale: LocaleField,
   spec: SpecIn,
   components: z.array(StudioComponentSchema).min(1).max(40),
 });
@@ -46,7 +55,7 @@ export const WiringBody = z.object({
 const Dim = z.number().finite().min(1).max(1000);
 export const EnclosureBody = z.object({
   projectId: ProjectId,
-  locale: Locale,
+  locale: LocaleField,
   spec: SpecIn,
   components: z.array(z.object({ partId: z.string().max(60), label: z.string().max(60).optional() })).max(40).optional().default([]),
   bbox: z.object({ w: Dim, d: Dim, h: Dim }),
@@ -61,7 +70,7 @@ export const MechBody = z.object({
 /** Starter code: the saved doc wins; spec + components cover a doc that lives in memory (before 0068). */
 export const FirmwareBody = z.object({
   projectId: ProjectId,
-  locale: Locale,
+  locale: LocaleField,
   spec: SpecIn.optional(),
   components: z.array(StudioComponentSchema).max(40).optional().default([]),
 });
@@ -100,7 +109,7 @@ export function cadRpcError(message: string | undefined): { status: number; erro
 type RpcError = { code?: string; message?: string } | null;
 /** The function does not exist yet (migration not run). */
 export const rpcMissing = (e: RpcError) =>
-  !!e && (e.code === "PGRST202" || e.code === "42883" || /could not find the function/i.test(e.message ?? ""));
+  !!e && (isMissingFunction(e) || /could not find the function/i.test(e.message ?? ""));
 
 /** 3 versions per CAD credit: cad_deliver reports the regens left after this one. */
 export function versionFromRegens(regens: unknown): { version: number; versionsLeft: number } {

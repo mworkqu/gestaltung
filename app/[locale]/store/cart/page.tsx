@@ -13,12 +13,16 @@ import type { CartItem } from "@/lib/supabase/types";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
 import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
 import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
+import { pricedTiers, selectableTier } from "@/lib/store/checkout-totals";
 import { IsolatedTitle } from "@/components/ltr-isolate";
 import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from "@/lib/store/shipping";
 import { kitDiscountQar as kitDiscountOf } from "@/lib/prototyping/kit-money";
 import { arabicCountForm } from "@/lib/text/count";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useClassOrderId, withClassOrder } from "@/lib/schools/client";
+
+/** Cart thumbnails loaded eagerly (the rows visible without scrolling). */
+const EAGER_THUMBS = 3;
 
 // A project kit (lines sharing a kit_id) is one entry: one kit price, with its
 // components listed underneath. Loose lines keep their own quantity controls.
@@ -106,7 +110,10 @@ export default function CartPage() {
   for (const i of items) if (i.kitId) kits.set(i.kitId, [...(kits.get(i.kitId) ?? []), i]);
   const loose = items.filter((i) => !i.kitId);
   const anyToConfirm = items.some(toConfirm);
-  const standardDate = quote?.tiers?.standard?.date ?? null;
+  // Same-price tiers: only the faster is shown (F-014); the headline moves off
+  // Standard only when Standard is hidden by a same-priced faster tier.
+  const headlineTier = selectableTier("standard", pricedTiers(quote, totalQar, false));
+  const standardDate = quote?.tiers?.[headlineTier]?.date ?? null;
   // Delivery cost before checkout (0044). The cart total is the goods subtotal
   // (after the kit discount, before shipping), the same figure the server uses.
   const deliveryFrom = minDeliveryFrom(quote?.tiers);
@@ -173,7 +180,7 @@ export default function CartPage() {
             );
           })}
 
-          {loose.map((item) => {
+          {loose.map((item, idx) => {
             const name = nameOf(item);
             return (
               <li key={item.rowId ?? item.sku} className="neu flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 p-3 sm:flex-nowrap sm:p-4">
@@ -188,7 +195,8 @@ export default function CartPage() {
                       width={64}
                       height={64}
                       alt={name}
-                      loading="lazy"
+                      // The first rows are on screen at once; lazy there showed grey squares.
+                      loading={idx < EAGER_THUMBS ? "eager" : "lazy"}
                       decoding="async"
                       className="h-full w-full object-contain"
                     />
@@ -304,7 +312,7 @@ export default function CartPage() {
               {standardDate && (
                 <p className="font-semibold text-heading">
                   {tD("arrivesBy", { date: formatDeliveryDate(standardDate, locale) })}
-                  <span className="font-normal text-mutedtext"> · {tD("tier_standard")}</span>
+                  <span className="font-normal text-mutedtext"> · {tD(`tier_${headlineTier}`)}</span>
                 </p>
               )}
               {quote?.held_by && <p className="mt-1 text-mutedtext">{tD("heldBy", { item: quote.held_by })}</p>}

@@ -8,6 +8,7 @@ import type { StepId } from "@/lib/studio/palette";
 import type { ProductSpec, StudioDoc } from "@/lib/studio/schema";
 import type { CardSlot } from "@/lib/studio/ai/spec-guards";
 import { classFor, fadedReasonKey, isFadedStep } from "@/lib/studio/build-class";
+import { unmetPromises } from "@/lib/studio/card-parts";
 
 export const FLOW = ["idea", "parts", "wiring", "enclosure", "print", "code", "make"] as const satisfies readonly StepId[];
 export type FlowStep = (typeof FLOW)[number];
@@ -43,7 +44,11 @@ export function stepDone(step: FlowStep, doc: StudioDoc | null): boolean {
     case "idea":
       return true; // a doc only exists once the idea summary was accepted
     case "parts":
-      return doc.components.length > 0;
+      // F-011: a card that promises something no part can do is not a finished parts list.
+      // The step is not "done" until the promise has a part (or the card drops it); the main
+      // button still moves on, so nobody is stuck — the tick and the progress line tell the
+      // truth instead.
+      return doc.components.length > 0 && unmetPromises(doc.spec).length === 0;
     case "wiring":
       return doc.checks.length > 0 && doc.netlist.nets.length > 0;
     case "enclosure":

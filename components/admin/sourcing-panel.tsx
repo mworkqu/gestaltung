@@ -29,6 +29,7 @@ import {
 } from "@/lib/store/sourcing";
 import { formatPrice } from "@/lib/parts/format";
 import { cn } from "@/lib/utils";
+import { intlTag, asLocale } from "@/lib/locale";
 
 const input =
   "w-full rounded-lg border border-white/60 bg-surface px-2 py-1 text-[12px] text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
@@ -166,7 +167,7 @@ export function SourcingPanel({ locale, partId, unitPrice, sourcing, offers, sup
                   <td className="px-2 py-2">{t(`av_${o.availability}`)}</td>
                   <td className="px-2 py-2 tabular-nums">{o.lead_time_days ?? "—"}</td>
                   <td className="px-2 py-2 tabular-nums">{money(o.landed_qar)}</td>
-                  <td className="px-2 py-2 text-mutedtext">{o.last_checked_at ? new Date(o.last_checked_at).toLocaleDateString(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB") : "—"}</td>
+                  <td className="px-2 py-2 text-mutedtext">{o.last_checked_at ? new Date(o.last_checked_at).toLocaleDateString(intlTag(asLocale(locale))) : "—"}</td>
                   <td className="px-2 py-2">
                     <div className="flex justify-end gap-1">
                       {["mouser", "digikey"].includes(supplierById.get(o.supplier_id)?.code ?? "") && (

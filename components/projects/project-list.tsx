@@ -13,6 +13,7 @@ import { Tag } from "@/components/ui/tag";
 import { ProductPicture } from "@/components/projects/product-picture";
 import type { Project } from "@/lib/supabase/types";
 import { PROJECT_HREF_COLUMNS, projectHref } from "@/lib/projects/href";
+import type { StudioCardFacts } from "@/lib/projects/studio-facts";
 import { PROJECT_LIMIT } from "@/lib/credits/constants";
 import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
 
@@ -48,7 +49,16 @@ type OrderLineRow = {
 };
 
 /** previews: project id → signed URL of its chosen Studio design picture (made on the server). */
-export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Record<string, string>; previewAlt?: string } = {}) {
+export function ProjectList({
+  previews = {},
+  previewAlt = "",
+  facts = {},
+}: {
+  previews?: Record<string, string>;
+  previewAlt?: string;
+  /** Studio projects: parts and quote-request state read from the doc itself (F-043). */
+  facts?: Record<string, StudioCardFacts>;
+} = {}) {
   const t = useTranslations("Projects");
   const format = useFormatter();
   const [projects, setProjects] = useState<CardProject[] | null>(null);
@@ -160,10 +170,12 @@ export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Rec
             brief: p.brief,
             created_at: p.created_at,
             archived: p.status === "archived",
-            partCount: (items.get(p.id) ?? 0) + (parts.get(p.id) ?? 0),
+            // A Studio project keeps its parts in its doc; the legacy tables stay empty for it.
+            partCount: facts[p.id] ? facts[p.id].parts : (items.get(p.id) ?? 0) + (parts.get(p.id) ?? 0),
             status: deriveProjectStatus({
               hasLiveOrder: ordered.has(p.id),
               hasCartLine: (carts.get(p.id) ?? 0) > 0,
+              quoteRequested: facts[p.id]?.quoteRequested === true,
             }),
           }))
         );
@@ -173,6 +185,8 @@ export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Rec
     return () => {
       cancelled = true;
     };
+    // facts only changes with the server render, which remounts this list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reload]);
 
   if (error) {
@@ -231,7 +245,7 @@ export function ProjectList({ previews = {}, previewAlt = "" }: { previews?: Rec
               {previews[p.id] && <ProductPicture url={previews[p.id]} alt={previewAlt} size={56} />}
               <p className="min-w-0 flex-1 break-words text-base font-semibold text-heading">{p.name}</p>
               <Tag
-                variant={p.status === "planning" ? "neutral" : p.status === "ordered" ? "inventory" : "buy"}
+                variant={p.status === "planning" ? "neutral" : p.status === "ordered" || p.status === "quote_requested" ? "inventory" : "buy"}
                 className="shrink-0"
               >
                 {t(`card_status_${p.status}`)}

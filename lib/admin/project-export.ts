@@ -20,6 +20,7 @@ import { projectReadiness, wordCount } from "@/lib/prototyping/readiness";
 import type { Spec } from "@/lib/prototyping/spec";
 import { branches } from "@/lib/prototyping/tree";
 import type { Project, ProjectPart } from "@/lib/supabase/types";
+import { round2 } from "@/lib/format/money";
 
 export const EXPORT_VERSION = 1;
 
@@ -300,7 +301,7 @@ export async function buildProjectExport(
           : null,
         orderQuantity: qty,
         // A bought line carries its product (bom-server) but is never totalled again.
-        lineTotal: prod && !m?.have && !l.fulfilled ? Math.round(Number(prod.unit_price) * qty * 100) / 100 : null,
+        lineTotal: prod && !m?.have && !l.fulfilled ? round2(Number(prod.unit_price) * qty) : null,
         candidates: (m?.candidates ?? []).map((c) => ({
           id: c.id,
           sku: c.sku,

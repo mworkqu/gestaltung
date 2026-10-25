@@ -6,6 +6,7 @@
 import type { createClient } from "@/lib/supabase/server";
 import { photoOf } from "@/lib/admin/stock-data";
 import { supplierForLine, type LineSupplier, type OfferRef } from "@/lib/orders/line-suppliers";
+import { readPartsAdmin } from "@/lib/store/part-columns";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -67,7 +68,7 @@ export async function loadOrderLines(db: Db, orderIds: string[]): Promise<{ byOr
   const offers = new Map<string, OfferRef[]>();
   for (const ids of chunks(partIds)) {
     const [p, o] = await Promise.all([
-      db.from("parts").select("id, image_url, images, preferred_offer_id").in("id", ids),
+      readPartsAdmin((t) => db.from(t).select("id, image_url, images, preferred_offer_id").in("id", ids)),
       db.from("supplier_offers").select("id, part_id, active, suppliers(code, name)").in("part_id", ids),
     ]);
     if (p.error || o.error) {

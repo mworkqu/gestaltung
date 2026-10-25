@@ -8,6 +8,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { callCostUsd } from "@/lib/ai/prices";
 import { logUsage, quota } from "@/lib/ai/usage";
 import { callGemini, geminiConfigured } from "./providers/gemini-client";
 import { ProviderError, type TokenUsage } from "./providers/types";
@@ -17,12 +18,20 @@ export type CallFeature = "netlist" | "electronics" | "cad" | "studio" | "billin
 /** The provider call; tests inject a fake (then the key check is skipped). */
 export type ModelCaller = typeof callGemini;
 
+/**
+ * What the call really consumed, summed over every attempt (0106 telemetry: the agreed
+ * ideation-token deduction is compared against this, never changed by it).
+ */
+export type CallSpend = { promptTokens: number; completionTokens: number; totalTokens: number; costUsd: number | null };
+
 export type CallResult<T> =
-  | { ok: true; value: T; model: string | null }
+  | { ok: true; value: T; model: string | null; spend: CallSpend }
   | { ok: false; error: "paused" | "unavailable" | "rate_limited" | "invalid"; problems: string[] };
 
 export async function validatedCall<T>(opts: {
   supabase: SupabaseClient;
+  /** The caller's verified user id (metering, 0101); looked up on `supabase` when absent. */
+  userId?: string | null;
   /** null = not tied to a project (billing: the Fawran proof check). */
   projectId: string | null;
   feature: CallFeature;
@@ -43,11 +52,11 @@ export async function validatedCall<T>(opts: {
   /** First model to ask (default GEMINI_MODEL). */
   model?: string;
 }): Promise<CallResult<T>> {
-  const { supabase, projectId, feature, step } = opts;
+  const { supabase, projectId, feature, step, userId } = opts;
   const caller = opts.caller ?? callGemini;
   if (!opts.caller && !geminiConfigured()) return { ok: false, error: "unavailable", problems: [] };
   if ((await quota(supabase, "gemini")).paused) {
-    await logUsage(supabase, { provider: "gemini", projectId, feature, step, outcome: "blocked", errorCode: "paused" });
+    await logUsage(supabase, { userId, provider: "gemini", projectId, feature, step, outcome: "blocked", errorCode: "paused" });
     return { ok: false, error: "paused", problems: [] };
   }
 
@@ -70,6 +79,16 @@ export async function validatedCall<T>(opts: {
 
   let errors: string[] = [];
   let model: string | null = null;
+  // Summed over both attempts: a retry is part of what this one answer cost us.
+  const spend: CallSpend = { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: null };
+  const addSpend = (u: TokenUsage | undefined, m: string | null) => {
+    if (!u) return;
+    spend.promptTokens += u.input ?? 0;
+    spend.completionTokens += u.output ?? 0;
+    spend.totalTokens += u.total ?? 0;
+    const usd = callCostUsd({ model: m, promptTokens: u.input, completionTokens: u.output, totalTokens: u.total });
+    if (usd !== null) spend.costUsd = (spend.costUsd ?? 0) + usd;
+  };
   for (let attempt = 1; attempt <= 2; attempt++) {
     const prompt =
       attempt === 1
@@ -104,7 +123,7 @@ export async function validatedCall<T>(opts: {
       errors = [err.reason === "malformed" ? "the answer was not valid JSON" : err.message];
       if (e instanceof ProviderError && e.reason !== "malformed") {
         await record({ model, attempt, rawText, raw: null, parsed: null, outcome: "error", errors });
-        await logUsage(supabase, {
+        await logUsage(supabase, { userId,
           provider: "gemini", model, projectId, feature, step,
           promptTokens: usage?.input, completionTokens: usage?.output, totalTokens: usage?.total,
           latencyMs, outcome: "error", errorCode: e.reason,
@@ -112,13 +131,14 @@ export async function validatedCall<T>(opts: {
         return { ok: false, error: e.reason === "rate_limited" ? "rate_limited" : "unavailable", problems: errors };
       }
     }
-    await logUsage(supabase, {
+    await logUsage(supabase, { userId,
       provider: "gemini", model, projectId, feature, step,
       promptTokens: usage?.input, completionTokens: usage?.output, totalTokens: usage?.total,
       latencyMs, outcome: value ? "ok" : "error", errorCode: value ? null : "invalid",
     });
     await record({ model, attempt, rawText, raw, parsed: value, outcome: value ? "ok" : "invalid", errors: value ? [] : errors });
-    if (value) return { ok: true, value, model };
+    addSpend(usage, model);
+    if (value) return { ok: true, value, model, spend };
     console.warn(`[${feature}] attempt ${attempt} rejected: ${errors.join("; ")}`);
   }
   return { ok: false, error: "invalid", problems: errors.slice(0, 6) };

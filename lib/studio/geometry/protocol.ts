@@ -1,12 +1,13 @@
 // Messages between the main thread (geometry/client.ts) and the geometry
 // worker (studio-geometry.worker.ts → job.ts). Plain data only.
 
-import type { EnclosureMeta } from "../enclosure/build";
+import type { EnclosureMeta } from "../enclosure/plan";
 import type { Vec3 } from "../explode";
 import type { LayoutResult } from "../layout";
 import type { MechTemplate, EnclosureSpec, Environment, LibraryPart, MechPart } from "../schema";
 import type { Material } from "../mech/materials";
 import type { PackedGeometry } from "./pack";
+import type { PrintCheck } from "./mesh-check";
 import type { BuiltLink, BuiltPiece } from "./product-kernel";
 import type { PlacedElectronic, SolvedProduct } from "../product/solve";
 import type { Archetype, Scene } from "../product/schema";
@@ -39,6 +40,10 @@ export type PackedMechPart = {
   printable: { material: Material; estGrams: number };
   volumeMm3: number;
   triangles: number;
+  /** F-003: the manifold check, run in the worker on the mesh we would export. */
+  check: PrintCheck;
+  /** Outer size in the print pose (mm). */
+  size: { w: number; d: number; h: number };
   /** lid / base: the enclosure's own geometry is reused on the main thread. */
   shell?: "lid" | "base";
   geometry?: PackedGeometry;
@@ -136,6 +141,8 @@ export type ProductPreviewError = "guest_limit" | "sign_in" | "no_tokens" | "no_
 export type ProductPreviewResult = {
   designs: ProductPreviewDesign[];
   error?: ProductPreviewError;
+  /** Why it failed, when the job can tell (F-009); only set together with error "failed". */
+  reason?: "network" | "setup" | "service" | "pictures";
   ms: number;
   /** Regenerations made on the project so far (set by the server on a regeneration; the first is free). */
   regens?: number;
@@ -154,7 +161,23 @@ export type ProductStlFile = {
   name: string;
   data: ArrayBuffer;
 };
-export type ProductStlResult = { files: ProductStlFile[]; combined: { name: string; data: ArrayBuffer } | null };
+export type ProductStlResult = {
+  files: ProductStlFile[];
+  /**
+   * F-003: one file per BED, laid out inside the printer's envelope. The old
+   * single "all parts" file was 406 mm long and did not fit the MK4.
+   */
+  plates: { name: string; data: ArrayBuffer; w: number; d: number }[];
+  /** Kept so older callers still compile: the first plate, or null. */
+  combined: { name: string; data: ArrayBuffer } | null;
+  /**
+   * Bodies we refused to export because they failed the manifold check
+   * (F-003: never hand over a mesh a slicer cannot fill).
+   */
+  unclosed: { id: string; role: string; shells: number }[];
+  /** Bodies that do not fit the bed at all, so no plate holds them. */
+  tooBig: string[];
+};
 
 // ---------------------------------------------------------------------------
 // Parts step picture: the picked parts on their plate, drawn in the worker so the

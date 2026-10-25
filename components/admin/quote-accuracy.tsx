@@ -7,9 +7,10 @@ import { getTranslations } from "next-intl/server";
 import { QuoteRuleForm, type SaveRuleAction } from "@/components/admin/quote-rule-form";
 import type { QuoteAccuracy } from "@/lib/studio/quote-accuracy";
 import type { QuoteRule } from "@/lib/studio/request-summary";
+import { intlTag, asLocale } from "@/lib/locale";
 
 function fmt(n: number, locale: string, digits = 2): string {
-  return new Intl.NumberFormat(locale === "ar" ? "ar-QA-u-nu-latn" : "en-GB", { maximumFractionDigits: digits }).format(n);
+  return new Intl.NumberFormat(intlTag(asLocale(locale)), { maximumFractionDigits: digits }).format(n);
 }
 
 export async function QuoteAccuracySection({

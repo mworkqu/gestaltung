@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getSessionContext } from "@/lib/auth/get-session";
+import { getSessionContextCached } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { digikeyConfigured, digikeyPart, digikeySearch } from "@/lib/sourcing/adapters/digikey";
 import { mouserConfigured, mouserPart, mouserSearch } from "@/lib/sourcing/adapters/mouser";
@@ -22,7 +22,7 @@ type ApiSupplier = (typeof API_SUPPLIERS)[number];
 const IMAGE_HOSTS = /(^|\.)(mouser\.com|digikey\.com)$/i;
 
 async function requireAdmin() {
-  const s = await getSessionContext();
+  const s = await getSessionContextCached();
   if (s?.profile.role !== "super_admin") throw new Error("forbidden");
 }
 

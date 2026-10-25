@@ -1,6 +1,6 @@
 // The last built cases, kept in this browser (IndexedDB) so the Enclosure step
 // shows the visitor's case INSTANTLY on a reload or a later visit instead of
-// waiting 1–5 s for the worker to cut it again (W6).
+// waiting for the worker to cut it again (W6).
 //
 //  * stores the packed geometry (typed arrays + the plain plan) by shape key
 //    (key.ts) — the same key the in-memory cache uses, so colour / finish never
@@ -13,12 +13,15 @@
 //    the caller simply builds as before. Reads give up after READ_TIMEOUT_MS.
 
 import type { PackedEnclosure } from "./protocol";
+import { DAY_MS } from "@/lib/format/date";
 
-export const GEOMETRY_CACHE_VERSION = "w6-1";
+// "k1": the case is cut by the product kernel (manifold-3d) since F-003 / §3.2 —
+// a cut saved by the old three-bvh-csg builder is not printable and must not be served.
+export const GEOMETRY_CACHE_VERSION = "k1";
 const DB_NAME = "studio-geometry";
 const STORE = "enclosures";
 const MAX_ENTRIES = 4;
-const MAX_AGE_MS = 7 * 24 * 3600 * 1000;
+const MAX_AGE_MS = 7 * DAY_MS;
 const READ_TIMEOUT_MS = 400;
 
 const NAMESPACE = `${GEOMETRY_CACHE_VERSION}:${process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? "local"}`;

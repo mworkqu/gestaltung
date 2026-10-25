@@ -2,11 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { activeLines, type ProjectBom } from "@/lib/prototyping/bom";
 import type { LineMatch } from "@/lib/prototyping/bom";
 import { matchProjectBom } from "@/lib/prototyping/bom-server";
+import { BomMatchBody } from "@/lib/projects/route-bodies";
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { categoriesOf } from "@/lib/store/bought-together";
 import { relevantAlsoUseful } from "@/lib/store/also-useful-relevance";
 import { getUpsellPool } from "@/lib/store/public-catalog";
 import { storeCategoryOf } from "@/lib/store/store-categories";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // Matches a project's bill of materials against the store and the caller's
 // own inventory. Server-side so the whole catalogue never ships to the
@@ -29,9 +31,9 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return new Response(null, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as { projectId?: unknown } | null;
-  const projectId = typeof body?.projectId === "string" ? body.projectId : null;
-  if (!projectId) return new Response(null, { status: 400 });
+  const parsed = BomMatchBody.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return new Response(null, { status: 400 });
+  const { projectId } = parsed.data;
 
   // RLS: only the owner (or super_admin) gets the row.
   const { data: project, error } = await supabase
@@ -39,11 +41,11 @@ export async function POST(request: Request) {
     .select("id, user_id, bom")
     .eq("id", projectId)
     .maybeSingle();
-  if (error) return Response.json({ error: "not_ready" }, { status: 409 });
+  if (error) return jsonError("not_ready", 409);
   if (!project) return new Response(null, { status: 404 });
 
   const bom = (project as { bom?: ProjectBom | null }).bom;
-  if (!bom?.lines?.length) return Response.json({ matches: [], alsoUseful: [] });
+  if (!bom?.lines?.length) return jsonOk({ matches: [], alsoUseful: [] });
 
   const matches = await matchProjectBom(supabase, bom, project.user_id as string);
 
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
     if (demandError) console.warn(`[bom] demand not recorded: ${demandError.message}`);
   }
 
-  return Response.json({ matches, alsoUseful: await alsoUsefulFor(matches, bom) });
+  return jsonOk({ matches, alsoUseful: await alsoUsefulFor(matches, bom) });
 }
 
 /** "Also useful" under the BOM; any failure is just an empty list. */

@@ -12,6 +12,7 @@ import { qrSvg } from "@/lib/schools/qr";
 import { metaFor } from "@/lib/meta";
 import { SITE_URL } from "@/lib/seo";
 import { cn } from "@/lib/utils";
+import { isMissing } from "../../missing";
 
 // noindex, like the printable pilot proposal (/institutions/proposal).
 export const generateMetadata = metaFor("schoolClasses");
@@ -35,16 +36,6 @@ const PRINT_CSS = `
 `;
 
 type ClassRow = { id: string; name: string; school_name: string; join_code: string };
-
-type PgError = { code?: string; message?: string } | null;
-
-/** The relation does not exist yet (0096 not run). */
-function isMissing(e: PgError): boolean {
-  if (!e) return false;
-  const code = e.code ?? "";
-  if (code === "42P01" || code === "PGRST202" || code === "PGRST205" || code === "42883") return true;
-  return /could not find the (?:function|table)|does not exist/i.test(e.message ?? "");
-}
 
 export default async function ClassSheetPage({
   params,

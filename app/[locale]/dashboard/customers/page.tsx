@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { cn } from "@/lib/utils";
 import { needsMigration, qarFormatter } from "../ai-costs/format";
+import { requireSuperAdmin } from "@/lib/auth/guards";
+import { intlTag, asLocale } from "@/lib/locale";
+import { dayFormatter, timeFormatter } from "@/lib/format/date";
 
 // Every customer in one place (owner, 2026-10-19: "allow me to see all
 // customer data"). One row per profiles row — who they are, how to reach them
@@ -57,16 +60,17 @@ export default async function CustomersPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   const { q } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations("Customers");
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
-  const loc = isRtl ? "ar-QA-u-nu-latn" : "en-GB";
+  const loc = intlTag(asLocale(locale));
   const num = new Intl.NumberFormat(loc);
   const qar = qarFormatter(locale);
-  const dayFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Qatar" });
-  const timeFmt = new Intl.DateTimeFormat(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Qatar" });
+  const dayFmt = dayFormatter(asLocale(locale));
+  const timeFmt = timeFormatter(asLocale(locale));
   const query = (typeof q === "string" ? q : "").trim().slice(0, 80);
 
   const supabase = await createClient();

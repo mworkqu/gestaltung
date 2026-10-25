@@ -15,7 +15,7 @@ import { getPart } from "@/lib/studio/library";
 import { layoutComponents } from "@/lib/studio/layout";
 import { defaultEnclosureFor } from "@/lib/studio/enclosure/templates";
 import { clampSpec, type EnclosureSpec } from "@/lib/studio/schema";
-import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/plan";
 import { STEP_ACCENT } from "@/lib/studio/palette";
 
 /** Same parts as the StudioFixture's mock pick (lib/studio/client/mock.ts PICK). */

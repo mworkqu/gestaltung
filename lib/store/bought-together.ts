@@ -14,6 +14,7 @@
 
 import type { StoreCardPart } from "@/lib/store/catalog";
 import { LEAD_CLASS_DAYS } from "@/lib/store/delivery";
+import { FALLBACK_STORE_CATEGORY } from "@/lib/store/store-categories";
 
 export const UPSELL_COUNT = 3;
 
@@ -63,17 +64,25 @@ export function inSkuOrder<T extends Pick<StoreCardPart, "sku">>(rows: readonly 
 /**
  * The product page's list: co-purchased first (their order kept), then
  * same-category products ranked in stock first, never the current SKU and
- * never twice; at most `limit`.
+ * never twice; at most `limit`. Every pick must be justified: a real
+ * co-purchase, or the product's own store category. The catch-all category
+ * (FALLBACK_STORE_CATEGORY) is where unreviewed products land, so sharing it
+ * says nothing about relevance (a DC jack and an enclosure both sit there):
+ * it never tops up. With nothing justified the list is empty and the page
+ * hides the block.
  */
 export function mergeBoughtTogether({
   together,
   fallback,
   currentSku,
+  category,
   limit = UPSELL_COUNT,
 }: {
   together: readonly StoreCardPart[];
   fallback: readonly StoreCardPart[];
   currentSku: string;
+  /** The current product's store category; null/catch-all means no top-up. */
+  category: string | null;
   limit?: number;
 }): UpsellPick {
   const seen = new Set<string>([currentSku]);
@@ -84,7 +93,8 @@ export function mergeBoughtTogether({
     seen.add(p.sku);
     fromOrders.push(p);
   }
-  const fill = pickAlsoUseful({ pool: fallback, excludeSkus: seen, limit: Math.max(0, limit - fromOrders.length) });
+  const justified = category && category !== FALLBACK_STORE_CATEGORY ? fallback.filter((p) => p.category === category) : [];
+  const fill = pickAlsoUseful({ pool: justified, excludeSkus: seen, limit: Math.max(0, limit - fromOrders.length) });
   const parts = [...fromOrders, ...fill];
   return { parts, source: fromOrders.length > 0 && fill.length === 0 ? "together" : "category" };
 }

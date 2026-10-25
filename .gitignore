@@ -63,3 +63,15 @@ Claude outputs/
 services/**/__pycache__/
 services/**/.pytest_cache/
 services/**/.venv/
+
+# FUSE temp files left by mounted-volume editors (a Word temp file was once committed)
+.fuse_hidden*
+
+# 2026-10 review artifacts (77 MB, none of it source): the input packs the owner
+# supplied and the outputs we generate from them. Named one by one rather than
+# ignoring review/ wholesale, because review/fixes/commits.txt and
+# review/fixes/emails/ are already tracked and must keep showing their changes.
+/review/qa/
+/review/gestaltung-audit-reports-2026-10/
+/review/fixes/build/
+/review/fixes/screenshots/

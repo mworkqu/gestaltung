@@ -1,27 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  honestSources,
-  withStandardGaps,
-  type Analysis,
-  type AnalysisEvent,
-  type AnalysisRequest,
-  type FallbackReason,
-} from "@/lib/prototyping/analysis";
-import {
-  AnalysisRequestSchema,
-  AnalysisSchema,
-  DisciplinesSchema,
-  RequirementsSchema,
-} from "@/lib/prototyping/analysis-schema";
-import { analysisFingerprint } from "@/lib/prototyping/analysis-request";
+import type { AnalysisEvent, AnalysisRequest } from "@/lib/prototyping/analysis";
+import { AnalysisRequestSchema } from "@/lib/prototyping/analysis-schema";
+import { runAnalysis } from "@/lib/prototyping/analyse-run";
 import { logUsage, quota } from "@/lib/ai/usage";
 import { bomRate } from "@/lib/credits/server";
 import { readTurnstileToken } from "@/lib/turnstile";
 import { checkTurnstile } from "@/lib/turnstile-server";
-import type { ProviderId } from "@/lib/ai/limits";
 import { configuredProviderName, loadProvider } from "@/lib/prototyping/providers";
 import { readWithRules } from "@/lib/prototyping/providers/rules";
-import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/types";
+import { jsonError } from "@/lib/http";
 
 // Brief analysis. The ONLY place a provider is called — never from the
 // browser, so no provider key ever leaves the server.
@@ -41,6 +28,9 @@ import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/type
 // raw reply beside its parsed result in analysis_runs (0024) — so a wrong
 // answer can be traced to the model or to our parsing.
 //
+// The sequencing lives in lib/prototyping/analyse-run.ts (runAnalysis); this
+// route authenticates, checks the CAPTCHA and the body, and streams its events.
+//
 // An identical request is never sent twice. Each run records the fingerprint of
 // what was asked (0099), so a second press on an unchanged brief is answered
 // from the stored run: no provider call, nothing metered, nothing charged. The
@@ -49,9 +39,6 @@ import { ProviderError, type TokenUsage } from "@/lib/prototyping/providers/type
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-/** Providers the daily guard meters. Others (the basic reader) cost nothing. */
-const METERED: Record<string, ProviderId> = { gemini: "gemini" };
 
 export async function POST(request: Request) {
   // Only someone with a session (a guest's anonymous session counts) may spend
@@ -68,7 +55,7 @@ export async function POST(request: Request) {
   // x-turnstile-token header (IdeaStage renders the widget for guests).
   if (user.is_anonymous) {
     const check = await checkTurnstile(request, readTurnstileToken(request.headers));
-    if (!check.ok) return Response.json({ error: "captcha_failed" }, { status: 403 });
+    if (!check.ok) return jsonError("captcha_failed", 403);
   }
 
   const parsed = AnalysisRequestSchema.safeParse(await request.json().catch(() => null));
@@ -76,155 +63,31 @@ export async function POST(request: Request) {
   const req: AnalysisRequest = parsed.data;
 
   const encoder = new TextEncoder();
+  const events = runAnalysis(
+    {
+      db: supabase,
+      userId: user.id,
+      providerName: configuredProviderName(),
+      loadProvider,
+      quotaPaused: async (provider) => (await quota(supabase, provider)).paused,
+      creditAllowed: async () => (await bomRate(supabase, request)).allowed,
+      logUsage: (row) => logUsage(supabase, row),
+      readWithRules,
+    },
+    req,
+  );
   const stream = new ReadableStream<Uint8Array>({
+    // Drained eagerly (not on pull) so the run is metered and recorded even if
+    // the client goes away mid-stream.
     async start(controller) {
-      const send = (e: AnalysisEvent) => controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
-      send({ type: "step", step: "reading" });
-
-      const name = configuredProviderName();
-
-      // The same brief and the same answers as a run we already paid for: send
-      // that run's answer back and stop. The stored result still goes through
-      // the schema — a row written by an older shape of the analysis is not
-      // reused rather than shown unvalidated.
-      const fingerprint = analysisFingerprint(req);
-      if (req.projectId) {
-        const { data: prior } = await supabase
-          .from("analysis_runs")
-          .select("parsed_response, provider, created_at")
-          .eq("project_id", req.projectId)
-          .eq("feature", "analyse")
-          .eq("request_hash", fingerprint)
-          .in("outcome", ["ok", "fallback"])
-          .not("parsed_response", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const stored = prior ? AnalysisSchema.safeParse(prior.parsed_response) : null;
-        if (prior && stored?.success) {
-          for (const step of ["disciplines", "requirements"] as const) send({ type: "step", step });
-          send({
-            type: "result",
-            analysis: stored.data,
-            provider: prior.provider,
-            fallback: null,
-            reused: true,
-            runAt: prior.created_at,
-          });
-          controller.close();
-          return;
+      const send = (e: AnalysisEvent) => {
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(e)}\n`));
+        } catch {
+          // The client disconnected: keep going so the run is still recorded.
         }
-      }
-
-      let analysis: Analysis | null = null;
-      let fallback: FallbackReason | null = null;
-      let usedProvider = name;
-
-      const metered = METERED[name];
-      let called = false;
-      let model: string | undefined;
-      let usage: TokenUsage | undefined;
-      let latencyMs: number | undefined;
-      let rawText: string | undefined;
-      let rawJson: unknown;
-      let errorText: string | null = null;
-      try {
-        const provider = await loadProvider(name);
-        if (!provider) throw new ProviderError("unavailable", `unknown provider "${name}"`);
-        if (!provider.configured()) throw new ProviderError("missing_key");
-        if (metered && (await quota(supabase, metered)).paused) throw new ProviderError("paused");
-        // The "bom" step's per-person daily allowance (0042) — over it, the
-        // basic reader answers instead and says why.
-        if (metered && !(await bomRate(supabase, request)).allowed) throw new ProviderError("daily_limit");
-
-        called = true;
-        const result = await provider.analyse(req);
-        ({ model, usage, latencyMs, rawText } = result);
-        rawJson = result.raw;
-        const raw = (result.raw ?? {}) as Record<string, unknown>;
-
-        if (!DisciplinesSchema.safeParse(raw.disciplines).success)
-          throw new ProviderError("malformed", "disciplines");
-        send({ type: "step", step: "disciplines" });
-
-        if (!RequirementsSchema.safeParse(raw).success)
-          throw new ProviderError("malformed", "requirements/questions");
-        send({ type: "step", step: "requirements" });
-
-        // Unknown keys (a `confidence` the model added, say) are stripped here.
-        const full = AnalysisSchema.safeParse(raw);
-        if (!full.success) throw new ProviderError("malformed", "summary/suggestedParts");
-        analysis = full.data;
-      } catch (e) {
-        fallback = e instanceof ProviderError ? e.reason : "unavailable";
-        const err = e as { usage?: TokenUsage; latencyMs?: number; model?: string; rawText?: string };
-        rawText ??= err.rawText;
-        errorText = `${fallback}: ${e instanceof Error ? e.message : String(e)}`;
-        usage ??= err.usage;
-        latencyMs ??= err.latencyMs;
-        model ??= err.model;
-        console.warn(`[analyse] ${name} failed (${fallback}): ${e instanceof Error ? e.message : e}. Using the basic reader.`);
-        usedProvider = "rules";
-      }
-
-      if (metered && (called || fallback === "paused")) {
-        await logUsage(supabase, {
-          provider: metered,
-          model,
-          projectId: req.projectId,
-          feature: "analyse",
-          promptTokens: usage?.input,
-          completionTokens: usage?.output,
-          totalTokens: usage?.total,
-          latencyMs,
-          outcome: fallback === "paused" ? "blocked" : fallback ? "error" : "ok",
-          errorCode: fallback,
-        });
-      }
-
-      try {
-        if (!analysis) {
-          analysis = await readWithRules(req);
-          send({ type: "step", step: "disciplines" });
-          send({ type: "step", step: "requirements" });
-        }
-        // Every provider's "from your brief" is checked against the brief's own
-        // words before anyone sees it (audit #5).
-        const normalised = withStandardGaps(analysis);
-        const final = { ...normalised, requirements: honestSources(normalised.requirements, req.brief) };
-        if (req.projectId) {
-          const row = {
-            project_id: req.projectId,
-            feature: "analyse",
-            provider: called ? name : usedProvider,
-            model: model ?? null,
-            raw_text: rawText ?? null,
-            raw_response: rawJson ?? null,
-            parsed_response: final,
-            outcome: usedProvider === name ? "ok" : "fallback",
-            error: errorText,
-          };
-          let { error: runErr } = await supabase
-            .from("analysis_runs")
-            .insert({ ...row, request_hash: fingerprint });
-          // Before 0099 there is no request_hash column: record the run as
-          // before, so only the reuse is missing, not the diagnostics.
-          if (runErr?.code === "PGRST204") {
-            ({ error: runErr } = await supabase.from("analysis_runs").insert(row));
-            if (!runErr) console.warn("[analyse] run recorded without its request fingerprint (migration 0099?)");
-          }
-          if (runErr) console.warn(`[analyse] run not recorded (migration 0024?): ${runErr.message}`);
-        }
-        send({
-          type: "result",
-          analysis: final,
-          provider: usedProvider,
-          fallback: usedProvider === name ? null : fallback,
-        });
-      } catch (e) {
-        console.error("[analyse] basic reader failed:", e);
-        send({ type: "error" });
-      }
+      };
+      for await (const e of events) send(e);
       controller.close();
     },
   });

@@ -10,6 +10,7 @@ import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { Turnstile, turnstileActive } from "@/components/turnstile";
+import { TURNSTILE_HEADER } from "@/lib/turnstile";
 import { takePendingUpload } from "@/lib/design/pending-upload";
 import {
   ACCEPT_ATTR,
@@ -70,13 +71,30 @@ export function QuoteRequest({
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<Done>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  // Guests (anonymous sessions) cannot come back to the project, so only a real account gets the link.
+  const [canOpenProject, setCanOpenProject] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+  const [sentFileName, setSentFileName] = useState("");
   const [needsCheck, setNeedsCheck] = useState(false);
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
+  // Latest widget token, readable from inside handleSubmit after awaits.
+  const captchaRef = useRef<string | null>(null);
+  // The server demands a token from everyone but a signed-in, non-guest account.
   useEffect(() => {
     if (!turnstileActive(turnstileEnabled)) return;
-    void getCurrentUser().then((u) => setNeedsCheck(!u));
+    void getCurrentUser().then((u) => setNeedsCheck(!u || u.is_anonymous === true));
   }, [turnstileEnabled]);
+
+  // A token is single-use and ensureSession() may already have spent ours on
+  // the anonymous sign-in, so /api/design-quote gets the widget's next one.
+  async function freshCaptchaToken(): Promise<string | null> {
+    if (!needsCheck || !turnstileActive(turnstileEnabled)) return null;
+    for (let i = 0; i < 50 && !captchaRef.current; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return captchaRef.current;
+  }
 
   // Pick up the file the homepage dropzone handed off (client-only).
   useEffect(() => {
@@ -141,14 +159,19 @@ export function QuoteRequest({
       let storagePath: string | null = null;
       let bucket: "cad" | "quote" = "quote";
       let newProject: string | null = null;
+      let signedIn = false;
       try {
         let user: Awaited<ReturnType<typeof ensureSession>>;
         try {
           user = await ensureSession({ captchaToken: captcha });
         } finally {
           // Single-use token: a retry needs a fresh one.
-          if (captcha) setCaptchaReset((k) => k + 1);
+          if (captcha) {
+            captchaRef.current = null;
+            setCaptchaReset((k) => k + 1);
+          }
         }
+        signedIn = user.is_anonymous !== true;
         const supabase = createClient();
         const title = (file?.name.replace(/\.[^.]+$/, "") || name.trim() || t("projectDefaultName")).slice(0, 120);
         const { data: proj, error: projErr } = await supabase
@@ -191,9 +214,10 @@ export function QuoteRequest({
         }
       }
 
+      const apiToken = await freshCaptchaToken();
       const res = await fetch("/api/design-quote", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(apiToken ? { [TURNSTILE_HEADER]: apiToken } : {}) },
         body: JSON.stringify({
           locale,
           email: email.trim(),
@@ -216,6 +240,15 @@ export function QuoteRequest({
       // "sent" = file safely stored; "sent_large" = had a file but upload
       // failed (ask them to send it another way); "sent_nofile" = no file.
       setProjectId(newProject);
+      setCanOpenProject(signedIn && Boolean(newProject));
+      try {
+        const sent = (await res.json()) as { reference?: string; file_name?: string };
+        setReference(typeof sent.reference === "string" ? sent.reference : null);
+        setSentFileName(typeof sent.file_name === "string" && sent.file_name ? sent.file_name : file?.name ?? "");
+      } catch {
+        setReference(null);
+        setSentFileName(file?.name ?? "");
+      }
       if (phone.trim()) track("phone_captured", { where: "quote" });
       setDone(!file ? "sent_nofile" : storagePath ? "sent" : "sent_large");
     } catch {
@@ -236,6 +269,20 @@ export function QuoteRequest({
               ? t("successNoFile")
               : t("successBody")}
         </p>
+        <dl className="mx-auto mt-5 max-w-md space-y-2 rounded-xl bg-panel p-4 text-start text-sm shadow-neu-inset">
+          {reference && (
+            <div className="flex flex-wrap justify-between gap-x-4">
+              <dt className="text-mutedtext">{t("successReference")}</dt>
+              <dd className="font-semibold text-heading" dir="ltr">{reference}</dd>
+            </div>
+          )}
+          <div className="flex flex-wrap justify-between gap-x-4">
+            <dt className="text-mutedtext">{t("successFile")}</dt>
+            <dd className="min-w-0 break-all font-semibold text-heading" dir="ltr">
+              {sentFileName || t("successNoFileName")}
+            </dd>
+          </div>
+        </dl>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button
             type="button"
@@ -248,12 +295,14 @@ export function QuoteRequest({
               setName("");
               setTechnique(DEFAULT_QUOTE_METHOD);
               setMessage("");
+              setReference(null);
+              setSentFileName("");
               setDone(null);
             }}
           >
             {t("newRequest")}
           </Button>
-          {projectId && (
+          {projectId && canOpenProject && (
             <Button asChild className="rounded-full">
               <Link href={`/projects/${projectId}`}>{t("openProject")}</Link>
             </Button>
@@ -399,10 +448,12 @@ export function QuoteRequest({
           >
             {QUOTE_METHODS.map((m) => (
               <option key={m} value={m}>
-                {m === "edm" ? t("technique_edm_from", { price: edmFrom }) : t(`technique_${m}`)}
+                {t(`technique_${m}`)}
               </option>
             ))}
           </select>
+          {/* The price sits outside the select, so no option carries one the others lack (F-051). */}
+          <p className="text-[11px] text-faint">{t("edmPriceNote", { price: edmFrom })}</p>
         </div>
       </div>
 
@@ -422,7 +473,15 @@ export function QuoteRequest({
       </div>
 
       {needsCheck && (
-        <Turnstile enabled={turnstileEnabled} onToken={setCaptcha} resetKey={captchaReset} action="quote" />
+        <Turnstile
+          enabled={turnstileEnabled}
+          onToken={(tok) => {
+            captchaRef.current = tok;
+            setCaptcha(tok);
+          }}
+          resetKey={captchaReset}
+          action="quote"
+        />
       )}
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}

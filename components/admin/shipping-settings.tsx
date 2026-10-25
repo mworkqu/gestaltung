@@ -13,20 +13,49 @@ import { saveShippingSettings, type ShippingSettings } from "@/app/[locale]/dash
 import { SHIPPING_TIERS } from "@/lib/store/delivery";
 import { cn } from "@/lib/utils";
 
+type Tier = ShippingSettings["tiers"][keyof ShippingSettings["tiers"]];
+
+// What the inputs hold while typing: strings. Converted to numbers when saved.
+type Draft = {
+  handling_fee_qar: string;
+  handling_days: string;
+  buffer_days: string;
+  tiers: Record<keyof ShippingSettings["tiers"], Record<keyof Tier, string>>;
+};
+
+const toDraft = (v: ShippingSettings): Draft => ({
+  handling_fee_qar: String(v.handling_fee_qar),
+  handling_days: String(v.handling_days),
+  buffer_days: String(v.buffer_days),
+  tiers: Object.fromEntries(
+    SHIPPING_TIERS.map((k) => [k, { carrier_cost_qar: String(v.tiers[k].carrier_cost_qar), transit_days: String(v.tiers[k].transit_days) }]),
+  ) as Draft["tiers"],
+});
+
+// The action coerces with Number() and clamps, so converting here sends the same values.
+const fromDraft = (d: Draft): ShippingSettings => ({
+  handling_fee_qar: Number(d.handling_fee_qar),
+  handling_days: Number(d.handling_days),
+  buffer_days: Number(d.buffer_days),
+  tiers: Object.fromEntries(
+    SHIPPING_TIERS.map((k) => [k, { carrier_cost_qar: Number(d.tiers[k].carrier_cost_qar), transit_days: Number(d.tiers[k].transit_days) }]),
+  ) as ShippingSettings["tiers"],
+});
+
 const input =
   "w-24 rounded-lg border border-white/60 bg-surface px-2 py-1 text-sm text-heading shadow-neu-inset outline-none focus:ring-2 focus:ring-cobalt/60";
 
 export function ShippingSettingsEditor({ locale, initial }: { locale: string; initial: ShippingSettings }) {
   const t = useTranslations("Delivery");
   const router = useRouter();
-  const [s, setS] = useState(initial);
+  const [s, setS] = useState<Draft>(() => toDraft(initial));
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
   const top = (k: "handling_fee_qar" | "handling_days" | "buffer_days") => (
     <label className="flex items-center justify-between gap-3 text-sm text-body">
       {t(`s_${k}`)}
-      <input value={String(s[k])} onChange={(e) => setS({ ...s, [k]: e.target.value as unknown as number })} inputMode="decimal" className={input} dir="ltr" />
+      <input value={s[k]} onChange={(e) => setS({ ...s, [k]: e.target.value })} inputMode="decimal" className={input} dir="ltr" />
     </label>
   );
 
@@ -57,7 +86,7 @@ export function ShippingSettingsEditor({ locale, initial }: { locale: string; in
                 {(["carrier_cost_qar", "transit_days"] as const).map((f) => (
                   <td key={f} className="px-2 py-1">
                     <input
-                      value={String(s.tiers[k][f])}
+                      value={s.tiers[k][f]}
                       onChange={(e) => setS({ ...s, tiers: { ...s.tiers, [k]: { ...s.tiers[k], [f]: e.target.value } } })}
                       inputMode="decimal"
                       className={input}
@@ -76,7 +105,7 @@ export function ShippingSettingsEditor({ locale, initial }: { locale: string; in
           disabled={pending}
           onClick={() =>
             start(async () => {
-              const r = await saveShippingSettings(locale, s);
+              const r = await saveShippingSettings(locale, fromDraft(s));
               setMsg(r.error ?? t("saved"));
               if (!r.error) router.refresh();
             })

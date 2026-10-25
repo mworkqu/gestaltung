@@ -5,6 +5,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { QuickEntry } from "@/components/admin/quick-entry";
 import type { Supplier } from "@/lib/store/sourcing";
 import { cn } from "@/lib/utils";
+import { requireSuperAdmin } from "@/lib/auth/guards";
 
 // Fast product entry with Google Drive images (Task 17). super_admin only
 // (store layout).
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export default async function QuickEntryPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  await requireSuperAdmin(locale);
   setRequestLocale(locale);
   const t = await getTranslations("QuickEntry");
   const isRtl = locale === "ar";

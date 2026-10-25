@@ -8,6 +8,7 @@ import { updateDoc } from "@/lib/studio/server/doc";
 import { callErrorStatus, PickBody } from "@/lib/studio/server/http";
 import { logClamp, studioCall, studioRequest } from "@/lib/studio/server/context";
 import { classGuard } from "@/lib/schools/safe-parts";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // POST /api/studio/pick — the parts list. Free (the parts list is the only free
 // AI step) but counted like a BOM run (bomRate: guests 5/day, users 30/day).
@@ -33,12 +34,15 @@ export async function POST(request: Request) {
   if (!rate.allowed) return Response.json({ error: "daily_limit", limit: rate.limit }, { status: 429 });
 
   const r = await runPick({
-    call: studioCall(supabase, project.id),
+    call: studioCall(supabase, project.id, ctx.userId),
     spec: body.spec,
     index: libraryIndexForAI(),
     locale: body.locale,
     nameFor: (id, locale) => getPart(id)?.name[locale],
     pinsOf: (id) => getPart(id)?.pins, // Part D: servo pin budget
+    // F-046: our code, never the model, prefers a part we can hand over. A linked store SKU is
+    // what "we have it" means here (docs/STUDIO_SKU_LINKS.md); parts without one are sourced.
+    stockOf: (id) => (getPart(id)?.storeSkus.length ?? 0) > 0,
     // Card items the model's index leaves out (the LED is a helper part): added by id.
     lookup: (id) => {
       const p = getPart(id);
@@ -46,7 +50,7 @@ export async function POST(request: Request) {
     },
     cache: pickCache, // W8: the same spec is not asked twice
   });
-  if (!r.ok) return Response.json({ error: r.error }, { status: callErrorStatus(r.error) });
+  if (!r.ok) return jsonError(r.error, callErrorStatus(r.error));
   logClamp("pick", project.id, r.clampLog, r.source, r.problems);
   if (isClass) console.info(`[studio/pick] ${project.id}: class project — ${lib.parts.length} safe parts offered`);
 
@@ -64,5 +68,5 @@ export async function POST(request: Request) {
     return { ...base, spec: body.spec, components, netlist: { nets: [] }, checks: [], layout: [], mech: [] };
   });
 
-  return Response.json({ components, reasons: r.value.reasons, docVersion: saved.version });
+  return jsonOk({ components, reasons: r.value.reasons, docVersion: saved.version });
 }

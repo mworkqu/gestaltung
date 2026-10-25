@@ -2,7 +2,7 @@
 // type props without pulling three.js into their bundle.
 
 import type * as THREE from "three";
-import type { EnclosureMeta } from "@/lib/studio/enclosure/build";
+import type { EnclosureMeta } from "@/lib/studio/enclosure/plan";
 import type { EnclosureSpec, LayoutItem } from "@/lib/studio/schema";
 
 export type ViewerComponent = { instanceId: string; partId: string; label: string };

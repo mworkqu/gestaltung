@@ -6,6 +6,8 @@ import { parametersToAttributes } from "@/lib/sourcing/spec-map";
 import { qarPerUnit } from "@/lib/pricing/fx";
 import { fetchImage, storeImage } from "@/lib/store/store-image";
 import { revalidateStorefront } from "@/lib/cache/storefront";
+import { isSuperAdminSession } from "@/lib/auth/guards";
+import { emptyStatus, jsonOk } from "@/lib/http";
 
 // One-off starter set (owner, 2026-09-28): standard components Voltaat doesn't
 // sell individually, from DigiKey's and Mouser's official APIs (2026-09-29:
@@ -58,7 +60,7 @@ const MARKUP = 1.4;
 
 export async function POST() {
   const session = await getSessionContext();
-  if (session?.profile.role !== "super_admin") return new Response(null, { status: 403 });
+  if (!isSuperAdminSession(session)) return emptyStatus(403);
   const supabase = await createClient();
 
   const { data: sups } = await supabase.from("suppliers").select("id, code, landed_overhead_pct").in("code", ["digikey", "mouser"]);
@@ -143,5 +145,5 @@ export async function POST() {
     results.push({ name: s.name, status: "added", sku: part.sku, price });
   }
   revalidateStorefront();
-  return Response.json({ calls, results });
+  return jsonOk({ calls, results });
 }

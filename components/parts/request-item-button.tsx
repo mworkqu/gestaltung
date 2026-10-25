@@ -10,6 +10,8 @@ import { useTranslations } from "next-intl";
 import { BellPlus, Check, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { requestTurnstileToken } from "@/lib/turnstile-client";
+import { TURNSTILE_HEADER } from "@/lib/turnstile";
 import { cn } from "@/lib/utils";
 
 const field =
@@ -39,9 +41,12 @@ export function RequestItemButton({
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     setState("sending");
+    // With the Turnstile switch on, the page's challenge dialog gives a fresh
+    // token (null when the switch is off or the visitor closes the dialog).
+    const token = await requestTurnstileToken().catch(() => null);
     const res = await fetch("/api/demand", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(token ? { [TURNSTILE_HEADER]: token } : {}) },
       body: JSON.stringify({
         kind: "request",
         partId: partId ?? null,
