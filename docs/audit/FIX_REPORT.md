@@ -303,7 +303,7 @@ each one before moving on. 0100 and 0105 need the app commit **deployed** first.
 | 0103 | `0103_guards_and_grants.sql` (needs 0098 first) | `select count(*) from pg_trigger where tgname in ('part_order_items_limits','part_orders_rate_limit','projects_guard_admin_columns','inquiries_guard_insert');` → 4 |
 | 0104 | `0104_quote_upload_path.sql` | `select with_check from pg_policies where policyname = 'quote_uploads_insert';` contains the path regex |
 | 0105 | `0105_parts_cost_private.sql` (deploy the app first) | `select has_column_privilege('anon','public.parts','landed_cost_qar','select');` → false |
-| 0106+ | **None.** This branch adds no migration of its own — every fix was possible in application code. The only new SQL files are the audit's 0100–0105, re-reviewed above. | — |
+| 0106 | `0106_idea_charge_telemetry.sql` — the ONLY migration this branch adds of its own (the tier rebuild; everything else was application code). **Optional and last**: it records what was quoted vs what was charged vs what the turn really cost. It adds nothing to the money path, and if it is never run the app keeps working — the telemetry write is best-effort and only logs a warning. | `select * from public.admin_idea_charge_summary(30);` → returns rows (empty is fine) |
 
 Smoke test after each: open the site and the dashboard once. After **0105** specifically,
 place one small test order and open Dashboard → Store, to confirm the admin still reads
