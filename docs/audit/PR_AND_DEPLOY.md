@@ -145,6 +145,19 @@ Expect exactly one row.
 
 Full per-file verification queries are in FIX_REPORT §4.
 
+**Batch 1 — RUN ✔ 2026-10-26 by the owner, verified.**
+
+`0103` is confirmed from outside, not from a query read back: `offer_landed_cost_qar`
+answered the anon role `HTTP 200` before, and answers `42501 permission denied` after. The
+storefront is unaffected — published products, store settings, `co_purchased` and
+`approved_reviews` all still answer anon, and gestaltung360.com serves home, store and a
+product page (prices rendering) after the change. `supplier_offers` returning 0 rows to
+anon is the pre-existing 0028 policy (super-admin only), not something 0103 did.
+
+`0104` was applied in the same pass. It cannot be checked from outside without attempting
+an upload, which would mean writing to storage to test a policy, so its evidence is the
+`pg_policies` query in the runbook.
+
 **Batch 1 — safe to run NOW, before the deploy (2 files):**
 
 | order | file | why it is safe now |
