@@ -503,30 +503,66 @@ and the only symptom is assertions failing for reasons that make no sense agains
 in front of you. Reuse is now opt-in (`E2E_REUSE=1`); the default starts its own server and
 tears it down. `E2E_PORT` still exists for running beside another checkout.
 
-**The suite runs without Supabase env**, because this worktree has no `.env.local` — the
-same condition the audit's baseline ran under.
+**Which environment a run used changes its numbers more than any code here does**, so
+every bar below says which one it was measured in. This worktree has no `.env.local`.
 
-| | passed | failed | flaky | skipped |
-|---|---|---|---|---|
-| audit baseline (`origin/main`, same condition) | 221 | 62 | — | 53 |
-| **this branch** | **250** | **59** | 2 | 65 |
+| run | env | passed | failed | flaky | skipped |
+|---|---|---|---|---|---|
+| audit baseline (`origin/main`) | none | 221 | 62 | — | 53 |
+| this branch, first measurement | none | 250 | 59 | 2 | 65 |
+| this branch | public Supabase vars | 321 | 28 | 0 | 39 |
+| **this branch, final** | **public Supabase vars** | **322** | **26** | **1** | **39** |
+| **`origin/main`, same seven specs, same env** | **public Supabase vars** | — | **26 (identical set)** | — | — |
 
-More passing and fewer failing, with ~30 tests added. The failures are dominated by
-"Supabase is not configured" and the empty pages that follow from it: no catalogue, no
-session, no orders. Both new specs are clean in the full run — `reset-password` 20/20 and
-`a11y-axe` 8 passed / 2 skipped (the product-page scan skips when there is no catalogue to
-scan rather than failing).
+"Public Supabase vars" means `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+loaded into the build environment and nothing else — both are shipped to every visitor's
+browser anyway. `SUPABASE_SERVICE_ROLE_KEY` was deliberately NOT loaded, nothing was
+written to disk, and the suite's write guard still aborts every non-GET to Supabase.
+Supplying them turns 59 failures into 26: that batch was "Supabase is not configured" and
+the empty pages that follow from it, nothing else.
 
-The 2 flaky (passed on retry, both pre-existing specs): `studio-parts-popover` *parts
-popover and card states [ar]* and `studio-wiring-viewer` *fit, zoom, pan, full screen [en]*
-on the 375 px project. Both are animation/viewport timing, not logic, and neither is new —
-worth a look if they get worse.
+**The check this section could not make before, now made.** The audit's criterion is "zero
+tests that passed in the baseline fail now", and totals cannot show that. So `origin/main`
+(88a6473) was built in its own worktree under the identical environment, on its own port,
+sharing `node_modules`, and the seven specs that still fail were run against it. The
+failure lists were then compared line by line:
 
-**What I cannot claim:** the audit's criterion was "zero tests that passed in the baseline
-fail now", and I do not have the baseline's per-test list — only its totals. So I can say
-the failure count is in line with it and the causes are environmental, but not that I
-diffed it test by test. Running the suite once with the real env, against a deployed
-preview, is the check that would settle it.
+* **fails here, passed on `origin/main`: none.**
+* The 26 remaining failures are the same 26 tests, test for test, that fail on
+  `origin/main` — `plan-a-product` 8, `studio` 5, `studio-robot-arm` 4, `studio-idea` 4,
+  `studio-enclosure` 4, `studio-product` 1. They are pre-existing and environmental: a
+  partial env still has no service-role key and no write path, and these specs expect a
+  signed-in, writable app.
+
+Both new specs are clean: `reset-password` 20/20, `a11y-axe` 10/10 over three consecutive
+runs, and the new `studio-tier-checkpoint` 12/12.
+
+**Two traps cost an hour each; neither is in the code.**
+
+1. **A stale `.next/cache/fetch-cache`.** Builds made before the env was supplied cached
+   the "flag off" answer, so the home page prerendered with `robots: noindex` and
+   `site-v2-flag` failed on four tests — and ONLY on this branch, because the baseline
+   worktree built fresh. CLAUDE.md records the same trap from the 2026-10-09 cut-over.
+   `rm -rf .next/cache/fetch-cache` and rebuild; all four pass.
+2. **Reading `$?` through a pipe.** `npx playwright test | tail` reports `tail`'s exit
+   code, which is always 0. A run with 59 failures looked like a pass. Capture the output
+   to a file and read Playwright's own exit code, or the summary line.
+
+**The flakes were chased, not retried away.** `studio-parts-popover` was the worst of
+them (flaky in two earlier runs, in different locales and projects, then failing outright):
+the open popover is remembered by `instanceId`, the rows are rendered again as the step
+settles, and a popover opened inside that window belongs to a row that no longer exists.
+Measured on both branches — opening immediately loses it on BOTH, opening on a settled list
+keeps it on BOTH — so the spec waits for the list to settle and parks the pointer off the
+rows first. Three runs: 6 passed, no flake. The `a11y` flake had its own cause, below.
+
+One flake is left, and it is pre-existing: `studio-wiring-views` *pin list selection…[en]*
+on the 375 px project, passed on retry. Viewport/animation timing, not logic.
+
+**What I still cannot claim:** that the app is right with a FULL environment. Everything
+above ran without a service-role key and against production read-only data, so the 26
+pre-existing failures stay unexplored rather than explained. Running the suite once against
+a deployed preview with the real env is the check that would settle those.
 
 ### Accessibility, measured
 
@@ -599,6 +635,29 @@ them against `origin/main` before blaming this change.
 `review/gestaltung-audit-reports-2026-10` (4.5 MB) are all on disk and all
 untracked. I left them out rather than put 77 MB into the repository without
 asking.
+
+## 8e. Found while verifying, worth your attention
+
+Three things the verification turned up that are NOT part of the token work.
+
+**1. A real accessibility fix shipped.** The axe scan had never actually run on a product
+page — without a catalogue it skips — so the first real run found the "Arrives by" badge at
+**4.47:1** where AA wants 4.5:1. Fixed (emerald-800); the in-stock badge shared the pair and
+moved with it.
+
+**2. The header tagline fails AA on every page, and that is your call.** "Product design &
+fabrication · Lusail, Qatar", 9px `text-faint`, measures **2.28:1**. It is already
+allow-listed on home, store, checkout and the studio fixture, and the product page now
+joins them. Changing the token changes the brand everywhere, so it sits in "Needs owner
+decision" rather than being quietly restyled. A darker `text-faint`, or dropping the 9px
+treatment, would clear it on every page at once.
+
+**3. A fast tap on the parts list can be swallowed (minor, pre-existing).** `PartsStep`
+remembers the open popover by `instanceId`; the rows are rendered again as the step
+settles, so a popover opened in that first moment belongs to a row that no longer exists
+and disappears. A person is unlikely to be that fast, which is why it has only ever shown
+up as a test flake — but it is real. The fix is to keep `popFor` when the same instance
+survives the re-render. Left alone here: it is product behaviour, not audit scope.
 
 ## 9. Follow-ups
 
