@@ -110,6 +110,10 @@ Full text: `docs/DECISIONS.md` (D1-D13, owner site review 2026-10-03).
 - Do not publish "1 free revision; you own the files" (B7).
 
 ## PENDING MIGRATIONS (run in order if not already done)
+
+**2026-10-26: nothing is pending.** Everything through 0106 has been run — 0103 and 0104 before the
+app deploy, 0100 / 0101 / 0102 / 0105 / 0106 after it. The entries below are kept for their
+descriptions and rollback notes; see docs/MIGRATIONS.md for how each one was confirmed.
 Check Supabase → Table Editor to confirm which tables exist before running.
 **Run order is load-bearing: 0096, 0097, 0098, 0099, then 0100-0106.** 0103's order-line
 guard reads `part_orders.class_id`, which comes from 0097; plpgsql resolves that column when
@@ -117,7 +121,7 @@ the trigger first fires, so applying 0103 before 0097 succeeds and then makes ev
 `part_order_items` insert fail — checkout dies silently. See `docs/audit/FIX_REPORT.md` §4,
 which also records that the run status of 0096/0097 disagrees between two copies of this
 file and must be confirmed in Supabase first.
-- 0106_idea_charge_telemetry.sql — NOT RUN. Ideation-charge telemetry (owner, 2026-10-25): `idea_charge_telemetry`
+- 0106_idea_charge_telemetry.sql — RUN ✔ 2026-10-26. Ideation-charge telemetry (owner, 2026-10-25): `idea_charge_telemetry`
   (one row per priced decision, `stage` 'quoted' = the checkpoint was shown at that price, 'charged' = approved and
   taken, so quoted minus charged is how often a price is declined; estimated vs charged vs what the model really
   consumed; super-admin read only, no session may write a row directly), `idea_charge_claim()` (writes the quote and
@@ -127,7 +131,7 @@ file and must be confirmed in Supabase first.
   safe to re-run. Touches nothing in the money path (`idea_token_charge` from 0088 is untouched). Until it runs, the
   Studio charges exactly as it does with it — a missing claim only means nothing is recorded (one warning per call
   in the server log), so the owner cannot yet compare the agreed deduction with the provider cost.
-- 0100_studio_private.sql — NOT RUN. Audit DB-01: public.project_studio_private (service_role only; the Studio
+- 0100_studio_private.sql — RUN ✔ 2026-10-26. Audit DB-01: public.project_studio_private (service_role only; the Studio
   product models, back-filled from projects.studio.productPrivate, which is then removed — updated_at kept), trigger
   projects_guard_studio_server_keys (anon/authenticated writes cannot store productPrivate or change studio.product;
   a null/non-object studio keeps the stored product), studio_product_save(project, user, version, studio, private)
@@ -136,12 +140,12 @@ file and must be confirmed in Supabase first.
   rollback). RUN AFTER 0099, AFTER the app commit is deployed. Safe to re-run.
   Until it runs the app keeps the models in studio.productPrivate (owners can still read them via PostgREST); after
   it, every Studio product route needs SUPABASE_SERVICE_ROLE_KEY (503 service_unavailable without it).
-- 0101_ai_usage_server_only.sql — NOT RUN. Audit DB-02: both log_ai_usage overloads revoked from anon/authenticated;
+- 0101_ai_usage_server_only.sql — RUN ✔ 2026-10-26. Audit DB-02: both log_ai_usage overloads revoked from anon/authenticated;
   log_ai_usage_server(p_user, …) service_role only, user required, per-row clamps (tokens ≤ 2,000,000, audio ≤ 3,600 s,
   cost ≤ USD 50, latency ≤ 600,000 ms), is_test copied from the project again; ai_usage_totals revoked from anon.
   RUN AFTER 0100. Safe to re-run. Until it runs the app falls back to the old client RPC (any session can still trip
   the global AI pause). After it, usage rows are written only when SUPABASE_SERVICE_ROLE_KEY is set.
-- 0102_credits_server_spend.sql — NOT RUN. Audit DB-04/DB-06/G-C1: spend_credit_for(p_user, p_step, p_project)
+- 0102_credits_server_spend.sql — RUN ✔ 2026-10-26. Audit DB-04/DB-06/G-C1: spend_credit_for(p_user, p_step, p_project)
   (service_role; same body as spend_credit v4); spend_credit revoked from anon/authenticated (cad_deliver still calls
   it internally); cad_set_code_for(p_user, p_id, p_scad, p_model) (service_role; the 0043 body, the generation must
   be p_user's) and cad_set_code revoked from anon/authenticated (a session can no longer store fake CAD code and let
@@ -149,7 +153,7 @@ file and must be confirmed in Supabase first.
   spend() / setCadCode() fall back to spend_credit / cad_set_code on the session (sessions can still mint redeemable
   spend rows / drain a teacher's class credits by direct RPC). The app already needs SUPABASE_SERVICE_ROLE_KEY for
   CAD (/api/cad, studio enclosure, product unlock) and non-admin wiring circuits: 503 without it, before any model call.
-- 0103_guards_and_grants.sql — NOT RUN. Audit DB-07/08/10/11/12/13/16/17/18/19/22 + API-02 (signatures unchanged):
+- 0103_guards_and_grants.sql — RUN ✔ 2026-10-26. Audit DB-07/08/10/11/12/13/16/17/18/19/22 + API-02 (signatures unchanged):
   job refunds go back per token kind (pass tokens as idea_pass); claim_guest_work drops the guest's duplicate
   idea_welcome; ORDER LIMITS — quantity ≤ 1000 per line, ≤ 100 lines per order, ≤ 10 orders per hour per customer
   phone (its last 8 digits, so +974 / 00974 / local forms are one phone) or email ('too_many_orders' /
@@ -162,13 +166,13 @@ file and must be confirmed in Supabase first.
   class helper functions not for anon, and the 0096 policy projects_select_class_teacher limited to authenticated (so
   an anon SELECT on projects returns no rows instead of a permission error); project_recovery_begin ≤ 3 emails per
   address per 24 h; ends with notify pgrst. RUN AFTER 0102 AND
-  AFTER 0098 (0098 is NOT RUN; 0103 replaces refresh_part_sourcing with 0098's version plus the caller check).
+  AFTER 0098 (both RUN ✔ 2026-10-26; 0103 replaces refresh_part_sourcing with 0098's version plus the caller check).
   Safe to re-run. Until it runs every hole above stays open.
-- 0104_quote_upload_path.sql — NOT RUN. Audit DB-15/WEB-06: the quote-uploads INSERT policy also requires
+- 0104_quote_upload_path.sql — RUN ✔ 2026-10-26. Audit DB-15/WEB-06: the quote-uploads INSERT policy also requires
   `<uuid>/<[A-Za-z0-9._-]{1,200}>`, no "..", not "." (what components/design/quote-request.tsx writes and
   lib/design/quote-paths.ts signs); 50 MB kept, MIME not restricted. RUN AFTER 0103. Safe to re-run. Until it runs
   anyone can write any object name into the bucket.
-- 0105_parts_cost_private.sql — NOT RUN. Audit DB-09: parts cost/sourcing columns (landed_cost_qar,
+- 0105_parts_cost_private.sql — RUN ✔ 2026-10-26. Audit DB-09: parts cost/sourcing columns (landed_cost_qar,
   expected_income_qar, income_pct, below_floor, pinned/preferred_offer_id, pricing_mode) no longer selectable by
   anon/authenticated (column grants; select=* on parts by the browser or a session is denied), public.parts_admin
   view for super_admin reads, store_settings internal keys hidden from the public (price_experiment, margin/commission
@@ -192,7 +196,7 @@ file and must be confirmed in Supabase first.
   stage that replaces create_part_order, so place one test order straight after. It drops the 0044
   9-argument version and refuses to apply unless exactly one create_part_order is left. Until it runs,
   checkout falls back to the call without p_class_id and a class order is charged normal delivery.
-- 0098_commission_floor.sql — NOT RUN. store_settings.commission_floor_pct (default 8) + refresh_part_sourcing
+- 0098_commission_floor.sql — RUN ✔ 2026-10-26 (probe: commission_floor_pct present). store_settings.commission_floor_pct (default 8) + refresh_part_sourcing
   replaced so a mirror part is judged against the commission floor and a markup part against margin_floor_pct
   (15). Numbered 0098 because review-analyse-guard took 0096 and main took 0096 + 0097. RUN AFTER 0095 — it
   builds on 0095's version of the function, so running it does NOT revert suppliers.rank. Safe to re-run; an
@@ -305,7 +309,7 @@ Full run log, rules for new migrations and the next free number (0107): `docs/MI
 ## Audit 2026-10
 - Branch `audit/code-and-security-2026-10` (based on origin/main 88a6473) holds the code-quality and security audit and the refactor slices R1 onward. The old stage log was moved out of this file by slice R13.
 - `docs/audit/` has FINAL_REPORT (start here: summary, findings table, behaviour changes, migrations to run, owner decisions, next steps), CODE_MAP, CODE_QUALITY_AUDIT, SECURITY_AUDIT, REFACTOR_PLAN, BASELINE and the raw `findings/`. Branch result: 36 findings fixed (20 of them via migrations 0100-0105), zero import cycles, 288 test files / 3,855 tests, CLAUDE.md is this index. Slices R9, R11, R12, R15 of REFACTOR_PLAN are not done (see FINAL_REPORT §7).
-- Migrations 0100-0105 are written on this branch and are NOT RUN; 0098 is also still NOT RUN and 0103 needs it first. Run in numeric order (0098, then 0100-0105), only when the owner says so; 0100 and 0105 also need the matching app commit deployed first (see Pending migrations). Each file's header has its rollback note.
+- Migrations 0098 and 0100-0106 are all RUN ✔ 2026-10-26, in that order: 0103 and 0104 before the app deploy, 0100 / 0101 / 0102 / 0105 / 0106 after it. Each file's header still carries its rollback note, and docs/MIGRATIONS.md records how each was confirmed.
 - The Content-Security-Policy is shipped as `Content-Security-Policy-Report-Only` (`lib/security/headers.mjs`); promote it to enforcing only after the reports are clean for one release.
 - Turnstile: client wiring already exists (`lib/turnstile-client.ts`, `components/turnstile-challenge.tsx`); it stays off until the flag and keys are set (`docs/TURNSTILE.md`).
 - Items that need an owner decision (nothing was deleted without one) are listed in `docs/audit/CODE_QUALITY_AUDIT.md` and `SECURITY_AUDIT.md`.
