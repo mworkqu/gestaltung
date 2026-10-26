@@ -16,18 +16,25 @@ Run log, rules for new migrations, and the next free number. Files are in `supab
 8. Tell the owner the file name and the order to run in. Run only when the owner says so, in numeric order.
 9. Check Supabase -> Table Editor to see which tables exist before running a pending file.
 
-## Not run
+## Was pending — all run as of 2026-10-26
+
+> **2026-10-26 — everything through 0106 has been run.** 0103 and 0104 went in before the
+> app was deployed; 0100, 0101, 0102, 0105 and 0106 after it, in that order. Each row below
+> says how it was confirmed. Where it says "probe", that is a read-only check through
+> PostgREST with the PUBLIC key: a revoked function answers `42501` where it used to answer,
+> a missing one answers `PGRST202`. 0101 and 0104 cannot be seen that way and rest on the
+> owner's run.
 
 | File | Notes |
 |---|---|
-| 0098_commission_floor.sql | NOT RUN. `store_settings.commission_floor_pct` (default 8); `refresh_part_sourcing` replaced so a mirror part is judged against the commission floor and a markup part against `margin_floor_pct` (15). Run after 0095. Until it runs every Voltaat product stays flagged "below margin" (911 of them). **Must run before 0103.** |
-| 0100_studio_private.sql | NOT RUN (audit DB-01). `project_studio_private` (service_role only); back-fill and removal of `studio.productPrivate`; guard trigger on `projects.studio`; `studio_product_save()`; strips private models from old `engineering_jobs.snapshot`. Run after 0099 and after the matching app commit is deployed. Afterwards every Studio product route needs `SUPABASE_SERVICE_ROLE_KEY` (503 without it). |
-| 0101_ai_usage_server_only.sql | NOT RUN (audit DB-02). Revokes both `log_ai_usage` overloads from anon/authenticated; adds service-only `log_ai_usage_server` with per-row clamps; revokes `ai_usage_totals` from anon. |
-| 0102_credits_server_spend.sql | NOT RUN (audit DB-04 / DB-06). Service-only `spend_credit_for` and `cad_set_code_for`; `spend_credit` and `cad_set_code` revoked from sessions. |
-| 0103_guards_and_grants.sql | NOT RUN (audit DB-07 to DB-22, API-02). Job refunds per token kind, guest-claim fix, order caps, revokes, admin-only columns, inquiry limits and more. Needs 0098 first. |
-| 0104_quote_upload_path.sql | NOT RUN. The quote-uploads insert policy requires `<uuid>/<name>`. |
-| 0106_idea_charge_telemetry.sql | NOT RUN. Ideation-charge telemetry (owner, 2026-10-25): `idea_charge_telemetry` (estimated vs charged vs the provider tokens and USD that turn really consumed, plus `stage` 'quoted'/'charged' so declined checkpoints are countable; super-admin read only), `idea_charge_claim()` / `idea_charge_fill()` (the project's own owner writes its rows; the unique `(project_id, idea_key)` is the replay guard for a "different product" charge and keeps a repeated quote to one row) and `admin_idea_charge_summary(days)`. Run after 0105; safe to re-run. Nothing in the money path changes — until it runs the Studio charges the same and only records nothing. Test: `lib/studio/db/idea-telemetry-migration.test.ts`. |
-| 0105_parts_cost_private.sql | NOT RUN. Column-level SELECT on `parts` without the cost columns, `parts_admin` view, internal `store_settings` keys hidden. Needs the matching app commit deployed first; after it, place one small test order and open Dashboard -> Store once. |
+| 0098_commission_floor.sql | RUN ✔ (confirmed by probe 2026-10-26: `commission_floor_pct` present). `store_settings.commission_floor_pct` (default 8); `refresh_part_sourcing` replaced so a mirror part is judged against the commission floor and a markup part against `margin_floor_pct` (15). Run after 0095. Until it runs every Voltaat product stays flagged "below margin" (911 of them). **Must run before 0103.** |
+| 0100_studio_private.sql | RUN ✔ 2026-10-26 (probe: `project_studio_private` exists, anon denied) (audit DB-01). `project_studio_private` (service_role only); back-fill and removal of `studio.productPrivate`; guard trigger on `projects.studio`; `studio_product_save()`; strips private models from old `engineering_jobs.snapshot`. Run after 0099 and after the matching app commit is deployed. Afterwards every Studio product route needs `SUPABASE_SERVICE_ROLE_KEY` (503 without it). |
+| 0101_ai_usage_server_only.sql | RUN ✔ 2026-10-26 (owner; not distinguishable from outside — both overloads are invisible to the public key) (audit DB-02). Revokes both `log_ai_usage` overloads from anon/authenticated; adds service-only `log_ai_usage_server` with per-row clamps; revokes `ai_usage_totals` from anon. |
+| 0102_credits_server_spend.sql | RUN ✔ 2026-10-26 (probe: `spend_credit` went from callable to `42501`) (audit DB-04 / DB-06). Service-only `spend_credit_for` and `cad_set_code_for`; `spend_credit` and `cad_set_code` revoked from sessions. |
+| 0103_guards_and_grants.sql | RUN ✔ 2026-10-26 (probe: `offer_landed_cost_qar` went from `HTTP 200` to `42501` for anon) (audit DB-07 to DB-22, API-02). Job refunds per token kind, guest-claim fix, order caps, revokes, admin-only columns, inquiry limits and more. Needs 0098 first. |
+| 0104_quote_upload_path.sql | RUN ✔ 2026-10-26 (owner; a storage policy cannot be proven from outside without writing). The quote-uploads insert policy requires `<uuid>/<name>`. |
+| 0106_idea_charge_telemetry.sql | RUN ✔ 2026-10-26 (probe: `admin_idea_charge_summary` went from `PGRST202 not found` to `42501`). Ideation-charge telemetry (owner, 2026-10-25): `idea_charge_telemetry` (estimated vs charged vs the provider tokens and USD that turn really consumed, plus `stage` 'quoted'/'charged' so declined checkpoints are countable; super-admin read only), `idea_charge_claim()` / `idea_charge_fill()` (the project's own owner writes its rows; the unique `(project_id, idea_key)` is the replay guard for a "different product" charge and keeps a repeated quote to one row) and `admin_idea_charge_summary(days)`. Run after 0105; safe to re-run. Nothing in the money path changes — until it runs the Studio charges the same and only records nothing. Test: `lib/studio/db/idea-telemetry-migration.test.ts`. |
+| 0105_parts_cost_private.sql | RUN ✔ 2026-10-26 (probe: cost columns now `42501` while `sku`/`name`/`unit_price` stay readable). Column-level SELECT on `parts` without the cost columns, `parts_admin` view, internal `store_settings` keys hidden. Needs the matching app commit deployed first; after it, place one small test order and open Dashboard -> Store once. |
 
 0100-0105 were added by the 2026-10 audit branch (`docs/audit/FINAL_REPORT.md` section 5 has the check queries). Run order: 0098, then 0100-0106, in numeric order.
 
@@ -135,14 +142,14 @@ RUN dates are the owner's, as recorded in the pre-audit `CLAUDE.md`. "No record"
 | 0091_engineering_jobs | Engineering jobs queue | No record |
 | 0092_engineer_services | Paid engineer services | No record |
 | 0093_function_search_path | Pins `search_path` on three functions | No record |
-| 0094_fx_rate_372 | USD = 3.72 QAR | Header: NOT RUN YET |
-| 0095_supplier_rank | Supplier running order | Header: NOT RUN YET |
+| 0094_fx_rate_372 | USD = 3.72 QAR | RUN (probe 2026-10-26: `fx_to_qar` holds USD 3.72) |
+| 0095_supplier_rank | Supplier running order | RUN (probe 2026-10-26: `suppliers.rank` exists) |
 | 0096_school_classes | School classes, class teams, class pricing seed | RUN 2026-10-21 |
 | 0097_class_order | `part_orders.class_id`, `create_part_order` v5 with `p_class_id` | RUN 2026-10-21; still to confirm: one test order through checkout (this file replaced `create_part_order`) |
-| 0098_commission_floor | Commission floor | NOT RUN |
-| 0099_analysis_request_hash | Remembers which request each analysis answered | No record (header: run after 0095) |
-| 0100 to 0105 | Audit migrations | NOT RUN (see above) |
-| 0106_idea_charge_telemetry | Ideation charges: quoted vs charged vs actual, admin read only | NOT RUN |
+| 0098_commission_floor | Commission floor | RUN (probe 2026-10-26: the key is present) |
+| 0099_analysis_request_hash | Remembers which request each analysis answered | RUN (probe 2026-10-26: `analysis_runs.request_hash` exists) |
+| 0100 to 0105 | Audit migrations | RUN 2026-10-26 (see above; 0103 and 0104 before the deploy, the rest after) |
+| 0106_idea_charge_telemetry | Ideation charges: quoted vs charged vs actual, admin read only | RUN 2026-10-26 |
 
 ## Gaps in the numbering
 
