@@ -1,5 +1,8 @@
 # Batch 1 runbook — `0103` then `0104` (pre-deploy)
 
+> **Done — 0103 and 0104 were run on 2026-10-26 and verified; batch 2 followed after the
+> deploy. Kept as the record of how it was done and checked.**
+
 **You run these, not me.** Not a policy dodge — I have no way to execute DDL from here, and
 the missing piece is a credential I should not go looking for:
 

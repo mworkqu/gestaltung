@@ -165,6 +165,13 @@ an upload, which would mean writing to storage to test a policy, so its evidence
 | 1 | `0103_guards_and_grants.sql` | both prerequisites are already in place (0097 ✓, 0098 ✓). Its guards do not reject anything the live app does: the projects guard silently forces `is_test`/`tenant_id` rather than raising, and the raising limits are 10 orders/hour per phone or email, quantity ≤ 1000, ≤ 300 lines per order. It keeps EXECUTE for `authenticated` on `offer_landed_cost_qar` and moves the admin check inside the function, so the dashboard keeps working. |
 | 2 | `0104_quote_upload_path.sql` | the new path rule is `<uuid>/<filename>` case-insensitively, and the live app already uploads exactly that — `${crypto.randomUUID()}/${sanitize(file.name)}`, with the same `sanitize()` on both branches. |
 
+**Batch 2 — RUN ✔ 2026-10-26, after the deploy.** Confirmed by probe: `spend_credit` now
+answers `42501` (0102), the `parts` cost columns deny anon while the storefront still reads
+`sku`/`name`/`unit_price` (0105), `project_studio_private` exists (0100) and
+`admin_idea_charge_summary` went from `PGRST202` to `42501` (0106). 0101 is the owner's
+word: both overloads are invisible to the public key. `SUPABASE_SERVICE_ROLE_KEY` is set
+for Production and Preview, which is what 0102 made mandatory.
+
 **Batch 2 — ONLY after the app is deployed (4 files):**
 
 | order | file | what it breaks if run early |
