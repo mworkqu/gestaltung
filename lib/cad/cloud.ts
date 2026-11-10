@@ -212,12 +212,9 @@ export async function idToken(audience: string, opts: AuthOpts = {}): Promise<st
 }
 
 /** An ID token for any audience (e.g. the CAD Champions grader); null when no Google credentials are configured. Throws on a token failure. */
-export async function googleIdTokenFor(
-  audience: string,
-  opts: { oidcToken?: string | null } = {}
-): Promise<string | null> {
+export async function googleIdTokenFor(audience: string): Promise<string | null> {
   if (!cloudAuthMode()) return null;
-  return idToken(audience, { oidcToken: opts.oidcToken });
+  return idToken(audience);
 }
 
 const Num = z.number().finite();
