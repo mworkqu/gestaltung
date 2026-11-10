@@ -134,3 +134,64 @@ describe("0108 drop tenant inventory", () => {
     expect((await rows<{ quantity: string }>("select quantity::text from public.client_inventory_items"))[0].quantity).toBe("11");
   });
 });
+
+const JOB_FUNCTIONS = [
+  "public.jobs_default_tenant()",
+  "public.jobs_guard_status()",
+  "public.jobs_status_transition()",
+  "public.jobs_log_insert_event()",
+  "public.jobs_log_status_event()",
+  "public.can_manage_job_bom(uuid)",
+  "public.accessible_client_tenants()",
+  "public.can_read_cad_object(text)",
+  "public.can_access_job(uuid)",
+  "public.current_user_role()",
+];
+const JOB_TABLES = ["public.jobs", "public.job_files", "public.job_events", "public.job_bom", "public.job_variations"];
+
+describe("0109 drop jobs remnants", () => {
+  it("drops every jobs table and helper; the cad-files policies projects use keep working", async () => {
+    const { rows, as, fails, applyTwice } = await legacyDb();
+    for (const t of JOB_TABLES) expect(await exists(rows, t), t).toBe(true);
+
+    await applyTwice("0108_drop_tenant_inventory.sql");
+    await applyTwice("0109_drop_jobs_remnants.sql");
+
+    for (const t of JOB_TABLES) expect(await exists(rows, t), t).toBe(false);
+    for (const f of JOB_FUNCTIONS) expect(await fnExists(rows, f), f).toBe(false);
+    for (const f of ["public.is_super_admin()", "public.current_user_tenant_id()", "public.set_updated_at()"])
+      expect(await fnExists(rows, f), f).toBe(true);
+
+    // cad-files (0018 owner-scoped policies): own folder readable and writable, nobody else's.
+    const seen = await as(ALICE, () => rows<{ name: string }>("select name from storage.objects where bucket_id = 'cad-files'"));
+    expect(seen.map((r) => r.name)).toEqual([`${ALICE}/p1/part.stl`]);
+    expect(await as(ALICE, () => fails(`insert into storage.objects (bucket_id, name) values ('cad-files', '${ALICE}/p1/new.step')`))).toBeNull();
+    expect(await as(ALICE, () => fails(`insert into storage.objects (bucket_id, name) values ('cad-files', '${BOB}/p2/x.step')`))).toMatch(/row-level security/);
+    // tenants / profiles policies still resolve current_user_tenant_id().
+    expect((await as(ALICE, () => rows("select 1 from public.tenants"))).length).toBe(1);
+  });
+
+  it("is a no-op after 0013 already dropped the pipeline", async () => {
+    const { db, rows, applyTwice } = await legacyDb({ cadFiles0018: false });
+    await db.exec(migration("0013_drop_jobs.sql"));
+    await db.exec(CAD_FILES_0018);
+    await applyTwice("0108_drop_tenant_inventory.sql");
+    await applyTwice("0109_drop_jobs_remnants.sql");
+    for (const t of JOB_TABLES) expect(await exists(rows, t), t).toBe(false);
+    expect(await fnExists(rows, "public.current_user_role()")).toBe(false);
+    expect(await fnExists(rows, "public.current_user_tenant_id()")).toBe(true);
+  });
+
+  it("stops without changing anything while the old 0006 cad-files policy still calls a jobs helper", async () => {
+    const { db, rows } = await legacyDb({ cadFiles0018: false });
+    let error: string | null = null;
+    try {
+      await db.exec(migration("0109_drop_jobs_remnants.sql"));
+    } catch (e) {
+      error = (e as Error).message;
+    }
+    expect(error).toMatch(/0109 stopped, nothing changed: cad_files_select on storage\.objects/);
+    expect(await exists(rows, "public.jobs")).toBe(true);
+    expect(await fnExists(rows, "public.can_read_cad_object(text)")).toBe(true);
+  });
+});
