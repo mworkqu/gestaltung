@@ -157,15 +157,27 @@ const nextConfig = {
         destination: "/:locale/pricing",
         permanent: true,
       },
-      // Stage 4: inventory is its own top-level signed-in area now.
+      // The workshop/tenant inventory (/inventory, formerly /dashboard/inventory)
+      // was retired in 2026-11 (consolidation O3). Old links land on the
+      // customer's own inventory, the surviving inventory page.
       {
         source: "/:locale(en|ar)/dashboard/inventory",
-        destination: "/:locale/inventory",
+        destination: "/:locale/my-inventory",
         permanent: true,
       },
       {
         source: "/:locale(en|ar)/dashboard/inventory/:path*",
-        destination: "/:locale/inventory/:path*",
+        destination: "/:locale/my-inventory",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/inventory",
+        destination: "/:locale/my-inventory",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/inventory/:path*",
+        destination: "/:locale/my-inventory",
         permanent: true,
       },
       // Stage 5: admin parts store renamed dashboard/parts -> dashboard/store.

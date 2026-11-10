@@ -2,7 +2,7 @@
 
 Run log, rules for new migrations, and the next free number. Files are in `supabase/migrations/` (92 files in this worktree). Run status is copied from the pre-audit `CLAUDE.md` (`docs/history/CLAUDE-2026-10-full.md`, "Pending migrations" and the stage log) and from the SQL file headers; nothing here was checked against the live database.
 
-**Next free number: 0108.**
+**Next free number: 0109.**
 
 ## Rules for a new migration
 
@@ -23,6 +23,7 @@ Written on branch `consolidation-2026-11` (Phase 1, "delete what is dead"). None
 | Run order | File | Notes |
 |---|---|---|
 | 1 | 0107_drop_site_v2_setting.sql | NOT RUN. Deletes the `store_settings` row `site_v2` (the retired v1/v2 flag, O1). Nothing reads it after the app commit. Test: `lib/db-test/consolidation-site-v2.test.ts`. |
+| 2 | 0108_drop_tenant_inventory.sql | NOT RUN. Drops `inventory_items` and `job_bom` (workshop/tenant inventory, O3) and `inventory_default_tenant()`. Keeps `tenants`, `profiles.tenant_id`, `current_user_tenant_id()` and `client_inventory_items`. **Production row counts were not checked: export `inventory_items` (and `job_bom` if it still exists) first if it holds anything you want.** Test: `lib/db-test/consolidation-legacy-drops.test.ts`. |
 
 ## Was pending — all run as of 2026-10-26
 
@@ -159,6 +160,7 @@ RUN dates are the owner's, as recorded in the pre-audit `CLAUDE.md`. "No record"
 | 0100 to 0105 | Audit migrations | RUN 2026-10-26 (see above; 0103 and 0104 before the deploy, the rest after) |
 | 0106_idea_charge_telemetry | Ideation charges: quoted vs charged vs actual, admin read only | RUN 2026-10-26 |
 | 0107_drop_site_v2_setting | Deletes the retired `site_v2` flag row | NOT RUN |
+| 0108_drop_tenant_inventory | Drops `inventory_items`, `job_bom`, `inventory_default_tenant()` | NOT RUN |
 
 ## Gaps in the numbering
 

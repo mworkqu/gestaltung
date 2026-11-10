@@ -33,7 +33,6 @@ export default async function DashboardLayout({
   const session = await requireSignedIn(locale);
 
   const t = await getTranslations("DashboardNav");
-  const isClient = session.profile.role === "client";
   const isSuperAdmin = session.profile.role === "super_admin";
   const groups: NavGroup[] = isSuperAdmin
     ? adminNavGroups(t)
@@ -42,8 +41,6 @@ export default async function DashboardLayout({
           items: [
             { href: "/dashboard", label: t("overview") },
             { href: "/projects", label: t("myProjects") },
-            // Inventory is hidden from clients; workshops keep it.
-            ...(isClient ? [] : [{ href: "/inventory", label: t("inventory") }]),
           ],
         },
       ];

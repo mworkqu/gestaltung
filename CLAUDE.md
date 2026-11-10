@@ -61,7 +61,7 @@ The stage-by-stage log that used to live here (about 1,400 lines) is in `docs/hi
 | UI | `components/**` | `lib/<area>/client`, pure `lib/` | `lib/supabase/service`, SQL-shaped logic |
 
 - Supabase clients: `lib/supabase/client.ts` (browser, anon), `server.ts` (cookie-bound, anon + RLS), `service.ts` `createServiceClient()` (service role, bypasses RLS, returns null without the key; server only), `middleware.ts` `updateSession()`. Types are hand-written in `lib/supabase/types.ts`.
-- Auth: `lib/auth/get-session.ts`, `guards.ts`, `guest-redirect.ts`, `next-path.ts` (redirect sanitising), `claim-guest*.ts`. Roles `super_admin | workshop | client` in `profiles.role`; guests are Supabase anonymous users (`is_anonymous`), created lazily by `ensureSession()` in `lib/supabase/guest.ts`. `tenants`/`inventory_items` is a legacy model.
+- Auth: `lib/auth/get-session.ts`, `guards.ts`, `guest-redirect.ts`, `next-path.ts` (redirect sanitising), `claim-guest*.ts`. Roles `super_admin | workshop | client` in `profiles.role`; guests are Supabase anonymous users (`is_anonymous`), created lazily by `ensureSession()` in `lib/supabase/guest.ts`. `tenants` + `profiles.tenant_id` are a legacy model (kept); the workshop inventory (`/inventory`, `inventory_items`) was retired in 2026-11 (O3, migration 0108) and `/inventory` 308-redirects to `/my-inventory`, the customer inventory (`client_inventory_items`).
 - Middleware: `middleware.ts` does CAD Champions routing, next-intl routing and a session refresh only when an auth cookie is present (an anonymous request makes no network call). The `site_v2` flag was retired in 2026-11: the former `/v2` pages are the public pages and `/:locale/v2/*` 308-redirects to them (`next.config.mjs`).
 - Money path: cart (`cart_items`, guests included) -> `/store/checkout` -> RPC `create_part_order` (latest 0097) -> order emails (`lib/email/**`, `notification_outbox`) -> `/orders`. Currency QAR; payment is manual (cash on delivery, Fawran, bank transfer); no card gateway.
 - Credits: `credits_ledger`, `spend_credit` / `credit_can_use` (0042, 0052, 0053, 0096), edu grants (0074/0075), tokens (0088), payments / maker pass (0089), CAD cost rewards (0090).
@@ -102,7 +102,7 @@ Route convention: `export async function POST(request)` -> `parseJsonBody` -> `r
 ## Owner decisions in force
 Full text: `docs/DECISIONS.md` (D1-D13, owner site review 2026-10-03).
 - Shipping QAR 50 on every tier, no handling fee; free delivery above QAR 300 goods on Standard only (D1, D2). The checkout total is binding (D3).
-- VLT codes are hidden from customers (D4). Guests on `/dashboard` and `/inventory` go to `/projects` (D5).
+- VLT codes are hidden from customers (D4). Guests on `/dashboard` go to `/projects` (D5; `/inventory` is retired and redirects to `/my-inventory`).
 - Cookie notice with Accept / Decline; GA4 only after Accept; no Google Signals (D7).
 - Legal pages come from `LEGAL_PAGES_DRAFT.md` exactly as written, wording never softened (D8).
 - WhatsApp +974 3366 4265 is published on Contact, footer, checkout and 404 (D10). Address: Rafal Tower, Lusail, Qatar; no opening hours (D12).

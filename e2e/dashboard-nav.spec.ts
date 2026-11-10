@@ -35,7 +35,6 @@ const OLD_URLS = [
   "/dashboard/usage",
   "/dashboard/notifications",
   "/dashboard/contact",
-  "/inventory",
 ];
 
 for (const locale of LOCALES) {
@@ -69,7 +68,7 @@ for (const locale of LOCALES) {
     expect(box.scrollH).toBeGreaterThanOrEqual(box.clientH);
 
     // The last item can be reached inside the sidebar and stays visible while the page scrolls.
-    const last = nav.getByRole("link", { name: msg(locale, "DashboardNav", "inventory") });
+    const last = nav.getByRole("link", { name: msg(locale, "DashboardNav", "contactInfo") });
     await last.scrollIntoViewIfNeeded();
     await expect(last).toBeInViewport();
     await page.mouse.wheel(0, 2000);
@@ -97,5 +96,11 @@ test("old dashboard URLs still answer", async ({ request }, info) => {
     expect(res.status(), url).toBeLessThan(400);
     // Without a session every one ends on sign-in, never on the 404 page.
     expect(new URL(res.url()).pathname, url).toBe("/en/sign-in");
+  }
+  // The retired workshop inventory (consolidation O3) lands on the customer's own inventory.
+  for (const url of ["/inventory", "/inventory/new", "/dashboard/inventory"]) {
+    const res = await request.get(`/en${url}`, { maxRedirects: 0 });
+    expect(res.status(), url).toBe(308);
+    expect(res.headers()["location"], url).toBe("/en/my-inventory");
   }
 });

@@ -3,17 +3,16 @@
 import { usePathname } from "@/i18n/navigation";
 import { isCcPath } from "@/lib/cad-champions/cc-routing";
 
-// The signed-in "app" areas (dashboard, inventory) render their
+// The signed-in "app" area (dashboard) renders its
 // own top bars, so the public marketing header is hidden there — only the
-// footer stays. usePathname (next-intl) is locale-stripped, e.g. "/inventory".
+// footer stays. usePathname (next-intl) is locale-stripped, e.g. "/dashboard".
 const APP_PREFIXES = [
   "/dashboard",
-  "/inventory",
   // Test-only dashboard photo fixture (lib/e2e-fixtures.ts): looks like the real dashboard.
   "/e2e-fixtures/dashboard",
 ];
 
-/** Dashboard, inventory and the prototyping workspace: the app areas without the public header. */
+/** Dashboard and the prototyping workspace: the app areas without the public header. */
 export function isAppPath(pathname: string): boolean {
   return (
     APP_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/")) ||
