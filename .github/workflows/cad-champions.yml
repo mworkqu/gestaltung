@@ -46,6 +46,11 @@ jobs:
       - run: npm run i18n:check
       - run: npx vitest run
 
+      # Mac Mini worker (services/worker, docs/WORKER.md): install its two
+      # pinned packages, typecheck, bundle. Fails if lib/** pulls next/* into it.
+      - name: Worker bundle
+        run: npm run worker:build
+
       - name: Build (fixtures on)
         run: npm run build
 
