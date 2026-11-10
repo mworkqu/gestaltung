@@ -1,0 +1,38 @@
+{
+  "close": "إغلاق",
+  "cancel": "إلغاء",
+  "confirm": "تأكيد",
+  "loading": "جارٍ التحميل…",
+  "working": "جارٍ التنفيذ…",
+  "helpFor": "مساعدة: {label}",
+  "learnMore": "اعرف المزيد",
+  "termLabel": "ماذا يعني «{term}»؟",
+  "needHelp": "تحتاج مساعدة؟",
+  "needHelpTitle": "كيف نساعدك؟",
+  "needHelpDescription": "اختر أسرع طريقة للحصول على إجابة.",
+  "searchHelpLabel": "ابحث في مركز المساعدة",
+  "searchHelpPlaceholder": "اكتب سؤالًا أو كلمة",
+  "searchHelpButton": "بحث",
+  "whatsappUs": "تواصل عبر واتساب",
+  "whatsappHint": "إجابات سريعة من فريقنا.",
+  "whatsappMessage": "مرحبًا، أحتاج مساعدة في صفحة: {page}\nHi, I need help on the page: {page}",
+  "emailUs": "أرسل بريدًا إلكترونيًا",
+  "emailHint": "الأنسب للأسئلة الطويلة.",
+  "emailSubject": "مساعدة أبطال التصميم بالحاسوب: {page}",
+  "toastRegion": "الإشعارات",
+  "stepperLabel": "التقدّم",
+  "status": {
+    "done": "تم",
+    "current": "الخطوة الحالية",
+    "upcoming": "التالية",
+    "locked": "مقفلة"
+  },
+  "tone": {
+    "neutral": "ملاحظة",
+    "info": "معلومة",
+    "success": "تم بنجاح",
+    "warning": "تنبيه",
+    "danger": "مشكلة",
+    "error": "خطأ"
+  }
+}

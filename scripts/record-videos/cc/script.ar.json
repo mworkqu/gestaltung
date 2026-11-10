@@ -1,0 +1,822 @@
+{
+  "lang": "ar",
+  "voice": "ar-QA-MoazNeural",
+  "rate": "+0%",
+  "say": {
+    "Autodesk Inventor": "أوتوديسك إنفنتور",
+    "Inventor": "إنفنتور",
+    "Fusion": "فيوجن",
+    "SOLIDWORKS": "سوليد ووركس",
+    "STEP": "ستيب",
+    "CAD": "كاد",
+    "90": "تسعين",
+    "50": "خمسين",
+    "18": "ثمانية عشر"
+  },
+  "segments": [
+    {
+      "id": "s01-what",
+      "narration": "أهلًا بك في أبطال التصميم بالحاسوب، برنامج تدريب لمسابقة مهارات التصميم بالحاسوب الوطنية في قطر، من جِشتالتُونج في لوسيل. تبدأ الرحلة باختبار CAD مجاني. يستغرق نحو 90 دقيقة، على Inventor أو Fusion أو SOLIDWORKS، بالعربية أو بالإنجليزية.",
+      "url": "/cad-champions/ar",
+      "poster": true,
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hover",
+          "sel": "#cc-hero-title"
+        },
+        {
+          "do": "wait",
+          "ms": 3000
+        },
+        {
+          "do": "hover",
+          "sel": "main section[aria-labelledby=cc-hero-title] svg, main section[aria-labelledby=cc-hero-title] [role=img]"
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "hover",
+          "sel": "main section[aria-labelledby=cc-hero-title] a[href*='sign-up']"
+        },
+        {
+          "do": "wait",
+          "ms": 3000
+        },
+        {
+          "do": "hover",
+          "sel": "main section[aria-labelledby=cc-hero-title] p.text-xs"
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s02-how",
+      "narration": "الطريق خمس خطوات. أنشئ حسابك، ثم استعد، ثم أدِّ الاختبار المجاني، واحصل على تقرير مهاراتك، ثم تدرّب. كل خطوة تفتح التي بعدها.",
+      "url": "/cad-champions/ar",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "scroll",
+          "to": "#how-it-works",
+          "offset": 80
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverEach",
+          "sel": "#how-it-works li",
+          "ms": 1000
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s03-sign-up",
+      "narration": "لننشئ حسابًا مجانيًا. اكتب اسمك وبريدك الإلكتروني وكلمة مرور. نطلب رقم جوالك لنتواصل معك عبر واتساب إذا احتاج اختبارك إلى متابعة، ونسأل عن مدرستك لننظّم جلسات تدريب قريبة منك.",
+      "url": "/cad-champions/ar/sign-up",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "sel": "#cc-fullName",
+          "text": "سارة أحمد"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-email",
+          "text": "sara.student@example.com"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-password",
+          "text": "Practice2026"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-phone",
+          "text": "+974 5512 3478"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "select",
+          "sel": "#cc-institution",
+          "index": 1
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hover",
+          "sel": "#cc-institution"
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s04-guardian",
+      "narration": "إذا كان عمرك أقل من 18 عامًا، يظهر قسم جديد. أضف اسم وليّ أمرك ورقم جواله، ثم ضع علامة الموافقة معه.",
+      "url": "/cad-champions/ar/sign-up",
+      "prep": [
+        {
+          "do": "fill",
+          "sel": "#cc-fullName",
+          "text": "سارة أحمد"
+        },
+        {
+          "do": "fill",
+          "sel": "#cc-email",
+          "text": "sara.student@example.com"
+        },
+        {
+          "do": "fill",
+          "sel": "#cc-phone",
+          "text": "+974 5512 3478"
+        },
+        {
+          "do": "jump",
+          "to": "#cc-dateOfBirth",
+          "offset": 260
+        }
+      ],
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "fillDate",
+          "sel": "#cc-dateOfBirth",
+          "value": "2010-03-14"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "scroll",
+          "to": "#cc-guardianName",
+          "offset": 260
+        },
+        {
+          "do": "type",
+          "sel": "#cc-guardianName",
+          "text": "منى أحمد"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-guardianPhone",
+          "text": "+974 5598 2211"
+        },
+        {
+          "do": "click",
+          "sel": "#cc-guardianConsent"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s05-check-email",
+      "narration": "بعد التسجيل، افتح بريدك الإلكتروني. اضغط الرابط الذي أرسلناه لتؤكد عنوانك وتُكمل حسابك.",
+      "url": "/cad-champions/ar/check-email",
+      "pendingEmail": "sara.student@example.com",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "auth:checkEmail.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": "sara.student@example.com"
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s06-sign-in",
+      "narration": "بعدها سجّل الدخول. أربع شاشات قصيرة تشرح لك ما هو البرنامج، وكيف يعمل، وما تحتاج إليه للاختبار.",
+      "url": "/cad-champions/ar/sign-in",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "type",
+          "sel": "input[type=email]",
+          "text": "sara.student@example.com"
+        },
+        {
+          "do": "type",
+          "sel": "input[type=password]",
+          "text": "Practice2026"
+        },
+        {
+          "do": "hover",
+          "sel": "form button[type=submit]"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "goto",
+          "url": "/cad-champions/ar/e2e-fixtures/onboarding"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        }
+      ],
+      "holdSeconds": 0.5
+    },
+    {
+      "id": "s07-software",
+      "narration": "في الشاشة الأخيرة، اختر برنامج التدريب. ننصح بـ Autodesk Inventor للمسابقة. ويمكنك أيضًا اختيار Fusion أو SOLIDWORKS، وتغيير اختيارك لاحقًا.",
+      "url": "/cad-champions/ar/e2e-fixtures/onboarding",
+      "prep": [
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true,
+          "instant": true
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "onboarding:how.title"
+          }
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true,
+          "instant": true
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "onboarding:before.title"
+          }
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true,
+          "instant": true
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "onboarding:software.title"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "onboarding:software.inventorName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 2600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "onboarding:software.fusionName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "onboarding:software.solidworksName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "clickText",
+          "text": {
+            "msg": "onboarding:software.inventorName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "hoverRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:goToGetReady"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s08-dashboard",
+      "narration": "تعرض لوحتك دائمًا في أعلاها الخطوة التالية التي عليك القيام بها. وتحتها يبيّن لك متتبّع الرحلة أين وصلت، من ملفك الشخصي حتى التدريب.",
+      "url": "/cad-champions/ar/e2e-fixtures/dashboard?state=ready",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hover",
+          "sel": "[data-testid=next-step] p"
+        },
+        {
+          "do": "wait",
+          "ms": 2400
+        },
+        {
+          "do": "hover",
+          "sel": "[data-testid=next-step] a"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hoverEach",
+          "sel": "[data-testid=tracker] li",
+          "ms": 900
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s09-get-ready",
+      "narration": "صفحة التجهيز تُعدّك ليوم الاختبار. شاهد فيديو الترحيب، وافحص حاسوبك، وثبّت برنامج التصميم. ابدأ مبكرًا، فالتحقق من رخصة الطالب قد يستغرق بضعة أيام.",
+      "url": "/cad-champions/ar/e2e-fixtures/get-ready",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.welcome_video.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.check_computer.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.install_software.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.essential_actions.title"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s10-practice",
+      "narration": "بعد ذلك، تعلّم الإجراءات الأساسية الخمسة، مثل ضبط الوحدات على المليمتر وتصدير ملف STEP. ثم جرّب رفع ملف تدريبي. صمّم مكعبًا من الفولاذ طول ضلعه 50 مليمترًا وارفعه. لا يوجد مؤقت، وعندما ينجح، تكون جاهزًا.",
+      "url": "/cad-champions/ar/e2e-fixtures/get-ready?keys=practice",
+      "mock": "practicePass",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.essential_actions.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 2200
+        },
+        {
+          "do": "scrollText",
+          "text": {
+            "msg": "get-ready:practice.taskTitle"
+          },
+          "offset": 160
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:practice.taskTitle"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 2400
+        },
+        {
+          "do": "hover",
+          "sel": "input[type=file][accept='.step,.stp']",
+          "parent": true
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "upload",
+          "sel": "input[type=file][accept='.step,.stp']",
+          "name": "cube.step"
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "get-ready:celebration.title"
+          }
+        },
+        {
+          "do": "scrollText",
+          "text": {
+            "msg": "get-ready:celebration.title"
+          },
+          "offset": 140
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s11-test-start",
+      "narration": "قبل الاختبار، اقرأ القواعد، وضع علامة في المربعين، ثم اضغط ابدأ. يعمل مؤقت الـ 90 دقيقة على خادمنا، لذلك لا يتوقف إذا أغلقت الصفحة.",
+      "url": "/cad-champions/ar/e2e-fixtures/test-intro?gate=ready",
+      "mock": "startTest",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "scrollLabel",
+          "label": {
+            "msg": "test:intro.agreeRules"
+          },
+          "offset": 320,
+          "slow": true
+        },
+        {
+          "do": "checkLabel",
+          "label": {
+            "msg": "test:intro.agreeRules"
+          }
+        },
+        {
+          "do": "checkLabel",
+          "label": {
+            "msg": "test:intro.agreeHonour"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "test:intro.start"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverRole",
+          "role": "button",
+          "name": {
+            "msg": "test:intro.startConfirm"
+          }
+        }
+      ],
+      "holdSeconds": 1,
+      "prep": [
+        {
+          "do": "jumpText",
+          "text": {
+            "msg": "test:intro.summaryTitle"
+          },
+          "offset": 90
+        }
+      ]
+    },
+    {
+      "id": "s12-workspace",
+      "narration": "في الاختبار، لكل مهمة وصف وكثافة المادة، وبعض المهام تأتي مع ملفات للتنزيل. صمّم القطعة في برنامجك، وصدّرها ملف STEP، ثم ارفعها. ويمكنك استبدال الملف كما تشاء حتى تسلّم الاختبار.",
+      "url": "/cad-champions/ar/e2e-fixtures/workspace?mode=per_task",
+      "mock": "saveTask",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:workspace.timerLabel"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:workspace.briefTitle"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:workspace.materialTitle"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "scrollTo",
+          "sel": "[id^=cc-task-panel-] input[type=file]",
+          "offset": 470
+        },
+        {
+          "do": "hover",
+          "sel": "[id^=cc-task-panel-] input[type=file]",
+          "parent": true
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "upload",
+          "sel": "[id^=cc-task-panel-] input[type=file]",
+          "name": "Bracket.step"
+        },
+        {
+          "do": "wait",
+          "ms": 2200
+        },
+        {
+          "do": "hoverText",
+          "text": "Bracket.step"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverRole",
+          "role": "button",
+          "name": {
+            "msg": "test:workspace.submit"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s13-submitted",
+      "narration": "عندما تنتهي، اضغط تسليم. وصلتنا ملفاتك، ويمكنك مغادرة الصفحة. تُفحص النماذج ثلاثية الأبعاد تلقائيًا، ويؤكد أحد المدربين الرسومات.",
+      "url": "/cad-champions/ar/e2e-fixtures/submitted",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:submitted.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:submitted.next4"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:submitted.next1"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s14-results",
+      "narration": "تعرض نتائجك درجتك الإجمالية ومستواك. وتبيّن خريطة المهارات أداءك في كل مجال من مجالات المهارة الستة.",
+      "url": "/cad-champions/ar/e2e-fixtures/results?variant=medium&offer=video&help=1",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "results:header.overall"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "results:header.bandLabel"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "scrollText",
+          "text": {
+            "msg": "results:skillMap.title"
+          },
+          "offset": 100
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "smoothBy",
+          "px": 420
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s15-training",
+      "narration": "ويبيّن لك مسار التدريب بماذا تبدأ، مع درس مجاني لتنطلق. وإذا احتجت إلى مساعدة في أي وقت، اضغط زر المساعدة لتراسلنا. بالتوفيق!",
+      "url": "/cad-champions/ar/e2e-fixtures/results?variant=medium&offer=video&help=1",
+      "prep": [
+        {
+          "do": "jump",
+          "to": "#cc-path-title",
+          "offset": 90
+        }
+      ],
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hover",
+          "sel": "#cc-path-title"
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "results:path.freeLesson.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1800
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "ui:needHelp"
+          },
+          "nth": "last"
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        }
+      ],
+      "holdSeconds": 1.5
+    }
+  ]
+}

@@ -1079,7 +1079,9 @@
     "studentsTitle": "School & student projects",
     "studentsText": "Science fair, exam project or a first robot: the same tool, written for a school budget.",
     "studentsCta": "See how it works for schools",
-    "choiceIdeaTokens": "Basic projects are free to plan. Multi-axis, multi-controller or turnkey builds need ideation tokens: {tier2} or {tier3}, at QAR {tokenPrice} a token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}}. We always quote the cost first, and nothing is deducted until you approve."
+    "choiceIdeaTokens": "Basic projects are free to plan. Multi-axis, multi-controller or turnkey builds need ideation tokens: {tier2} or {tier3}, at QAR {tokenPrice} a token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}}. We always quote the cost first, and nothing is deducted until you approve.",
+    "cadChampionsSide": "CAD Champions",
+    "cadChampionsSideLabel": "CAD Champions: free CAD skills test and training"
   },
   "DesignQuote": {
     "metaTitle": "Get a free quote | Gestaltung360",

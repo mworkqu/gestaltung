@@ -179,19 +179,8 @@ file and must be confirmed in Supabase first.
   Safe to re-run, BUT a re-run after a new parts column was added grants that column to anon/authenticated (the list
   is rebuilt from the live columns) and re-creates parts_admin with it (its column list is frozen at creation). A NEW
   parts column must be granted to anon/authenticated in its own migration. Until it runs anyone reads every margin.
-- 0096_school_classes.sql - RUN ✔ 2026-10-21 (owner; verified by live probe: school_classes readable, is_class_project() answers, school_pricing seeded 3/49, 15/199, 30 + 0.7/g). School classes: school_classes / class_teams / class_team_comments
-  (+ RLS, no anon privileges), class_teacher_of_project / is_class_project / is_class_teacher_of_project /
-  ai_role_of / new_join_code, the extra projects SELECT policy for the class teacher, credit_can_use +
-  spend_credit v4 (a class team project spends the TEACHER's credits), projects_enforce_limit v2 (class team
-  projects are outside the 3-active cap), create_school_class + join_class_team, and the school_pricing seed.
-  RUN AFTER 0093. Safe to re-run. Until it runs, /schools/classes and /join say classes are not set up and
-  every project reads as "not a class" (no safety mode, nothing else changes).
-- 0097_class_order.sql - RUN ✔ 2026-10-21 (owner; verified by live probe: part_orders.class_id readable). STILL TO CONFIRM: one test order through checkout, since this file replaced create_part_order. The class parts order: part_orders.class_id + class_breakdown,
-  school_free_class_delivery(), class_order_delivery_quote(), and create_part_order v5 with p_class_id
-  (Economy delivery QAR 0 on a class order). RUN AFTER 0096, ON ITS OWN - it is the only file of the school
-  stage that replaces create_part_order, so place one test order straight after. It drops the 0044
-  9-argument version and refuses to apply unless exactly one create_part_order is left. Until it runs,
-  checkout falls back to the call without p_class_id and a class order is charged normal delivery.
+- 0096_school_classes.sql - RUN ✔ 2026-10-21 (owner, live probe). School classes, teams, comments, class-teacher credit routing, school_pricing seed; details in `docs/MIGRATIONS.md`.
+- 0097_class_order.sql - RUN ✔ 2026-10-21 (owner, live probe). STILL TO CONFIRM: one test order through checkout, since this file replaced create_part_order (`create_part_order` v5 with `p_class_id`).
 - 0098_commission_floor.sql — NOT RUN. store_settings.commission_floor_pct (default 8) + refresh_part_sourcing
   replaced so a mirror part is judged against the commission floor and a markup part against margin_floor_pct
   (15). Numbered 0098 because review-analyse-guard took 0096 and main took 0096 + 0097. RUN AFTER 0095 — it
@@ -284,6 +273,14 @@ Full run log, rules for new migrations and the next free number (0107): `docs/MI
   NOT set yet — owner chose not to publish the number publicly until launch. Falls back to /contact.
 - OWNER RULE: never sign the owner up for paid services or subscriptions.
 - Environment ids (Supabase project, Vercel project and team, GA4 id, domain, Node, next pin) are in `docs/ENVIRONMENT.md`.
+
+## CAD Champions (`/cad-champions`)
+- Training platform for the Mechanical Engineering CAD skills competition, a route section inside this app (merged from branch `cad-champions`, 2026-11). Public URLs `/cad-champions/{en,ar}/…` are rewritten by middleware to `app/[locale]/cad-champions`; English default, sticky per-user Arabic.
+- Own tables `cc_*` (migrations 0077-0087; 0077-0086 RUN by the owner 2026-10-15, 0087 run status to confirm), own code in `lib/cad-champions`, `components/cad-champions` (own UI kit), messages in `messages/cad-champions/{en,ar}/*.json` (merged under `CC`), grader service in `grader/` (Cloud Run).
+- Docs: start at `docs/cad-champions/AGENT_BRIEF.md`; also PROMPTS, GRADER, RESULTS, TRAINING, AUTH_EMAILS, SECURITY_REVIEW, QA, DEPLOY, LAUNCH in that folder, and `docs/COMPETITION_ALIGNMENT.md` (overrides older task text).
+- Checks: `npm run test:cc` (vitest `lib/cad-champions` + Playwright `e2e/cad-champions`), `npm run i18n:check`, `npm run cc:rtl-check` (also part of `npm run lint`); CI `.github/workflows/cad-champions.yml`.
+- Owner still to do: env vars (GRADER_URL/SECRET, ANTHROPIC_API_KEY, BUNNY_*, FAWRAN_*), plan prices, content placeholders, policies approval, noindex removal at launch (`docs/cad-champions/DEPLOY.md` §6).
+- sharp is installed only as the alias `sharp-admin` (never a top-level `sharp`): imported by `lib/store/load-sharp.ts` from API routes only (`next.config.mjs` SHARP_ROUTES); pages store images through `/api/admin/store-image`.
 
 ## Pointers
 | Where | What |

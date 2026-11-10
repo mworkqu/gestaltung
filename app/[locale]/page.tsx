@@ -29,6 +29,7 @@ import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
 import { cn } from "@/lib/utils";
 import { tokenCopyParams } from "@/lib/billing/config";
 import { VIDEOS, videoBase, videoJsonLd } from "@/lib/videos";
+import { CadChampionsSideButton } from "@/components/home/cad-champions-side-button";
 
 // ISR (Phase G): static per locale, re-rendered at most every 5 minutes, or at
 // once when an admin edit calls revalidateStorefront() (tag "parts"). Nothing
@@ -309,6 +310,7 @@ export default async function Home({
       {/* Add to cart may mint a guest session: the on-demand check (renders nothing while off). */}
       <TurnstileChallenge enabled={turnstileEnabled} />
     </div>
+    <CadChampionsSideButton locale={locale} />
     </MessagesScope>
   );
 }

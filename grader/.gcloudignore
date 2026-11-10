@@ -1,0 +1,8 @@
+# Uploaded by `gcloud run deploy cad-grader --source ./grader` (Dockerfile + context only).
+.gcloudignore
+.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.venv
+venv

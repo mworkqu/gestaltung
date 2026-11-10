@@ -1,0 +1,38 @@
+{
+  "close": "Close",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "loading": "Loading…",
+  "working": "Working…",
+  "helpFor": "Help: {label}",
+  "learnMore": "Learn more",
+  "termLabel": "What does “{term}” mean?",
+  "needHelp": "Need help?",
+  "needHelpTitle": "How can we help?",
+  "needHelpDescription": "Pick the fastest way to get an answer.",
+  "searchHelpLabel": "Search the Help Center",
+  "searchHelpPlaceholder": "Type a question or a word",
+  "searchHelpButton": "Search",
+  "whatsappUs": "Chat on WhatsApp",
+  "whatsappHint": "Quick answers from our team.",
+  "whatsappMessage": "مرحبًا، أحتاج مساعدة في صفحة: {page}\nHi, I need help on the page: {page}",
+  "emailUs": "Send an email",
+  "emailHint": "Best for longer questions.",
+  "emailSubject": "CAD Champions help: {page}",
+  "toastRegion": "Notifications",
+  "stepperLabel": "Progress",
+  "status": {
+    "done": "Done",
+    "current": "Current step",
+    "upcoming": "Up next",
+    "locked": "Locked"
+  },
+  "tone": {
+    "neutral": "Note",
+    "info": "Info",
+    "success": "Success",
+    "warning": "Warning",
+    "danger": "Problem",
+    "error": "Error"
+  }
+}
