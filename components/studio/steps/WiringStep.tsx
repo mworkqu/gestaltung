@@ -14,7 +14,7 @@ import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 
 import { AccessNote } from "@/components/credits/access-note";
 import { track } from "@/lib/analytics";
-import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import { creditsChanged, useCanUse } from "@/lib/credits/client/use-credits";
 import { buildConnections } from "@/lib/studio/connections";
 import { downloadBlob, exportSVG } from "@/lib/studio/download";
 import { useStudioLibrary } from "../StudioLibraryProvider";

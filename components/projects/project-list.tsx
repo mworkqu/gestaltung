@@ -15,7 +15,7 @@ import type { Project } from "@/lib/supabase/types";
 import { PROJECT_HREF_COLUMNS, projectHref } from "@/lib/projects/href";
 import type { StudioCardFacts } from "@/lib/projects/studio-facts";
 import { PROJECT_LIMIT } from "@/lib/credits/constants";
-import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
+import { creditsChanged, useCreditSummary } from "@/lib/credits/client/use-credits";
 
 // Client-side on purpose: a first-time visitor has no session at all, and a
 // guest's session cookie is written by the browser. Reading here means the list

@@ -5,7 +5,7 @@
 import { useLocale, useTranslations } from "next-intl";
 
 import { Link } from "@/i18n/navigation";
-import { useCreditSummary } from "@/lib/credits/use-credits";
+import { useCreditSummary } from "@/lib/credits/client/use-credits";
 
 export function CreditsOverview() {
   const t = useTranslations("Credits");

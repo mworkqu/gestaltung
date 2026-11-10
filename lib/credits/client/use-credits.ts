@@ -19,7 +19,7 @@ import type { User } from "@supabase/supabase-js";
 import { useAuth } from "@/components/auth/auth-provider";
 import { createSharedLoader } from "@/lib/dedupe";
 import { loadSupabase } from "@/lib/supabase/lazy";
-import { CREDITS_CHANGED, noFreeCircuit, type AiStep, type CanUse, type CreditSummary, type RawCanUse } from "./constants";
+import { CREDITS_CHANGED, noFreeCircuit, type AiStep, type CanUse, type CreditSummary, type RawCanUse } from "../constants";
 
 export function creditsChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(CREDITS_CHANGED));

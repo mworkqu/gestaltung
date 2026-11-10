@@ -105,3 +105,50 @@ fails in CI, so the number really gets lowered: `npm run lint:ratchet -- --updat
 writes the new count). The comparison lives in `scripts/lint-ratchet.mjs`
 (`compareToRatchet`, `countFromEslintJson`) and is unit-tested in
 `lib/dev-lint-ratchet.test.ts`.
+
+## 4.4 Audit slices R11 and R12
+
+Rule: only mechanical, test-covered items were fixed (cap about 10 files).
+Everything else is listed with a suggested fix and a risk rating.
+
+### R11: hooks out of `lib/`, no inline Supabase queries in components
+
+Fixed (mechanical: file moves + import paths, `tsc`, vitest, build as proof, 16 files touched):
+
+| Was | Now |
+|---|---|
+| `lib/credits/use-credits.ts` (11 importers) | `lib/credits/client/use-credits.ts` |
+| `lib/pricing/use-price-quote.ts` | `lib/pricing/client/use-price-quote.ts` |
+| `lib/store/use-delivery-quote.ts` | `lib/store/client/use-delivery-quote.ts` |
+
+Not fixed:
+
+| File | Violation | Suggested fix | Risk |
+|---|---|---|---|
+| `lib/schools/client.ts` | exports a hook (`useClassOrderId`) beside client helpers; already client-only, imported by 2 pages | move to `lib/schools/client/` with `use-class-order.ts` | Low, but it is also imported as `schools/client` by name in `client.test.ts`; do it with its test |
+| `components/parts/cart-provider.tsx` (19 `.from(` calls) | the whole cart (guest session, kits, project lines) is inline queries in a context provider | extract `lib/store/client/cart-db.ts` (same queries, moved); provider keeps state only | High: money path, guest-cart migration; needs the e2e store specs against a real project |
+| `components/dashboard/admin-overview.tsx` (17) | KPI queries inline in a component | `lib/admin/overview-data.ts` called from the (server) page | Medium |
+| `components/prototyping/workspace.tsx` (10), `idea-stage.tsx` (5), `part-dialogs.tsx` (4), `schematics-stage.tsx` (3), `parts-stage.tsx` (3), `bom-table.tsx` (3), `parts-list.tsx` (2), `client/client-workspace.tsx`, `use-project-boards.ts` | project/brief/BOM reads and writes inline | one `lib/prototyping/client/project-db.ts` (typed functions: `loadProject`, `patchProject`, `savePart` ...) | High: the studio e2e specs (the known-failing ones) cover it |
+| `components/inventory/my-inventory.tsx` (7) | inventory CRUD inline | `lib/inventory/client/*` | Medium |
+| `components/home/your-work-strip.tsx` (7) | read queries inline (pure selection logic is already in `lib/home/your-work.ts`) | move the 4 reads next to the selection logic | Low |
+| `components/projects/{project-list,items-card,blocks-card}.tsx` (6 each), `new-project-form.tsx` (4), `project-cad-card.tsx` (3), `use-project-data.ts`, `brief-card`, `phone-prompt`, `new-project-chat`, `project-header`, `project-parts-list` | inline project queries | `lib/projects/client/*` (some already exist) | Medium |
+| `components/parts/add-to-project-button.tsx` (5), `components/search/unified-search.tsx` (3), `components/design/quote-request.tsx` (2), `components/dashboard/admin-home.tsx` (2), `components/credits/cad-card.tsx`, `components/cad-champions/training/stats.tsx` (2) | inline queries | same pattern | Low to Medium |
+| 10 cache modules without a `server-only` marker | can be imported from a client by mistake | `import "server-only"` | Not done: vitest imports several of them and the `server-only` package throws outside Next; needs a vitest alias first |
+
+Totals: 29 component/hook files contain a `.from("` call (about 160 calls).
+
+### R12: one error shape per API route
+
+75 route files; 44 use `lib/http.ts` (`jsonError`/`jsonOk`). 31 do not:
+
+| Group | Routes | Why left | Suggested fix |
+|---|---|---|---|
+| Already `{ error: "<code>" }` + status, but with a `Cache-Control: no-store` header the helper cannot carry | `cad-champions/attempts/[id]/status`, `certificates/[code]`, `payments/[id]/receipt`, `payments/[id]/status`, `results/[attemptId]/report`, `results-template`, `payments/skipcash/webhook`, `cron/cc-payments-expire`, `cron/cc-weekly-progress` | swapping to `jsonError` would drop the no-store header (a behaviour change) | give `jsonError` an optional `headers` argument, then swap (byte-identical output); Low |
+| `{ ok: false, error }` / `{ ok: true }` envelopes parsed by clients | `auth/claim-guest`, `projects/claim`, `admin/youtube/upload`, `design-quote`, `project-cad` | clients read `ok` | keep (documented bespoke shape) or migrate client and route together; Medium |
+| `{ sent: boolean }` | `projects/recovery-email` | client branches on `sent` | keep; documented bespoke shape |
+| HTML pages, redirects, file downloads | `auth/callback`, `notifications/unsubscribe`, `orders/rate`, `orders/review`, `admin/customers/[id]/export`, `admin/projects/[id]/export`, `cad-champions/video/[ref]`, `cad-champions/time` | not JSON errors | keep |
+| Studio product routes (`studio/product/{check,choose,design,engineer,model,preview,unlock}`) and `store/search` | use `lib/studio/server/product.ts` `json()` / their own helper | shape already uniform inside the studio | point `json()` at `lib/http.ts` later; Low |
+
+Nothing in R12 was changed: the only candidates that are byte-identical need a
+helper change first, and the rest are client-parsed shapes that the plan says to
+leave and document.

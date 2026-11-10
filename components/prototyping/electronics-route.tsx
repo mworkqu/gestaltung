@@ -21,7 +21,7 @@ import type { BuildRoute, RouteRecommendation } from "@/lib/prototyping/analysis
 import type { LevelFlag } from "@/lib/prototyping/electronics-rules";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
-import { creditsChanged } from "@/lib/credits/use-credits";
+import { creditsChanged } from "@/lib/credits/client/use-credits";
 
 const optionClass = (on: boolean) =>
   cn(
