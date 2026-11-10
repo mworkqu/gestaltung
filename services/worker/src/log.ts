@@ -14,7 +14,8 @@ const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
 const BEARER = /bearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const JWT = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
 // 8+ digits, optionally with +, spaces or dashes: phone numbers (Qatar numbers are 8 digits).
-const PHONE = /\+?\d[\d\s-]{6,}\d/g;
+// Not inside an id: a run id or UUID such as 9b88302146c9 must stay readable.
+const PHONE = /(?<![\w-])\+?\d[\d\s-]{6,}\d(?![\w-])/g;
 const MAX_STRING = 300;
 const MAX_DEPTH = 4;
 

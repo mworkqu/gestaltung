@@ -38,6 +38,13 @@ describe("log redaction", () => {
     expect(out.nested).toEqual({ authorization: "[redacted]", count: 3 });
   });
 
+  it("keeps ids readable", () => {
+    expect(redact({ run_id: "166389cd-54ae-4f7f-81de-9b88302146c9", order: "#12345678" })).toEqual({
+      run_id: "166389cd-54ae-4f7f-81de-9b88302146c9",
+      order: "#[number]",
+    });
+  });
+
   it("writes one JSON line", () => {
     const line = formatLine("info", "job done", { job: "x", ms: 5 }, new Date("2026-11-10T00:00:00Z"));
     expect(line).not.toContain("\n");
