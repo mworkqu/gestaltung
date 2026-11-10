@@ -279,7 +279,7 @@ export type ClientInventoryItem = {
 
 // ── Prototyping ─────────────────────────────────────────────────────────────
 // See supabase/migrations/0020_prototyping.sql and 0022. The brief's reading
-// lives in projects.spec; project_claims is retired and no longer typed.
+// lives in projects.spec; project_claims was retired (0022) and is dropped by 0110.
 
 export type PartStatus = "suggested" | "confirmed" | "edited" | "added";
 

@@ -81,6 +81,9 @@ const LEGACY = [
   "0010_job_upsells.sql",
 ];
 
+// Each case applies 0001 + 0004-0010 to a fresh PGlite: seconds alone, much more under a loaded full run.
+const LEGACY_TIMEOUT = 120_000;
+
 const ALICE = "00000000-0000-4000-8000-00000000a11c";
 const BOB = "00000000-0000-4000-8000-0000000000b0";
 const TENANT = "00000000-0000-4000-8000-000000007e17";
@@ -132,7 +135,7 @@ describe("0108 drop tenant inventory", () => {
     expect(await as(BOB, () => rows("select 1 from public.client_inventory_items"))).toEqual([]);
     await as(ALICE, () => rows("update public.client_inventory_items set quantity = 11"));
     expect((await rows<{ quantity: string }>("select quantity::text from public.client_inventory_items"))[0].quantity).toBe("11");
-  });
+  }, LEGACY_TIMEOUT);
 });
 
 const JOB_FUNCTIONS = [
@@ -169,7 +172,7 @@ describe("0109 drop jobs remnants", () => {
     expect(await as(ALICE, () => fails(`insert into storage.objects (bucket_id, name) values ('cad-files', '${BOB}/p2/x.step')`))).toMatch(/row-level security/);
     // tenants / profiles policies still resolve current_user_tenant_id().
     expect((await as(ALICE, () => rows("select 1 from public.tenants"))).length).toBe(1);
-  });
+  }, LEGACY_TIMEOUT);
 
   it("is a no-op after 0013 already dropped the pipeline", async () => {
     const { db, rows, applyTwice } = await legacyDb({ cadFiles0018: false });
@@ -180,7 +183,7 @@ describe("0109 drop jobs remnants", () => {
     for (const t of JOB_TABLES) expect(await exists(rows, t), t).toBe(false);
     expect(await fnExists(rows, "public.current_user_role()")).toBe(false);
     expect(await fnExists(rows, "public.current_user_tenant_id()")).toBe(true);
-  });
+  }, LEGACY_TIMEOUT);
 
   it("stops without changing anything while the old 0006 cad-files policy still calls a jobs helper", async () => {
     const { db, rows } = await legacyDb({ cadFiles0018: false });
@@ -193,5 +196,5 @@ describe("0109 drop jobs remnants", () => {
     expect(error).toMatch(/0109 stopped, nothing changed: cad_files_select on storage\.objects/);
     expect(await exists(rows, "public.jobs")).toBe(true);
     expect(await fnExists(rows, "public.can_read_cad_object(text)")).toBe(true);
-  });
+  }, LEGACY_TIMEOUT);
 });

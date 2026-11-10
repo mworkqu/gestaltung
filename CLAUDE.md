@@ -268,7 +268,7 @@ file and must be confirmed in Supabase first.
   metered or recorded)
 - 0024_project_diagnostics.sql — analysis_runs + project_events + event triggers (RUN AFTER 0023; the
   export's raw responses and event log are empty until it runs)
-Full run log, rules for new migrations and the next free number (0107): `docs/MIGRATIONS.md`.
+Full run log, rules for new migrations and the next free number (0111): `docs/MIGRATIONS.md`.
 
 ## PERMANENT NOTES
 - STOREFRONT CACHE EXPIRY = 24 h since 2026-10-16 (was 5 min; it blew the Hobby ISR-write allowance). Wherever older notes say "or wait 5 min", read "or wait for the daily 06:00 Qatar purge": any Dashboard → Store save or cron sync still purges at once. Store listings WITH a search query are not cached at all (lib/store/public-catalog.ts getStoreListing).

@@ -22,7 +22,7 @@ describe("0107 drop site_v2 setting", () => {
   beforeAll(async () => {
     await db.exec(STUB);
     await applyTwice("0107_drop_site_v2_setting.sql");
-  });
+  }, 60_000);
 
   it("deletes the site_v2 row", async () => {
     expect(await rows("select key from public.store_settings where key = 'site_v2'")).toEqual([]);
