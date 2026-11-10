@@ -7,12 +7,19 @@
 // the tags below, so an admin edit can refresh them at once instead of waiting
 // for the expiry:
 //   "parts"           every published-product read (list, facets, product
-//                     page, featured row, delivery quote)
+//                     page, featured row, delivery quote): the full purge
+//   "parts-listing"   the listing-level reads only (store listing, facets, home
+//                     featured row, collections, upsell pool, review strip), on
+//                     top of "parts": a few dozen pages, never a product page
 //   "store-settings"  store_settings reads (shipping tiers -> "Arrives by")
-//   "part-<sku>"      the reads of ONE product, on top of "parts"
+//   "part-<sku>"      the reads of ONE product, on top of "parts" (also the
+//                     "bought together" cards that show it on other products)
 //   "contact-phone"   the contact number in the footer, on top of "store-settings"
 // Call revalidateStorefront() after any write to parts, supplier_offers,
-// suppliers or store_settings (admin actions, admin API routes, the cron syncs).
+// suppliers or store_settings (admin actions, admin API routes). The two
+// supplier crons purge per product instead: revalidateCatalogChange() with
+// the decision from lib/cache/catalog-tags.ts ("part-<sku>" per moved
+// product, "parts-listing" only when a listed field moved, "parts" past the cap).
 // The two narrow tags exist because the broad purge is expensive: ~1,300
 // products x 2 locales of cached pages all re-render, and every re-render is
 // an ISR write. Use revalidatePart() / revalidateContactPhone() only where the
@@ -22,18 +29,17 @@
 // Expiry is 24 h (2026-10-16): the 5-minute window rewrote every visited page
 // and its 5-6 cache entries ~288 times a day and blew the Vercel Hobby ISR-write
 // allowance (200k/month). Data only changes through writes that purge the tags,
-// and the daily Voltaat cron (06:00 Qatar) purges everything, so "Arrives by"
-// dates are re-rendered once a day. Search results with a query are not cached
-// at all (unbounded key space from bots).
+// and the 24 h expiry itself re-renders a visited page's "Arrives by" dates
+// once a day. Search results with a query are not cached at all (unbounded key
+// space from bots).
 
 import { revalidateTag } from "next/cache";
 
-export const CATALOG_TAG = "parts";
+import { CATALOG_TAG, catalogTagsFor, partTag, type CatalogChange } from "@/lib/cache/catalog-tags";
+
+export { CATALOG_TAG, LISTING_TAG, partTag } from "@/lib/cache/catalog-tags";
 export const SETTINGS_TAG = "store-settings";
 export const CONTACT_PHONE_TAG = "contact-phone";
-
-/** The tag carried by one product's cached reads, and so by its own two pages. */
-export const partTag = (sku: string): string => `part-${sku}`;
 
 /** Seconds (24 h). Pages repeat this as a literal `export const revalidate = 86400` (Next needs a literal). */
 export const STOREFRONT_REVALIDATE = 86400;
@@ -50,6 +56,17 @@ function purge(...tags: string[]): void {
 /** Mark every cached storefront read stale; the next visit re-renders the page. */
 export function revalidateStorefront(): void {
   purge(CATALOG_TAG, SETTINGS_TAG);
+}
+
+/**
+ * After a supplier sync: purge only what the run changed (catalogTagsFor:
+ * per-SKU tags, the listing tag when a listed field moved, or one full
+ * "parts" purge past the cap). Returns the tags purged, for the cron reply.
+ */
+export function revalidateCatalogChange(change: CatalogChange): string[] {
+  const tags = catalogTagsFor(change);
+  if (tags.length) purge(...tags);
+  return tags;
 }
 
 /**

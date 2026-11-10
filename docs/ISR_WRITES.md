@@ -34,6 +34,16 @@ none of it was traffic:
 - Pages are kept for 24 hours instead of 5 minutes (done earlier, 2026-10-16).
 - The crons purge only when the run actually changed, dropped or re-listed
   something. A quiet day now costs nothing, and the reply says so.
+- Since 2026-11 (consolidation 2.2) the two supplier crons purge **per
+  product**: each product whose offer moved gets its own `part-<sku>` tag
+  (its two pages, plus product pages that show it as a "bought together"
+  card). The listing pages (store, home, collections) carry a separate
+  `parts-listing` tag, purged only when a field a listing shows or filters on
+  moved: published / merged, name (EN/AR), price, photo, category, store
+  category, material, lead-time class, minimum quantity. More than 100 moved
+  products in one run (`CRON_SKU_TAG_CAP`) fall back to one full `parts`
+  purge. The decision is `lib/cache/catalog-tags.ts` (unit-tested); the cron
+  reply lists the tags it purged under `purged`.
 - Saving the contact number purges only the number's own cache tag
   (`contact-phone`). The number is still correct everywhere immediately.
 - Each product's cached reads carry a `part-<sku>` tag as well as `parts`, so
