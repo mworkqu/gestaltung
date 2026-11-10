@@ -1,6 +1,5 @@
 import { isAuthorizedCron } from "@/lib/notifications/links";
-import { runMonitoringAlerts } from "@/lib/cad-champions/monitoring/alerts-server";
-import { runPaymentsCron } from "@/lib/cad-champions/payments/server";
+import { runCronRoute } from "@/lib/cron/route";
 
 // CAD Champions payments cron (Prompt 10 Steps D + F):
 //   - awaiting_transfer payments past expires_at (48 h) -> expired; the held
@@ -12,11 +11,14 @@ import { runPaymentsCron } from "@/lib/cad-champions/payments/server";
 // NOT in vercel.json yet (Hobby plan cron limits): add
 //   { "path": "/api/cron/cc-payments-expire", "schedule": "0 * * * *" }  (Pro, hourly)
 // or a daily schedule on Hobby (then a reservation can live up to ~24 h past 48 h).
+// The Mac Mini worker runs it hourly once it is switched on (docs/WORKER.md).
 //
 // After the payments run it also runs the monitoring check (grading errors > 3 in the
 // last hour, review items older than 48 h) and emails CC_ALERT_EMAIL. See docs/cad-champions/DEPLOY.md.
 //
 // Manual run: curl -H "Authorization: Bearer $CRON_SECRET" <origin>/api/cron/cc-payments-expire
+// The job itself is lib/cron/jobs.ts (shared with the Mac Mini worker,
+// docs/WORKER.md); lib/cron/route.ts runs it here or forwards it.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,14 +28,5 @@ export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return Response.json({ error: "cron_secret_unset" }, { status: 500 });
   if (!isAuthorizedCron(request.headers.get("authorization"), secret)) return new Response(null, { status: 401 });
-  const result = await runPaymentsCron();
-  // The alert check never blocks or fails the payments run.
-  const monitoring = await runMonitoringAlerts();
-  console.log("[cc-monitor] run:", JSON.stringify(monitoring));
-  if ("error" in result) {
-    console.error("[cc-payments-cron] run failed:", result.error);
-    return Response.json({ ...result, monitoring }, { status: 500 });
-  }
-  console.log("[cc-payments-cron] run:", JSON.stringify(result));
-  return Response.json({ ...result, monitoring });
+  return runCronRoute("cc-payments-expire", request);
 }

@@ -70,6 +70,16 @@ export function revalidateCatalogChange(change: CatalogChange): string[] {
 }
 
 /**
+ * Purge a list of tags that was already decided elsewhere: the cron jobs
+ * (lib/cron/jobs.ts) and POST /api/internal/revalidate, which the Mac Mini
+ * worker calls because it cannot reach revalidateTag. Returns the tags.
+ */
+export function revalidateTags(tags: readonly string[]): string[] {
+  if (tags.length) purge(...tags);
+  return [...tags];
+}
+
+/**
  * Mark one product's cached reads stale: only its own two pages (en + ar)
  * re-render, instead of the whole catalogue. For an edit that cannot show up
  * on a card, in a facet, in search or on another product — a product's specs,

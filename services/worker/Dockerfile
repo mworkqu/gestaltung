@@ -16,8 +16,6 @@ COPY services/worker/package.json services/worker/package-lock.json services/wor
 RUN npm --prefix services/worker ci
 COPY tsconfig.json ./
 COPY lib ./lib
-COPY i18n ./i18n
-COPY messages ./messages
 COPY services/worker ./services/worker
 ARG GIT_SHA=""
 ENV GIT_SHA=${GIT_SHA}

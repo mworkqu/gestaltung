@@ -19,14 +19,13 @@ import {
   createCheckout,
   rejectPayment,
   submitProof,
-  validateCouponForUser,
   isUuid,
   type AdminActionError,
   type CheckoutError,
-  type CouponCheck,
   type ProofError,
   type ProofInput,
 } from "./server";
+import { validateCouponForUser, type CouponCheck } from "./coupon-server";
 
 function revalidatePayment(paymentId?: string) {
   for (const l of CC_LOCALES) {

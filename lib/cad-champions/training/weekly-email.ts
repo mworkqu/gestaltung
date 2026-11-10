@@ -13,7 +13,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import { ccPath } from "../routes";
 import { qatarWeekStart } from "./gamification";
-import { continueItem, loadCatalog, loadProgress, moduleView, pick } from "./server";
+import { continueItem, loadCatalogWith, loadProgressWith, moduleView, pick } from "./data";
 
 export interface WeeklyEmailData {
   locale: "en" | "ar";
@@ -97,7 +97,7 @@ export async function sendWeeklyProgressEmails(opts: { now?: Date; limit?: numbe
   const site = defaultSiteUrl();
   const summary: WeeklySummary = { considered: 0, sent: 0, skipped: 0, failed: 0 };
 
-  const catalog = await loadCatalog(service);
+  const catalog = await loadCatalogWith(async () => service, true);
   if (!catalog.ok) return { error: catalog.reason };
 
   // Students who have started training (any lesson progress or exercise attempt).
@@ -131,7 +131,7 @@ export async function sendWeeklyProgressEmails(opts: { now?: Date; limit?: numbe
         service.from("cc_exercise_attempts").select("exercise_id").eq("user_id", p.id).eq("passed", true).gte("created_at", since),
         service.rpc("cc_has_active_enrollment", { p_user: p.id }),
       ]);
-      const progress = await loadProgress(p.id, catalog.modules, service);
+      const progress = await loadProgressWith(p.id, catalog.modules, async () => service);
       const access = { enrolled: enrolled.data === true, staff: p.role !== "student" };
       const views = catalog.modules.map((m) => moduleView(m, progress, access));
       const next = continueItem(catalog.modules, views, progress);

@@ -4,8 +4,6 @@
 !package-lock.json
 !tsconfig.json
 !lib/
-!i18n/
-!messages/
 !services/worker/
 services/worker/node_modules/
 services/worker/dist/
