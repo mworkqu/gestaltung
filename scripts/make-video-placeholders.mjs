@@ -10,7 +10,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import sharp from "sharp";
+import sharp from "sharp-admin";
 
 // Keep in step with lib/videos.ts (VIDEO_SLUGS) and messages Videos.<slug>Title.
 const VIDEOS = [
