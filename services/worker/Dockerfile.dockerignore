@@ -1,0 +1,12 @@
+# Build context = repository root; send only what the worker build needs.
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!lib/
+!i18n/
+!messages/
+!services/worker/
+services/worker/node_modules/
+services/worker/dist/
+**/*.test.ts

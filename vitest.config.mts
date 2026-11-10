@@ -11,7 +11,9 @@ export default defineConfig({
   // (lib/auth/guards.test.ts) need the JSX compiled.
   oxc: { jsx: { runtime: "automatic" } },
   test: {
-    include: ["lib/**/*.test.ts"],
+    // services/worker/src: the Mac Mini worker (docs/WORKER.md); its tests import
+    // only repo code and node built-ins, so they run without the worker's own install.
+    include: ["lib/**/*.test.ts", "services/worker/src/**/*.test.ts"],
     environment: "node",
     // Several suites are deterministic but slow: they walk the whole source
     // tree (lib/i18n/scopes, lib/store/part-columns), compile a page, or apply
