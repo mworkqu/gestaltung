@@ -10,15 +10,8 @@ import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, test } 
 // the cart_items insert / reads never reach Supabase. Product data is the live
 // catalogue, read through GET /api/store/search.
 
-/**
- * The live home is the v2 page (site_v2 ON). The middleware reads that flag with a
- * 1.5 s timeout and falls back to the old v1 home when the read fails (it does under
- * a loaded test machine), so open /v2 with the preview cookie: flag ON → 308 to
- * /{locale} (v2), flag read failed → the cookie still serves v2.
- */
-async function gotoHome(page: Page, locale: string, baseURL: string | undefined) {
-  await page.context().addCookies([{ name: "site_v2", value: "1", url: baseURL ?? "http://localhost:3000" }]);
-  await page.goto(`/${locale}/v2`);
+async function gotoHome(page: Page, locale: string) {
+  await page.goto(`/${locale}`);
   await expect(page.getByTestId("hero-enclosure")).toHaveCount(1);
 }
 
@@ -77,8 +70,8 @@ async function mockCartWrites(page: Page) {
 
 for (const locale of LOCALES) {
   test.describe(`home W7 [${locale}]`, () => {
-    test("hero: poster first, a link to a new project, live 3D after interaction", async ({ page, baseURL }) => {
-      await gotoHome(page, locale, baseURL);
+    test("hero: poster first, a link to a new project, live 3D after interaction", async ({ page }) => {
+      await gotoHome(page, locale);
       await expectLocale(page, locale);
       const hero = page.getByTestId("hero-enclosure");
       await expect(hero).toHaveAttribute("href", `/${locale}/projects/new`);
@@ -93,9 +86,9 @@ for (const locale of LOCALES) {
       await expectNoHorizontalOverflow(page);
     });
 
-    test("hero: reduced motion keeps the poster only", async ({ page, baseURL }) => {
+    test("hero: reduced motion keeps the poster only", async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
-      await gotoHome(page, locale, baseURL);
+      await gotoHome(page, locale);
       const hero = page.getByTestId("hero-enclosure");
       await expect(hero.locator("img")).toBeVisible();
       await page.mouse.move(5, 5);
@@ -105,8 +98,8 @@ for (const locale of LOCALES) {
       await expect(hero).toHaveAttribute("data-live", "0");
     });
 
-    test("founder cards are links: new project, store, WhatsApp", async ({ page, baseURL }) => {
-      await gotoHome(page, locale, baseURL);
+    test("founder cards are links: new project, store, WhatsApp", async ({ page }) => {
+      await gotoHome(page, locale);
       const cards = page.getByTestId("founder-cards").locator("a");
       await expect(cards).toHaveCount(3);
       await expect(cards.nth(0)).toHaveAttribute("href", `/${locale}/projects/new`);
@@ -125,7 +118,7 @@ for (const locale of LOCALES) {
       await expectNoHorizontalOverflow(page);
     });
 
-    test("search: 'dc motor' shows a dropdown; arrows, Esc, Enter; Add to cart updates the badge", async ({ page, baseURL }) => {
+    test("search: 'dc motor' shows a dropdown; arrows, Esc, Enter; Add to cart updates the badge", async ({ page }) => {
       const { posted } = await mockCartWrites(page);
       // Remember the suggested products so the mocked cart can return them.
       page.on("response", async (res) => {
@@ -141,7 +134,7 @@ for (const locale of LOCALES) {
           .catch(() => {});
       });
 
-      await gotoHome(page, locale, baseURL);
+      await gotoHome(page, locale);
       const input = page.locator('form[role="search"] input[name="q"]');
       await input.click();
       await input.pressSequentially("dc motor", { delay: 30 });
@@ -174,7 +167,7 @@ for (const locale of LOCALES) {
       await expect(added).toContainText(msg(locale, "StoreSearch", "added"));
       expect(posted).toHaveLength(1);
       await expect(page.locator(`header a[href="/${locale}/store/cart"]`).first()).toContainText("1");
-      expect(page.url()).toMatch(new RegExp(`/${locale}(/v2)?/?$`));
+      expect(page.url()).toMatch(new RegExp(`/${locale}/?$`));
 
       // Enter with nothing highlighted goes to the full results page.
       await input.click();

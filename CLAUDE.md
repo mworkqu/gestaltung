@@ -62,7 +62,7 @@ The stage-by-stage log that used to live here (about 1,400 lines) is in `docs/hi
 
 - Supabase clients: `lib/supabase/client.ts` (browser, anon), `server.ts` (cookie-bound, anon + RLS), `service.ts` `createServiceClient()` (service role, bypasses RLS, returns null without the key; server only), `middleware.ts` `updateSession()`. Types are hand-written in `lib/supabase/types.ts`.
 - Auth: `lib/auth/get-session.ts`, `guards.ts`, `guest-redirect.ts`, `next-path.ts` (redirect sanitising), `claim-guest*.ts`. Roles `super_admin | workshop | client` in `profiles.role`; guests are Supabase anonymous users (`is_anonymous`), created lazily by `ensureSession()` in `lib/supabase/guest.ts`. `tenants`/`inventory_items` is a legacy model.
-- Middleware: `middleware.ts` does next-intl routing, the `site_v2` flag and a session refresh only when an auth cookie is present.
+- Middleware: `middleware.ts` does CAD Champions routing, next-intl routing and a session refresh only when an auth cookie is present (an anonymous request makes no network call). The `site_v2` flag was retired in 2026-11: the former `/v2` pages are the public pages and `/:locale/v2/*` 308-redirects to them (`next.config.mjs`).
 - Money path: cart (`cart_items`, guests included) -> `/store/checkout` -> RPC `create_part_order` (latest 0097) -> order emails (`lib/email/**`, `notification_outbox`) -> `/orders`. Currency QAR; payment is manual (cash on delivery, Fawran, bank transfer); no card gateway.
 - Credits: `credits_ledger`, `spend_credit` / `credit_can_use` (0042, 0052, 0053, 0096), edu grants (0074/0075), tokens (0088), payments / maker pass (0089), CAD cost rewards (0090).
 - AI paths: `/api/analyse`, `brief-chat`, `cad`, `project-cad`, `firmware`, `netlist`, `bom/**`, `studio/**` (Gemini / Groq via `lib/ai`, `lib/prototyping/providers`, `lib/studio/**`); cloud CAD worker via Google WIF (`docs/CAD_CLOUD.md`). Every AI call is metered by credits.
@@ -111,7 +111,7 @@ Full text: `docs/DECISIONS.md` (D1-D13, owner site review 2026-10-03).
 
 ## PENDING MIGRATIONS (run in order if not already done)
 
-**2026-10-26: nothing is pending.** Everything through 0106 has been run — 0103 and 0104 before the
+**2026-11 consolidation: new NOT RUN files from 0107 on are listed in `docs/MIGRATIONS.md` ("Pending — consolidation 2026-11").** Through 0106: everything has been run — 0103 and 0104 before the
 app deploy, 0100 / 0101 / 0102 / 0105 / 0106 after it. The entries below are kept for their
 descriptions and rollback notes; see docs/MIGRATIONS.md for how each one was confirmed.
 Check Supabase → Table Editor to confirm which tables exist before running.

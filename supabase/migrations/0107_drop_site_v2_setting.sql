@@ -1,0 +1,29 @@
+-- Gestaltung — 0107: retire the site_v2 flag row (consolidation 2026-11, owner decision O1).
+--
+-- WHY: store_settings.site_v2 (seeded by 0056) switched the public home,
+-- /how-it-works, /design and /store between the v1 and v2 pages. It has been
+-- {"enabled": true} in production since 2026-10-09. The app commit that ships
+-- with this file makes the former v2 pages the only pages and removes every
+-- reader of the flag (middleware, lib/site-v2*.ts, /api/admin/site-v2-preview),
+-- so the row is dead data.
+--
+-- WHAT: deletes the one store_settings row with key 'site_v2'. Nothing else:
+-- no table, column, policy or function changes. Other store_settings rows are
+-- untouched.
+--
+-- BEFORE IT RUNS: nothing reads the row any more, so the app behaves the same
+-- with or without it. Run it any time AFTER the app commit is deployed (running
+-- it earlier, while the old middleware is still live, would make the old code
+-- read the flag as OFF and serve the v1 pages until the deploy).
+--
+-- Run AFTER 0106. Safe to re-run (deleting an absent row is a no-op).
+--
+-- Check query (expect 0):
+--   select count(*) from public.store_settings where key = 'site_v2';
+--
+-- Rollback (re-creates the row as it was in production):
+--   insert into public.store_settings (key, value)
+--   values ('site_v2', '{"enabled": true}'::jsonb)
+--   on conflict (key) do nothing;
+
+delete from public.store_settings where key = 'site_v2';

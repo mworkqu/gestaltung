@@ -1061,7 +1061,6 @@
     "choiceIdeaText": "No drawings yet? Describe it and we help you plan the parts, the circuit and the cost.",
     "choiceIdeaCta": "Plan a product",
     "choiceIdeaDatasheet": "Wiring is built from the parts' datasheets in our database and checked by rules (driver, flyback, LED resistor, power budget).",
-    "choiceIdeaNote": "Free parts list, no account needed.",
     "heroH1": "From idea to a working prototype — in Qatar.",
     "heroSub": "Parts, wiring, 3D models and fabrication from one studio in Lusail, so you don't juggle suppliers abroad.",
     "heroPrimary": "Start a project",
@@ -1139,20 +1138,13 @@
     "metaDescription": "Upload a 3D or drawing file for a free quote, or let our engineers draw it for you. 3D printing, CNC, laser cutting and EDM (spark erosion) across Qatar.",
     "kicker": "Made in Qatar",
     "heading": "Get a part made",
-    "subheading": "Two ways to start: upload your 3D or drawing file, or let our team draw it for you.",
-    "uploadTitle": "Upload a file → get a free quote",
-    "uploadCopy": "Have a 3D or drawing file? Upload it. Our engineer reviews your file and quotes the best method within one working day.",
     "drawingTitle": "No file? We'll draw it",
     "drawingCopy": "Our engineers turn your sketch, photo or idea into a production-ready drawing, then take it all the way to a finished part.",
-    "drawingMeta": "From a sketch, photo or idea",
-    "panelTag": "GET A PART MADE",
     "pathsTag": "Choose your path",
     "ctaTag": "Not sure which?",
     "ctaHeading": "Tell us what you need — we'll guide you.",
     "ctaButton": "Talk to us",
-    "searchLabel": "Maybe we already sell it — search first",
-    "searchPlaceholder": "Part name, model or size, e.g. M3 bracket, NE555",
-    "searchButton": "Search"
+    "searchLabel": "Maybe we already sell it — search first"
   },
   "Leads": {
     "kicker": "Leads",
@@ -3191,8 +3183,6 @@
   },
   "Videos": {
     "seeItWorkKicker": "Short videos",
-    "seeItWorkHeading": "See it work",
-    "seeItWorkSub": "Short clips, under a minute each.",
     "play": "Play video",
     "pause": "Pause video",
     "replay": "Replay video",

@@ -2,12 +2,12 @@
 
 Run log, rules for new migrations, and the next free number. Files are in `supabase/migrations/` (92 files in this worktree). Run status is copied from the pre-audit `CLAUDE.md` (`docs/history/CLAUDE-2026-10-full.md`, "Pending migrations" and the stage log) and from the SQL file headers; nothing here was checked against the live database.
 
-**Next free number: 0107.**
+**Next free number: 0108.**
 
 ## Rules for a new migration
 
 1. Never edit an applied migration. Write a new file.
-2. Number it from 0107 upward. Before committing, re-run `ls supabase/migrations`: a parallel session can take your number.
+2. Number it from the next free number upward. Before committing, re-run `ls supabase/migrations`: a parallel session can take your number.
 3. Make it idempotent (safe to re-run; `on conflict do nothing` for seeds, so owner edits survive).
 4. Put a rollback note in the header (every file from 0088 on has a `Rollback:` section, 0100-0105 included).
 5. Add a PGlite test. Pattern: `lib/schools/db/schools-migration.test.ts`.
@@ -15,6 +15,14 @@ Run log, rules for new migrations, and the next free number. Files are in `supab
 7. Say in the header what happens before it runs (the app should degrade, not break) and which earlier file it must follow.
 8. Tell the owner the file name and the order to run in. Run only when the owner says so, in numeric order.
 9. Check Supabase -> Table Editor to see which tables exist before running a pending file.
+
+## Pending — consolidation 2026-11 (NOT RUN)
+
+Written on branch `consolidation-2026-11` (Phase 1, "delete what is dead"). None of these has been run; Claude never runs a migration. Run them in numeric order, each only AFTER the app commit that ships with it is deployed. Every file is idempotent, carries a rollback block in its header and has a PGlite test.
+
+| Run order | File | Notes |
+|---|---|---|
+| 1 | 0107_drop_site_v2_setting.sql | NOT RUN. Deletes the `store_settings` row `site_v2` (the retired v1/v2 flag, O1). Nothing reads it after the app commit. Test: `lib/db-test/consolidation-site-v2.test.ts`. |
 
 ## Was pending — all run as of 2026-10-26
 
@@ -150,6 +158,7 @@ RUN dates are the owner's, as recorded in the pre-audit `CLAUDE.md`. "No record"
 | 0099_analysis_request_hash | Remembers which request each analysis answered | RUN (probe 2026-10-26: `analysis_runs.request_hash` exists) |
 | 0100 to 0105 | Audit migrations | RUN 2026-10-26 (see above; 0103 and 0104 before the deploy, the rest after) |
 | 0106_idea_charge_telemetry | Ideation charges: quoted vs charged vs actual, admin read only | RUN 2026-10-26 |
+| 0107_drop_site_v2_setting | Deletes the retired `site_v2` flag row | NOT RUN |
 
 ## Gaps in the numbering
 

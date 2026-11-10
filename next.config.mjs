@@ -87,6 +87,19 @@ const nextConfig = {
   // (308) redirects keep old links + bookmarks working, for both locales.
   async redirects() {
     return [
+      // 2026-11 consolidation: the site_v2 flag is gone and the former /v2
+      // pages ARE the public pages. Old /v2 links (previews, shares) land on
+      // the public path.
+      {
+        source: "/:locale(en|ar)/v2",
+        destination: "/:locale",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/v2/:path*",
+        destination: "/:locale/:path*",
+        permanent: true,
+      },
       {
         source: "/:locale(en|ar)/parts",
         destination: "/:locale/store",
