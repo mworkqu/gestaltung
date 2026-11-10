@@ -76,8 +76,8 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
       # Turns on /{locale}/e2e-fixtures/* (lib/e2e-fixtures.ts; never on Vercel).
       E2E_FIXTURES: "1"
-      # Leaves out the tests in e2e/KNOWN_FAILING.txt (playwright.config.ts).
-      # That list may only shrink; the count is printed below.
+      # Leaves out the tests in e2e/KNOWN_FAILING.txt and e2e/NEEDS_LIVE_READS.txt
+      # (playwright.config.ts). Both lists may only shrink; the counts are printed below.
       E2E_SKIP_KNOWN_FAILING: "1"
     steps:
       - uses: actions/checkout@v4
@@ -111,8 +111,10 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      - name: Known-failing e2e tests left out (must shrink, never grow)
-        run: echo "excluded $(grep -vcE '^(#|[[:space:]]*$)' e2e/KNOWN_FAILING.txt) tests listed in e2e/KNOWN_FAILING.txt"
+      - name: Excluded e2e tests (the lists must shrink, never grow)
+        run: |
+          echo "known failing:    $(grep -vcE '^(#|[[:space:]]*$)' e2e/KNOWN_FAILING.txt) test titles (e2e/KNOWN_FAILING.txt)"
+          echo "needs live reads: $(grep -vcE '^(#|[[:space:]]*$)' e2e/NEEDS_LIVE_READS.txt) test titles (e2e/NEEDS_LIVE_READS.txt)"
 
       # Root suite (write-guarded, read-only). Regex = spec files directly in e2e/.
       - name: Playwright (root suite)
