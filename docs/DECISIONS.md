@@ -1,4 +1,6 @@
-# Owner decisions D1-D13
+# Owner decisions
+
+D1-D13 (site review, 2026-10-03), then later decisions further down.
 
 Owner site review, 2026-10-03. Source prompt: `docs/history/prompts/STAGE_SITE_REVIEW_FIXES_PROMPT.md`. One commit per phase (A-I). Copied from the pre-audit `CLAUDE.md` (`docs/history/CLAUDE-2026-10-full.md`, "Site review decisions"). These are in force unless the owner says otherwise.
 
@@ -55,6 +57,30 @@ Migrations 0088-0093 are RUN (owner confirmed 2026-10-23).
   - 10x guarantee: each idea gets an AI budget of price / 10; after it, edits continue on Gemini. At least USD 1
     per idea. The price is shown before every paid action.
 - School classes (0096/0097) are the kids path; CAD Champions is the competition path. Both are separate from the levels.
+
+## Consolidation stage, 2026-11-10 and 2026-11-11
+
+Owner decisions taken during the 2026-11 consolidation and hosting-split stage. Branch `consolidation-2026-11`; report: `docs/history/2026-11-consolidation.md`. The ids O1-O5 come from the stage prompt (`docs/history/prompts/STAGE_CONSOLIDATION_AND_HOSTING_SPLIT_PROMPT.md`); the audit list that defines O1-O15 is `docs/audit/CODE_QUALITY_AUDIT.md`.
+
+1. **O1-O5, as decided by the stage prompt.**
+   - O1: delete the v1 public pages and the `site_v2` flag. The former `/v2` pages are the public pages; `/:locale/v2/*` redirects to them.
+   - O2: keep the Engineer view (`/projects/[id]/prototyping`, admin only).
+   - O3: drop the workshop/tenant inventory (`inventory_items`); `/inventory` redirects to `/my-inventory`. The customer inventory stays.
+   - O4: drop the jobs tables; keep the redirects.
+   - O5: drop `project_claims`.
+2. **Previews are off.** Vercel builds `main` only. Test locally.
+3. **The worker is a Node service in this same repo, on the Mac Mini.** The tunnel is Cloudflare Tunnel (the owner created a Cloudflare account on 2026-11-10; it needs the domain's nameservers on Cloudflare; Tailscale Funnel is the documented fallback). On 2026-11-11 the owner said to skip the Mac Mini step for now. The worker stays off.
+4. **Google Cloud Run stays for now.** Retiring it depends on worker Part B. Open question, not answered: keep Cloud Run for good if it costs nothing?
+5. **Product library with downloadable 3D models. Not built; it is the next project after this stage.**
+   - Files live on Cloudflare R2 (private bucket `gestaltung-models`, created 2026-11-10, free tier, 10 GB, downloads not billed). R2 has no hard spending cap.
+   - All access goes through ONE storage module, so the host can change later.
+   - A model download costs QAR 1 at the store checkout. This is real money, not a credit.
+   - Expected size: about 500 models of about 1.5 MB.
+   - Never serve model files through Vercel.
+   - Host only models the owner drew or is licensed to share.
+   - An R2 API token does not exist yet.
+6. **The website stays on Vercel.** The Cloudflare Workers free plan allows 10 ms CPU per request; real use would need the US$5 per month paid plan, which the no-subscription rule forbids. CAD and grading do not move to Cloudflare either (Containers need the paid plan).
+7. **Claude API: allowed in principle, nothing built.** It would be the first paid AI service, so ask before adding it. (The 2026-10-23 model-per-level decision above still stands.)
 
 ## Notes
 
