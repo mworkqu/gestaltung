@@ -5494,5 +5494,12 @@
     "secLeads": "Messages and quote requests",
     "secPayments": "Payments",
     "secAi": "AI usage per model"
+  },
+  "RouteState": {
+    "loading": "Loading…",
+    "errorTitle": "Something went wrong on our side",
+    "errorBody": "This page could not be loaded. Please try again in a moment.",
+    "retry": "Try again",
+    "contact": "Contact us"
   }
 }

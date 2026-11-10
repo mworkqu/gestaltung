@@ -31,6 +31,8 @@ export const BASE_MESSAGES = [
   "Credits.badgeAdmin",
   "Credits.badgeTitle",
   "GuestClaim",
+  // Route error screens (error.tsx is a client component rendered outside any page scope).
+  "RouteState",
 ] as const;
 
 export const MESSAGE_SCOPES = {
