@@ -245,17 +245,37 @@ export function sitemapEntries(
 
 // ----------------------------------------------------------------- robots
 
-/** Areas kept out of search: signed-in pages and the API, bare and per locale. */
+/**
+ * Areas kept out of search (consolidation 2.3): signed-in pages, the API, and
+ * every store listing with a query string — each ?q= / ?page= / filter
+ * combination is a dynamic render, and crawlers walking them were pure cost.
+ * A leading "/" + "*" + "/x" matches /en/x and /ar/x (the wildcard Google and Bing honour).
+ * CAD Champions' public URLs are /cad-champions/{en,ar}/...
+ */
 export const ROBOTS_DISALLOW = [
+  "/api/",
   "/dashboard",
   "/inventory",
-  "/api",
-  ...routing.locales.flatMap((l) => [`/${l}/dashboard`, `/${l}/inventory`]),
+  "/*/dashboard",
+  "/*/inventory",
+  "/*/projects",
+  "/*/orders",
+  "/*/my-inventory",
+  "/*/store?*",
+  "/*/store/search",
+  "/cad-champions/*/admin",
 ];
+
+/**
+ * Exceptions inside the disallowed areas, for pages in the sitemap: the
+ * longer (more specific) rule wins, so "Plan a product" (/{locale}/projects/new)
+ * stays crawlable under the projects rule.
+ */
+export const ROBOTS_ALLOW = ["/", "/*/projects/new"];
 
 export function robotsRules(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: "/", disallow: ROBOTS_DISALLOW }],
+    rules: [{ userAgent: "*", allow: ROBOTS_ALLOW, disallow: ROBOTS_DISALLOW }],
     sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }

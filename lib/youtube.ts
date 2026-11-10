@@ -15,6 +15,8 @@
 // YouTube thumbnail. Pure (no Next runtime, no I/O): tested in lib/youtube.test.ts.
 // The public read is getYoutube() in lib/store/public-catalog.ts.
 
+import { storeQueryText } from "@/lib/store/search-limits";
+
 export const YOUTUBE_KEY = "youtube";
 export const YOUTUBE_MAX = 12;
 export const TITLE_MAX = 120;
@@ -90,7 +92,7 @@ export function cleanChannelUrl(input: unknown): string {
 export const videoUrl = (id: string): string => `https://www.youtube.com/watch?v=${id}`;
 
 /** Locale-less store path for "Get the parts". */
-export const kitHref = (query: string): string => `/store?q=${encodeURIComponent(query.trim())}`;
+export const kitHref = (query: string): string => `/store?q=${encodeURIComponent(storeQueryText(query))}`;
 
 // ── Parse / validate ─────────────────────────────────────────────────────────
 

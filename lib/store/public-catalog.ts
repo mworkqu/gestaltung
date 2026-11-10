@@ -48,6 +48,7 @@ import {
 } from "@/lib/store/bought-together";
 import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 import { isMissingFunction } from "@/lib/supabase/errors";
+import type { SitemapProduct } from "@/lib/seo";
 
 /**
  * Listing-level reads (several products at once): "parts" for the full purge
@@ -214,6 +215,31 @@ async function storeListing(
     const parts = ((data ?? []) as unknown as CardRow[]).map(toCard);
     return { parts, total: count ?? parts.length };
 }
+
+/**
+ * Every product the storefront page serves (published, not merged) with its
+ * updated_at, for the sitemap's <lastmod>. Paged past PostgREST's 1,000 cap;
+ * cached like the other listing reads, so a sitemap rebuild costs no query
+ * until a listing purge or the 24 h expiry.
+ */
+export const getSitemapProducts = unstable_cache(
+  async (): Promise<SitemapProduct[]> => {
+    const supabase = createPublicClient();
+    if (!supabase) return [];
+    const { rows } = await fetchAllRows<SitemapProduct>((from, to) =>
+      supabase
+        .from("parts")
+        .select("sku, updated_at")
+        .eq("is_published", true)
+        .is("merged_into", null)
+        .order("id")
+        .range(from, to),
+    );
+    return rows;
+  },
+  ["store:sitemap-products"],
+  CACHE,
+);
 
 /**
  * The homepage's featured row: in-stock products with a photo, one per

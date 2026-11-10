@@ -10,6 +10,7 @@ import {
   activeFilterCount,
   hasActiveFilters,
   LEAD_FILTER_OPTIONS,
+  MAX_STORE_QUERY,
   sortOptions,
   storeQuery,
   type StorePatch,
@@ -284,7 +285,7 @@ export function PartsFilters({
             {...comboboxAttrs(suggestId)}
             placeholder={t("searchPlaceholder")}
             enterKeyHint="search"
-            maxLength={100}
+            maxLength={MAX_STORE_QUERY}
             className={cn(fieldClass, "w-full ps-9 pe-10 [&::-webkit-search-cancel-button]:hidden")}
           />
           <span className="absolute end-2 top-1/2 flex -translate-y-1/2 items-center gap-1">

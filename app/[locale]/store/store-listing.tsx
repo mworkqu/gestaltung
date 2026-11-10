@@ -12,7 +12,7 @@ import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { OccasionBanner } from "@/components/store/occasion-banner";
-import { emptyState, hasActiveFilters, storeQuery, STORE_PAGE_SIZE, type StoreState } from "@/lib/store/catalog";
+import { emptyState, hasActiveFilters, MAX_STORE_PAGE, storeQuery, STORE_PAGE_SIZE, type StoreState } from "@/lib/store/catalog";
 import { getStoreFacets, getStoreListing } from "@/lib/store/public-catalog";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import { getContactPhone } from "@/lib/contact-phone-server";
@@ -47,7 +47,8 @@ export async function StoreListing({
     turnstileEnabledForPages(),
   ]);
 
-  const pages = Math.max(1, Math.ceil(total / STORE_PAGE_SIZE));
+  // The pager stops at MAX_STORE_PAGE (deeper ?page= URLs answer 404).
+  const pages = Math.min(MAX_STORE_PAGE, Math.max(1, Math.ceil(total / STORE_PAGE_SIZE)));
   const href = (patch: Parameters<typeof storeQuery>[1]) => ({ pathname: "/store" as const, query: storeQuery(state, patch) });
   const empty = emptyState(state, total, parts.length);
 
