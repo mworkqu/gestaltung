@@ -59,6 +59,10 @@ read-only; see `playwright.config.ts`.
 | `npm run check:cycles` | madge import-cycle check |
 | `npm run check:unused` | knip unused files, exports, dependencies |
 | `node scripts/check-i18n-parity.mjs` | EN and AR message files have identical keys |
+| `npm run lint:ratchet` | Fails if lint warnings go above `lint-ratchet.json` |
+| `npm run db:types` / `db:types:check` | Regenerate / check `lib/supabase/database.types.ts` from the migrations |
+| `npm run test:cc` | CAD Champions tests |
+| `npm run worker:build` | Build the Mac Mini worker bundle |
 | `node scripts/split-legal-draft.mjs --check` | `content/legal/**` still equals `LEGAL_PAGES_DRAFT.md` |
 
 ## Folder map
@@ -74,6 +78,8 @@ read-only; see `playwright.config.ts`.
 | `content/` | `legal/**` (generated, never hand-edited) and case studies |
 | `supabase/migrations/` | SQL migrations, run by hand in the Supabase SQL editor |
 | `services/cad-worker/` | Optional cloud CAD worker (not part of the Vercel build) |
+| `services/worker/`, `services/compose.yaml` | Mac Mini worker for scheduled jobs (built, switched off; `docs/WORKER.md`) |
+| `grader/` | CAD Champions grader service (Cloud Run) |
 | `scripts/` | Maintenance scripts (i18n parity, legal split, measurements) |
 | `e2e/` | Playwright specs |
 | `public/`, `assets/` | Static files, OG images |
@@ -81,6 +87,7 @@ read-only; see `playwright.config.ts`.
 
 ## Documentation
 
+- `docs/history/2026-11-consolidation.md`: final report of the 2026-11 consolidation (current state, migrations, owner checklist).
 - `CLAUDE.md`: rules, architecture map, commands and pending migrations for contributors and agents.
 - `docs/audit/CODE_MAP.md`: detailed code map. Also in `docs/audit/`: security audit, code-quality
   audit, refactor plan, baseline.
