@@ -61,3 +61,124 @@ each one keeps reading the request.
 Auth-gated pages (dashboard, my-inventory, orders, projects, studio,
 schools/classes, CAD Champions account/admin/training/results), checkout and
 every API route keep `force-dynamic`; nothing there was touched.
+
+## 2.1 Builds: `main` only
+
+`vercel.json` `"ignoreCommand": "[ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ]"`
+(exit 0 = skip on any other branch, exit 1 = build on `main`; it overrides
+the dashboard "Ignored Build Step"). Previews are off; see
+`docs/ENVIRONMENT.md` "Builds". Owner action: clear the dashboard's old
+`[deploy]` command.
+
+## 2.2 Per-product purges from the supplier crons
+
+Tags: `parts` (every catalogue read, full purge, admin writes),
+`parts-listing` (listing-level reads only), `part-<sku>` (one product's reads,
+including the bought-together card of that product on other pages). The cron
+decision is `lib/cache/catalog-tags.ts`:
+
+- `part-<sku>` for every product whose offer the run changed or dropped, plus
+  the product it is a backup for (`backup_for`, its page shows the backup).
+- `parts-listing` only when a listed field moved between the parts row before
+  and after the run: `is_published`, `merged_into`, `name`, `name_ar`,
+  `unit_price`, `image_url`, `category`, `store_category`, `material`,
+  `lead_time_class`, `min_order_qty` (the card query's columns + filters).
+  `updated_at` is deliberately left out (it only orders "newest").
+- One full `parts` purge when more than 100 SKUs moved (`CRON_SKU_TAG_CAP`,
+  ~8 % of the catalogue: a catalogue-wide repricing) or a touched product
+  could not be read.
+- Already done before this phase: the crons purged only when something moved.
+  Was still missing: per-SKU tags for the crons, a listing tag separate from
+  the full one, and fresh per-card reads for bought-together.
+
+## 2.3 Crawlers
+
+robots.txt now disallows `/api/`, `/dashboard`, `/inventory`,
+`/*/dashboard`, `/*/inventory`, `/*/projects` (allow `/*/projects/new`),
+`/*/orders`, `/*/my-inventory`, `/*/store?*`, `/*/store/search`,
+`/cad-champions/*/admin`. Sitemap: product `<lastmod>` from
+`parts.updated_at` (was already there) now read through a cached
+`getSitemapProducts()` (tags `parts` + `parts-listing`), route revalidate
+1 h -> 24 h. Search: `q` > 64 characters or `page` > 20 -> 404 (`notFound()`;
+a page route cannot answer 400).
+
+## 2.5 Middleware
+
+`lib/middleware-network.test.ts`: anonymous `/en/store`, an `/ar` product
+page, `/`, `/cad-champions/en`, a protected CC page and `/en/cad-champions`
+make no `fetch` and create no Supabase client. No `/api` path is covered by
+the matcher (asserted). Positive control with an auth cookie.
+
+## 2.7 Measurements (`npm run build`, 2026-11-10)
+
+| | Before (2f63a29) | After (2b03880) |
+|---|---|---|
+| Routes in the table | 252 (73 under /api) | 252 (73 under /api) |
+| `○` static, no revalidate | 3 | 3 |
+| `●` prerendered, no revalidate column | 103 | 103 |
+| ISR (revalidate column) | 29 | 29 (sitemap 1 h -> 1 d) |
+| `ƒ` dynamic | 117 | 117 |
+| `[locale]` pages that render per request (prerender manifest) | 139 | 139 |
+| Files containing `force-dynamic` | 198 (130 pages/layouts, 68 API) | 198 |
+| First Load JS `/` | 151 kB | 151 kB |
+| First Load JS `/store` | 149 kB | 149 kB |
+| First Load JS `/store/[sku]` | 212 kB | 212 kB |
+| First Load JS `/projects/[id]/studio` | 361 kB | 361 kB |
+| Shared JS / Middleware | 104 kB / 103 kB | 104 kB / 103 kB |
+
+The `●` count includes force-dynamic pages: the `[locale]` layout's
+`generateStaticParams` makes the table print them as SSG without a
+Revalidate column. The 2026-11-02 figures (165 pages, 66 API routes, 178
+force-dynamic, 7 ISR) were counted differently (page files vs table rows);
+today's counts: 167 `page.tsx`, 78 `route.ts`.
+
+## Behaviour changes
+
+1. Pushes to any branch other than `main` no longer build on Vercel (no
+   previews; `[deploy]` in a commit message does nothing).
+2. After a supplier cron, only the moved products' pages (and the pages that
+   show them as bought-together cards) re-render; the listing pages re-render
+   only when a listed field moved; >100 moved products = full purge as before.
+3. A Voltaat "missing" offer (cannot be followed, not written) no longer
+   triggers a purge; a Voltaat run that fails after writing offers now purges
+   fully (before: nothing).
+4. Bought-together cards on a product page are re-read per card; a card whose
+   product is no longer listed disappears instead of showing until expiry.
+5. Featured row / upsell pool order ("newest") can lag a cron change by up to
+   24 h (updated_at is not a listing field).
+6. Sitemap rebuilds daily instead of hourly (and at once on any listing purge).
+7. robots.txt blocks query listings, /store/search, account areas and CC admin.
+8. `/store?q=` longer than 64 characters or `?page=` past 20 answer 404; the
+   pager stops at page 20; the store, home and 404 search boxes take 64
+   characters (was 100); occasion and YouTube store links trim stored queries
+   to 64.
+
+## Checks at the end (2026-11-10, after 2b03880)
+
+typecheck clean; lint 0 errors (298 warnings, same as before); vitest 404
+files / 5,115 tests; EN/AR parity 5,248/5,248; no cycles; build green;
+`npm run test:cc` 90 files / 1,039 vitest + 72/72 Playwright;
+`npm run test:e2e` (write guard in `e2e/fixtures.ts` active, `auto: true`):
+397 passed, 39 skipped, 1 flaky (`[desktop] studio-engine.spec.ts:129 studio
+engine: out of credits never loads the engine [en]`), 19 failed — all in the
+six known studio specs:
+
+- [desktop] studio-enclosure.spec.ts:32 studio enclosure: plant idea → stake pod, other shapes, take it apart [en]
+- [desktop] studio-enclosure.spec.ts:32 studio enclosure: plant idea → stake pod, other shapes, take it apart [ar]
+- [desktop] studio-idea.spec.ts:70 idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [en]
+- [desktop] studio-idea.spec.ts:70 idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [ar]
+- [desktop] studio-product.spec.ts:154 studio product: guest limit, fallback, out of credits, engineer view [en]
+- [desktop] studio-robot-arm.spec.ts:54 robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [en]
+- [desktop] studio-robot-arm.spec.ts:54 robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [ar]
+- [desktop] studio.spec.ts:28 design studio: idea to enclosure [en]
+- [desktop] studio.spec.ts:28 design studio: idea to enclosure [ar]
+- [mobile-375] studio-enclosure.spec.ts:32 studio enclosure: plant idea → stake pod, other shapes, take it apart [en]
+- [mobile-375] studio-enclosure.spec.ts:32 studio enclosure: plant idea → stake pod, other shapes, take it apart [ar]
+- [mobile-375] studio-engine.spec.ts:129 studio engine: out of credits never loads the engine [en]
+- [mobile-375] studio-idea.spec.ts:70 idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [en]
+- [mobile-375] studio-idea.spec.ts:70 idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [ar]
+- [mobile-375] studio-robot-arm.spec.ts:54 robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [en]
+- [mobile-375] studio-robot-arm.spec.ts:54 robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [ar]
+- [mobile-375] studio.spec.ts:28 design studio: idea to enclosure [en]
+- [mobile-375] studio.spec.ts:28 design studio: idea to enclosure [ar]
+- [mobile-375] studio.spec.ts:246 design studio: final phone pictures + name on the lid
