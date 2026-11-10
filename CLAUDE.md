@@ -301,7 +301,7 @@ Full run log, rules for new migrations and the next free number (0107): `docs/MI
 | `docs/*.md` | Feature notes: AUTH_EMAILS, CAD_CLOUD, CUTOVER, IA_V2, ISR_WRITES, LIVE_RETEST, SOCIAL_SIGN_IN, SOURCING_ORDER, STUDIO_CAD, STUDIO_PRODUCT, STUDIO_SKU_LINKS, TEST_DATA_CLEANUP, TURNSTILE |
 | `DESIGN.md` | Design system (also read by the OG image and manifest code) |
 | `LEGAL_PAGES_DRAFT.md` | Owner's legal text; source of `content/legal/**` |
-| `Gestaltung_Build_Plan.md` | A Word document with a `.md` name; open it in Word |
+| `docs/history/Gestaltung_Build_Plan.docx` | The original build plan (Word document) |
 
 ## Audit 2026-10
 - Branch `audit/code-and-security-2026-10` (based on origin/main 88a6473) holds the code-quality and security audit and the refactor slices R1 onward. The old stage log was moved out of this file by slice R13.

@@ -88,5 +88,5 @@ read-only; see `playwright.config.ts`.
 - `docs/DECISIONS.md`: owner decisions. `docs/ENVIRONMENT.md`: ids and environment notes.
 - `docs/history/`: the old stage-by-stage log and prompt files, kept verbatim.
 - `DESIGN.md`: design system. `LEGAL_PAGES_DRAFT.md`: source of the legal pages.
-- `Gestaltung_Build_Plan.md` is a Word document with a `.md` extension; open it with Word, not a
-  text editor.
+- `docs/history/Gestaltung_Build_Plan.docx` is the original build plan (a Word document), kept as
+  history.
