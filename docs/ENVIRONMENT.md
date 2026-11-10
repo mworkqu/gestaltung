@@ -28,6 +28,7 @@ Where the project lives. Copied from the pre-audit `CLAUDE.md` (`docs/history/CL
 - Vercel, all three scopes (Production / Preview / Development): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (server-only). Values: (see .env.local).
 - `NEXT_PUBLIC_GA_MEASUREMENT_ID` must be set in Vercel (all three scopes).
 - `NEXT_PUBLIC_WHATSAPP_NUMBER` (digits only, e.g. 97412345678). Recorded as not set, with a fallback to /contact; see the note in `docs/DECISIONS.md` (D10).
+- Mac Mini worker (Phase 3A, `docs/WORKER.md`): Vercel Production gets `WORKER_URL` (https tunnel address) and `WORKER_SECRET` (32+ characters, the same value as in `services/.env` on the Mac). Without both, no cron route ever contacts the worker. The worker's own env names are in `services/.env.example`.
 - Only `NEXT_PUBLIC_`-prefixed variables reach the browser.
 - Further env var names per area: `README.md` and `docs/audit/CODE_MAP.md`.
 

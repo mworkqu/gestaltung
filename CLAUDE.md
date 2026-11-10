@@ -66,7 +66,7 @@ The stage-by-stage log that used to live here (about 1,400 lines) is in `docs/hi
 - Money path: cart (`cart_items`, guests included) -> `/store/checkout` -> RPC `create_part_order` (latest 0097) -> order emails (`lib/email/**`, `notification_outbox`) -> `/orders`. Currency QAR; payment is manual (cash on delivery, Fawran, bank transfer); no card gateway.
 - Credits: `credits_ledger`, `spend_credit` / `credit_can_use` (0042, 0052, 0053, 0096), edu grants (0074/0075), tokens (0088), payments / maker pass (0089), CAD cost rewards (0090).
 - AI paths: `/api/analyse`, `brief-chat`, `cad`, `project-cad`, `firmware`, `netlist`, `bom/**`, `studio/**` (Gemini / Groq via `lib/ai`, `lib/prototyping/providers`, `lib/studio/**`); cloud CAD worker via Google WIF (`docs/CAD_CLOUD.md`). Every AI call is metered by credits.
-- Crons (`vercel.json`, UTC, `Authorization: Bearer $CRON_SECRET`): delivery-promises, voltaat-sync, supplier-refresh, notifications, anonymous-cleanup, youtube-retire.
+- Crons (`vercel.json`, UTC, `Authorization: Bearer $CRON_SECRET`): delivery-promises, voltaat-sync, supplier-refresh, notifications, anonymous-cleanup, youtube-retire. Each job is defined once in `lib/cron/jobs.ts` (with cc-payments-expire and cc-weekly-progress) and also runs on the Mac Mini worker `services/worker/` when `store_settings.worker` is on (`docs/WORKER.md`). Worker code must not import `next/*` (its bundle build fails).
 - Email: everything goes through `lib/email/brand-layout.ts` `renderBrandedEmail()`.
 
 ## Shared primitives
