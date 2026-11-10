@@ -94,7 +94,8 @@ export async function validatedCall<T>(opts: {
       const { value } = opts.validate(row.raw_response, 1);
       if (value) {
         console.info(`[${feature}${step ? `/${step}` : ""}] reused an identical earlier answer, no model call`);
-        return { ok: true, value, model: row.model };
+        // A stored answer made no model call, so it spent nothing.
+        return { ok: true, value, model: row.model, spend: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 } };
       }
     }
   }
