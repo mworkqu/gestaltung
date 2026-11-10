@@ -24,6 +24,38 @@ Owner site review, 2026-10-03. Source prompt: `docs/history/prompts/STAGE_SITE_R
 - **Phase A:** migration 0044 sets shipping outright, makes email required server-side for bank transfer, rejects 0-total orders, adds the free-delivery threshold.
 - **Phase I:** the 30-day expiry of the QAR 20 redemption runs from the day the credit is earned.
 
+## Build levels, ideation tokens, engineering (owner, 2026-10-18 and 2026-10-23)
+
+Recovered 2026-11-10 from an uncommitted note in the old `cad-champions` checkout; main had no record of it.
+Migrations 0088-0093 are RUN (owner confirmed 2026-10-23).
+
+- **Levels** (`lib/studio/tiers.ts` is the one config): Explorers (1 controller, up to 3 sensors, up to 2 movers,
+  tokens x1, default model), Makers (up to 6 sensors, up to 4 movers, x2, stronger model `TIER_MODEL_MAKER`, deep
+  electronics check every turn), Engineers (anything bigger, x3, `TIER_MODEL_ENGINEER`). LEDs, buzzers and screens
+  do not count. Today the level is computed from the build size (`tierOf(spec)`); `idea_sessions.tier` stores it.
+- **Ideation tokens** (0088, kind `idea`): 5 welcome tokens per account, a new idea costs 1 x level, every 5th edit
+  turn 1 x level, first 3D redesign free then 1 x level. `idea:<project>` spends are not redeemable at checkout.
+- **Billing** (0089, `lib/billing/*`): token packs never expire; optional Maker Pass (30 days, one-month rollover
+  cap); Fawran screenshot goes to the `payment-proofs` bucket, a vision check auto-approves or sends it to
+  `/dashboard/payments`. Admin costs at `/dashboard/ai-costs`.
+- **CAD by complexity** (0090): simple 1 / standard 2 / complex 3 CAD credits. Rewards: delivered order gives 2
+  idea tokens, completed print gives 1 CAD credit (`store_settings.rewards`).
+- **Engineering** (0091-0092, `lib/engineering/*`): our engineers deliver a full editable STEP of the whole
+  project by hand (not the cloud CadQuery worker), about 10 idea tokens, promised 1-3 working hours. Never name the
+  CAD program in copy. Failed or cancelled job returns the tokens. Paid services by Fawran
+  (`store_settings.engineer_services`): assembly 100 + 5/component + 2/connection, CAD by engineer 200 + 60/h,
+  PCB/Gerber 150 + 5/component.
+- **Owner decisions 2026-10-23, NOT BUILT YET** (prompt `docs/history/prompts/STAGE_STUDIO_LEVEL_CHOICE_PROMPT.md`):
+  - The user chooses to upgrade. Explorers is the default; Makers and Engineers are an explicit upgrade.
+  - Models: Explorers = Gemini, Makers = Claude Sonnet 5.5, Engineers = Claude Opus 5.5 (never Fable), hidden from
+    clients, Gemini as fallback.
+  - 1 token = QAR 5 (was 2); prices rounded up to whole tokens.
+  - Chat edits are always free; the cost is taken upfront per new idea (Explorers no charge, Makers 7 tokens,
+    Engineers 14 tokens). Wiring and CAD stay paid at every level.
+  - 10x guarantee: each idea gets an AI budget of price / 10; after it, edits continue on Gemini. At least USD 1
+    per idea. The price is shown before every paid action.
+- School classes (0096/0097) are the kids path; CAD Champions is the competition path. Both are separate from the levels.
+
 ## Notes
 
 - The pre-audit `CLAUDE.md` still said in its permanent notes that the WhatsApp number was not published yet (env var `NEXT_PUBLIC_WHATSAPP_NUMBER`, falling back to /contact; "owner chose not to publish the number publicly until launch"). D10 (above) is the later, dated decision; the current `CLAUDE.md` keeps that permanent note unchanged.
