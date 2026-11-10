@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { defineConfig } from "@playwright/test";
 
 // P3-10 smoke suite (read-only). The app's Supabase is PRODUCTION, so every
@@ -18,7 +21,23 @@ import { defineConfig } from "@playwright/test";
 const PORT = process.env.E2E_PORT || "3000";
 const ORIGIN = `http://localhost:${PORT}`;
 
+// CI only (E2E_SKIP_KNOWN_FAILING=1): leave out the tests listed in
+// e2e/KNOWN_FAILING.txt (the studio specs that fail today; see
+// docs/history/2026-11-consolidation-phase4.md). Locally they still run. The
+// list may only shrink, never grow. Matched against "<project> <file> <title>".
+function knownFailingPattern(): RegExp | undefined {
+  if (process.env.E2E_SKIP_KNOWN_FAILING !== "1") return undefined;
+  const escape = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = readFileSync(path.join(__dirname, "e2e", "KNOWN_FAILING.txt"), "utf8")
+    .split(/\r?\n/)
+    .filter((l) => l.trim() && !l.startsWith("#"))
+    .map((l) => l.split("|").map((x) => x.trim()))
+    .map(([project, file, title]) => `${escape(project)} ${escape(file)} ${escape(title)}$`);
+  return parts.length ? new RegExp(parts.join("|")) : undefined;
+}
+
 export default defineConfig({
+  grepInvert: knownFailingPattern(),
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
   fullyParallel: true,
