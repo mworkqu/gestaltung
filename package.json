@@ -11,6 +11,8 @@
     "start": "next start",
     "lint": "eslint . && node scripts/cc-rtl-check.mjs",
     "lint:ratchet": "node scripts/lint-ratchet.mjs",
+    "db:types": "node scripts/db-types.mjs",
+    "db:types:check": "node scripts/db-types.mjs --check",
     "i18n:check": "node scripts/cc-i18n-check.mjs",
     "cc:rtl-check": "node scripts/cc-rtl-check.mjs",
     "cc:strings:export": "node scripts/cc-strings-export.mjs",
