@@ -20,6 +20,17 @@ Run log, rules for new migrations, and the next free number. Files are in `supab
 
 Written on branch `consolidation-2026-11` (Phase 1, "delete what is dead"). None of these has been run; Claude never runs a migration. Run them in numeric order, each only AFTER the app commit that ships with it is deployed. Every file is idempotent, carries a rollback block in its header and has a PGlite test.
 
+> **Status 2026-11-10 (owner ran some of these early, before the app commit was live):**
+> - **0107: run, then REVERTED the same day.** Running it early made the live middleware serve the v1 pages
+>   (`/en/v2` answered 404). The owner re-inserted the row (`site_v2 = {"enabled": true}`); the live site was
+>   re-checked (`/en/v2` 308). 0107 must be run AGAIN after this branch is merged and deployed.
+> - **0108: NOT RUN** (probe: `to_regclass('public.inventory_items')` still answers). Run after the deploy.
+> - **0109: RUN** (probe: `public.jobs` is null). No live code read the jobs tables.
+> - **0110: RUN** (probe: `public.project_claims` is null). No live code read it.
+> - The owner also states (2026-11-10) that 0076 and 0087 are run; no probe was made for those two.
+>
+> Still to run after the merge and deploy, in this order: 0107, then 0108.
+
 | Run order | File | Notes |
 |---|---|---|
 | 1 | 0107_drop_site_v2_setting.sql | NOT RUN. Deletes the `store_settings` row `site_v2` (the retired v1/v2 flag, O1). Nothing reads it after the app commit. Test: `lib/db-test/consolidation-site-v2.test.ts`. |
