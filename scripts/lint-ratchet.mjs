@@ -66,8 +66,9 @@ function main() {
   }
   (verdict.status === "fail" ? console.error : console.log)(`lint-ratchet: ${verdict.message}`);
   if (verdict.status === "fail") process.exit(1);
-  // "improved" fails in CI so the number actually gets lowered; locally it is a hint.
-  if (verdict.status === "improved" && process.env.CI) process.exit(1);
+  // "improved" is a hint everywhere, never a failure: the count differs by a
+  // warning or two between Windows and the Linux CI runner (first CI run:
+  // 303 there, 304 here), so failing on "below" made CI red for no defect.
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
