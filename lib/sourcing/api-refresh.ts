@@ -16,6 +16,8 @@ import { digikeyConfigured, digikeyPart } from "@/lib/sourcing/adapters/digikey"
 import { mouserConfigured, mouserPart } from "@/lib/sourcing/adapters/mouser";
 import type { SupplierProduct } from "@/lib/sourcing/types";
 import { DAY_MS } from "@/lib/format/date";
+import { diffPartSnapshots, type CatalogChange } from "@/lib/cache/catalog-tags";
+import { snapshotParts } from "@/lib/sourcing/catalog-snapshot";
 
 type Code = "mouser" | "digikey";
 
@@ -34,18 +36,19 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Change = { partName: string; sku: string; field: string; from: string | number | null; to: string | number | null };
 
-/** True when any supplier in a runApiRefresh summary changed or dropped an offer. */
-export function refreshChangedSomething(summary: Record<string, unknown>): boolean {
-  return Object.values(summary).some((v) => {
-    if (!v || typeof v !== "object") return false;
-    const r = v as { changed?: number; dropped?: number };
-    return (r.changed ?? 0) > 0 || (r.dropped ?? 0) > 0;
-  });
-}
-
-export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manual") {
+/**
+ * Per supplier: its run summary (or why it did not run). `storefront` = what
+ * the storefront must refresh (lib/cache/catalog-tags.ts): the SKUs of the
+ * products whose offer changed or was dropped, and whether a listed field moved.
+ */
+export async function runApiRefresh(
+  db: SupabaseClient,
+  trigger: "cron" | "manual",
+): Promise<Record<string, unknown> & { storefront: CatalogChange }> {
   const started = Date.now();
   const summary: Record<string, unknown> = {};
+  const touchedPartIds: string[] = [];
+  const before: Awaited<ReturnType<typeof snapshotParts>> = [];
   const allChanges: (Change & { supplier: Code })[] = [];
 
   for (const code of ["mouser", "digikey"] as Code[]) {
@@ -74,7 +77,7 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
     }
     const { data: offers } = await db
       .from("supplier_offers")
-      .select("id, supplier_sku, cost, currency, availability, lead_time_days, part:parts!supplier_offers_part_id_fkey(name)")
+      .select("id, part_id, supplier_sku, cost, currency, availability, lead_time_days, part:parts!supplier_offers_part_id_fkey(name)")
       .eq("supplier_id", sup.id)
       .eq("active", true)
       .not("supplier_sku", "is", null)
@@ -83,6 +86,7 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       .limit(cfg.maxPerRun);
     type Row = {
       id: string;
+      part_id: string;
       supplier_sku: string;
       cost: number | null;
       currency: string;
@@ -96,6 +100,8 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       continue;
     }
 
+    // The products this supplier's run may change, as they are now.
+    before.push(...(await snapshotParts(db, rows.map((o) => o.part_id))));
     const { data: run } = await db.from("supplier_sync_runs").insert({ supplier_code: code, trigger, status: "running" }).select("id").single();
     let requests = 0;
     let checked = 0;
@@ -133,6 +139,7 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
           .update({ active: false, availability: "unavailable", last_checked_at: new Date().toISOString() })
           .eq("id", o.id);
         dropped.push({ partName: o.part?.name ?? "", sku: o.supplier_sku });
+        touchedPartIds.push(o.part_id);
         continue;
       }
       checked++;
@@ -141,6 +148,7 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       await db.from("supplier_offers").update({ ...next, last_checked_at: new Date().toISOString() }).eq("id", o.id);
       if (diff.length) {
         changedOffers++;
+        touchedPartIds.push(o.part_id);
         for (const k of diff) changes.push({ partName: o.part?.name ?? "", sku: o.supplier_sku, field: k, from: o[k], to: next[k] });
       }
     }
@@ -203,5 +211,9 @@ export async function runApiRefresh(db: SupabaseClient, trigger: "cron" | "manua
       text: mail.text,
     });
   }
-  return summary;
+  // The 0028 trigger has re-derived price / lead class by now: compare.
+  const storefront: CatalogChange = touchedPartIds.length
+    ? diffPartSnapshots(touchedPartIds, before, await snapshotParts(db, touchedPartIds))
+    : { skus: [], listingChanged: false };
+  return { ...summary, storefront };
 }

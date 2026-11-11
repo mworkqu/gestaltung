@@ -36,21 +36,6 @@ export type Profile = {
   price_cohort?: string | null;
 };
 
-export type InventoryItem = {
-  id: string;
-  tenant_id: string;
-  sku: string;
-  name: string;
-  description: string | null;
-  category: string | null;
-  quantity: number;
-  unit: string;
-  unit_price: number | null;
-  low_stock_threshold: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
 // ─── Parts Store (e-commerce module) ─────────────────────────────────────────
 
 export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
@@ -294,7 +279,7 @@ export type ClientInventoryItem = {
 
 // ── Prototyping ─────────────────────────────────────────────────────────────
 // See supabase/migrations/0020_prototyping.sql and 0022. The brief's reading
-// lives in projects.spec; project_claims is retired and no longer typed.
+// lives in projects.spec; project_claims was retired (0022) and is dropped by 0110.
 
 export type PartStatus = "suggested" | "confirmed" | "edited" | "added";
 

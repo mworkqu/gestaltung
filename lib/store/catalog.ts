@@ -18,6 +18,7 @@ import { arrivesByDate, LEAD_CLASS_DAYS, todayIso, type ShippingSettings } from 
 import { DAY_MS } from "@/lib/format/date";
 import { categoriesForArabicTerm } from "@/lib/store/category-label";
 import type { ProductSort } from "@/lib/store/search";
+import { MAX_STORE_PAGE, MAX_STORE_QUERY, storeQueryText } from "@/lib/store/search-limits";
 
 // ── Card data contract ───────────────────────────────────────────────────────
 
@@ -146,14 +147,23 @@ export type RawSearchParams = Record<string, string | string[] | undefined>;
 export const STORE_URL_PARAMS = ["q", "category", "material", "stock", "sort", "page"] as const;
 
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-const MAX_QUERY = 100;
+const normalizeQuery = (v: string | string[] | undefined): string => (first(v) ?? "").replace(/\s+/g, " ").trim();
+
+export { MAX_STORE_PAGE, MAX_STORE_QUERY, storeQueryText };
+
+/** True when the raw URL asks for a longer query or a deeper page than the caps allow. */
+export function storeParamsOutOfRange(raw: RawSearchParams): boolean {
+  if (normalizeQuery(raw.q).length > MAX_STORE_QUERY) return true;
+  const page = Math.trunc(Number(first(raw.page)));
+  return Number.isFinite(page) && page > MAX_STORE_PAGE;
+}
 
 /** Read the URL into a clean state; anything malformed falls back to the default. */
 export function parseStoreParams(raw: RawSearchParams): StoreState {
-  const q = (first(raw.q) ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_QUERY);
+  const q = normalizeQuery(raw.q).slice(0, MAX_STORE_QUERY);
   const category = first(raw.category)?.trim() || undefined;
   const material = first(raw.material)?.trim() || undefined;
-  const page = Math.max(1, Math.trunc(Number(first(raw.page))) || 1);
+  const page = Math.min(MAX_STORE_PAGE, Math.max(1, Math.trunc(Number(first(raw.page))) || 1));
   return {
     q,
     category,

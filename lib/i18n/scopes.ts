@@ -31,12 +31,14 @@ export const BASE_MESSAGES = [
   "Credits.badgeAdmin",
   "Credits.badgeTitle",
   "GuestClaim",
+  // Route error screens (error.tsx is a client component rendered outside any page scope).
+  "RouteState",
 ] as const;
 
 export const MESSAGE_SCOPES = {
-  // YourWork + Orders: the signed-in "Your work" strip on the v2 home (P3-05).
+  // YourWork + Orders: the signed-in "Your work" strip on the home (P3-05).
   // StoreSearch: the instant store search combobox (W7) on home + store.
-  // The home pages (v1 + v2) and /v2/design. Spelled out key by key, not as
+  // The home page and /design. Spelled out key by key, not as
   // whole namespaces: "Delivery", "Parts" and "StoreLanding" together are
   // 11.7 kB of en.json / 16.4 kB of ar.json, nearly all of it admin dashboard
   // text (delivery settings, stock and sourcing forms) that no client component

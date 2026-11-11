@@ -11,7 +11,7 @@ import { formatPrice } from "@/lib/parts/format";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import type { CartItem } from "@/lib/supabase/types";
 import { LeadTimeBadge } from "@/components/parts/lead-time-badge";
-import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
+import { useDeliveryQuote } from "@/lib/store/client/use-delivery-quote";
 import { formatDeliveryDate, isOnRequest } from "@/lib/store/delivery";
 import { pricedTiers, selectableTier } from "@/lib/store/checkout-totals";
 import { IsolatedTitle } from "@/components/ltr-isolate";

@@ -15,7 +15,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import sharp from "sharp";
+import sharp from "sharp-admin";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ar = JSON.parse(readFileSync(join(root, "messages/ar.json"), "utf8"));

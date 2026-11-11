@@ -1,5 +1,17 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["scripts/**/*.mjs", "lib/prototyping/providers/*.ts", "e2e/**/*.ts"],
-  "ignoreDependencies": ["eslint-config-next", "playwright"]
+  "entry": [
+    "scripts/**/*.mjs",
+    "lib/prototyping/providers/*.ts",
+    "e2e/**/*.ts",
+    "services/worker/src/main.ts",
+    "services/worker/build.mjs"
+  ],
+  "ignoreDependencies": [
+    "eslint-config-next",
+    "playwright"
+  ],
+  "ignore": [
+    "services/worker/dist/**"
+  ]
 }

@@ -5,11 +5,17 @@
 // returns the problems and NO value — nothing unvalidated ever leaves here.
 // Every attempt is metered (ai_usage) and recorded raw beside parsed
 // (analysis_runs), so a wrong answer can be traced to the model or to us.
+//
+// `reuse` makes that record durable money: the request's fingerprint goes on
+// the row, and an identical request is answered from the row instead of the
+// provider. The in-memory caches above this (lib/studio/ai/cache.ts) cannot do
+// that on Vercel — the next press lands on another instance and pays again.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { callCostUsd } from "@/lib/ai/prices";
 import { logUsage, quota } from "@/lib/ai/usage";
+import { callFingerprint } from "./call-fingerprint";
 import { callGemini, geminiConfigured } from "./providers/gemini-client";
 import { ProviderError, type TokenUsage } from "./providers/types";
 
@@ -38,7 +44,8 @@ export async function validatedCall<T>(opts: {
   system: string;
   prompt: string;
   schema: object;
-  validate: (raw: unknown) => { value: T | null; errors: string[] };
+  /** `attempt` is 1 on the first ask, 2 on the retry (and 1 when a stored answer is read back). */
+  validate: (raw: unknown, attempt: number) => { value: T | null; errors: string[] };
   /** Sub-step, written to the usage log line and the analysis_runs error text. */
   step?: string;
   /** Defaults to 0.1 (existing callers). */
@@ -51,9 +58,48 @@ export async function validatedCall<T>(opts: {
   images?: Parameters<ModelCaller>[0]["images"];
   /** First model to ask (default GEMINI_MODEL). */
   model?: string;
+  /** Answer an identical earlier request for this project from its stored run instead of calling again. */
+  reuse?: boolean;
 }): Promise<CallResult<T>> {
   const { supabase, projectId, feature, step, userId } = opts;
   const caller = opts.caller ?? callGemini;
+
+  // One fingerprint for the whole call, including the retry: it names the
+  // request, not the attempt, so the row a retry finally answered is found by
+  // the next identical request.
+  const fingerprint =
+    opts.reuse && projectId
+      ? callFingerprint({ step, system: opts.system, prompt: opts.prompt, schema: opts.schema, model: opts.model, images: opts.images })
+      : null;
+
+  // A request we already paid for. The stored RAW answer goes back through the
+  // same `validate` as a live one, so a row written by an older shape of this
+  // step is paid for again rather than handed over unchecked. Before the
+  // provider guards: a stored answer costs nothing, so neither the daily guard
+  // nor a missing key is a reason to refuse it.
+  if (fingerprint) {
+    const { data: prior } = await supabase
+      .from("analysis_runs")
+      .select("raw_response, model")
+      .eq("project_id", projectId)
+      .eq("feature", feature)
+      .eq("request_hash", fingerprint)
+      .eq("outcome", "ok")
+      .not("raw_response", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prior) {
+      const row = prior as { raw_response: unknown; model: string | null };
+      const { value } = opts.validate(row.raw_response, 1);
+      if (value) {
+        console.info(`[${feature}${step ? `/${step}` : ""}] reused an identical earlier answer, no model call`);
+        // A stored answer made no model call, so it spent nothing.
+        return { ok: true, value, model: row.model, spend: { promptTokens: 0, completionTokens: 0, totalTokens: 0, costUsd: 0 } };
+      }
+    }
+  }
+
   if (!opts.caller && !geminiConfigured()) return { ok: false, error: "unavailable", problems: [] };
   if ((await quota(supabase, "gemini")).paused) {
     await logUsage(supabase, { userId, provider: "gemini", projectId, feature, step, outcome: "blocked", errorCode: "paused" });
@@ -62,7 +108,7 @@ export async function validatedCall<T>(opts: {
 
   const record = async (row: { model: string | null; attempt: number; rawText: string | null; raw: unknown; parsed: unknown; outcome: "ok" | "invalid" | "error"; errors: string[] }) => {
     if (!projectId) return; // analysis_runs rows belong to a project
-    const { error } = await supabase.from("analysis_runs").insert({
+    const base = {
       project_id: projectId,
       feature,
       provider: "gemini",
@@ -73,7 +119,14 @@ export async function validatedCall<T>(opts: {
       parsed_response: row.parsed ?? null,
       outcome: row.outcome,
       error: row.errors.length ? `${step ? `[${step}] ` : ""}${row.errors.join("\n")}` : null,
-    });
+    };
+    let { error } = await supabase.from("analysis_runs").insert({ ...base, ...(fingerprint ? { request_hash: fingerprint } : {}) });
+    // Before 0099 there is no request_hash column: record the run as before,
+    // so only the reuse is missing, not the diagnostics.
+    if (fingerprint && error?.code === "PGRST204") {
+      ({ error } = await supabase.from("analysis_runs").insert(base));
+      if (!error) console.warn(`[${feature}] run recorded without its request fingerprint (migration 0099?)`);
+    }
     if (error) console.warn(`[${feature}] run not recorded: ${error.message}`);
   };
 
@@ -113,7 +166,7 @@ export async function validatedCall<T>(opts: {
       rawText = r.rawText;
       raw = r.raw;
       model = r.model;
-      ({ value, errors } = opts.validate(r.raw));
+      ({ value, errors } = opts.validate(r.raw, attempt));
     } catch (e) {
       const err = e as ProviderError & { usage?: TokenUsage; latencyMs?: number; rawText?: string; model?: string };
       usage = err.usage;

@@ -19,7 +19,7 @@ import { AccessNote } from "@/components/credits/access-note";
 import { BigButton, SoftBigButton } from "@/components/prototyping/client/step-card";
 import { SvgFrame } from "@/components/prototyping/svg-frame";
 import { track } from "@/lib/analytics";
-import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import { creditsChanged, useCanUse } from "@/lib/credits/client/use-credits";
 import { createClient } from "@/lib/supabase/client";
 import type { LineMatch, ProjectBom } from "@/lib/prototyping/bom";
 import { autoSetup } from "@/lib/prototyping/auto-electronics";

@@ -31,7 +31,6 @@ import {
   Users,
   type LucideIcon,
   Video,
-  Warehouse,
   Wrench,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -62,7 +61,6 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   notifications: Bell,
   contact: Phone,
   schools: GraduationCap,
-  inventory: Warehouse,
 };
 
 export function DashboardNav({

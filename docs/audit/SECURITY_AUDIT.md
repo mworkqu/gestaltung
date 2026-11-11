@@ -1,5 +1,10 @@
 # Gestaltung security audit (consolidated)
 
+> **2026-10-26 UPDATE — every migration this report proposes (0100-0105) has since been
+> run, together with 0098 and 0106. The report below is left exactly as written, as the
+> record of what was found and why; it is no longer a to-do list. Current status lives in
+> [../MIGRATIONS.md](../MIGRATIONS.md).**
+
 Date: 2026-10-22. Repo: `/Users/salman.mik.us/Developer/gestaltung`, branch `audit/code-and-security-2026-10` (base origin/main 88a6473). Status snapshot: HEAD bab42fd, 125 commits ahead of origin/main.
 Sources: `docs/audit/findings/sec-database-rls-rpc.md` (DB-01..31), `sec-api-routes-and-actions.md` (API-01..15), `sec-ai-routes-and-credits.md` (AI-01..16), `sec-web-layer.md` (WEB-01..13), plus `docs/audit-history/SECURITY_REVIEW.md` (Stage 8A, 2026-06) and `docs/audit-history/FINDINGS.md` (both were in the repo root until audit slice R13). Two later independent reviews (of the five High fixes, and of migrations 0100/0102/0103/0105 with the DB-01/DB-02 gap fixes) added the gaps in section 3.5. Fix status is read from `git log origin/main..HEAD` as of HEAD bab42fd; re-run `git log --oneline origin/main..HEAD` for later commits.
 

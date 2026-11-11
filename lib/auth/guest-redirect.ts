@@ -2,16 +2,17 @@ import { routing } from "@/i18n/routing";
 
 // D5 (owner, 2026-10-03): a guest is a visitor with an ANONYMOUS Supabase
 // session (user.is_anonymous === true). Guests keep their projects but have no
-// dashboard or inventory, so those areas send them to /projects.
+// dashboard, so it sends them to /projects. (The workshop /inventory area this
+// also covered was retired in 2026-11; /inventory now redirects to /my-inventory.)
 //
 // Pure on purpose (no Next/Supabase imports) so the rule is unit-tested. The
-// dashboard and inventory layouts call it; signed-out visitors are NOT handled
-// here — those layouts still send them to /sign-in exactly as before.
+// dashboard layout calls it; signed-out visitors are NOT handled
+// here — that layout still sends them to /sign-in exactly as before.
 
 export type GuestUserLike = { is_anonymous?: boolean | null } | null | undefined;
 
 /** Paths (locale-agnostic) that guests may not open, with all their sub-routes. */
-export const GUEST_BLOCKED_PREFIXES = ["/dashboard", "/inventory"] as const;
+export const GUEST_BLOCKED_PREFIXES = ["/dashboard"] as const;
 
 /** Where a guest lands instead (locale-agnostic). */
 export const GUEST_HOME = "/projects";

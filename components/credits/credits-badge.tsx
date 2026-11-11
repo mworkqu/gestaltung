@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Zap } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { useCreditSummary } from "@/lib/credits/use-credits";
+import { useCreditSummary } from "@/lib/credits/client/use-credits";
 
 export function CreditsBadge() {
   const t = useTranslations("Credits");

@@ -29,7 +29,7 @@ import { sortProducts } from "@/lib/store/search";
 import type { DeliveryQuote } from "@/lib/store/delivery";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import type { LeadTimeClass } from "@/lib/store/sourcing";
-import { CATALOG_TAG, partTag, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
+import { CATALOG_TAG, LISTING_TAG, partTag, SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
 import { parseTrustedBy, TRUSTED_BY_KEY, type TrustedLogo } from "@/lib/trust";
 import { PRICING_PLANS_KEY, SERVICE_PRICES_KEY, type PricingPlans, type ServicePrices } from "@/lib/pricing/defaults";
 import { parsePricingPlans, parseServicePrices } from "@/lib/pricing/plans";
@@ -48,8 +48,17 @@ import {
 } from "@/lib/store/bought-together";
 import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 import { isMissingFunction } from "@/lib/supabase/errors";
+import type { SitemapProduct } from "@/lib/seo";
 
-const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG] };
+/**
+ * Listing-level reads (several products at once): "parts" for the full purge
+ * plus "parts-listing", which a supplier sync purges only when a field these
+ * reads show or filter on moved (lib/cache/catalog-tags.ts). Product pages
+ * never read one of these at the top level (getUpsellPool runs nested inside
+ * the bought-together cache, where Next adds no tags to the page), so a
+ * listing purge does not re-render the ~2,600 product pages.
+ */
+const CACHE = { revalidate: STOREFRONT_REVALIDATE, tags: [CATALOG_TAG, LISTING_TAG] };
 
 /**
  * Cache options for a read that belongs to ONE product: the broad "parts" tag
@@ -206,6 +215,31 @@ async function storeListing(
     const parts = ((data ?? []) as unknown as CardRow[]).map(toCard);
     return { parts, total: count ?? parts.length };
 }
+
+/**
+ * Every product the storefront page serves (published, not merged) with its
+ * updated_at, for the sitemap's <lastmod>. Paged past PostgREST's 1,000 cap;
+ * cached like the other listing reads, so a sitemap rebuild costs no query
+ * until a listing purge or the 24 h expiry.
+ */
+export const getSitemapProducts = unstable_cache(
+  async (): Promise<SitemapProduct[]> => {
+    const supabase = createPublicClient();
+    if (!supabase) return [];
+    const { rows } = await fetchAllRows<SitemapProduct>((from, to) =>
+      supabase
+        .from("parts")
+        .select("sku, updated_at")
+        .eq("is_published", true)
+        .is("merged_into", null)
+        .order("id")
+        .range(from, to),
+    );
+    return rows;
+  },
+  ["store:sitemap-products"],
+  CACHE,
+);
 
 /**
  * The homepage's featured row: in-stock products with a photo, one per
@@ -477,8 +511,34 @@ export function getUpsellPool(categories: readonly string[]): Promise<StoreCardP
  * same-category products; fewer than three co-purchased products are topped
  * up the same way. `source` says which, so the heading stays honest.
  */
-export function getFrequentlyBoughtTogether(sku: string, storeCategory: string | null): Promise<UpsellPick> {
-  return unstable_cache(boughtTogether, ["store:bought-together"], partCache(sku))(sku, storeCategory);
+export async function getFrequentlyBoughtTogether(sku: string, storeCategory: string | null): Promise<UpsellPick> {
+  const pick = await unstable_cache(boughtTogether, ["store:bought-together"], partCache(sku))(sku, storeCategory);
+  // Which products to show is cached with this product; each card's own fields
+  // (price, lead time, photo) are re-read per card under that card's own
+  // "part-<sku>" tag, so a sync that reprices product X also refreshes every
+  // product page showing X here — without purging the whole catalogue.
+  const fresh = await Promise.all(pick.parts.map((p) => getPartCard(p.sku)));
+  return { ...pick, parts: fresh.filter((p): p is StoreCardPart => p !== null) };
+}
+
+/** One listed product's card fields (published, unmerged, with a delivery date), or null. */
+function getPartCard(sku: string): Promise<StoreCardPart | null> {
+  return unstable_cache(partCard, ["store:part-card"], partCache(sku))(sku);
+}
+
+async function partCard(sku: string): Promise<StoreCardPart | null> {
+  const supabase = createPublicClient();
+  if (!supabase) return null;
+  const store = await hasStoreCategory();
+  const { data } = await supabase
+    .from("parts")
+    .select(cardColumns(store))
+    .eq("sku", sku)
+    .eq("is_published", true)
+    .is("merged_into", null)
+    .not("lead_time_class", "is", null)
+    .maybeSingle();
+  return data ? toCard(data as unknown as CardRow) : null;
 }
 
 const boughtTogether = async (sku: string, storeCategory: string | null): Promise<UpsellPick> => {

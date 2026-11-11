@@ -23,8 +23,7 @@ export type NavIcon =
   | "usage"
   | "notifications"
   | "contact"
-  | "schools"
-  | "inventory";
+  | "schools";
 
 /** "Something to do" counts shown next to a nav item. */
 export type BadgeKey = "orders" | "fix" | "leads" | "reviews";

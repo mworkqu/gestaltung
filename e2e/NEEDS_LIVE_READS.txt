@@ -1,0 +1,19 @@
+# Playwright tests that cannot pass in CI: they read the REAL Supabase project
+# (products, provider settings) or need the AI provider key, and CI only has a
+# dummy Supabase URL. Measured 2026-11-11 with the CI environment (dummy
+# Supabase, no AI key) on this branch: these, in desktop and mobile-375, EN and AR,
+# are the only failures outside e2e/KNOWN_FAILING.txt. Run locally against the
+# real project (read-only, write guard on) they pass.
+#
+# CI only (E2E_SKIP_KNOWN_FAILING=1, playwright.config.ts) leaves them out. They
+# still run locally. THIS LIST MUST SHRINK, NEVER GROW: a test that starts to
+# fail for any other reason must NOT be added here. The long-term fix is a seeded
+# local Supabase in CI (docs/history/2026-11-consolidation-phase4.md).
+#
+# Format: <spec file> | <test title>   (matches every project and locale suffix)
+home-w7.spec.ts | store page search box shows the same dropdown
+home-w7.spec.ts | search: 'dc motor' shows a dropdown; arrows, Esc, Enter; Add to cart updates the badge
+plan-a-product.spec.ts | home CTA opens /projects/new; Start stays disabled until consent AND text
+plan-a-product.spec.ts | /projects/new has no horizontal overflow
+social-sign-in.spec.ts | social buttons match the enabled providers
+store.spec.ts | search -> results -> product (Add to cart, upsell) -> checkout redirects to the empty cart

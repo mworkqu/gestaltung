@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { defineConfig } from "@playwright/test";
 
 // P3-10 smoke suite (read-only). The app's Supabase is PRODUCTION, so every
@@ -18,7 +21,28 @@ import { defineConfig } from "@playwright/test";
 const PORT = process.env.E2E_PORT || "3000";
 const ORIGIN = `http://localhost:${PORT}`;
 
+// CI only (E2E_SKIP_KNOWN_FAILING=1): leave out two checked-in lists of tests.
+//   e2e/KNOWN_FAILING.txt     the studio specs that fail today (docs/history/2026-11-consolidation-phase2.md)
+//   e2e/NEEDS_LIVE_READS.txt  specs that need the real Supabase project / AI key, which CI does not have
+// Locally nothing is hidden. Both lists may only shrink, never grow
+// (docs/history/2026-11-consolidation-phase4.md). Matched against "<project> <file> <title>".
+function excludedTests(): RegExp | undefined {
+  if (process.env.E2E_SKIP_KNOWN_FAILING !== "1") return undefined;
+  const escape = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const lines = (file: string) =>
+    readFileSync(path.join(__dirname, "e2e", file), "utf8")
+      .split(/\r?\n/)
+      .filter((l) => l.trim() && !l.startsWith("#"))
+      .map((l) => l.split("|").map((x) => x.trim()));
+  const parts = [
+    ...lines("KNOWN_FAILING.txt").map(([project, file, title]) => `${escape(project)} ${escape(file)} ${escape(title)}$`),
+    ...lines("NEEDS_LIVE_READS.txt").map(([file, title]) => `\\S+ ${escape(file)} .*${escape(title)}`),
+  ];
+  return parts.length ? new RegExp(parts.join("|")) : undefined;
+}
+
 export default defineConfig({
+  grepInvert: excludedTests(),
   testDir: "./e2e",
   testMatch: "**/*.spec.ts",
   fullyParallel: true,
