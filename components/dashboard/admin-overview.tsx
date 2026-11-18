@@ -14,12 +14,10 @@ import {
 import { Link } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/parts/format";
-import { conversionPct, parseCohortFunnel, type CohortFunnelRow } from "@/lib/pricing/experiment";
+import { conversionPct } from "@/lib/pricing/experiment";
 import { cn } from "@/lib/utils";
 import { intlTag, asLocale } from "@/lib/locale";
-import { DAY_MS } from "@/lib/format/date";
-import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
-import { loadPluginFunnel } from "@/lib/admin/plugin-funnel";
+import { loadOverviewData } from "@/lib/admin/overview-data";
 
 // "Today" — the owner's first screen (owner, 2026-09-29: the dashboard was
 // confusing; audit #41). Only what needs doing, each with a count and a link:
@@ -33,12 +31,7 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
   const isRtl = locale === "ar";
   const mono = (extra = "") => cn(isRtl ? "font-sans" : "font-mono uppercase tracking-[0.18em]", extra);
 
-  const db = await createClient();
-  const weekAgo = new Date(Date.now() - 7 * DAY_MS).toISOString();
-  const monthAgo = new Date(Date.now() - 30 * DAY_MS).toISOString();
-  const count = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => r.count ?? 0, () => 0);
-
-  const [
+  const {
     newLeads,
     openOrders,
     requests,
@@ -56,74 +49,9 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
     fDelivered,
     fSpends,
     fRedemptions,
-  ] = await Promise.all([
-    count(db.from("inquiries").select("id", { count: "exact", head: true }).eq("status", "new")),
-    count(
-      db
-        .from("part_orders")
-        .select("id", { count: "exact", head: true })
-        .in("status", OPEN_ORDER_STATUSES)
-        .not("is_test", "is", true)
-    ),
-    count(db.from("demand_signals").select("id", { count: "exact", head: true }).eq("kind", "request").is("served_at", null)),
-    count(db.from("sourcing_gaps").select("id", { count: "exact", head: true })),
-    count(db.from("projects").select("id", { count: "exact", head: true }).gte("updated_at", weekAgo).not("is_test", "is", true)),
-    count(
-      db
-        .from("parts")
-        .select("id", { count: "exact", head: true })
-        .eq("is_published", true)
-        .is("merged_into", null)
-        .is("lead_time_class", null)
-    ),
-    db.from("inquiries").select("id, name, phone, message, created_at, status").order("created_at", { ascending: false }).limit(5),
-    db
-      .from("part_orders")
-      .select("id, customer_name, total_qar, status, created_at, payment_method")
-      .not("is_test", "is", true)
-      .order("created_at", { ascending: false })
-      .limit(5),
-    // Funnel (P1-08): last 30 days, one head-count query per figure. The server
-    // client applies RLS, and the admin sees every row. Test projects/orders left out.
-    count(db.from("projects").select("id", { count: "exact", head: true }).gte("created_at", monthAgo).not("is_test", "is", true)),
-    count(
-      db.from("analysis_runs").select("id", { count: "exact", head: true }).eq("feature", "analyse").eq("outcome", "ok").gte("created_at", monthAgo)
-    ),
-    count(
-      db.from("analysis_runs").select("id", { count: "exact", head: true }).eq("feature", "netlist").eq("outcome", "ok").gte("created_at", monthAgo)
-    ),
-    count(db.from("cad_generations").select("id", { count: "exact", head: true }).eq("status", "delivered").gte("delivered_at", monthAgo)),
-    count(db.from("part_orders").select("id", { count: "exact", head: true }).gte("created_at", monthAgo).not("is_test", "is", true)),
-    // P3-06 kit attach rate: orders holding at least one kit line (inner join, so one count per order).
-    count(
-      db
-        .from("part_orders")
-        .select("id, part_order_items!inner(kit_id)", { count: "exact", head: true })
-        .not("part_order_items.kit_id", "is", null)
-        .gte("created_at", monthAgo)
-        .not("is_test", "is", true)
-    ),
-    count(
-      db
-        .from("part_orders")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "delivered")
-        .gte("created_at", monthAgo)
-        .not("is_test", "is", true)
-    ),
-    count(db.from("credits_ledger").select("id", { count: "exact", head: true }).like("reason", "spend:%").gte("created_at", monthAgo)),
-    count(db.from("credits_ledger").select("id", { count: "exact", head: true }).like("reason", "redeemed:%").gte("created_at", monthAgo)),
-  ]);
-
-  // Price experiment (P4-02): per invite-code cohort. Missing before 0060 (PGRST202) or
-  // not a super admin = no rows, and the block below is not rendered.
-  const priceCohorts: CohortFunnelRow[] = await Promise.resolve(db.rpc("price_cohort_funnel")).then(
-    (r) => (r.error ? [] : parseCohortFunnel(r.data)),
-    () => [],
-  );
-
-  // Chat plugin handoffs (0112): hidden when the table is missing.
-  const pluginFunnel = await loadPluginFunnel(db, monthAgo);
+    priceCohorts,
+    pluginFunnel,
+  } = await loadOverviewData(await createClient());
 
   const funnel: { key: string; value: number }[] = [
     { key: "funnelProjects", value: fProjects },
@@ -275,11 +203,11 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
               {t("seeAll")}
             </Link>
           </div>
-          {(leads.data ?? []).length === 0 ? (
+          {leads.length === 0 ? (
             <p className="mt-4 text-sm text-mutedtext">{t("noLeads")}</p>
           ) : (
             <ul className="mt-4 space-y-2">
-              {(leads.data ?? []).map((l) => (
+              {leads.map((l) => (
                 <li key={l.id} className="rounded-xl bg-panel px-3 py-2 shadow-neu-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium text-heading">{l.name}</span>
@@ -300,11 +228,11 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
               {t("seeAll")}
             </Link>
           </div>
-          {(orders.data ?? []).length === 0 ? (
+          {orders.length === 0 ? (
             <p className="mt-4 text-sm text-mutedtext">{t("noOrders")}</p>
           ) : (
             <ul className="mt-4 space-y-2">
-              {(orders.data ?? []).map((o) => (
+              {orders.map((o) => (
                 <li key={o.id}>
                   <Link
                     href={`/dashboard/store/orders/${o.id}`}
