@@ -68,7 +68,7 @@ const PATH_HINT =
   "/bodies/N/attach, /bodies/N/attach/to|anchor|offset|rotate, /bodies/N/attach/offset/0..2, /bodies/N/features(/K), " +
   "/links, /links/N, /links/-, /links/N/kind|diameter|colour|from|to";
 
-export function visionPrompt(i: { idea: string; spec: ProductSpec; partNames: string[]; model: ProductModel; loop: number }): string {
+export function visionPrompt(i: { idea: string; spec: ProductSpec; partNames: string[]; model: ProductModel; loop: number; final?: boolean }): string {
   const s = i.spec;
   return [
     `The client's idea: ${i.idea.slice(0, 600)}`,
@@ -76,7 +76,11 @@ export function visionPrompt(i: { idea: string; spec: ProductSpec; partNames: st
     `Parts inside: ${i.partNames.slice(0, 20).join(", ") || "none"}.`,
     `Question: does this look like a ${s.name} at a glance, and are all its functional parts visible?`,
     "USB / power sockets are cut into the back or the underside (checked by our solver to be reachable), so they are usually out of view: do not count them as missing.",
-    `Images in order: front, side, three-quarter view. Check round ${i.loop + 1} of 3.`,
+    `Images in order: front, side, three-quarter view. Check round ${i.loop + 1}.`,
+    // The rounds a design gets come from a pool the whole press shares
+    // (geometry/vision-budget.ts), so on its last round a patch could not be
+    // applied any more and asking for one is paid-for output nobody reads.
+    ...(i.final ? ["This is the last round for this design: score it and say what is missing, but return an empty patches list."] : []),
     "The design JSON (patch this):",
     JSON.stringify(i.model),
     `Allowed patch paths: ${PATH_HINT}.`,
@@ -136,6 +140,7 @@ export async function runVisionCheck(opts: {
   model: ProductModel;
   images: VisionImages;
   loop: number;
+  final?: boolean;
 }): Promise<VisionResult> {
   const r = await opts.call<VisionAnswer>({
     step: "vision",

@@ -1,6 +1,7 @@
 import { getSessionContext } from "@/lib/auth/get-session";
 import { readCapped } from "@/lib/net/safe-fetch";
-import { isRasterContentType, storeImage } from "@/lib/store/store-image";
+import { isRasterContentType } from "@/lib/store/store-image";
+import { storeImage } from "@/lib/store/store-image-sharp";
 import { createClient } from "@/lib/supabase/server";
 import { isSuperAdminSession } from "@/lib/auth/guards";
 import { emptyStatus, jsonOk } from "@/lib/http";

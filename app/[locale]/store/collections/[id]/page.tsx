@@ -11,7 +11,7 @@ import { IsolatedTitle } from "@/components/ltr-isolate";
 import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
-import { parseStoreParams, type StoreCardPart } from "@/lib/store/catalog";
+import { parseStoreParams, storeQueryText, type StoreCardPart } from "@/lib/store/catalog";
 import { getCardsBySkus, getOccasions, getStoreListing } from "@/lib/store/public-catalog";
 import { loadShippingSettings } from "@/lib/store/shipping-settings";
 import {
@@ -110,7 +110,7 @@ export default async function OccasionCollectionPage({
   }
 
   const [shipping, turnstileEnabled] = await Promise.all([loadShippingSettings(), turnstileEnabledForPages()]);
-  const allResults = occasion.query ? { pathname: "/store" as const, query: { q: occasion.query } } : null;
+  const allResults = occasion.query ? { pathname: "/store" as const, query: { q: storeQueryText(occasion.query) } } : null;
   const arrow = cn("h-4 w-4", locale === "ar" && "-scale-x-100");
 
   return (

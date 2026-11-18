@@ -35,7 +35,7 @@ import { track } from "@/lib/analytics";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { AccessNote, CostLabel } from "@/components/credits/access-note";
-import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import { creditsChanged, useCanUse } from "@/lib/credits/client/use-credits";
 
 type ErrorCode = "paused" | "invalid" | "no_electronics" | "unavailable" | "rate_limited" | "not_ready" | "failed";
 

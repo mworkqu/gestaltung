@@ -99,5 +99,5 @@ Date: 2026-10-10   Run by: Claude Code from the owner's PC (Lighthouse 13.5.0, m
 ## 7. After the cut-over (separate task, later; do not do it now)
 
 - Remove the v1 page code (the old home, how-it-works, design hub and store landing treatment).
-- Remove the `site_v2` flag, the middleware branch, `app/api/admin/site-v2-preview`, the `/v2` routes and `lib/site-v2*.ts`.
+- Remove the `site_v2` flag, the middleware branch, `app/api/admin/site-v2-preview`, the `/v2` routes and `lib/site-v2*.ts`. **Done 2026-11 (consolidation Phase 1, O1):** the v2 pages moved to the public paths, `/:locale/v2/*` 308-redirects there, migration 0107 deletes the flag row. Sections 1-5 above describe the retired flag and are kept as history.
 - Keep `/pricing`, `/trust`, `/students`, `/institutions` and `/orders` as they are.

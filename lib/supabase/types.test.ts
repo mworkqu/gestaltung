@@ -19,7 +19,6 @@ const TYPES_SRC = readFileSync(join(process.cwd(), "lib", "supabase", "types.ts"
 const TABLE_TYPES: Record<string, string> = {
   tenants: "Tenant",
   profiles: "Profile",
-  inventory_items: "InventoryItem",
   parts: "Part",
   part_orders: "PartOrder",
   inquiries: "Inquiry",

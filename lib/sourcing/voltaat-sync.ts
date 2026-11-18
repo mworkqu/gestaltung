@@ -30,6 +30,8 @@ import {
   type MissingOffer,
   type OfferChange,
 } from "@/lib/sourcing/adapters/voltaat";
+import { diffPartSnapshots, type CatalogChange } from "@/lib/cache/catalog-tags";
+import { snapshotParts } from "@/lib/sourcing/catalog-snapshot";
 
 export type SyncSummary = {
   status: "ok" | "blocked" | "failed" | "disabled" | "skipped";
@@ -41,8 +43,17 @@ export type SyncSummary = {
   missing: number;
   /** Products newly marked "order on request" this run because Voltaat dropped them. */
   dropped: number;
+  /**
+   * What the storefront must refresh (lib/cache/catalog-tags.ts): the SKUs of
+   * the products whose offer this run changed or dropped, and whether a field
+   * a listing shows moved. Empty when nothing was written.
+   */
+  storefront: CatalogChange;
   error?: string;
 };
+
+const NO_CHANGE: CatalogChange = { skus: [], listingChanged: false };
+const UNKNOWN_CHANGE: CatalogChange = { skus: [], listingChanged: true, unknown: true };
 
 const MIN_HOURS_BETWEEN_RUNS = 20;
 
@@ -52,7 +63,7 @@ export async function voltaatSyncEnabled(db: SupabaseClient): Promise<boolean> {
 }
 
 export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manual"): Promise<SyncSummary> {
-  const empty = { requests: 0, checked: 0, changed: 0, missing: 0, dropped: 0 };
+  const empty = { requests: 0, checked: 0, changed: 0, missing: 0, dropped: 0, storefront: NO_CHANGE };
 
   if (!(await voltaatSyncEnabled(db))) {
     await db.from("supplier_sync_runs").insert({ supplier_code: "voltaat", trigger, status: "disabled", finished_at: new Date().toISOString() });
@@ -85,6 +96,7 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
         .eq("id", runId);
   };
 
+  let wrote = false;
   try {
     // Mapped offers: Voltaat offers with a product link (in or out of stock). Nothing else is touched.
     const { data: sup } = await db.from("suppliers").select("id").eq("code", "voltaat").single();
@@ -104,6 +116,8 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
       await finish({ status: "ok", checked: 0, changed: 0, missing: 0 });
       return { status: "ok", runId, ...empty };
     }
+    // A failure after the first offer write answers with a full purge (the
+    // per-product list is not known yet), so nothing stays stale.
 
     const robots = await client.robots();
     if (!robotsAllows(robots, "/products.json?limit=250&page=1")) {
@@ -116,6 +130,11 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
     const plan = planChanges(offers, catalogue);
 
     const now = new Date().toISOString();
+    const newlyDropped = plan.dropped.filter((d) => !d.alreadyOnRequest);
+    // Products whose offer this run writes (a "missing" offer is not written).
+    const touchedPartIds = [...new Set([...plan.changes.map((c) => c.partId), ...newlyDropped.map((d) => d.partId)])];
+    const before = touchedPartIds.length ? await snapshotParts(db, touchedPartIds) : [];
+    wrote = touchedPartIds.length > 0;
     for (const c of plan.changes) {
       await db
         .from("supplier_offers")
@@ -133,7 +152,6 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
     // Dropped from Voltaat's list → "order on request": the offer goes inactive, so the
     // 0028 trigger clears the product's lead_time_class. Price and link are kept, so a
     // product that comes back is picked up by the change path above and re-activated.
-    const newlyDropped = plan.dropped.filter((d) => !d.alreadyOnRequest);
     for (const d of newlyDropped) {
       await db
         .from("supplier_offers")
@@ -153,6 +171,10 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
       : { data: [] };
     const priceNow = new Map((after ?? []).map((p) => [p.id as string, Number(p.unit_price)]));
     const changes = plan.changes.map((c) => ({ ...c, newOurPrice: priceNow.get(c.partId) ?? null }));
+    // The 0028 trigger has re-derived price / lead class by now: compare.
+    const storefront = touchedPartIds.length
+      ? diffPartSnapshots(touchedPartIds, before, await snapshotParts(db, touchedPartIds))
+      : NO_CHANGE;
 
     const stillOnRequest = plan.dropped.length - newlyDropped.length;
     await finish({
@@ -175,6 +197,7 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
       changed: changes.length,
       missing: plan.missing.length,
       dropped: newlyDropped.length,
+      storefront,
     };
   } catch (e) {
     if (e instanceof BlockedError) {
@@ -182,12 +205,12 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
       await alert(
         `Voltaat answered ${e.status} (${e.status === 429 ? "too many requests" : "forbidden"}). The sync stopped at once, did not retry, and kept the last known prices.`
       );
-      return { status: "blocked", runId, ...empty, requests: client.requests, error: e.message };
+      return { status: "blocked", runId, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error: e.message };
     }
     const msg = e instanceof Error ? e.message : "failed";
     await finish({ status: "failed", error: msg });
     await alert(`The Voltaat price sync failed (${msg}). Prices were not changed.`);
-    return { status: "failed", runId, ...empty, requests: client.requests, error: msg };
+    return { status: "failed", runId, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error: msg };
   }
 }
 

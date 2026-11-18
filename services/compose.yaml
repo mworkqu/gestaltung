@@ -1,0 +1,89 @@
+# Gestaltung Mac Mini stack (docs/WORKER.md). Run from this folder:
+#   cp .env.example .env      # then fill in the values yourself
+#   docker compose up -d --build
+#   docker compose --profile tunnel up -d   # also start the Cloudflare Tunnel
+#
+# Who can reach what:
+#   - worker: the only service with a published port, bound to 127.0.0.1 (this
+#     Mac only). The internet reaches it only through the tunnel container.
+#   - cad-worker: on the "cad" network, internal (no internet at all: it runs
+#     model-written CadQuery code). Only the worker is on that network.
+#   - grader: on the "grader" network with the worker. It needs internet to
+#     download the signed STEP file links, so that network is not internal, but
+#     no port is published: only the worker can call it.
+#   - cloudflared: on "edge" with the worker; forwards worker.gestaltung360.com
+#     to http://worker:8787.
+# cad-worker and grader are the existing services/cad-worker and grader/ code,
+# unchanged (each image runs its own tests while building).
+
+name: gestaltung
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  worker:
+    build:
+      context: ..
+      dockerfile: services/worker/Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-}
+    image: gestaltung-worker:local
+    env_file: .env
+    environment:
+      PORT: "8787"
+      HOST: "0.0.0.0"
+      # Part B: how the worker reaches the two CAD services on the private networks.
+      CAD_WORKER_URL: http://cad-worker:8080
+      GRADER_URL: http://grader:8080
+    ports:
+      - "127.0.0.1:8787:8787"
+    networks: [edge, cad, grader]
+    restart: unless-stopped
+    stop_grace_period: 15s
+    logging: *logging
+
+  cad-worker:
+    build:
+      context: ./cad-worker
+    image: gestaltung-cad-worker:local
+    environment:
+      PORT: "8080"
+      CAD_WORKER_TOKEN: ${CAD_WORKER_TOKEN:-}
+    expose: ["8080"]
+    networks: [cad]
+    restart: unless-stopped
+    logging: *logging
+
+  grader:
+    build:
+      context: ../grader
+    image: gestaltung-grader:local
+    environment:
+      PORT: "8080"
+      GRADER_SECRET: ${GRADER_SECRET:-}
+      GRADER_ALLOWED_URL_PREFIXES: ${GRADER_ALLOWED_URL_PREFIXES:-}
+    expose: ["8080"]
+    networks: [grader]
+    restart: unless-stopped
+    logging: *logging
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.7
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks: [edge]
+    depends_on: [worker]
+    restart: unless-stopped
+    logging: *logging
+    profiles: [tunnel]
+
+networks:
+  edge: {}
+  cad:
+    internal: true
+  grader: {}

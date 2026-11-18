@@ -25,8 +25,11 @@ const config = [
       "_archive/**",
       // Claude Code tooling, not project source.
       ".claude/**",
-      // Python services (CadQuery worker): not part of the Next.js app.
-      "services/**",
+      // Python services (CadQuery worker): not part of the Next.js app. The
+      // Node worker (services/worker) IS linted; its install and bundle are not.
+      "services/cad-worker/**",
+      "services/worker/node_modules/**",
+      "services/worker/dist/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),

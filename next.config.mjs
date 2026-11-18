@@ -5,6 +5,19 @@ import { securityHeaders } from "./lib/security/headers.mjs";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
+// Routes whose server code imports sharp (lib/store/store-image-sharp.ts or
+// lib/store/load-sharp.ts): API route handlers ONLY. No page may reach sharp, or
+// every page bundle that shares a file with it grows by ~20 MB. Keep in step
+// with `grep -rlE "store-image-sharp|load-sharp" app lib`.
+const SHARP_FILES = ["./node_modules/sharp-admin/**/*", "./node_modules/@img/**/*"];
+const SHARP_ROUTES = [
+  "/api/admin/drive-import",
+  "/api/admin/sourcing-backup",
+  "/api/admin/starter-parts",
+  "/api/admin/store-cleanup",
+  "/api/admin/store-image",
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // F-053: the two stylesheets (~19 kB gzip) were render-blocking <link>s, two
@@ -33,6 +46,25 @@ const nextConfig = {
     "/[locale]/case-studies": ["./content/case-studies/**/*"],
     "/[locale]/case-studies/[slug]": ["./content/case-studies/**/*"],
     "/sitemap.xml": ["./content/case-studies/**/*"],
+    // sharp only where it is really used (lib/store/load-sharp.ts hides it from the tracer; API routes only).
+    ...Object.fromEntries(SHARP_ROUTES.map((r) => [r, SHARP_FILES])),
+  },
+  // Vercel "Function Storage" (2026-10-14): a package named "sharp" is traced
+  // into EVERY route by Next's image optimizer (~20 MB x 500 outputs = ~5 GB
+  // per deployment). It is installed as "sharp-admin" instead and imported only
+  // by lib/store/load-sharp.ts; the includes above ship it with SHARP_ROUTES.
+  // Native module: keep it out of the webpack bundle.
+  serverExternalPackages: ["sharp-admin"],
+  // sharp's WebAssembly fallback (@img/sharp-wasm32, ~10 MB) and the other
+  // platforms' binaries are never used on Vercel (linux-x64 native is), so
+  // they are dropped from every function. Applied after the includes above.
+  outputFileTracingExcludes: {
+    "*": [
+      "./node_modules/@img/sharp-wasm32/**/*",
+      "./node_modules/@img/sharp-win32-*/**/*",
+      "./node_modules/@img/sharp-darwin-*/**/*",
+      "./node_modules/@img/sharp-libvips-darwin-*/**/*",
+    ],
   },
 
   // Phase G caching: /<locale>/store without query params is a static (ISR)
@@ -55,6 +87,19 @@ const nextConfig = {
   // (308) redirects keep old links + bookmarks working, for both locales.
   async redirects() {
     return [
+      // 2026-11 consolidation: the site_v2 flag is gone and the former /v2
+      // pages ARE the public pages. Old /v2 links (previews, shares) land on
+      // the public path.
+      {
+        source: "/:locale(en|ar)/v2",
+        destination: "/:locale",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/v2/:path*",
+        destination: "/:locale/:path*",
+        permanent: true,
+      },
       {
         source: "/:locale(en|ar)/parts",
         destination: "/:locale/store",
@@ -112,15 +157,27 @@ const nextConfig = {
         destination: "/:locale/pricing",
         permanent: true,
       },
-      // Stage 4: inventory is its own top-level signed-in area now.
+      // The workshop/tenant inventory (/inventory, formerly /dashboard/inventory)
+      // was retired in 2026-11 (consolidation O3). Old links land on the
+      // customer's own inventory, the surviving inventory page.
       {
         source: "/:locale(en|ar)/dashboard/inventory",
-        destination: "/:locale/inventory",
+        destination: "/:locale/my-inventory",
         permanent: true,
       },
       {
         source: "/:locale(en|ar)/dashboard/inventory/:path*",
-        destination: "/:locale/inventory/:path*",
+        destination: "/:locale/my-inventory",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/inventory",
+        destination: "/:locale/my-inventory",
+        permanent: true,
+      },
+      {
+        source: "/:locale(en|ar)/inventory/:path*",
+        destination: "/:locale/my-inventory",
         permanent: true,
       },
       // Stage 5: admin parts store renamed dashboard/parts -> dashboard/store.

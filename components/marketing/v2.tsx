@@ -18,7 +18,7 @@ import { formatPerOutput, formatQar } from "@/lib/pricing/plans";
 import { CAD_GENERATIONS, ORDER_DELIVERED_CREDITS } from "@/lib/credits/constants";
 import { cn } from "@/lib/utils";
 
-// Building blocks of the v2 marketing pages (app/[locale]/v2/*, P3-03). Server
+// Building blocks of the marketing pages (home, how-it-works, design, store; P3-03). Server
 // components only: nothing here reads cookies or headers, so the pages stay
 // static / ISR. Tokens come from DESIGN.md section 10; the one addition is the
 // larger hero scale (V2_TITLE), shared by the four v2 heroes.

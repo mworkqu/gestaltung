@@ -6,12 +6,16 @@ import {
   hasActiveFilters,
   LEAD_FILTER_OPTIONS,
   leadClassesFor,
+  MAX_STORE_PAGE,
+  MAX_STORE_QUERY,
   parseStoreParams,
   resolveSort,
   searchFilter,
   searchTerms,
   sortOptions,
+  storeParamsOutOfRange,
   storeQuery,
+  storeQueryText,
   STORE_URL_PARAMS,
 } from "@/lib/store/catalog";
 import { arrivesByDate } from "@/lib/store/delivery";
@@ -239,5 +243,34 @@ describe("STORE_URL_PARAMS", () => {
   it("covers every key parseStoreParams reads", () => {
     const parsed = parseStoreParams(Object.fromEntries(STORE_URL_PARAMS.map((k) => [k, "1"])));
     expect(Object.keys(parsed).sort()).toEqual([...STORE_URL_PARAMS].sort());
+  });
+});
+describe("search caps (consolidation 2.3)", () => {
+  it("are 64 characters and 20 pages", () => {
+    expect([MAX_STORE_QUERY, MAX_STORE_PAGE]).toEqual([64, 20]);
+  });
+
+  it("a query up to 64 characters (after collapsing spaces) and page 20 are in range", () => {
+    expect(storeParamsOutOfRange({ q: "a".repeat(64), page: "20" })).toBe(false);
+    expect(storeParamsOutOfRange({ q: `  ${"a ".repeat(32)}   ` })).toBe(false);
+    expect(storeParamsOutOfRange({})).toBe(false);
+    expect(storeParamsOutOfRange({ page: "abc" })).toBe(false);
+  });
+
+  it("a longer query or a deeper page is out of range", () => {
+    expect(storeParamsOutOfRange({ q: "a".repeat(65) })).toBe(true);
+    expect(storeParamsOutOfRange({ page: "21" })).toBe(true);
+    expect(storeParamsOutOfRange({ page: ["999", "1"] })).toBe(true);
+  });
+
+  it("parseStoreParams clamps to the caps", () => {
+    expect(parseStoreParams({ page: "500" }).page).toBe(20);
+    expect(parseStoreParams({ q: "b".repeat(80) }).q).toHaveLength(64);
+  });
+
+  it("storeQueryText keeps link queries inside the cap", () => {
+    expect(storeQueryText("  line   following ")).toBe("line following");
+    expect(storeQueryText("x".repeat(80))).toHaveLength(64);
+    expect(storeParamsOutOfRange({ q: storeQueryText("word ".repeat(30)) })).toBe(false);
   });
 });

@@ -250,7 +250,7 @@ both with copy, the owner replaced the model.
 a turn moves the project up a tier, or starts a genuinely different product — and both pause
 and quote the exact cost before anything is deducted, with the option to decline and carry
 on refining. Once agreed, exactly that amount is charged even if the model's real usage
-differs; estimated-vs-actual is recorded for unit economics (migration **0106**, NOT RUN).
+differs; estimated-vs-actual is recorded for unit economics (migration **0106**, RUN ✔ 2026-10-26).
 
 **Decided here, and worth knowing because each will look like a bug to someone:**
 
@@ -291,18 +291,19 @@ I have written down what I checked, rather than changing code to look responsive
 
 ## 4. Migrations to run, in order
 
-**Nothing here has been run.** Run them in this order, only when you are ready, and check
-each one before moving on. 0100 and 0105 need the app commit **deployed** first.
+**All of these have now been run (2026-10-26).** 0103 and 0104 went in before the deploy,
+the rest after it, in the order below. Kept for the check queries and the ordering
+reasons; docs/MIGRATIONS.md says how each was confirmed.
 
 | # | File | Check it ran (read-only, SQL editor) |
 |---|---|---|
 | 0098 | `0098_commission_floor.sql` — **already RUN** (probed live 2026-10-26: the key is present, and nothing else in the repo seeds it; 0103 and 0105 only read it). 0103's prerequisite is satisfied. | `select value from store_settings where key = 'commission_floor_pct';` |
-| 0100 | `0100_studio_private.sql` (deploy the app first) | `select to_regclass('public.project_studio_private') is not null;` → true; then `select count(*) from public.engineering_jobs_snapshot_backup_2026_10;` |
+| 0100 | `0100_studio_private.sql` — **RUN ✔ 2026-10-26** (probe: the table exists, anon denied) | `select to_regclass('public.project_studio_private') is not null;` → true; then `select count(*) from public.engineering_jobs_snapshot_backup_2026_10;` |
 | 0101 | `0101_ai_usage_server_only.sql` **(deploy the app first)** — it revokes `log_ai_usage` from `authenticated`, and today's code logs with the caller's own client. Soft: `logUsage` only warns, so AI keeps working, but cost tracking goes blind. | `select has_function_privilege('authenticated','public.log_ai_usage(text,text,uuid,text,integer,integer,integer,numeric,integer,text,text,integer,integer,text,numeric)','execute');` → false |
 | 0102 | `0102_credits_server_spend.sql` **(deploy the app first — HARD)** — it revokes `spend_credit` from `authenticated`, and `origin/main` calls it on the user's own client; only this branch moves to `spend_credit_for` on the service client. Run early and every wiring diagram and 3D model fails until the deploy lands. | `select has_function_privilege('authenticated','public.spend_credit(text,uuid)','execute');` → false |
 | 0103 | `0103_guards_and_grants.sql` — **RUN ✔ 2026-10-26**, verified: `offer_landed_cost_qar` went from `HTTP 200` to `42501` for anon, storefront unaffected. | `select count(*) from pg_trigger where tgname in ('part_order_items_limits','part_orders_rate_limit','projects_guard_admin_columns','inquiries_guard_insert');` → 4 |
 | 0104 | `0104_quote_upload_path.sql` — **RUN ✔ 2026-10-26** (owner). Not verifiable from outside without writing to storage; check with the `pg_policies` query. | `select with_check from pg_policies where policyname = 'quote_uploads_insert';` contains the path regex |
-| 0105 | `0105_parts_cost_private.sql` (deploy the app first) | `select has_column_privilege('anon','public.parts','landed_cost_qar','select');` → false |
+| 0105 | `0105_parts_cost_private.sql` — **RUN ✔ 2026-10-26**; the leak is closed, and column-scoped: cost columns deny anon while `sku`/`name`/`unit_price` still read | `select has_column_privilege('anon','public.parts','landed_cost_qar','select');` → false |
 | 0106 | `0106_idea_charge_telemetry.sql` — the ONLY migration this branch adds of its own (the tier rebuild; everything else was application code). **Optional and last**: it records what was quoted vs what was charged vs what the turn really cost. It adds nothing to the money path, and if it is never run the app keeps working — the telemetry write is best-effort and only logs a warning. | `select * from public.admin_idea_charge_summary(30);` → returns rows (empty is fine) |
 
 Smoke test after each: open the site and the dashboard once. After **0105** specifically,

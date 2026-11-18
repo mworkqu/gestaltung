@@ -28,7 +28,6 @@ export type MetaKey =
   | "partnersAccelerators"
   | "signIn"
   | "signUp"
-  | "inventory"
   | "dashboard";
 
 // Where each page lives (no locale prefix) and whether it is private. Layouts
@@ -57,7 +56,6 @@ const PAGES: Record<MetaKey, { path: string; noindex?: boolean }> = {
   partnersAccelerators: { path: "/partners/accelerators" },
   signIn: { path: "/sign-in", noindex: true },
   signUp: { path: "/sign-up", noindex: true },
-  inventory: { path: "/inventory", noindex: true },
   dashboard: { path: "/dashboard", noindex: true },
 };
 

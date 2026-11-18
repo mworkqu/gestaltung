@@ -14,7 +14,7 @@ import { Warn } from "@/components/prototyping/ui";
 import { useContactPhone } from "@/components/contact-phone-provider";
 import { CREDIT_QAR } from "@/lib/credits/constants";
 import { formatQar } from "@/lib/pricing/plans";
-import { usePriceQuote } from "@/lib/pricing/use-price-quote";
+import { usePriceQuote } from "@/lib/pricing/client/use-price-quote";
 
 const linkCls = "inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-cobalt hover:text-cobalt-hover";
 

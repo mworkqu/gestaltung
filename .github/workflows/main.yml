@@ -1,0 +1,208 @@
+name: Main
+
+# The gate for main: every push to main and every pull request that targets
+# main runs the same checks. It replaces cad-champions.yml (everything that
+# file checked is in here: lint, typecheck, CC strings, vitest, worker bundle,
+# fixtures build, CC Playwright suite, grader pytest).
+#
+# NO SECRETS. The build and the e2e suites get DUMMY Supabase values (nothing
+# listens on them), so server reads fail fast and pages show their "being set
+# up" states; the e2e write guard (e2e/fixtures.ts) still aborts any write.
+# Never put a real key or the production Supabase URL in this file.
+#
+# To make this gate binding, mark the single job "Main / all checks" as a
+# required status check in GitHub (docs/history/2026-11-consolidation-phase4.md).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: main-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  # Fast static checks: no build, no browser.
+  static:
+    name: Static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      # Warnings may only go down (lint-ratchet.json); fails when they go up.
+      - run: npm run lint:ratchet
+      - run: npm run typecheck
+      - name: i18n parity (EN/AR)
+        run: node scripts/check-i18n-parity.mjs
+      - name: CAD Champions strings
+        run: npm run i18n:check
+      - run: npm run check:cycles
+      - run: npm run test
+      # lib/supabase/database.types.ts is generated from supabase/migrations
+      # (PGlite, no Docker); fails when a migration changed and `npm run db:types` was not run.
+      - name: Database types are fresh
+        run: npm run db:types:check
+
+      # Mac Mini worker (services/worker, docs/WORKER.md): install its pinned
+      # packages, typecheck, bundle. Fails if lib/** pulls next/* into it.
+      - name: Worker bundle
+        run: npm run worker:build
+
+  # Production build with dummy env, then the Playwright suites against it.
+  build-e2e:
+    name: Build and e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Dummy values: unreachable on purpose (never a real project, never a secret).
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+      # Turns on /{locale}/e2e-fixtures/* (lib/e2e-fixtures.ts; never on Vercel).
+      E2E_FIXTURES: "1"
+      # Leaves out the tests in e2e/KNOWN_FAILING.txt and e2e/NEEDS_LIVE_READS.txt
+      # (playwright.config.ts). Both lists may only shrink; the counts are printed below.
+      E2E_SKIP_KNOWN_FAILING: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build (fixtures on, dummy Supabase)
+        run: npm run build
+
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Chromium (and system libraries)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: System libraries only (browser cached)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Excluded e2e tests (the lists must shrink, never grow)
+        run: |
+          echo "known failing:    $(grep -vcE '^(#|[[:space:]]*$)' e2e/KNOWN_FAILING.txt) test titles (e2e/KNOWN_FAILING.txt)"
+          echo "needs live reads: $(grep -vcE '^(#|[[:space:]]*$)' e2e/NEEDS_LIVE_READS.txt) test titles (e2e/NEEDS_LIVE_READS.txt)"
+
+      # Root suite (write-guarded, read-only). Regex = spec files directly in e2e/.
+      - name: Playwright (root suite)
+        run: npx playwright test 'e2e/[^/]+\.spec\.ts'
+
+      - name: Playwright (CAD Champions)
+        run: npx playwright test e2e/cad-champions
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  grader:
+    name: Grader (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: grader
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            grader/requirements.txt
+            grader/requirements-dev.txt
+
+      # The CadQuery wheel (cadquery-ocp / vtk) is large and may not install on
+      # every runner; tests marked cadquery skip themselves without it.
+      - name: Install runtime requirements (CadQuery may fail)
+        continue-on-error: true
+        run: pip install -r requirements.txt
+
+      - name: Install the rest without CadQuery
+        run: |
+          grep -vE '^(cadquery|cadquery-ocp|vtk|nlopt|multimethod)==' requirements.txt > /tmp/requirements-lite.txt
+          pip install -r /tmp/requirements-lite.txt -r requirements-dev.txt
+
+      - run: python -m pytest
+
+  # services/cad-worker (Cloud Run CadQuery worker). No network, no secrets.
+  # SKIPPED here: tests marked cadquery (they importorskip cadquery; the big
+  # CadQuery/OCP/vtk wheels are not installed on CI, the Cloud Build image runs
+  # them). NOT YET SEEN GREEN: written without being able to run Python locally,
+  # so continue-on-error until the first CI run confirms; then remove that line.
+  cad-worker:
+    name: CAD worker (pytest, CadQuery tests skipped)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: services/cad-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            services/cad-worker/requirements.txt
+            services/cad-worker/requirements-dev.txt
+
+      - name: Install without CadQuery
+        run: |
+          grep -vE '^(cadquery|cadquery-ocp|vtk|nlopt|multimethod)==' requirements.txt > /tmp/requirements-lite.txt
+          pip install -r /tmp/requirements-lite.txt -r requirements-dev.txt
+
+      - run: python -m pytest
+
+  # One stable name to require in branch protection.
+  all-checks:
+    name: all checks
+    if: always()
+    needs: [static, build-e2e, grader]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every required job succeeded
+        run: |
+          echo '${{ toJSON(needs) }}'
+          test "${{ needs.static.result }}" = success
+          test "${{ needs.build-e2e.result }}" = success
+          test "${{ needs.grader.result }}" = success

@@ -1,10 +1,11 @@
-import { createServiceClient } from "@/lib/supabase/service";
 import { isAuthorizedCron } from "@/lib/auth/cron";
-import { refreshChangedSomething, runApiRefresh } from "@/lib/sourcing/api-refresh";
-import { revalidateStorefront } from "@/lib/cache/storefront";
-import { jsonError, jsonOk } from "@/lib/http";
+import { runCronRoute } from "@/lib/cron/route";
+import { jsonError } from "@/lib/http";
 
 // Daily Mouser + DigiKey refresh (vercel.json cron). Vercel sends CRON_SECRET.
+// Purges only the storefront tags of products that moved.
+// The job itself is lib/cron/jobs.ts (shared with the Mac Mini worker,
+// docs/WORKER.md); lib/cron/route.ts runs it here or forwards it.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -13,10 +14,5 @@ export async function GET(request: Request) {
   if (!isAuthorizedCron(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return jsonError("unauthorized", 401);
   }
-  const db = createServiceClient();
-  if (!db) return jsonError("no_service_key", 500);
-  const result = await runApiRefresh(db, "cron");
-  // Purge only when an offer's numbers moved (see voltaat-sync for why).
-  if (refreshChangedSomething(result)) revalidateStorefront();
-  return jsonOk(result);
+  return runCronRoute("supplier-refresh", request);
 }

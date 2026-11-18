@@ -31,7 +31,7 @@ import { AuthReturnLink } from "@/components/auth/auth-return-link";
 import { ProductViewer, ProductViewerLoading, preloadProductViewer } from "@/components/studio/viewer/ProductViewerLazy";
 import type { ViewerApi } from "@/components/studio/viewer/types";
 import { track } from "@/lib/analytics";
-import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import { creditsChanged, useCanUse } from "@/lib/credits/client/use-credits";
 import type { TokenInfo } from "@/lib/studio/client/api";
 import { regenCost } from "@/lib/studio/tiers";
 import { Link } from "@/i18n/navigation";

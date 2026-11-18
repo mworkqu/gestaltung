@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ROBOTS_ALLOW,
   ROBOTS_DISALLOW,
   SITE_URL,
   SITEMAP_STATIC_PATHS,
@@ -275,25 +276,74 @@ describe("robotsRules", () => {
   const r = robotsRules();
   const rule = (Array.isArray(r.rules) ? r.rules[0] : r.rules) as {
     userAgent: string;
-    allow: string;
+    allow: string[];
     disallow: string[];
   };
 
-  it("allows everything for all agents and disallows the private areas", () => {
+  // Google-style matching: "*" = any characters; the longest matching rule
+  // wins and allow wins a tie.
+  const toRe = (pattern: string) =>
+    new RegExp("^" + pattern.split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*"));
+  const allowed = (url: string): boolean => {
+    const best = (list: string[]) => Math.max(-1, ...list.filter((p) => toRe(p).test(url)).map((p) => p.length));
+    return best(rule.allow) >= best(rule.disallow);
+  };
+
+  it("all agents; the private areas and the query listings are disallowed", () => {
     expect(rule.userAgent).toBe("*");
-    expect(rule.allow).toBe("/");
+    expect(rule.allow).toEqual(ROBOTS_ALLOW);
+    expect(rule.disallow).toEqual(ROBOTS_DISALLOW);
     expect(rule.disallow).toEqual(
       expect.arrayContaining([
-        "/dashboard",
-        "/inventory",
-        "/api",
-        "/en/dashboard",
-        "/ar/dashboard",
-        "/en/inventory",
-        "/ar/inventory",
+        "/api/",
+        "/*/store?*",
+        "/*/store/search",
+        "/*/dashboard",
+        "/*/projects",
+        "/*/orders",
+        "/*/my-inventory",
+        "/cad-champions/*/admin",
       ])
     );
-    expect(rule.disallow).toEqual(ROBOTS_DISALLOW);
+  });
+
+  it.each([
+    "/api/store/search",
+    "/en/store?q=arduino",
+    "/ar/store?page=3",
+    "/en/store?category=Sensors&page=2",
+    "/en/store/search",
+    "/en/dashboard",
+    "/ar/dashboard/store",
+    "/en/projects",
+    "/en/projects/123/prototyping",
+    "/ar/orders/abc",
+    "/en/my-inventory",
+    "/en/inventory",
+    "/dashboard",
+    "/cad-champions/en/admin",
+    "/cad-champions/ar/admin/students",
+  ])("blocks %s", (url) => {
+    expect(allowed(url)).toBe(false);
+  });
+
+  it.each([
+    "/",
+    "/en",
+    "/ar/store",
+    "/en/store/VLT-31976620458086",
+    "/en/store/collections/back-to-campus",
+    "/en/projects/new",
+    "/ar/projects/new",
+    "/en/how-it-works",
+    "/cad-champions/en",
+    "/sitemap.xml",
+  ])("allows %s", (url) => {
+    expect(allowed(url)).toBe(true);
+  });
+
+  it("every sitemap path stays crawlable", () => {
+    for (const path of SITEMAP_STATIC_PATHS) for (const l of ["en", "ar"]) expect(allowed(`/${l}${path}`)).toBe(true);
   });
 
   it("points at the sitemap", () => {

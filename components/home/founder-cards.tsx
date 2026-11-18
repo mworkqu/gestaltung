@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils";
 const cardBase =
   "group flex min-w-0 flex-col gap-4 text-start outline-none transition-[transform,border-color,box-shadow] duration-200 hover:border-cobalt/40 hover:shadow-neu-sm focus-visible:ring-2 focus-visible:ring-cobalt/60 motion-safe:hover:-translate-y-0.5";
 
-/** `neu` = raised cards on the page background (v1 home); `tile` = flat tiles inside a .neu section (v2). */
-export async function FounderCards({ locale, variant = "tile" }: { locale: string; variant?: "tile" | "neu" }) {
-  const card = cn(cardBase, variant === "tile" ? "tile" : "neu border border-transparent p-5");
+/** Flat tiles inside the home page's .neu "Built for founders" section. */
+export async function FounderCards({ locale }: { locale: string }) {
+  const card = cn(cardBase, "tile");
   const t = await getTranslations("StoreLanding");
   const th = await getTranslations("HomeHero");
   const phone = await getContactPhone();

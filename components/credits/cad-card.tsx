@@ -27,7 +27,7 @@ import { AccessNote, CostLabel } from "@/components/credits/access-note";
 import { FeatureVideoClient } from "@/components/feature-video-client";
 import { classifyCadRequest, type CadTier } from "@/lib/credits/classify";
 import { CAD_GENERATIONS, CREDIT_QAR, REDEEM_DAYS } from "@/lib/credits/constants";
-import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import { creditsChanged, useCanUse } from "@/lib/credits/client/use-credits";
 import { renderScad, stlStats } from "@/lib/cad/render";
 import { cloudFilePaths, isCadQueryCode, parseManifest, type CloudManifest } from "@/lib/cad/engine";
 import { CAD_BUCKET } from "@/lib/design/constants";

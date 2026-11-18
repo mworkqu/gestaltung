@@ -11,7 +11,7 @@
 // buttons).
 
 import { COMPANY } from "@/lib/company";
-import { peekContactPhone } from "@/lib/contact-phone-server";
+import { peekContactPhone } from "@/lib/contact-phone-current";
 import { asLocale, type Locale } from "@/lib/locale";
 import { escapeHtml } from "@/lib/text/escape";
 

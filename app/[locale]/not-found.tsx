@@ -5,6 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { DocumentTitle } from "@/components/document-title";
 import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
+import { MAX_STORE_QUERY } from "@/lib/store/search-limits";
 
 // Branded 404 for everything under a locale: unknown URLs (via the
 // [...rest] catch-all) and notFound() calls such as an unknown product SKU.
@@ -46,6 +47,7 @@ export default async function LocaleNotFound() {
               id="nf-q"
               name="q"
               type="search"
+              maxLength={MAX_STORE_QUERY}
               placeholder={t("searchPlaceholder")}
               className="neu-inset min-h-11 min-w-0 flex-1 rounded-xl px-4 text-base text-heading placeholder:text-faint focus:outline-none focus-visible:ring-2 focus-visible:ring-cobalt"
             />

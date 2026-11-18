@@ -8,6 +8,7 @@ import { useId, useRef, useState } from "react";
 import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { MAX_STORE_QUERY } from "@/lib/store/search-limits";
 import { comboboxAttrs, LazyStoreSuggest, useSuggestArmed } from "./suggest-shell";
 
 export function HomeStoreSearch({ locale, placeholder, submitLabel }: { locale: string; placeholder: string; submitLabel: string }) {
@@ -27,7 +28,7 @@ export function HomeStoreSearch({ locale, placeholder, submitLabel }: { locale: 
           type="search"
           aria-label={placeholder}
           placeholder={placeholder}
-          maxLength={100}
+          maxLength={MAX_STORE_QUERY}
           enterKeyHint="search"
           value={query}
           onFocus={arm}

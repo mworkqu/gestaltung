@@ -1,0 +1,20 @@
+{
+  "name": "gestaltung-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mac Mini worker: scheduled jobs (and, in part B, slow AI/CAD calls) for gestaltung360.com. Imports the repo's lib/** and is bundled by esbuild.",
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node dist/worker.mjs"
+  },
+  "dependencies": {
+    "node-cron": "4.6.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.27.7"
+  }
+}

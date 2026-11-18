@@ -1,0 +1,30 @@
+-- Gestaltung — 0110: drop the retired project_claims table (consolidation 2026-11, owner decision O5).
+--
+-- WHY: project_claims (0020) held the old prototyping "claims" (one row per
+-- sentence the assistant understood). 0022 retired it ("nothing reads or writes
+-- it any more") when the brief moved to projects.spec; the audit
+-- (docs/audit/CODE_QUALITY_AUDIT.md, O5) confirmed zero readers in app/,
+-- components/ and lib/, and no function body in supabase/migrations names it
+-- (0071 lists it only in a comment). lib/supabase/types.ts has no type for it.
+--
+-- WHAT: drop table if exists public.project_claims — its four RLS policies
+-- (project_claims_select/_insert/_update/_delete, which call owns_project()),
+-- its index and grants go with it. Nothing else changes: owns_project() and the
+-- sibling tables project_parts / project_schematics(+_revisions) are untouched.
+--
+-- PRODUCTION ROW COUNTS WERE NOT CHECKED (Claude cannot read production).
+-- BEFORE RUNNING: if the table holds anything you want to keep (old claim
+-- rows from September 2026 projects), export it first (Table Editor ->
+-- project_claims -> Export CSV) or check:
+--   select count(*) from public.project_claims;
+--
+-- BEFORE IT RUNS nothing changes for anyone: no code reads the table.
+--
+-- Run AFTER 0109. Safe to re-run.
+--
+-- Rollback (structure only; rows come back only from your export): re-run
+-- section 2 ("create table if not exists public.project_claims" + its index)
+-- and the project_claims part of section 5 (RLS, grants, the four policies
+-- built in the do-block) of supabase/migrations/0020_prototyping.sql.
+
+drop table if exists public.project_claims;

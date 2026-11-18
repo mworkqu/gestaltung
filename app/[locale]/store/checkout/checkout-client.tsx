@@ -14,8 +14,8 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/parts/format";
 import { cn } from "@/lib/utils";
 import type { CartItem } from "@/lib/supabase/types";
-import { useDeliveryQuote } from "@/lib/store/use-delivery-quote";
-import { creditsChanged, useCreditSummary } from "@/lib/credits/use-credits";
+import { useDeliveryQuote } from "@/lib/store/client/use-delivery-quote";
+import { creditsChanged, useCreditSummary } from "@/lib/credits/client/use-credits";
 import {
   formatDeliveryDate,
   isOnRequest,

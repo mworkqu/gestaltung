@@ -1,0 +1,106 @@
+{
+  "title": "UI kit gallery",
+  "purpose": "Every shared component in every state. Developer page, hidden in production.",
+  "sections": {
+    "buttons": "Buttons",
+    "cards": "Cards",
+    "chips": "Status chips",
+    "alerts": "Alerts",
+    "help": "Help tips and glossary terms",
+    "empty": "Empty state",
+    "loading": "Skeletons and spinner",
+    "toasts": "Toasts",
+    "confirm": "Confirm dialog",
+    "stepper": "Stepper",
+    "needHelp": "Need help button",
+    "directions": "Both directions"
+  },
+  "buttons": {
+    "primary": "Primary",
+    "secondary": "Secondary",
+    "ghost": "Ghost",
+    "danger": "Delete",
+    "small": "Small",
+    "loading": "Save",
+    "loadingText": "Saving…",
+    "disabled": "Submit",
+    "disabledReason": "Upload a file first."
+  },
+  "cards": {
+    "title": "Card title",
+    "body": "Cards share the canvas colour. Depth comes from the soft shadows.",
+    "tile": "A tile inside a card has no second shadow."
+  },
+  "chips": {
+    "neutral": "Draft",
+    "info": "In review",
+    "success": "Approved",
+    "warning": "Needs changes",
+    "danger": "Rejected"
+  },
+  "alerts": {
+    "infoTitle": "Your file is being checked",
+    "infoBody": "This usually takes under a minute.",
+    "successTitle": "File uploaded",
+    "successBody": "We found 1 solid body.",
+    "warningTitle": "Units look unusual",
+    "warningBody": "Check that your model uses millimetres.",
+    "errorTitle": "We could not read this file",
+    "errorBody": "Export it again as STEP and retry.",
+    "action": "Try again"
+  },
+  "help": {
+    "tipLabel": "Units",
+    "tipBody": "All CAD Champions tasks use millimetres.",
+    "sentenceBefore": "Export your part as a",
+    "sentenceMiddle": "file, then check the",
+    "sentenceAfter": "and the material density before you submit."
+  },
+  "empty": {
+    "title": "No files yet",
+    "description": "Upload your first CAD file to see it here.",
+    "action": "Upload a file"
+  },
+  "loading": {
+    "spinner": "Checking your file…"
+  },
+  "toasts": {
+    "success": "Show success",
+    "error": "Show error",
+    "info": "Show info",
+    "successTitle": "Saved",
+    "successBody": "Your changes are safe.",
+    "errorTitle": "Could not save",
+    "errorBody": "Check your connection and try again.",
+    "infoTitle": "New tip available",
+    "infoBody": "Open the Help Center to read it."
+  },
+  "confirm": {
+    "open": "Delete submission",
+    "title": "Delete this submission?",
+    "consequence": "The file and its score will be removed. You cannot undo this.",
+    "confirm": "Yes, delete",
+    "toast": "Submission deleted"
+  },
+  "stepper": {
+    "upload": "Upload",
+    "uploadDesc": "Add your STEP file",
+    "check": "Check",
+    "checkDesc": "We read the model",
+    "drawing": "Drawing",
+    "drawingDesc": "Create the 2D sheet",
+    "review": "Review",
+    "reviewDesc": "Compare with the target",
+    "submit": "Submit",
+    "lockedReason": "Finish the drawing first."
+  },
+  "directions": {
+    "ltr": "Left to right (English)",
+    "rtl": "Right to left (Arabic)",
+    "sampleButton": "Continue",
+    "sampleAlert": "Check this value",
+    "sampleAlertBody": "Density of steel:",
+    "sampleChip": "Approved",
+    "fileLabel": "File:"
+  }
+}

@@ -6,7 +6,8 @@ import { handleFromUrl } from "@/lib/sourcing/adapters/voltaat";
 import { optionsNote } from "@/lib/sourcing/voltaat-catalogue";
 import { callGemini, geminiConfigured } from "@/lib/prototyping/providers/gemini-client";
 import { digikeySearch } from "@/lib/sourcing/adapters/digikey";
-import { fetchImage, storeImage } from "@/lib/store/store-image";
+import { fetchImage } from "@/lib/store/store-image";
+import { storeImage } from "@/lib/store/store-image-sharp";
 import { ProviderError } from "@/lib/prototyping/providers/types";
 import {
   DETAILS_SCHEMA,

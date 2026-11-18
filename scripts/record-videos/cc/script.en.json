@@ -1,0 +1,812 @@
+{
+  "lang": "en",
+  "voice": "en-US-AndrewNeural",
+  "rate": "+0%",
+  "say": {},
+  "segments": [
+    {
+      "id": "s01-what",
+      "narration": "Welcome to CAD Champions, training for the national CAD skills competition in Qatar, by Gestaltung360 in Lusail. It starts with a free CAD test. It takes about 90 minutes, in Inventor, Fusion or SOLIDWORKS, in English or Arabic.",
+      "url": "/cad-champions/en",
+      "poster": true,
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hover",
+          "sel": "#cc-hero-title"
+        },
+        {
+          "do": "wait",
+          "ms": 3000
+        },
+        {
+          "do": "hover",
+          "sel": "main section[aria-labelledby=cc-hero-title] svg, main section[aria-labelledby=cc-hero-title] [role=img]"
+        },
+        {
+          "do": "wait",
+          "ms": 2500
+        },
+        {
+          "do": "hover",
+          "sel": "main section[aria-labelledby=cc-hero-title] a[href*='sign-up']"
+        },
+        {
+          "do": "wait",
+          "ms": 3000
+        },
+        {
+          "do": "hover",
+          "sel": "main section[aria-labelledby=cc-hero-title] p.text-xs"
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s02-how",
+      "narration": "There are five steps. Create an account, get ready, take the free test, get your skill report, then train. Each step unlocks the next.",
+      "url": "/cad-champions/en",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "scroll",
+          "to": "#how-it-works",
+          "offset": 80
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverEach",
+          "sel": "#how-it-works li",
+          "ms": 1000
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s03-sign-up",
+      "narration": "Let's create a free account. Add your name, email and a password. We ask for your mobile number so we can reach you on WhatsApp if your test needs attention, and your school so we can plan training sessions near you.",
+      "url": "/cad-champions/en/sign-up",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "type",
+          "sel": "#cc-fullName",
+          "text": "Sara Ahmed"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-email",
+          "text": "sara.student@example.com"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-password",
+          "text": "Practice2026"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-phone",
+          "text": "+974 5512 3478"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "select",
+          "sel": "#cc-institution",
+          "index": 1
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hover",
+          "sel": "#cc-institution"
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s04-guardian",
+      "narration": "If you're under 18, a new section appears. Add your parent or guardian's name and mobile number, and tick the consent box together.",
+      "url": "/cad-champions/en/sign-up",
+      "prep": [
+        {
+          "do": "fill",
+          "sel": "#cc-fullName",
+          "text": "Sara Ahmed"
+        },
+        {
+          "do": "fill",
+          "sel": "#cc-email",
+          "text": "sara.student@example.com"
+        },
+        {
+          "do": "fill",
+          "sel": "#cc-phone",
+          "text": "+974 5512 3478"
+        },
+        {
+          "do": "jump",
+          "to": "#cc-dateOfBirth",
+          "offset": 260
+        }
+      ],
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "fillDate",
+          "sel": "#cc-dateOfBirth",
+          "value": "2010-03-14"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "scroll",
+          "to": "#cc-guardianName",
+          "offset": 260
+        },
+        {
+          "do": "type",
+          "sel": "#cc-guardianName",
+          "text": "Mona Ahmed"
+        },
+        {
+          "do": "type",
+          "sel": "#cc-guardianPhone",
+          "text": "+974 5598 2211"
+        },
+        {
+          "do": "click",
+          "sel": "#cc-guardianConsent"
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s05-check-email",
+      "narration": "After you sign up, check your email. Open the link we send you to confirm your address and finish your account.",
+      "url": "/cad-champions/en/check-email",
+      "pendingEmail": "sara.student@example.com",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "auth:checkEmail.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": "sara.student@example.com"
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s06-sign-in",
+      "narration": "Then sign in. Four short screens explain what CAD Champions is, how it works, and what you'll need for the test.",
+      "url": "/cad-champions/en/sign-in",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "type",
+          "sel": "input[type=email]",
+          "text": "sara.student@example.com"
+        },
+        {
+          "do": "type",
+          "sel": "input[type=password]",
+          "text": "Practice2026"
+        },
+        {
+          "do": "hover",
+          "sel": "form button[type=submit]"
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "goto",
+          "url": "/cad-champions/en/e2e-fixtures/onboarding"
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true
+        },
+        {
+          "do": "wait",
+          "ms": 1000
+        }
+      ],
+      "holdSeconds": 0.5
+    },
+    {
+      "id": "s07-software",
+      "narration": "On the last one, choose your training software. Autodesk Inventor is recommended for the competition. Fusion and SOLIDWORKS work too, and you can switch later.",
+      "url": "/cad-champions/en/e2e-fixtures/onboarding",
+      "prep": [
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true,
+          "instant": true
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "onboarding:how.title"
+          }
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true,
+          "instant": true
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "onboarding:before.title"
+          }
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:next"
+          },
+          "exact": true,
+          "instant": true
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "onboarding:software.title"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "onboarding:software.inventorName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 2600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "onboarding:software.fusionName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "onboarding:software.solidworksName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "clickText",
+          "text": {
+            "msg": "onboarding:software.inventorName"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 800
+        },
+        {
+          "do": "hoverRole",
+          "role": "button",
+          "name": {
+            "msg": "onboarding:goToGetReady"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s08-dashboard",
+      "narration": "Your dashboard always shows the one thing to do next, at the top. Below it, the journey tracker shows where you are, from your profile all the way to training.",
+      "url": "/cad-champions/en/e2e-fixtures/dashboard?state=ready",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hover",
+          "sel": "[data-testid=next-step] p"
+        },
+        {
+          "do": "wait",
+          "ms": 2400
+        },
+        {
+          "do": "hover",
+          "sel": "[data-testid=next-step] a"
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hoverEach",
+          "sel": "[data-testid=tracker] li",
+          "ms": 900
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s09-get-ready",
+      "narration": "Get Ready prepares you for test day. Watch the welcome video, check your computer, and install your CAD software. Start early, because student licence checks can take a few days.",
+      "url": "/cad-champions/en/e2e-fixtures/get-ready",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.welcome_video.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.check_computer.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.install_software.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.essential_actions.title"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s10-practice",
+      "narration": "Next, learn the 5 essential actions, like setting units to millimetres and exporting a STEP file. Then do a practice upload. Model a 50 millimetre steel cube and upload it. There's no timer, and when it passes, you're ready.",
+      "url": "/cad-champions/en/e2e-fixtures/get-ready?keys=practice",
+      "mock": "practicePass",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:steps.essential_actions.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 2200
+        },
+        {
+          "do": "scrollText",
+          "text": {
+            "msg": "get-ready:practice.taskTitle"
+          },
+          "offset": 160
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "get-ready:practice.taskTitle"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 2400
+        },
+        {
+          "do": "hover",
+          "sel": "input[type=file][accept='.step,.stp']",
+          "parent": true
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "upload",
+          "sel": "input[type=file][accept='.step,.stp']",
+          "name": "cube.step"
+        },
+        {
+          "do": "waitText",
+          "text": {
+            "msg": "get-ready:celebration.title"
+          }
+        },
+        {
+          "do": "scrollText",
+          "text": {
+            "msg": "get-ready:celebration.title"
+          },
+          "offset": 140
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s11-test-start",
+      "narration": "Before the test, read the rules, tick the two boxes and press Start. The 90-minute timer runs on our server, so closing the page doesn't pause it.",
+      "url": "/cad-champions/en/e2e-fixtures/test-intro?gate=ready",
+      "mock": "startTest",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "scrollLabel",
+          "label": {
+            "msg": "test:intro.agreeRules"
+          },
+          "offset": 320,
+          "slow": true
+        },
+        {
+          "do": "checkLabel",
+          "label": {
+            "msg": "test:intro.agreeRules"
+          }
+        },
+        {
+          "do": "checkLabel",
+          "label": {
+            "msg": "test:intro.agreeHonour"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 500
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "test:intro.start"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hoverRole",
+          "role": "button",
+          "name": {
+            "msg": "test:intro.startConfirm"
+          }
+        }
+      ],
+      "holdSeconds": 1,
+      "prep": [
+        {
+          "do": "jumpText",
+          "text": {
+            "msg": "test:intro.summaryTitle"
+          },
+          "offset": 90
+        }
+      ]
+    },
+    {
+      "id": "s12-workspace",
+      "narration": "In the test, each task has a brief and the material density, and some come with files to download. Build the part in your CAD software, export a STEP file and upload it. You can replace a file as often as you like until you submit.",
+      "url": "/cad-champions/en/e2e-fixtures/workspace?mode=per_task",
+      "mock": "saveTask",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:workspace.timerLabel"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:workspace.briefTitle"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:workspace.materialTitle"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "scrollTo",
+          "sel": "[id^=cc-task-panel-] input[type=file]",
+          "offset": 470
+        },
+        {
+          "do": "hover",
+          "sel": "[id^=cc-task-panel-] input[type=file]",
+          "parent": true
+        },
+        {
+          "do": "wait",
+          "ms": 600
+        },
+        {
+          "do": "upload",
+          "sel": "[id^=cc-task-panel-] input[type=file]",
+          "name": "Bracket.step"
+        },
+        {
+          "do": "wait",
+          "ms": 2200
+        },
+        {
+          "do": "hoverText",
+          "text": "Bracket.step"
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverRole",
+          "role": "button",
+          "name": {
+            "msg": "test:workspace.submit"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s13-submitted",
+      "narration": "When you're done, press Submit. Your files are in, and you can leave this page. 3D models are checked automatically, and a trainer confirms drawings.",
+      "url": "/cad-champions/en/e2e-fixtures/submitted",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:submitted.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:submitted.next4"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "test:submitted.next1"
+          }
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s14-results",
+      "narration": "Your results show your overall score and your band. The skill map shows how you did in each of the six skill areas.",
+      "url": "/cad-champions/en/e2e-fixtures/results?variant=medium&offer=video&help=1",
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 1000
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "results:header.overall"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1500
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "results:header.bandLabel"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "scrollText",
+          "text": {
+            "msg": "results:skillMap.title"
+          },
+          "offset": 100
+        },
+        {
+          "do": "wait",
+          "ms": 1200
+        },
+        {
+          "do": "smoothBy",
+          "px": 420
+        }
+      ],
+      "holdSeconds": 1
+    },
+    {
+      "id": "s15-training",
+      "narration": "Your training path shows what to practise first, with a free lesson to start. And if you ever get stuck, press Need help to message us. Good luck!",
+      "url": "/cad-champions/en/e2e-fixtures/results?variant=medium&offer=video&help=1",
+      "prep": [
+        {
+          "do": "jump",
+          "to": "#cc-path-title",
+          "offset": 90
+        }
+      ],
+      "actions": [
+        {
+          "do": "wait",
+          "ms": 900
+        },
+        {
+          "do": "hover",
+          "sel": "#cc-path-title"
+        },
+        {
+          "do": "wait",
+          "ms": 1400
+        },
+        {
+          "do": "hoverText",
+          "text": {
+            "msg": "results:path.freeLesson.title"
+          }
+        },
+        {
+          "do": "wait",
+          "ms": 1800
+        },
+        {
+          "do": "clickRole",
+          "role": "button",
+          "name": {
+            "msg": "ui:needHelp"
+          },
+          "nth": "last"
+        },
+        {
+          "do": "wait",
+          "ms": 1600
+        }
+      ],
+      "holdSeconds": 1.5
+    }
+  ]
+}

@@ -51,7 +51,6 @@ export function adminNavGroups(t: (key: string) => string): NavGroup[] {
         { href: "/dashboard/engineering-jobs", label: t("engineeringJobs"), icon: "projects" },
         { href: "/dashboard/notifications", label: t("notifications"), icon: "notifications" },
         { href: "/dashboard/contact", label: t("contactInfo"), icon: "contact" },
-        { href: "/inventory", label: t("inventory"), icon: "inventory" },
       ],
     },
   ];

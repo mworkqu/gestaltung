@@ -33,7 +33,7 @@ import { cadSessionCharge } from "@/lib/credits/cad-cost";
 import { StudioViewer, type ViewerApi } from "@/components/studio/viewer/ViewerLazy";
 import type { ViewerExtraObject } from "@/components/studio/viewer/types";
 import { track } from "@/lib/analytics";
-import { creditsChanged, useCanUse } from "@/lib/credits/use-credits";
+import { creditsChanged, useCanUse } from "@/lib/credits/client/use-credits";
 import { arabicCountForm } from "@/lib/text/count";
 import { defaultMechParts, layoutBounds, mechSummary } from "@/lib/studio/ai/mech-default";
 import { downloadBlob } from "@/lib/studio/download";

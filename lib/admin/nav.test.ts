@@ -38,7 +38,6 @@ const OLD_ROUTES = [
   "/dashboard/ai-costs",
   "/dashboard/payments",
   "/dashboard/notifications",
-  "/inventory",
 ];
 
 describe("admin nav groups", () => {
@@ -69,7 +68,6 @@ describe("admin nav groups", () => {
         "/dashboard/engineering-jobs",
         "/dashboard/notifications",
         "/dashboard/contact",
-        "/inventory",
       ],
     ]);
   });
@@ -117,7 +115,6 @@ describe("active-route matching", () => {
     ["/dashboard/store/overview", "/dashboard/store/suppliers"],
     ["/dashboard/store/gaps", "/dashboard/store/gaps"],
     ["/dashboard/leads", "/dashboard/leads"],
-    ["/inventory/projects", "/inventory"],
     ["/dashboard/storefront", null],
     ["/projects", null],
   ];

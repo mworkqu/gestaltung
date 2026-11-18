@@ -141,10 +141,17 @@ function inheritedScope(file: string): string {
   return "BASE";
 }
 
+// CAD Champions (app/[locale]/cad-champions, components/cad-champions) is NOT
+// part of this scheme: its layout passes its own provider with every "CC.*"
+// message (from messages/cad-champions/*, not messages/en.json), so its keys
+// are checked by lib/cad-champions/messages.test.ts instead.
+const CC_ROUTES = path.join(APP, "cad-champions");
+
 function routeFiles(dir: string): string[] {
   const out: string[] = [];
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, e.name);
+    if (p === CC_ROUTES) continue;
     if (e.isDirectory()) out.push(...routeFiles(p));
     else if (/^(page|layout|not-found|error|loading|template)\.tsx$/.test(e.name)) out.push(p);
   }

@@ -20,7 +20,8 @@ export type StudioCallRequest<T> = {
   system: string;
   prompt: string;
   schema: object;
-  validate: (raw: unknown) => Validated<T>;
+  /** `attempt` is 1 on the first ask, 2 on the retry; a reused stored answer is read back as 1. */
+  validate: (raw: unknown, attempt: number) => Validated<T>;
   /** Inline images (vision check only). */
   images?: readonly { mimeType: "image/png" | "image/jpeg"; data: string }[];
   /** Overrides the 45 s default (the product designer writes long JSON). */
