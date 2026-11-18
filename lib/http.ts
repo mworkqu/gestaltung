@@ -10,9 +10,14 @@ export function jsonOk(body: unknown, init?: ResponseInit): Response {
   return Response.json(body, init);
 }
 
-/** `{ error: code, ...extra }` with the given status, e.g. `jsonError("sign_in", 401)`. */
-export function jsonError(code: string, status: number, extra?: Record<string, unknown> & { error?: never }): Response {
-  return Response.json({ error: code, ...extra }, { status });
+/** `{ error: code, ...extra }` with the given status, e.g. `jsonError("sign_in", 401)`; optional response `headers` (e.g. `Cache-Control: no-store`). */
+export function jsonError(
+  code: string,
+  status: number,
+  extra?: Record<string, unknown> & { error?: never },
+  headers?: HeadersInit
+): Response {
+  return Response.json({ error: code, ...extra }, headers ? { status, headers } : { status });
 }
 
 /** A bare status with no body (the `new Response(null, { status })` calls). */

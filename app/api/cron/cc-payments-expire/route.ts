@@ -1,4 +1,5 @@
 import { isAuthorizedCron } from "@/lib/notifications/links";
+import { jsonError } from "@/lib/http";
 import { runCronRoute } from "@/lib/cron/route";
 
 // CAD Champions payments cron (Prompt 10 Steps D + F):
@@ -26,7 +27,7 @@ export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return Response.json({ error: "cron_secret_unset" }, { status: 500 });
+  if (!secret) return jsonError("cron_secret_unset", 500);
   if (!isAuthorizedCron(request.headers.get("authorization"), secret)) return new Response(null, { status: 401 });
   return runCronRoute("cc-payments-expire", request);
 }

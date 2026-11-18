@@ -1,4 +1,5 @@
 import { getCcUser } from "@/lib/cad-champions/auth/server";
+import { jsonError } from "@/lib/http";
 import { closeIfExpired, loadAttemptById } from "@/lib/cad-champions/test/server";
 import { liveTaskState } from "@/lib/cad-champions/test/status";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -16,14 +17,14 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cc = await getCcUser();
-  if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
+  if (!cc) return jsonError("signed_out", 401, undefined, NO_STORE);
 
   const found = await loadAttemptById(id);
   if (!found || (found.user_id !== cc.user.id && !cc.isStaff)) {
-    return Response.json({ error: "not_found" }, { status: 404, headers: NO_STORE });
+    return jsonError("not_found", 404, undefined, NO_STORE);
   }
   const service = createServiceClient();
-  if (!service) return Response.json({ error: "unavailable" }, { status: 503, headers: NO_STORE });
+  if (!service) return jsonError("unavailable", 503, undefined, NO_STORE);
 
   try {
     const { data: test } = await service.from("cc_tests").select("type,grace_seconds").eq("id", found.test_id).maybeSingle<{ type: string; grace_seconds: number }>();
@@ -48,6 +49,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return Response.json({ status: attempt.status, submittedAt: attempt.submitted_at, tasks }, { headers: NO_STORE });
   } catch (e) {
     console.error("[cc-test] status failed:", e instanceof Error ? e.message : "unknown");
-    return Response.json({ error: "error" }, { status: 500, headers: NO_STORE });
+    return jsonError("error", 500, undefined, NO_STORE);
   }
 }

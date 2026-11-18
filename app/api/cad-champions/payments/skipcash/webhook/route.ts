@@ -1,4 +1,5 @@
 import { handleSkipCashWebhook } from "@/lib/cad-champions/payments/server";
+import { jsonError, jsonOk } from "@/lib/http";
 
 // SkipCash webhook (Prompt 10 Step E). No session: authenticity comes from
 // the HMAC-SHA256 signature in the Authorization header (constant-time check,
@@ -14,10 +15,10 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   try {
     const { status, body } = await handleSkipCashWebhook(req);
-    return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
+    return jsonOk(body, { status, headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error("[cc-skipcash] webhook failed:", e instanceof Error ? e.message : "unknown");
-    return Response.json({ error: "error" }, { status: 500 });
+    return jsonError("error", 500);
   }
 }
 

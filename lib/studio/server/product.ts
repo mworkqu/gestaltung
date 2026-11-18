@@ -18,6 +18,7 @@ import type { DbClient } from "@/lib/supabase/db";
 import { z } from "zod";
 
 import { ipHash } from "@/lib/credits/server";
+import { jsonOk } from "@/lib/http";
 import { createServiceClient } from "@/lib/supabase/service";
 import { stableHash } from "../cache";
 import type { LayoutInput } from "../layout";
@@ -70,7 +71,7 @@ export const ExcludeArchetypes = z.array(Archetype);
 
 /** JSON, never cached anywhere (models and private data pass through here). */
 export function json(body: unknown, status = 200): Response {
-  return Response.json(body, { status, headers: { "Cache-Control": "no-store, private" } });
+  return jsonOk(body, { status, headers: { "Cache-Control": "no-store, private" } });
 }
 
 /** updateProductDoc error → HTTP status. */

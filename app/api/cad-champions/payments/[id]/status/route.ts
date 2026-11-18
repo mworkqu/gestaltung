@@ -1,4 +1,5 @@
 import { getCcUser } from "@/lib/cad-champions/auth/server";
+import { jsonError } from "@/lib/http";
 import { refreshPaymentStatus } from "@/lib/cad-champions/payments/server";
 import { ccRateLimited } from "@/lib/cad-champions/rate-limits";
 
@@ -14,9 +15,9 @@ const NO_STORE = { "Cache-Control": "no-store, max-age=0" };
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cc = await getCcUser();
-  if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
-  if (ccRateLimited("poll", cc.user.id)) return Response.json({ error: "rate_limited" }, { status: 429, headers: { ...NO_STORE, "Retry-After": "30" } });
+  if (!cc) return jsonError("signed_out", 401, undefined, NO_STORE);
+  if (ccRateLimited("poll", cc.user.id)) return jsonError("rate_limited", 429, undefined, { ...NO_STORE, "Retry-After": "30" });
   const res = await refreshPaymentStatus(cc, id);
-  if (!res) return Response.json({ error: "not_found" }, { status: 404, headers: NO_STORE });
+  if (!res) return jsonError("not_found", 404, undefined, NO_STORE);
   return Response.json(res, { headers: NO_STORE });
 }

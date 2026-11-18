@@ -9,6 +9,7 @@ import type { LeadTimeClass } from "@/lib/store/sourcing";
 import { partImageUrl } from "@/lib/parts/format";
 import { IMAGE_WIDTHS, sizedImage } from "@/lib/store/image-url";
 import { asLocale } from "@/lib/locale";
+import { jsonError, jsonOk } from "@/lib/http";
 
 /** Results shown in the dropdown. */
 export const SUGGEST_LIMIT = 6;
@@ -89,15 +90,15 @@ export async function handleStoreSearch(request: Request, deps: StoreSearchDeps,
   const locale = asLocale(url.searchParams.get("locale"));
   const headers = { "Cache-Control": SUGGEST_CACHE_CONTROL };
   if (q.length < SUGGEST_MIN_CHARS) {
-    return Response.json({ q, results: [], total: 0 } satisfies StoreSearchResponse, { headers });
+    return jsonOk({ q, results: [], total: 0 } satisfies StoreSearchResponse, { headers });
   }
   try {
     const { parts, total } = await deps.listing(q, locale);
     const results = parts.slice(0, SUGGEST_LIMIT).map((p) => toSuggestion(p as StoreCardPart & Record<string, unknown>));
-    return Response.json({ q, results, total } satisfies StoreSearchResponse, { headers });
+    return jsonOk({ q, results, total } satisfies StoreSearchResponse, { headers });
   } catch (err) {
     console.warn("[store/search] listing failed", err instanceof Error ? err.message : err);
-    return Response.json({ error: "unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    return jsonError("unavailable", 503, undefined, { "Cache-Control": "no-store" });
   }
 }
 

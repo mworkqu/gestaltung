@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { jsonError } from "@/lib/http";
 
 import type { Locale } from "@/i18n/routing";
 import { getCcUser } from "@/lib/cad-champions/auth/server";
@@ -66,15 +67,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
   const { attemptId } = await params;
   const lang: Locale = new URL(req.url).searchParams.get("lang") === "ar" ? "ar" : "en";
   const cc = await getCcUser();
-  if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
+  if (!cc) return jsonError("signed_out", 401, undefined, NO_STORE);
 
   const loaded = await loadResultsView(attemptId, lang);
   if (!loaded.ok || (loaded.view.userId !== cc.user.id && !cc.isStaff)) {
-    return Response.json({ error: "not_found" }, { status: 404, headers: NO_STORE });
+    return jsonError("not_found", 404, undefined, NO_STORE);
   }
   const v = loaded.view;
   if ((v.status !== "provisional" && v.status !== "graded") || v.percent == null || !v.band) {
-    return Response.json({ error: "not_ready" }, { status: 409, headers: NO_STORE });
+    return jsonError("not_ready", 409, undefined, NO_STORE);
   }
 
   try {
@@ -139,6 +140,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ attemptI
     });
   } catch (e) {
     console.error("[cc-report] failed:", e instanceof Error ? e.message : "unknown");
-    return Response.json({ error: "error" }, { status: 500, headers: NO_STORE });
+    return jsonError("error", 500, undefined, NO_STORE);
   }
 }

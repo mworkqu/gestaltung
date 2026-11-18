@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { jsonError } from "@/lib/http";
 
 import { getCcUser } from "@/lib/cad-champions/auth/server";
 import { formatDate, formatQAR } from "@/lib/cad-champions/format";
@@ -22,13 +23,13 @@ const KEYS = ["title", "number", "date", "billedTo", "plan", "cohort", "listPric
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const cc = await getCcUser();
-  if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
+  if (!cc) return jsonError("signed_out", 401, undefined, NO_STORE);
   // Payments are admin business: instructors (staff) see only their own receipts.
   const loaded = await loadPayment(cc.user.id, id, cc.isAdmin);
-  if (!loaded.ok) return Response.json({ error: loaded.reason }, { status: 503, headers: NO_STORE });
+  if (!loaded.ok) return jsonError(loaded.reason, 503, undefined, NO_STORE);
   const p = loaded.value;
   if (!p || (p.status !== "paid" && p.status !== "refunded") || !p.receipt_number) {
-    return Response.json({ error: "not_found" }, { status: 404, headers: NO_STORE });
+    return jsonError("not_found", 404, undefined, NO_STORE);
   }
 
   try {
@@ -75,6 +76,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     });
   } catch (e) {
     console.error("[cc-receipt] render failed:", e instanceof Error ? e.message : "unknown");
-    return Response.json({ error: "error" }, { status: 500, headers: NO_STORE });
+    return jsonError("error", 500, undefined, NO_STORE);
   }
 }

@@ -1,4 +1,5 @@
 import { getCcUser } from "@/lib/cad-champions/auth/server";
+import { jsonError } from "@/lib/http";
 import { TEMPLATE_ZIP_NAME, templateEntries } from "@/lib/cad-champions/upload/package-check";
 import { zipStore } from "@/lib/studio/zip";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const cc = await getCcUser();
-  if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  if (!cc) return jsonError("signed_out", 401, undefined, { "Cache-Control": "no-store" });
 
   const zip = zipStore(templateEntries().map((name) => ({ name, data: "" })));
   const body = zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength) as ArrayBuffer;

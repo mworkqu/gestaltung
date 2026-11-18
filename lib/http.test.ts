@@ -28,6 +28,25 @@ describe("response helpers", () => {
     expect(await e.json()).toEqual({ error: "rate_limited", retryAfter: 30 });
   });
 
+  it("jsonError with headers is byte-identical to the Response.json it replaced", async () => {
+    const NO_STORE = { "Cache-Control": "private, no-store, max-age=0" };
+    const old = Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
+    const now = jsonError("signed_out", 401, undefined, NO_STORE);
+    expect(now.status).toBe(old.status);
+    expect(await now.text()).toBe(await old.text());
+    expect([...now.headers.entries()]).toEqual([...old.headers.entries()]);
+
+    const limited = jsonError("rate_limited", 429, undefined, { ...NO_STORE, "Retry-After": "30" });
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("30");
+    expect(limited.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+    expect(limited.headers.get("content-type")).toBe("application/json");
+    expect(await limited.json()).toEqual({ error: "rate_limited" });
+
+    const plain = jsonError("error", 500);
+    expect([...plain.headers.entries()]).toEqual([...Response.json({ error: "error" }, { status: 500 }).headers.entries()]);
+  });
+
   it("emptyStatus has no body", async () => {
     const r = emptyStatus(403);
     expect(r.status).toBe(403);

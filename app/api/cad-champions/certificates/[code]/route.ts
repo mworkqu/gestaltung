@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { jsonError } from "@/lib/http";
 
 import type { Locale } from "@/i18n/routing";
 import { getCcUser } from "@/lib/cad-champions/auth/server";
@@ -22,9 +23,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
   const { code } = await params;
   const lang: Locale = new URL(req.url).searchParams.get("lang") === "ar" ? "ar" : "en";
   const cc = await getCcUser();
-  if (!cc) return Response.json({ error: "signed_out" }, { status: 401, headers: NO_STORE });
+  if (!cc) return jsonError("signed_out", 401, undefined, NO_STORE);
   const cert = await loadOwnCertificate(code, lang);
-  if (!cert) return Response.json({ error: "not_found" }, { status: 404, headers: NO_STORE });
+  if (!cert) return jsonError("not_found", 404, undefined, NO_STORE);
 
   try {
     const t = await getTranslations({ locale: lang, namespace: "CC.training.certificate" });
@@ -53,6 +54,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
     });
   } catch (e) {
     console.error("[cc-cert] render failed:", e instanceof Error ? e.message : "unknown");
-    return Response.json({ error: "error" }, { status: 500, headers: NO_STORE });
+    return jsonError("error", 500, undefined, NO_STORE);
   }
 }
