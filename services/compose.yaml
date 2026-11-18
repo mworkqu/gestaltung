@@ -36,7 +36,10 @@ services:
     environment:
       PORT: "8787"
       HOST: "0.0.0.0"
-      # Part B: how the worker reaches the two CAD services on the private networks.
+      # Part B: how the worker reaches the two CAD services on the private networks
+      # (POST /cad/build and /grader/* are forwarded there; services/worker/src/proxy.ts).
+      # The worker also sends CAD_WORKER_TOKEN and GRADER_SECRET from .env (env_file
+      # above) to those containers, so Vercel only ever needs WORKER_SECRET.
       CAD_WORKER_URL: http://cad-worker:8080
       GRADER_URL: http://grader:8080
     ports:

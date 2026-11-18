@@ -1,6 +1,9 @@
 // The worker's HTTP surface (plain node:http, no framework):
 //   GET  /healthz       200 {ok, version, uptime, jobs}            no secret
 //   POST /jobs/<name>   runs a registered job                       Bearer WORKER_SECRET
+//   POST /cad/build, /grader/grade, /grader/grade-package, /grader/reference
+//                       part B: forwarded to the private CAD containers  Bearer WORKER_SECRET
+//                       (proxy.ts; body cap 1 MiB, the container's answer passed through)
 //   OPTIONS *           CORS preflight (allowed origins only)
 //
 // POST /jobs/<name> answers 200 with an envelope {job, run_id, status, body,
@@ -14,6 +17,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { isAuthorizedCron } from "@/lib/auth/cron";
 
 import type { Logger } from "./log";
+import { PROXY_MAX_BODY_BYTES, proxyRouteFor, type Proxy, type ProxyRoute } from "./proxy";
 import type { JobSource } from "./registry";
 import type { JobRunner } from "./runner";
 
@@ -29,6 +33,9 @@ export type ServerOptions = {
   allowedOrigins?: readonly string[];
   maxBodyBytes?: number;
   now?: () => number;
+  /** Part B: forwards /cad/* and /grader/* to the private containers. Absent = those paths 404. */
+  proxy?: Proxy;
+  proxyMaxBodyBytes?: number;
 };
 
 type JobRequestBody = { force?: boolean; source?: "vercel-cron" | "manual" };
@@ -40,6 +47,10 @@ class BodyError extends Error {
 }
 
 function readBody(req: IncomingMessage, max: number): Promise<string> {
+  return readBodyBytes(req, max).then((b) => b.toString("utf8"));
+}
+
+function readBodyBytes(req: IncomingMessage, max: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const declared = Number(req.headers["content-length"] ?? 0);
     if (declared > max) {
@@ -61,7 +72,7 @@ function readBody(req: IncomingMessage, max: number): Promise<string> {
       chunks.push(c);
     });
     req.on("end", () => {
-      if (!failed) resolve(Buffer.concat(chunks).toString("utf8"));
+      if (!failed) resolve(Buffer.concat(chunks));
     });
     req.on("error", (e) => {
       if (!failed) reject(e);
@@ -108,9 +119,69 @@ export function corsHeaders(origin: string | undefined, allowed: readonly string
   };
 }
 
+type ProxyRequest = {
+  req: IncomingMessage;
+  res: ServerResponse;
+  method: string;
+  path: string;
+  route: ProxyRoute;
+  proxy: Proxy;
+  secret: string;
+  max: number;
+  cors: Record<string, string>;
+  log: Logger;
+};
+
+/** Part B: one forwarded call (auth, body cap, the container's answer or the proxy's error). Returns the status sent. */
+async function handleProxy(p: ProxyRequest): Promise<number> {
+  const { req, res, cors } = p;
+  if (p.method !== "POST") {
+    send(res, 405, { error: "method_not_allowed" }, { ...cors, allow: "POST" });
+    return 405;
+  }
+  if (!isAuthorizedCron(req.headers.authorization, p.secret)) {
+    req.resume();
+    send(res, 401, { error: "unauthorized" }, cors);
+    return 401;
+  }
+  let raw: Buffer;
+  try {
+    raw = await readBodyBytes(req, p.max);
+    JSON.parse(raw.toString("utf8"));
+  } catch (e) {
+    if (e instanceof BodyError) {
+      send(res, 413, { error: "too_large" }, cors);
+      return 413;
+    }
+    if (e instanceof SyntaxError) {
+      send(res, 400, { error: "bad_json" }, cors);
+      return 400;
+    }
+    throw e;
+  }
+  const answer = await p.proxy.forward(p.route, raw);
+  if (answer.kind === "error") {
+    p.log("warn", "proxy failed", { path: p.path, upstream: p.route.target, code: answer.code });
+    send(res, answer.status, { error: answer.code }, { ...cors, "x-worker-proxy-error": answer.code });
+    return answer.status;
+  }
+  // The container's answer, unchanged (never logged: it carries files and grades).
+  res.writeHead(answer.status, {
+    "content-type": answer.contentType,
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    "x-worker-upstream": p.route.target === "cad" ? "cad-worker" : "grader",
+    ...cors,
+  });
+  res.end(answer.body);
+  return answer.status;
+}
+
 export function createWorkerHandler(opts: ServerOptions) {
   const allowed = opts.allowedOrigins ?? ALLOWED_ORIGINS;
   const max = opts.maxBodyBytes ?? MAX_BODY_BYTES;
+  const proxyMax = opts.proxyMaxBodyBytes ?? PROXY_MAX_BODY_BYTES;
+  const upstreams = () => (opts.proxy ? { upstreams: opts.proxy.upstreams() } : {});
   const now = opts.now ?? Date.now;
 
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -136,9 +207,20 @@ export function createWorkerHandler(opts: ServerOptions) {
         return send(
           res,
           200,
-          { ok: true, version: opts.version, uptime: Math.round((now() - opts.startedAt) / 1000), jobs: opts.runner.lastRuns() },
+          {
+            ok: true,
+            version: opts.version,
+            uptime: Math.round((now() - opts.startedAt) / 1000),
+            jobs: opts.runner.lastRuns(),
+            ...upstreams(),
+          },
           cors,
         );
+      }
+      const route = proxyRouteFor(path);
+      if (route && opts.proxy) {
+        status = await handleProxy({ req, res, method, path, route, proxy: opts.proxy, secret: opts.secret, max: proxyMax, cors, log: opts.log });
+        return;
       }
       const m = /^\/jobs\/([^/]+)$/.exec(path);
       if (!m) {

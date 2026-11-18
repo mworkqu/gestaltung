@@ -8,6 +8,8 @@
 //   REVALIDATE_URL                optional, where to send cache purges (default NEXT_PUBLIC_SITE_URL)
 //   WORKER_SCHEDULES              "off" disables the built-in schedules
 //   PORT / HOST                   default 8787 / 0.0.0.0
+//   CAD_WORKER_URL / GRADER_URL   part B upstreams (default http://cad-worker:8080 / http://grader:8080)
+//   CAD_WORKER_TOKEN / GRADER_SECRET  sent to those containers by the worker (Vercel never needs them)
 //   + what the jobs themselves read (RESEND_*, MOUSER_API_KEY, DIGIKEY_*, YOUTUBE / Google, CC_*)
 
 import cron from "node-cron";
@@ -17,6 +19,7 @@ import { readWorkerSettings } from "@/lib/worker/settings";
 
 import { buildJobs, refreshContactPhone } from "./jobs";
 import { createLogger } from "./log";
+import { createProxy, proxyConfigFromEnv } from "./proxy";
 import { defineRegistry } from "./registry";
 import { createRevalidateClient } from "./revalidate";
 import { createJobRunner } from "./runner";
@@ -49,8 +52,12 @@ const registry = defineRegistry(buildJobs());
 const purge = createRevalidateClient({ baseUrl: process.env.REVALIDATE_URL || siteUrl, secret, log });
 const runner = createJobRunner({ registry, log, siteUrl, purge, beforeRun: refreshContactPhone });
 
-const server = createWorkerServer({ secret, runner, log, version, startedAt: Date.now() });
-server.listen(port, host, () => log("info", "worker listening", { port, host, version, jobs: [...registry.keys()] }));
+const proxyConfig = proxyConfigFromEnv();
+const proxy = createProxy({ config: proxyConfig });
+if (!proxyConfig.graderSecret) log("warn", "GRADER_SECRET missing: /grader/* calls will be refused by the grader");
+
+const server = createWorkerServer({ secret, runner, log, version, startedAt: Date.now(), proxy });
+server.listen(port, host, () => log("info", "worker listening", { port, host, version, jobs: [...registry.keys()], upstreams: { cad: proxyConfig.cadUrl, grader: proxyConfig.graderUrl } }));
 
 const stopSchedules =
   process.env.WORKER_SCHEDULES === "off"
