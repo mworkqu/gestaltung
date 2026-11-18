@@ -13,10 +13,21 @@ import { GLOSSARY, type GlossaryId } from "@/lib/cad-champions/glossary";
 import { getHelpCategory } from "@/lib/cad-champions/help/categories";
 import { getHelpArticle, listHelpArticles } from "@/lib/cad-champions/help/search";
 import { ccPageMetadata } from "@/lib/cad-champions/metadata";
-import { ccPath, isCcLocale } from "@/lib/cad-champions/routes";
+import { CC_LOCALES, ccPath, isCcLocale } from "@/lib/cad-champions/routes";
 import { cn } from "@/lib/utils";
 
 type Props = { params: Promise<{ locale: string; slug: string }> };
+
+// Prerendered (ISR): articles live in the database, so the known slugs are
+// listed at build time (public read, never throws) and any new article renders
+// on first visit. Admin edits revalidate the article path (admin/help/actions.ts).
+export const revalidate = 3600;
+
+export async function generateStaticParams() {
+  const list = await listHelpArticles("en");
+  if (!list.ok) return [];
+  return CC_LOCALES.flatMap((locale) => list.data.map((a) => ({ locale, slug: a.slug })));
+}
 
 const ring =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";

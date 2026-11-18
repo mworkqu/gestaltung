@@ -20,9 +20,4 @@ export async function getCcContact(): Promise<CcContact> {
   };
 }
 
-/** wa.me link; returns null when the number has no digits. */
-export function buildWhatsAppUrl(number: string | null | undefined, text: string): string | null {
-  const digits = (number ?? "").replace(/\D/g, "");
-  if (!digits) return null;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-}
+export { buildWhatsAppUrl } from "./whatsapp-url";
