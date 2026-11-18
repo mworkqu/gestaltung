@@ -75,7 +75,10 @@ describe("POST /api/worker-token", () => {
     const v = verifyWorkerToken(j.token, SECRET);
     expect(v.ok && v.claims).toMatchObject({ sub: ME, pid: MY_PROJECT, tier: "maker", adm: false, anon: true });
     expect(v.ok && v.claims.exp - v.claims.iat).toBe(600);
-    expect(JSON.stringify(v.ok && v.claims)).not.toContain("99");
+    // No credit balance in the token (the timestamps may contain "99", so compare values, not text).
+    const claims = (v.ok ? v.claims : {}) as Record<string, unknown>;
+    expect(Object.values(claims)).not.toContain(99);
+    expect(Object.keys(claims).some((k) => /balance|credit/i.test(k))).toBe(false);
   });
 
   it("404 for someone else's project, unless super_admin", async () => {
