@@ -172,13 +172,21 @@ function mockUnderstood(spec: ProductSpec, locale: Locale): ProductSpec {
   if (spec.outputs.includes("pump") && !movers.some((m) => m.kind === "pump")) {
     movers.push({ name: ar ? "مضخة ماء 5 فولت" : "5V water pump", count: 1, kind: "pump" });
   }
+  // The understanding decides the parts (lib/studio/card-parts.ts), so a sensor listed here is
+  // picked. A card with movers and no inputs (the robot arm) has no sensor, as the real model says.
+  const sensors =
+    plant
+      ? [{ name: ar ? "حساس رطوبة التربة" : "Soil moisture sensor", count: 1 }]
+      : spec.inputs.length === 0 && movers.length > 0
+        ? []
+        : [{ name: ar ? "حساس حركة" : "Motion sensor", count: 1 }];
   return {
     ...spec,
     understanding: {
       goal: spec.oneLine || spec.name,
       howItWorks: ar ? "يقرأ الحساس ما حوله، ويقرر المتحكّم، ثم تتحرك القطع." : "The sensor reads its surroundings, the board decides, then the parts act.",
       controller: "Arduino Uno",
-      sensors: [plant ? { name: ar ? "حساس رطوبة التربة" : "Soil moisture sensor", count: 1 } : { name: ar ? "حساس حركة" : "Motion sensor", count: 1 }],
+      sensors,
       actuators: movers,
       // "3 LEDs" said in the chat (kept as a feature by the mock refine) → the lights' count.
       outputs: spec.outputs
