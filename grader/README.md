@@ -15,7 +15,7 @@ Every POST needs the header `X-Grader-Secret: <GRADER_SECRET>`. The compare is c
 - Wrong or missing header: 401.
 - `GRADER_SECRET` not set on the server: every POST gets 503 (fail closed).
 
-`GET /health` (open) returns `{"ok": true, "cadquery": "2.6.1", "service": "cad-grader"}`. `ok` is false when CadQuery is missing.
+`GET /health` (open) returns `{"ok": true, "cadquery": "2.8.0", "service": "cad-grader"}`. `ok` is false when CadQuery is missing.
 
 ### `POST /grade`
 
@@ -283,7 +283,7 @@ If `pip install cadquery` stops working on the slim image (for example, a missin
 FROM mambaorg/micromamba:1.5.10-bookworm-slim AS base
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libxrender1 libxext6 && rm -rf /var/lib/apt/lists/*
-RUN micromamba install -y -n base -c conda-forge python=3.12 cadquery=2.6.1 scipy=1.15.3 numpy=2.2.6 && micromamba clean -a -y
+RUN micromamba install -y -n base -c conda-forge python=3.12 cadquery=2.8.0 scipy=1.15.3 numpy=2.2.6 && micromamba clean -a -y
 ENV PATH=/opt/conda/bin:$PATH
 WORKDIR /srv
 RUN pip install --no-cache-dir fastapi==0.115.12 pydantic==2.11.4 uvicorn==0.34.2 httpx==0.28.1
