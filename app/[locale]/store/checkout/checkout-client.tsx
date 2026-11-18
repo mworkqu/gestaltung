@@ -38,7 +38,7 @@ import {
   type PlaceOrderError,
 } from "@/lib/store/place-order";
 import { checkoutPrefill, NO_PREFILL, type CheckoutPrefill } from "@/lib/store/checkout-prefill";
-import { useClassOrderId } from "@/lib/schools/client";
+import { useClassOrderId } from "@/lib/schools/client/use-class-order";
 import { CustomerFields, FieldLabel, fieldClass, monoClass } from "./customer-fields";
 import { OrderSummary } from "./order-summary";
 

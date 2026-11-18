@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CLASS_ORDER_PARAM, classOrderIdFrom, withClassOrder } from "./client";
+import { CLASS_ORDER_PARAM, classOrderIdFrom, withClassOrder } from "./use-class-order";
 
 const ID = "3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 

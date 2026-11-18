@@ -19,7 +19,7 @@ import { activeFreeShipping, freeDeliveryGap, minDeliveryFrom, qarAmount } from 
 import { kitDiscountQar as kitDiscountOf } from "@/lib/prototyping/kit-money";
 import { arabicCountForm } from "@/lib/text/count";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useClassOrderId, withClassOrder } from "@/lib/schools/client";
+import { useClassOrderId, withClassOrder } from "@/lib/schools/client/use-class-order";
 
 /** Cart thumbnails loaded eagerly (the rows visible without scrolling). */
 const EAGER_THUMBS = 3;

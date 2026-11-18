@@ -8,22 +8,11 @@ import { Link } from "@/i18n/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useCart } from "@/components/parts/cart-provider";
 import { Skeleton } from "@/components/ui/skeleton";
-import { loadSupabase } from "@/lib/supabase/lazy";
-import { PROJECT_HREF_COLUMNS, projectHref } from "@/lib/projects/href";
+import { projectHref } from "@/lib/projects/href";
 import { normaliseOrderStatus, orderShort, type OrderStatus } from "@/lib/orders/status";
 import { arabicCountForm } from "@/lib/text/count";
-import {
-  YOUR_WORK_PROJECTS,
-  buildReorderPlan,
-  partsToBuy,
-  pickActiveProjects,
-  pickLastDelivered,
-  REORDER_PART_COLUMNS,
-  type PartsToBuy,
-  type ReorderPart,
-  type WorkOrderRow,
-  type WorkProjectRow,
-} from "@/lib/home/your-work";
+import { buildReorderPlan } from "@/lib/home/your-work";
+import { loadReorderInputs, loadYourWork, type YourWorkData } from "@/lib/home/your-work-data";
 import { cn } from "@/lib/utils";
 import { intlTag, asLocale } from "@/lib/locale";
 
@@ -47,73 +36,13 @@ const TONE: Record<OrderStatus, string> = {
   cancelled: "bg-slate-200 text-slate-700",
 };
 
-type Data = {
-  projects: WorkProjectRow[];
-  toBuy: PartsToBuy;
-  lastOrder: WorkOrderRow | null;
-  lastDelivered: WorkOrderRow | null;
-};
-
-type View = { phase: "none" } | { phase: "loading" } | { phase: "ready"; data: Data };
+type View = { phase: "none" } | { phase: "loading" } | { phase: "ready"; data: YourWorkData };
 
 type ReorderState =
   | { phase: "idle" }
   | { phase: "busy" }
   | { phase: "done"; added: number; unavailable: string[] }
   | { phase: "error" };
-
-async function loadYourWork(userId: string): Promise<Data | null> {
-  const supabase = await loadSupabase();
-
-  const listProjects = async (): Promise<WorkProjectRow[]> => {
-    // `status` arrives with migration 0042; before it every project is active.
-    const base = () =>
-      supabase.from("projects").select("id, name, updated_at").eq("user_id", userId).order("updated_at", { ascending: false });
-    const withStatus = await supabase
-      .from("projects")
-      .select(`id, name, status, updated_at, ${PROJECT_HREF_COLUMNS}`)
-      .eq("user_id", userId)
-      .or("status.is.null,status.neq.archived")
-      .order("updated_at", { ascending: false })
-      .limit(YOUR_WORK_PROJECTS);
-    const res = withStatus.error ? await base().limit(YOUR_WORK_PROJECTS) : withStatus;
-    if (res.error) return [];
-    return pickActiveProjects(res.data ?? []);
-  };
-
-  const readOrders = async (delivered: boolean): Promise<WorkOrderRow | null> => {
-    let q = supabase.from("part_orders").select("id, status, created_at").eq("profile_id", userId);
-    if (delivered) q = q.eq("status", "delivered");
-    const res = await q.order("created_at", { ascending: false }).limit(1);
-    if (res.error) return null;
-    return (res.data ?? [])[0] ?? null;
-  };
-
-  const [projects, lastOrder, delivered] = await Promise.all([listProjects(), readOrders(false), readOrders(true)]);
-  if (projects.length === 0 && !lastOrder) return null;
-
-  // The bill of materials of the three projects shown, in one read. The count is
-  // taken from the stored lines only (no store matching, no AI), so a failed
-  // read simply means "unknown".
-  let toBuy: PartsToBuy = { kind: "unknown" };
-  if (projects.length > 0) {
-    const res = await supabase
-      .from("projects")
-      .select("id, bom")
-      .in(
-        "id",
-        projects.map((p) => p.id)
-      );
-    if (!res.error) toBuy = partsToBuy((res.data ?? []) as Pick<WorkProjectRow, "bom">[]);
-  }
-
-  return {
-    projects,
-    toBuy,
-    lastOrder,
-    lastDelivered: pickLastDelivered([delivered, lastOrder].filter((o): o is WorkOrderRow => o !== null)),
-  };
-}
 
 function YourWorkStrip() {
   const { ready, user } = useAuth();
@@ -159,7 +88,7 @@ function StripSkeleton() {
   );
 }
 
-function Strip({ data }: { data: Data }) {
+function Strip({ data }: { data: YourWorkData }) {
   const t = useTranslations("YourWork");
   const to = useTranslations("Orders");
   const locale = useLocale();
@@ -185,22 +114,9 @@ function Strip({ data }: { data: Data }) {
     if (!lastDelivered || reorder.phase === "busy") return;
     setReorder({ phase: "busy" });
     try {
-      const supabase = await loadSupabase();
-      const items = await supabase.from("part_order_items").select("part_sku, part_name, quantity").eq("order_id", lastDelivered.id);
-      if (items.error) throw items.error;
-      const lines = (items.data ?? []);
-      if (lines.length === 0) throw new Error("empty order");
+      const { lines, parts } = await loadReorderInputs(lastDelivered.id);
 
-      const skus = [...new Set(lines.map((l) => l.part_sku))];
-      // Only public columns, only published products (cost and margin are never read).
-      let res: { data: unknown; error: unknown } = await supabase.from("parts").select(REORDER_PART_COLUMNS).in("sku", skus).eq("is_published", true);
-      if (res.error) {
-        // merged_into arrives with migration 0030.
-        res = await supabase.from("parts").select("id, sku, name, name_ar, min_order_qty, is_published").in("sku", skus).eq("is_published", true);
-      }
-      if (res.error) throw res.error;
-
-      const plan = buildReorderPlan(lines, (res.data ?? []) as ReorderPart[]);
+      const plan = buildReorderPlan(lines, parts);
       // One at a time: every add re-reads the cart. Plain lines, no kit, no project.
       let added = 0;
       let failed = false;
