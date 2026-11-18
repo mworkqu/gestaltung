@@ -165,7 +165,7 @@ Everything else is listed with a suggested fix and a risk rating.
 
 ### R11: hooks out of `lib/`, no inline Supabase queries in components
 
-**Update (maintenance pass, branch `maint-r11r12`):** the Low/Medium rows below marked FIXED are done (moves only, same queries). Still open: the High rows (cart provider, prototyping/studio), `components/projects/**`, `cad-card.tsx` and `quote-request.tsx` (storage uploads + credit spend; not mechanical). `.from(` calls under `components/`: 163 before, 140 after.
+**Update (maintenance pass, branch `maint-r11r12`):** the Low/Medium rows below marked FIXED are done (moves only, same queries). Still open: the High rows (cart provider, prototyping/studio), `components/projects/**`, `cad-card.tsx` and `quote-request.tsx` (storage uploads + credit spend; not mechanical). `.from(` calls under `components/`: 163 before, 118 after (raw grep count, includes storage.from).
 
 Fixed (mechanical: file moves + import paths, `tsc`, vitest, build as proof, 16 files touched):
 
