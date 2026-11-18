@@ -1,3 +1,5 @@
+import "server-only";
+
 // Server read of the contact number (store_settings.contact_phone, anon
 // readable). Cached like the shipping settings: React cache() within a render,
 // unstable_cache across renders under the "store-settings" tag (so a broad

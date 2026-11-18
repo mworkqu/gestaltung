@@ -1,3 +1,5 @@
+import "server-only";
+
 // Which social sign-in buttons to show (server side, cached).
 //
 // GET {NEXT_PUBLIC_SUPABASE_URL}/auth/v1/settings with the public anon key,

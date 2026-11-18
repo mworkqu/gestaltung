@@ -5,6 +5,7 @@ import { HelpTip } from "@/components/cad-champions/ui";
 import type { Locale } from "@/i18n/routing";
 import { formatNumber } from "@/lib/cad-champions/format";
 import { displayStreak } from "@/lib/cad-champions/training/gamification";
+import { loadTrainingStats } from "@/lib/cad-champions/training/stats-data";
 import { createClient } from "@/lib/supabase/server";
 
 import { LevelBadge } from "./visuals";
@@ -70,10 +71,7 @@ export async function StatsPanel({ locale, xp, streak, badges }: { locale: Local
 export async function DashboardTrainingStats({ userId, locale }: { userId: string; locale: Locale }) {
   try {
     const db = await createClient();
-    const [{ data: xp, error }, { count }] = await Promise.all([
-      db.from("cc_student_xp").select("xp,streak_weeks,last_active_week").eq("user_id", userId).maybeSingle<{ xp: number; streak_weeks: number; last_active_week: string | null }>(),
-      db.from("cc_badges").select("level_id", { count: "exact", head: true }).eq("user_id", userId),
-    ]);
+    const { xp, error, badgeCount: count } = await loadTrainingStats(db, userId);
     if (error || (!xp && !count)) return null;
     const t = await getTranslations({ locale, namespace: "CC.training.stats" });
     const streak = displayStreak(xp ? { streakWeeks: xp.streak_weeks, lastActiveWeek: xp.last_active_week } : null);

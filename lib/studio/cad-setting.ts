@@ -1,3 +1,5 @@
+import "server-only";
+
 // Server-side read of store_settings.studio_cad (which CAD backend builds Studio
 // models). Same cookie-free anon client + unstable_cache + "store-settings" tag
 // as lib/cad/engine-server.ts. No row, a bad value or any error = "browser".

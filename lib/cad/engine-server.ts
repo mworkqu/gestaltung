@@ -1,3 +1,5 @@
+import "server-only";
+
 // Server-side reads for the CAD engine switch and the board the model must
 // hold. store_settings.cad_engine goes through the same cookie-free anon
 // client + unstable_cache + "store-settings" tag as the other settings reads

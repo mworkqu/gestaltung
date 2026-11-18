@@ -4,12 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Loader2, Plus, Search } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/client";
 import { formatPrice, partName } from "@/lib/parts/format";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/lib/utils";
 import type { ClientInventoryItem, Part } from "@/lib/supabase/types";
-import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
+import { loadOwnedInventory, searchStoreParts } from "@/lib/inventory/client/search-data";
 
 // ── One search box, inventory first ─────────────────────────────────────────
 //
@@ -63,16 +62,7 @@ export function UnifiedSearch({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      // Returns nothing for a guest — no session, no rows, no error.
-      const { data: invRows } = await supabase.from("client_inventory_items").select("*");
-      const inv = (invRows ?? []) as ClientInventoryItem[];
-      const ids = [...new Set(inv.map((r) => r.product_id).filter((x): x is string => !!x))];
-      const owned: Part[] = [];
-      for (let i = 0; i < ids.length; i += 200) {
-        const { data } = await supabase.from("parts").select(PART_PUBLIC_COLUMNS).in("id", ids.slice(i, i + 200));
-        owned.push(...((data ?? []) as Part[]));
-      }
+      const { inventory: inv, ownedParts: owned } = await loadOwnedInventory();
       if (cancelled) return;
       setInventory(inv);
       setOwnedParts(owned);
@@ -91,17 +81,8 @@ export function UnifiedSearch({
       return;
     }
     (async () => {
-      const like = `%${q}%`;
-      const { data } = await createClient()
-        .from("parts")
-        .select(PART_PUBLIC_COLUMNS)
-        .eq("is_published", true)
-        .is("merged_into", null)
-        .not("lead_time_class", "is", null)
-        .or(["name", "name_ar", "sku", "material"].map((c) => `${c}.ilike.${like}`).join(","))
-        .order("name")
-        .limit(24);
-      if (!cancelled) setStoreMatches((data ?? []) as Part[]);
+      const data = await searchStoreParts(q);
+      if (!cancelled) setStoreMatches(data);
     })();
     return () => {
       cancelled = true;

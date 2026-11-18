@@ -1,3 +1,5 @@
+import "server-only";
+
 // Reads store_settings.shipping + holidays (anon client; both are public) so every
 // product card on a page can compute its "Arrives by" date without a database
 // call of its own. React's cache() dedupes the read within a render;

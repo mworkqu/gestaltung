@@ -1,3 +1,5 @@
+import "server-only";
+
 // Cached, cookie-free catalogue reads for the public storefront (Phase G).
 //
 // Every function here uses the anon client (lib/supabase/public.ts: no

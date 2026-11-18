@@ -5,21 +5,23 @@ import { useLocale, useTranslations } from "next-intl";
 import { ImagePlus, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { getCurrentUser, isGuest } from "@/lib/supabase/guest";
 import { formatPrice, partName } from "@/lib/parts/format";
+import { MAX_PROJECT_IMAGE_BYTES, PROJECT_IMAGE_ACCEPT } from "@/lib/projects/constants";
 import {
-  MAX_PROJECT_IMAGE_BYTES,
-  PROJECT_IMAGE_ACCEPT,
-  PROJECT_IMAGE_BUCKET,
-} from "@/lib/projects/constants";
+  addStoreProduct,
+  deleteInventoryRow,
+  insertCustomItem,
+  loadInventoryRows,
+  saveInventoryRow,
+  uploadInventoryImage,
+  type InventoryRow,
+} from "@/lib/inventory/client/inventory-db";
 import { inventoryEdit } from "@/lib/inventory/edit";
 import { UnifiedSearch, type SearchHit } from "@/components/search/unified-search";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ClientInventoryItem, Part } from "@/lib/supabase/types";
-import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 
 // ── The client's own inventory ──────────────────────────────────────────────
 //
@@ -33,7 +35,7 @@ import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 // because signing up keeps the same auth.uid(), whatever they were doing
 // survives the trip.
 
-type Row = ClientInventoryItem & { part: Part | null };
+type Row = InventoryRow;
 
 export function MyInventory() {
   const t = useTranslations("MyInventory");
@@ -57,11 +59,7 @@ export function MyInventory() {
       return;
     }
 
-    const { data } = await createClient()
-      .from("client_inventory_items")
-      .select(`*, part:parts(${PART_PUBLIC_COLUMNS})`)
-      .order("created_at", { ascending: false });
-    setRows((data ?? []) as Row[]);
+    setRows(await loadInventoryRows());
   }, []);
 
   useEffect(() => {
@@ -74,27 +72,7 @@ export function MyInventory() {
     try {
       const user = await getCurrentUser();
       if (!user || isGuest(user)) return;
-      const supabase = createClient();
-
-      const { data: existing } = await supabase
-        .from("client_inventory_items")
-        .select("id, quantity")
-        .eq("user_id", user.id)
-        .eq("product_id", hit.part.id)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from("client_inventory_items")
-          .update({ quantity: existing.quantity + 1 })
-          .eq("id", existing.id);
-      } else {
-        await supabase.from("client_inventory_items").insert({
-          user_id: user.id,
-          product_id: hit.part.id,
-          quantity: 1,
-        });
-      }
+      await addStoreProduct(user.id, hit.part.id);
       await load();
       setAddedKey(hit.key);
       setTimeout(() => setAddedKey(null), 1200);
@@ -105,23 +83,14 @@ export function MyInventory() {
 
   /** Save an edited row (quantity, and the name of a custom item). True when saved. */
   async function saveRow(row: Row, quantity: number, name: string | null): Promise<boolean> {
-    const { error } = await createClient()
-      .from("client_inventory_items")
-      .update(name === null ? { quantity } : { quantity, custom_name: name })
-      .eq("id", row.id);
-    if (error) return false;
+    if (!(await saveInventoryRow(row.id, quantity, name))) return false;
     await load();
     return true;
   }
 
   /** Delete a row and its photo. True when deleted. */
   async function removeRow(row: Row): Promise<boolean> {
-    const supabase = createClient();
-    const { error } = await supabase.from("client_inventory_items").delete().eq("id", row.id);
-    if (error) return false;
-    if (row.image_path) {
-      await supabase.storage.from(PROJECT_IMAGE_BUCKET).remove([row.image_path]);
-    }
+    if (!(await deleteInventoryRow(row.id, row.image_path))) return false;
     await load();
     return true;
   }
@@ -383,8 +352,6 @@ function AddCustomItem({ onAdded }: { onAdded: () => Promise<void> }) {
     try {
       const user = await getCurrentUser();
       if (!user) return;
-      const supabase = createClient();
-
       let imagePath: string | null = null;
       if (file) {
         if (file.size > MAX_PROJECT_IMAGE_BYTES) {
@@ -392,12 +359,8 @@ function AddCustomItem({ onAdded }: { onAdded: () => Promise<void> }) {
           setBusy(false);
           return;
         }
-        const ext = file.name.split(".").pop() ?? "png";
-        const path = `${user.id}/inventory/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from(PROJECT_IMAGE_BUCKET)
-          .upload(path, file);
-        if (upErr) {
+        const path = await uploadInventoryImage(user.id, file);
+        if (!path) {
           setError(t("uploadFailed"));
           setBusy(false);
           return;
@@ -405,12 +368,7 @@ function AddCustomItem({ onAdded }: { onAdded: () => Promise<void> }) {
         imagePath = path;
       }
 
-      await supabase.from("client_inventory_items").insert({
-        user_id: user.id,
-        custom_name: trimmed,
-        quantity: Math.max(1, qty),
-        image_path: imagePath,
-      });
+      await insertCustomItem(user.id, trimmed, Math.max(1, qty), imagePath);
 
       setName("");
       setQty(1);

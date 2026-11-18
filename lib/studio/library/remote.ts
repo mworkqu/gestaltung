@@ -1,3 +1,5 @@
+import "server-only";
+
 // Server-side Studio library: code parts + the owner's studio_parts rows
 // (migration 0070). Cookie-free anon client + unstable_cache (tag
 // "studio-library", 5 min) so every request reuses one read; the admin save

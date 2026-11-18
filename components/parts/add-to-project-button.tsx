@@ -10,11 +10,11 @@ import { useTranslations } from "next-intl";
 import { Check, FolderPlus, Loader2 } from "lucide-react";
 
 import { Link } from "@/i18n/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { addProductToProject, createProjectNamed, listRecentProjects, type ProjectChoice } from "@/lib/projects/client/add-to-project";
 import { ensureSession, getCurrentUser } from "@/lib/supabase/guest";
 import { Button } from "@/components/ui/button";
 
-type Project = { id: string; name: string };
+type Project = ProjectChoice;
 
 export function AddToProjectButton({ partId, partName }: { partId: string; partName: string }) {
   const t = useTranslations("Parts");
@@ -30,16 +30,9 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
 
   useEffect(() => {
     if (!open || projects) return;
-    const supabase = createClient();
     getCurrentUser().then(async (user) => {
       if (!user) return setProjects([]);
-      const { data: rows } = await supabase
-        .from("projects")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(20);
-      setProjects((rows ?? []) as Project[]);
+      setProjects(await listRecentProjects(user.id));
     });
   }, [open, projects]);
 
@@ -54,16 +47,7 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
   async function addTo(project: Project) {
     setBusy(true);
     setError(false);
-    const supabase = createClient();
-    const { data: existing } = await supabase
-      .from("project_items")
-      .select("id, quantity")
-      .eq("project_id", project.id)
-      .eq("product_id", partId)
-      .maybeSingle();
-    const { error: err } = existing
-      ? await supabase.from("project_items").update({ quantity: (existing.quantity as number) + 1 }).eq("id", existing.id)
-      : await supabase.from("project_items").insert({ project_id: project.id, product_id: partId, quantity: 1 });
+    const err = await addProductToProject(project.id, partId);
     setBusy(false);
     if (err) return setError(true);
     setAdded(project);
@@ -78,14 +62,9 @@ export function AddToProjectButton({ partId, partName }: { partId: string; partN
       // P2-08: a visitor without a session gets the page's Turnstile dialog
       // (store/[sku] page) when the switch is on; off = as before.
       const user = await ensureSession();
-      const { data, error: err } = await createClient()
-        .from("projects")
-        .insert({ user_id: user.id, name: name.slice(0, 120) })
-        .select("id, name")
-        .single();
-      if (err) throw err;
+      const data = await createProjectNamed(user.id, name);
       setBusy(false);
-      await addTo(data as Project);
+      await addTo(data);
     } catch (e) {
       setBusy(false);
       setError(true);

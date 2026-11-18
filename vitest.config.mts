@@ -5,7 +5,12 @@ import { defineConfig } from "vitest/config";
 // "@/…" path alias from tsconfig.json.
 export default defineConfig({
   resolve: {
-    alias: [{ find: /^@\//, replacement: fileURLToPath(new URL("./", import.meta.url)) }],
+    alias: [
+      { find: /^@\//,replacement: fileURLToPath(new URL("./", import.meta.url)) },
+      // The real package throws outside a Next server build; tests may import
+      // modules that carry the marker.
+      { find: /^server-only$/, replacement: fileURLToPath(new URL("./vitest.server-only.ts", import.meta.url)) },
+    ],
   },
   // tsconfig keeps "jsx": "preserve" for Next; tests that import a page
   // (lib/auth/guards.test.ts) need the JSX compiled.

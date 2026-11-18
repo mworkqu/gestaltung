@@ -1,3 +1,5 @@
+import "server-only";
+
 // Storefront caching model (Phase G).
 //
 // Public pages (home, /store, product pages, marketing + legal pages) are

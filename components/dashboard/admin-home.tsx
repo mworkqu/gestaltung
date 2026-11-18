@@ -6,7 +6,8 @@ import { ContinueCard, ContinueCardSkeleton } from "@/components/dashboard/conti
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@/i18n/navigation";
 import { loadFixParts } from "@/lib/admin/fix-data";
-import { buildTiles, countConfirm, countReply, ORDER_STATUSES_TO_HANDLE, type TileKey } from "@/lib/admin/home-tiles";
+import { loadConfirmCount, loadReplyCount } from "@/lib/admin/home-counts";
+import { buildTiles, type TileKey } from "@/lib/admin/home-tiles";
 import { NUMBERS_ANCHOR } from "@/lib/admin/nav";
 import { loadStockData } from "@/lib/admin/stock-data";
 import { arabicCountForm } from "@/lib/text/count";
@@ -22,23 +23,8 @@ import { cn } from "@/lib/utils";
 export async function AdminHome({ locale }: { locale: string }) {
   const db = await createClient();
 
-  const reply = Promise.resolve(
-    db.from("inquiries").select("id, name, message, status, is_test").eq("status", "new").limit(1000)
-  ).then(
-    (r) => (r.error ? null : countReply(r.data ?? [])),
-    () => null
-  );
-  const confirm = Promise.resolve(
-    db
-      .from("part_orders")
-      .select("id, status, customer_name, is_test")
-      .in("status", [...ORDER_STATUSES_TO_HANDLE])
-      .not("is_test", "is", true) // orders marked as test (D3) never count; countConfirm also drops TEST-looking rows
-      .limit(1000)
-  ).then(
-    (r) => (r.error ? null : countConfirm(r.data ?? [])),
-    () => null
-  );
+  const reply = loadReplyCount(db);
+  const confirm = loadConfirmCount(db);
   const buy = loadStockData(db, { buyOnly: true }).then(
     (d) => (d ? d.lists.buy.length : null),
     () => null

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { unstable_cache } from "next/cache";
 
 import { SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
