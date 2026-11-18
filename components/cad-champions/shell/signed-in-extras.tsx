@@ -1,13 +1,13 @@
-import { NeedHelpButton } from "@/components/cad-champions/ui";
-import { getCcUser } from "@/lib/cad-champions/auth/server";
 import { getCcContact } from "@/lib/cad-champions/site-contact";
 
-// Extras shown only on SIGNED-IN CC pages (dashboard, get ready, test, results,
-// training, help, admin): the floating "Need help?" button. Renders nothing
-// without a CC session (getCcUser is memoised per request, so this is free
-// next to the page's own requireCcUser call).
+import { CcSessionNeedHelp } from "./session-need-help";
+
+// Extras shown only to SIGNED-IN visitors (dashboard, get ready, test, results,
+// training, help, policies, admin): the floating "Need help?" button. The
+// session is checked in the browser (session-context.tsx), not here, so a page
+// that only uses this stays prerenderable. Pages that need auth call
+// requireCcUser themselves.
 export async function SignedInExtras({ pageName }: { pageName: string }) {
-  if (!(await getCcUser())) return null;
   const { whatsappNumber, supportEmail } = await getCcContact();
-  return <NeedHelpButton pageName={pageName} whatsappNumber={whatsappNumber} supportEmail={supportEmail} />;
+  return <CcSessionNeedHelp pageName={pageName} whatsappNumber={whatsappNumber} supportEmail={supportEmail} />;
 }
