@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { ArrowLeft, Mail, MessageCircle } from "lucide-react";
 
+import { PluginHandoffPanel } from "@/components/admin/plugin-handoff-panel";
 import { QuoteCalcCard } from "@/components/admin/quote-calc-card";
 import { QuoteForm } from "@/components/admin/quote-form";
 import { ProductPicture } from "@/components/projects/product-picture";
@@ -9,6 +10,7 @@ import { Link } from "@/i18n/navigation";
 import { leadKind, leadProjectId } from "@/lib/admin/lead-kind";
 import { REWARDS_DEFAULT } from "@/lib/credits/cad-cost";
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
+import { loadLeadHandoff } from "@/lib/admin/plugin-handoff-server";
 import { formatPhoneDisplay, toWhatsAppDigits } from "@/lib/phone";
 import { parseQuoteCalc } from "@/lib/studio/request-summary";
 import { projectPreviewUrl } from "@/lib/studio/server/preview-url";
@@ -62,6 +64,8 @@ export default async function LeadDetailPage({
   const rewardProject = lead.project_id ?? leadProjectId(lead.message);
   const tr = await getTranslations("PrintReward");
   const dateFmt = new Intl.DateTimeFormat(intlTag(asLocale(locale)), { dateStyle: "medium", timeStyle: "short" });
+  const isPlugin = leadKind(lead.message) === "plugin";
+  const handoff = isPlugin ? await loadLeadHandoff(supabase, lead.id) : null;
 
   return (
     <div className="space-y-6" data-testid="lead-detail">
@@ -112,6 +116,8 @@ export default async function LeadDetailPage({
           </p>
         )}
       </section>
+
+      {handoff && <PluginHandoffPanel locale={locale} info={handoff.info} migrationMissing={handoff.migrationMissing} />}
 
       {isPrint && rewardProject && (
         <section className="neu space-y-3 p-5 sm:p-6" data-testid="lead-print-reward">

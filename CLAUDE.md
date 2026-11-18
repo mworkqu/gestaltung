@@ -130,9 +130,18 @@ Full list, run order and rollback notes: `docs/MIGRATIONS.md` ("Pending — cons
 - **0108** (drops `inventory_items` and `job_bom`): NOT RUN. Run it after the deploy, after 0107. Export the table first if it holds anything.
 - **0111** (worker switch row, default off): NOT RUN. Needed only before the worker is switched on.
 - 0076 and 0087: the owner says they are run (no probe).
-- Next free number: 0112. New migrations are idempotent, have a rollback note in the header and a PGlite test.
+- **0112** (`plugin_handoffs` + `claim_plugin_handoff` / `plugin_handoff_set_phone` / `plugin_rate_hit`): NOT RUN. Chat plugin Phase 1. Until it runs, MCP `send_project` answers "being set up", the hand-off page shows "being set up", and rate limits fall back to per-instance memory.
+- Next free number: 0113. New migrations are idempotent, have a rollback note in the header and a PGlite test.
 - The old per-file descriptions that used to be listed here are in `docs/history/CLAUDE-2026-10-pending-migrations-block.md`.
 
+
+## CHAT PLUGIN (Claude first, then ChatGPT)
+- Clients design in their own Claude with our MCP server; their AI does the thinking, we pay no AI tokens. Concept (owner-approved): https://claude.ai/artifact/MWu1McVo4V5w4za41j95ST. One phase at a time; Phase 2 (paid meetings), 3 (plugin package + in-chat look) and 4 (OAuth, cart, ChatGPT) wait for the owner's go.
+- Phase 1 (2026-11-18): `app/api/mcp/route.ts` = `https://gestaltung360.com/api/mcp` (mcp-handler 2.3.1 + @modelcontextprotocol/server 2.4.0; stateless, CORS open, reads/sets no cookies). Tools in `lib/plugin/server/register.ts`: `get_design_rules`, `search_parts`, `check_project` (read-only, no AI, no writes), `send_project` (writes; only after the user agrees). Resource `gestaltung://design-rules`, prompt `design_a_product`. Never add `@modelcontextprotocol/sdk` (different McpServer class).
+- Build file contract: `lib/plugin/build-file.ts` (zod, hard caps, unknown keys stripped; up to 10 quotes of 140 chars; no transcript field ever). `lib/plugin/to-studio.ts` maps it with the website's own rules (enforcePick, buildWiring, our pin block via syncPinBlock, clampEnclosure); `lib/plugin/check-project.ts` prices with studioKitPlan; `lib/plugin/design-rules.ts`. The CAD prompt / OpenSCAD never go into the client's doc: only `plugin_handoffs.build` (admin) and the owner email.
+- send_project stores `plugin_handoffs` (sha256 of a 32-byte token only), creates an `inquiries` lead with the service client (message starts `Plugin project: ` = lead kind `plugin`, tag "From Claude"), emails the owner, returns `/{locale}/handoff/<token>` (30 days). Hand-off page `app/[locale]/handoff/[token]` (noindex, scope `handoff`): ensureSession → `claim_plugin_handoff` → optional WhatsApp card → `/projects/<id>/studio?step=enclosure`.
+- Rate limits per hashed IP (AI_RATE_SALT): read 120/h, check 30/h, send 10/day (`plugin_rate_hit` on `ai_rate_limits`). Admin: lead detail "Project from chat" panel (quotes, CAD prompt, copy / download .scad, open project), Funnel rows sent / claimed / ordered.
+- Never: a tool parameter about the chat/conversation/transcript, a CAD program name in client copy, "free" in CTAs, a reprint promise.
 
 ## PERMANENT NOTES
 - STOREFRONT CACHE EXPIRY = 24 h since 2026-10-16 (was 5 min; it blew the Hobby ISR-write allowance). Wherever older notes say "or wait 5 min", read "or wait for the daily 06:00 Qatar purge": any Dashboard → Store save or cron sync still purges at once. Store listings WITH a search query are not cached at all (lib/store/public-catalog.ts getStoreListing).

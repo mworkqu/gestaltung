@@ -45,7 +45,29 @@ export const SOURCES: Record<string, LeadSourceDef> = {
     subject: (n, { count }) => `Print request — ${n} · ${count} part${count === 1 ? "" : "s"}`,
     fallbackMessage: "Design Studio — print request.",
   },
+  // A project sent from the client's own AI chat through the MCP server
+  // (lib/plugin/server). The server writes this lead itself; the subject names
+  // the chat app, see pluginProjectSubject.
+  plugin_project: {
+    label: "Chat plugin project",
+    subject: (n) => pluginProjectSubject(n, "claude"),
+    fallbackMessage: "Plugin project.",
+  },
 };
+
+/** Which AI chat sent a plugin project (plugin_handoffs.source). */
+export type PluginChatSource = "claude" | "chatgpt" | "other";
+
+const PLUGIN_CHAT_NAME: Record<PluginChatSource, string> = {
+  claude: "Claude",
+  chatgpt: "ChatGPT",
+  other: "an AI chat",
+};
+
+/** "New project from Claude — <name>" / "from ChatGPT" / "from an AI chat". */
+export function pluginProjectSubject(name: string, source: PluginChatSource): string {
+  return `New project from ${PLUGIN_CHAT_NAME[source] ?? PLUGIN_CHAT_NAME.other} — ${name}`;
+}
 
 /** The source a body names; an unknown or missing one is treated as the homepage callback. */
 export function sourceFor(key: unknown): LeadSourceDef {

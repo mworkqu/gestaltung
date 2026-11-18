@@ -2,11 +2,13 @@
 // writes (/api/store-lead sources, /api/design-quote). Used to filter the
 // Leads page and to label each card (audit Phase 6).
 
-export const LEAD_KINDS = ["quote", "drawing", "bom", "callback", "contact"] as const;
+export const LEAD_KINDS = ["plugin", "quote", "drawing", "bom", "callback", "contact"] as const;
 export type LeadKind = (typeof LEAD_KINDS)[number];
 
 export function leadKind(message: string | null | undefined): LeadKind {
   const m = (message ?? "").toLowerCase();
+  // A project sent from the client's own AI chat (lib/plugin): first line "Plugin project: <name>". Checked first.
+  if (m.startsWith("plugin project:")) return "plugin";
   if (m.startsWith("custom manufacturing quote request") || m.startsWith("cad file attached") || m.startsWith("design studio:") || m.startsWith("print request:"))
     return "quote";
   if (m.startsWith("drawing request") || m.startsWith("help me draw it")) return "drawing";

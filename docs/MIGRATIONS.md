@@ -2,7 +2,7 @@
 
 Run log, rules for new migrations, and the next free number. Files are in `supabase/migrations/` (92 files in this worktree). Run status is copied from the pre-audit `CLAUDE.md` (`docs/history/CLAUDE-2026-10-full.md`, "Pending migrations" and the stage log) and from the SQL file headers; nothing here was checked against the live database.
 
-**Next free number: 0111.**
+**Next free number: 0113.**
 
 ## Rules for a new migration
 
@@ -38,6 +38,7 @@ Written on branch `consolidation-2026-11` (Phase 1, "delete what is dead"). None
 | 3 | 0109_drop_jobs_remnants.sql | NOT RUN. Drops whatever is left of the jobs pipeline (O4): `jobs`, `job_files`, `job_events`, `job_bom`, `job_variations` and their helper functions incl. `can_access_job`, `can_read_cad_object` and `current_user_role()`, each only when nothing refers to it. A no-op where 0013 already ran (its run status is unrecorded). Stops without changing anything if an old 0006 cad-files policy still calls a jobs helper. The live `cad-files` policies (0018 / 0045) are untouched. **Production row counts were not checked: if a jobs table still exists, export it first.** Test: `lib/db-test/consolidation-legacy-drops.test.ts`. |
 | 4 | 0110_drop_project_claims.sql | NOT RUN. Drops `project_claims` (O5; retired by 0022, no reader in code or in any function). `owns_project()` and `project_parts` / `project_schematics` are untouched. **Production row counts were not checked: export `project_claims` first if its old claim rows matter.** Test: `lib/db-test/consolidation-project-claims.test.ts`. |
 | 5 | 0111_worker_switch.sql | NOT RUN (Phase 3A, Mac Mini worker). Inserts `store_settings.worker = {"enabled": false}` only when the row is missing; never overwrites it. A missing row already means "disabled", so the app behaves the same before and after; order relative to 0107/0108 does not matter. Switching on is a separate, later step (docs/WORKER.md). Test: `lib/db-test/consolidation-worker-switch.test.ts`. |
+| 6 | 0112_plugin_handoffs.sql | NOT RUN (chat plugin). Creates `plugin_handoffs` (service_role writes, super_admin reads; only the sha256 of the token is stored), `claim_plugin_handoff(token)` (a signed-in caller gets one project from the hand-off, idempotent, links the inquiry, answers `project_limit` at the 3-project cap), `plugin_handoff_set_phone(token, phone)` and the service-only `plugin_rate_hit(key, limit)` counter on `ai_rate_limits`. Run after 0111. Until it runs the code degrades: the MCP `send_project` tool answers "not set up yet" and the hand-off page shows a not-ready error. Test: `lib/db-test/plugin-handoffs-migration.test.ts`. |
 
 ## Was pending — all run as of 2026-10-26
 

@@ -39,6 +39,11 @@ export type AnalyticsEvents = {
   team_joined: Record<string, never>;
   class_parts_ordered: { teams: number; lines: number; total_qar: number };
   school_invoice_requested: { teams: number; total_qar: number };
+  // Chat plugin: a client opened the handoff link from their own AI chat, and
+  // the project landed in their account. `source` is "plugin" when the browser
+  // does not know which chat it came from.
+  handoff_opened: Record<string, never>;
+  handoff_claimed: { source: "claude" | "chatgpt" | "other" | "plugin" };
 };
 
 export type AnalyticsEvent = keyof AnalyticsEvents;

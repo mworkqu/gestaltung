@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { intlTag, asLocale } from "@/lib/locale";
 import { DAY_MS } from "@/lib/format/date";
 import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
+import { loadPluginFunnel } from "@/lib/admin/plugin-funnel";
 
 // "Today" — the owner's first screen (owner, 2026-09-29: the dashboard was
 // confusing; audit #41). Only what needs doing, each with a count and a link:
@@ -121,6 +122,9 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
     () => [],
   );
 
+  // Chat plugin handoffs (0112): hidden when the table is missing.
+  const pluginFunnel = await loadPluginFunnel(db, monthAgo);
+
   const funnel: { key: string; value: number }[] = [
     { key: "funnelProjects", value: fProjects },
     { key: "funnelBoms", value: fBoms },
@@ -131,6 +135,13 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
     { key: "funnelDelivered", value: fDelivered },
     { key: "funnelSpends", value: fSpends },
     { key: "funnelRedemptions", value: fRedemptions },
+    ...(pluginFunnel
+      ? [
+          { key: "funnelPluginSent", value: pluginFunnel.sent },
+          { key: "funnelPluginClaimed", value: pluginFunnel.claimed },
+          { key: "funnelPluginOrdered", value: pluginFunnel.ordered },
+        ]
+      : []),
   ];
 
   const cards: { icon: LucideIcon; key: string; value: number; href: string; urgent: boolean }[] = [
