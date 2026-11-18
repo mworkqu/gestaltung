@@ -2,6 +2,8 @@
 
 AI-written CadQuery code is turned into STEP + STL + a preview picture on a small private server in Doha (Google Cloud Run, region `me-central1`). The browser OpenSCAD path stays as the fallback. A switch decides who uses which path. While it is set to `browser`, nothing changes for clients.
 
+> **2026-11-18, part B:** with the Mac Mini worker switch on (docs/WORKER.md, "Part B"), `/build` goes to the `cad-worker` container on the Mac first (`POST <WORKER_URL>/cad/build`, Bearer `WORKER_SECRET`) and this Cloud Run service is the fallback when the Mac does not take the call. After a Mac timeout nothing is sent here (no double build). Keep every variable below set in Vercel: the cloud engine is only offered when they are, and they are the fallback. The delivered manifest records `runner: "mac" | "cloud-run"`.
+
 ## How it fits together
 
 ```

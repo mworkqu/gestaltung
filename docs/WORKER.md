@@ -2,7 +2,7 @@
 
 Phase 3 of the 2026-11 consolidation. Vercel keeps the public site, the store, checkout and sign-in. The Mac Mini runs the slow and scheduled work as ONE service, `services/worker`, reached from the internet through a free tunnel.
 
-**Status (2026-11-10): part A only.** The worker exists and can run the eight scheduled jobs. It is OFF: until you finish the steps below and flip the switch (step 11), everything keeps running in Vercel exactly as today. Part B (long AI steps, CAD and grading calls) comes later.
+**Status (2026-11-18): part A live; part B (CAD builds + CAD Champions grading on the Mac, Cloud Run as fallback) in code, see "Part B" below. AI/LLM routes stay in Vercel (owner decision).** Earlier status (2026-11-10): part A only. The worker exists and can run the eight scheduled jobs. It is OFF: until you finish the steps below and flip the switch (step 11), everything keeps running in Vercel exactly as today. Part B (long AI steps, CAD and grading calls) comes later.
 
 ## What changes when the Mac is off
 
@@ -57,7 +57,9 @@ Open it with `open -e .env` and type each value yourself. Where each value comes
 | `MOUSER_API_KEY`, `DIGIKEY_CLIENT_ID`, `DIGIKEY_CLIENT_SECRET` | Vercel environment variables |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `INTEGRATIONS_ENC_KEY` | Vercel environment variables (YouTube retire job) |
 | `ORDER_RATING_SECRET` | Vercel environment variables (rating links in delivered-order emails) |
-| `CAD_WORKER_TOKEN`, `GRADER_SECRET`, `GRADER_ALLOWED_URL_PREFIXES` | Part B. Leave empty for now. |
+| `CAD_WORKER_TOKEN` | Part B, optional: any long random string (`openssl rand -base64 32`). Stays on the Mac. |
+| `GRADER_SECRET` | Part B: any long random string. Stays on the Mac; without it every grading call on the Mac is refused and goes to Cloud Run. |
+| `GRADER_ALLOWED_URL_PREFIXES` | Part B: `<NEXT_PUBLIC_SUPABASE_URL>/storage/v1/object/sign/` (the grader only downloads files from there) |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Step 8 |
 
 Vercel shows "Sensitive" values only once; if one cannot be read back, make a new one at its source (Supabase, Resend, …) and update Vercel too.
@@ -154,6 +156,36 @@ While ON:
 
 While OFF (or the row is missing): the worker's timetable skips every run, and Vercel runs everything as today.
 
+## Part B: CAD builds and grading on the Mac
+
+**What moved.** Two kinds of calls now go to the Mac first, when the switch (step 11) is on:
+- CAD builds of the 3D model card (`lib/cad/cloud.ts` → `POST <WORKER_URL>/cad/build` → the `cad-worker` container's `/build`).
+- CAD Champions grading: tests, practice upload, admin reference measurement (`lib/cad-champions/grader/http.ts` → `POST <WORKER_URL>/grader/grade`, `/grader/grade-package`, `/grader/reference` → the `grader` container).
+
+Vercel sends only `Authorization: Bearer WORKER_SECRET`; the worker adds `CAD_WORKER_TOKEN` / `GRADER_SECRET` from `services/.env`. Credits, the AI that writes the CadQuery code, saving files, `cad_deliver` and grading results all stay in Vercel, unchanged. The AI routes (idea chat, analyse, netlist, firmware, studio) stay in Vercel.
+
+**How the fallback works** (`lib/worker/proxy.ts`, one decision per call):
+
+| Situation | Where it runs |
+|---|---|
+| Switch off, or `WORKER_URL` / `WORKER_SECRET` missing in Vercel | Cloud Run, exactly as before (nothing sent to the Mac) |
+| Worker "down" (same health check as the crons: 2 failures within 60 s) | Cloud Run |
+| The worker did not take the call: no connection, tunnel error, 401/404/5xx from the worker, or the container is stopped / not configured / refuses the Mac's secret | Cloud Run |
+| The worker took the call but no answer in time (60 s CAD, 120 s grading) | **No Cloud Run call.** The CAD build counts as "down" (one retry, then the browser engine, nothing charged); the grade becomes "checked by hand" (manual review). |
+| The Mac answered | That answer, whatever it is (a failed build goes to the normal repair step) |
+
+A stopped container on a healthy Mac sends calls to Cloud Run but does not mark the worker down, so the crons stay on the Mac.
+
+**Why nothing is charged twice.** A CAD credit is spent only by `cad_deliver`, called once per generation row after its files are saved; a build that ran on neither engine, timed out or failed is never delivered. Each build attempt runs on one engine only: Cloud Run is used only when the Mac never took the call, and after a Mac timeout nothing is sent to Cloud Run. Grading has no credits; a grade written twice for the same task overwrites the same row, and the queue skips tasks already graded.
+
+**Which engine served a call.** CAD: the delivered model's manifest (`cad-files/…/<id>.json`) has `"runner": "mac" | "cloud-run"`; when the cloud path falls back to the browser, the ai_usage row (provider `cad-worker`, error `fallback_browser:<reason>`) has model `mac` or `cloud-run` (Dashboard → AI usage). Grading: `cc_grading_logs.model` = `grader:mac` or `grader:cloud-run`. Vercel logs say `[worker] … using Cloud Run` whenever it fell back.
+
+**Turn it on.** On the Mac: fill `GRADER_SECRET`, `GRADER_ALLOWED_URL_PREFIXES` (and optionally `CAD_WORKER_TOKEN`) in `services/.env`, then `GIT_SHA=$(git rev-parse --short HEAD) docker compose up -d --build`. Check: `curl http://127.0.0.1:8787/healthz` shows `"upstreams":{"cad":"up","grader":"up"}` (refreshed every 30 s). Nothing to change in Vercel: the same switch and `WORKER_URL` / `WORKER_SECRET` as part A. Keep the Cloud Run variables in Vercel (`GCP_CAD_URL`, `GRADER_URL`, `GRADER_SECRET`, Google keyless settings): they are the fallback, and the CAD engine / grading are only offered when they are set.
+
+**Turn part B off** without stopping the crons: `docker compose stop cad-worker grader` on the Mac. Every call then goes to Cloud Run (the worker answers "upstream unreachable"). Turning the switch off (step 11) sends everything, crons included, back to Vercel / Cloud Run.
+
+Tailscale Funnel note: a CAD answer can be several MB (STEP + STL as base64); Funnel has bandwidth limits. If CAD calls time out through Funnel, stop the two containers and keep using Cloud Run.
+
 ## 12. Update the worker
 
 ```bash
@@ -165,14 +197,14 @@ curl http://127.0.0.1:8787/healthz   # "version" shows the new commit
 ## 13. After one healthy week (NOT done yet)
 
 - [ ] Remove the six `crons` from `vercel.json` (the worker is then the only scheduler; the Vercel routes stay for manual runs and as a fallback trigger).
-- [ ] Part B: move the long AI routes, the heavy admin jobs and the CAD/grading calls to the worker, then remove the old in-Vercel paths.
+- [x] Part B (reduced scope): CAD builds and grading go to the Mac first, Cloud Run as fallback ("Part B" above). The AI routes stay in Vercel (owner decision).
 - [ ] Retire the Cloud Run services (cad-worker, grader) once the Mac serves them.
 
 ---
 
 ## For developers
 
-**Surface.** `GET /healthz` (no secret) → `{ok, version, uptime, jobs: {name: last run}}`. `POST /jobs/<name>` with `Authorization: Bearer <WORKER_SECRET>` (constant-time) → `{job, run_id, status, body, ms, source, deduped?}`, where `status` + `body` are exactly what the job's Vercel route answers; 401 bad secret, 404 unknown job, 409 already running, 413 body over 16 KiB, 400 bad JSON, 403 Origin other than `https://gestaltung360.com` / `http://localhost:3000`. Logs are one JSON line each; secrets, emails, phone numbers, tokens and briefs are redacted.
+**Surface.** `GET /healthz` (no secret) → `{ok, version, uptime, jobs: {name: last run}, upstreams: {cad, grader}}` (`up` / `down` / `unknown`, probed in the background at most every 30 s). `POST /jobs/<name>` with `Authorization: Bearer <WORKER_SECRET>` (constant-time) → `{job, run_id, status, body, ms, source, deduped?}`, where `status` + `body` are exactly what the job's Vercel route answers; 401 bad secret, 404 unknown job, 409 already running, 413 body over 16 KiB, 400 bad JSON, 403 Origin other than `https://gestaltung360.com` / `http://localhost:3000`. Logs are one JSON line each; secrets, emails, phone numbers, tokens and briefs are redacted.
 
 **Jobs** (`lib/cron/jobs.ts` is the one definition; the Vercel routes and the worker run the same code):
 
@@ -190,5 +222,7 @@ curl http://127.0.0.1:8787/healthz   # "version" shows the new commit
 **Cache purges.** The worker cannot call `revalidateTag`; after a job that changed the storefront it calls `POST /api/internal/revalidate` (Bearer `WORKER_SECRET`, only the storefront tag shapes from `lib/cache/catalog-tags.ts`), so the per-SKU purge of Phase 2 is kept.
 
 **Rules for worker code.** The worker bundles `lib/**` through the `@/` alias (`npm run worker:build`); the build fails if anything resolves to `next/*`, `react` or `server-only`. When a module the worker needs imports one of those, split the pure part into its own file and have the Next wrapper import it (done in part A: `notifications/links-core.ts`, `notifications/drain-core.ts`, `integrations/youtube-retire-core.ts`, `cad-champions/training/data.ts`, `cad-champions/payments/coupon-server.ts`).
+
+**Part B proxy** (`services/worker/src/proxy.ts`). `POST /cad/build` → `${CAD_WORKER_URL}/build` (60 s, adds `X-Cad-Worker-Token` when `CAD_WORKER_TOKEN` is set), `POST /grader/{grade,grade-package,reference}` → `${GRADER_URL}/…` (120 s, adds `X-Grader-Secret`). Same auth as `/jobs` (Bearer `WORKER_SECRET`, constant time, Origin rule). Body cap 1 MiB (requests are CadQuery code under 20 KB or grader JSON with signed file URLs; STEP files never pass through), answers up to 40 MiB. The container's status + body pass through unchanged with `x-worker-upstream: cad-worker | grader`. The worker's own failures carry `x-worker-proxy-error`: `upstream_not_configured` 503 and `upstream_unreachable` 502 (nothing ran → Vercel uses Cloud Run), `upstream_timeout` 504 and `upstream_error` 502 (it may have run → no fallback), `upstream_too_large` 502. Bodies and answers are never logged. Vercel side: `lib/worker/proxy.ts` (pure decision + call, tested in `proxy.test.ts`), `lib/worker/proxy-server.ts` (wiring to the switch + health monitor); `buildOnce` and `callGrader` take an injectable `worker` router.
 
 **User tokens (part B).** `POST /api/worker-token` (session required, guests allowed; 20/min per user) returns a 10-minute HS256 JWT signed with `WORKER_SECRET`: user id, project id (ownership checked), the project's stored tier, `is_admin`. The worker checks it with `verifyUserToken()` (`services/worker/src/user-token.ts`). The token never carries credits: the worker must check and spend credits in the database at the moment it does the paid work.
