@@ -87,6 +87,8 @@ export type CloudManifest = {
   log: string;
   minWallMm: number;
   board: { label: string; box: Box3 } | null;
+  /** Part B: which machine built it ("mac" = the Mac Mini worker, "cloud-run"). Older manifests have none. */
+  runner?: "mac" | "cloud-run";
 };
 
 const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -117,6 +119,7 @@ export function parseManifest(raw: unknown): CloudManifest | null {
     log: typeof m.log === "string" ? m.log : "",
     minWallMm: num(m.minWallMm) ?? DEFAULT_MIN_WALL_MM,
     board: b && boardBox ? { label: String(b.label ?? ""), box: boardBox } : null,
+    ...(m.runner === "mac" || m.runner === "cloud-run" ? { runner: m.runner } : {}),
   };
 }
 

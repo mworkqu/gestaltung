@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { RouteAttempt, WorkerRouter } from "@/lib/worker/proxy";
+
 import { callGrader, graderConfigured } from "./http";
 
 const noToken = async () => null;
@@ -158,5 +160,56 @@ describe("callGrader", () => {
     const res = await callGrader("/grade", {}, { fetch: fetchMock as unknown as typeof fetch, env, retryDelayMs: 0, idToken });
     expect(res).toMatchObject({ ok: false, kind: "not_authorized" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("part B: Mac Mini first, Cloud Run as fallback", () => {
+  const mac = (outcome: Extract<RouteAttempt, { engine: "mac" }>["outcome"]): WorkerRouter => async () => ({ engine: "mac", outcome });
+
+  it("worker on + healthy → graded on the Mac, Cloud Run never called", async () => {
+    const fetchMock = vi.fn();
+    const worker = vi.fn(mac({ kind: "answered", status: 200, raw: okBody }));
+    const res = await callGrader("/grade", { a: 1 }, { fetch: fetchMock as unknown as typeof fetch, env, idToken: noToken, worker });
+    expect(res).toMatchObject({ ok: true, engine: "mac", tries: 1 });
+    expect(worker).toHaveBeenCalledWith("grader-grade", { a: 1 }, 120_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("maps the paths to the worker's grader routes", async () => {
+    const worker = vi.fn(mac({ kind: "answered", status: 200, raw: {} }));
+    await callGrader("/grade-package", {}, { env, idToken: noToken, worker });
+    await callGrader("/reference", {}, { env, idToken: noToken, worker });
+    expect(worker.mock.calls.map((c) => c[0])).toEqual(["grader-grade-package", "grader-reference"]);
+  });
+
+  it("worker off / down / refused → Cloud Run exactly as before", async () => {
+    const fetchMock = vi.fn(async () => json(200, okBody));
+    const res = await callGrader("/grade", {}, {
+      fetch: fetchMock as unknown as typeof fetch,
+      env,
+      idToken: noToken,
+      worker: async () => ({ engine: "cloud-run", why: "not_accepted", detail: "http_404" }),
+    });
+    expect(res).toMatchObject({ ok: true, engine: "cloud-run" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("Mac accepted but timed out → timeout failure (manual review), no Cloud Run call, no retry", async () => {
+    const fetchMock = vi.fn();
+    const res = await callGrader("/grade", {}, { fetch: fetchMock as unknown as typeof fetch, env, idToken: noToken, worker: mac({ kind: "timeout" }) });
+    expect(res).toMatchObject({ ok: false, kind: "timeout", engine: "mac", tries: 1 });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("the Mac's answer is validated like Cloud Run's", async () => {
+    const res = await callGrader("/grade", {}, { env, idToken: noToken, worker: mac({ kind: "answered", status: 200, raw: { nope: true } }) });
+    expect(res).toMatchObject({ ok: false, kind: "invalid_response", engine: "mac" });
+  });
+
+  it("not configured on Vercel → no call to either engine", async () => {
+    const worker = vi.fn();
+    const res = await callGrader("/grade", {}, { env: { url: "", secret: "" }, idToken: noToken, worker });
+    expect(res).toMatchObject({ ok: false, kind: "not_configured" });
+    expect(worker).not.toHaveBeenCalled();
   });
 });

@@ -28,6 +28,8 @@ import { parseExpectations } from "../upload/package-check";
 import { readZipEntries } from "../upload/zip-manifest";
 import { openStoredZip } from "../upload/zip-remote";
 import { DEFAULT_MAX_BYTES } from "../upload/validate";
+import type { Engine } from "@/lib/worker/proxy";
+
 import { callGrader, graderConfigured, type GraderGradeResponse } from "./http";
 import { isReferenceComplete, studentDetails, type AspectLite, type AspectOutcome, type GraderMode, type StudentGradeResult } from "./mapping";
 import { GRADER_CONCURRENCY, mapLimit, planGrading, readyForScoring, selectPackageSteps, type TaskAction } from "./plan";
@@ -84,10 +86,20 @@ function gradeTask(ctx: Ctx, t: TaskRow): GradeTask {
 
 async function log(
   ctx: Ctx,
-  row: { submission_id: string | null; task_id: string; duration_ms: number; error?: string | null; error_code?: string | null; response?: unknown }
+  row: {
+    submission_id: string | null;
+    task_id: string;
+    duration_ms: number;
+    error?: string | null;
+    error_code?: string | null;
+    response?: unknown;
+    engine?: Engine;
+  }
 ) {
   const { error } = await ctx.service.from("cc_grading_logs").insert({
     kind: "step",
+    // Which engine graded it: "grader:mac" (Mac Mini worker) or "grader:cloud-run" (no schema change).
+    model: row.engine ? `grader:${row.engine}` : null,
     submission_id: row.submission_id,
     task_result_id: ctx.resultIds.get(row.task_id) ?? null,
     duration_ms: Math.max(0, Math.round(row.duration_ms)),
@@ -124,7 +136,7 @@ async function saveGraded(
   taskId: string,
   submissionId: string,
   graded: { result: StudentGradeResult; aspects: AspectOutcome[] },
-  meta: { raw: unknown; durationMs: number; fileName?: string | null; matchedByVolume?: boolean }
+  meta: { raw: unknown; durationMs: number; fileName?: string | null; matchedByVolume?: boolean; engine?: Engine }
 ) {
   const r = graded.result;
   const { error } = await ctx.service
@@ -146,7 +158,14 @@ async function saveGraded(
     .eq("task_id", taskId);
   if (error) console.error("[cc-grader] result update failed:", error.code ?? error.message);
   await writeAspects(ctx, taskId, graded.aspects);
-  await log(ctx, { submission_id: submissionId, task_id: taskId, duration_ms: meta.durationMs, error_code: r.errorCode, response: meta.raw });
+  await log(ctx, {
+    submission_id: submissionId,
+    task_id: taskId,
+    duration_ms: meta.durationMs,
+    error_code: r.errorCode,
+    response: meta.raw,
+    engine: meta.engine,
+  });
 }
 
 /** Grader unavailable / failed after the retry: a person checks the file. */
@@ -154,7 +173,7 @@ async function saveManualReview(
   ctx: Ctx,
   taskId: string,
   submissionId: string | null,
-  why: { error: string; errorCode?: string | null; raw?: unknown; durationMs?: number }
+  why: { error: string; errorCode?: string | null; raw?: unknown; durationMs?: number; engine?: Engine }
 ) {
   const { error } = await ctx.service
     .from("cc_task_results")
@@ -170,7 +189,15 @@ async function saveManualReview(
     .eq("attempt_id", ctx.attemptId)
     .eq("task_id", taskId);
   if (error) console.error("[cc-grader] manual-review update failed:", error.code ?? error.message);
-  await log(ctx, { submission_id: submissionId, task_id: taskId, duration_ms: why.durationMs ?? 0, error: why.error, error_code: why.errorCode ?? null, response: why.raw });
+  await log(ctx, {
+    submission_id: submissionId,
+    task_id: taskId,
+    duration_ms: why.durationMs ?? 0,
+    error: why.error,
+    error_code: why.errorCode ?? null,
+    response: why.raw,
+    engine: why.engine,
+  });
 }
 
 // ------------------------------------------------------------------ per_task
@@ -185,13 +212,14 @@ async function gradeFiles(ctx: Ctx, actions: Extract<TaskAction, { kind: "grade_
       logId: ctx.resultIds.get(a.taskId) ?? a.submissionId,
     });
     if (out.ok) {
-      await saveGraded(ctx, a.taskId, a.submissionId, out, { raw: out.raw, durationMs: out.durationMs });
+      await saveGraded(ctx, a.taskId, a.submissionId, out, { raw: out.raw, durationMs: out.durationMs, engine: out.engine });
     } else {
       await saveManualReview(ctx, a.taskId, a.submissionId, {
         error: `${out.reason}: ${out.error}`,
         errorCode: out.reason === "download_failed" ? "E_DOWNLOAD_FAILED" : null,
         raw: out.raw,
         durationMs: out.durationMs,
+        engine: out.engine,
       });
     }
   });
@@ -256,7 +284,7 @@ async function gradePackage(ctx: Ctx, actions: Extract<TaskAction, { kind: "grad
   const res = await callGrader("/grade-package", body);
   const durationMs = Date.now() - started;
   if (!res.ok) {
-    for (const t of ready) await saveManualReview(ctx, t.id, sub.id, { error: `${res.kind}: ${res.error}`, raw: res.raw, durationMs });
+    for (const t of ready) await saveManualReview(ctx, t.id, sub.id, { error: `${res.kind}: ${res.error}`, raw: res.raw, durationMs, engine: res.engine });
     return;
   }
   const byTask = new Map(res.data.results.map((r) => [r.task_id, r]));
@@ -264,12 +292,24 @@ async function gradePackage(ctx: Ctx, actions: Extract<TaskAction, { kind: "grad
     const r = byTask.get(t.id);
     const raw = r ? { ...r, unmatched_files: res.data.unmatched_files, ignored_files: res.data.ignored_files } : res.raw;
     if (!r) {
-      await saveManualReview(ctx, t.id, sub.id, { error: "grader returned no result for this task", raw, durationMs });
+      await saveManualReview(ctx, t.id, sub.id, { error: "grader returned no result for this task", raw, durationMs, engine: res.engine });
     } else if (r.error_code === "E_DOWNLOAD_FAILED") {
-      await saveManualReview(ctx, t.id, sub.id, { error: "grader could not download the file", errorCode: "E_DOWNLOAD_FAILED", raw, durationMs });
+      await saveManualReview(ctx, t.id, sub.id, {
+        error: "grader could not download the file",
+        errorCode: "E_DOWNLOAD_FAILED",
+        raw,
+        durationMs,
+        engine: res.engine,
+      });
     } else {
       const graded = interpretResult(gradeTask(ctx, t), graderMode(t), r as GraderGradeResponse);
-      await saveGraded(ctx, t.id, sub.id, graded, { raw, durationMs, fileName: r.file_name ?? null, matchedByVolume: !!r.matched_by_volume });
+      await saveGraded(ctx, t.id, sub.id, graded, {
+        raw,
+        durationMs,
+        fileName: r.file_name ?? null,
+        matchedByVolume: !!r.matched_by_volume,
+        engine: res.engine,
+      });
     }
   }
 }

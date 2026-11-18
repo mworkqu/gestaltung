@@ -5,12 +5,20 @@
 // configured (same keyless WIF setup as the CAD worker) each attempt also sends
 // Authorization: Bearer <ID token, audience = the service origin>. Without them
 // (local dev) only the secret is sent. 401/403 from Cloud Run => "not_authorized".
+// Part B (docs/WORKER.md): with the worker switch on and the Mac healthy, the
+// call goes to the Mac Mini first (POST {WORKER_URL}/grader/<path>, Bearer
+// WORKER_SECRET; the worker adds the Mac's own GRADER_SECRET) and Cloud Run
+// is used only when the Mac did not take it (lib/worker/proxy.ts). Once the
+// Mac took it there is no Cloud Run call and no retry: a timeout is returned
+// as today's "timeout" failure (manual review). Every result says which
+// engine served it ("mac" | "cloud-run").
 // Responses are validated with zod. The raw JSON (with `details`) is returned
 // for cc_grading_logs only; never pass it to a student.
 
 import { z } from "zod";
 
 import { googleIdTokenFor } from "@/lib/cad/cloud";
+import type { Engine, ProxyTarget, RouteAttempt, WorkerRouter } from "@/lib/worker/proxy";
 
 if (typeof window !== "undefined") throw new Error("lib/cad-champions/grader/http.ts is server-only");
 
@@ -104,9 +112,11 @@ export function graderConfigured(env: GraderEnv = readEnv()): boolean {
 export type GraderFailureKind = "not_configured" | "network" | "timeout" | "http" | "invalid_response" | "not_authorized";
 
 export type GraderCallResult<T> =
-  | { ok: true; data: T; raw: unknown; status: number; durationMs: number; tries: number }
+  | { ok: true; data: T; raw: unknown; status: number; durationMs: number; tries: number; engine: Engine }
   | {
       ok: false;
+      /** Which engine was tried last; absent only when nothing was called (not_configured). */
+      engine?: Engine;
       kind: GraderFailureKind;
       /** Short, secret-free description for logs. */
       error: string;
@@ -123,6 +133,52 @@ export interface CallDeps {
   retryDelayMs?: number;
   /** Test hook; default = googleIdTokenFor (null when no Google credentials are configured). */
   idToken?: (audience: string) => Promise<string | null>;
+  /** Part B: the Mac Mini worker router (default: lib/worker/proxy-server.ts). */
+  worker?: WorkerRouter;
+}
+
+const GRADER_TARGETS: Readonly<Record<GraderPath, ProxyTarget>> = {
+  "/grade": "grader-grade",
+  "/grade-package": "grader-grade-package",
+  "/reference": "grader-reference",
+};
+
+/** The default router, loaded only when a call is made (it reads the worker switch). */
+const defaultWorker: WorkerRouter = async (target, body, timeoutMs) =>
+  (await import("@/lib/worker/proxy-server")).routeViaWorker(target, body, timeoutMs);
+
+/** A grader answer (status + JSON) as a call result; the same contract on both engines. */
+function fromResponse<P extends GraderPath>(
+  path: P,
+  status: number,
+  raw: unknown,
+  meta: { durationMs: number; tries: number; engine: Engine }
+): GraderCallResult<GraderResponseFor<P>> {
+  if (status === 401 || status === 403) {
+    // Cloud Run IAM refusal (HTML body) or the grader's own secret check (JSON).
+    return { ok: false, kind: "not_authorized", status, error: `not authorized (HTTP ${status})`, raw, ...meta };
+  }
+  if (status < 200 || status >= 300) {
+    return { ok: false, kind: "http", status, error: errorFrom(raw, status), raw, ...meta };
+  }
+  const parsed = SCHEMAS[path].safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, kind: "invalid_response", status, error: "response did not match the grader contract", raw, ...meta };
+  }
+  return { ok: true, data: parsed.data as GraderResponseFor<P>, raw, status, ...meta };
+}
+
+/** The Mac's answer; never followed by a Cloud Run call (it may have run there). */
+function fromWorker<P extends GraderPath>(
+  path: P,
+  outcome: Extract<RouteAttempt, { engine: "mac" }>["outcome"],
+  started: number,
+  timeoutMs: number
+): GraderCallResult<GraderResponseFor<P>> {
+  const meta = { durationMs: Date.now() - started, tries: 1, engine: "mac" as const };
+  if (outcome.kind === "answered") return fromResponse(path, outcome.status, outcome.raw, meta);
+  if (outcome.kind === "timeout") return { ok: false, kind: "timeout", error: `mac: timed out after ${Math.round(timeoutMs / 1000)} s`, ...meta };
+  return { ok: false, kind: "network", error: `mac: ${outcome.reason}`, ...meta };
 }
 
 type Attempt =
@@ -191,6 +247,12 @@ export async function callGrader<P extends GraderPath>(path: P, body: unknown, d
   const url = `${env.url!.trim().replace(/\/+$/, "")}${path}`;
   const secret = env.secret!.trim();
   const timeoutMs = deps.timeoutMs ?? GRADER_TIMEOUT_MS;
+
+  // Part B: the Mac Mini first; Cloud Run only when the Mac did not take the call.
+  const attempt = await (deps.worker ?? defaultWorker)(GRADER_TARGETS[path], body, timeoutMs).catch(
+    (): RouteAttempt => ({ engine: "cloud-run", why: "off" })
+  );
+  if (attempt.engine === "mac") return fromWorker(path, attempt.outcome, started, timeoutMs);
   const retryDelay = deps.retryDelayMs ?? RETRY_DELAY_MS;
   const getToken = deps.idToken ?? ((audience: string) => googleIdTokenFor(audience));
 
@@ -205,19 +267,9 @@ export async function callGrader<P extends GraderPath>(path: P, body: unknown, d
   }
   const durationMs = Date.now() - started;
   const a = last!;
-  if (a.kind === "timeout") return { ok: false, kind: "timeout", error: a.error, durationMs, tries };
-  if (a.kind === "auth") return { ok: false, kind: "not_authorized", error: a.error, durationMs, tries };
-  if (a.kind === "network") return { ok: false, kind: "network", error: a.error, durationMs, tries };
-  if (a.status === 401 || a.status === 403) {
-    // Cloud Run IAM refusal (HTML body) or the grader's own secret check (JSON).
-    return { ok: false, kind: "not_authorized", status: a.status, error: `not authorized (HTTP ${a.status})`, raw: a.raw, durationMs, tries };
-  }
-  if (a.status < 200 || a.status >= 300) {
-    return { ok: false, kind: "http", status: a.status, error: errorFrom(a.raw, a.status), raw: a.raw, durationMs, tries };
-  }
-  const parsed = SCHEMAS[path].safeParse(a.raw);
-  if (!parsed.success) {
-    return { ok: false, kind: "invalid_response", status: a.status, error: "response did not match the grader contract", raw: a.raw, durationMs, tries };
-  }
-  return { ok: true, data: parsed.data as GraderResponseFor<P>, raw: a.raw, status: a.status, durationMs, tries };
+  const engine = "cloud-run" as const;
+  if (a.kind === "timeout") return { ok: false, kind: "timeout", error: a.error, durationMs, tries, engine };
+  if (a.kind === "auth") return { ok: false, kind: "not_authorized", error: a.error, durationMs, tries, engine };
+  if (a.kind === "network") return { ok: false, kind: "network", error: a.error, durationMs, tries, engine };
+  return fromResponse(path, a.status, a.raw, { durationMs, tries, engine });
 }

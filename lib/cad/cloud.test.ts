@@ -43,6 +43,7 @@ import {
   type BuildOutcome,
   type BuildResult,
 } from "./cloud";
+import type { RouteAttempt, WorkerRouter } from "@/lib/worker/proxy";
 
 const KEY = { type: "service_account", client_email: "cad@example.iam.gserviceaccount.com", private_key: "x" };
 const URL_ = "https://cad-worker-abc-ew.a.run.app";
@@ -403,5 +404,62 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
     const r = await buildOnce(req, { fetchImpl: g.impl });
     expect(r).toMatchObject({ kind: "down", reason: "not_configured" });
     expect(g.calls).toHaveLength(0);
+  });
+});
+
+describe("part B: Mac Mini first, Cloud Run as fallback", () => {
+  const mac = (outcome: Extract<RouteAttempt, { engine: "mac" }>["outcome"]): WorkerRouter => async () => ({ engine: "mac", outcome });
+  const cloudRun: WorkerRouter = async () => ({ engine: "cloud-run", why: "off" });
+
+  it("worker on + healthy → the Mac builds it, Cloud Run is never called", async () => {
+    const fetchImpl = vi.fn();
+    const worker = vi.fn(mac({ kind: "answered", status: 200, raw: okBody }));
+    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch, worker });
+    expect(r).toMatchObject({ kind: "result", engine: "mac", result: { ok: true } });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(worker).toHaveBeenCalledWith("cad-build", { code: req.code, units: "mm", checks: { min_wall_mm: 1.2, must_contain_box: null } }, 60_000);
+  });
+
+  it("worker off / down / refused → Cloud Run exactly as before", async () => {
+    const fetchImpl = vi.fn(async () => json(okBody));
+    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch, worker: cloudRun });
+    expect(r).toMatchObject({ kind: "result", engine: "cloud-run" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("Mac accepted but timed out → down (timeout) with NO Cloud Run call; nothing delivered, so nothing charged", async () => {
+    const fetchImpl = vi.fn();
+    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch, worker: mac({ kind: "timeout" }) });
+    expect(r).toMatchObject({ kind: "down", reason: "timeout", engine: "mac" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(nextCloudStep(r)).toEqual({ action: "fallback" });
+  });
+
+  it("Mac lost the answer → down (unreachable), no Cloud Run call", async () => {
+    const fetchImpl = vi.fn();
+    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch, worker: mac({ kind: "lost", reason: "upstream_error" }) });
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable", engine: "mac" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("a failed build on the Mac is a result (repair path), not a reason to run it on Cloud Run", async () => {
+    const fetchImpl = vi.fn();
+    const r = await buildOnce(req, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      worker: mac({ kind: "answered", status: 200, raw: { ok: false, error: "NameError", log: "" } }),
+    });
+    expect(r).toMatchObject({ kind: "result", engine: "mac", result: { ok: false } });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("a router that throws counts as off (Cloud Run)", async () => {
+    const fetchImpl = vi.fn(async () => json(okBody));
+    const r = await buildOnce(req, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      worker: async () => {
+        throw new Error("boom");
+      },
+    });
+    expect(r).toMatchObject({ kind: "result", engine: "cloud-run" });
   });
 });

@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     if (cloud.kind === "delivered") return jsonOk(cloud.body);
     if (cloud.kind === "error") return jsonError(cloud.error, cloud.status);
     // Worker down twice: tell the admin, then the existing browser path below.
-    await logCloudFallback(supabase, projectId, cloud.reason, user.id);
+    await logCloudFallback(supabase, projectId, cloud.reason, user.id, cloud.engine);
     fallback = true;
   }
 

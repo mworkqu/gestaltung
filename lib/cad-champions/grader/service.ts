@@ -11,6 +11,8 @@
 
 import { createServiceClient } from "@/lib/supabase/service";
 
+import type { Engine } from "@/lib/worker/proxy";
+
 import { callGrader, graderConfigured, type GraderGradeResponse } from "./http";
 import {
   aspectOutcomes,
@@ -57,8 +59,10 @@ export type GradeNowOutcome =
       /** Full grader JSON (incl. details): cc_grading_logs.response only. */
       raw: unknown;
       durationMs: number;
+      /** Which engine graded it (Mac Mini worker or Cloud Run): cc_grading_logs.model. */
+      engine?: Engine;
     }
-  | { ok: false; reason: GradeNowFailure; error: string; raw?: unknown; durationMs: number };
+  | { ok: false; reason: GradeNowFailure; error: string; raw?: unknown; durationMs: number; engine?: Engine };
 
 /** Builds the /grade request body (no URL yet). Exported for the package call. */
 export function gradeRequestBody(task: GradeTask, mode: GraderMode) {
@@ -103,7 +107,15 @@ async function signedUrl(bucket: string, path: string): Promise<string | null> {
 
 export async function gradeSubmissionNow(input: GradeNowInput): Promise<GradeNowOutcome> {
   const started = Date.now();
-  const fail = (reason: GradeNowFailure, error: string, raw?: unknown): GradeNowOutcome => ({ ok: false, reason, error, raw, durationMs: Date.now() - started });
+  const fail = (reason: GradeNowFailure, error: string, raw?: unknown, engine?: Engine): GradeNowOutcome => ({
+    ok: false,
+    reason,
+    error,
+    raw,
+    durationMs: Date.now() - started,
+    ...(engine ? { engine } : {}),
+  });
+  let lastEngine: Engine | undefined;
 
   if (!graderConfigured()) return fail("not_configured", "GRADER_URL / GRADER_SECRET not set");
   if (!isReferenceComplete(input.task.reference_data)) return fail("reference_missing", "task reference_data is incomplete");
@@ -120,11 +132,12 @@ export async function gradeSubmissionNow(input: GradeNowInput): Promise<GradeNow
     const url = await signedUrl(where.bucket, where.path);
     if (!url) return fail("file_missing", "could not sign the file URL");
     const res = await callGrader("/grade", { ...body, submission_id: logId, file_url: url });
-    if (!res.ok) return fail(res.kind === "not_configured" ? "not_configured" : "grader_error", res.error, res.raw);
+    if (!res.ok) return fail(res.kind === "not_configured" ? "not_configured" : "grader_error", res.error, res.raw, res.engine);
     lastRaw = res.raw;
+    lastEngine = res.engine;
     if (res.data.error_code === "E_DOWNLOAD_FAILED") continue; // fresh URL, one more try
     const { result, aspects } = interpretResult(input.task, input.mode, res.data);
-    return { ok: true, result, aspects, raw: res.raw, durationMs: Date.now() - started };
+    return { ok: true, result, aspects, raw: res.raw, durationMs: Date.now() - started, engine: res.engine };
   }
-  return fail("download_failed", "grader could not download the file (E_DOWNLOAD_FAILED twice)", lastRaw);
+  return fail("download_failed", "grader could not download the file (E_DOWNLOAD_FAILED twice)", lastRaw, lastEngine);
 }

@@ -21,6 +21,12 @@
 // WITHOUT code (so it does not count against the cap), an ai_usage row
 // (provider "cad-worker", error_code "fallback_browser:<reason>") is written
 // for the admin, and the route falls back to the browser OpenSCAD path.
+//
+// Part B: buildWithRetry tries the Mac Mini worker first and Cloud Run only
+// when the Mac did not take the call (lib/worker/proxy.ts). Either way one
+// build result per row reaches deliver(), so one delivery = one charge; the
+// engine is kept in the manifest (runner) and in the fallback usage row
+// (p_model "mac" | "cloud-run").
 
 import type { DbClient } from "@/lib/supabase/db";
 import { z } from "zod";
@@ -32,6 +38,8 @@ import { CAD_BUCKET } from "@/lib/design/constants";
 import { validatedCall } from "@/lib/prototyping/ai-call";
 import { CADQUERY_SCHEMA, CADQUERY_SYSTEM, cadQueryPrompt } from "./prompt";
 import { cleanScad, validateCadQuery } from "./validate";
+import type { Engine } from "@/lib/worker/proxy";
+
 import { buildWithRetry, cloudFailureCode, nextCloudStep, repairMessages, type BuildResult } from "./cloud";
 import { cloudFilePaths, mustContainBox, type CloudManifest } from "./engine";
 import type { Footprint } from "@/lib/prototyping/footprints";
@@ -60,7 +68,7 @@ type Ctx = {
 };
 
 export type CloudReply =
-  | { kind: "fallback"; reason: string }
+  | { kind: "fallback"; reason: string; engine?: Engine }
   | { kind: "error"; error: string; status: number }
   | {
       kind: "delivered";
@@ -84,15 +92,18 @@ const fail = (supabase: DbClient, id: string, error: string) =>
     () => undefined
   );
 
-/** The admin's signal that the cloud worker was skipped: one ai_usage row (no new table). */
-export async function logCloudFallback(supabase: DbClient, projectId: string, reason: string, userId?: string) {
-  console.warn(`[cad] cloud worker unavailable (${reason}); using the browser engine`);
+/**
+ * The admin's signal that the cloud worker was skipped: one ai_usage row (no new table).
+ * p_model = the engine that was last tried ("mac" = the Mac Mini worker, "cloud-run").
+ */
+export async function logCloudFallback(supabase: DbClient, projectId: string, reason: string, userId?: string, engine?: Engine) {
+  console.warn(`[cad] cloud worker unavailable (${reason}${engine ? ` on ${engine}` : ""}); using the browser engine`);
   // Server-side logging (0101): service client + the session's verified user id.
   await recordUsage(
     supabase,
     {
       p_provider: "cad-worker",
-      p_model: null,
+      p_model: engine ?? null,
       p_project: projectId,
       p_feature: "cad",
       p_prompt_tokens: null,
@@ -173,7 +184,8 @@ async function deliver(
   id: string,
   code: string,
   answer: CqAnswer,
-  r: BuildResult
+  r: BuildResult,
+  runner: Engine | undefined
 ): Promise<CloudReply> {
   const files = cloudFilePaths(ctx.userId, ctx.projectId, id);
   const b = board(ctx);
@@ -185,6 +197,7 @@ async function deliver(
     log: r.log,
     minWallMm: ctx.minWallMm,
     board: b ? { label: b.label, box: { x: b.x, y: b.y, z: b.z } } : null,
+    ...(runner ? { runner } : {}),
   };
   const storage = ctx.supabase.storage.from(CAD_BUCKET);
   const uploads: [string, Buffer, string][] = [
@@ -239,8 +252,8 @@ export async function runCloudCad(ctx: Ctx): Promise<CloudReply> {
   );
   if (b1.kind === "down") {
     // No code stored: our own outage never counts against the caller's cap.
-    await fail(ctx.supabase, a.id, `cloud_down: ${b1.reason}`);
-    return { kind: "fallback", reason: b1.reason };
+    await fail(ctx.supabase, a.id, `cloud_down: ${b1.reason}${b1.engine ? ` (${b1.engine})` : ""}`);
+    return { kind: "fallback", reason: b1.reason, engine: b1.engine };
   }
   if (!(await setCode(ctx, a.id, code1, first.model))) {
     await fail(ctx.supabase, a.id, "not saved");
@@ -248,7 +261,7 @@ export async function runCloudCad(ctx: Ctx): Promise<CloudReply> {
   }
 
   const step1 = nextCloudStep(b1);
-  if (step1.action === "deliver") return deliver(ctx, a.id, code1, first.value, b1.result);
+  if (step1.action === "deliver") return deliver(ctx, a.id, code1, first.value, b1.result, b1.engine);
 
   // ONE automatic repair, fed with the worker's own words (its error and every
   // failed check). A model that built but failed a check is NOT delivered: the
@@ -270,8 +283,12 @@ export async function runCloudCad(ctx: Ctx): Promise<CloudReply> {
   }
 
   const step2 = nextCloudStep(b1, b2);
-  if (step2.action === "deliver" && b2.kind === "result") return deliver(ctx, b.id, second.value.code, second.value, b2.result);
-  await fail(ctx.supabase, b.id, b2.kind === "down" ? `cloud_down: ${b2.reason}` : `build: ${repairMessages(b2.result)}`);
-  if (step2.action === "fallback" && b2.kind === "down") return { kind: "fallback", reason: b2.reason };
+  if (step2.action === "deliver" && b2.kind === "result") return deliver(ctx, b.id, second.value.code, second.value, b2.result, b2.engine);
+  await fail(
+    ctx.supabase,
+    b.id,
+    b2.kind === "down" ? `cloud_down: ${b2.reason}${b2.engine ? ` (${b2.engine})` : ""}` : `build: ${repairMessages(b2.result)}`
+  );
+  if (step2.action === "fallback" && b2.kind === "down") return { kind: "fallback", reason: b2.reason, engine: b2.engine };
   return { kind: "error", error: cloudFailureCode(b2), status: 502 };
 }

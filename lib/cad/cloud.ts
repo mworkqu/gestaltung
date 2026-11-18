@@ -17,6 +17,12 @@
 // Keys and tokens are never logged; error messages carry the HTTP status and
 // Google's error code only.
 //
+// Part B (docs/WORKER.md): with the worker switch on and the Mac healthy,
+// /build goes to the Mac Mini first (POST {WORKER_URL}/cad/build, Bearer
+// WORKER_SECRET; lib/worker/proxy.ts) and Cloud Run is used only when the Mac
+// did not take the call. Once the Mac took it, a timeout is "down" with no
+// Cloud Run call (no build runs on both).
+//
 // "Down" = the worker could not be reached, timed out (60 s), refused us
 // (401/403/5xx), we could not get a token, or it answered something that is
 // not the contract. A build that RAN and failed (ok:false, a check failed) is
@@ -24,6 +30,8 @@
 
 import { GoogleAuth } from "google-auth-library";
 import { z } from "zod";
+
+import type { Engine, RouteAttempt, WorkerRouter } from "@/lib/worker/proxy";
 
 import type { Box3, CadCheck } from "./engine";
 
@@ -246,9 +254,15 @@ export type BuildResult = {
   error: string | null;
 };
 
+/** engine: which machine ran (or was asked to run) the build — "mac" (worker proxy) or "cloud-run". */
 export type BuildOutcome =
-  | { kind: "result"; result: BuildResult }
-  | { kind: "down"; reason: "not_configured" | "timeout" | "unreachable" | "refused" | "bad_response"; detail: string };
+  | { kind: "result"; result: BuildResult; engine?: Engine }
+  | {
+      kind: "down";
+      reason: "not_configured" | "timeout" | "unreachable" | "refused" | "bad_response";
+      detail: string;
+      engine?: Engine;
+    };
 
 /** A delivered model needs every file and a size; anything else counts as a failed build. */
 export function usable(r: BuildResult): boolean {
@@ -278,7 +292,61 @@ export type BuildOpts = {
   timeoutMs?: number;
   /** Used for the worker AND the keyless Google calls (tests route by URL). */
   fetchImpl?: typeof fetch;
+  /** Part B: the Mac Mini worker router (default: lib/worker/proxy-server.ts). */
+  worker?: WorkerRouter;
 };
+
+/** The default router, loaded only when a build runs (it reads the worker switch). */
+const defaultWorker: WorkerRouter = async (target, body, timeoutMs) =>
+  (await import("@/lib/worker/proxy-server")).routeViaWorker(target, body, timeoutMs);
+
+/** The /build request body (same for Cloud Run and the worker proxy). */
+export function buildBody(req: BuildRequest) {
+  return {
+    code: req.code,
+    units: "mm",
+    checks: { min_wall_mm: req.minWallMm, must_contain_box: req.mustContainBox },
+  };
+}
+
+/** A /build answer (status + JSON) as an outcome; the same contract on both engines. */
+export function buildOutcomeFrom(status: number, body: unknown, engine: Engine): BuildOutcome {
+  const parsed = BuildResponse.safeParse(body);
+  if (!parsed.success) {
+    if (status === 401 || status === 403 || status >= 500)
+      return { kind: "down", reason: "refused", detail: `HTTP ${status}`, engine };
+    return { kind: "down", reason: "bad_response", detail: `HTTP ${status}: not the build contract`, engine };
+  }
+  const d = parsed.data;
+  return {
+    kind: "result",
+    engine,
+    result: {
+      ok: d.ok,
+      stepB64: d.step_b64 ?? null,
+      stlB64: d.stl_b64 ?? null,
+      previewSvg: d.preview_svg ?? null,
+      bbox: d.bbox ?? null,
+      volumeMm3: d.volume_mm3 ?? null,
+      checks: (d.checks ?? []).map((c) => ({ name: c.name, pass: c.pass, detail: c.detail ?? "" })),
+      log: (d.log ?? "").slice(-20_000),
+      error: d.error ?? null,
+    },
+  };
+}
+
+/**
+ * The Mac's answer. A timeout or a lost answer after the worker took the call
+ * is "down" WITHOUT a Cloud Run call: the build may still be running on the
+ * Mac. The existing retry / browser fallback then decides, and nothing is
+ * charged on a "down" (cad_deliver only runs on a delivered result).
+ */
+function fromWorker(outcome: Extract<RouteAttempt, { engine: "mac" }>["outcome"], timeoutMs: number): BuildOutcome {
+  if (outcome.kind === "answered") return buildOutcomeFrom(outcome.status, outcome.raw, "mac");
+  if (outcome.kind === "timeout")
+    return { kind: "down", reason: "timeout", detail: `mac: no answer within ${Math.round(timeoutMs / 1000)} s`, engine: "mac" };
+  return { kind: "down", reason: "unreachable", detail: `mac: ${outcome.reason}`, engine: "mac" };
+}
 
 /** One call to /build. Never throws. */
 export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promise<BuildOutcome> {
@@ -289,49 +357,38 @@ export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promis
       reason: "not_configured",
       detail: "GCP_CAD_URL and GCP_WIF_PROVIDER + GCP_CAD_SA_EMAIL (or GCP_CAD_SA_KEY) missing",
     };
+  const timeoutMs = opts.timeoutMs ?? CLOUD_BUILD_TIMEOUT_MS;
+  // Part B: the Mac Mini first; Cloud Run only when the Mac did not take the call.
+  const attempt = await (opts.worker ?? defaultWorker)("cad-build", buildBody(req), timeoutMs).catch(
+    (): RouteAttempt => ({ engine: "cloud-run", why: "off" })
+  );
+  if (attempt.engine === "mac") return fromWorker(attempt.outcome, timeoutMs);
+
   const doFetch = opts.fetchImpl ?? fetch;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? CLOUD_BUILD_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const token = await idToken(url, { fetchImpl: opts.fetchImpl });
     const res = await doFetch(`${url}/build`, {
       method: "POST",
       headers: workerHeaders(token),
-      body: JSON.stringify({
-        code: req.code,
-        units: "mm",
-        checks: { min_wall_mm: req.minWallMm, must_contain_box: req.mustContainBox },
-      }),
+      body: JSON.stringify(buildBody(req)),
       signal: controller.signal,
       cache: "no-store",
     });
     const body = await res.json().catch(() => null);
-    const parsed = BuildResponse.safeParse(body);
-    if (!parsed.success) {
-      if (res.status === 401 || res.status === 403 || res.status >= 500)
-        return { kind: "down", reason: "refused", detail: `HTTP ${res.status}` };
-      return { kind: "down", reason: "bad_response", detail: `HTTP ${res.status}: not the build contract` };
-    }
-    const d = parsed.data;
-    return {
-      kind: "result",
-      result: {
-        ok: d.ok,
-        stepB64: d.step_b64 ?? null,
-        stlB64: d.stl_b64 ?? null,
-        previewSvg: d.preview_svg ?? null,
-        bbox: d.bbox ?? null,
-        volumeMm3: d.volume_mm3 ?? null,
-        checks: (d.checks ?? []).map((c) => ({ name: c.name, pass: c.pass, detail: c.detail ?? "" })),
-        log: (d.log ?? "").slice(-20_000),
-        error: d.error ?? null,
-      },
-    };
+    return buildOutcomeFrom(res.status, body, "cloud-run");
   } catch (e) {
-    if (controller.signal.aborted) return { kind: "down", reason: "timeout", detail: `no answer within ${Math.round((opts.timeoutMs ?? CLOUD_BUILD_TIMEOUT_MS) / 1000)} s` };
+    if (controller.signal.aborted)
+      return { kind: "down", reason: "timeout", detail: `no answer within ${Math.round(timeoutMs / 1000)} s`, engine: "cloud-run" };
     // A token failure counts as "worker unavailable" too (retry, then the browser
     // path). The message of a fetch / auth error never contains a key or a token.
-    return { kind: "down", reason: "unreachable", detail: e instanceof Error ? e.message.slice(0, 200) : "request failed" };
+    return {
+      kind: "down",
+      reason: "unreachable",
+      detail: e instanceof Error ? e.message.slice(0, 200) : "request failed",
+      engine: "cloud-run",
+    };
   } finally {
     clearTimeout(timer);
   }
