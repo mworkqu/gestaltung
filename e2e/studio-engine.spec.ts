@@ -113,7 +113,7 @@ for (const locale of LOCALES) {
     await page.getByRole("button", { name: msg(locale, "Studio", "next"), exact: true }).click();
     await expect(shell).toHaveAttribute("data-step", "enclosure");
     await expect(page.getByTestId("studio-product-picture").first()).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
+    await expect(page.getByTestId("studio-shell").getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
     await page.waitForTimeout(1500);
     expect(await engineRequested(page, chunks)).toEqual([]);
     await expect(page.locator("canvas")).toHaveCount(0);
@@ -130,7 +130,9 @@ test("studio engine: out of credits never loads the engine [en]", async ({ page 
   test.setTimeout(120_000);
   const chunks = engineChunks();
   await open(page, "en", "idea=plant_waterer&step=enclosure&unlock=no_credits");
-  await expect(page.getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
+  // Scoped to the shell: until the server's HTML stream ends, React keeps a hidden copy of the
+  // streamed step outside it (<div hidden>), so a page-wide locator can match two elements.
+  await expect(page.getByTestId("studio-shell").getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
   await page.getByTestId("studio-create-cad").click();
   await expect(page.getByText(msg("en", "Credits", "blockedNoCad"))).toBeVisible();
   await page.waitForTimeout(1500);

@@ -8,4 +8,3 @@
 # line; never add a line to hide a new failure. CI prints the count.
 #
 # Format: <project> | <spec file> | <test title>   (one test per line)
-mobile-375 | studio-engine.spec.ts | studio engine: out of credits never loads the engine [en]
