@@ -33,7 +33,7 @@ Response (always this shape):
     { "name": "must_contain_box", "pass": true, "detail": "Fits your board (70 × 50 × 20 mm) with room to spare: ..." },
     { "name": "min_wall", "pass": true, "detail": "Walls about 2.0 mm (minimum 1.2 mm)." }
   ],
-  "log": "cadquery 2.6.1 loaded in 2.3 s\nmodel ran in 0.1 s\n...",
+  "log": "cadquery 2.8.0 loaded in 2.3 s\nmodel ran in 0.1 s\n...",
   "error": "only when ok is false"
 }
 ```
@@ -48,7 +48,7 @@ Response (always this shape):
 - Optional auth: when the env var `CAD_WORKER_TOKEN` is set, `/build` needs
   `X-Cad-Worker-Token: <token>` (401 otherwise; Authorization carries the Google ID token). `/health` stays open.
 
-`GET /health` → `{"ok": true, "cadquery": "2.6.1"}` (`ok: false` when cadquery is missing).
+`GET /health` → `{"ok": true, "cadquery": "2.8.0"}` (`ok: false` when cadquery is missing).
 
 The model code: CadQuery, millimetres, named dimensions at the top, the final
 shape in one variable `result` (`cq.Workplane`, `cq.Shape` or `cq.Assembly`).
