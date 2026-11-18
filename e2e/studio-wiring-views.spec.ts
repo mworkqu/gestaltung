@@ -69,6 +69,17 @@ async function goToCode(page: Page, locale: Loc, idea: string) {
   await expect(page.getByTestId("studio-shell")).toHaveAttribute("data-step", "code");
 }
 
+/** Wait until neither the page nor the code box is scrolling (smooth scrollIntoView has ended). */
+async function settleScroll(page: Page) {
+  const pos = () =>
+    page.evaluate(() => `${window.scrollY}:${document.querySelector('[data-testid="studio-code"]')?.scrollTop ?? 0}`);
+  await expect(async () => {
+    const a = await pos();
+    await page.waitForTimeout(250);
+    expect(await pos()).toBe(a);
+  }).toPass({ timeout: 10_000 });
+}
+
 function viewsMsg(locale: Loc, group: string, key: string): string {
   const all = JSON.parse(readFileSync(path.join(ROOT, "messages", `${locale}.json`), "utf8")) as {
     Studio: { views: Record<string, Record<string, string>> };
@@ -139,6 +150,11 @@ for (const locale of LOCALES) {
     await expect(line).toHaveAttribute("data-highlight", "true");
     await expect(line).toBeInViewport();
     await expect(line).toContainText("const int LED_PIN = 4;");
+
+    // "Show in code" scrolls the line to the middle smoothly. Wait for that scroll to end: while
+    // the page moves under the cursor the line leaves the pointer, and a hover preview closes
+    // (pointerleave → 220 ms), so "Show in wiring" below was detached mid-click.
+    await settleScroll(page);
 
     // Hover (a click if hover does not open it) a pin line → the wire preview with the same connection.
     // Retried: the preview closes when the code string changes (pin sync) right after arriving.
