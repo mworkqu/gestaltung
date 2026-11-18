@@ -128,6 +128,8 @@ export const MESSAGE_SCOPES = {
   // /schools/classes and a class page: the teacher's own forms and buttons.
   schools: ["SchoolClasses", "SchoolSafety", "Parts", "Delivery", "Turnstile"],
   projects: ["Projects", "Turnstile"],
+  // /handoff/<token> (chat plugin): the claim flow, its phone card and the guest bot check.
+  handoff: ["Handoff", "Phone.invalid", "Turnstile"],
   // /tokens: the pack / Maker Pass checkout with the Fawran proof upload (TokenShop).
   tokens: ["Tokens"],
   // /orders/[id]: only PaymentInstructions is a client component; the rest of

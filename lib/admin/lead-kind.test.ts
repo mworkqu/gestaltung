@@ -13,6 +13,14 @@ describe("leadKind", () => {
   });
 });
 
+describe("plugin leads", () => {
+  it("are detected first, case-insensitively", () => {
+    expect(leadKind("Plugin project: Desk lamp\nSomething")).toBe("plugin");
+    expect(leadKind("plugin PROJECT: x")).toBe("plugin");
+    expect(leadKind("Hello, plugin project: no")).toBe("contact");
+  });
+});
+
 describe("leadProjectId", () => {
   const id = "c3881430-94d3-4c79-9b61-7507a012d582";
   it("finds the project in a quote, drawing or BOM message", () => {

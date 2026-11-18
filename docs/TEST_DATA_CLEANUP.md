@@ -8,6 +8,7 @@ A running list. Add a row whenever test or demo data is written to production. N
 | Guest demo project "Demo video — plant monitor" | `dd3f63ea-e2fc-4476-aca5-a1e0acb4ac89` | 2026-10-10 | Used to record the idea-to-kit, file-to-part, sketch-to-drawing and store-to-door clips; kept for re-recording. |
 | Guest cart line (soil moisture sensor) of the guest demo project above | cart_items row of the guest session that owns `dd3f63ea-...` (id to be read by the dry-run SELECT) | 2026-10-10 | Part of the store-to-door recording; goes with the guest project. |
 | Test order #945ea389 "TEST ORDER — please delete" (Fawran, QAR 53.50) | `945ea389...` (full id to be read by the dry-run SELECT) | 2026-09-29 | Checkout and payment-instruction checks; keep as a reference for the order flow until all phases are verified. |
+| Chat plugin Phase 1 owner test: the `plugin_handoffs` row, its `inquiries` lead (message starts "Plugin project: ") and the claimed project | `select id, inquiry_id, project_id, created_at from public.plugin_handoffs order by created_at desc limit 5` | when the owner tests Phase 1 | Mark `is_test = true` on the hand-off and the inquiry right after the test; delete with the rest. |
 | Inquiry row "TEST LEAD (please ignore)" (plus one test email in the info@ mailbox) | inquiries row, message "TEST LEAD (please ignore)" (id to be read by the dry-run SELECT) | July 2026 (2026-07-05) | Proof that the lead endpoint saves and emails; the email in the mailbox is deleted by hand. |
 
 ## To add when the school stage is tested (2026-10-20)

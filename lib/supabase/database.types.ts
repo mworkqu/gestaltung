@@ -4293,6 +4293,91 @@ export type Database = {
           },
         ];
       };
+      plugin_handoffs: {
+        Row: {
+          id: string;
+          token_hash: string;
+          source: string;
+          build: Json;
+          studio_doc: Json;
+          parts_total_qar: number;
+          contact_name: string | null;
+          contact_phone: string | null;
+          contact_email: string | null;
+          locale: string;
+          ip_hash: string | null;
+          created_at: string;
+          expires_at: string;
+          claimed_at: string | null;
+          claimed_by: string | null;
+          project_id: string | null;
+          inquiry_id: string | null;
+          is_test: boolean;
+        };
+        Insert: {
+          id?: string;
+          token_hash: string;
+          source?: string;
+          build: JsonInput;
+          studio_doc: JsonInput;
+          parts_total_qar?: number;
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          locale?: string;
+          ip_hash?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          claimed_at?: string | null;
+          claimed_by?: string | null;
+          project_id?: string | null;
+          inquiry_id?: string | null;
+          is_test?: boolean;
+        };
+        Update: {
+          id?: string;
+          token_hash?: string;
+          source?: string;
+          build?: JsonInput;
+          studio_doc?: JsonInput;
+          parts_total_qar?: number;
+          contact_name?: string | null;
+          contact_phone?: string | null;
+          contact_email?: string | null;
+          locale?: string;
+          ip_hash?: string | null;
+          created_at?: string;
+          expires_at?: string;
+          claimed_at?: string | null;
+          claimed_by?: string | null;
+          project_id?: string | null;
+          inquiry_id?: string | null;
+          is_test?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "plugin_handoffs_claimed_by_fkey";
+            columns: ["claimed_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "plugin_handoffs_inquiry_id_fkey";
+            columns: ["inquiry_id"];
+            isOneToOne: false;
+            referencedRelation: "inquiries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "plugin_handoffs_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           id: string;
@@ -5585,6 +5670,7 @@ export type Database = {
       cc_verify_certificate: { Args: { p_code: string | null }; Returns: Json };
       claim_guest_work: { Args: { p_from: string | null; p_to: string | null }; Returns: Json };
       claim_notifications: { Args: { p_limit?: number | null }; Returns: { id: string; user_id: string; kind: string; payload: Json; locale: string; email: string; status: string; attempts: number; created_at: string; token: string; unsubscribed_kinds: string[]; all_off: boolean }[] };
+      claim_plugin_handoff: { Args: { p_token: string | null }; Returns: Json };
       claim_price_cohort: { Args: { p_code: string | null }; Returns: number };
       claim_project: { Args: { p_project: string | null; p_token: string | null }; Returns: Json };
       class_order_delivery_quote: { Args: { p_items: JsonInput | null; p_class: string | null; p_from?: string | null }; Returns: Json };
@@ -5654,6 +5740,8 @@ export type Database = {
       payment_create_service: { Args: { p_user: string | null; p_service: string | null; p_amount: number | null; p_project: string | null; p_meta: JsonInput | null; p_is_test?: boolean | null }; Returns: Database["public"]["Tables"]["payments"]["Row"] };
       payment_settle: { Args: { p_payment: string | null; p_status: string | null; p_auto: boolean | null; p_verdict: JsonInput | null; p_reasons: string[] | null; p_transfer_ref: string | null }; Returns: string };
       payment_unapply_internal: { Args: { p_payment: string | null }; Returns: undefined };
+      plugin_handoff_set_phone: { Args: { p_token: string | null; p_phone: string | null }; Returns: Json };
+      plugin_rate_hit: { Args: { p_key: string | null; p_limit: number | null }; Returns: Json };
       price_cohort_funnel: { Args: Record<PropertyKey, never>; Returns: { cohort: string; users: number; with_project: number; bought_credits: number; with_order: number }[] };
       price_experiment_quote: { Args: { p_code: string | null }; Returns: number };
       profile_locale_from_meta: { Args: { p_meta: JsonInput | null }; Returns: string };

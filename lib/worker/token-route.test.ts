@@ -75,7 +75,10 @@ describe("POST /api/worker-token", () => {
     const v = verifyWorkerToken(j.token, SECRET);
     expect(v.ok && v.claims).toMatchObject({ sub: ME, pid: MY_PROJECT, tier: "maker", adm: false, anon: true });
     expect(v.ok && v.claims.exp - v.claims.iat).toBe(600);
-    expect(JSON.stringify(v.ok && v.claims)).not.toContain("99");
+    // The balance (99) must not leak into the token. Check values, not the JSON text:
+    // iat/exp are unix seconds and can contain "99" themselves.
+    expect(Object.values(v.ok ? v.claims : {})).not.toContain(99);
+    expect(JSON.stringify(v.ok && v.claims)).not.toMatch(/balance|credit/i);
   });
 
   it("404 for someone else's project, unless super_admin", async () => {

@@ -74,7 +74,7 @@ export function parseLeadMessage(message: string | null | undefined): ParsedLead
   const kind = leadKind(raw);
 
   // Free text a person wrote (contact form, callback): show it as typed.
-  if (kind === "contact" || kind === "callback") {
+  if (kind === "contact" || kind === "callback" || kind === "plugin") {
     out.body = raw.trim();
     return out;
   }
