@@ -37,6 +37,7 @@ import {
 
 import { FaqAccordion } from "@/components/cad-champions/landing/faq-accordion";
 import { HeroVisual } from "@/components/cad-champions/landing/hero-visual";
+import { CcSessionCta } from "@/components/cad-champions/landing/session-cta";
 import { ScrollLink, TrackLink } from "@/components/cad-champions/landing/track-link";
 import { Term } from "@/components/cad-champions/ui";
 import { FilePlayer } from "@/components/cad-champions/video/file-player";
@@ -44,7 +45,6 @@ import type { Locale } from "@/i18n/routing";
 import { ccSignUpHref } from "@/lib/cad-champions/auth/paths";
 import { loadPublishedTestimonials } from "@/lib/cad-champions/admin/testimonials-server";
 import { publicTestimonials } from "@/lib/cad-champions/admin/testimonials";
-import { getCcUser } from "@/lib/cad-champions/auth/server";
 import { faqHiddenKey, getOverride, msgKey } from "@/lib/cad-champions/content/overrides";
 import { loadContentOverrides } from "@/lib/cad-champions/content/overrides-server";
 import { formatNumber } from "@/lib/cad-champions/format";
@@ -161,8 +161,7 @@ export default async function CcLandingPage({ params }: Params) {
   const trainerName = t("studio.trainerName");
 
   const hasTrainer = trainerName.trim().length > 0 && !trainerName.includes("[TODO-MO");
-  const [cc, data, overrides, overridesEn, testimonialRows] = await Promise.all([
-    getCcUser(),
+  const [data, overrides, overridesEn, testimonialRows] = await Promise.all([
     getLandingData(),
     loadContentOverrides(locale),
     loadContentOverrides("en"),
@@ -171,8 +170,9 @@ export default async function CcLandingPage({ params }: Params) {
   // Section 10: shown only while at least one testimonial is published (admin: Landing).
   const testimonials = publicTestimonials(testimonialRows, locale);
 
-  const signedIn = Boolean(cc);
-  const ctaHref = signedIn ? ccPath(locale, "/dashboard") : ccSignUpHref(locale, ccPath(locale, "/dashboard"));
+  // The page is prerendered; the CTA switches to the dashboard version in the browser (CcSessionCta).
+  const dashboardHref = ccPath(locale, "/dashboard");
+  const signUpHref = ccSignUpHref(locale, dashboardHref);
   const contact = await getCcContact();
   const needWhatsapp = buildWhatsAppUrl(contact.whatsappNumber, t("need.whatsappText"));
   const finalWhatsapp = buildWhatsAppUrl(contact.whatsappNumber, t("final.whatsappText"));
@@ -220,10 +220,16 @@ export default async function CcLandingPage({ params }: Params) {
           </h1>
           <p className="max-w-xl text-base leading-relaxed text-body sm:text-lg">{t("hero.sub")}</p>
           <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-6">
-            <TrackLink href={ctaHref} event="cc_landing_hero_cta" props={{ signed_in: signedIn }} className={ctaClass}>
-              {signedIn ? t("hero.ctaSignedIn") : t("hero.ctaSignedOut")}
+            <CcSessionCta
+              event="cc_landing_hero_cta"
+              signedOutHref={signUpHref}
+              signedInHref={dashboardHref}
+              signedOutLabel={t("hero.ctaSignedOut")}
+              signedInLabel={t("hero.ctaSignedIn")}
+              className={ctaClass}
+            >
               <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />
-            </TrackLink>
+            </CcSessionCta>
             <ScrollLink targetId="how-it-works" className={cn(linkClass, "justify-center px-3 sm:justify-start sm:px-0")}>
               {t("hero.secondary")}
               <ArrowDown aria-hidden="true" className="h-4 w-4" />
@@ -584,10 +590,16 @@ export default async function CcLandingPage({ params }: Params) {
         </h2>
         <p className="max-w-2xl text-base leading-relaxed text-body">{t("final.text")}</p>
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-6">
-          <TrackLink href={ctaHref} event="cc_landing_final_cta" props={{ signed_in: signedIn }} className={ctaClass}>
-            {signedIn ? t("final.ctaSignedIn") : t("final.ctaSignedOut")}
+          <CcSessionCta
+            event="cc_landing_final_cta"
+            signedOutHref={signUpHref}
+            signedInHref={dashboardHref}
+            signedOutLabel={t("final.ctaSignedOut")}
+            signedInLabel={t("final.ctaSignedIn")}
+            className={ctaClass}
+          >
             <ArrowRight aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />
-          </TrackLink>
+          </CcSessionCta>
           {finalWhatsapp ? (
             <TrackLink
               href={finalWhatsapp}

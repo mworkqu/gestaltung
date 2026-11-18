@@ -9,8 +9,8 @@ import { CcDeniedToast } from "@/components/cad-champions/auth/denied-toast";
 import { CcContentOverridesProvider } from "@/components/cad-champions/content/content-overrides";
 import { CcFooter } from "@/components/cad-champions/shell/cc-footer";
 import { CcHeader } from "@/components/cad-champions/shell/cc-header";
+import { CcSessionProvider } from "@/components/cad-champions/shell/session-context";
 import { ToastProvider } from "@/components/cad-champions/ui";
-import { getCcUser } from "@/lib/cad-champions/auth/server";
 import { applyMessageOverrides, clientOverrides } from "@/lib/cad-champions/content/overrides";
 import { loadContentOverrides } from "@/lib/cad-champions/content/overrides-server";
 import { ccLayoutMetadata } from "@/lib/cad-champions/metadata";
@@ -38,9 +38,11 @@ const FONT_STACK = {
   ar: "var(--font-sans-ar), var(--font-cc-sans), ui-sans-serif, system-ui, sans-serif",
 } as const;
 
-// Every CC page reads the session (header account menu, Need help), so the whole
-// subtree is dynamic. Public CC pages are noindex and cheap; no ISR is lost.
-export const dynamic = "force-dynamic";
+// No force-dynamic and no session read here: the header account menu loads the
+// session in the browser (components/cad-champions/shell/session-context.tsx),
+// so public CC pages can be prerendered. Signed-in pages are dynamic on their
+// own (requireCcUser / requireCcStaff read cookies) and each enforces auth
+// itself; this layout enforces none.
 
 type Params = { params: Promise<{ locale: string }> };
 
@@ -70,12 +72,6 @@ export default async function CadChampionsLayout({ children, params }: Params & 
     CC: applyMessageOverrides((all.CC ?? {}) as Record<string, unknown>, overrides),
   };
   const t = await getTranslations({ locale, namespace: "CC.shell" });
-  // Prompt 2: the header shows "Sign in" or the account menu. Reading the
-  // session makes CC pages dynamic (they are noindex and per-user anyway).
-  const cc = await getCcUser();
-  const session = cc
-    ? { name: cc.profile?.full_name ?? null, email: cc.user.email ?? null, isStaff: cc.isStaff }
-    : null;
 
   return (
     <NextIntlClientProvider messages={messages}>
@@ -91,6 +87,7 @@ export default async function CadChampionsLayout({ children, params }: Params & 
         style={{ fontFamily: FONT_STACK[locale] }}
       >
         <CcContentOverridesProvider value={clientOverrides(overrides)}>
+        <CcSessionProvider>
         <ToastProvider>
           <a
             href="#cc-main"
@@ -98,7 +95,7 @@ export default async function CadChampionsLayout({ children, params }: Params & 
           >
             {t("skipToContent")}
           </a>
-          <CcHeader locale={locale} session={session} />
+          <CcHeader locale={locale} />
           <Suspense fallback={null}>
             <CcDeniedToast />
           </Suspense>
@@ -107,6 +104,7 @@ export default async function CadChampionsLayout({ children, params }: Params & 
           </div>
           <CcFooter locale={locale} />
         </ToastProvider>
+        </CcSessionProvider>
         </CcContentOverridesProvider>
       </div>
     </NextIntlClientProvider>

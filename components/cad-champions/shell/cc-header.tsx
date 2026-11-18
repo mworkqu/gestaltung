@@ -4,21 +4,14 @@ import { getTranslations } from "next-intl/server";
 import type { Locale } from "@/i18n/routing";
 import { ccPath } from "@/lib/cad-champions/routes";
 
-import { CcAccountMenu } from "./account-menu";
-import { CcLanguageSwitcher } from "./language-switcher";
 import { CcMark } from "./cc-mark";
-
-/** What the header needs to know about the visitor (from getCcUser() in the CC layout). */
-export type CcHeaderSession = {
-  name: string | null;
-  email: string | null;
-  isStaff: boolean;
-} | null;
+import { CcHeaderActions } from "./header-actions";
 
 // CAD Champions header: wordmark (home), language switcher, and "Sign in"
 // when signed out or the account menu (Dashboard, Settings, Sign out) when
-// signed in. Server component; the CC layout passes the session.
-export async function CcHeader({ locale, session = null }: { locale: Locale; session?: CcHeaderSession }) {
+// signed in. Server component with no session read: that part is a client
+// component (header-actions.tsx) so the header can be prerendered.
+export async function CcHeader({ locale }: { locale: Locale }) {
   const t = await getTranslations({ locale, namespace: "CC.shell" });
   const focus = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
 
@@ -35,17 +28,7 @@ export async function CcHeader({ locale, session = null }: { locale: Locale; ses
         </Link>
 
         <nav aria-label={t("headerNav")} className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <CcLanguageSwitcher locale={locale} signedIn={session !== null} />
-          {session ? (
-            <CcAccountMenu locale={locale} name={session.name} email={session.email} isStaff={session.isStaff} />
-          ) : (
-            <Link
-              href={ccPath(locale, "/sign-in")}
-              className={`inline-flex min-h-11 items-center justify-center rounded-full bg-accent px-4 text-sm font-semibold text-accent-foreground shadow-neu-sm transition-colors hover:bg-cobalt-hover sm:px-5 ${focus}`}
-            >
-              {t("signIn")}
-            </Link>
-          )}
+          <CcHeaderActions locale={locale} />
         </nav>
       </div>
     </header>
