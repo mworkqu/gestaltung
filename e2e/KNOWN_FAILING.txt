@@ -8,22 +8,12 @@
 # line; never add a line to hide a new failure. CI prints the count.
 #
 # Format: <project> | <spec file> | <test title>   (one test per line)
-desktop | studio-enclosure.spec.ts | studio enclosure: plant idea → stake pod, other shapes, take it apart [en]
-desktop | studio-enclosure.spec.ts | studio enclosure: plant idea → stake pod, other shapes, take it apart [ar]
 desktop | studio-idea.spec.ts | idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [en]
 desktop | studio-idea.spec.ts | idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [ar]
-desktop | studio-product.spec.ts | studio product: guest limit, fallback, out of credits, engineer view [en]
 desktop | studio-robot-arm.spec.ts | robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [en]
 desktop | studio-robot-arm.spec.ts | robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [ar]
-desktop | studio.spec.ts | design studio: idea to enclosure [en]
-desktop | studio.spec.ts | design studio: idea to enclosure [ar]
-mobile-375 | studio-enclosure.spec.ts | studio enclosure: plant idea → stake pod, other shapes, take it apart [en]
-mobile-375 | studio-enclosure.spec.ts | studio enclosure: plant idea → stake pod, other shapes, take it apart [ar]
 mobile-375 | studio-engine.spec.ts | studio engine: out of credits never loads the engine [en]
 mobile-375 | studio-idea.spec.ts | idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [en]
 mobile-375 | studio-idea.spec.ts | idea W3: plant idea gets a pump, the card sits beside the chat, refinement updates it [ar]
 mobile-375 | studio-robot-arm.spec.ts | robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [en]
 mobile-375 | studio-robot-arm.spec.ts | robot arm from the chat: desktop reply, 6 joints, grouped parts, wiring passes, 6 servo rows [ar]
-mobile-375 | studio.spec.ts | design studio: idea to enclosure [en]
-mobile-375 | studio.spec.ts | design studio: idea to enclosure [ar]
-mobile-375 | studio.spec.ts | design studio: final phone pictures + name on the lid

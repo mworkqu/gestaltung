@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
 
-import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, test, type Loc } from "./fixtures";
+import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, msgf, test, type Loc } from "./fixtures";
 
 // P5-16 Phase 2b — the real product in the Studio, on the TEST-ONLY fixture
 // /{locale}/e2e-fixtures/studio?product=1&idea=<key>: the five acceptance ideas
@@ -46,7 +46,7 @@ async function open(page: Page, locale: Loc, query: string) {
 async function pictures(page: Page) {
   const pics = page.getByTestId("studio-product-picture");
   await expect(pics.first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
+  await expect(page.getByTestId("studio-shell").getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
   return pics;
 }
 
@@ -100,7 +100,7 @@ for (const locale of LOCALES) {
     await expect(page.getByText(msg(locale, "Studio", "downloadStl"))).toHaveCount(0);
     await expect(page.getByTestId("studio-product-progress")).not.toContainText(/\d/);
     await expectNoHorizontalOverflow(page);
-    await scrollTo(page, page.getByTestId("studio-product-pictures"));
+    await scrollTo(page, page.getByTestId("studio-shell").getByTestId("studio-product-pictures"));
     await page.screenshot({ path: path.join(dir, "1-pictures.png") });
 
     // Tap the first card (chosen), then Create my CAD.
@@ -143,7 +143,7 @@ test("studio product: Try another gives different designs [en]", async ({ page }
   const cards = page.getByTestId("studio-product-card");
   const before = await cards.evaluateAll((els) => els.map((e) => e.getAttribute("data-archetype")));
   await page.getByTestId("studio-try-another").click();
-  await expect(page.getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
+  await expect(page.getByTestId("studio-shell").getByTestId("studio-product-pictures")).toHaveAttribute("data-phase", "ready", { timeout: 60_000 });
   await expect(async () => {
     const after = await cards.evaluateAll((els) => els.map((e) => e.getAttribute("data-archetype")));
     expect(after.length).toBeGreaterThanOrEqual(2);
@@ -161,7 +161,7 @@ test("studio product: guest limit, fallback, out of credits, engineer view [en]"
   // The pipeline fails → the template enclosure flow (never a blank screen).
   await page.goto("/en/e2e-fixtures/studio?product=1&idea=plant_waterer&step=enclosure&productfail=1");
   await expect(page.getByTestId("studio-product-fallback")).toBeVisible({ timeout: 40_000 });
-  await expect(page.getByRole("button", { name: msg("en", "Studio", "drawItCredit") })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: msgf("en", "Studio", "drawItCredit", { n: 1 }) })).toBeVisible({ timeout: 20_000 });
 
   // Out of credits → the usual AccessNote; nothing opens.
   await page.goto("/en/e2e-fixtures/studio?product=1&idea=plant_waterer&step=enclosure&unlock=no_credits");

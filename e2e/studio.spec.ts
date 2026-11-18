@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
 
-import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, test } from "./fixtures";
+import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, msgf, test } from "./fixtures";
 
 // Design Studio (P5-13 Phase 1) on the TEST-ONLY route /{locale}/e2e-fixtures/studio
 // (lib/e2e-fixtures.ts: E2E_FIXTURES=1 on the server, which playwright.config.ts
@@ -127,7 +127,7 @@ for (const locale of LOCALES) {
 
     // ── Enclosure: draw it, the case renders in 3D ───────────────────────
     await expect(shell).toHaveAttribute("data-step", "enclosure");
-    await tap(page.getByRole("button", { name: msg(locale, "Studio", "drawItCredit") }));
+    await tap(page.getByRole("button", { name: msgf(locale, "Studio", "drawItCredit", { n: 1 }) }));
     await expect(page.getByTestId("studio-enclosure-skeleton")).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: msg(locale, "Studio", "colour") })).toBeVisible();
     await expectCanvas(page.getByTestId("studio-enclosure-viewer"));
@@ -292,7 +292,7 @@ test("design studio: final phone pictures + name on the lid", async ({ page }, i
 
   // 4 · Enclosure: dome look, then the name on the lid
   await expect(shell).toHaveAttribute("data-step", "enclosure");
-  await page.getByRole("button", { name: msg(locale, "Studio", "drawItCredit") }).click();
+  await page.getByRole("button", { name: msgf(locale, "Studio", "drawItCredit", { n: 1 }) }).click();
   const encViewer = page.getByTestId("studio-enclosure-viewer");
   await expectCanvas(encViewer);
   const caseState = encViewer.locator("[data-case]");

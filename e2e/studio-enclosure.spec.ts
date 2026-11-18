@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { Locator, Page } from "@playwright/test";
 
-import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, test, type Loc } from "./fixtures";
+import { expect, expectLocale, expectNoHorizontalOverflow, LOCALES, msg, msgf, test, type Loc } from "./fixtures";
 
 // W6 — Enclosure: the shape follows the idea; everything 3D in one step.
 // TEST-ONLY fixture /{locale}/e2e-fixtures/studio?preset=plant opens the Studio
@@ -57,7 +57,7 @@ for (const locale of LOCALES) {
     await expect(shell).toHaveAttribute("data-step", "enclosure");
 
     // ── Draw it: the plant idea gets a stake pod + its reason ──────────────
-    await clickWhenHydrated(page.getByRole("button", { name: msg(locale, "Studio", "drawItCredit") }));
+    await clickWhenHydrated(page.getByRole("button", { name: msgf(locale, "Studio", "drawItCredit", { n: 1 }) }));
     const viewer = page.getByTestId("studio-enclosure-viewer");
     const caseState = viewer.locator("[data-case]");
     await expect(caseState).toHaveAttribute("data-case", "ready", { timeout: 40_000 });
