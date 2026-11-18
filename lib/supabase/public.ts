@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
+import type { Database } from "./database.types";
 import { supabaseEnv } from "./env";
 
 // Anonymous, cookie-free Supabase client for public catalogue reads (the
@@ -10,7 +11,7 @@ import { supabaseEnv } from "./env";
 export function createPublicClient() {
   const env = supabaseEnv();
   if (!env) return null;
-  return createSupabaseClient(env.url, env.anonKey, {
+  return createSupabaseClient<Database>(env.url, env.anonKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

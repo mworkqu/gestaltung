@@ -8,6 +8,7 @@ import { AVAILABILITIES, type Supplier } from "@/lib/store/sourcing";
 import type { ColumnMapping } from "@/lib/sourcing/adapters/csv";
 import type { SourcedOffer } from "@/lib/sourcing/types";
 import { revalidateStorefront } from "@/lib/cache/storefront";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 // Supplier price-list import (Task 19a). The browser parses the CSV through
 // the column mapping; the server re-plans from those rows and the database,
@@ -31,6 +32,13 @@ export type ImportPlan = {
   attach: PlanAttach[];
   unmatched: PlanNew[];
 };
+
+// One compared field onto an offer patch: currency / availability are text,
+// the rest numbers (the plan compares them the same way).
+function setSourced(patch: TableUpdate<"supplier_offers">, c: Change) {
+  if (c.field === "currency" || c.field === "availability") patch[c.field] = String(c.to);
+  else patch[c.field] = Number(c.to);
+}
 
 async function requireAdmin() {
   const s = await getSessionContextCached();
@@ -185,8 +193,8 @@ export async function applyImport(
   for (let i = 0; i < p.updates.length; i += 20) {
     await Promise.all(
       p.updates.slice(i, i + 20).map(async (u) => {
-        const patch: Record<string, unknown> = { last_checked_at: now };
-        for (const c of u.changes) patch[c.field] = c.to;
+        const patch: TableUpdate<"supplier_offers"> = { last_checked_at: now };
+        for (const c of u.changes) setSourced(patch, c);
         const { error } = await supabase.from("supplier_offers").update(patch).eq("id", u.offerId);
         if (error) out.failed.push({ supplierSku: u.supplierSku, reason: error.message });
         else out.updated++;

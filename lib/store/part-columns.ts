@@ -24,14 +24,18 @@ export const PART_PUBLIC_COLUMNS =
   "id, sku, name, name_ar, description, description_ar, category, material, standard, unit_price, min_order_qty, stock_status, image_url, is_published, created_at, updated_at, tags, attributes, pack_size, images, lead_time_class, name_key, merged_into, is_test, datasheet_url, specs, backup_for, specs_ar, details_ar_at, store_category, store_category_review, in_own_stock";
 
 /** The admin read view of parts (0105): every column, super_admin rows only. */
-export const PARTS_ADMIN_VIEW = "parts_admin";
+export const PARTS_ADMIN_VIEW: string = "parts_admin";
 
 /**
  * An admin read that needs the hidden columns (or `*`): runs `query` against the
  * parts_admin view; before 0105 runs (no view) it runs again on the table,
  * which still grants every column then.
  */
-export async function readPartsAdmin<R extends { error: unknown }>(query: (table: "parts_admin" | "parts") => PromiseLike<R>): Promise<R> {
-  const first = await query(PARTS_ADMIN_VIEW);
+export async function readPartsAdmin<R extends { error: unknown }>(query: (table: "parts") => PromiseLike<R>): Promise<R> {
+  // The callback sees the table's name type: the view is `select p.* from parts p`
+  // (0105), so its row IS the parts row. Typed as the view, every column would be
+  // nullable (Postgres reports view columns as nullable), and a union of the two
+  // names makes supabase-js's select parser give up ("excessively deep").
+  const first = await query(PARTS_ADMIN_VIEW as "parts");
   return isMissingRelation(first.error) ? query("parts") : first;
 }

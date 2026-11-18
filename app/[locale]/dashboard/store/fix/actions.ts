@@ -19,6 +19,7 @@ import {
 import { asLocale } from "@/lib/locale";
 import { UUID_RE } from "@/lib/uuid";
 import { round2 } from "@/lib/format/money";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 // Fix list actions (D1). super_admin only — checked here and again by RLS.
 // The client sends at most MAX_IDS products per call (it batches) and shows
@@ -146,7 +147,7 @@ export async function fixOne(locale: string, partId: string, input: FixOneInput)
   if (typeof partId !== "string" || !UUID_RE.test(partId)) return { error: "input" };
   const db = await createClient();
 
-  const patch: Record<string, unknown> = {};
+  const patch: TableUpdate<"parts"> = {};
   if (input.imageUrl !== undefined && input.imageUrl !== null && String(input.imageUrl).trim() !== "") {
     const url = String(input.imageUrl).trim();
     if (!/^https:\/\/[^\s]+$/i.test(url) || url.length > 2000) return { error: "image" };

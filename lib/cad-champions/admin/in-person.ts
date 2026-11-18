@@ -17,6 +17,7 @@ import { introState, type AttemptLite } from "../test/status";
 import { DEFAULT_GRACE_SECONDS, deadlineFrom, isPastGrace, parseTime } from "../test/timer";
 import type { AdminDb } from "./server";
 import { isUuid } from "./student-detail";
+import type { JsonInput, TableInsert } from "@/lib/supabase/db";
 
 /** Most students one session can start at once (a studio room). */
 export const IN_PERSON_MAX_STUDENTS = 40;
@@ -106,8 +107,8 @@ export interface InPersonStore {
   loadAttempts(testId: string, userIds: string[]): Promise<AttemptRowLite[]>;
   /** Closes an in-progress attempt that is past deadline + grace (the normal timeout path). */
   closeExpired?(attempt: AttemptRowLite, testType: string): Promise<void>;
-  insertAttempt(row: Record<string, unknown>): Promise<{ id: string } | { error: string }>;
-  audit(entry: { actorId: string; testId: string; after: unknown }): Promise<void>;
+  insertAttempt(row: TableInsert<"cc_attempts">): Promise<{ id: string } | { error: string }>;
+  audit(entry: { actorId: string; testId: string; after: JsonInput }): Promise<void>;
 }
 
 export type InPersonStartResult =

@@ -15,6 +15,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 import type { CcBand } from "../db/types";
 import { ccPath } from "../routes";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 export const BAND_LABEL: Record<CcBand, { en: string; ar: string }> = {
   beginner: { en: "Beginner", ar: "مبتدئ" },
@@ -167,12 +168,17 @@ async function loadEmailData(attemptId: string): Promise<Loaded | null> {
 }
 
 /** Claims `column` (null -> now). Returns true when THIS call claimed it; null when the column is missing. */
-async function claim(attemptId: string, column: "results_email_sent_at" | "final_email_sent_at", extra: Record<string, unknown> = {}): Promise<boolean | null> {
+type EmailColumn = "results_email_sent_at" | "final_email_sent_at";
+
+async function claim(attemptId: string, column: EmailColumn, extra: TableUpdate<"cc_attempts"> = {}): Promise<boolean | null> {
   const service = createServiceClient();
   if (!service) return false;
+  // Typed column write: a computed [column] literal would widen to an index signature.
+  const patch: TableUpdate<"cc_attempts"> = { ...extra };
+  patch[column] = new Date().toISOString();
   const { data, error } = await service
     .from("cc_attempts")
-    .update({ [column]: new Date().toISOString(), ...extra })
+    .update(patch)
     .eq("id", attemptId)
     .is(column, null)
     .select("id");
@@ -187,10 +193,12 @@ async function claim(attemptId: string, column: "results_email_sent_at" | "final
   return !!data && data.length > 0;
 }
 
-async function release(attemptId: string, column: "results_email_sent_at" | "final_email_sent_at"): Promise<void> {
+async function release(attemptId: string, column: EmailColumn): Promise<void> {
   const service = createServiceClient();
   if (!service) return;
-  await service.from("cc_attempts").update({ [column]: null }).eq("id", attemptId);
+  const patch: TableUpdate<"cc_attempts"> = {};
+  patch[column] = null;
+  await service.from("cc_attempts").update(patch).eq("id", attemptId);
 }
 
 /** "Your results are ready", once per attempt. Returns true when sent by this call. */

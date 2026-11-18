@@ -12,12 +12,15 @@ import { checkoutRpcError, validateCheckoutEmail } from "@/lib/store/checkout";
 import { isZeroTotal, placedTotalQar } from "@/lib/store/checkout-totals";
 import { isValidPhone } from "@/lib/phone";
 import { LAST_ORDER_KEY } from "@/lib/parts/storage-keys";
+import type { Database } from "@/lib/supabase/database.types";
 
 type RpcResult = { data: unknown; error: { code?: string; message?: string } | null };
+type OrderRpc = "create_part_order" | "redeem_credits" | "set_order_payment_method";
+type OrderRpcArgs<F extends OrderRpc> = Database["public"]["Functions"][F]["Args"];
 
 export type PlaceOrderDeps = {
   /** The browser Supabase client (only .rpc is used). */
-  supabase: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<RpcResult> };
+  supabase: { rpc: <F extends OrderRpc>(fn: F, args: OrderRpcArgs<F>) => PromiseLike<RpcResult> };
   /** window.sessionStorage, read inside a try (it can throw in privacy modes). */
   storage: () => Pick<Storage, "setItem">;
   /** Validation passed; the first RPC is about to go out. */

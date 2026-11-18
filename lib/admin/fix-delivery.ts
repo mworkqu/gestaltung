@@ -8,6 +8,7 @@ import type { createClient } from "@/lib/supabase/server";
 import { cleanOffer } from "@/lib/store/offer-clean";
 import { ON_REQUEST_KEY, OWN_STOCK_SUPPLIER_CODE, parseOnRequest } from "@/lib/admin/fix-groups";
 import { readPartsAdmin } from "@/lib/store/part-columns";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -82,7 +83,7 @@ export async function setPartDelivery(
   let offerId: string | null = existing.data?.[0]?.id ?? null;
   const cost = opts.cost ?? null;
   if (offerId) {
-    const patch: Record<string, unknown> = {
+    const patch: TableUpdate<"supplier_offers"> = {
       lead_time_days: days,
       active: true,
       last_checked_at: new Date().toISOString(),

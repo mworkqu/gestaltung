@@ -104,7 +104,7 @@ import { TreeNav } from "@/components/prototyping/tree-nav";
 import { ComponentsCard, PowerCard } from "@/components/prototyping/discipline-cards";
 import { Card, GhostButton, PrimaryButton, Warn, useMono } from "@/components/prototyping/ui";
 import { cn } from "@/lib/utils";
-import type { Project, ProjectPart, ProjectSchematicRevision } from "@/lib/supabase/types";
+import type { Project, ProjectPart, ProjectPatch, ProjectSchematicRevision } from "@/lib/supabase/types";
 import { FirmwareCard } from "@/components/prototyping/firmware-card";
 import { PhonePrompt } from "@/components/projects/phone-prompt";
 import { DEFAULT_PROJECT_NAME } from "@/lib/projects/create-from-chat";
@@ -564,7 +564,7 @@ export function PrototypingWorkspace({
   const nextIndex =
     Math.max(0, ...parts.map((p) => parseInt(p.code.replace(/\D/g, ""), 10) || 0)) + 1;
 
-  async function patchProject(changes: Partial<Project>) {
+  async function patchProject(changes: ProjectPatch) {
     setProject((p) => (p ? { ...p, ...changes } : p));
     return createClient().from("projects").update(changes).eq("id", project!.id);
   }

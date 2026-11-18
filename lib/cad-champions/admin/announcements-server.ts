@@ -28,6 +28,7 @@ import {
 import { isMissingSchema, writeAudit, type AdminDb } from "./server";
 import { studentFilterParams, type StudentFilters } from "./students";
 import { loadStudentRows } from "./students-server";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 if (typeof window !== "undefined") throw new Error("lib/cad-champions/admin/announcements-server.ts is server-only");
 
@@ -167,7 +168,7 @@ export async function sendNextBatch(db: AdminDb, announcementId: string, size: n
   const c = await counts(db, announcementId);
   if (!c) return { ok: false, error: "error" };
   const status = nextStatus(c);
-  const patch: Record<string, unknown> = { status, sent_count: c.sent, failed_count: c.failed };
+  const patch: TableUpdate<"cc_announcements"> = { status, sent_count: c.sent, failed_count: c.failed };
   if (status !== "sending") patch.sent_at = new Date().toISOString();
   const { error: ae } = await db.from("cc_announcements").update(patch).eq("id", announcementId);
   if (ae) console.error("[cc-admin] announcement update failed:", ae.code ?? ae.message);

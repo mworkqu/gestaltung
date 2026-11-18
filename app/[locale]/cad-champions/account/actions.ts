@@ -15,6 +15,7 @@ import { ccRateLimited } from "@/lib/cad-champions/rate-limits";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 // Account settings writes. Each action re-checks the session on the server.
 // Things a student may change about themselves go through their own RLS client;
@@ -30,7 +31,7 @@ async function currentUser() {
   return { supabase, user: data.user };
 }
 
-async function updateOwnProfile(values: Record<string, unknown>): Promise<AccountResult> {
+async function updateOwnProfile(values: TableUpdate<"cc_profiles">): Promise<AccountResult> {
   const { supabase, user } = await currentUser();
   if (!user) return { ok: false, error: "session" };
   const { error } = await supabase.from("cc_profiles").update(values).eq("id", user.id);

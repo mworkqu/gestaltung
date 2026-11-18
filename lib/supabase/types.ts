@@ -239,6 +239,12 @@ export type Project = {
   updated_at: string;
 };
 
+/**
+ * A partial projects update from the workspace. firmware / studio are opaque
+ * here (unknown) and have their own writers, so they are not part of it.
+ */
+export type ProjectPatch = Partial<Omit<Project, "firmware" | "studio">>;
+
 export type ProjectBlockType = "text" | "image";
 
 export type ProjectBlock = {

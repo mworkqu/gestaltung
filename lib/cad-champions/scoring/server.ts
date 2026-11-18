@@ -26,6 +26,7 @@ import type { CcAttemptStatus, CcBand } from "../db/types";
 import { OFFICIAL_WEIGHTS, SKILL_AREA_IDS } from "./config";
 import { scoreAttempt, type AspectInput, type AspectResultInput, type AttemptOutcome, type TaskInput, type TaskResultInput } from "./core";
 import { sendFinalScoreEmail, sendResultsReadyEmail } from "./emails";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 if (typeof window !== "undefined") throw new Error("lib/cad-champions/scoring/server.ts is server-only");
 
@@ -133,7 +134,7 @@ export async function computeAttemptScores(attemptId: string): Promise<ComputeSc
     // 4. attempt
     const status = STATUS_FOR[scores.outcome];
     const noFiles = scores.outcome === "no_files";
-    const update: Record<string, unknown> = {
+    const update: TableUpdate<"cc_attempts"> = {
       status,
       total_score: scores.totalEarned,
       max_score: scores.totalMax,

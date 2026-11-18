@@ -18,6 +18,7 @@ import {
 } from "@/lib/cad-champions/admin/lessons";
 import { CC_LOCALES } from "@/lib/cad-champions/db/types";
 import { ccPath } from "@/lib/cad-champions/routes";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 // Training content admin actions (Prompt 11). Admin only: every call runs
 // adminGuard("admin") first, validates its input, audits publish / free
@@ -85,7 +86,7 @@ export async function saveLevelAction(id: string, raw: Raw): Promise<ActionResul
   if (e1) return dbError(e1, "level read");
   if (!before) return { ok: false, error: "not_found" };
   const { unlock_rule, ...rest } = v.value;
-  const patch: Record<string, unknown> = { ...rest };
+  const patch: TableUpdate<"cc_levels"> = { ...rest };
   if (unlock_rule) patch.unlock_rule = unlock_rule;
   const { error } = await g.db.from("cc_levels").update(patch).eq("id", id);
   if (error) return dbError(error, "level save");

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { buildElectronics } from "@/lib/prototyping/electronics-build";
+import { buildElectronics, projectForBuild } from "@/lib/prototyping/electronics-build";
 import { bomRate, canUse, serverWritesReady, spend, spendRefusal, undoUnpaidCircuit } from "@/lib/credits/server";
 import { asLocale } from "@/lib/locale";
 import { jsonError } from "@/lib/http";
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const wiring = listOnly ? { allowed: false, reason: "list_only" as const, role: null } : await canUse(supabase, "wiring", project.id);
   // The spend needs the service client (0102): refuse before paying for the model calls.
   if (wiring.allowed && wiring.role !== "admin" && !serverWritesReady()) return jsonError("unavailable", 503);
-  const r = await buildElectronics({ supabase, project, locale, relist: true, drawCircuit: wiring.allowed });
+  const r = await buildElectronics({ supabase, project: projectForBuild(project), locale, relist: true, drawCircuit: wiring.allowed });
   if (!r.ok)
     return Response.json(
       { error: r.error, problems: r.problems },

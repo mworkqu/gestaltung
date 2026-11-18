@@ -21,6 +21,7 @@ import type { IdeaMessage } from "./steps";
 import type { Locale } from "@/lib/locale";
 import { safeFileName } from "@/lib/storage/paths";
 import { missingProjectError } from "./load-miss";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 export type { ApprovalAsk, TokenInfo };
 
@@ -393,7 +394,7 @@ export function liveStudioApi(projectId: string): StudioApi {
     },
 
     async saveContact(c) {
-      const patch: Record<string, string> = {};
+      const patch: TableUpdate<"profiles"> = {};
       if (c.fullName?.trim()) patch.full_name = c.fullName.trim().slice(0, 120);
       if (c.phone?.trim()) patch.phone = c.phone.trim();
       if (!Object.keys(patch).length) return;

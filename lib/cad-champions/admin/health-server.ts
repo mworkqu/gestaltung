@@ -25,6 +25,7 @@ import {
   type HealthIssue,
 } from "./health";
 import { adminDb, isMissingSchema } from "./server";
+import type { TableName } from "@/lib/supabase/db";
 
 if (typeof window !== "undefined") throw new Error("lib/cad-champions/admin/health-server.ts is server-only");
 
@@ -35,7 +36,7 @@ export type ContentHealth =
 type Db = NonNullable<ReturnType<typeof adminDb>>;
 type Row = Record<string, unknown>;
 
-async function readTable(db: Db, table: string, select: string): Promise<{ rows: Row[] | null; missing: boolean }> {
+async function readTable(db: Db, table: TableName, select: string): Promise<{ rows: Row[] | null; missing: boolean }> {
   const { rows, error } = await fetchAllRows<Row>((from, to) => db.from(table).select(select).order("id").range(from, to));
   if (error) {
     const missing = isMissingSchema(error.code);

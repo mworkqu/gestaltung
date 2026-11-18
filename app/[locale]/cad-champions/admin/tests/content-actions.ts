@@ -88,6 +88,9 @@ function revalidateTarget(target: Target, slug: string) {
 }
 
 const parentColumn = (kind: TargetKind) => (kind === "task" ? "task_id" : "exercise_id");
+// The parent link of an aspect row as a typed object (a computed [col] key
+// widens to an index signature, which the typed insert rejects).
+const parentRef = (kind: TargetKind, id: string) => (kind === "task" ? { task_id: id } : { exercise_id: id });
 const table = (kind: TargetKind) => (kind === "task" ? "cc_test_tasks" : "cc_exercises");
 
 // ------------------------------------------------------------------ aspects
@@ -174,7 +177,8 @@ export async function addStandardAspectsAction(input: { target: Target }): Promi
   if (!g.ok) return g;
   const t = await loadTarget(g.db, input?.target);
   if (!t.ok) return t;
-  if (!t.row.skill_area_id) return { ok: false, error: "invalid", detail: "skill_area" };
+  const skillAreaId = t.row.skill_area_id;
+  if (!skillAreaId) return { ok: false, error: "invalid", detail: "skill_area" };
   if (!(Number(t.row.max_points) > 0)) return { ok: false, error: "invalid", detail: "max_points" };
   const col = parentColumn(input.target.kind);
   const existing = await g.db.from("cc_task_aspects").select("check_key,position").eq(col, t.row.id);
@@ -187,13 +191,13 @@ export async function addStandardAspectsAction(input: { target: Target }): Promi
     .map((p) => {
       const d = STANDARD_AUTO_TEXTS[p.key];
       return {
-        [col]: t.row.id,
+        ...parentRef(input.target.kind, t.row.id),
         position: position++,
         description_en: d.en,
         description_ar: d.ar,
         student_hint_en: d.hint_en,
         student_hint_ar: d.hint_ar,
-        skill_area_id: t.row.skill_area_id,
+        skill_area_id: skillAreaId,
         competition_module: t.row.competition_module,
         type: "measurement",
         max_points: p.points,

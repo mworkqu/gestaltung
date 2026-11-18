@@ -40,10 +40,13 @@ export async function markJourney(userId: string, key: CcJourneyKey, at: Date = 
     return false;
   }
   const iso = at.toISOString();
+  // One typed column: a computed [key] literal would widen to an index signature.
+  const stamp: Partial<Record<CcJourneyKey, string>> = {};
+  stamp[key] = iso;
   try {
     const { data, error } = await service
       .from("cc_journey_progress")
-      .update({ [key]: iso })
+      .update(stamp)
       .eq("user_id", userId)
       .is(key, null)
       .select("user_id");
@@ -57,7 +60,7 @@ export async function markJourney(userId: string, key: CcJourneyKey, at: Date = 
     // trigger normally creates it). Insert-if-missing, then never overwrite.
     const { data: inserted, error: insertError } = await service
       .from("cc_journey_progress")
-      .upsert({ user_id: userId, [key]: iso }, { onConflict: "user_id", ignoreDuplicates: true })
+      .upsert({ user_id: userId, ...stamp }, { onConflict: "user_id", ignoreDuplicates: true })
       .select("user_id");
     if (insertError) {
       console.error("[cc-journey] insert failed:", key, insertError.code ?? insertError.message);

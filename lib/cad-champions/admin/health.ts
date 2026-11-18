@@ -12,6 +12,8 @@
 //   todo_content          "[TODO-MO" in a database text column
 //   todo_message          "[TODO-MO" in a message file visible on public pages
 
+import type { TableName } from "@/lib/supabase/db";
+
 export type EntityKind = "test" | "task" | "module" | "level" | "lesson" | "exercise" | "help" | "plan" | "cohort";
 
 export const HEALTH_KINDS = [
@@ -63,7 +65,7 @@ type Pair = readonly [field: string, en: string, ar: string, array?: boolean];
 
 export interface EntitySpec {
   kind: EntityKind;
-  table: string;
+  table: TableName;
   /** Columns to select (comma separated). */
   select: string;
   titleCols: readonly [en: string, ar: string];

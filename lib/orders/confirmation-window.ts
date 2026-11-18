@@ -19,7 +19,10 @@ export type ConfirmationOrder = {
  * True when the order has an address, has not been emailed yet and is at most
  * an hour old (exactly 60 minutes still counts).
  */
-export function confirmationAllowed(order: ConfirmationOrder | null | undefined, now: Date | number): boolean {
+export function confirmationAllowed<T extends ConfirmationOrder>(
+  order: T | null | undefined,
+  now: Date | number
+): order is T & { customer_email: string } {
   if (!order || !order.customer_email || order.confirmation_emailed_at) return false;
   const age = (typeof now === "number" ? now : now.getTime()) - new Date(order.created_at).getTime();
   return !(age > CONFIRMATION_WINDOW_MS);

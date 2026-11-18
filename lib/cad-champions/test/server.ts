@@ -9,14 +9,17 @@ import { after } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { Json, TableRow } from "@/lib/supabase/db";
 
 import type { CcUser } from "../auth/server";
 import type {
   CcAttempt,
+  CcAttemptStatus,
   CcCompetitionModule,
   CcJourneyProgress,
   CcSkillArea,
   CcSubmission,
+  CcSubmitReason,
   CcTest,
   CcTestTaskPublic,
 } from "../db/types";
@@ -111,6 +114,27 @@ export type AttemptRow = Pick<
 
 const ATTEMPT_COLUMNS = "id,user_id,test_id,status,started_at,deadline_at,submitted_at,submit_reason,in_person,phase_markers";
 
+type AttemptDbRow = Pick<TableRow<"cc_attempts">, AttemptColumn>;
+type AttemptColumn = "id" | "user_id" | "test_id" | "status" | "started_at" | "deadline_at" | "submitted_at" | "submit_reason" | "in_person" | "phase_markers";
+
+function isPhaseMarker(v: Json): v is { key: string; at: string } {
+  return typeof v === "object" && v !== null && !Array.isArray(v) && typeof v.key === "string" && typeof v.at === "string";
+}
+
+/**
+ * A stored attempt → AttemptRow. status / submit_reason are text columns whose
+ * values the 0077 check constraints limit to the CcAttemptStatus / CcSubmitReason
+ * lists; phase_markers is jsonb, kept only where it has the {key, at} shape.
+ */
+function toAttemptRow(r: AttemptDbRow): AttemptRow {
+  return {
+    ...r,
+    status: r.status as CcAttemptStatus,
+    submit_reason: r.submit_reason as CcSubmitReason | null,
+    phase_markers: Array.isArray(r.phase_markers) ? r.phase_markers.filter(isPhaseMarker) : [],
+  };
+}
+
 /** The user's attempts at one test, newest first (RLS: own rows). */
 export async function loadAttempts(userId: string, testId: string): Promise<AttemptRow[]> {
   try {
@@ -126,7 +150,7 @@ export async function loadAttempts(userId: string, testId: string): Promise<Atte
       if (!isMissingTable(error.code)) console.error("[cc-test] attempts read failed:", error.code ?? error.message);
       return [];
     }
-    return (data ?? []) as AttemptRow[];
+    return (data ?? []).map(toAttemptRow);
   } catch (e) {
     console.error("[cc-test] attempts read failed:", e instanceof Error ? e.message : "unknown");
     return [];
@@ -147,7 +171,7 @@ export async function loadLatestAttempts(userId: string, testIds: string[]): Pro
       .order("started_at", { ascending: false })
       .limit(200);
     if (error) return out;
-    for (const a of (data ?? []) as AttemptRow[]) if (!out.has(a.test_id)) out.set(a.test_id, a);
+    for (const a of (data ?? []).map(toAttemptRow)) if (!out.has(a.test_id)) out.set(a.test_id, a);
   } catch {
     // list still renders without statuses
   }

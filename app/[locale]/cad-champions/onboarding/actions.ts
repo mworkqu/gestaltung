@@ -3,6 +3,7 @@
 import { ONBOARDING_LAST_SCREEN, ONBOARDING_SKIPPED_STEP } from "@/lib/cad-champions/profile/onboarding";
 import { isCcTrack } from "@/lib/cad-champions/profile/track";
 import { createClient } from "@/lib/supabase/server";
+import type { TableUpdate } from "@/lib/supabase/db";
 
 // Onboarding writes. Every action re-checks the session on the server and then
 // writes through the user's own RLS client (a student may update their own
@@ -10,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type OnboardingResult = { ok: true } | { ok: false; error: "session" | "invalid" | "save" };
 
-async function updateOwnProfile(values: Record<string, unknown>): Promise<OnboardingResult> {
+async function updateOwnProfile(values: TableUpdate<"cc_profiles">): Promise<OnboardingResult> {
   const supabase = await createClient();
   const { data, error: authError } = await supabase.auth.getUser();
   if (authError || !data.user) return { ok: false, error: "session" };

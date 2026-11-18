@@ -30,7 +30,7 @@ import { plainComponentLabels, plainNetLabels, plainPartName, plainPinLabel, typ
 import { safetyNote } from "@/lib/prototyping/plain-safety";
 import { setFact, EMPTY_SPEC, type Spec } from "@/lib/prototyping/spec";
 import { renderWiring, wiringProducts, type WiringProduct } from "@/lib/prototyping/wiring-svg";
-import type { Project } from "@/lib/supabase/types";
+import type { Project, ProjectPatch } from "@/lib/supabase/types";
 import { asLocale } from "@/lib/locale";
 
 type Problem = "failed" | "busy";
@@ -48,7 +48,7 @@ export function ClientWiring({
   matches: Map<string, LineMatch>;
   netlist: ProjectNetlist | null;
   onSaved: () => Promise<void>;
-  patchProject: (changes: Partial<Project>) => PromiseLike<{ error: unknown }>;
+  patchProject: (changes: ProjectPatch) => PromiseLike<{ error: unknown }>;
 }) {
   const t = useTranslations("ClientView");
   const locale = asLocale(useLocale());
@@ -119,7 +119,7 @@ export function ClientWiring({
       // Board and power are chosen for the client, in one write, before drawing.
       const setup = autoSetup({ route: project.build_route ?? null, spec: project.spec ?? null, brief: project.brief });
       if (setup.needsRoute || setup.needsPower) {
-        const changes: Partial<Project> = {};
+        const changes: ProjectPatch = {};
         if (setup.needsRoute) changes.build_route = setup.route;
         if (setup.needsPower) {
           const next: Spec = setFact(project.spec ?? EMPTY_SPEC, { id: "power", label: "Power" }, setup.power);

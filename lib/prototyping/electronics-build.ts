@@ -24,6 +24,8 @@ import type { CallResult } from "./ai-call";
 import { generateNetlist, listElectronics } from "./electronics-gen";
 import type { Netlist, ProjectNetlist } from "./netlist";
 import type { Spec } from "./spec";
+import { readBom, readBuildRoute, readNetlist, readSpec } from "./project-json";
+import type { TableRow } from "@/lib/supabase/db";
 
 export type BuildOutcome =
   | { ok: true; bom: ProjectBom; netlist: ProjectNetlist | null; circuit: "ok" | "failed" | "skipped"; problems: string[] }
@@ -37,6 +39,21 @@ type ProjectRow = {
   netlist: ProjectNetlist | null;
   build_route: BuildRoute | null;
 };
+
+/** The projects columns the routes read, as stored. */
+export type ProjectBuildColumns = Pick<TableRow<"projects">, "id" | "brief" | "spec" | "bom" | "netlist" | "build_route">;
+
+/** A stored projects row → the shape the builder works on (jsonb read through project-json.ts). */
+export function projectForBuild(row: ProjectBuildColumns): ProjectRow {
+  return {
+    id: row.id,
+    brief: row.brief,
+    spec: readSpec(row.spec),
+    bom: readBom(row.bom),
+    netlist: readNetlist(row.netlist),
+    build_route: readBuildRoute(row.build_route),
+  };
+}
 
 export async function buildElectronics(opts: {
   supabase: SupabaseClient;
