@@ -137,8 +137,7 @@ export function AddExistingDialog({
           .order("created_at", { ascending: false })
           .limit(100);
         if (!live) return;
-        type Row = { id: string; custom_name: string | null; quantity: number; product: StorePart | null };
-        const rows = ((data ?? []) as unknown as Row[]).map((r) => ({
+        const rows = (data ?? []).map((r) => ({
           key: r.id,
           name: r.product ? partName(r.product, locale) : r.custom_name ?? "—",
           sku: r.product?.sku ?? null,

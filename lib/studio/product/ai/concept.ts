@@ -9,7 +9,7 @@
 // The preview pictures themselves are never AI-drawn: they are renders of the
 // real model (worker), so this only ever decorates the share card.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 export function parseConceptSetting(value: unknown): boolean {
   if (value === true) return true;
@@ -18,7 +18,7 @@ export function parseConceptSetting(value: unknown): boolean {
 }
 
 /** store_settings.studio_concept_image (default false; a missing row or a read error = false). */
-export async function conceptImageEnabled(supabase: SupabaseClient): Promise<boolean> {
+export async function conceptImageEnabled(supabase: DbClient): Promise<boolean> {
   try {
     const { data, error } = await supabase.from("store_settings").select("value").eq("key", "studio_concept_image").maybeSingle();
     if (error || !data) return false;

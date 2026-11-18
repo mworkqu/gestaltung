@@ -14,7 +14,7 @@
 // selected at all. Item snapshots are updated so each change is emailed once.
 // The owner gets a summary of what was sent.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderOwnerEmail } from "@/lib/email/lead-email";
@@ -33,7 +33,7 @@ import { HOLIDAYS_KEY, parseHolidays } from "@/lib/store/working-days";
 // Not yet shipped: the 0053 set (confirmed, paid, sourcing) and the old one (pending, processing).
 const OPEN = OPEN_ORDER_STATUSES.filter((s) => s !== "shipped");
 
-export async function runDeliveryPromiseReview(db: SupabaseClient): Promise<{ checked: number; affected: string[] }> {
+export async function runDeliveryPromiseReview(db: DbClient): Promise<{ checked: number; affected: string[] }> {
   const today = new Date().toISOString().slice(0, 10);
   const { data: cfgRow } = await db.from("store_settings").select("value").eq("key", "shipping").maybeSingle();
   const cfg = (cfgRow?.value ?? {}) as CronShippingConfig;
@@ -55,7 +55,7 @@ export async function runDeliveryPromiseReview(db: SupabaseClient): Promise<{ ch
       .from("part_order_items")
       .select("id, part_id, part_name, lead_time_class, part:parts(lead_time_class)")
       .eq("order_id", order.id);
-    const rows = (items ?? []) as unknown as PromiseItemRow[];
+    const rows: PromiseItemRow[] = items ?? [];
     const plan = planPromiseReview(order as PromiseOrder, rows, cfg, holidays);
     if (!plan) continue;
     const { changed, oldDate, newDate } = plan;

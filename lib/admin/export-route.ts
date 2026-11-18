@@ -5,7 +5,7 @@
 // Every read runs through RLS as the caller; the service client is passed to
 // the loader for the sections RLS hides from a super_admin's own session.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -14,7 +14,7 @@ type ExportData = Record<string, unknown>;
 
 export type ExportConfig = {
   /** Build the export, or null when there is no such record (404). */
-  load: (db: SupabaseClient, id: string, opts: { service: SupabaseClient | null; exportedBy: string }) => Promise<ExportData | null>;
+  load: (db: DbClient, id: string, opts: { service: DbClient | null; exportedBy: string }) => Promise<ExportData | null>;
   /** The attachment name used when ?download=1. */
   filename: (data: ExportData, id: string) => string;
   /**
@@ -22,7 +22,7 @@ export type ExportConfig = {
    * non-admin export this record? Only called when the hook is enabled.
    */
   devOwner: {
-    isOwn: (db: SupabaseClient, id: string, userId: string) => Promise<boolean>;
+    isOwn: (db: DbClient, id: string, userId: string) => Promise<boolean>;
     exportedBy: string;
     /** Appended to `_notes` so the reader knows RLS hid the admin-only sections. */
     note: string;
@@ -31,8 +31,8 @@ export type ExportConfig = {
 
 /** Seams for tests: the two Supabase clients and the environment. */
 export type ExportDeps = {
-  userClient: () => Promise<SupabaseClient>;
-  serviceClient: () => SupabaseClient | null;
+  userClient: () => Promise<DbClient>;
+  serviceClient: () => DbClient | null;
   env: { NODE_ENV?: string; EXPORT_DEV_OWNER?: string };
 };
 

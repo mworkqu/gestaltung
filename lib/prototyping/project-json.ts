@@ -7,7 +7,7 @@
 // readers check the outer shape (a JSON object) and hand the value on as the
 // app type. This is the ONE place that trust is stated; call sites stay free
 // of casts.
-import type { Json } from "@/lib/supabase/database.types";
+import type { Json, TableRow } from "@/lib/supabase/db";
 
 import { BUILD_ROUTES, type BuildRoute } from "./analysis";
 import type { ProjectBom } from "./bom-types";
@@ -32,7 +32,29 @@ export function readBom(v: Json | null | undefined): ProjectBom | null {
 
 /** projects.netlist as the app's ProjectNetlist; null when unset or not an object. */
 export function readNetlist(v: Json | null | undefined): ProjectNetlist | null {
-  return isJsonObject(v) ? (v as unknown as ProjectNetlist) : null;
+  return isJsonObject(v) ? (v as ProjectNetlist) : null;
+}
+
+/** The project as buildElectronics (electronics-build.ts) works on it. */
+export type BuildProject = {
+  id: string;
+  brief: string | null;
+  spec: Spec | null;
+  bom: ProjectBom | null;
+  netlist: ProjectNetlist | null;
+  build_route: BuildRoute | null;
+};
+
+/** A stored projects row (the columns the electronics routes read) → BuildProject. */
+export function projectForBuild(row: Pick<TableRow<"projects">, "id" | "brief" | "spec" | "bom" | "netlist" | "build_route">): BuildProject {
+  return {
+    id: row.id,
+    brief: row.brief,
+    spec: readSpec(row.spec),
+    bom: readBom(row.bom),
+    netlist: readNetlist(row.netlist),
+    build_route: readBuildRoute(row.build_route),
+  };
 }
 
 /** projects.build_route narrowed to a known route; anything else is null. */

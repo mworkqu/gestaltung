@@ -92,7 +92,7 @@ export default async function OrderDetailPage({
   const tD = await getTranslations("Delivery");
   const tPay = await getTranslations("PayMethods");
   const tCredits = await getTranslations("Credits");
-  const ship = order as unknown as {
+  const ship = order as {
     shipping_tier?: string | null;
     split_shipments?: boolean;
     shipping_qar?: number | null;

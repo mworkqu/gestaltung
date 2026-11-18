@@ -10,7 +10,7 @@
 // both through lib/notifications/drain.ts, and by the Mac Mini worker. No
 // next/*: the caller passes how to load the contact number for the footers.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { sendEmailResult } from "@/lib/email";
 import { renderNotification, NOTIFICATION_KINDS, type NotificationKind } from "@/lib/email/templates";
@@ -35,7 +35,7 @@ export type DrainSummary = {
 export type DrainResult = { ok: true; summary: DrainSummary } | { ok: false; error: string; detail?: string };
 
 export async function drainOutboxWith(
-  db: SupabaseClient,
+  db: DbClient,
   siteUrl: string,
   limit: number,
   refreshContactPhone: () => Promise<unknown>,

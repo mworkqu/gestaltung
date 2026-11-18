@@ -19,12 +19,6 @@ import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 
 export type ItemWithPart = ProjectItem & { part: Part | null };
 
-type OrderLineRow = {
-  part_id: string;
-  quantity: number;
-  order: StatusOrderLine["order"] | StatusOrderLine["order"][];
-};
-
 /**
  * The live store matches for a project's bill of materials (/api/bom/match),
  * read once for the page: the parts list and the prototyping card both use
@@ -155,7 +149,7 @@ export function useProjectData(projectId: string) {
     setItems((itemRes.data ?? []) as ItemWithPart[]);
     setCartRows((cartRes.data ?? []) as StatusCartRow[]);
     setOrderLines(
-      ((orderRes.data ?? []) as unknown as OrderLineRow[]).map((l) => ({
+      (orderRes.data ?? []).map((l) => ({
         part_id: l.part_id,
         quantity: l.quantity,
         order: Array.isArray(l.order) ? (l.order[0] ?? null) : l.order,

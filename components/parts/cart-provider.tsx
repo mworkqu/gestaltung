@@ -167,7 +167,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const rows = (res.data ?? []) as unknown as Row[];
+    const rows = (res.data ?? []) as Row[];
     const nextItems = rows
       .filter((r): r is Row & { part: Part } => Boolean(r.part))
       .map((r) => ({

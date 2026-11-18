@@ -13,7 +13,7 @@
 // Before migration 0096 runs, is_class_project() does not exist, every project
 // reads as "not a class" and nothing here changes behaviour.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { makeLibrary, type StudioLibrary } from "@/lib/studio/library/index";
 import { classSafeParts, classSafetyReason } from "@/lib/studio/library/class-safe";
@@ -33,7 +33,7 @@ export type ClassGuard = {
 };
 
 export async function classGuard(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   lib: StudioLibrary,
 ): Promise<ClassGuard> {

@@ -11,7 +11,7 @@
 // provider. The in-memory caches above this (lib/studio/ai/cache.ts) cannot do
 // that on Vercel — the next press lands on another instance and pays again.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { callCostUsd } from "@/lib/ai/prices";
 import { logUsage, quota } from "@/lib/ai/usage";
@@ -35,7 +35,7 @@ export type CallResult<T> =
   | { ok: false; error: "paused" | "unavailable" | "rate_limited" | "invalid"; problems: string[] };
 
 export async function validatedCall<T>(opts: {
-  supabase: SupabaseClient;
+  supabase: DbClient;
   /** The caller's verified user id (metering, 0101); looked up on `supabase` when absent. */
   userId?: string | null;
   /** null = not tied to a project (billing: the Fawran proof check). */
@@ -77,7 +77,7 @@ export async function validatedCall<T>(opts: {
   // step is paid for again rather than handed over unchecked. Before the
   // provider guards: a stored answer costs nothing, so neither the daily guard
   // nor a missing key is a reason to refuse it.
-  if (fingerprint) {
+  if (fingerprint && projectId) {
     const { data: prior } = await supabase
       .from("analysis_runs")
       .select("raw_response, model")

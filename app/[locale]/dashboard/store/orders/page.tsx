@@ -44,7 +44,7 @@ export default async function PartsOrdersPage({
   ]);
   const hiddenCount = hiddenRes.error ? 0 : (hiddenRes.count ?? 0);
 
-  const orders = (data ?? []) as unknown as OrderListRow[];
+  const orders = (data ?? []) as OrderListRow[];
   // D2: 100 rows per page, ?page= kept next to ?show= in the URL.
   const paged = paginate(orders, parsePage(sp.page));
   const { byOrder, failed: linesFailed } = error

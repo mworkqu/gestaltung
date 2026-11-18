@@ -97,6 +97,8 @@ export const hasStoreCategory = unstable_cache(
 );
 
 /** Card columns, plus store_category once 0048 has run. */
+// The column list depends on whether 0048 ran, so supabase-js cannot parse it:
+// the reads below name their row type (CardRow) as the select type argument.
 const cardColumns = (store: boolean): string => (store ? `${STORE_CARD_COLUMNS}, store_category` : STORE_CARD_COLUMNS);
 
 type CardRow = StoreCardPart & { store_category?: string | null };
@@ -184,7 +186,7 @@ async function storeListing(
     const base = (withCount: boolean) => {
       let query = supabase
         .from("parts")
-        .select(cardColumns(store), withCount ? { count: "exact" } : undefined)
+        .select<string, CardRow>(cardColumns(store), withCount ? { count: "exact" } : undefined)
         .eq("is_published", true)
         .is("merged_into", null)
         // Nothing without a delivery date is listed (owner, 2026-09-29); its
@@ -212,7 +214,7 @@ async function storeListing(
     if (locale === "ar") query = query.order("name_ar", { ascending: true, nullsFirst: false });
     query = query.order("name", { ascending: true }).order("id", { ascending: true });
     const { data, count } = await query.range(from, from + STORE_PAGE_SIZE - 1);
-    const parts = ((data ?? []) as unknown as CardRow[]).map(toCard);
+    const parts = (data ?? []).map(toCard);
     return { parts, total: count ?? parts.length };
 }
 
@@ -253,13 +255,13 @@ export const getFeaturedParts = unstable_cache(
     const store = await hasStoreCategory();
     const { data } = await supabase
       .from("parts")
-      .select(`${cardColumns(store)}, is_published, merged_into`)
+      .select<string, CardRow & { is_published: boolean; merged_into: string | null }>(`${cardColumns(store)}, is_published, merged_into`)
       .eq("is_published", true)
       .eq("lead_time_class", "in_stock")
       .not("image_url", "is", null)
       .order("updated_at", { ascending: false })
       .limit(200);
-    const pool = ((data ?? []) as unknown as (CardRow & { is_published: boolean; merged_into: string | null })[])
+    const pool = (data ?? [])
       .filter(isListed)
       .map(toCard);
     const byCategory = new Map<string, StoreCardPart>();
@@ -425,12 +427,12 @@ export const getCardsBySkus = unstable_cache(
     const store = await hasStoreCategory();
     const { data } = await supabase
       .from("parts")
-      .select(cardColumns(store))
+      .select<string, CardRow>(cardColumns(store))
       .in("sku", skus)
       .eq("is_published", true)
       .is("merged_into", null)
       .not("lead_time_class", "is", null);
-    return inSkuOrder(((data ?? []) as unknown as CardRow[]).map(toCard), skus);
+    return inSkuOrder((data ?? []).map(toCard), skus);
   },
   ["store:cards-by-sku"],
   CACHE,
@@ -475,7 +477,7 @@ const upsellPool = unstable_cache(
     const base = () =>
       supabase
         .from("parts")
-        .select(cardColumns(store))
+        .select<string, CardRow>(cardColumns(store))
         .eq("is_published", true)
         .is("merged_into", null)
         .in(column, categories)
@@ -485,7 +487,7 @@ const upsellPool = unstable_cache(
       base().eq("lead_time_class", "in_stock"),
       base().not("lead_time_class", "is", null).neq("lead_time_class", "in_stock"),
     ]);
-    const rows = [...((inStock.data ?? []) as unknown as CardRow[]), ...((later.data ?? []) as unknown as CardRow[])];
+    const rows = [...(inStock.data ?? []), ...(later.data ?? [])];
     return rankInStockFirst(rows.map(toCard)).slice(0, UPSELL_POOL);
   },
   ["store:upsell-pool"],
@@ -532,13 +534,13 @@ async function partCard(sku: string): Promise<StoreCardPart | null> {
   const store = await hasStoreCategory();
   const { data } = await supabase
     .from("parts")
-    .select(cardColumns(store))
+    .select<string, CardRow>(cardColumns(store))
     .eq("sku", sku)
     .eq("is_published", true)
     .is("merged_into", null)
     .not("lead_time_class", "is", null)
     .maybeSingle();
-  return data ? toCard(data as unknown as CardRow) : null;
+  return data ? toCard(data) : null;
 }
 
 const boughtTogether = async (sku: string, storeCategory: string | null): Promise<UpsellPick> => {
@@ -552,12 +554,12 @@ const boughtTogether = async (sku: string, storeCategory: string | null): Promis
       const store = await hasStoreCategory();
       const { data: rows } = await supabase
         .from("parts")
-        .select(cardColumns(store))
+        .select<string, CardRow>(cardColumns(store))
         .in("sku", ranked)
         .eq("is_published", true)
         .is("merged_into", null)
         .not("lead_time_class", "is", null);
-      together = inSkuOrder(((rows ?? []) as unknown as CardRow[]).map(toCard), ranked);
+      together = inSkuOrder((rows ?? []).map(toCard), ranked);
     }
     const fallback = together.length >= UPSELL_COUNT || !storeCategory ? [] : await getUpsellPool([storeCategory]);
     return mergeBoughtTogether({ together, fallback, currentSku: sku, category: storeCategory });

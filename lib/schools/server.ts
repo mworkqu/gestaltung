@@ -6,7 +6,7 @@
 // school_classes. Before 0096 runs the function does not exist and the answer
 // is false, i.e. today's behaviour: no class, no safety mode.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import { isMissingFunction } from "@/lib/supabase/errors";
 
 type RpcError = { code?: string; message?: string } | null;
@@ -17,7 +17,7 @@ const missing = (e: RpcError) =>
 
 let warned = false;
 
-export async function isClassProject(supabase: SupabaseClient, projectId: string | null): Promise<boolean> {
+export async function isClassProject(supabase: DbClient, projectId: string | null): Promise<boolean> {
   if (!projectId) return false;
   const { data, error } = await supabase.rpc("is_class_project", { p_project: projectId });
   if (error) {
@@ -50,7 +50,7 @@ export type ClassTeamContext = {
  * project, before 0096, or when the caller may not see the row.
  */
 export async function classTeamOf(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
 ): Promise<ClassTeamContext | null> {
   const { data, error } = await supabase
@@ -59,12 +59,7 @@ export async function classTeamOf(
     .eq("project_id", projectId)
     .maybeSingle();
   if (error || !data) return null;
-  const row = data as unknown as {
-    id: string;
-    team_name: string;
-    class_id: string;
-    school_classes: { name: string; school_name: string } | null;
-  };
+  const row = data;
   return {
     teamId: row.id,
     teamName: row.team_name,

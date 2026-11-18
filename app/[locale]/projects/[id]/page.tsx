@@ -10,7 +10,7 @@ import { MessagesScope } from "@/components/i18n/messages-scope";
 import { TurnstileChallenge } from "@/components/turnstile-challenge";
 import { turnstileEnabledForPages } from "@/lib/turnstile-server";
 import { getSessionContext } from "@/lib/auth/get-session";
-import { PROJECT_HREF_COLUMNS, isStudioProject, studioRedirectPath, type ProjectHrefRow } from "@/lib/projects/href";
+import { PROJECT_HREF_COLUMNS, isStudioProject, studioRedirectPath } from "@/lib/projects/href";
 import { UUID_RE } from "@/lib/uuid";
 
 /**
@@ -30,7 +30,7 @@ async function isReadableStudioProject(id: string): Promise<boolean> {
     // Before migration 0068 there is no studio_version.
     if (res.error) res = await supabase.from("projects").select("id, ai_consent:spec->aiConsent").eq("id", id).maybeSingle();
     if (res.error || !res.data) return false;
-    return isStudioProject(res.data as unknown as ProjectHrefRow);
+    return isStudioProject(res.data);
   } catch {
     return false;
   }

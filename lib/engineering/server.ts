@@ -2,7 +2,7 @@
 // Submitting goes through the service-role function so the token amount comes
 // from lib/engineering/config.ts, never from the browser.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { stripServerOnly } from "@/lib/studio/product/private";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -30,7 +30,7 @@ export type SubmitResult =
 
 /** Engineers level: queue the full STEP file for a project (charges STEP_JOB.tokens). */
 export async function submitStepJob(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   user: { id: string; isAdmin: boolean },
   projectId: string,
   note: string,

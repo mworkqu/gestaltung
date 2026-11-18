@@ -39,7 +39,7 @@ export function LessonForm({ lesson, backHref }: { lesson: CcLesson; backHref: s
   const router = useRouter();
   const toast = useToast();
 
-  const rec = lesson as unknown as Record<string, unknown>;
+  const rec: Record<string, unknown> = { ...lesson };
   const savedVideos: VideoState = Object.fromEntries(VIDEO_KEYS.map((k) => [k, (rec[`video_${k}`] as string | null) ?? ""]));
   const [slug, setSlug] = React.useState(lesson.slug);
   const [sort, setSort] = React.useState(String(lesson.sort));

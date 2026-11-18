@@ -26,7 +26,7 @@
 
 import { createHash } from "node:crypto";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient, Json } from "@/lib/supabase/db";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { noFreeCircuit, type AiStep, type CanUse, type RawCanUse } from "./constants";
@@ -38,7 +38,7 @@ type RpcError = { code?: string; message?: string } | null;
 const missing = (e: RpcError) =>
   !!e && (isMissingFunction(e) || /could not find the function/i.test(e.message ?? ""));
 
-export async function canUse(supabase: SupabaseClient, step: AiStep, projectId: string | null): Promise<CanUse> {
+export async function canUse(supabase: DbClient, step: AiStep, projectId: string | null): Promise<CanUse> {
   const { data, error } = await supabase.rpc("credit_can_use", { p_step: step, p_project: projectId });
   if (error) {
     if (missing(error)) {
@@ -60,7 +60,7 @@ export type SpendResult =
  * `projectId`, after a successful model answer. `supabase` = the caller's
  * session (only used before 0102 runs).
  */
-export async function spend(supabase: SupabaseClient, userId: string, step: "wiring" | "cad", projectId: string): Promise<SpendResult> {
+export async function spend(supabase: DbClient, userId: string, step: "wiring" | "cad", projectId: string): Promise<SpendResult> {
   const first = await spendOnce(supabase, userId, step, projectId);
   // Before 0052: spend_credit marks the project's first circuit as used
   // (free_wiring_used) without charging and answers cost "free". The flag is
@@ -69,7 +69,7 @@ export async function spend(supabase: SupabaseClient, userId: string, step: "wir
   return first;
 }
 
-async function spendOnce(supabase: SupabaseClient, userId: string, step: "wiring" | "cad", projectId: string): Promise<SpendResult> {
+async function spendOnce(supabase: DbClient, userId: string, step: "wiring" | "cad", projectId: string): Promise<SpendResult> {
   const service = createServiceClient();
   if (!service) {
     console.error(`[credits] spend ${step} on ${projectId} not recorded: SUPABASE_SERVICE_ROLE_KEY is not set`);
@@ -120,7 +120,7 @@ export type SetCadCodeResult = { ok: true } | { ok: false; error: "unavailable" 
  * used before 0102 runs). No service key → "unavailable" (nothing written).
  */
 export async function setCadCode(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   generationId: string,
   code: string,
@@ -143,8 +143,8 @@ export async function setCadCode(
  * saved an unpaid circuit (AI-05). Best effort: a failure is logged.
  */
 export async function undoUnpaidCircuit(
-  supabase: SupabaseClient,
-  project: { id: string; bom: unknown; netlist: unknown },
+  supabase: DbClient,
+  project: { id: string; bom: Json; netlist: Json },
   tag: string,
 ): Promise<void> {
   const { error } = await supabase.from("projects").update({ bom: project.bom, netlist: project.netlist }).eq("id", project.id);
@@ -163,7 +163,7 @@ export function ipHash(request: Request): string | null {
 export type RateResult = { allowed: boolean; used: number; limit: number | null };
 
 /** Counts one BOM run against today's allowance (anonymous 5, user 30, admin ∞). */
-export async function bomRate(supabase: SupabaseClient, request: Request): Promise<RateResult> {
+export async function bomRate(supabase: DbClient, request: Request): Promise<RateResult> {
   // Turnstile (P2-08): guests' /api/analyse calls are checked in the route
   // (lib/turnstile-server.ts checkTurnstile) before this runs, while the
   // store_settings switch is on. /api/bom/electronics is not checked yet.

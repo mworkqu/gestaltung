@@ -8,7 +8,7 @@
 // is computed by the same code the page uses, so the file shows what the
 // client saw. Sections that could not be read say why in `_notes`.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import { getTranslations } from "next-intl/server";
 
 import { matchProjectBom } from "@/lib/prototyping/bom-server";
@@ -80,9 +80,9 @@ export function redactKeys<T>(value: T): T {
 }
 
 export async function buildProjectExport(
-  db: SupabaseClient,
+  db: DbClient,
   projectId: string,
-  opts: { service: SupabaseClient | null; exportedBy: string }
+  opts: { service: DbClient | null; exportedBy: string }
 ): Promise<Row | null> {
   const notes: string[] = [];
   const { data: projectRow, error: projErr } = await db.from("projects").select("*").eq("id", projectId).maybeSingle();
@@ -100,7 +100,7 @@ export async function buildProjectExport(
   };
 
   const [parts, runs, events, usage, schematics, profile, kits, orderLines] = await Promise.all([
-    soft<ProjectPart[]>("parts", db.from("project_parts").select("*").eq("project_id", projectId).order("position")),
+    soft("parts", db.from("project_parts").select("*").eq("project_id", projectId).order("position")),
     soft<Row[]>("analysis runs", db.from("analysis_runs").select("*").eq("project_id", projectId).order("created_at")),
     soft<Row[]>("event log", db.from("project_events").select("*").eq("project_id", projectId).order("created_at")),
     soft<Row[]>("ai usage", db.from("ai_usage").select("*").eq("project_id", projectId).order("created_at")),
@@ -115,7 +115,8 @@ export async function buildProjectExport(
       db.from("part_order_items").select("*, order:part_orders(id, status, total_qar, discount_qar, created_at)").eq("project_id", projectId)
     ),
   ]);
-  const allParts = parts ?? [];
+  // ProjectPart narrows the text columns the 0020 / 0022 check constraints limit.
+  const allParts = (parts ?? []) as ProjectPart[];
 
   // Owner identity: the auth record needs the service key (production has it).
   let owner: Row = { id: project.user_id, profile };

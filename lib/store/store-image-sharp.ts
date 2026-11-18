@@ -7,7 +7,7 @@ import "server-only";
 // (sharp is installed as "sharp-admin" so Next's image optimizer does not find
 // it either; see lib/store/load-sharp.ts and next.config.mjs SHARP_ROUTES.)
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import type { Sharp } from "sharp-admin";
 
 import type { ProductImage } from "@/lib/google/drive-picker";
@@ -40,7 +40,7 @@ export async function openRaster(buf: Buffer): Promise<Sharp> {
 
 /** Resizes to a ≤ 1600 px WebP and a 400 px thumbnail and uploads both to `product-images`. */
 export async function storeImage(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   buf: Buffer,
   stem: string,
   driveFileId: string | null = null

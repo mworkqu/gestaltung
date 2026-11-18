@@ -9,7 +9,7 @@
 // Before 0068 runs the columns do not exist: loads report available=false and
 // saves answer run_0068, so the Studio keeps working in memory.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { StudioDocSchema, parseStudioDoc, type ProductDoc, type StudioDoc } from "../schema";
@@ -42,7 +42,7 @@ export type LoadResult =
   | { ok: true; available: boolean; doc: StudioDoc | null; version: number }
   | { ok: false; error: "not_found" | "failed" };
 
-export async function loadDoc(supabase: SupabaseClient, projectId: string): Promise<LoadResult> {
+export async function loadDoc(supabase: DbClient, projectId: string): Promise<LoadResult> {
   const { data, error } = await supabase
     .from("projects")
     .select("id, studio, studio_version")
@@ -72,7 +72,7 @@ export type SaveResult =
  * "conflict" when somebody saved since — the caller answers as for a lost update.
  */
 async function storedServerOwned(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   version: number,
 ): Promise<{ ok: true; owned: ServerOwned } | { ok: false; error: "conflict" | "run_0068" | "not_found" | "failed" }> {
@@ -101,7 +101,7 @@ async function storedServerOwned(
  * updateProductDoc (service client).
  */
 export async function saveDoc(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   doc: unknown,
   version: number,
@@ -146,7 +146,7 @@ export async function saveDoc(
  * result when this fails (e.g. before 0068).
  */
 export async function updateDoc(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   apply: (doc: StudioDoc | null) => StudioDoc | null,
 ): Promise<{ saved: boolean; version: number | null; error?: string }> {
@@ -179,7 +179,7 @@ export async function updateDoc(
 // studio.productPrivate, written with the same service client.
 // ---------------------------------------------------------------------------
 
-type ServiceClient = SupabaseClient;
+type ServiceClient = DbClient;
 
 /**
  * 0100 not run: project_studio_private / studio_product_save do not exist.
@@ -220,7 +220,7 @@ export async function loadPrivateModels(
   return { ok: true, priv: parseProductPrivate((data as { product_private?: unknown } | null)?.product_private) };
 }
 
-export async function loadDocPrivate(supabase: SupabaseClient, projectId: string): Promise<PrivateLoad> {
+export async function loadDocPrivate(supabase: DbClient, projectId: string): Promise<PrivateLoad> {
   // Ownership / visibility: the caller's RLS client.
   const { data, error } = await supabase.from("projects").select("id, user_id, studio, studio_version").eq("id", projectId).maybeSingle();
   if (error) {
@@ -310,7 +310,7 @@ export type ProductState = { doc: StudioDoc; product: ProductDoc; priv: ProductP
  * studio_product_save → "not_found" otherwise.
  */
 export async function updateProductDoc(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   projectId: string,
   apply: (s: ProductState) => ProductState | null,

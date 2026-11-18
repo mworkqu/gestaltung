@@ -67,9 +67,10 @@ export async function updateTestAction(testId: string, raw: Record<string, unkno
   if (!before) return { ok: false, error: "not_found" };
   const { error } = await g.db.from("cc_tests").update(v.value).eq("id", testId);
   if (error) return dbError(error, "update");
-  const changed = Object.fromEntries(Object.entries(v.value).filter(([k, val]) => (before as unknown as Record<string, unknown>)[k] !== val));
+  const beforeValues: Record<string, unknown> = { ...before };
+  const changed = Object.fromEntries(Object.entries(v.value).filter(([k, val]) => beforeValues[k] !== val));
   if (Object.keys(changed).length > 0) {
-    const prev = Object.fromEntries(Object.keys(changed).map((k) => [k, (before as unknown as Record<string, unknown>)[k] ?? null]));
+    const prev = Object.fromEntries(Object.keys(changed).map((k) => [k, beforeValues[k] ?? null]));
     await writeAudit(g.db, g.cc.user.id, "test.update", "cc_tests", testId, prev, changed);
   }
   revalidateTest(before.slug);

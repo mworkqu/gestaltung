@@ -3,7 +3,7 @@
 // diagram can still show what that kind of part looks like, using a photo we
 // already have in the store, labelled "Example photo". Never generated.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { partImageUrl } from "@/lib/parts/format";
 import type { WiringProduct } from "./wiring-svg";
@@ -34,7 +34,7 @@ type Row = { sku: string; name: string; image_url: string | null };
  * Only published products with a photo, in stock first. Keyed by BOM line id.
  */
 export async function loadExamplePhotos(
-  db: SupabaseClient,
+  db: DbClient,
   wanted: { bomId: string; fn: string }[],
   locale: string
 ): Promise<Map<string, WiringProduct>> {

@@ -19,7 +19,6 @@ import {
   pickActiveProjects,
   pickLastDelivered,
   REORDER_PART_COLUMNS,
-  type OrderedLine,
   type PartsToBuy,
   type ReorderPart,
   type WorkOrderRow,
@@ -79,7 +78,7 @@ async function loadYourWork(userId: string): Promise<Data | null> {
       .limit(YOUR_WORK_PROJECTS);
     const res = withStatus.error ? await base().limit(YOUR_WORK_PROJECTS) : withStatus;
     if (res.error) return [];
-    return pickActiveProjects((res.data ?? []) as unknown as WorkProjectRow[]);
+    return pickActiveProjects(res.data ?? []);
   };
 
   const readOrders = async (delivered: boolean): Promise<WorkOrderRow | null> => {
@@ -87,7 +86,7 @@ async function loadYourWork(userId: string): Promise<Data | null> {
     if (delivered) q = q.eq("status", "delivered");
     const res = await q.order("created_at", { ascending: false }).limit(1);
     if (res.error) return null;
-    return ((res.data ?? []) as unknown as WorkOrderRow[])[0] ?? null;
+    return (res.data ?? [])[0] ?? null;
   };
 
   const [projects, lastOrder, delivered] = await Promise.all([listProjects(), readOrders(false), readOrders(true)]);
@@ -105,7 +104,7 @@ async function loadYourWork(userId: string): Promise<Data | null> {
         "id",
         projects.map((p) => p.id)
       );
-    if (!res.error) toBuy = partsToBuy((res.data ?? []) as unknown as Pick<WorkProjectRow, "bom">[]);
+    if (!res.error) toBuy = partsToBuy((res.data ?? []) as Pick<WorkProjectRow, "bom">[]);
   }
 
   return {
@@ -189,7 +188,7 @@ function Strip({ data }: { data: Data }) {
       const supabase = await loadSupabase();
       const items = await supabase.from("part_order_items").select("part_sku, part_name, quantity").eq("order_id", lastDelivered.id);
       if (items.error) throw items.error;
-      const lines = (items.data ?? []) as unknown as OrderedLine[];
+      const lines = (items.data ?? []);
       if (lines.length === 0) throw new Error("empty order");
 
       const skus = [...new Set(lines.map((l) => l.part_sku))];
@@ -201,7 +200,7 @@ function Strip({ data }: { data: Data }) {
       }
       if (res.error) throw res.error;
 
-      const plan = buildReorderPlan(lines, (res.data ?? []) as unknown as ReorderPart[]);
+      const plan = buildReorderPlan(lines, (res.data ?? []) as ReorderPart[]);
       // One at a time: every add re-reads the cart. Plain lines, no kit, no project.
       let added = 0;
       let failed = false;

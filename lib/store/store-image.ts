@@ -8,7 +8,7 @@
 // /api/admin/store-image (lib/store/store-image-sharp.ts). API routes can call
 // store-image-sharp directly and skip the HTTP hop.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import type { ProductImage } from "@/lib/google/drive-picker";
 import { fetchWithinAllowList } from "@/lib/net/safe-fetch";
@@ -78,7 +78,7 @@ export function buildStoreImageRequest(
  * cannot be reached.
  */
 export async function storeImage(
-  _supabase: SupabaseClient,
+  _supabase: DbClient,
   buf: Buffer,
   stem: string,
   driveFileId: string | null = null

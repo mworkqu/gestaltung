@@ -6,7 +6,7 @@
 
 import { createHash } from "node:crypto";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { validatedCall } from "@/lib/prototyping/ai-call";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -64,7 +64,7 @@ export type ProofResult =
  * hash it, read it with the vision model, settle the row.
  * `supabase` = the user's own session (RLS: only their rows; also meters the AI call).
  */
-export async function submitProof(supabase: SupabaseClient, userId: string, paymentId: string, path: string): Promise<ProofResult> {
+export async function submitProof(supabase: DbClient, userId: string, paymentId: string, path: string): Promise<ProofResult> {
   const service = createServiceClient();
   if (!service) return { ok: false, error: "not_configured" };
   if (!path.startsWith(`${userId}/`) || path.includes("..")) return { ok: false, error: "bad_file" };

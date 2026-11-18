@@ -33,7 +33,7 @@ import {
 if (typeof window !== "undefined") throw new Error("lib/cad-champions/training/server.ts is server-only");
 
 async function userDb(): Promise<Db> {
-  return (await createClient()) as unknown as Db;
+  return (await createClient());
 }
 
 // ─── access ──────────────────────────────────────────────────────────────

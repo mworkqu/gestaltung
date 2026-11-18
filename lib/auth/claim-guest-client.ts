@@ -12,7 +12,7 @@
 // window event, so <GuestClaimNotice> (site layout) shows "Try again" on
 // whatever page the visitor lands on. Nothing fails silently.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 export const CLAIM_PENDING_KEY = "g360:claim-guest";
 export const CLAIM_EVENT = "g360:claim-guest";
@@ -22,7 +22,7 @@ const TIMEOUT_MS = 12_000;
 export type ClaimState = "pending" | "done";
 
 /** The current session's access token when it is a guest (anonymous) session, else null. Reads no network. */
-export async function guestAccessToken(supabase: Pick<SupabaseClient, "auth">): Promise<string | null> {
+export async function guestAccessToken(supabase: Pick<DbClient, "auth">): Promise<string | null> {
   try {
     const {
       data: { session },

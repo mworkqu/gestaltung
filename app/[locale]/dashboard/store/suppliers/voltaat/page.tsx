@@ -66,7 +66,7 @@ export default async function VoltaatSyncPage({ params }: { params: Promise<{ lo
     last_checked_at: string | null;
     part: { name: string; sku: string; unit_price: number; pricing_mode: string } | null;
   };
-  const offerRows = (offersRes.data ?? []) as unknown as OfferRow[];
+  const offerRows = (offersRes.data ?? []) as OfferRow[];
   // pricing_mode is not readable through the parts embed (0105): the admin view, by id.
   const partIds = [...new Set(offerRows.map((o) => o.part_id))];
   const modes = new Map<string, string>();

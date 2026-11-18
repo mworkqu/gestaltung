@@ -15,7 +15,7 @@
 // the agreed amount before the tokens move and fillCharge() records what the model
 // really consumed beside it.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import type { CallSpend } from "@/lib/prototyping/ai-call";
 import { stableHash } from "../cache";
@@ -39,7 +39,7 @@ export type IdeaStatus = {
   pass_until?: string | null;
 };
 
-export async function ideaStatus(supabase: SupabaseClient, projectId: string | null): Promise<IdeaStatus | null> {
+export async function ideaStatus(supabase: DbClient, projectId: string | null): Promise<IdeaStatus | null> {
   const { data, error } = await supabase.rpc("idea_token_status", { p_project: projectId });
   if (error) {
     if (missing(error)) console.warn("[tokens] idea_token_status missing — run migration 0088. Chat is free until then.");
@@ -54,7 +54,7 @@ export type IdeaCharge =
   | { ok: false; error: "no_tokens" | "not_found" | "sign_in" | "failed"; balance: number };
 
 export async function ideaCharge(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   amount: number,
   tier: TierId,
@@ -73,7 +73,7 @@ export async function ideaCharge(
  * about the money comes from the request body. `edit` is false: an upfront charge is
  * not an edit turn (edits are free and are never counted against a token).
  */
-export async function applyChargePlan(supabase: SupabaseClient, projectId: string, plan: ChargePlan): Promise<IdeaCharge | null> {
+export async function applyChargePlan(supabase: DbClient, projectId: string, plan: ChargePlan): Promise<IdeaCharge | null> {
   return ideaCharge(supabase, projectId, plan.amount, plan.tier.id, false);
 }
 
@@ -92,7 +92,7 @@ export async function applyChargePlan(supabase: SupabaseClient, projectId: strin
  * not applied; `{ok: false}` is passed back for the route to answer with.
  */
 export async function settleCharge(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   plan: ChargePlan,
   opts: {
@@ -135,7 +135,7 @@ export async function settleCharge(
  * (quoteTurn below); the caller ignores the answer and charges nothing.
  */
 export async function claimCharge(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   plan: ChargePlan,
   ideaKey?: string | null,
@@ -165,7 +165,7 @@ export async function claimCharge(
  * the tokens have already moved, so a telemetry failure only warns.
  */
 export async function fillCharge(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   rowId: string,
   opts: {
     charged: number;
@@ -228,7 +228,7 @@ export function approvalAsk(plan: ChargePlan, status: IdeaStatus | null): Approv
  * Nothing is charged here, and a failure only warns.
  */
 async function quoteTurn(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   plan: ChargePlan,
   after: ProductSpec | null,
@@ -285,7 +285,7 @@ export type TurnMoney =
   | { ok: false; pause: { needsApproval: ApprovalAsk; tokens: TokenInfo }; refused?: undefined };
 
 export async function priceTurn(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   projectId: string,
   plan: ChargePlan,
   opts: {

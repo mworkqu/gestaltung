@@ -4,7 +4,7 @@
 // a lead. All I/O comes in through `deps`, which lets tests record the calls and
 // lets a server action create a lead without an HTTP hop back to the route.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { parseLeadMessage } from "@/lib/admin/lead-parse";
 import { renderLeadEmail } from "@/lib/email/lead-email";
@@ -18,14 +18,14 @@ export type LeadEmail = { to: string[]; replyTo: string; subject: string; html: 
 
 export type LeadDeps = {
   /** The caller's cookie-bound (RLS) client. May throw; every use is guarded. */
-  userClient: () => Promise<SupabaseClient>;
+  userClient: () => Promise<DbClient>;
   /** The service-role client, or null when its key is missing. */
-  serviceClient: () => SupabaseClient | null;
+  serviceClient: () => DbClient | null;
   /** False when the Supabase URL / anon key are not configured: nothing can be saved. */
   canSave: boolean;
   sendEmail: (mail: LeadEmail) => Promise<boolean>;
   ownerEmail: string;
-  buildQuoteCalc: (db: SupabaseClient, projectId: string, projectLink: string | null) => Promise<QuoteCalc | null>;
+  buildQuoteCalc: (db: DbClient, projectId: string, projectLink: string | null) => Promise<QuoteCalc | null>;
   /** Migration 0073 (quote columns on inquiries) has not been run yet. */
   isMissingQuoteColumn: (e: PgError) => boolean;
   /** This deployment's origin: used for the project links and the email footer. */

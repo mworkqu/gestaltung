@@ -185,10 +185,17 @@ export function normalizeAttachments(raw: unknown): CcAttachment[] {
     if (!path || path.startsWith("/") || path.split("/").some((s) => s === ".." || s === "") || seen.has(path)) continue;
     seen.add(path);
     const kind = oneOf(ATTACHMENT_KINDS, r.kind) ?? "file";
-    out.push({ path, label_en: text(r.label_en, 200) || undefined, label_ar: text(r.label_ar, 200) || undefined, kind });
+    // Absent labels are left out (not set to undefined), as stored before.
+    const att: CcAttachment = { path };
+    const labelEn = text(r.label_en, 200);
+    const labelAr = text(r.label_ar, 200);
+    if (labelEn) att.label_en = labelEn;
+    if (labelAr) att.label_ar = labelAr;
+    att.kind = kind;
+    out.push(att);
     if (out.length >= 20) break;
   }
-  return out.map((a) => Object.fromEntries(Object.entries(a).filter(([, v]) => v !== undefined)) as unknown as CcAttachment);
+  return out;
 }
 
 /** Attachment kind from the uploaded file name. */

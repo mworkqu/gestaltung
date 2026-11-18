@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 // "Confirmation sent on WhatsApp" flag on an order (part_orders.whatsapp_sent).
 //
@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // in the UI has to change. Server only; `db` is a Supabase client that may
 // update part_orders (super admin cookie client, or the service client).
 
-type Db = SupabaseClient;
+type Db = DbClient;
 
 export async function setWhatsappSent(db: Db, orderId: string, sent: boolean): Promise<boolean> {
   const { error } = await db.from("part_orders").update({ whatsapp_sent: sent }).eq("id", orderId);

@@ -43,11 +43,6 @@ type ListRow = Pick<Project, "id" | "name" | "brief" | "created_at"> & {
 };
 
 type ProjectIdRow = { project_id: string | null };
-type OrderLineRow = {
-  project_id: string | null;
-  order: { status: string } | { status: string }[] | null;
-};
-
 /** previews: project id → signed URL of its chosen Studio design picture (made on the server). */
 export function ProjectList({
   previews = {},
@@ -106,7 +101,8 @@ export function ProjectList({
       }
 
       const list = (cols: string) =>
-        supabase.from("projects").select(cols).eq("user_id", user.id).order("updated_at", { ascending: false });
+        // cols falls back with older migrations, so the row type is named here.
+        supabase.from("projects").select<string, ListRow>(cols).eq("user_id", user.id).order("updated_at", { ascending: false });
       // projectHref columns (studio_version, spec->aiConsent) come last so the older
       // fallbacks (before 0068 / 0042) still load; those projects keep the project page.
       let { data, error: listErr } = await list(`id, name, brief, created_at, status, ${PROJECT_HREF_COLUMNS}`);
@@ -120,7 +116,7 @@ export function ProjectList({
       }
       if (!cancelled) setHasStatus(withStatus);
 
-      const rows = (data ?? []) as unknown as ListRow[];
+      const rows = data ?? [];
       const ids = rows.map((p) => p.id);
       if (ids.length === 0) {
         if (!cancelled) setProjects([]);
@@ -156,7 +152,7 @@ export function ProjectList({
       const parts = tally((partRes.data ?? []) as ProjectIdRow[]);
       const carts = tally((cartRes.data ?? []) as ProjectIdRow[]);
       const ordered = new Set<string>();
-      for (const l of (orderRes.data ?? []) as unknown as OrderLineRow[]) {
+      for (const l of (orderRes.data ?? [])) {
         const order = Array.isArray(l.order) ? l.order[0] : l.order;
         if (l.project_id && order && order.status !== "cancelled") ordered.add(l.project_id);
       }

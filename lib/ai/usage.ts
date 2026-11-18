@@ -17,7 +17,7 @@
 // AI route requires one). If 0023 has not run yet, the guard lets calls
 // through (there is nothing to count), rather than breaking the feature.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { dayStart, guardThreshold, providerLimits, type ProviderId } from "./limits";
@@ -50,7 +50,7 @@ export type UsageRow = {
   remainingTokens?: number | null;
 };
 
-export async function logUsage(supabase: SupabaseClient, u: UsageRow): Promise<void> {
+export async function logUsage(supabase: DbClient, u: UsageRow): Promise<void> {
   // Server console too, so usage is visible even before 0023 runs.
   console.info(
     `[ai] ${u.feature}${u.step ? `/${u.step}` : ""} ${u.provider}${u.model ? ` (${u.model})` : ""} ${u.outcome}${
@@ -103,7 +103,7 @@ const fnMissing = (e: RpcError) => !!e && (isMissingFunction(e) || /could not fi
 // Fallback for callers that do not pass the verified id: one auth.getUser() per
 // session client. Only a found id is cached — a failed lookup is retried.
 const sessionUsers = new WeakMap<object, string>();
-async function sessionUserId(supabase: SupabaseClient): Promise<string | null> {
+async function sessionUserId(supabase: DbClient): Promise<string | null> {
   const known = sessionUsers.get(supabase);
   if (known) return known;
   const id = await supabase.auth.getUser().then(
@@ -121,7 +121,7 @@ let warnedNoService = false;
  * the row itself is written with the service client (0101). Never throws.
  */
 export async function recordUsage(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   args: UsageArgs,
   extra: { p_step: string | null; p_cost_usd: number | null },
   verifiedUserId?: string | null,
@@ -163,7 +163,7 @@ export type Quota = {
   paused: boolean;
 };
 
-export async function quota(supabase: SupabaseClient, provider: ProviderId): Promise<Quota> {
+export async function quota(supabase: DbClient, provider: ProviderId): Promise<Quota> {
   const lim = providerLimits(provider);
   const since = dayStart(lim.resetTimeZone);
   const { data, error } = await supabase.rpc("ai_usage_totals", {

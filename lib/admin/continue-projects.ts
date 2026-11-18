@@ -3,7 +3,7 @@
 // one small query is in loadContinueProjects. Never reads the whole studio doc: only
 // its lastStep key is selected.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { FLOW, type FlowStep } from "@/lib/studio/client/steps";
 
@@ -53,14 +53,14 @@ export function shapeContinueProjects(rows: ContinueRow[], fallbackName: string)
  * The signed-in user's own projects (RLS lets a super_admin read everyone's, so the owner
  * filter is explicit), newest touched first. null = could not be read (the card says so).
  */
-export async function loadContinueProjects(db: SupabaseClient, userId: string): Promise<ContinueRow[] | null> {
+export async function loadContinueProjects(db: DbClient, userId: string): Promise<ContinueRow[] | null> {
   const withStep = await db
     .from("projects")
     .select("id, name, updated_at, last_step:studio->>lastStep")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(CONTINUE_LIMIT);
-  if (!withStep.error) return (withStep.data ?? []) as unknown as ContinueRow[];
+  if (!withStep.error) return (withStep.data ?? []);
 
   // Before migration 0068 there is no studio column: names only.
   const plain = await db

@@ -111,7 +111,7 @@ async function plan(supplierId: string, raw: SourcedOffer[]): Promise<ImportPlan
       .order("id")
       .range(from, from + 999);
     if (error) return { error: error.message };
-    existing.push(...((data ?? []) as unknown as typeof existing));
+    existing.push(...(data ?? []));
     if ((data ?? []).length < 1000) break;
   }
   const bySku = new Map(existing.filter((e) => e.supplier_sku).map((e) => [e.supplier_sku!.toLowerCase(), e]));

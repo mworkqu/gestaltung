@@ -367,7 +367,7 @@ export function liveStudioApi(projectId: string): StudioApi {
         .in("sku", wanted)
         .eq("is_published", true)
         .is("merged_into", null);
-      for (const p of (data ?? []) as unknown as StoreCardPart[]) out.set(p.sku, p);
+      for (const p of (data ?? []) as StoreCardPart[]) out.set(p.sku, p);
       return out;
     },
 

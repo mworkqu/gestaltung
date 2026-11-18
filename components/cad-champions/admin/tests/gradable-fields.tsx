@@ -16,6 +16,7 @@ import {
   type CcCompetitionModule,
   type CcSkillArea,
   type CcTestTask,
+  type Json,
 } from "@/lib/cad-champions/db/types";
 
 import { AttachmentsEditor } from "./attachments-editor";
@@ -75,6 +76,21 @@ function percentOf(v: unknown): string {
   return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100 * 10000) / 10000) : "";
 }
 
+/** cc_test_tasks.attachments (jsonb) as the form edits it; entries without a path are skipped. */
+function readAttachments(v: Json | undefined): CcAttachment[] {
+  if (!Array.isArray(v)) return [];
+  const out: CcAttachment[] = [];
+  for (const a of v) {
+    if (typeof a !== "object" || a === null || Array.isArray(a) || typeof a.path !== "string") continue;
+    const att: CcAttachment = { path: a.path };
+    if (typeof a.label_en === "string") att.label_en = a.label_en;
+    if (typeof a.label_ar === "string") att.label_ar = a.label_ar;
+    if (typeof a.kind === "string") att.kind = a.kind;
+    out.push(att);
+  }
+  return out;
+}
+
 export function gradableFromRow(row: Partial<GradableRow> | null, defaults: Partial<GradableState> = {}): GradableState {
   const tol = (row?.tolerances && typeof row.tolerances === "object" && !Array.isArray(row.tolerances) ? row.tolerances : {}) as Record<string, unknown>;
   return {
@@ -84,7 +100,7 @@ export function gradableFromRow(row: Partial<GradableRow> | null, defaults: Part
     title_ar: row?.title_ar ?? "",
     brief_en: row?.brief_en ?? "",
     brief_ar: row?.brief_ar ?? "",
-    attachments: Array.isArray(row?.attachments) ? (row!.attachments as unknown as CcAttachment[]) : [],
+    attachments: readAttachments(row?.attachments),
     expected_upload: row?.expected_upload ?? defaults.expected_upload ?? "step",
     max_points: row?.max_points != null ? String(Number(row.max_points)) : (defaults.max_points ?? ""),
     grading_mode: row?.grading_mode ?? defaults.grading_mode ?? "auto_step",

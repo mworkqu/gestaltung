@@ -7,7 +7,8 @@
 // (studioRequest owner: true). Credits are deliberately NOT in the token: the
 // worker spends or checks them in the database when it does the paid work.
 
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { TIER_IDS } from "@/lib/studio/tiers";
 import { signWorkerToken } from "@/lib/worker/token";
@@ -16,12 +17,12 @@ export type MintResult =
   | { ok: true; token: string; expiresAt: string; projectId: string | null; tier: string | null; isAdmin: boolean }
   | { ok: false; error: "not_found" };
 
-async function isSuperAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
+async function isSuperAdmin(supabase: DbClient, userId: string): Promise<boolean> {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle<{ role: string | null }>();
   return data?.role === "super_admin";
 }
 
-async function storedTier(supabase: SupabaseClient, projectId: string): Promise<string | null> {
+async function storedTier(supabase: DbClient, projectId: string): Promise<string | null> {
   const { data, error } = await supabase.rpc("idea_token_status", { p_project: projectId });
   if (error) return null;
   const tier = (data as { tier?: unknown } | null)?.tier;
@@ -29,7 +30,7 @@ async function storedTier(supabase: SupabaseClient, projectId: string): Promise<
 }
 
 export async function mintWorkerTokenFor(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   user: User,
   projectId: string | null,
   secret: string,

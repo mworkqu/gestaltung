@@ -10,7 +10,7 @@
 //   isMissingQuoteColumn  0073 not run yet
 
 import { skusFor } from "../variants";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { studioLibrary } from "../library/remote";
 import {
@@ -46,7 +46,7 @@ export type RuleRead = { rule: QuoteRule; source: "settings" | "default" | "scho
  * priced with store_settings.school_pricing.print (3e) instead of the studio
  * rule — the spread stays the studio's, so the range is built the same way.
  */
-export async function getQuoteRule(db: SupabaseClient, projectId?: string | null): Promise<RuleRead> {
+export async function getQuoteRule(db: DbClient, projectId?: string | null): Promise<RuleRead> {
   const studio = await studioQuoteRule(db);
   if (!projectId) return studio;
   try {
@@ -62,7 +62,7 @@ export async function getQuoteRule(db: SupabaseClient, projectId?: string | null
   }
 }
 
-async function studioQuoteRule(db: SupabaseClient): Promise<RuleRead> {
+async function studioQuoteRule(db: DbClient): Promise<RuleRead> {
   try {
     const { data, error } = await db.from("store_settings").select("value").eq("key", QUOTE_RULE_KEY).maybeSingle();
     if (error || !data) return { rule: DEFAULT_QUOTE_RULE, source: "default" };
@@ -73,7 +73,7 @@ async function studioQuoteRule(db: SupabaseClient): Promise<RuleRead> {
 }
 
 export async function linkedPrices(
-  db: SupabaseClient,
+  db: DbClient,
   doc: StudioDoc | null,
   getPart: (id: string) => LibraryPart | undefined,
 ): Promise<Map<string, number>> {
@@ -94,7 +94,7 @@ export async function linkedPrices(
  * Never trusts numbers from the browser.
  */
 export async function buildQuoteCalc(
-  db: SupabaseClient,
+  db: DbClient,
   projectId: string,
   projectLink: string | null,
 ): Promise<QuoteCalc | null> {
@@ -111,7 +111,7 @@ export async function buildQuoteCalc(
 export type ProjectQuote = { finalQar: number; note: string | null; quotedAt: string | null };
 
 /** The latest owner quote for this project, or null (none yet, not the caller's, or 0073 not run). */
-export async function getProjectQuote(db: SupabaseClient, projectId: string): Promise<ProjectQuote | null> {
+export async function getProjectQuote(db: DbClient, projectId: string): Promise<ProjectQuote | null> {
   try {
     const { data, error } = await db.rpc("project_quote", { p_project: projectId });
     if (error) return null;

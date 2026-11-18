@@ -123,7 +123,7 @@ const LISTED_FIELDS = [
 
 function onlyThisProductChanged(before: Record<string, unknown> | null, after: ParsedPart): boolean {
   if (!before) return false;
-  const next = after as unknown as Record<string, unknown>;
+  const next = after;
   return LISTED_FIELDS.every((field) => {
     // A field the form did not send (store_category before 0048) is untouched.
     if (!(field in next)) return true;
@@ -346,7 +346,8 @@ async function loadExistingParts(
       : "id, sku, name, material, pack_size";
     const { data, error } = await supabase
       .from("parts")
-      .select(cols)
+      // cols switches with migration 0030, so the row type is named here.
+      .select<string, Row>(cols)
       .order("id")
       .range(from, from + PAGE - 1);
     if (error) {
@@ -358,7 +359,7 @@ async function loadExistingParts(
       }
       return null;
     }
-    const page = (data ?? []) as unknown as Row[];
+    const page = data ?? [];
     rows.push(...page);
     if (page.length < PAGE) break;
     from += PAGE;

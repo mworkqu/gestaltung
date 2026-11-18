@@ -22,7 +22,7 @@
 // (provider "cad-worker", error_code "fallback_browser:<reason>") is written
 // for the admin, and the route falls back to the browser OpenSCAD path.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import { z } from "zod";
 
 import { recordUsage } from "@/lib/ai/usage";
@@ -44,7 +44,7 @@ const Answer = z.object({
 type CqAnswer = { code: string; summary: string; dimensions: { x: number; y: number; z: number } | null };
 
 type Ctx = {
-  supabase: SupabaseClient;
+  supabase: DbClient;
   userId: string;
   projectId: string;
   /** What the version list shows (the request, or the original request of a repair). */
@@ -78,14 +78,14 @@ export type CloudReply =
 
 const STATUS: Record<string, number> = { sign_in: 401, no_credits: 402, not_found: 404, too_many_failed: 429 };
 
-const fail = (supabase: SupabaseClient, id: string, error: string) =>
+const fail = (supabase: DbClient, id: string, error: string) =>
   supabase.rpc("cad_fail", { p_id: id, p_error: error.slice(0, 500) }).then(
     () => undefined,
     () => undefined
   );
 
 /** The admin's signal that the cloud worker was skipped: one ai_usage row (no new table). */
-export async function logCloudFallback(supabase: SupabaseClient, projectId: string, reason: string, userId?: string) {
+export async function logCloudFallback(supabase: DbClient, projectId: string, reason: string, userId?: string) {
   console.warn(`[cad] cloud worker unavailable (${reason}); using the browser engine`);
   // Server-side logging (0101): service client + the session's verified user id.
   await recordUsage(

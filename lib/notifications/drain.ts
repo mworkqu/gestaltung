@@ -4,13 +4,13 @@
 // daily cron (app/api/cron/notifications, through lib/cron/jobs.ts) and right
 // after an admin status change by the orders server action (after()).
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { getContactPhone } from "@/lib/contact-phone-server";
 import { drainOutboxWith, type DrainResult } from "@/lib/notifications/drain-core";
 
 export type { ClaimedRow, DrainResult, DrainSummary } from "@/lib/notifications/drain-core";
 
-export function drainOutbox(db: SupabaseClient, siteUrl: string, limit = 50): Promise<DrainResult> {
+export function drainOutbox(db: DbClient, siteUrl: string, limit = 50): Promise<DrainResult> {
   return drainOutboxWith(db, siteUrl, limit, getContactPhone);
 }

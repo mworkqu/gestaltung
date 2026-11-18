@@ -75,9 +75,8 @@ export async function searchSuppliers(query: string): Promise<{
         .select("supplier_id, supplier_sku, part:parts!supplier_offers_part_id_fkey(id, name, sku)")
         .in("supplier_sku", skus)
     : { data: [] };
-  type Row = { supplier_id: string; supplier_sku: string; part: { id: string; name: string; sku: string } | null };
   const linked = new Map(
-    ((offers ?? []) as unknown as Row[]).filter((o) => o.part).map((o) => [`${o.supplier_id}|${o.supplier_sku}`, o.part!])
+    (offers ?? []).filter((o) => o.part).map((o) => [`${o.supplier_id}|${o.supplier_sku}`, o.part!])
   );
 
   return {
@@ -234,7 +233,7 @@ export async function refreshApiOffer(locale: string, offerId: string): Promise<
     supplier: { code: string } | null;
     part: { attributes: Attributes | null } | null;
   };
-  const row = o as unknown as Row | null;
+  const row = o as Row | null;
   if (!row?.supplier_sku || !row.supplier || !isApi(row.supplier.code)) return { error: "not_api" };
 
   let r: SupplierProduct | null;

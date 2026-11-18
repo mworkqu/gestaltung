@@ -11,7 +11,7 @@
 //
 // Both go through validatedCall (one retry, metered, recorded raw + parsed).
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import { z } from "zod";
 
 import type { BuildRoute } from "./analysis";
@@ -61,7 +61,7 @@ ${attributesGuide(MODEL_CLASSES)}
 - Do not include any confidence, probability or score.`;
 
 export async function listElectronics(opts: {
-  supabase: SupabaseClient;
+  supabase: DbClient;
   projectId: string;
   summary: string;
   facts: string;
@@ -189,7 +189,7 @@ Rules:
 - Do not include any confidence, probability or score.`;
 
 export async function generateNetlist(opts: {
-  supabase: SupabaseClient;
+  supabase: DbClient;
   projectId: string;
   summary: string;
   lines: ProjectLine[];

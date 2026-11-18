@@ -12,7 +12,7 @@
 //  * logClamp(): clamp changes go to the server console (admin), never to the
 //    response body.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import type { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
@@ -25,7 +25,7 @@ import { isSuperAdmin } from "./product";
 export const STUDIO_TEMPERATURE = 0.2;
 
 export type StudioCtx<T> = {
-  supabase: SupabaseClient;
+  supabase: DbClient;
   userId: string;
   /** A guest's anonymous session (P5-16 guest limits). */
   isAnonymous: boolean;
@@ -62,7 +62,7 @@ export async function studioRequest<S extends z.ZodTypeAny>(
   return { supabase, userId: user.id, isAnonymous: user.is_anonymous === true, body, project: row };
 }
 
-export function studioCall(supabase: SupabaseClient, projectId: string, userId?: string): StudioCall {
+export function studioCall(supabase: DbClient, projectId: string, userId?: string): StudioCall {
   return (req) =>
     validatedCall({
       supabase,

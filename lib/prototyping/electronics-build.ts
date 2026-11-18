@@ -14,7 +14,7 @@
 // If the circuit cannot be validated, the list is still saved with its
 // consumables, and the caller is told the passives could not be derived.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import { getTranslations } from "next-intl/server";
 
 import type { BuildRoute } from "./analysis";
@@ -23,40 +23,16 @@ import { augmentedCircuit, deriveElectronics } from "./electronics-rules";
 import type { CallResult } from "./ai-call";
 import { generateNetlist, listElectronics } from "./electronics-gen";
 import type { Netlist, ProjectNetlist } from "./netlist";
-import type { Spec } from "./spec";
-import { readBom, readBuildRoute, readNetlist, readSpec } from "./project-json";
-import type { TableRow } from "@/lib/supabase/db";
+import type { BuildProject } from "./project-json";
 
 export type BuildOutcome =
   | { ok: true; bom: ProjectBom; netlist: ProjectNetlist | null; circuit: "ok" | "failed" | "skipped"; problems: string[] }
   | { ok: false; error: string; problems: string[] };
 
-type ProjectRow = {
-  id: string;
-  brief: string | null;
-  spec: Spec | null;
-  bom: ProjectBom | null;
-  netlist: ProjectNetlist | null;
-  build_route: BuildRoute | null;
-};
-
-/** The projects columns the routes read, as stored. */
-export type ProjectBuildColumns = Pick<TableRow<"projects">, "id" | "brief" | "spec" | "bom" | "netlist" | "build_route">;
-
-/** A stored projects row → the shape the builder works on (jsonb read through project-json.ts). */
-export function projectForBuild(row: ProjectBuildColumns): ProjectRow {
-  return {
-    id: row.id,
-    brief: row.brief,
-    spec: readSpec(row.spec),
-    bom: readBom(row.bom),
-    netlist: readNetlist(row.netlist),
-    build_route: readBuildRoute(row.build_route),
-  };
-}
+type ProjectRow = BuildProject;
 
 export async function buildElectronics(opts: {
-  supabase: SupabaseClient;
+  supabase: DbClient;
   project: ProjectRow;
   locale: "en" | "ar";
   /** false = keep the current electronics lines and only redraw + re-derive. */

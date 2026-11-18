@@ -7,7 +7,7 @@
 // directly — the owner chose no approval queue. Each supplier's run is
 // logged in supplier_sync_runs; the owner is emailed what moved.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderOwnerEmail } from "@/lib/email/lead-email";
@@ -42,7 +42,7 @@ type Change = { partName: string; sku: string; field: string; from: string | num
  * products whose offer changed or was dropped, and whether a listed field moved.
  */
 export async function runApiRefresh(
-  db: SupabaseClient,
+  db: DbClient,
   trigger: "cron" | "manual",
 ): Promise<Record<string, unknown> & { storefront: CatalogChange }> {
   const started = Date.now();
@@ -94,7 +94,7 @@ export async function runApiRefresh(
       lead_time_days: number | null;
       part: { name: string } | null;
     };
-    const rows = (offers ?? []) as unknown as Row[];
+    const rows: Row[] = offers ?? [];
     if (!rows.length) {
       summary[code] = "nothing_stale";
       continue;

@@ -4,7 +4,7 @@
 // these rules are what stop the bare order id from being used to send mail
 // twice or to someone long after checkout.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 /** The order id alone must not trigger a mail once the order is older than this. */
 export const CONFIRMATION_WINDOW_MS = 60 * 60 * 1000;
@@ -32,7 +32,7 @@ export function confirmationAllowed<T extends ConfirmationOrder>(
  * Stamp confirmation_emailed_at before sending, only while it is still null, so
  * of two concurrent calls exactly one gets true and sends.
  */
-export async function claimConfirmation(db: SupabaseClient, orderId: string, now: Date): Promise<boolean> {
+export async function claimConfirmation(db: DbClient, orderId: string, now: Date): Promise<boolean> {
   const { data: claimed } = await db
     .from("part_orders")
     .update({ confirmation_emailed_at: now.toISOString() })
@@ -43,6 +43,6 @@ export async function claimConfirmation(db: SupabaseClient, orderId: string, now
 }
 
 /** The mail failed to send: clear the claim so a retry can send it. */
-export async function releaseConfirmation(db: SupabaseClient, orderId: string): Promise<void> {
+export async function releaseConfirmation(db: DbClient, orderId: string): Promise<void> {
   await db.from("part_orders").update({ confirmation_emailed_at: null }).eq("id", orderId);
 }

@@ -244,7 +244,8 @@ async function translateDetails(db: Db, force: boolean, after: string | null) {
   const query = (cols: string, head = false) => {
     let q = db
       .from("parts")
-      .select(cols, head ? { count: "exact", head: true } : undefined)
+      // cols is chosen per call (and depends on 0047), so the row type is named here.
+      .select<string, DetailsRow>(cols, head ? { count: "exact", head: true } : undefined)
       .eq("is_published", true)
       .is("merged_into", null);
     if (!force) q = q.is("details_ar_at", null);
@@ -259,7 +260,7 @@ async function translateDetails(db: Db, force: boolean, after: string | null) {
       if (isMissingColumn(error) || /specs_ar|details_ar_at/.test(error.message)) return { error: "run_0047" };
       return { error: error.message };
     }
-    const rows = (data ?? []) as unknown as DetailsRow[];
+    const rows = data ?? [];
     if (!rows.length) {
       done = true;
       break;

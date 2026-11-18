@@ -9,7 +9,7 @@
 //   INTEGRATIONS_ENC_KEY           32 random bytes, base64 (AES-256-GCM + state HMAC)
 //   SUPABASE_SERVICE_ROLE_KEY      already set (only service_role reads integrations)
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { decryptSecret, parseEncKey } from "@/lib/integrations/crypto";
@@ -51,7 +51,7 @@ export type ReadResult =
   | { state: "no_service" }
   | { state: "no_table" }
   | { state: "error"; message: string }
-  | { state: "ok"; db: SupabaseClient; row: IntegrationRow | null; meta: YoutubeMeta };
+  | { state: "ok"; db: DbClient; row: IntegrationRow | null; meta: YoutubeMeta };
 
 const isMissingTable = (code: string | undefined, message: string | undefined) =>
   isMissingRelation({ code }) ||
@@ -76,7 +76,7 @@ export async function readYoutubeIntegration(): Promise<ReadResult> {
 
 /** Upsert the youtube row's metadata (and any other columns given). */
 export async function saveYoutubeRow(
-  db: SupabaseClient,
+  db: DbClient,
   meta: YoutubeMeta,
   extra: Partial<Omit<IntegrationRow, "provider" | "metadata">> & { connected_by?: string | null } = {},
 ): Promise<string | null> {
@@ -94,7 +94,7 @@ export async function saveYoutubeRow(
  * when the row can't be read.
  */
 export async function updateYoutubeMeta(
-  db: SupabaseClient,
+  db: DbClient,
   fallback: YoutubeMeta,
   change: (meta: YoutubeMeta) => YoutubeMeta,
 ): Promise<YoutubeMeta> {
@@ -106,7 +106,7 @@ export async function updateYoutubeMeta(
 }
 
 /** Count `units` of YouTube API quota against today (Pacific day). Best-effort. */
-export async function recordQuota(db: SupabaseClient, meta: YoutubeMeta, units: number): Promise<YoutubeMeta> {
+export async function recordQuota(db: DbClient, meta: YoutubeMeta, units: number): Promise<YoutubeMeta> {
   return updateYoutubeMeta(db, meta, (m) => ({ ...m, quota: addQuota(m.quota, units, new Date()) }));
 }
 

@@ -14,7 +14,7 @@
 
 import { randomBytes } from "node:crypto";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import { z } from "zod";
 
 import { ipHash } from "@/lib/credits/server";
@@ -188,7 +188,7 @@ export async function guestDesignLimit(request: Request, userId: string, store: 
 // Roles + preview storage
 // ---------------------------------------------------------------------------
 
-export async function isSuperAdmin(supabase: SupabaseClient, userId: string): Promise<boolean> {
+export async function isSuperAdmin(supabase: DbClient, userId: string): Promise<boolean> {
   const { data } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
   return (data as { role?: string } | null)?.role === "super_admin";
 }

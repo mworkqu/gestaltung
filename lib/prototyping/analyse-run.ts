@@ -8,7 +8,7 @@
 // Pure of Next/Supabase imports (types only) so the sequencing is unit-tested
 // with a fake provider. The route keeps auth, Turnstile and body validation.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient, TableInsert } from "@/lib/supabase/db";
 
 import type { ProviderId } from "@/lib/ai/limits";
 import type { UsageRow } from "@/lib/ai/usage";
@@ -29,7 +29,7 @@ export const METERED: Record<string, ProviderId> = { gemini: "gemini" };
 
 export type AnalyseDeps = {
   /** The caller's cookie-bound (RLS) client: analysis_runs reads and writes. */
-  db: SupabaseClient;
+  db: DbClient;
   userId: string;
   /** The configured provider's name (ANALYSIS_PROVIDER). */
   providerName: string;
@@ -48,7 +48,7 @@ export type AnalyseDeps = {
  * answer. The stored result still goes through the schema — a row written by an
  * older shape of the analysis is not reused rather than shown unvalidated.
  */
-async function priorRun(db: SupabaseClient, req: AnalysisRequest, fingerprint: string) {
+async function priorRun(db: DbClient, req: AnalysisRequest, fingerprint: string) {
   if (!req.projectId) return null;
   const { data: prior } = await db
     .from("analysis_runs")
@@ -66,7 +66,7 @@ async function priorRun(db: SupabaseClient, req: AnalysisRequest, fingerprint: s
 }
 
 /** Insert the run. Before 0099 there is no request_hash column: record it as before, so only the reuse is missing, not the diagnostics. */
-async function recordRun(db: SupabaseClient, row: Record<string, unknown>, fingerprint: string): Promise<void> {
+async function recordRun(db: DbClient, row: TableInsert<"analysis_runs">, fingerprint: string): Promise<void> {
   let { error: runErr } = await db.from("analysis_runs").insert({ ...row, request_hash: fingerprint });
   if (runErr?.code === "PGRST204") {
     ({ error: runErr } = await db.from("analysis_runs").insert(row));

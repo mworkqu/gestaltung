@@ -6,7 +6,7 @@
 // logs every run in cleanup_runs. The owner gets a one-line email only when
 // accounts were actually deleted. Returns the route's status + body.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import {
   CLEANUP_KEY,
@@ -25,7 +25,7 @@ type RpcError = { code?: string; message?: string } | null;
 const missing = (e: RpcError) =>
   !!e && (isMissingFunction(e) || /could not find the function/i.test(e.message ?? ""));
 
-export async function runAnonymousCleanup(db: SupabaseClient): Promise<CronOutcome> {
+export async function runAnonymousCleanup(db: DbClient): Promise<CronOutcome> {
   const { data: row, error: readError } = await db
     .from("store_settings")
     .select("value")

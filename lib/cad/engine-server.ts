@@ -4,7 +4,7 @@
 // (lib/store/public-catalog.ts); no row or any error = browser.
 
 import { unstable_cache } from "next/cache";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { SETTINGS_TAG, STOREFRONT_REVALIDATE } from "@/lib/cache/storefront";
 import { createPublicClient } from "@/lib/supabase/public";
@@ -34,7 +34,7 @@ export const getCadEngineSetting = unstable_cache(
  * lines, catalog parts, store lines). A failed read = no board known, which
  * only drops the fit check (never blocks a model).
  */
-export async function loadProjectBoards(supabase: SupabaseClient, projectId: string): Promise<Footprint[]> {
+export async function loadProjectBoards(supabase: DbClient, projectId: string): Promise<Footprint[]> {
   try {
     const [project, parts, items] = await Promise.all([
       supabase.from("projects").select("bom").eq("id", projectId).maybeSingle(),

@@ -11,7 +11,7 @@
 // cart_items is deliberately absent: it has no super_admin policy (0016), so
 // an open basket is the customer's own business.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { callCostUsd } from "@/lib/ai/prices";
 import { normalizePhone } from "@/lib/phone";
@@ -170,9 +170,9 @@ const SECTION_LABEL: Record<CustomerSection, string> = {
 };
 
 export async function buildCustomerExport(
-  db: SupabaseClient,
+  db: DbClient,
   userId: string,
-  opts: { service: SupabaseClient | null; exportedBy: string }
+  opts: { service: DbClient | null; exportedBy: string }
 ): Promise<Row | null> {
   const notes: string[] = [];
   const { profile, projects, orders, leadRows, ledger, payments, pass, sessions, usage, jobs, cad, signals, outbox, items } =

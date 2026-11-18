@@ -120,16 +120,14 @@ export async function runRetirementsWith(
     const { data, error } = await db.from("store_settings").select("value").eq("key", YOUTUBE_KEY).maybeSingle();
     if (error) console.error("[youtube-retire] site links read failed:", error.message);
     else {
-      let value: unknown = data?.value;
-      let changed = false;
+      // The parsed setting once a link was removed; null = nothing changed.
+      let next: ReturnType<typeof removeSiteLink>["value"] | null = null;
       for (const id of deletedIds) {
-        const r = removeSiteLink(value, id);
-        if (r.changed) {
-          value = r.value;
-          changed = true;
-        }
+        const r = removeSiteLink(next ?? data?.value, id);
+        if (r.changed) next = r.value;
       }
-      if (changed) {
+      if (next) {
+        const value = next;
         const { error: upErr } = await db
           .from("store_settings")
           .upsert({ key: YOUTUBE_KEY, value, updated_at: new Date().toISOString() });

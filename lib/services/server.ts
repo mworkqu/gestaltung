@@ -2,7 +2,7 @@
 // The price is recomputed here from the saved Studio doc and the admin's prices;
 // the browser only names the service and the project.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { StudioDocSchema, type StudioDoc } from "@/lib/studio/schema";
@@ -10,13 +10,13 @@ import type { PaymentRow } from "@/lib/billing/server";
 import { ENGINEER_SERVICES_KEY, parseEngineerServices, quoteService, serviceReady, type EngineerServices, type Quote, type ServiceKind } from "./quote";
 
 /** The admin's prices (store_settings 'engineer_services'), else the defaults. */
-export async function engineerServicePrices(supabase: SupabaseClient): Promise<EngineerServices> {
+export async function engineerServicePrices(supabase: DbClient): Promise<EngineerServices> {
   const db = createServiceClient() ?? supabase;
   const { data } = await db.from("store_settings").select("value").eq("key", ENGINEER_SERVICES_KEY).maybeSingle();
   return parseEngineerServices(data?.value);
 }
 
-export async function projectDoc(supabase: SupabaseClient, projectId: string): Promise<{ name: string; doc: StudioDoc | null } | null> {
+export async function projectDoc(supabase: DbClient, projectId: string): Promise<{ name: string; doc: StudioDoc | null } | null> {
   const { data } = await supabase.from("projects").select("name, studio").eq("id", projectId).maybeSingle();
   if (!data) return null;
   const parsed = StudioDocSchema.safeParse(data.studio);
@@ -28,7 +28,7 @@ export type ServicePaymentResult =
   | { ok: false; error: "not_found" | "not_ready" | "already_open" | "not_configured" | "failed" };
 
 export async function createServicePayment(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   projectId: string,
   kind: ServiceKind,

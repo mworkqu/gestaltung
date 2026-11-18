@@ -14,7 +14,7 @@
 // reported once; it is not nagged about again. If it comes back, the normal
 // change path re-activates it.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderOwnerEmail } from "@/lib/email/lead-email";
@@ -57,12 +57,12 @@ const UNKNOWN_CHANGE: CatalogChange = { skus: [], listingChanged: true, unknown:
 
 const MIN_HOURS_BETWEEN_RUNS = 20;
 
-export async function voltaatSyncEnabled(db: SupabaseClient): Promise<boolean> {
+export async function voltaatSyncEnabled(db: DbClient): Promise<boolean> {
   const { data } = await db.from("store_settings").select("value").eq("key", "voltaat_sync").maybeSingle();
   return (data?.value as { enabled?: boolean } | null)?.enabled !== false;
 }
 
-export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manual"): Promise<SyncSummary> {
+export async function runVoltaatSync(db: DbClient, trigger: "cron" | "manual"): Promise<SyncSummary> {
   const empty = { requests: 0, checked: 0, changed: 0, missing: 0, dropped: 0, storefront: NO_CHANGE };
 
   if (!(await voltaatSyncEnabled(db))) {
@@ -105,8 +105,7 @@ export async function runVoltaatSync(db: SupabaseClient, trigger: "cron" | "manu
       .select("id, part_id, supplier_sku, supplier_url, retail_price, availability, lead_time_days, active, part:parts!supplier_offers_part_id_fkey(name, unit_price)")
       .eq("supplier_id", sup!.id)
       .not("supplier_url", "is", null);
-    type Row = Omit<MappedOffer, "part_name" | "our_price"> & { part: { name: string; unit_price: number } | null };
-    const offers: MappedOffer[] = ((rows ?? []) as unknown as Row[]).map((r) => ({
+    const offers: MappedOffer[] = (rows ?? []).map((r) => ({
       ...r,
       part_name: r.part?.name ?? "",
       our_price: Number(r.part?.unit_price ?? 0),

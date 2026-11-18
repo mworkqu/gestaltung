@@ -5,7 +5,7 @@
 // schedules skip their runs (so a job never runs on both sides). Migration
 // 0111 seeds {"enabled": false}.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 export const WORKER_SETTINGS_KEY = "worker";
 /** WORKER_SECRET shorter than this is treated as unset, everywhere. */
@@ -19,7 +19,7 @@ export function parseWorkerSettings(value: unknown): WorkerSettings {
 }
 
 /** Uncached read with any client that may read the row (service role). Errors = disabled. */
-export async function readWorkerSettings(db: SupabaseClient | null): Promise<WorkerSettings> {
+export async function readWorkerSettings(db: DbClient | null): Promise<WorkerSettings> {
   if (!db) return { enabled: false };
   try {
     const { data, error } = await db.from("store_settings").select("value").eq("key", WORKER_SETTINGS_KEY).maybeSingle();

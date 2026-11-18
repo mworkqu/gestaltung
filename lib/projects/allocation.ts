@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 // ── Where a part on a project comes from ────────────────────────────────────
 //
@@ -39,7 +39,7 @@ export function splitOnRemove(drop: number, qtyFromInventory: number, quantity: 
 
 /** Move `qty` units of a product from the client's inventory onto a project. */
 export async function takeFromInventory(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   productId: string,
   qty: number
@@ -66,7 +66,7 @@ export async function takeFromInventory(
 
 /** Put `qty` units of a product back on the client's shelf. */
 export async function returnToInventory(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   productId: string,
   qty: number
@@ -94,7 +94,7 @@ export async function returnToInventory(
 
 /** Add or remove `delta` units of a cart line tagged with a project. */
 export async function adjustCart(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   productId: string,
   projectId: string,
@@ -136,7 +136,7 @@ export async function adjustCart(
 
 /** How many of a product the client currently has on their shelf. */
 export async function ownedCount(
-  supabase: SupabaseClient,
+  supabase: DbClient,
   userId: string,
   productId: string
 ): Promise<number> {

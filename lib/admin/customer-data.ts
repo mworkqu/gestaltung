@@ -9,7 +9,7 @@
 //
 // cart_items is absent on purpose: it has no super_admin policy (0016).
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 export type CustomerRow = Record<string, unknown>;
 
@@ -56,7 +56,7 @@ export const LEAD_LIMIT = 4000;
 const USAGE_LIMIT = 20000;
 
 export async function loadCustomerBundle(
-  db: SupabaseClient,
+  db: DbClient,
   userId: string,
   opts: {
     onError: (section: CustomerSection, error: CustomerQueryError) => void;

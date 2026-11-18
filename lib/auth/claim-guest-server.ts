@@ -2,7 +2,7 @@
 // by POST /api/auth/claim-guest (email sign-in) and /api/auth/callback
 // (social sign-in). The token is never logged or stored.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 import { isMissingFunction, type ClaimDeps } from "@/lib/auth/claim-guest";
 
@@ -11,7 +11,7 @@ import { isMissingFunction, type ClaimDeps } from "@/lib/auth/claim-guest";
  * signed in); `service` = the service-role client (verifies the guest token,
  * runs claim_guest_work).
  */
-export function claimGuestDeps(supabase: Pick<SupabaseClient, "auth">, service: SupabaseClient): ClaimDeps {
+export function claimGuestDeps(supabase: Pick<DbClient, "auth">, service: DbClient): ClaimDeps {
   return {
     async sessionUser() {
       const { data, error } = await supabase.auth.getUser();

@@ -88,7 +88,7 @@ export default async function EditPartPage({
               locale={locale}
               partId={part.id}
               unitPrice={part.unit_price}
-              sourcing={part as unknown as PartSourcing}
+              sourcing={part as PartSourcing}
               offers={landed}
               suppliers={(suppliersRes.data ?? []) as Supplier[]}
               floors={floors}

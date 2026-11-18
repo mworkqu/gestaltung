@@ -9,16 +9,16 @@
 // (bom.ts buyable/bomCost skip fulfilled lines). Removed (dismissed) lines are
 // skipped.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 
 import { matchLine, type InventoryRow } from "./bom-match";
 import { groupOf, type Candidate, type LineMatch, type ProjectBom, type ProjectLine, type ScoredCandidate } from "./bom";
-import type { Attributes } from "@/lib/store/attributes";
+import { readAttributes } from "@/lib/store/attributes";
 import { PART_PUBLIC_COLUMNS } from "@/lib/store/part-columns";
 
 export async function matchProjectBom(
-  db: SupabaseClient,
+  db: DbClient,
   bom: ProjectBom | null | undefined,
   ownerId: string
 ): Promise<LineMatch[]> {
@@ -33,19 +33,12 @@ export async function matchProjectBom(
       .eq("user_id", ownerId),
   ]);
   const catalogue = catRes.rows;
-  type InvRow = {
-    product_id: string | null;
-    custom_name: string | null;
-    quantity: number;
-    attributes?: Attributes | null;
-    part: { name: string } | null;
-  };
-  const inv = (invRes.data ?? []) as unknown as InvRow[];
+  const inv = invRes.data ?? [];
   const inventory: InventoryRow[] = inv.map((r) => ({
     productId: r.product_id,
     customName: r.custom_name,
     quantity: r.quantity,
-    attributes: r.attributes ?? null,
+    attributes: readAttributes(r.attributes),
   }));
   const byId = new Map(catalogue.map((p) => [p.id, p]));
   const bySku = new Map(catalogue.map((p) => [p.sku, p]));

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
-import { buildElectronics, projectForBuild } from "@/lib/prototyping/electronics-build";
+import { buildElectronics } from "@/lib/prototyping/electronics-build";
+import { projectForBuild } from "@/lib/prototyping/project-json";
 import { bomRate, canUse, serverWritesReady, spend, spendRefusal, undoUnpaidCircuit } from "@/lib/credits/server";
 import { asLocale } from "@/lib/locale";
 import { jsonError } from "@/lib/http";

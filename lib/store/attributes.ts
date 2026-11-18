@@ -175,6 +175,17 @@ export const ATTR_CLASSES = Object.keys(CLASSES) as AttrClass[];
 
 export type Attributes = { class?: string } & Record<string, unknown>;
 
+/**
+ * A stored attributes jsonb value as Attributes: any JSON object (a missing or
+ * non-string class stays as it is read, so matching treats it as unclassed);
+ * anything else is null.
+ */
+export function readAttributes(v: unknown): Attributes | null {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) return null;
+  const out: Attributes = { ...v };
+  return out;
+}
+
 export const isAttrClass = (c: unknown): c is AttrClass => typeof c === "string" && c in CLASSES;
 
 export const fieldsOf = (c: AttrClass): readonly Field[] => CLASSES[c].fields;

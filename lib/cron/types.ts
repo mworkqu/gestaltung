@@ -1,6 +1,6 @@
 // Shared shapes for the scheduled jobs (lib/cron/jobs.ts). Pure.
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { DbClient } from "@/lib/supabase/db";
 
 /** What a cron job answers: exactly the HTTP status + JSON body of its Vercel route. */
 export type CronOutcome = { status: number; body: unknown };
@@ -13,7 +13,7 @@ export type CronOutcome = { status: number; body: unknown };
  */
 export type CronDeps = {
   /** createServiceClient(): null when SUPABASE_SERVICE_ROLE_KEY is missing. */
-  db: () => SupabaseClient | null;
+  db: () => DbClient | null;
   /** Origin for links in emails. */
   siteUrl: string;
   /** Purge storefront cache tags; returns the tags purged. */

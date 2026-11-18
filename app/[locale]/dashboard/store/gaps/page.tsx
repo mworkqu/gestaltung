@@ -19,17 +19,6 @@ import { isMissingColumn } from "@/lib/supabase/errors";
 
 export const dynamic = "force-dynamic";
 
-type Gap = {
-  function: string;
-  function_key: string;
-  spec: string | null;
-  kind: string | null;
-  quantity: number | null;
-  project_id: string;
-  last_seen: string;
-  project: { is_test: boolean } | null;
-};
-
 export default async function SourcingGapsPage({
   params,
   searchParams,
@@ -61,7 +50,7 @@ export default async function SourcingGapsPage({
   const { data, error } = await query;
   // 42703: is_test does not exist yet — migration 0031 has not run.
   const needsMigration = isMissingColumn(error);
-  const gaps = (data ?? []) as unknown as Gap[];
+  const gaps = (data ?? []);
 
   // Test gaps never merge into real demand: they get their own rows.
   const groups = new Map<

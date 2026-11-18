@@ -37,8 +37,6 @@ type ItemRow = {
   project_id?: string | null;
 };
 type PartRow = { id: string; image_url: string | null; images: unknown; preferred_offer_id: string | null };
-type OfferRow = { id: string; part_id: string; active: boolean; suppliers: { code: string; name: string } | { code: string; name: string }[] | null };
-
 function chunks<T>(list: T[], size = 100): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
@@ -77,7 +75,7 @@ export async function loadOrderLines(db: Db, orderIds: string[]): Promise<{ byOr
       continue;
     }
     for (const row of (p.data ?? []) as PartRow[]) parts.set(row.id, row);
-    for (const row of (o.data ?? []) as unknown as OfferRow[]) {
+    for (const row of (o.data ?? [])) {
       const sup = Array.isArray(row.suppliers) ? row.suppliers[0] : row.suppliers;
       if (!sup) continue;
       const list = offers.get(row.part_id) ?? [];
