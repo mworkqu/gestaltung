@@ -130,7 +130,7 @@ Full list, run order and rollback notes: `docs/MIGRATIONS.md` ("Pending — cons
 - **0108** (drops `inventory_items` and `job_bom`): NOT RUN. Run it after the deploy, after 0107. Export the table first if it holds anything.
 - **0111** (worker switch row, default off): NOT RUN. Needed only before the worker is switched on.
 - 0076 and 0087: the owner says they are run (no probe).
-- **0112** (`plugin_handoffs` + `claim_plugin_handoff` / `plugin_handoff_set_phone` / `plugin_rate_hit`): NOT RUN. Chat plugin Phase 1. Until it runs, MCP `send_project` answers "being set up", the hand-off page shows "being set up", and rate limits fall back to per-instance memory.
+- **0112** (`plugin_handoffs` + `claim_plugin_handoff` / `plugin_handoff_set_phone` / `plugin_rate_hit`): RUN 2026-11-18 (by Claude in the owner's Supabase, owner approved). Chat plugin Phase 1; live test passed the same day.
 - Next free number: 0113. New migrations are idempotent, have a rollback note in the header and a PGlite test.
 - The old per-file descriptions that used to be listed here are in `docs/history/CLAUDE-2026-10-pending-migrations-block.md`.
 
