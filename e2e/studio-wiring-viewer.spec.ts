@@ -109,15 +109,17 @@ for (const locale of LOCALES) {
     await zoomIn.click();
     await zoomIn.click();
     await zoomIn.click();
-    const before = await box(content);
-    // A point of the frame that is on screen (on a phone the frame is taller than what is visible).
+    // A point of the frame that really receives the pointer. On a phone the frame is taller than
+    // the screen and the sticky header / sticky button / fixed "Get it made" bar cover parts of
+    // it: the middle of the visible part could land on a bar (no drag at all, moved 0 px).
+    // hover() scrolls the point into view and waits until the frame, not a bar, is hit.
+    const f0w = (await box(frame)).width;
+    const grab = { x: f0w / 2, y: 120 };
+    await frame.hover({ position: grab });
     const f1 = await box(frame);
-    const vh = page.viewportSize()?.height ?? 800;
-    const top = Math.max(f1.y, 0);
-    const bottom = Math.min(f1.y + f1.height, vh);
-    const cx = f1.x + f1.width / 2;
-    const cy = (top + bottom) / 2;
-    await page.mouse.move(cx, cy);
+    const cx = f1.x + grab.x;
+    const cy = f1.y + grab.y;
+    const before = await box(content);
     await page.mouse.down();
     await page.mouse.move(cx - 80, cy - 40, { steps: 6 });
     await page.mouse.up();
