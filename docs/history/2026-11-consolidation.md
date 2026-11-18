@@ -157,13 +157,13 @@ Claude never runs a migration. Every file is idempotent, has a rollback note in 
 
 ## 9. Still open
 
-- **Typed Supabase factories and 140 casts.** 56 type errors in 38 files appeared when the four client factories were typed. Reverted. `as unknown as`: 140 in 76 files, unchanged. Suggested order and causes: Phase 4 doc, section 4.2.
+- ~~**Typed Supabase factories and 140 casts.**~~ DONE 2026-11-18: the four factories and ~50 helpers take `SupabaseClient<Database>` (`DbClient`, `lib/supabase/db.ts`). Non-test `as unknown as` 62 → 19 (none on database rows; the rest are browser/library APIs). Typecheck is slower (about 1.5–2 min).
 - **R11 and R12 lists.** The not-fixed R11 items (inline queries in components, 10 cache modules without a `server-only` marker) and the 31 API routes with their own error shape are listed with fixes and risk in `2026-11-consolidation-phase4.md`, section 4.4.
-- **19 known-failing studio e2e tests** (`e2e/KNOWN_FAILING.txt`). Exact titles: Phase 2 doc. One more studio test failed once in the last full run (`studio-wiring-views`, `[ar]`, mobile), and `studio-engine` "out of credits" is flaky. The wiring-viewer drag test is flaky too.
+- ~~**19 known-failing studio e2e tests**~~ DONE 2026-11-18: all 19 pass and the three flaky ones are fixed (stale "Draw it" label → `msgf()` in e2e/fixtures.ts, idea layout checks, mock motion sensor, scoped locators, drag start point, scroll wait). `e2e/KNOWN_FAILING.txt` is empty.
 - **`e2e/NEEDS_LIVE_READS.txt`**: 6 tests (28 runs) pass only against the real Supabase project. Fix: a seeded local Supabase in CI.
 - **Both lists may only shrink.**
 - **Public pages still dynamic**: see section 4. The "100 % static" target was not met.
-- **CAD Champions pages are dynamic** because the layout reads the session.
+- ~~**CAD Champions pages are dynamic**~~ PARTLY DONE 2026-11-18: the layout no longer reads the session (browser `CcSessionProvider`, display only; pages still enforce auth). Landing, privacy, terms, refunds, check-email, reset-password prerender (en + ar). Still dynamic: sign-in, sign-up, forgot-password, help (they read query strings).
 - **The CAD worker pytest job has never run** (no Python on the dev PC), so it is `continue-on-error`.
 - **`node scripts/split-legal-draft.mjs --check` reports a difference on a CRLF (Windows) checkout.** It is not in CI. Do not hand-edit `content/legal/**`.
 - **GitHub Actions never ran**; the workflow was checked against its schema only. The Docker images were never built.
