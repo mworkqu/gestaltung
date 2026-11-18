@@ -102,18 +102,19 @@ for (const locale of LOCALES) {
     await expect(cardEl).toContainText(msg(locale, "Studio", "fact_power_usb"));
     await expect(cardEl).not.toContainText(msg(locale, "Studio", "fact_use_desk"));
 
-    // Layout: desktop = chat at the start, card at the end (mirrored in Arabic); phone = card above.
+    // Layout (6b11972, "Our understanding" panel): desktop = card in the main column at the
+    // start, chat in the side column at the end (mirrored in Arabic); phone = card after the chat.
     const cardBox = await page.getByTestId("studio-idea-card-col").boundingBox();
     const chatBox = await page.getByTestId("studio-idea-chat").boundingBox();
     if (!cardBox || !chatBox) throw new Error("layout boxes missing");
     if (phone) {
-      expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(chatBox.y + 1);
+      expect(cardBox.y).toBeGreaterThanOrEqual(chatBox.y + chatBox.height - 1);
       await expect(page.getByTestId("studio-idea-card-toggle")).toBeVisible();
       await expect(page.getByTestId("studio-idea-card-toggle")).toHaveAttribute("aria-expanded", "true");
     } else if (locale === "en") {
-      expect(cardBox.x).toBeGreaterThan(chatBox.x + chatBox.width - 1);
+      expect(chatBox.x).toBeGreaterThan(cardBox.x + cardBox.width - 1);
     } else {
-      expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(chatBox.x + 1);
+      expect(chatBox.x + chatBox.width).toBeLessThanOrEqual(cardBox.x + 1);
     }
     await expectNoHorizontalOverflow(page);
     // The chat never disappears with the card.

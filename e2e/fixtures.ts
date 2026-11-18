@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { expect, test as base, type Page } from "@playwright/test";
+import { createTranslator } from "next-intl";
 
 // ── Production-safe fixtures ────────────────────────────────────────────────
 // .env.local points at the PRODUCTION Supabase project, so the suite must never
@@ -119,6 +120,16 @@ export function msg(locale: Loc, ns: string, key: string): string {
   const value = all[ns]?.[key];
   if (typeof value !== "string") throw new Error(`missing message ${locale}:${ns}.${key}`);
   return value;
+}
+
+/**
+ * Like msg(), but formatted with values (ICU plurals such as "Draw it ({n, plural, …})"),
+ * through next-intl's own formatter, so the label equals what the page renders.
+ */
+export function msgf(locale: Loc, ns: string, key: string, values: Record<string, string | number>): string {
+  msg(locale, ns, key); // same "missing message" error as msg()
+  const t = createTranslator({ locale, messages: JSON.parse(readFileSync(path.join(ROOT, "messages", `${locale}.json`), "utf8")), namespace: ns });
+  return (t as unknown as (k: string, v: Record<string, string | number>) => string)(key, values);
 }
 
 export async function expectLocale(page: Page, locale: Loc) {

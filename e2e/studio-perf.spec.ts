@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { expect, msg, test } from "./fixtures";
+import { expect, msg, msgf, test } from "./fixtures";
 
 // Studio performance probe (P5-15e), on the e2e studio fixture at 375 px with the
 // CPU slowed 4× through CDP (Emulation.setCPUThrottlingRate) — a mid phone.
@@ -102,7 +102,7 @@ test("studio perf: first render, parts canvas, enclosure build off the main thre
   await expect(page.getByTestId("studio-schematic").locator("svg").first()).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: msg("en", "Studio", "next"), exact: true }).click();
   const t1 = await page.evaluate(() => performance.now());
-  await page.getByRole("button", { name: msg("en", "Studio", "drawItCredit") }).click();
+  await page.getByRole("button", { name: msgf("en", "Studio", "drawItCredit", { n: 1 }) }).click();
   await expect(page.getByTestId("studio-enclosure-viewer").locator("[data-case]")).toHaveAttribute("data-case", "ready", { timeout: 90_000 });
   const t2 = await page.evaluate(() => performance.now());
   const longest = await page.evaluate(
