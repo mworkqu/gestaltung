@@ -195,7 +195,8 @@ The answer is JSON with the payments counts and a `monitoring` block.
 - Alert 1: more than 3 failed grading calls (rows in `cc_grading_logs` with an `error`) in the last hour.
 - Alert 2: any item in the review queue (`cc_task_results` with status `ai_pending_review` or `error`) older than 48 hours.
 - Sent to `CC_ALERT_EMAIL`, else `CC_PAYMENTS_ALERT_EMAIL`, else `STORE_LEAD_EMAIL` / info@gestaltung360.com, through Resend (same sender as the other emails).
-- At most one email per alert combination per hour (Resend idempotency key), so an hourly cron does not spam you while a problem persists (it repeats each hour, which is the reminder).
+- **One email per alert, and at most one a day (2026-11).** Each alert carries its own Resend idempotency key built from the *digest day* (it starts at 09:00 Qatar) and from what the alert is about — for the review queue the sorted ids of the stale items, for grading the distinct error texts. So: the same unattended review item is mailed once, not once an hour; it is mailed again the next morning at 09:00 Qatar while it is still there; and a change the same day (a new stale item, or one cleared) is mailed at once. The grading check still runs hourly, but the same failure reports once a day.
+- The review-queue email names the student and the task for each stale item and links straight to `/cad-champions/en/admin/review/<id>`, plus a button to the whole queue.
 - If the CC tables do not exist yet, or the email key is missing, it quietly does nothing and reports `skipped` in the JSON answer. It never fails the payments run.
 
 ### 4.3 Optional: error tracking (Sentry)
