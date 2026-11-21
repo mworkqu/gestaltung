@@ -1,0 +1,18 @@
+{
+  "name": "gestaltung360",
+  "description": "Gestaltung360's own plugins (Lusail, Qatar).",
+  "owner": {
+    "name": "Gestaltung for Trading and Services W.L.L",
+    "email": "info@gestaltung360.com",
+    "url": "https://gestaltung360.com"
+  },
+  "plugins": [
+    {
+      "name": "gestaltung360",
+      "source": "./plugins/gestaltung360",
+      "description": "Design an electronic product with a case, price its parts in QAR, and send it to Gestaltung360's engineer in Qatar for a quote.",
+      "category": "hardware",
+      "tags": ["hardware", "electronics", "3d-printing", "manufacturing", "qatar"]
+    }
+  ]
+}

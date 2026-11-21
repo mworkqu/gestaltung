@@ -154,7 +154,7 @@ function propertyNames(schema: unknown, out: string[] = []): string[] {
 }
 
 describe("plugin MCP server", () => {
-  it("lists exactly the six tools with the right annotations and no chat-shaped inputs", async () => {
+  it("lists exactly the seven tools with the right annotations and no chat-shaped inputs", async () => {
     const c = await connect(fakeDeps().deps);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
@@ -162,6 +162,7 @@ describe("plugin MCP server", () => {
       "check_project",
       "get_design_rules",
       "list_meeting_slots",
+      "preview_look",
       "search_parts",
       "send_project",
     ]);
@@ -554,5 +555,102 @@ describe("helpers", () => {
     expect(SERVER_INSTRUCTIONS).toMatch(/list_meeting_slots/);
     expect(SERVER_INSTRUCTIONS).toMatch(/only after the user explicitly agrees/);
     expect(SERVER_INSTRUCTIONS.length).toBeLessThan(1500);
+  });
+
+  // ── how it will look (Phase 3) ─────────────────────────────────────────────
+
+  it("previews the look with the parts, the total and what would be sent", async () => {
+    const c = await connect(fakeDeps().deps);
+    const r = await call(c, "preview_look", { build: EXAMPLE_BUILD_FILE, locale: "en" });
+    const data = r.structuredContent as {
+      name: string;
+      look: { template: string; shape: string; colour: string; finish: string; swatch: string };
+      parts: { name: string; qty: number; price: string | null }[];
+      parts_total: string;
+      sends: string[];
+      engineer_line: string;
+      company: string;
+      build: unknown;
+    };
+
+    expect(r.isError).toBeFalsy();
+    expect(data.name).toBe(EXAMPLE_BUILD_FILE.name);
+    expect(data.parts.length).toBeGreaterThan(0);
+    expect(data.parts_total).toMatch(/QAR/);
+    expect(data.company).toContain("236988");
+    expect(data.engineer_line).toMatch(/within one working day/);
+    // the look is described in plain words, never by our template id
+    expect(data.look.shape).not.toMatch(/_/);
+    expect(data.look.swatch).toMatch(/^#[0-9a-f]{6}$/i);
+
+    // the list the user reads before agreeing, and the promise we never send the chat
+    expect(data.sends.some((s) => /never sent/i.test(s))).toBe(true);
+    // the build rides along so the card's Send button can call send_project
+    expect(data.build).toBeTruthy();
+
+    // a host with no card support gets the same facts as text
+    expect(firstText(r)).toMatch(/Parts total: QAR/);
+    expect(firstText(r)).toContain(EXAMPLE_BUILD_FILE.name);
+
+    // house rules: no CAD program and no "free" anywhere in what the user reads
+    const all = JSON.stringify(data) + firstText(r);
+    expect(all).not.toMatch(/SolidWorks|Fusion|OpenSCAD|FreeCAD|CadQuery/i);
+    expect(all).not.toMatch(/\bfree\b/i);
+
+    // We quote NO case dimension of our own: the engineer models it. A part's
+    // own name and the user's case notes may of course mention a size.
+    expect(Object.keys(data.look).join(" ")).not.toMatch(/width|depth|height|mm|size/i);
+    expect(`${data.look.shape} ${data.look.colour} ${data.look.finish}`).not.toMatch(/\d/);
+  });
+
+  it("refuses to preview a project that does not pass the checks", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+    const bad = { ...EXAMPLE_BUILD_FILE, parts: [{ library_id: "not_a_real_part", qty: 1 }] };
+    const r = await call(c, "preview_look", { build: bad, locale: "en" });
+
+    expect((r.structuredContent as { ok: boolean }).ok).toBe(false);
+    expect(firstText(r)).toMatch(/Not ready to show/);
+    // a preview writes nothing, ever
+    expect(cap.handoffs).toHaveLength(0);
+    expect(cap.leads).toHaveLength(0);
+  });
+
+  it("points the tool at its UI resource for both hosts", async () => {
+    const c = await connect(fakeDeps().deps);
+    const { tools } = await c.listTools();
+    const preview = tools.find((t) => t.name === "preview_look")!;
+    const meta = preview._meta as { ui?: { resourceUri?: string }; "openai/outputTemplate"?: string };
+
+    expect(meta.ui?.resourceUri).toBe("ui://gestaltung360/preview");
+    // ChatGPT's alias for the same resource, so one server serves both
+    expect(meta["openai/outputTemplate"]).toBe("ui://gestaltung360/preview");
+    expect(preview.annotations).toMatchObject({ readOnlyHint: true, openWorldHint: false });
+  });
+
+  it("serves the widget as an MCP Apps HTML resource", async () => {
+    const c = await connect(fakeDeps().deps);
+    const { resources } = await c.listResources();
+    expect(resources.map((r) => r.uri)).toContain("ui://gestaltung360/preview");
+
+    const res = await c.readResource({ uri: "ui://gestaltung360/preview" });
+    const first = res.contents[0] as { mimeType: string; text: string; _meta?: { ui?: { csp?: { resourceDomains?: string[] } } } };
+
+    // the one mime type the MCP Apps spec allows for an HTML widget
+    expect(first.mimeType).toBe("text/html;profile=mcp-app");
+    expect(first.text.startsWith("<!doctype html>")).toBe(true);
+    // self-contained: no external script or stylesheet is fetched at render time
+    expect(first.text).not.toMatch(/<script[^>]+src=/i);
+    expect(first.text).not.toMatch(/<link[^>]+stylesheet/i);
+    // the CDN is declared for a lazy engine, but nothing loads from it today
+    expect(first._meta?.ui?.csp?.resourceDomains).toEqual(["https://cdn.jsdelivr.net"]);
+    // it talks to the host through the spec's bridge, with ChatGPT's as a fallback
+    expect(first.text).toContain("ui/notifications/tool-result");
+    expect(first.text).toContain("tools/call");
+    expect(first.text).toContain("window.openai");
+    // and it names no CAD program
+    expect(first.text).not.toMatch(/SolidWorks|Fusion|OpenSCAD|FreeCAD|CadQuery/i);
+    // comfortably inside the 300 kB budget
+    expect(first.text.length).toBeLessThan(300_000);
   });
 });

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gestaltung360": {
+      "type": "http",
+      "url": "https://gestaltung360.com/api/mcp"
+    }
+  }
+}

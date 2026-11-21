@@ -28,7 +28,9 @@ import type { StudioDoc } from "@/lib/studio/schema";
 import { BuildFileSchema, type BuildFile } from "../build-file";
 import { checkProject, storeSkusFor, type CheckResult, type PluginProduct } from "../check-project";
 import { designRules, designRulesText } from "../design-rules";
+import { previewPayload, PREVIEW_MIME, PREVIEW_URI } from "../preview";
 import type { PluginLibrary } from "../to-studio";
+import { PREVIEW_UI_META, PREVIEW_WIDGET_HTML } from "./preview-widget";
 
 export const SERVER_INFO = { name: "gestaltung360", version: "1.0.0" } as const;
 
@@ -37,6 +39,7 @@ export const ENGINEER_LINE = "Our engineer reviews your file and quotes the best
 export const SERVER_INSTRUCTIONS = [
   "Gestaltung360 is a company in Qatar that makes electronic products from a person's idea: parts, wiring, code and a 3D-printed case.",
   "How to work: ask what the product must do; call get_design_rules; choose parts only by their library id from it; write the build file and call check_project until ok is true; describe how it will look and work, with the parts and their total in QAR.",
+  "Then call preview_look to show the user how it will look.",
   "Before sending, list exactly what will be sent (summary, parts, wiring, code, the look and the case design notes) and ask the user to agree. Never call send_project without the user's explicit agreement.",
   "Never send the chat. requirement_quotes holds at most 10 short quotes (140 characters each) of the user's own words, for key requirements only.",
   "Prices are in QAR. Never name CAD software to the user. Never promise that anything is free, and never promise a reprint or a remake.",
@@ -374,7 +377,7 @@ export const DESIGN_A_PRODUCT_PROMPT = [
   "1. Ask me what the product must do, who it is for, where it will be used (indoor, outdoor or both), how it is powered and any size wishes. Ask short questions, one or two at a time.",
   "2. Call get_design_rules and choose parts only by their library id from it. Never invent a part.",
   "3. Write the build file and call check_project. Fix every problem it reports and call it again until ok is true. Tell me the parts and the total in QAR.",
-  "4. Describe how the product will look and work: the case shape, colour, finish, any label, where the openings go.",
+  "4. Call preview_look so I can see how it will look, and describe it too: the case shape, colour, finish, any label, where the openings go.",
   "5. List exactly what will be sent: the summary, the parts, the wiring, the code, the look and the case design notes. The chat itself is never sent; only up to 10 short quotes (max 140 characters each) of my own words for key requirements. Ask me clearly whether I agree to send it.",
   "6. Only after I say yes, call send_project. Never send without my explicit agreement.",
   `7. Give me the link it returns and tell me: "${ENGINEER_LINE}"`,
@@ -542,6 +545,59 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
         const summaryLine = `${build.name}: ${r.parts.length} parts, parts total ${formatQar(r.parts_total_qar, locale)}. ${ENGINEER_LINE}`;
         return reply(`Sent. Open your project: ${link}`, { ok: true, link, expires_at: expiresAt, summary_line: summaryLine });
       }),
+  );
+
+  // ── how it will look (Phase 3, MCP Apps UI) ────────────────────────────────
+
+  server.registerTool(
+    "preview_look",
+    {
+      title: "Show how it will look",
+      description:
+        "Shows the user how the product will look: the case shape, its colour and finish, the parts with their prices in QAR and the total. On a client that can show a card the user sees it rendered; everywhere else the same facts come back as text. Nothing is sent or saved.",
+      inputSchema: z.object({ build: BuildFileSchema, locale: LOCALE.default("en") }),
+      annotations: READ_ONLY,
+      // MCP Apps (spec 2026-01-26) links a tool to its UI resource with
+      // _meta.ui.resourceUri; openai/outputTemplate is ChatGPT's alias for the
+      // same thing, so one server satisfies both hosts.
+      _meta: {
+        ui: { resourceUri: PREVIEW_URI },
+        "openai/outputTemplate": PREVIEW_URI,
+      },
+    },
+    (args, ctx) =>
+      guarded("preview_look", async () => {
+        if (await limited("check", ctx)) return errorReply(TEXT_RATE_LIMITED);
+        const { build, locale } = args;
+
+        const r = await runCheck(deps, build, locale);
+        if (!r.ok) return reply(`Not ready to show: ${problemsLine(r.problems.length)}`, { ok: false, problems: r.problems, warnings: r.warnings });
+
+        const payload = previewPayload(build, r, { locale, company: companyLine(locale) });
+        // A host without MCP Apps gets exactly the same facts as text, and the
+        // hand-off page stays the full preview.
+        const text = [
+          `${payload.name} — ${payload.look.shape}, ${payload.look.colour}, ${payload.look.finish}${payload.look.label ? `, label "${payload.look.label}"` : ""}.`,
+          ...payload.parts.map((p) => `- ${p.qty} × ${p.name}${p.price ? ` — ${p.price}` : ""}`),
+          `Parts total: ${payload.parts_total}`,
+          payload.wiring_summary,
+        ].join("\n");
+
+        // `build` rides along so the card's Send button can call send_project.
+        return {
+          content: [{ type: "text", text }],
+          structuredContent: { ...payload, build } as unknown as Json,
+        };
+      }),
+  );
+
+  server.registerResource(
+    "preview",
+    PREVIEW_URI,
+    { title: "How it will look", description: "The product's case, its parts and the total in QAR.", mimeType: PREVIEW_MIME },
+    async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: PREVIEW_MIME, text: PREVIEW_WIDGET_HTML, _meta: PREVIEW_UI_META }],
+    }),
   );
 
   // ── meetings (Phase 2) ─────────────────────────────────────────────────────

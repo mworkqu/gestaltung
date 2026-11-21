@@ -1,0 +1,14 @@
+{
+  "name": "gestaltung360",
+  "displayName": "Gestaltung360",
+  "version": "1.0.0",
+  "description": "Design an electronic product with a case, check it against what Gestaltung360 can actually make in Qatar, and send it to their engineer for a quote. Parts and prices in QAR.",
+  "author": {
+    "name": "Gestaltung for Trading and Services W.L.L",
+    "email": "info@gestaltung360.com",
+    "url": "https://gestaltung360.com"
+  },
+  "homepage": "https://gestaltung360.com",
+  "license": "LicenseRef-Proprietary",
+  "keywords": ["hardware", "electronics", "3d-printing", "manufacturing", "qatar", "product-design"]
+}
