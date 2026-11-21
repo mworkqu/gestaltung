@@ -21,7 +21,9 @@ function headCount(q: PromiseLike<CountResult>): Promise<number | null> {
 }
 
 export async function loadNavBadges(db: Db): Promise<NavBadges> {
-  const [orders, leads, reviews, fix] = await Promise.all([
+  const now = new Date();
+  const weekEnd = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+  const [orders, leads, reviews, fix, meetings] = await Promise.all([
     // Same statuses as the Home "Confirm" tile (head count: is_test rows left out).
     headCount(
       db
@@ -38,8 +40,19 @@ export async function loadNavBadges(db: Db): Promise<NavBadges> {
       (items) => (items ? items.length : null),
       () => null
     ),
+    // Meetings starting in the next seven days (0113). Before that migration
+    // runs the table is missing and the count is left out, so no badge shows.
+    headCount(
+      db
+        .from("meeting_bookings")
+        .select("id", { count: "exact", head: true })
+        .gte("starts_at", now.toISOString())
+        .lt("starts_at", weekEnd)
+        .not("status", "in", "(cancelled,no_show)")
+        .not("is_test", "is", true)
+    ),
   ]);
-  return badgesFrom({ orders, leads, reviews, fix });
+  return badgesFrom({ orders, leads, reviews, fix, meetings });
 }
 
 /** Drops unknown counts (null) so they render no badge. */

@@ -12,6 +12,7 @@ import { Suspense, use, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Bell,
+  CalendarClock,
   ChevronDown,
   ClipboardList,
   Coins,
@@ -61,6 +62,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   notifications: Bell,
   contact: Phone,
   schools: GraduationCap,
+  meetings: CalendarClock,
 };
 
 export function DashboardNav({

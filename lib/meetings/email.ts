@@ -88,7 +88,9 @@ export function renderMeetingReminderEmail(input: MeetingMailInput): MeetingMail
     preheader: time,
     facts,
     paragraphs: [modeLine(input.booking.mode, locale)],
-    buttons: [{ label: ar ? "إدارة الاجتماع" : "Manage your meeting", url: input.manageUrl }],
+    // Only the token's sha256 is stored, so a reminder sent by the cron has no
+    // manage link to offer; the footer's WhatsApp line is how they reach us.
+    buttons: input.manageUrl ? [{ label: ar ? "إدارة الاجتماع" : "Manage your meeting", url: input.manageUrl }] : [],
     siteUrl: input.siteUrl,
   });
   return { subject: ar ? `تذكير: اجتماعك غدًا — ${time}` : `Reminder: your meeting is tomorrow — ${time}`, html, text };

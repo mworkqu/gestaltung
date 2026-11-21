@@ -14,6 +14,7 @@ const m = vi.hoisted(() => ({
   runDeliveryPromiseReview: vi.fn(),
   runAnonymousCleanup: vi.fn(),
   drainOutboxWith: vi.fn(),
+  runMeetingReminders: vi.fn(),
   runRetirementsWith: vi.fn(),
   runPaymentsCron: vi.fn(),
   runMonitoringAlerts: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock("@/lib/sourcing/voltaat-sync", () => ({ runVoltaatSync: m.runVoltaatSync
 vi.mock("@/lib/cron/delivery-promises", () => ({ runDeliveryPromiseReview: m.runDeliveryPromiseReview }));
 vi.mock("@/lib/cron/anonymous-cleanup", () => ({ runAnonymousCleanup: m.runAnonymousCleanup }));
 vi.mock("@/lib/notifications/drain-core", () => ({ drainOutboxWith: m.drainOutboxWith }));
+vi.mock("@/lib/meetings/reminders-core", () => ({ runMeetingReminders: m.runMeetingReminders }));
 vi.mock("@/lib/integrations/youtube-retire-core", () => ({ runRetirementsWith: m.runRetirementsWith }));
 vi.mock("@/lib/cad-champions/payments/server", () => ({ runPaymentsCron: m.runPaymentsCron }));
 vi.mock("@/lib/cad-champions/monitoring/alerts-server", () => ({ runMonitoringAlerts: m.runMonitoringAlerts }));
@@ -132,9 +134,19 @@ describe("cron route results (unchanged)", () => {
 
   it("notifications: drains 50 with the site URL and the cached contact number; errors stay 500", async () => {
     m.drainOutboxWith.mockResolvedValue({ ok: true, summary: { claimed: 1, sent: 1, failed: 0, skipped: 0, reasons: {} } });
+    // 0113: the day-before meeting reminders ride on the same daily run.
+    m.runMeetingReminders.mockResolvedValue({ tomorrow: 2, clientsEmailed: 1, clientsSkipped: 1, ownerEmailed: true });
     const ok = await notifications(req("notifications"));
     expect(m.drainOutboxWith).toHaveBeenCalledWith(m.db, ORIGIN, 50, m.getContactPhone);
-    expect(await ok.json()).toEqual({ claimed: 1, sent: 1, failed: 0, skipped: 0, reasons: {} });
+    expect(m.runMeetingReminders).toHaveBeenCalledWith(m.db, ORIGIN);
+    expect(await ok.json()).toEqual({
+      claimed: 1,
+      sent: 1,
+      failed: 0,
+      skipped: 0,
+      reasons: {},
+      meetings: { tomorrow: 2, clientsEmailed: 1, clientsSkipped: 1, ownerEmailed: true },
+    });
     m.drainOutboxWith.mockResolvedValue({ ok: false, error: "claim_failed", detail: "x" });
     const bad = await notifications(req("notifications"));
     expect(bad.status).toBe(500);

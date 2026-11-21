@@ -5,11 +5,9 @@
 // forward-only status transitions, the order credit, and RLS. Never touches Supabase.
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { canChangeOnline, canSetStatus, creditCheck, type MeetingStatus } from "@/lib/meetings/rules";
-import { DEFAULT_MEETING_SETTINGS } from "@/lib/meetings/settings";
-import { freeSlots as tsFreeSlots, slotOnGrid as tsSlotOnGrid } from "@/lib/meetings/slots";
-
 import { SUPABASE_BASE_STUB, pgliteDb } from "./pglite";
+
+// The SQL-against-TypeScript parity checks live in ./meetings-parity.test.ts.
 
 const ADMIN = "dddddddd-0000-0000-0000-000000000004";
 const USER = "aaaaaaaa-0000-0000-0000-000000000001";

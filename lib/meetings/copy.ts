@@ -10,7 +10,7 @@
  * one SLA phrase, and never a CAD program name.
  */
 
-import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
+import { COMPANY, COMPANY_ADDRESS, PAYMENT_DETAILS } from "@/lib/company";
 import { formatQar } from "@/lib/format/money";
 import type { Locale } from "@/lib/locale";
 
@@ -66,6 +66,27 @@ export function modeLine(mode: MeetingMode, locale: Locale): string {
 export function modeLabel(mode: MeetingMode, locale: Locale): string {
   if (locale === "ar") return mode === "studio" ? "في الاستوديو" : "عبر الإنترنت";
   return mode === "studio" ? "At the studio" : "Online";
+}
+
+/**
+ * The short invoice message the owner sends on WhatsApp after the meeting. The
+ * amount and the Fawran alias only — the IBAN goes in the e-mail, never here.
+ */
+export function invoiceWhatsappText(settings: MeetingSettings, locale: Locale, amountQar?: number): string {
+  const amount = formatQar(amountQar ?? settings.price_qar, locale);
+  return locale === "ar"
+    ? [
+        `فاتورة اجتماعك: ${amount}.`,
+        `يمكنك الدفع عبر فوران (${PAYMENT_DETAILS.fawranAlias}) أو بتحويل بنكي — سنرسل تفاصيل التحويل بالبريد الإلكتروني.`,
+        `ويُحتسب هذا المبلغ من طلب تصنيع خلال ${settings.order_credit_days} يومًا.`,
+        COMPANY_LINE_AR,
+      ].join("\n")
+    : [
+        `Invoice for your meeting: ${amount}.`,
+        `You can pay by Fawran (${PAYMENT_DETAILS.fawranAlias}) or bank transfer — we send the bank transfer details by email.`,
+        `This amount counts towards a manufacturing order placed within ${settings.order_credit_days} days.`,
+        COMPANY_LINE_EN,
+      ].join("\n");
 }
 
 /** Too late to change without us: the one SLA-free fallback sentence. */

@@ -239,6 +239,28 @@ export async function meetingByToken(token: string): Promise<MeetingBooking | nu
   }
 }
 
+/** One meeting by id (super-admin pages and actions). */
+export async function meetingById(id: string): Promise<MeetingBooking | null> {
+  const svc = createServiceClient();
+  if (!svc) return null;
+  try {
+    const { data, error } = await svc
+      .from("meeting_bookings")
+      .select<string, MeetingBooking>(BOOKING_COLUMNS)
+      .eq("id", id)
+      .maybeSingle();
+    if (error) {
+      if (notSetUp(error)) return null;
+      throw error;
+    }
+    return data ?? null;
+  } catch (err) {
+    if (notSetUp(err)) return null;
+    console.error("[meetings] id read failed:", err);
+    return null;
+  }
+}
+
 export type TokenActionResult = { ok: true; startsAt?: string } | { ok: false; reason: string };
 
 /** {ok, reason, starts_at} from one of the jsonb-returning RPCs. */

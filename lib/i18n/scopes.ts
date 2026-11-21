@@ -162,6 +162,8 @@ export const MESSAGE_SCOPES = {
     "Projects",
     "Parts",
     "Turnstile",
+    // The Make step's "Book a meeting with our engineer" card.
+    "Meetings",
   ],
 } as const satisfies Record<string, readonly string[]>;
 

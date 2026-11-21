@@ -55,6 +55,7 @@ describe("admin nav groups", () => {
         "/dashboard/store/stock",
         "/dashboard/store/discounts",
         "/dashboard/reviews",
+        "/dashboard/meetings",
       ],
       ["/dashboard/leads", "/dashboard/customers", "/dashboard/projects", "/dashboard/credits", "/dashboard/studio-library"],
       [
@@ -77,12 +78,14 @@ describe("admin nav groups", () => {
     expect(new Set(items.map((i) => i.href)).size).toBe(items.length);
   });
 
-  it("puts badges on orders, fix, leads and reviews only", () => {
+  it("puts badges on orders, fix, leads, reviews and meetings only", () => {
     expect(Object.fromEntries(items.filter((i) => i.badge).map((i) => [i.href, i.badge]))).toEqual({
       "/dashboard/store/orders": "orders",
       "/dashboard/store/fix": "fix",
       "/dashboard/leads": "leads",
       "/dashboard/reviews": "reviews",
+      // 0113: meetings starting in the next seven days.
+      "/dashboard/meetings": "meetings",
     });
   });
 
@@ -172,7 +175,7 @@ describe("badges", () => {
   });
 
   it("drops counts that could not be read", () => {
-    expect(badgesFrom({ orders: 2, fix: null, leads: 0, reviews: null })).toEqual({ orders: 2, leads: 0 });
+    expect(badgesFrom({ orders: 2, fix: null, leads: 0, reviews: null, meetings: null })).toEqual({ orders: 2, leads: 0 });
   });
 });
 

@@ -26,6 +26,8 @@ export function adminNavGroups(t: (key: string) => string): NavGroup[] {
         { href: "/dashboard/store/stock", label: t("restockNav"), icon: "restock", match: ["/dashboard/store/restock"] },
         { href: "/dashboard/store/discounts", label: t("discountsNav"), icon: "discounts", match: ["/dashboard/store/occasions"] },
         { href: "/dashboard/reviews", label: t("reviews"), icon: "reviews", badge: "reviews" },
+        // Paid engineer meetings (0113). The badge counts this week's upcoming ones.
+        { href: "/dashboard/meetings", label: t("meetings"), icon: "meetings", badge: "meetings" },
       ],
     },
     {

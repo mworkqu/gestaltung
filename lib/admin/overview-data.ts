@@ -9,6 +9,7 @@ import type { DbClient } from "@/lib/supabase/db";
 import { DAY_MS } from "@/lib/format/date";
 import { OPEN_ORDER_STATUSES } from "@/lib/orders/status";
 import { parseCohortFunnel, type CohortFunnelRow } from "@/lib/pricing/experiment";
+import { loadMeetingFunnel, type MeetingFunnel } from "@/lib/admin/meeting-funnel";
 import { loadPluginFunnel, type PluginFunnel } from "@/lib/admin/plugin-funnel";
 
 export type OverviewLead = { id: string; name: string | null; phone: string | null; message: string | null; created_at: string; status: string | null };
@@ -41,6 +42,7 @@ export type OverviewData = {
   fRedemptions: number;
   priceCohorts: CohortFunnelRow[];
   pluginFunnel: PluginFunnel | null;
+  meetingFunnel: MeetingFunnel | null;
 };
 
 export async function loadOverviewData(db: DbClient): Promise<OverviewData> {
@@ -134,6 +136,8 @@ export async function loadOverviewData(db: DbClient): Promise<OverviewData> {
 
   // Chat plugin handoffs (0112): hidden when the table is missing.
   const pluginFunnel = await loadPluginFunnel(db, monthAgo);
+  // Paid engineer meetings (0113): hidden when the table is missing.
+  const meetingFunnel = await loadMeetingFunnel(db, monthAgo);
 
   return {
     newLeads,
@@ -155,5 +159,6 @@ export async function loadOverviewData(db: DbClient): Promise<OverviewData> {
     fRedemptions,
     priceCohorts,
     pluginFunnel,
+    meetingFunnel,
   };
 }

@@ -23,10 +23,11 @@ export type NavIcon =
   | "usage"
   | "notifications"
   | "contact"
-  | "schools";
+  | "schools"
+  | "meetings";
 
 /** "Something to do" counts shown next to a nav item. */
-export type BadgeKey = "orders" | "fix" | "leads" | "reviews";
+export type BadgeKey = "orders" | "fix" | "leads" | "reviews" | "meetings";
 export type NavBadges = Partial<Record<BadgeKey, number>>;
 
 export type NavItem = {

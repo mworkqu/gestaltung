@@ -15,6 +15,7 @@ import { runMonitoringAlerts } from "@/lib/cad-champions/monitoring/alerts-serve
 import { runPaymentsCron } from "@/lib/cad-champions/payments/server";
 import { sendWeeklyProgressEmails } from "@/lib/cad-champions/training/weekly-email";
 import { runRetirementsWith } from "@/lib/integrations/youtube-retire-core";
+import { runMeetingReminders } from "@/lib/meetings/reminders-core";
 import { drainOutboxWith } from "@/lib/notifications/drain-core";
 import { runApiRefresh } from "@/lib/sourcing/api-refresh";
 import { runVoltaatSync } from "@/lib/sourcing/voltaat-sync";
@@ -119,7 +120,16 @@ export const CRON_JOBS: Readonly<Record<CronJobName, CronJob>> = {
       if (!db) return noServiceKey;
       const result = await drainOutboxWith(db, deps.siteUrl, NOTIFICATION_BATCH, deps.refreshContactPhone);
       if (!result.ok) return { status: 500, body: { error: result.error, detail: result.detail } };
-      return { status: 200, body: result.summary };
+      // Day-before meeting reminders (0113) ride on the same daily run. A
+      // failure here must not fail the outbox drain, which already happened.
+      let meetings: unknown = { skipped: true };
+      try {
+        meetings = await runMeetingReminders(db, deps.siteUrl);
+      } catch (err) {
+        console.error("[cron] meeting reminders failed:", err);
+        meetings = { error: true };
+      }
+      return { status: 200, body: { ...result.summary, meetings } };
     },
   },
   // Weekly, Sunday.

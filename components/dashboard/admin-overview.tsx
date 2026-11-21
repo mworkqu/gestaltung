@@ -51,6 +51,7 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
     fRedemptions,
     priceCohorts,
     pluginFunnel,
+    meetingFunnel,
   } = await loadOverviewData(await createClient());
 
   const funnel: { key: string; value: number }[] = [
@@ -68,6 +69,14 @@ export async function AdminOverview({ locale, embedded = false }: { locale: stri
           { key: "funnelPluginSent", value: pluginFunnel.sent },
           { key: "funnelPluginClaimed", value: pluginFunnel.claimed },
           { key: "funnelPluginOrdered", value: pluginFunnel.ordered },
+        ]
+      : []),
+    ...(meetingFunnel
+      ? [
+          { key: "funnelMeetingsBooked", value: meetingFunnel.booked },
+          { key: "funnelMeetingsDone", value: meetingFunnel.done },
+          { key: "funnelMeetingsInvoiced", value: meetingFunnel.invoiced },
+          { key: "funnelMeetingsPaid", value: meetingFunnel.paid },
         ]
       : []),
   ];
