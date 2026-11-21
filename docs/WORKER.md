@@ -196,7 +196,7 @@ curl http://127.0.0.1:8787/healthz   # "version" shows the new commit
 
 ## 13. After one healthy week (NOT done yet)
 
-- [ ] Remove the six `crons` from `vercel.json` (the worker is then the only scheduler; the Vercel routes stay for manual runs and as a fallback trigger).
+- [ ] Remove the remaining five `crons` from `vercel.json` (the worker is then the only scheduler; the Vercel routes stay for manual runs and as a fallback trigger).
 - [x] Part B (reduced scope): CAD builds and grading go to the Mac first, Cloud Run as fallback ("Part B" above). The AI routes stay in Vercel (owner decision).
 - [ ] Retire the Cloud Run services (cad-worker, grader) once the Mac serves them.
 
@@ -211,13 +211,16 @@ curl http://127.0.0.1:8787/healthz   # "version" shows the new commit
 | Job | Vercel (UTC) | Worker (Asia/Qatar, UTC+3) |
 |---|---|---|
 | supplier-refresh | `0 2 * * *` | `0 5 * * *` |
-| voltaat-sync | `0 3 * * *` | `0 6 * * *` |
+| voltaat-sync | **not scheduled** (worker only since 2026-11) | `0 6 * * *` |
 | delivery-promises | `0 4 * * *` | `0 7 * * *` |
 | notifications | `30 4 * * *` | `30 7 * * *` |
 | anonymous-cleanup | `0 5 * * 0` | `0 8 * * 0` |
 | youtube-retire | `0 7 * * *` | `0 10 * * *` |
 | cc-payments-expire | not scheduled (docs: `0 * * * *`) | `0 * * * *` (hourly) |
 | cc-weekly-progress | not scheduled (docs: `0 6 * * 0`) | `0 9 * * 0` |
+
+**voltaat-sync runs HERE only (2026-11).** It was removed from `vercel.json`: Voltaat's Shopify store answers 429 to shared cloud IP addresses (Vercel/AWS), not to our request count — one run a day, one request every 5 s, at most 41 requests, no retry after a block. The Mac Mini's Qatar line is the fix. The Vercel route stays for a manual run and for Dashboard → Suppliers → "Run now".
+**While the worker switch is off, nothing syncs Voltaat prices**: the storefront keeps the last known prices until the owner switches the worker on (`store_settings.worker`, migration 0111). A blocked run now records the store's `Retry-After` on its `supplier_sync_runs` row, later runs skip until it passes, and the owner gets ONE email once the block has lasted three days in a row (`lib/sourcing/voltaat-block.ts`) instead of one per run. The 20 h guard reads the same table from both runners, and a `running` row younger than an hour keeps the second runner out.
 
 **Cache purges.** The worker cannot call `revalidateTag`; after a job that changed the storefront it calls `POST /api/internal/revalidate` (Bearer `WORKER_SECRET`, only the storefront tag shapes from `lib/cache/catalog-tags.ts`), so the per-SKU purge of Phase 2 is kept.
 

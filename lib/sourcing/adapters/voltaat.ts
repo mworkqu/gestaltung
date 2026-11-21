@@ -6,6 +6,7 @@
 // retry around a block.
 
 import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
+import { parseRetryAfter } from "@/lib/sourcing/voltaat-block";
 
 export const VOLTAAT_BASE = "https://www.voltaat.com";
 export const USER_AGENT = "GestaltungPriceSync/1.0 (+https://gestaltung360.com; info@gestaltung360.com)";
@@ -17,7 +18,15 @@ export type VoltaatVariant = { id: number; sku: string | null; title: string; pr
 export type VoltaatProduct = { handle: string; title: string; variants: VoltaatVariant[] };
 
 export class BlockedError extends Error {
-  constructor(public status: number) {
+  /**
+   * The instant the store's Retry-After header pointed at (ISO), when it sent
+   * one. The sync records it and skips runs until then instead of trying again
+   * on the next schedule (lib/sourcing/voltaat-block.ts).
+   */
+  constructor(
+    public status: number,
+    public retryAfter: string | null = null
+  ) {
     super(`blocked_${status}`);
   }
 }
@@ -217,7 +226,7 @@ export class VoltaatClient {
       redirect: "follow",
       signal: AbortSignal.timeout(20000),
     });
-    if (res.status === 403 || res.status === 429) throw new BlockedError(res.status);
+    if (res.status === 403 || res.status === 429) throw new BlockedError(res.status, parseRetryAfter(res.headers.get("retry-after")));
     return res;
   }
 

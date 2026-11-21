@@ -78,11 +78,14 @@ export const CRON_JOBS: Readonly<Record<CronJobName, CronJob>> = {
       return { status: 200, body: { ...result, purged } };
     },
   },
-  // Daily Voltaat price sync.
+  // Daily Voltaat price sync. NOT in vercel.json since 2026-11: Voltaat's
+  // store answers 429 to shared cloud IP addresses, so this one runs on the
+  // Mac Mini worker (Qatar line) only. The route stays, for a manual run and
+  // for the admin "Run now" button; nothing calls it on a schedule.
   "voltaat-sync": {
     name: "voltaat-sync",
     utc: "0 3 * * *",
-    inVercelJson: true,
+    inVercelJson: false,
     qatar: "0 6 * * *",
     async run(deps) {
       const db = deps.db();
