@@ -36,6 +36,7 @@ import {
   cloudFailureCode,
   cloudUrl,
   idToken,
+  cloudDown,
   nextCloudStep,
   repairMessages,
   resetCloudAuth,
@@ -117,7 +118,8 @@ describe("ID token", () => {
   it("sends the token as a Bearer header to /build", async () => {
     const fetchImpl = vi.fn(async () => json(okBody));
     await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const call = fetchImpl.mock.calls.find((c) => String((c as unknown as [string])[0]).endsWith("/build"));
+    const [url, init] = call as unknown as [string, RequestInit];
     expect(url).toBe(`${URL_}/build`);
     expect((init.headers as Record<string, string>).authorization).toMatch(/^Bearer h\./);
     expect(JSON.parse(String(init.body))).toEqual({
@@ -133,7 +135,8 @@ describe("shared worker secret", () => {
     const send = async () => {
       const fetchImpl = vi.fn(async () => json(okBody));
       await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
-      return (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
+      const call = fetchImpl.mock.calls.find((c) => String((c as unknown as [string])[0]).endsWith("/build"));
+      return (call as unknown as [string, RequestInit])[1].headers as Record<string, string>;
     };
     expect((await send())["x-cad-worker-token"]).toBeUndefined();
     vi.stubEnv("CAD_WORKER_TOKEN", "s3cret");
@@ -160,12 +163,26 @@ describe("buildOnce", () => {
     expect(r).toMatchObject({ kind: "result", result: { ok: false, error: "NameError: result" } });
   });
   it("times out → down (timeout)", async () => {
-    const hang: typeof fetch = (_u, init) =>
-      new Promise((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
-      });
+    // The service answers the reachability ping, then never finishes the build.
+    const hang: typeof fetch = (url, init) =>
+      String(url).endsWith("/health")
+        ? Promise.resolve(new Response("ok"))
+        : new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+          });
     const r = await buildOnce(req, { fetchImpl: hang, timeoutMs: 20 });
     expect(r).toMatchObject({ kind: "down", reason: "timeout" });
+  });
+  it("no answer to the reachability ping → down (unreachable) inside the 5 s budget, no build attempt", async () => {
+    const silent = vi.fn(
+      (_u: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "TimeoutError")));
+        })
+    );
+    const r = await buildOnce(req, { fetchImpl: silent as unknown as typeof fetch, reachTimeoutMs: 30, timeoutMs: 60_000 });
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+    expect(silent.mock.calls.filter((c) => String(c[0]).endsWith("/build"))).toHaveLength(0);
   });
   it("5xx / 403 without the contract → down (refused)", async () => {
     const r = await buildOnce(req, { fetchImpl: (async () => new Response("no", { status: 503 })) as unknown as typeof fetch });
@@ -191,26 +208,49 @@ describe("buildOnce", () => {
 });
 
 describe("buildWithRetry + fallback decision", () => {
-  it("retries once when down, then succeeds", async () => {
-    const fetchImpl = vi
-      .fn()
-      .mockRejectedValueOnce(new TypeError("fetch failed"))
-      .mockResolvedValueOnce(json(okBody));
-    const r = await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(r.kind).toBe("result");
+  // Every fetchImpl below also answers the /health ping of a cold instance.
+  const buildCalls = (f: { mock: { calls: unknown[][] } }) => f.mock.calls.filter((c) => String(c[0]).endsWith("/build")).length;
+
+  it("retries once when the worker REFUSED us, then succeeds", async () => {
+    const fetchImpl = vi.fn(async (url: string) =>
+      String(url).endsWith("/health") ? new Response("ok") : new Response("unavailable", { status: 503 })
+    );
+    const refused = await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(buildCalls(fetchImpl)).toBe(2);
+    expect(refused.kind).toBe("down");
+    expect(nextCloudStep(refused)).toEqual({ action: "fallback" });
   });
-  it("worker down twice → down → fallback to the browser path", async () => {
-    const fetchImpl = vi.fn(async () => new Response("unavailable", { status: 503 }));
+  it("does NOT retry an unreachable cloud, and remembers it (one wait per page view)", async () => {
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (String(url).endsWith("/health")) return new Response("ok");
+      throw new TypeError("fetch failed");
+    });
     const r = await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    expect(r.kind).toBe("down");
+    expect(buildCalls(fetchImpl)).toBe(1);
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+    expect(cloudDown()).toBe(true);
+    // The next build asks nothing at all and falls back at once.
+    const again = await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
+    expect(buildCalls(fetchImpl)).toBe(1);
+    expect(nextCloudStep(again)).toEqual({ action: "fallback" });
+  });
+  it("the trial ended: the service answers nothing, so the browser engine takes over inside the reach budget", async () => {
+    const hang: typeof fetch = (_u, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "TimeoutError")));
+      });
+    const started = Date.now();
+    const r = await buildWithRetry(req, { fetchImpl: hang, reachTimeoutMs: 30, timeoutMs: 60_000 });
+    // It never waited for the 60 s build timeout.
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
     expect(nextCloudStep(r)).toEqual({ action: "fallback" });
+    expect(cloudDown()).toBe(true);
   });
   it("does not retry a build that ran", async () => {
-    const fetchImpl = vi.fn(async () => json({ ok: false, error: "bad", log: "" }));
+    const fetchImpl = vi.fn(async (url: string) => (String(url).endsWith("/health") ? new Response("ok") : json({ ok: false, error: "bad", log: "" })));
     await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(buildCalls(fetchImpl)).toBe(1);
   });
 });
 
@@ -272,8 +312,12 @@ const googleIdToken = (expSeconds = 3600) =>
 
 /** Routes by URL: STS, IAM Credentials, then the worker. Records every call. */
 function googleFetch(over: { sts?: () => Response; iam?: () => Response; worker?: () => Response } = {}) {
+  // `calls` holds the calls that matter to these tests; the reachability ping
+  // of a cold instance (GET <service>/health, lib/cad/cloud.ts) is answered
+  // but not recorded, so "Google was never called" stays readable.
   const calls: { url: string; init: RequestInit }[] = [];
   const impl = vi.fn(async (url: string, init: RequestInit) => {
+    if (url.endsWith("/health")) return new Response("ok");
     calls.push({ url, init });
     if (url === STS) return over.sts?.() ?? json({ access_token: "fed-access", token_type: "Bearer", expires_in: 3600 });
     if (url === IAM) return over.iam?.() ?? json({ token: googleIdToken() });
@@ -370,12 +414,13 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
     expect(short.calls.filter((c) => c.url === STS)).toHaveLength(2);
   });
 
-  it("STS failure → down (unreachable) → retried once → fallback to the browser path, no worker call, no token leaked", async () => {
+  it("STS failure → down (unreachable), ONE attempt → fallback to the browser path, no worker call, no token leaked", async () => {
     const g = googleFetch({ sts: () => json({ error: "invalid_grant", error_description: "bad" }, 400) });
     const r = await buildWithRetry(req, { fetchImpl: g.impl });
     expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
     expect(r.kind === "down" && r.detail).toContain("sts HTTP 400 invalid_grant");
-    expect(g.calls.filter((c) => c.url === STS)).toHaveLength(2);
+    // A cloud we cannot get a token for is not asked twice (2026-11).
+    expect(g.calls.filter((c) => c.url === STS)).toHaveLength(1);
     expect(g.calls.some((c) => c.url.startsWith(URL_))).toBe(false);
     expect(nextCloudStep(r)).toEqual({ action: "fallback" });
     expect(JSON.stringify(r)).not.toContain(VERCEL_JWT);
@@ -421,10 +466,11 @@ describe("part B: Mac Mini first, Cloud Run as fallback", () => {
   });
 
   it("worker off / down / refused → Cloud Run exactly as before", async () => {
-    const fetchImpl = vi.fn(async () => json(okBody));
+    // One reachability ping (cold instance) and one build.
+    const fetchImpl = vi.fn(async (url: string) => (String(url).endsWith("/health") ? new Response("ok") : json(okBody)));
     const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch, worker: cloudRun });
     expect(r).toMatchObject({ kind: "result", engine: "cloud-run" });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls.filter((c) => String(c[0]).endsWith("/build"))).toHaveLength(1);
   });
 
   it("Mac accepted but timed out → down (timeout) with NO Cloud Run call; nothing delivered, so nothing charged", async () => {

@@ -41,6 +41,51 @@ export const CLOUD_BUILD_TIMEOUT_MS = 60_000;
 export const GOOGLE_CALL_TIMEOUT_MS = 10_000;
 const TOKEN_EARLY_MS = 5 * 60_000;
 
+// ── Is the cloud worker there at all? (2026-11, the Google trial ended) ─────
+// A build legitimately takes tens of seconds, so the 60 s build timeout cannot
+// also be the "is it there" timeout. Instead:
+//   * the FIRST build of a server instance pings GET {url}/health with a 5 s
+//     budget; no answer in 5 s = gone, fall back to the browser engine at once
+//     (any HTTP answer, 403 included, means the service is up and the build
+//     attempt is worth making);
+//   * a cloud that was unreachable is remembered for CLOUD_DOWN_MEMORY_MS, so
+//     the builds after it fall back with NO network call and no page view
+//     waits again;
+//   * an unreachable cloud is never retried inside one request.
+/** Budget for deciding whether the service exists at all. */
+export const CLOUD_REACH_TIMEOUT_MS = 5_000;
+/** How long an unreachable cloud is taken at its word. */
+export const CLOUD_DOWN_MEMORY_MS = 5 * 60_000;
+
+let cloudDownUntil = 0;
+let cloudSeenAlive = false;
+
+/** True while a recent attempt found the cloud worker unreachable. */
+export function cloudDown(now: number = Date.now()): boolean {
+  return cloudDownUntil > now;
+}
+
+/** Remember that the cloud worker could not be reached. */
+export function noteCloudDown(now: number = Date.now()): void {
+  cloudDownUntil = now + CLOUD_DOWN_MEMORY_MS;
+}
+
+/** Test hook / after a configuration change: forget what we know about the cloud. */
+export function resetCloudHealth(): void {
+  cloudDownUntil = 0;
+  cloudSeenAlive = false;
+}
+
+/** Any HTTP answer within CLOUD_REACH_TIMEOUT_MS = the service is up. */
+async function reachable(url: string, doFetch: typeof fetch, timeoutMs: number): Promise<boolean> {
+  try {
+    await doFetch(`${url}/health`, { method: "GET", cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const STS_URL = "https://sts.googleapis.com/v1/token";
 export const iamIdTokenUrl = (email: string) =>
   `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${encodeURIComponent(email)}:generateIdToken`;
@@ -91,6 +136,7 @@ const cachedTokens = new Map<string, { token: string; expires: number }>();
 export function resetCloudAuth() {
   sources.clear();
   cachedTokens.clear();
+  resetCloudHealth();
 }
 
 function tokenExpiry(token: string): number {
@@ -290,6 +336,8 @@ export function workerHeaders(idTokenValue: string): Record<string, string> {
 
 export type BuildOpts = {
   timeoutMs?: number;
+  /** Budget for the "is the service there" ping (default CLOUD_REACH_TIMEOUT_MS). */
+  reachTimeoutMs?: number;
   /** Used for the worker AND the keyless Google calls (tests route by URL). */
   fetchImpl?: typeof fetch;
   /** Part B: the Mac Mini worker router (default: lib/worker/proxy-server.ts). */
@@ -365,6 +413,23 @@ export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promis
   if (attempt.engine === "mac") return fromWorker(attempt.outcome, timeoutMs);
 
   const doFetch = opts.fetchImpl ?? fetch;
+  // The cloud was unreachable a moment ago: fall back without a network call.
+  if (cloudDown())
+    return { kind: "down", reason: "unreachable", detail: "cloud worker was unreachable; not called again yet", engine: "cloud-run" };
+  // First build of this instance: 5 s to prove the service exists.
+  if (!cloudSeenAlive) {
+    const reachTimeout = opts.reachTimeoutMs ?? CLOUD_REACH_TIMEOUT_MS;
+    if (!(await reachable(url, doFetch, reachTimeout))) {
+      noteCloudDown();
+      return {
+        kind: "down",
+        reason: "unreachable",
+        detail: `no answer from the CAD worker within ${Math.round(reachTimeout / 1000)} s`,
+        engine: "cloud-run",
+      };
+    }
+    cloudSeenAlive = true;
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -394,10 +459,19 @@ export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promis
   }
 }
 
-/** /build with one retry when the worker is down; "down" only after two misses in a row. */
+/** /build with one retry when the worker REFUSED us; an unreachable cloud is not retried. */
 export async function buildWithRetry(req: BuildRequest, opts: BuildOpts = {}): Promise<BuildOutcome> {
   const first = await buildOnce(req, opts);
   if (first.kind === "result" || first.reason === "not_configured") return first;
+  // Not there / did not answer: ONE attempt per request. Trying again only
+  // doubles the wait before the browser engine takes over, and the next
+  // requests skip the call entirely (cloudDown).
+  if (first.reason === "unreachable" || first.reason === "timeout") {
+    noteCloudDown();
+    return first;
+  }
+  // Refused (401/403/5xx) or not the contract: that can be one bad instance,
+  // so it is still worth one retry.
   return buildOnce(req, opts);
 }
 

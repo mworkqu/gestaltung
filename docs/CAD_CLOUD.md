@@ -4,6 +4,16 @@ AI-written CadQuery code is turned into STEP + STL + a preview picture on a smal
 
 > **2026-11-18, part B:** with the Mac Mini worker switch on (docs/WORKER.md, "Part B"), `/build` goes to the `cad-worker` container on the Mac first (`POST <WORKER_URL>/cad/build`, Bearer `WORKER_SECRET`) and this Cloud Run service is the fallback when the Mac does not take the call. After a Mac timeout nothing is sent here (no double build). Keep every variable below set in Vercel: the cloud engine is only offered when they are, and they are the fallback. The delivered manifest records `runner: "mac" | "cloud-run"`.
 
+> **2026-11-21, the Google Cloud free trial ended.** The `cad-worker` Cloud Run service may be stopped, suspended or deleted. Nothing on the site breaks, and no code was removed.
+>
+> **What still works.** Everything a client sees. `store_settings.cad_engine` has no row or `{"engine":"browser"}`, which is also what a missing row, a malformed value and any read error mean (`lib/cad/engine.ts` `DEFAULT_CAD_ENGINE`), so every visitor and the owner get the browser OpenSCAD path, exactly as before the cloud engine existed. The CAD Champions grader is a separate Cloud Run service (`grader/`) with its own URL; the trial ending affects it the same way, and `docs/cad-champions/DEPLOY.md` covers it.
+>
+> **What does not work.** `{"engine":"cloud"}` or `{"engine":"admin"}` while the service is gone: a build there cannot run, so the request falls back to the browser engine. Nothing is charged on a fallback (`cad_deliver` runs only on a delivered model).
+>
+> **How fast the fallback is** (`lib/cad/cloud.ts`, 2026-11): the first build of a server instance pings `GET <service>/health` with a **5 s** budget; no answer in 5 s means the service is gone and the browser engine takes over at once, without waiting for the 60 s build timeout. That result is remembered for 5 minutes, so the builds after it fall back with **no network call at all**. An unreachable cloud (including a Google token failure) is tried **once** — the old second attempt is gone. A service that answers but refuses us (401/403/5xx) is still retried once, since that can be one bad instance.
+>
+> **To turn the cloud engine off for good** (optional): set `store_settings.cad_engine` to `{"engine":"browser"}` — or leave it, since that is already the default. Clearing `GCP_CAD_URL` in Vercel also works: without it the engine reports `not_configured` and never makes a call. Do not delete the code: `services/cad-worker/` and `lib/cad/cloud.ts` are how the Mac Mini's own `cad-worker` container is reached too (part B above).
+
 ## How it fits together
 
 ```
