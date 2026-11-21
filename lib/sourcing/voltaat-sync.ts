@@ -2,12 +2,21 @@
 // route (daily) or the admin "Run now" button. Uses the service client — the
 // cron has no user session.
 //
-// Order of checks: switch off → skip; a finished run in the last 20 h → skip
-// (one run a day); robots.txt must allow the feed; then read the catalogue
-// once, compare with every mapped Voltaat offer, and write numbers only.
-// A 403/429 stops everything, keeps the last known prices and emails the
-// owner. Every run is logged in supplier_sync_runs, and when anything moved
-// the owner gets the change report.
+// Order of checks: switch off → skip; another runner mid-run, a good run in
+// the last 20 h, or an unexpired block → skip (lib/sourcing/voltaat-block.ts
+// runGuard, which reads supplier_sync_runs and so covers BOTH runners);
+// robots.txt must allow the feed; then read the catalogue once, compare with
+// every mapped Voltaat offer, and write numbers only.
+// A 403/429 stops everything and keeps the last known prices; the store's
+// Retry-After is recorded on the run so the next schedules are skipped until
+// it passes, and the owner gets ONE email once the block has lasted
+// BLOCKED_DAYS_BEFORE_EMAIL days — not one per blocked run (2026-11).
+// Every run is logged in supplier_sync_runs, and when anything moved the owner
+// gets the change report.
+//
+// Where it runs: the Mac Mini worker only (2026-11). It was removed from
+// vercel.json because Voltaat's store blocks shared cloud IP addresses; see
+// docs/WORKER.md and lib/sourcing/voltaat-block.ts.
 //
 // A mapped product that Voltaat no longer lists is marked "order on request"
 // (offer inactive → lead_time_class null) the first time it goes missing and
@@ -32,6 +41,14 @@ import {
 } from "@/lib/sourcing/adapters/voltaat";
 import { diffPartSnapshots, type CatalogChange } from "@/lib/cache/catalog-tags";
 import { snapshotParts } from "@/lib/sourcing/catalog-snapshot";
+import {
+  BLOCKED_DAYS_BEFORE_EMAIL,
+  blockedDayStreak,
+  blockErrorText,
+  runGuard,
+  shouldEmailBlocked,
+  type RecentRun,
+} from "@/lib/sourcing/voltaat-block";
 
 export type SyncSummary = {
   status: "ok" | "blocked" | "failed" | "disabled" | "skipped";
@@ -56,6 +73,14 @@ const NO_CHANGE: CatalogChange = { skus: [], listingChanged: false };
 const UNKNOWN_CHANGE: CatalogChange = { skus: [], listingChanged: true, unknown: true };
 
 const MIN_HOURS_BETWEEN_RUNS = 20;
+/** How far back the guard and the blocked-day streak look. */
+const RUN_HISTORY_DAYS = 14;
+
+/** Blocked days in a row, counting this run's block (which is not in `history` yet). */
+function blockedStreak(history: readonly RecentRun[], now: Date): number {
+  const blocked = history.filter((r) => r.status === "blocked").map((r) => r.started_at);
+  return blockedDayStreak([...blocked, now.toISOString()], now);
+}
 
 export async function voltaatSyncEnabled(db: DbClient): Promise<boolean> {
   const { data } = await db.from("store_settings").select("value").eq("key", "voltaat_sync").maybeSingle();
@@ -70,15 +95,23 @@ export async function runVoltaatSync(db: DbClient, trigger: "cron" | "manual"): 
     return { status: "disabled", ...empty };
   }
 
-  const since = new Date(Date.now() - MIN_HOURS_BETWEEN_RUNS * 3600_000).toISOString();
-  const { data: recent } = await db
+  // One guard for BOTH runners (Vercel and the Mac Mini worker share this
+  // table): another run in flight, a good run inside 20 h, or a block whose
+  // wait is not over all mean "not now". lib/sourcing/voltaat-block.ts.
+  const startedAt = new Date();
+  const { data: recentRuns } = await db
     .from("supplier_sync_runs")
-    .select("id")
+    .select("id, status, started_at, error")
     .eq("supplier_code", "voltaat")
-    .eq("status", "ok")
-    .gte("started_at", since)
-    .limit(1);
-  if (recent?.length) return { status: "skipped", ...empty, error: "already_ran_today" };
+    .gte("started_at", new Date(startedAt.getTime() - RUN_HISTORY_DAYS * 86_400_000).toISOString())
+    .order("started_at", { ascending: false })
+    .limit(200);
+  const history: RecentRun[] = (recentRuns ?? []) as RecentRun[];
+  const guard = runGuard(history, startedAt, MIN_HOURS_BETWEEN_RUNS);
+  if (guard.skip) {
+    if (guard.reason === "blocked_until") console.warn(`[voltaat-sync] still blocked, next try after ${guard.until}`);
+    return { status: "skipped", ...empty, error: guard.reason };
+  }
 
   const { data: run } = await db
     .from("supplier_sync_runs")
@@ -121,7 +154,12 @@ export async function runVoltaatSync(db: DbClient, trigger: "cron" | "manual"): 
     const robots = await client.robots();
     if (!robotsAllows(robots, "/products.json?limit=250&page=1")) {
       await finish({ status: "blocked", error: "robots_disallow" });
-      await alert("Voltaat's robots.txt no longer allows reading its catalogue. The sync stopped and kept the last known prices.");
+      // Same rule as a 403/429: one email once the block has lasted days, not
+      // one per blocked run.
+      if (shouldEmailBlocked(blockedStreak(history, startedAt)))
+        await alert(
+          `Voltaat's robots.txt has not allowed reading its catalogue for ${BLOCKED_DAYS_BEFORE_EMAIL} days. The sync stopped each time and kept the last known prices.`
+        );
       return { status: "blocked", runId, ...empty, requests: client.requests, error: "robots_disallow" };
     }
 
@@ -200,11 +238,21 @@ export async function runVoltaatSync(db: DbClient, trigger: "cron" | "manual"): 
     };
   } catch (e) {
     if (e instanceof BlockedError) {
-      await finish({ status: "blocked", error: e.message });
-      await alert(
-        `Voltaat answered ${e.status} (${e.status === 429 ? "too many requests" : "forbidden"}). The sync stopped at once, did not retry, and kept the last known prices.`
-      );
-      return { status: "blocked", runId, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error: e.message };
+      // Record what the store said we may try again: the next scheduled run
+      // reads it from this row and skips until then (runGuard).
+      const retryAfter = e.retryAfter;
+      const error = blockErrorText(e.message, retryAfter);
+      await finish({ status: "blocked", error });
+      const streak = blockedStreak(history, startedAt);
+      if (shouldEmailBlocked(streak))
+        await alert(
+          `Voltaat has answered ${e.status} (${e.status === 429 ? "too many requests" : "forbidden"}) on ${BLOCKED_DAYS_BEFORE_EMAIL} days in a row. ` +
+            `The sync stops at once each time, does not retry, and keeps the last known prices. ` +
+            `A 429 for one run a day at one request every 5 seconds is almost certainly the store refusing a shared cloud IP address, not our request count: ` +
+            `running the sync from the Mac Mini worker (a Qatar line) is the fix.`
+        );
+      else console.warn(`[voltaat-sync] blocked (${e.message}), day ${streak} of the streak; no email${retryAfter ? `, retry after ${retryAfter}` : ""}`);
+      return { status: "blocked", runId, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error };
     }
     const msg = e instanceof Error ? e.message : "failed";
     await finish({ status: "failed", error: msg });

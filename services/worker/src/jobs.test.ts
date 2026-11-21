@@ -28,13 +28,15 @@ function utcToQatar(expr: string): string {
 describe("cron job list", () => {
   it("covers every vercel.json cron with the same UTC schedule", () => {
     const vercel = JSON.parse(fs.readFileSync(path.join(root, "vercel.json"), "utf8")) as { crons: { path: string; schedule: string }[] };
-    expect(vercel.crons).toHaveLength(6);
+    expect(vercel.crons).toHaveLength(5);
     for (const c of vercel.crons) {
       const name = c.path.replace("/api/cron/", "") as (typeof CRON_JOB_NAMES)[number];
       expect(CRON_JOBS[name]?.utc).toBe(c.schedule);
       expect(CRON_JOBS[name]?.inVercelJson).toBe(true);
     }
-    expect(CRON_JOB_NAMES.filter((n) => !CRON_JOBS[n].inVercelJson)).toEqual(["cc-payments-expire", "cc-weekly-progress"]);
+    // voltaat-sync left vercel.json in 2026-11 (Voltaat blocks cloud IPs): it
+    // runs on this worker only.
+    expect(CRON_JOB_NAMES.filter((n) => !CRON_JOBS[n].inVercelJson)).toEqual(["voltaat-sync", "cc-payments-expire", "cc-weekly-progress"]);
   });
 
   it("has a route for every job", () => {
