@@ -95,7 +95,11 @@ type SaveFailure = { reason: Exclude<RecordResult, { ok: true }>["reason"]; uplo
 const CHIP_TONE: Record<TaskChip, ChipTone> = { not_started: "neutral", uploading: "info", uploaded: "success", failed: "danger" };
 const PKG_TONE: Record<string, ChipTone> = { complete: "success", partial: "warning", missing: "danger", none: "neutral" };
 
-const SYNC_EVERY_MS = 60_000;
+// Clock re-sync with the server. 5 minutes, not 1 (2026-11, Fast Origin
+// Transfer): between syncs the countdown keeps running on the local 1 s tick
+// with the last measured offset, and a browser clock does not drift by a
+// meaningful amount in five minutes.
+const SYNC_EVERY_MS = 300_000;
 
 export function TestWorkspace(props: WorkspaceProps) {
   const { mode, uploadMode, attempt, tasks, userId, graceSeconds } = props;

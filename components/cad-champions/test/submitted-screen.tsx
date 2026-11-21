@@ -11,7 +11,10 @@ import { formatDateTime } from "@/lib/cad-champions/format";
 import { ccPath } from "@/lib/cad-champions/routes";
 import { allSettled, type LiveTaskState } from "@/lib/cad-champions/test/status";
 
-const POLL_MS = 5000;
+// Grading-progress poll. 10 s, not 5 (2026-11, Fast Origin Transfer): every
+// poll is a function response, and grading takes tens of seconds, so the
+// screen is no less live in practice.
+const POLL_MS = 10_000;
 
 const TONE: Record<LiveTaskState, ChipTone> = {
   no_file: "neutral",
@@ -32,7 +35,7 @@ const ICON = {
 
 /**
  * "Test submitted" screen: what happens next, plus a live status line per
- * task (polls GET /api/cad-champions/attempts/[id]/status every 5 s until
+ * task (polls GET /api/cad-champions/attempts/[id]/status every 10 s until
  * nothing is still being checked).
  */
 export function SubmittedScreen({

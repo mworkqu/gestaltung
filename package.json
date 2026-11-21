@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/origin-budget.mjs",
+    "origin:budget": "node scripts/origin-budget.mjs",
     "start": "next start",
     "lint": "eslint . && node scripts/cc-rtl-check.mjs",
     "lint:ratchet": "node scripts/lint-ratchet.mjs",

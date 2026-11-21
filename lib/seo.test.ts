@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ROBOTS_ALLOW,
+  ROBOTS_BLOCKED_AGENTS,
   ROBOTS_DISALLOW,
   SITE_URL,
   SITEMAP_STATIC_PATHS,
@@ -348,5 +349,22 @@ describe("robotsRules", () => {
 
   it("points at the sitemap", () => {
     expect(r.sitemap).toBe("https://gestaltung360.com/sitemap.xml");
+  });
+
+  // 2026-11: AI training / answer bots and SEO scrapers walk every product
+  // page, and each page they touch after a purge is an origin render.
+  it("turns the AI and SEO crawlers away from the whole site", () => {
+    const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
+    const blocked = rules[1] as { userAgent: string[]; disallow: string };
+    expect(blocked.disallow).toBe("/");
+    expect(blocked.userAgent).toEqual(ROBOTS_BLOCKED_AGENTS);
+    expect(blocked.userAgent).toEqual(
+      expect.arrayContaining(["GPTBot", "ClaudeBot", "CCBot", "Bytespider", "AhrefsBot", "SemrushBot", "PetalBot", "Amazonbot", "meta-externalagent"])
+    );
+  });
+
+  it("keeps the search engines that send customers", () => {
+    const names = ROBOTS_BLOCKED_AGENTS.map((a) => a.toLowerCase());
+    for (const keep of ["googlebot", "bingbot", "duckduckbot", "applebot", "yandexbot"]) expect(names).not.toContain(keep);
   });
 });

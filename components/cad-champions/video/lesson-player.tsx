@@ -25,7 +25,12 @@ import { WATCHED_THRESHOLD, watchedFraction } from "@/lib/cad-champions/videos/r
 import { markLessonCompleteAction, saveLessonProgressAction } from "@/lib/cad-champions/training/actions";
 import { cn } from "@/lib/utils";
 
-const PING_MS = 15_000;
+// Resume-position ping. 60 s, not 15 s (2026-11, Fast Origin Transfer):
+// each ping is a server-action round trip, and finishing a lesson is sent at
+// once anyway (sendProgress(true) when the watched threshold is crossed), as
+// is the last position when the player unmounts. The only cost of a longer
+// ping is that "continue where I left off" can be up to a minute behind.
+const PING_MS = 60_000;
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 
 type Source = { embedUrl: string; provider: "youtube" | "bunny" };

@@ -236,6 +236,10 @@ export const getSitemapProducts = unstable_cache(
         .select("sku, updated_at")
         .eq("is_published", true)
         .is("merged_into", null)
+        // Only pages a visitor can actually buy from (2026-11, Fast Origin
+        // Transfer): a product with no price is a placeholder, and every SKU
+        // in the sitemap is a page crawlers come back to and re-render.
+        .gt("unit_price", 0)
         .order("id")
         .range(from, to),
     );

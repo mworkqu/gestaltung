@@ -8,13 +8,16 @@ import { useTranslations } from "next-intl";
 import { Alert, StatusChip, type ChipTone } from "@/components/cad-champions/ui";
 import type { LiveTaskState } from "@/lib/cad-champions/test/status";
 
-const POLL_MS = 5000;
+// Grading-progress poll. 10 s, not 5 (2026-11, Fast Origin Transfer): every
+// poll is a function response, and grading takes tens of seconds, so the
+// screen is no less live in practice.
+const POLL_MS = 10_000;
 const TONE: Record<LiveTaskState, ChipTone> = { no_file: "neutral", checking: "info", done: "success", waiting_trainer: "warning", error: "danger" };
 const ICON = { no_file: FileX2, checking: Loader2, done: CheckCircle2, waiting_trainer: UserCheck, error: OctagonAlert } as const;
 
 /**
  * "Still grading" state: live progress per task. Polls the existing
- * GET /api/cad-champions/attempts/[id]/status every 5 s and refreshes the page
+ * GET /api/cad-champions/attempts/[id]/status every 10 s and refreshes the page
  * once the attempt has left "submitted" / "grading".
  */
 export function GradingPoller({ attemptId, tasks }: { attemptId: string; tasks: { id: string; number: number; title: string }[] }) {

@@ -273,9 +273,42 @@ export const ROBOTS_DISALLOW = [
  */
 export const ROBOTS_ALLOW = ["/", "/*/projects/new"];
 
+/**
+ * Crawlers that are turned away from the whole site (2026-11, Fast Origin
+ * Transfer). None of them sends customers: they are AI training / answer bots
+ * and SEO link scrapers, and between them they walk all ~1,300 product pages
+ * in both locales. Every page they touch after a cache purge is an origin
+ * render and its bytes leave our functions.
+ *
+ * Search engines that do send customers are NOT in this list and keep the
+ * rules above: Googlebot, Bingbot, DuckDuckBot, Applebot, YandexBot.
+ * Robots.txt is a request, not a wall — a bot that ignores it has to be
+ * stopped at the edge (Vercel firewall), which is the owner's call.
+ */
+export const ROBOTS_BLOCKED_AGENTS = [
+  "GPTBot",
+  "OAI-SearchBot",
+  "ClaudeBot",
+  "anthropic-ai",
+  "CCBot",
+  "Google-Extended",
+  "Bytespider",
+  "AhrefsBot",
+  "SemrushBot",
+  "PetalBot",
+  "Amazonbot",
+  "meta-externalagent",
+  "DataForSeoBot",
+  "MJ12bot",
+  "DotBot",
+];
+
 export function robotsRules(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: ROBOTS_ALLOW, disallow: ROBOTS_DISALLOW }],
+    rules: [
+      { userAgent: "*", allow: ROBOTS_ALLOW, disallow: ROBOTS_DISALLOW },
+      { userAgent: ROBOTS_BLOCKED_AGENTS, disallow: "/" },
+    ],
     sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }
