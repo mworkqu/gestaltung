@@ -1,0 +1,111 @@
+diff --git a/server.mjs b/server.mjs
+new file mode 100644
+index 0000000..b84ad89
+--- /dev/null
++++ b/server.mjs
+@@ -0,0 +1,105 @@
++// Self-hosting entry point (Mac mini behind a Cloudflare Tunnel). Replaces
++// `next start -H 127.0.0.1 -p 3000`; only needed while we self-host — nothing
++// on Vercel uses this file.
++//
++// WHY. Next builds the absolute URL of every request once, in
++// next-server.js `attachRequestMeta()`:
++//
++//   const initUrl = this.fetchHostname && this.port
++//     ? `${protocol}://${this.fetchHostname}:${this.port}${req.url}`
++//     : this.nextConfig.experimental.trustHostHeader
++//       ? `https://${req.headers.host || "localhost"}${req.url}`
++//       : req.url;
++//
++// and the URL middleware sees the same way (next-server.js, runMiddleware:
++// `${initProtocol}://${this.fetchHostname || "localhost"}:${this.port}...`).
++// That origin is what `request.url` / `request.nextUrl.origin` carry, and it
++// feeds middleware.ts, the Supabase auth callback and the YouTube
++// `redirect_uri` we hand to Google.
++//
++// `next start -H 127.0.0.1 -p 3000` therefore makes every one of those read
++// http://localhost:3000: start-server passes the bind address straight through
++// as the NextServer `hostname`, and `fetchHostname` is derived from it.
++// `experimental.trustHostHeader` does NOT help in a self-hosted server: the
++// render server is created with `hostname: opts.hostname || "localhost"`
++// (next/dist/server/lib/render-server.js) and `port: this.options.port || 3000`
++// (next/dist/server/next.js), so `fetchHostname && this.port` is always true
++// and the first branch always wins. Verified on 15.5.28 — the flag is also not
++// in this version's config schema and only warns.
++//
++// SO: bind the socket ourselves (loopback only — the tunnel is the only way in,
++// and that must not change) and tell Next the PUBLIC origin instead of the bind
++// address. fetchHostname/port then describe where visitors actually are, which
++// is what every URL Next builds should say. The `Host` header is still read
++// where it has to be: the www -> apex redirect in next.config.mjs matches on the
++// real Host header (resolve-routes reads it directly), so www keeps 308ing.
++//
++// x-forwarded-proto is pinned to the SITE_ORIGIN scheme because that protocol
++// is what decides http/https in the two snippets above; the tunnel terminates
++// TLS, so the public scheme is https no matter what reaches this socket. With
++// scheme and port agreeing (https + 443) WHATWG URL drops the port, so the
++// origin comes out as exactly https://gestaltung360.com.
++import { createServer } from "node:http";
++import { fileURLToPath } from "node:url";
++import { dirname } from "node:path";
++
++import next from "next";
++
++// Where to listen: loopback only. SITE_HOST is an escape hatch, not an invite
++// to bind 0.0.0.0 — nothing but cloudflared should be able to reach this.
++const HOST = process.env.SITE_HOST ?? "127.0.0.1";
++const PORT = Number(process.env.PORT ?? 3000);
++
++// The origin visitors use. Must match lib/seo.ts SITE_URL.
++const SITE_ORIGIN = new URL(process.env.SITE_ORIGIN ?? "https://gestaltung360.com");
++const PUBLIC_PROTO = SITE_ORIGIN.protocol === "https:" ? "https" : "http";
++const PUBLIC_PORT = Number(SITE_ORIGIN.port || (PUBLIC_PROTO === "https" ? 443 : 80));
++
++// Next's own default for `next start` (there: --keepAliveTimeout).
++const KEEP_ALIVE_TIMEOUT = 5000;
++
++const app = next({
++  dev: false,
++  dir: dirname(fileURLToPath(import.meta.url)),
++  // NOT the bind address: the public origin Next should build request URLs from.
++  hostname: SITE_ORIGIN.hostname,
++  port: PUBLIC_PORT,
++});
++
++async function main() {
++  await app.prepare();
++  const handler = app.getRequestHandler();
++
++  const server = createServer((req, res) => {
++    req.headers["x-forwarded-proto"] = PUBLIC_PROTO;
++    return handler(req, res);
++  });
++  server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT;
++
++  await new Promise((resolve, reject) => {
++    server.once("error", reject);
++    server.listen(PORT, HOST, () => {
++      server.off("error", reject);
++      resolve();
++    });
++  });
++
++  // From here on a socket-level error must not take the process down: launchd
++  // would restart us and every in-flight request would be dropped with it.
++  server.on("error", (err) => console.error("[server] http error", err));
++
++  console.error(`[server] ready on http://${HOST}:${PORT} serving ${SITE_ORIGIN.origin}`);
++
++  const shutdown = (signal) => {
++    console.error(`[server] ${signal} received, closing`);
++    server.close(() => process.exit(0));
++  };
++  process.on("SIGTERM", () => shutdown("SIGTERM"));
++  process.on("SIGINT", () => shutdown("SIGINT"));
++}
++
++// Exit non-zero so launchd's KeepAlive restarts us.
++main().catch((err) => {
++  console.error("[server] failed to start", err);
++  process.exit(1);
++});
