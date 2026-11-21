@@ -4,6 +4,7 @@ import { Client } from "@modelcontextprotocol/client";
 import { InMemoryTransport, McpServer } from "@modelcontextprotocol/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_MEETING_SETTINGS } from "@/lib/meetings/settings";
 import { CODE_LIBRARY } from "@/lib/studio/library";
 import { EXAMPLE_BUILD_FILE } from "../build-file";
 import type { PluginProduct } from "../check-project";
@@ -21,6 +22,7 @@ import {
   TEXT_RATE_LIMITED,
   type HandoffInsert,
   type LeadInsert,
+  type MeetingBookRequest,
   type OwnerMail,
   type PluginServerDeps,
 } from "./register";
@@ -32,10 +34,22 @@ const PRODUCTS = new Map<string, PluginProduct>([
   [skuOf("pump_5v"), { sku: skuOf("pump_5v"), name: "Pump", name_ar: null, unit_price: 20 }],
 ]);
 
-type Captured = { handoffs: HandoffInsert[]; leads: LeadInsert[]; links: [string, string][]; mails: OwnerMail[]; rateKeys: string[] };
+type Captured = {
+  handoffs: HandoffInsert[];
+  leads: LeadInsert[];
+  links: [string, string][];
+  mails: OwnerMail[];
+  clientMails: { to: string; mail: OwnerMail }[];
+  rateKeys: string[];
+  books: MeetingBookRequest[];
+};
+
+/** The free slots the fake offers: Monday 23 and Wednesday 25 November 2026, 16:00 Qatar. */
+const SLOT_MON = "2026-11-23T13:00:00.000Z";
+const SLOT_WED = "2026-11-25T13:00:00.000Z";
 
 function fakeDeps(over: Partial<PluginServerDeps> = {}): { deps: PluginServerDeps; cap: Captured } {
-  const cap: Captured = { handoffs: [], leads: [], links: [], mails: [], rateKeys: [] };
+  const cap: Captured = { handoffs: [], leads: [], links: [], mails: [], clientMails: [], rateKeys: [], books: [] };
   const deps: PluginServerDeps = {
     loadLibrary: async () => lib,
     loadProducts: async (skus) => new Map([...PRODUCTS].filter(([k]) => skus.includes(k))),
@@ -71,6 +85,23 @@ function fakeDeps(over: Partial<PluginServerDeps> = {}): { deps: PluginServerDep
       cap.mails.push(mail);
       return true;
     },
+    sendClientEmail: async (to, mail) => {
+      cap.clientMails.push({ to, mail });
+      return true;
+    },
+    meetingSettings: async () => DEFAULT_MEETING_SETTINGS,
+    freeMeetingSlots: async () => [SLOT_MON, SLOT_WED],
+    bookMeeting: async (req) => {
+      cap.books.push(req);
+      return {
+        ok: true,
+        startsAt: req.startsAt,
+        mode: req.mode,
+        manageUrl: `https://gestaltung360.com/${req.locale}/meetings/tok-test`,
+        invoiceQar: 150,
+      };
+    },
+    handoffIdForToken: async (token) => (token ? "handoff-1" : null),
     siteUrl: "https://gestaltung360.com",
     now: () => new Date("2026-11-18T10:30:00Z"),
     ...over,
@@ -123,18 +154,27 @@ function propertyNames(schema: unknown, out: string[] = []): string[] {
 }
 
 describe("plugin MCP server", () => {
-  it("lists exactly the four tools with the right annotations and no chat-shaped inputs", async () => {
+  it("lists exactly the six tools with the right annotations and no chat-shaped inputs", async () => {
     const c = await connect(fakeDeps().deps);
     const { tools } = await c.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["check_project", "get_design_rules", "search_parts", "send_project"]);
+    expect(tools.map((t) => t.name).sort()).toEqual([
+      "book_meeting",
+      "check_project",
+      "get_design_rules",
+      "list_meeting_slots",
+      "search_parts",
+      "send_project",
+    ]);
+    // Every writing tool says it is only called after the user agrees.
+    const WRITERS = ["send_project", "book_meeting"];
     for (const t of tools) {
-      if (t.name === "send_project") {
+      if (WRITERS.includes(t.name)) {
         expect(t.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false });
-        expect(t.description).toContain("Only call this after the user has explicitly agreed to send it");
-        expect(t.description).toContain("The chat itself is never sent.");
+        expect(t.description).toMatch(/[Oo]nly call this after the user has explicitly agreed/);
       } else {
         expect(t.annotations).toMatchObject({ readOnlyHint: true, openWorldHint: false });
       }
+      if (t.name === "send_project") expect(t.description).toContain("The chat itself is never sent.");
       const names = propertyNames(t.inputSchema);
       for (const n of names) expect(n).not.toMatch(/conversation|transcript|chat|history|messages/i);
     }
@@ -340,5 +380,179 @@ describe("helpers", () => {
     expect(res.headers.get("content-type")).toBe("text/plain");
     for (const [k, v] of Object.entries(MCP_CORS_HEADERS)) expect(res.headers.get(k)).toBe(v);
     expect(res.headers.get("access-control-expose-headers")).toBe("mcp-session-id");
+  });
+
+  // ── meetings (Phase 2) ─────────────────────────────────────────────────────
+
+  it("lists free meeting slots with both labels, the price and the three rules", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+    const r = await call(c, "list_meeting_slots", { days: 21, locale: "en" });
+    const data = r.structuredContent as {
+      slots: { starts_at: string; label_en: string; label_ar: string }[];
+      price_qar: number;
+      lines: string[];
+      modes: { mode: string; label: string; detail: string }[];
+      company: string;
+    };
+
+    expect(r.isError).toBeFalsy();
+    expect(data.slots).toHaveLength(2);
+    expect(data.slots[0]!.starts_at).toBe(SLOT_MON);
+    expect(data.slots[0]!.label_en).toMatch(/Mon 23 Nov/);
+    expect(data.slots[0]!.label_ar).toContain("نوفمبر");
+    // Western digits in Arabic
+    expect(data.slots[0]!.label_ar).not.toMatch(/[٠-٩۰-۹]/);
+
+    expect(data.price_qar).toBe(150);
+    expect(data.lines[0]).toMatch(/1 hour/);
+    expect(data.lines[0]).toMatch(/QAR\s*150/);
+    expect(data.lines[1]).toMatch(/only if you are happy/i);
+    expect(data.lines[2]).toMatch(/24 hours before/);
+    expect(data.lines[2]).toMatch(/within 30 days/);
+    // the company's legal name and C.R. go on anything that books
+    expect(data.company).toContain("Gestaltung for Trading and Services W.L.L");
+    expect(data.company).toContain("236988");
+    // no CAD program, no "free" offer
+    expect(JSON.stringify(data)).not.toMatch(/SolidWorks|Fusion|OpenSCAD|FreeCAD/i);
+    expect(data.modes.map((m) => m.mode)).toEqual(["online", "studio"]);
+    expect(data.modes[0]!.detail).toMatch(/WhatsApp/);
+    expect(data.modes[1]!.detail).toMatch(/Lusail/);
+
+    // read bucket, hourly window
+    expect(cap.rateKeys.some((k) => k.startsWith("mcp:read:"))).toBe(true);
+  });
+
+  it("books a meeting, writes the lead, e-mails the owner and the client, and returns the manage link", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+    const r = await call(c, "book_meeting", {
+      starts_at: SLOT_MON,
+      mode: "online",
+      name: "Noora",
+      phone: "+974 5555 1234",
+      email: "noora@example.com",
+      topic: "I want to talk about the pump",
+      locale: "en",
+    });
+    const data = r.structuredContent as Record<string, unknown>;
+
+    expect(r.isError).toBeFalsy();
+    expect(data.ok).toBe(true);
+    expect(data.price_qar).toBe(150);
+    expect(data.manage_link).toBe("https://gestaltung360.com/en/meetings/tok-test");
+    expect(firstText(r)).toMatch(/Booked:/);
+    expect(data.company).toContain("236988");
+
+    // the phone reached the booking as E.164
+    expect(cap.books).toHaveLength(1);
+    expect(cap.books[0]).toMatchObject({ phone: "+97455551234", mode: "online", startsAt: SLOT_MON, handoffId: null });
+
+    // the lead is keyed for lib/admin/lead-kind.ts
+    expect(cap.leads).toHaveLength(1);
+    expect(cap.leads[0]!.message.startsWith("Meeting booked:")).toBe(true);
+    expect(cap.leads[0]!.phone).toBe("+97455551234");
+
+    // owner e-mail names the person and the time; the client gets their own
+    expect(cap.mails).toHaveLength(1);
+    expect(cap.mails[0]!.subject).toMatch(/^New meeting booked — Noora · Mon 23 Nov/);
+    expect(cap.clientMails).toHaveLength(1);
+    expect(cap.clientMails[0]!.to).toBe("noora@example.com");
+    expect(cap.clientMails[0]!.mail.subject).toMatch(/Your meeting is booked/);
+    // the IBAN never goes in a booking e-mail
+    expect(cap.mails[0]!.html + cap.clientMails[0]!.mail.html).not.toContain("QA94");
+
+    // daily bucket for bookings
+    expect(cap.rateKeys.some((k) => /^mcp:meeting:noip:\d{8}$/.test(k))).toBe(true);
+  });
+
+  it("sends no e-mail to a client who gave no address", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+    await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "studio", name: "Ali", phone: "+97455551234", locale: "ar" });
+    expect(cap.books).toHaveLength(1);
+    expect(cap.clientMails).toHaveLength(0);
+    expect(cap.mails).toHaveLength(1);
+  });
+
+  it("refuses a bad phone and a bad time without booking anything", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+
+    const badPhone = await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "online", name: "X", phone: "12345678", locale: "en" });
+    expect((badPhone.structuredContent as { ok: boolean }).ok).toBe(false);
+    expect(firstText(badPhone)).toMatch(/phone number looks wrong/);
+
+    const badTime = await call(c, "book_meeting", { starts_at: "not-a-time!!", mode: "online", name: "X", phone: "+97455551234", locale: "en" });
+    expect((badTime.structuredContent as { ok: boolean }).ok).toBe(false);
+
+    const badEmail = await call(c, "book_meeting", {
+      starts_at: SLOT_MON,
+      mode: "online",
+      name: "X",
+      phone: "+97455551234",
+      email: "nope",
+      locale: "en",
+    });
+    expect((badEmail.structuredContent as { ok: boolean }).ok).toBe(false);
+
+    expect(cap.books).toHaveLength(0);
+    expect(cap.leads).toHaveLength(0);
+    expect(cap.mails).toHaveLength(0);
+  });
+
+  it("links a hand-off only from one of our own links", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+    const token = "a".repeat(40);
+
+    await call(c, "book_meeting", {
+      starts_at: SLOT_MON,
+      mode: "online",
+      name: "Noora",
+      phone: "+97455551234",
+      handoff_link: `https://gestaltung360.com/en/handoff/${token}`,
+      locale: "en",
+    });
+    expect(cap.books[0]!.handoffId).toBe("handoff-1");
+
+    // a foreign host is ignored, never fetched
+    await call(c, "book_meeting", {
+      starts_at: SLOT_WED,
+      mode: "online",
+      name: "Noora",
+      phone: "+97455551234",
+      handoff_link: `https://evil.test/en/handoff/${token}`,
+      locale: "en",
+    });
+    expect(cap.books[1]!.handoffId).toBe(null);
+  });
+
+  it("passes a refused slot back as words the model can act on", async () => {
+    const { deps, cap } = fakeDeps({ bookMeeting: async () => ({ ok: false, error: "slot_taken" }) });
+    const c = await connect(deps);
+    const r = await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "online", name: "X", phone: "+97455551234", locale: "en" });
+
+    expect((r.structuredContent as { ok: boolean }).ok).toBe(false);
+    expect(firstText(r)).toMatch(/just been taken/);
+    expect(firstText(r)).toMatch(/list_meeting_slots/);
+    expect(cap.leads).toHaveLength(0);
+    expect(cap.mails).toHaveLength(0);
+  });
+
+  it("says 'not set up yet' before the migration runs, with no stack trace", async () => {
+    const { deps } = fakeDeps({ bookMeeting: async () => ({ ok: false, error: "not_set_up" }) });
+    const c = await connect(deps);
+    const r = await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "online", name: "X", phone: "+97455551234", locale: "en" });
+
+    expect(r.isError).toBe(true);
+    expect(firstText(r)).toBe(TEXT_NOT_SET_UP);
+    expect(firstText(r)).not.toMatch(/at .*\.ts:\d+|Error:/);
+  });
+
+  it("tells the client's AI to offer a meeting only with explicit agreement", () => {
+    expect(SERVER_INSTRUCTIONS).toMatch(/list_meeting_slots/);
+    expect(SERVER_INSTRUCTIONS).toMatch(/only after the user explicitly agrees/);
+    expect(SERVER_INSTRUCTIONS.length).toBeLessThan(1500);
   });
 });

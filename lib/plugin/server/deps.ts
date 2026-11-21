@@ -6,7 +6,10 @@
  */
 import "server-only";
 
+import { randomBytes } from "node:crypto";
+
 import { getCadEngineSetting } from "@/lib/cad/engine-server";
+import { bookMeeting, freeMeetingSlots, loadMeetingSettings, sha256 } from "@/lib/meetings/server";
 import { ipHash as hashIp } from "@/lib/credits/server";
 import { defaultSiteUrl } from "@/lib/email/brand-layout";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
@@ -177,6 +180,61 @@ export function realDeps(): PluginServerDeps {
       if (error) throw new Error(`plugin_handoffs link failed: ${error.message}`);
     },
     sendOwnerEmail: (mail) => sendEmail({ to: [OWNER_EMAIL], subject: mail.subject, html: mail.html, text: mail.text }),
+    sendClientEmail: (to, mail) => sendEmail({ to: [to], subject: mail.subject, html: mail.html, text: mail.text }),
+
+    // meetings (Phase 2). Each one degrades to a default or `not_set_up`
+    // before migration 0113 runs; lib/meetings/server.ts does the detecting.
+    meetingSettings: loadMeetingSettings,
+    freeMeetingSlots: (days) => freeMeetingSlots(days),
+    bookMeeting: async (req) => {
+      const token = randomBytes(32).toString("base64url");
+      const r = await bookMeeting(
+        {
+          startsAt: req.startsAt,
+          mode: req.mode,
+          name: req.name,
+          phone: req.phone,
+          email: req.email,
+          locale: req.locale,
+          topic: req.topic,
+          handoffId: req.handoffId,
+          source: "plugin",
+        },
+        siteUrl,
+        token,
+      );
+      return r.ok
+        ? {
+            ok: true,
+            startsAt: r.booking.starts_at,
+            mode: r.booking.mode,
+            manageUrl: r.manageUrl,
+            invoiceQar: Number(r.booking.invoice_qar),
+          }
+        : { ok: false, error: r.error };
+    },
+    handoffIdForToken: async (token) => {
+      if (!token) return null;
+      const svc = createServiceClient();
+      if (!svc) return null;
+      try {
+        const { data, error } = await svc
+          .from("plugin_handoffs")
+          .select<string, { id: string }>("id")
+          .eq("token_hash", sha256(token))
+          .maybeSingle();
+        if (error) {
+          if (notSetUp(error)) return null;
+          throw error;
+        }
+        return data?.id ?? null;
+      } catch (err) {
+        if (notSetUp(err)) return null;
+        console.error("[mcp] handoff lookup failed:", err);
+        return null;
+      }
+    },
+
     siteUrl,
     now: () => new Date(),
   };

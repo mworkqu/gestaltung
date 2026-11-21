@@ -3703,6 +3703,106 @@ export type Database = {
           },
         ];
       };
+      meeting_bookings: {
+        Row: {
+          id: string;
+          starts_at: string;
+          ends_at: string;
+          mode: string;
+          status: string;
+          name: string;
+          phone: string;
+          email: string | null;
+          locale: string;
+          topic: string | null;
+          project_id: string | null;
+          handoff_id: string | null;
+          source: string;
+          manage_token_hash: string;
+          meet_link: string | null;
+          owner_note: string | null;
+          invoice_qar: number;
+          credit_order_id: string | null;
+          created_at: string;
+          cancelled_at: string | null;
+          invoiced_at: string | null;
+          paid_at: string | null;
+          is_test: boolean;
+        };
+        Insert: {
+          id?: string;
+          starts_at: string;
+          ends_at: string;
+          mode: string;
+          status?: string;
+          name: string;
+          phone: string;
+          email?: string | null;
+          locale?: string;
+          topic?: string | null;
+          project_id?: string | null;
+          handoff_id?: string | null;
+          source?: string;
+          manage_token_hash: string;
+          meet_link?: string | null;
+          owner_note?: string | null;
+          invoice_qar?: number;
+          credit_order_id?: string | null;
+          created_at?: string;
+          cancelled_at?: string | null;
+          invoiced_at?: string | null;
+          paid_at?: string | null;
+          is_test?: boolean;
+        };
+        Update: {
+          id?: string;
+          starts_at?: string;
+          ends_at?: string;
+          mode?: string;
+          status?: string;
+          name?: string;
+          phone?: string;
+          email?: string | null;
+          locale?: string;
+          topic?: string | null;
+          project_id?: string | null;
+          handoff_id?: string | null;
+          source?: string;
+          manage_token_hash?: string;
+          meet_link?: string | null;
+          owner_note?: string | null;
+          invoice_qar?: number;
+          credit_order_id?: string | null;
+          created_at?: string;
+          cancelled_at?: string | null;
+          invoiced_at?: string | null;
+          paid_at?: string | null;
+          is_test?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "meeting_bookings_credit_order_id_fkey";
+            columns: ["credit_order_id"];
+            isOneToOne: false;
+            referencedRelation: "part_orders";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meeting_bookings_handoff_id_fkey";
+            columns: ["handoff_id"];
+            isOneToOne: false;
+            referencedRelation: "plugin_handoffs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meeting_bookings_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       notification_outbox: {
         Row: {
           id: string;
@@ -5642,15 +5742,18 @@ export type Database = {
       ai_role_of: { Args: { p_user: string | null }; Returns: string };
       ai_usage_daily: { Args: { p_days?: number | null }; Returns: { day: string; step: string; calls: number; ok_calls: number; tokens_in: number; tokens_out: number; cost_usd: number }[] };
       ai_usage_totals: { Args: { p_provider: string | null; p_since: string | null }; Returns: { requests: number; tokens: number; audio_seconds: number }[] };
+      apply_meeting_credit: { Args: { p_meeting: string | null; p_order: string | null }; Returns: Json };
       approved_review_count: { Args: Record<PropertyKey, never>; Returns: number };
       approved_reviews: { Args: { p_sku?: string | null; p_limit?: number | null }; Returns: { id: string; score: number; comment: string; first_name: string; locale: string; created_at: string }[] };
       bom_rate_check: { Args: { p_ip_hash?: string | null }; Returns: Json };
+      book_meeting: { Args: { p_starts_at: string | null; p_mode: string | null; p_name: string | null; p_phone: string | null; p_token_hash: string | null; p_email?: string | null; p_locale?: string | null; p_topic?: string | null; p_project_id?: string | null; p_handoff_id?: string | null; p_source?: string | null; p_is_test?: boolean | null }; Returns: Database["public"]["Tables"]["meeting_bookings"]["Row"] };
       cad_begin: { Args: { p_project: string | null; p_request: string | null; p_tier: string | null; p_parent?: string | null }; Returns: string };
       cad_deliver: { Args: { p_id: string | null }; Returns: Json };
       cad_fail: { Args: { p_id: string | null; p_error: string | null }; Returns: undefined };
       cad_set_code: { Args: { p_id: string | null; p_scad: string | null; p_model: string | null }; Returns: undefined };
       cad_set_code_for: { Args: { p_user: string | null; p_id: string | null; p_scad: string | null; p_model: string | null }; Returns: undefined };
       cad_tier_cost: { Args: { p_tier: string | null }; Returns: number };
+      cancel_meeting: { Args: { p_token: string | null }; Returns: Json };
       cc_anonymise_profile: { Args: { p_user: string | null; p_actor: string | null; p_note?: string | null }; Returns: Json };
       cc_cohort_seats: { Args: Record<PropertyKey, never>; Returns: { cohort_id: string; seats_taken: number }[] };
       cc_create_payment: { Args: { p_user: string | null; p_plan: string | null; p_cohort: string | null; p_coupon: string | null; p_addon_plan: string | null; p_list: number | null; p_discount: number | null; p_addon: number | null; p_amount: number | null; p_method: string | null; p_reference: string | null; p_expires_at: string | null; p_terms_at?: string | null }; Returns: Json };
@@ -5717,6 +5820,10 @@ export type Database = {
       log_sourcing_gap: { Args: { p_project: string | null; p_function: string | null; p_spec: string | null; p_kind: string | null; p_quantity: number | null }; Returns: undefined };
       mark_notification: { Args: { p_id: string | null; p_status: string | null; p_error?: string | null }; Returns: boolean };
       mark_restock_received: { Args: { p_part: string | null; p_supplier: string | null; p_quantity: number | null }; Returns: number };
+      meeting_free_slots: { Args: { p_from?: string | null; p_days?: number | null }; Returns: string[] };
+      meeting_settings: { Args: Record<PropertyKey, never>; Returns: Json };
+      meeting_slot_on_grid: { Args: { p_starts_at: string | null }; Returns: boolean };
+      move_meeting: { Args: { p_token: string | null; p_starts_at: string | null }; Returns: Json };
       my_price_quote: { Args: Record<PropertyKey, never>; Returns: { cohort: string; credit_qar: number }[] };
       new_join_code: { Args: Record<PropertyKey, never>; Returns: string };
       notification_enqueue: { Args: { p_user: string | null; p_kind: string | null; p_payload: JsonInput | null }; Returns: string };
@@ -5759,6 +5866,7 @@ export type Database = {
       reward_setting: { Args: { p_key: string | null; p_default: number | null }; Returns: number };
       school_free_class_delivery: { Args: Record<PropertyKey, never>; Returns: boolean };
       set_cad_request: { Args: { p_project: string | null; p_tier: string | null }; Returns: undefined };
+      set_meeting_status: { Args: { p_id: string | null; p_status: string | null; p_note?: string | null }; Returns: Json };
       set_order_payment_method: { Args: { p_order: string | null; p_method: string | null }; Returns: boolean };
       set_order_status: { Args: { p_order: string | null; p_status: string | null; p_note?: string | null }; Returns: Json };
       set_own_stock: { Args: { p_part: string | null; p_qty: number | null }; Returns: undefined };

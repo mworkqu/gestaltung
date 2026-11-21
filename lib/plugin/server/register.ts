@@ -17,6 +17,10 @@ import type { BrandFact } from "@/lib/email/brand-layout";
 import { isPlausibleEmail } from "@/lib/email-address";
 import { formatQar } from "@/lib/format/money";
 import { pluginProjectSubject, type PluginChatSource } from "@/lib/leads/sources";
+import { companyLine, meetingLines, modeLabel, modeLine } from "@/lib/meetings/copy";
+import { meetingBookedSubject, meetingLeadMessage, renderMeetingClientEmail, renderMeetingOwnerEmail } from "@/lib/meetings/email";
+import type { MeetingMode, MeetingSettings } from "@/lib/meetings/settings";
+import { slotLabel, slotOptions } from "@/lib/meetings/slots";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { STORE_CATEGORIES, type StoreCategory } from "@/lib/store/store-categories";
 import { escapeHtml } from "@/lib/text/escape";
@@ -37,12 +41,18 @@ export const SERVER_INSTRUCTIONS = [
   "Never send the chat. requirement_quotes holds at most 10 short quotes (140 characters each) of the user's own words, for key requirements only.",
   "Prices are in QAR. Never name CAD software to the user. Never promise that anything is free, and never promise a reprint or a remake.",
   `After sending, give the user the link and say: "${ENGINEER_LINE}"`,
+  "If the user wants to talk to the engineer, offer a paid meeting: call list_meeting_slots, show the times, the price and the cancellation rule, and call book_meeting only after the user explicitly agrees.",
 ].join("\n");
 
-/** Per hashed IP. Reads per hour, checks per hour, sends per day. */
-export const RATE_LIMITS = { read: 120, check: 30, send: 10 } as const;
-/** Phase 2 (meeting requests); no meeting tool exists yet. */
-export const MEETING_LIMIT = 10;
+/** Per hashed IP. Reads per hour, checks per hour, sends and bookings per day. */
+export const RATE_LIMITS = { read: 120, check: 30, send: 10, meeting: 10 } as const;
+/** Kept as its own name because the owner's brief names it. */
+export const MEETING_LIMIT = RATE_LIMITS.meeting;
+
+/** Which buckets count per day rather than per hour. */
+const DAILY_BUCKETS: readonly RateKind[] = ["send", "meeting"];
+
+export type RateKind = keyof typeof RATE_LIMITS;
 
 export const TEXT_RATE_LIMITED = "Too many requests from your network. Please wait and try again later.";
 export const TEXT_FAILED = "Something went wrong on our side. Please try again.";
@@ -88,6 +98,23 @@ export type LeadInsert = { name: string; phone: string; email: string | null; lo
 
 export type OwnerMail = { subject: string; html: string; text: string };
 
+// ── meetings (Phase 2) ───────────────────────────────────────────────────────
+
+export type MeetingBookRequest = {
+  startsAt: string;
+  mode: MeetingMode;
+  name: string;
+  phone: string;
+  email: string | null;
+  locale: "en" | "ar";
+  topic: string | null;
+  handoffId: string | null;
+};
+
+export type MeetingBookOutcome =
+  | { ok: true; startsAt: string; mode: MeetingMode; manageUrl: string; invoiceQar: number }
+  | { ok: false; error: "slot_taken" | "too_soon" | "bad_slot" | "too_many" | "not_set_up" | "failed" };
+
 export interface PluginServerDeps {
   loadLibrary(): Promise<PluginLibrary>;
   loadProducts(skus: string[]): Promise<ReadonlyMap<string, PluginProduct>>;
@@ -102,6 +129,15 @@ export interface PluginServerDeps {
   createLead(row: LeadInsert): Promise<{ id: string }>;
   linkLead(handoffId: string, inquiryId: string): Promise<void>;
   sendOwnerEmail(mail: OwnerMail): Promise<boolean>;
+  /** One e-mail to one address (the client's confirmation). */
+  sendClientEmail(to: string, mail: OwnerMail): Promise<boolean>;
+  // meetings (Phase 2)
+  meetingSettings(): Promise<MeetingSettings>;
+  /** Free slot start times as ISO instants, already clamped to the horizon. */
+  freeMeetingSlots(days: number): Promise<string[]>;
+  bookMeeting(req: MeetingBookRequest): Promise<MeetingBookOutcome>;
+  /** The hand-off a `/handoff/<token>` link of ours names, or null. */
+  handoffIdForToken(token: string): Promise<string | null>;
   siteUrl: string;
   now(): Date;
 }
@@ -133,9 +169,9 @@ export function qatarHour(now: Date): string {
   return new Date(now.getTime() + 3 * 3_600_000).toISOString().slice(0, 13).replace(/[-T]/g, "");
 }
 
-export function rateKey(kind: "read" | "check" | "send", ipHash: string | null, now: Date): string {
+export function rateKey(kind: RateKind, ipHash: string | null, now: Date): string {
   const h = qatarHour(now);
-  return `mcp:${kind}:${ipHash ?? "noip"}:${kind === "send" ? h.slice(0, 8) : h}`;
+  return `mcp:${kind}:${ipHash ?? "noip"}:${DAILY_BUCKETS.includes(kind) ? h.slice(0, 8) : h}`;
 }
 
 export function sourceFromName(name: string | null | undefined): PluginChatSource {
@@ -165,6 +201,31 @@ function clientSource(server: McpServer, ctx: ServerContext): PluginChatSource {
 }
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+/**
+ * The hand-off token inside one of OUR links, or null. A link on any other host
+ * is ignored rather than followed, so a project can only ever be attached to a
+ * meeting through a gestaltung360.com hand-off.
+ */
+export function handoffTokenFromLink(link: string, siteUrl: string): string | null {
+  try {
+    const u = new URL(link.trim());
+    if (u.host !== new URL(siteUrl).host) return null;
+    return /^\/(?:en|ar)\/handoff\/([A-Za-z0-9_-]{20,200})\/?$/.exec(u.pathname)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** What the client's AI is told when the database refuses a booking. */
+const BOOK_FAIL_TEXT: Record<Exclude<MeetingBookOutcome & { ok: false }, { ok: true }>["error"], string> = {
+  slot_taken: "That time has just been taken. Call list_meeting_slots again and offer the user another time.",
+  too_soon: "That time is too soon. Offer a time further ahead from list_meeting_slots.",
+  bad_slot: "That is not one of our meeting times. Use a starts_at exactly as list_meeting_slots returned it.",
+  too_many: "This number already has two meetings booked. Ask the user to move or cancel one first.",
+  not_set_up: TEXT_NOT_SET_UP,
+  failed: TEXT_FAILED,
+};
 
 function publicCheck(r: CheckResult) {
   return {
@@ -317,6 +378,7 @@ export const DESIGN_A_PRODUCT_PROMPT = [
   "5. List exactly what will be sent: the summary, the parts, the wiring, the code, the look and the case design notes. The chat itself is never sent; only up to 10 short quotes (max 140 characters each) of my own words for key requirements. Ask me clearly whether I agree to send it.",
   "6. Only after I say yes, call send_project. Never send without my explicit agreement.",
   `7. Give me the link it returns and tell me: "${ENGINEER_LINE}"`,
+  "8. Then ask whether I would like to talk to the engineer. If I do, call list_meeting_slots, show me the times in my language with the price and the cancellation rule, and call book_meeting only after I say yes.",
   "Rules: prices are in QAR; never name CAD software to me; never promise that anything is free; never promise a reprint or a remake.",
 ].join("\n");
 
@@ -327,7 +389,7 @@ const LOCALE = z.enum(["en", "ar"]);
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 
 export function registerPluginServer(server: McpServer, deps: PluginServerDeps): void {
-  const limited = async (kind: "read" | "check" | "send", ctx: ServerContext): Promise<boolean> => {
+  const limited = async (kind: RateKind, ctx: ServerContext): Promise<boolean> => {
     const key = rateKey(kind, deps.ipHash(ctx.http?.req), deps.now());
     return !(await deps.rateHit(key, RATE_LIMITS[kind]));
   };
@@ -479,6 +541,159 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
         const link = `${deps.siteUrl.replace(/\/+$/, "")}/${locale}/handoff/${token}`;
         const summaryLine = `${build.name}: ${r.parts.length} parts, parts total ${formatQar(r.parts_total_qar, locale)}. ${ENGINEER_LINE}`;
         return reply(`Sent. Open your project: ${link}`, { ok: true, link, expires_at: expiresAt, summary_line: summaryLine });
+      }),
+  );
+
+  // ── meetings (Phase 2) ─────────────────────────────────────────────────────
+
+  server.registerTool(
+    "list_meeting_slots",
+    {
+      title: "List free meeting times with the engineer",
+      description:
+        "Lists the free times in the next three weeks for a paid one-hour meeting with a Gestaltung360 engineer, online or at the studio in Lusail, Qatar. Times are Qatar time. Returns the price in QAR and the payment and cancellation rules. Nothing is booked by this tool.",
+      inputSchema: z.object({
+        days: z.number().int().min(1).max(21).default(21).describe("How many days ahead to look."),
+        locale: LOCALE.default("en").describe("The user's language for the time labels."),
+      }),
+      annotations: READ_ONLY,
+    },
+    (args, ctx) =>
+      guarded("list_meeting_slots", async () => {
+        if (await limited("read", ctx)) return errorReply(TEXT_RATE_LIMITED);
+        const settings = await deps.meetingSettings();
+        const slots = slotOptions(await deps.freeMeetingSlots(args.days), settings);
+        const lines = meetingLines(settings, args.locale);
+        const summary = slots.length
+          ? `${slots.length} free time${slots.length === 1 ? "" : "s"}. ${lines[0]}`
+          : "No free times in that period. Ask the user to try a later date.";
+        return reply(summary, {
+          slots,
+          price_qar: settings.price_qar,
+          lines,
+          modes: settings.modes.map((m) => ({ mode: m, label: modeLabel(m, args.locale), detail: modeLine(m, args.locale) })),
+          company: companyLine(args.locale),
+        });
+      }),
+  );
+
+  server.registerTool(
+    "book_meeting",
+    {
+      title: "Book the meeting with the engineer",
+      description:
+        "Books one paid meeting with a Gestaltung360 engineer at a time from list_meeting_slots. Only call this after the user has explicitly agreed to book it and has seen the price and the cancellation rule. It is invoiced after the meeting and only if the user is happy. Returns the time, the price and a link where the user can move or cancel it.",
+      inputSchema: z.object({
+        starts_at: z.string().trim().min(10).max(40).describe("A starts_at exactly as list_meeting_slots returned it."),
+        mode: z.enum(["online", "studio"]).describe("online = we send a Google Meet link on WhatsApp; studio = at our studio in Lusail."),
+        name: z.string().trim().min(1).max(60),
+        phone: z.string().trim().min(6).max(20).describe("WhatsApp number with the country code, e.g. +974 5555 1234."),
+        email: z.string().trim().max(160).optional().describe("Only if the user wants a confirmation by e-mail."),
+        topic: z.string().trim().max(400).optional().describe("What the user wants to talk about, in their own short words."),
+        handoff_link: z.string().trim().max(300).optional().describe("The gestaltung360.com project link from send_project, if there is one."),
+        locale: LOCALE.default("en"),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    (args, ctx) =>
+      guarded("book_meeting", async () => {
+        if (await limited("meeting", ctx)) return errorReply(TEXT_RATE_LIMITED);
+        const { locale } = args;
+        const settings = await deps.meetingSettings();
+
+        if (!isValidPhone(args.phone)) {
+          return reply("Not booked: the phone number looks wrong.", {
+            ok: false,
+            problems: ["phone: ask for a WhatsApp number with the country code, e.g. +974 5555 1234."],
+          });
+        }
+        const email = args.email?.trim() || "";
+        if (email && !isPlausibleEmail(email)) {
+          return reply("Not booked: the email address looks wrong.", {
+            ok: false,
+            problems: ["email: ask again or leave it out."],
+          });
+        }
+        const startsAt = new Date(args.starts_at);
+        if (Number.isNaN(startsAt.getTime())) {
+          return reply("Not booked: that is not a time we offer.", {
+            ok: false,
+            problems: ["starts_at: use a value exactly as list_meeting_slots returned it."],
+          });
+        }
+
+        const handoffId = args.handoff_link
+          ? await deps.handoffIdForToken(handoffTokenFromLink(args.handoff_link, deps.siteUrl) ?? "")
+          : null;
+
+        const booked = await deps.bookMeeting({
+          startsAt: startsAt.toISOString(),
+          mode: args.mode,
+          name: args.name,
+          phone: normalizePhone(args.phone),
+          email: email || null,
+          locale,
+          topic: args.topic?.trim() || null,
+          handoffId,
+        });
+        if (!booked.ok) {
+          if (booked.error === "not_set_up" || booked.error === "failed") return errorReply(BOOK_FAIL_TEXT[booked.error]);
+          return reply(`Not booked: ${BOOK_FAIL_TEXT[booked.error]}`, { ok: false, problems: [BOOK_FAIL_TEXT[booked.error]] });
+        }
+
+        const bookingForMail = {
+          starts_at: booked.startsAt,
+          mode: booked.mode,
+          name: args.name,
+          phone: normalizePhone(args.phone),
+          email: email || null,
+          locale,
+          topic: args.topic?.trim() || null,
+          source: "plugin" as const,
+          invoice_qar: booked.invoiceQar,
+        };
+        const mailInput = { booking: bookingForMail, settings, manageUrl: booked.manageUrl, siteUrl: deps.siteUrl };
+        const timeLabel = slotLabel(booked.startsAt, locale, settings);
+
+        // The meeting is booked: from here on a failure is logged, never shown.
+        try {
+          const lead = await deps.createLead({
+            name: args.name,
+            phone: normalizePhone(args.phone),
+            email: email || null,
+            locale,
+            message: meetingLeadMessage(mailInput),
+          });
+          void lead;
+        } catch (err) {
+          console.error("[mcp] book_meeting: lead not saved:", err);
+        }
+        try {
+          const sent = await deps.sendOwnerEmail(renderMeetingOwnerEmail(mailInput));
+          if (!sent) console.warn("[mcp] book_meeting: owner email not sent", { subject: meetingBookedSubject(args.name, timeLabel) });
+        } catch (err) {
+          console.error("[mcp] book_meeting: owner email failed:", err);
+        }
+        if (email) {
+          try {
+            await deps.sendClientEmail(email, renderMeetingClientEmail(mailInput));
+          } catch (err) {
+            console.error("[mcp] book_meeting: client email failed:", err);
+          }
+        }
+
+        const lines = meetingLines(settings, locale);
+        return reply(`Booked: ${timeLabel} (${modeLabel(booked.mode, locale)}). Manage it here: ${booked.manageUrl}`, {
+          ok: true,
+          starts_at: booked.startsAt,
+          label: timeLabel,
+          mode: booked.mode,
+          mode_detail: modeLine(booked.mode, locale),
+          price_qar: booked.invoiceQar,
+          lines,
+          manage_link: booked.manageUrl,
+          company: companyLine(locale),
+        });
       }),
   );
 
