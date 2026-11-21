@@ -448,6 +448,10 @@ describe("helpers", () => {
     // the phone reached the booking as E.164
     expect(cap.books).toHaveLength(1);
     expect(cap.books[0]).toMatchObject({ phone: "+97455551234", mode: "online", startsAt: SLOT_MON, handoffId: null });
+    // 0114: which chat booked it travels with the booking. This test's client
+    // announces itself as "claude-ai" in the handshake, so it reads as "claude"
+    // — the same path a real Claude connector takes.
+    expect(cap.books[0]!.chatSource).toBe("claude");
 
     // the lead is keyed for lib/admin/lead-kind.ts
     expect(cap.leads).toHaveLength(1);

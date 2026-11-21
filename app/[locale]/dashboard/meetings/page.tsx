@@ -136,7 +136,15 @@ function MeetingRow({
         <span className="text-sm font-black text-heading">{slotLabel(m.starts_at, locale, settings)}</span>
         <span className="text-xs text-mutedtext">{modeLabel(m.mode, locale)}</span>
         <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", STATUS_STYLE[m.status])}>{t(STATUS_KEY[m.status])}</span>
-        <span className="text-[11px] text-faint">{m.source === "plugin" ? t("sourcePlugin") : t("sourceWebsite")}</span>
+        <span className="text-[11px] text-faint">
+          {m.chat_source === "chatgpt"
+            ? t("sourceChatgpt")
+            : m.chat_source === "claude"
+              ? t("sourceClaude")
+              : m.source === "plugin"
+                ? t("sourcePlugin")
+                : t("sourceWebsite")}
+        </span>
         {m.is_test && <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{t("testRow")}</span>}
       </div>
 

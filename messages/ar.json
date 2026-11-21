@@ -5640,6 +5640,8 @@
     "creditApply": "طبّق",
     "creditApplied": "تم التطبيق: اخصم {amount} عند تأكيد السعر.",
     "creditNone": "لا يوجد رصيد اجتماع لهذا العميل.",
-    "failed": "لم تنجح العملية. حاول مرة أخرى."
+    "failed": "لم تنجح العملية. حاول مرة أخرى.",
+    "sourceClaude": "من Claude",
+    "sourceChatgpt": "من ChatGPT"
   }
 }

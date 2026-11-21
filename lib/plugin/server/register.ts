@@ -112,6 +112,8 @@ export type MeetingBookRequest = {
   locale: "en" | "ar";
   topic: string | null;
   handoffId: string | null;
+  /** Which AI chat is booking it (0114), read from the client info. */
+  chatSource: PluginChatSource;
 };
 
 export type MeetingBookOutcome =
@@ -683,6 +685,7 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
           : null;
 
         const booked = await deps.bookMeeting({
+          chatSource: clientSource(server, ctx),
           startsAt: startsAt.toISOString(),
           mode: args.mode,
           name: args.name,

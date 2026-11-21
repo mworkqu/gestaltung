@@ -5640,6 +5640,8 @@
     "creditApply": "Apply",
     "creditApplied": "Applied: take {amount} off when you confirm the price.",
     "creditNone": "No meeting credit for this customer.",
-    "failed": "That did not work. Please try again."
+    "failed": "That did not work. Please try again.",
+    "sourceClaude": "From Claude",
+    "sourceChatgpt": "From ChatGPT"
   }
 }

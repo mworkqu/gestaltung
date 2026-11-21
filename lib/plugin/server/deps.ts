@@ -199,6 +199,7 @@ export function realDeps(): PluginServerDeps {
           topic: req.topic,
           handoffId: req.handoffId,
           source: "plugin",
+          chatSource: req.chatSource,
         },
         siteUrl,
         token,

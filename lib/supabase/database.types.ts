@@ -3728,6 +3728,7 @@ export type Database = {
           invoiced_at: string | null;
           paid_at: string | null;
           is_test: boolean;
+          chat_source: string | null;
         };
         Insert: {
           id?: string;
@@ -3753,6 +3754,7 @@ export type Database = {
           invoiced_at?: string | null;
           paid_at?: string | null;
           is_test?: boolean;
+          chat_source?: string | null;
         };
         Update: {
           id?: string;
@@ -3778,6 +3780,7 @@ export type Database = {
           invoiced_at?: string | null;
           paid_at?: string | null;
           is_test?: boolean;
+          chat_source?: string | null;
         };
         Relationships: [
           {
@@ -5746,7 +5749,7 @@ export type Database = {
       approved_review_count: { Args: Record<PropertyKey, never>; Returns: number };
       approved_reviews: { Args: { p_sku?: string | null; p_limit?: number | null }; Returns: { id: string; score: number; comment: string; first_name: string; locale: string; created_at: string }[] };
       bom_rate_check: { Args: { p_ip_hash?: string | null }; Returns: Json };
-      book_meeting: { Args: { p_starts_at: string | null; p_mode: string | null; p_name: string | null; p_phone: string | null; p_token_hash: string | null; p_email?: string | null; p_locale?: string | null; p_topic?: string | null; p_project_id?: string | null; p_handoff_id?: string | null; p_source?: string | null; p_is_test?: boolean | null }; Returns: Database["public"]["Tables"]["meeting_bookings"]["Row"] };
+      book_meeting: { Args: { p_starts_at: string | null; p_mode: string | null; p_name: string | null; p_phone: string | null; p_token_hash: string | null; p_email?: string | null; p_locale?: string | null; p_topic?: string | null; p_project_id?: string | null; p_handoff_id?: string | null; p_source?: string | null; p_is_test?: boolean | null; p_chat_source?: string | null }; Returns: Database["public"]["Tables"]["meeting_bookings"]["Row"] };
       cad_begin: { Args: { p_project: string | null; p_request: string | null; p_tier: string | null; p_parent?: string | null }; Returns: string };
       cad_deliver: { Args: { p_id: string | null }; Returns: Json };
       cad_fail: { Args: { p_id: string | null; p_error: string | null }; Returns: undefined };

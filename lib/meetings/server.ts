@@ -40,6 +40,7 @@ export type MeetingBooking = {
   project_id: string | null;
   handoff_id: string | null;
   source: "plugin" | "website";
+  chat_source: "claude" | "chatgpt" | "other" | null;
   meet_link: string | null;
   owner_note: string | null;
   invoice_qar: number;
@@ -49,7 +50,7 @@ export type MeetingBooking = {
 };
 
 const BOOKING_COLUMNS =
-  "id, starts_at, ends_at, mode, status, name, phone, email, locale, topic, project_id, handoff_id, source, meet_link, owner_note, invoice_qar, credit_order_id, created_at, is_test";
+  "id, starts_at, ends_at, mode, status, name, phone, email, locale, topic, project_id, handoff_id, source, chat_source, meet_link, owner_note, invoice_qar, credit_order_id, created_at, is_test";
 
 // ── settings ─────────────────────────────────────────────────────────────────
 
@@ -153,6 +154,8 @@ export type BookInput = {
   projectId?: string | null;
   handoffId?: string | null;
   source?: "plugin" | "website";
+  /** Which AI chat booked it (0114); null for the website. */
+  chatSource?: "claude" | "chatgpt" | "other" | null;
   isTest?: boolean;
 };
 
@@ -193,6 +196,7 @@ export async function bookMeeting(input: BookInput, siteUrl: string, token: stri
       p_handoff_id: input.handoffId ?? null,
       p_source: input.source ?? "website",
       p_is_test: input.isTest ?? false,
+      p_chat_source: input.chatSource ?? null,
     });
     if (error) {
       if (notSetUp(error)) return { ok: false, error: "not_set_up" };
