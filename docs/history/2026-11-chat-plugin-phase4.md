@@ -24,98 +24,84 @@ records `chatgpt` on a hand-off. What this phase added:
 The preview card already carried `openai/outputTemplate` from Phase 3, so one
 server serves both hosts.
 
-## 4a — why OAuth is not built
+## 4a — not built, but smaller than this file first said
 
-The brief says "Supabase Auth is the identity provider … OAuth is the only way
-to know the user". The first half does not work as written, and that changes
-the size of the job:
+**Correction (2026-11-22).** An earlier version of this file said Supabase Auth
+cannot be the identity provider and that we would have to write an OAuth 2.1
+authorization server ourselves. That is out of date. Supabase shipped **OAuth
+2.1 server capabilities** in Auth: it serves the authorization and token
+endpoints, RFC 8414 discovery and JWKS, and it supports Dynamic Client
+Registration, which is how Claude and ChatGPT register themselves. It is in
+**beta, on all plans, with no separate charge**, so it breaks no rule about paid
+services. The design below is rewritten accordingly; there is no migration
+0115 and there are no `oauth_*` tables of ours.
 
-**The MCP server is a resource server, not an authorization server.** The spec
-(2026-07-28, and 2025-11-25 before it) requires the MCP server to serve RFC
-9728 protected-resource metadata and to validate audience-bound bearer tokens.
-The RFC 8414 authorization-server metadata, the `/authorize` endpoint, the
-`/token` endpoint and client registration all belong to an **authorization
-server**, which is a separate thing.
+What stays true: the MCP server is a **resource server**, not an authorization
+server. Our `/api/mcp` route must publish RFC 9728 protected-resource metadata,
+answer 401 with a `WWW-Authenticate` challenge on a scope-requiring tool, and
+validate the bearer token it is given — including that the token was issued for
+us. That part is ours either way.
 
-**Supabase Auth is not one.** It signs users into *our* app. It does not issue
-OAuth access tokens to third-party clients, has no authorization endpoint for
-them, cannot bind a token's audience to our MCP URI (RFC 8707 `resource`), and
-offers neither Dynamic Client Registration nor Client ID Metadata Documents —
-all of which Claude and ChatGPT use to register themselves. So "use Supabase
-Auth as the IdP" can only mean: Supabase signs the person in on our consent
-page, and **we** issue the MCP token. That is us writing an OAuth 2.1
-authorization server.
+### The design, if the owner says go
 
-### The two options (the owner picks)
+Supabase side (dashboard, the owner's to do, no code):
 
-1. **Build our own minimal authorization server.** Free, no new service, fits
-   the "no paid services" rule. It is real work and it is security-critical:
-   roughly a migration for three tables, five endpoints, a consent page, token
-   issuing and validation, and its own test suite. Design below.
-2. **Use a hosted identity provider** (Auth0, WorkOS, Clerk, Stytch…). Much
-   less of our code, and they already do DCR, PKCE, resource indicators and
-   rotation properly. **Every one of them costs money above a small free tier**,
-   so this needs the owner's explicit yes first (CLAUDE.md: a service that
-   costs money needs the owner's yes; never sign him up for one).
+- Authentication → **OAuth Server**: enable OAuth 2.1 server capabilities, set
+  the Authorization Path to `/oauth/consent`, and decide whether to allow
+  dynamic registration. The docs warn that dynamic registration lets **any** MCP
+  client register with the project; the alternative is to register Claude and
+  ChatGPT by hand under Authentication → OAuth Apps.
+- **JWT Signing Keys**: the project must sign with an asymmetric key (ES256 or
+  RS256). A project still on the legacy shared secret has to be switched first,
+  and that switch affects every existing token, so it is not a side effect to
+  take lightly — it wants its own small stage.
+- The issuer stays on the project host
+  (`https://<ref>.supabase.co/auth/v1`) even behind our custom domain.
 
-My recommendation: **option 1**, and only when the cart actually needs it.
-Nothing in Phases 1–3 needs sign-in, both directories accept an anonymous
-server, and an OAuth server written in a hurry is the worst thing in this
-repository to get wrong.
+Our side (code):
 
-### The design, if option 1 is chosen
+- `GET /.well-known/oauth-protected-resource` and the path-scoped
+  `/.well-known/oauth-protected-resource/api/mcp` → `{ resource:
+  "https://gestaltung360.com/api/mcp", authorization_servers:
+  ["https://<ref>.supabase.co/auth/v1"], bearer_methods_supported: ["header"],
+  resource_documentation: ".../legal/privacy" }`.
+- A **consent page** at `/[locale]/oauth/consent`, EN + AR, in our design. This
+  is the only real UI: Supabase hands it an `authorization_id`; it requires a
+  real (non-guest) Supabase sign-in, calls `getAuthorizationDetails`, shows the
+  client name and what is being asked for in plain words, and on the person's
+  decision calls `approveAuthorization` or `denyAuthorization` and redirects to
+  the `redirect_url` it gets back.
+- **Token validation** in the MCP route: verify the JWT against the project
+  JWKS (asymmetric only — reject HS256), check it is not expired, and read
+  `user_id` and `client_id`. Unauthenticated calls stay **allowed**: everything
+  in Phases 1–3 must keep working without an account, and only a
+  scope-requiring tool answers 401.
+- Signed in, the behaviour the brief asks for: `send_project` creates the
+  project in the person's account with no claim step, and `book_meeting` fills
+  the contact details from the profile.
 
-Migration 0115:
+### The three things to check before building, not during
 
-- `oauth_clients` — `client_id`, `client_name`, `redirect_uris text[]`,
-  `token_endpoint_auth_method` ('none' for a public PKCE client),
-  `created_at`. Written by the registration endpoint (DCR), service_role only.
-- `oauth_codes` — `code_hash` (sha256 only), `client_id`, `user_id`,
-  `redirect_uri`, `code_challenge`, `code_challenge_method` ('S256' only),
-  `scope`, `resource`, `expires_at` (60 s), `used_at`. One-time.
-- `oauth_tokens` — `token_hash`, `refresh_hash`, `client_id`, `user_id`,
-  `scope`, `audience`, `expires_at`, `revoked_at`. Opaque random tokens,
-  hashed at rest exactly like `plugin_handoffs.token_hash`.
+The docs I read do not answer these, and each one changes the code:
 
-Endpoints:
+1. **Audience binding.** The spec requires a resource server to refuse a token
+   that was not issued for it. Supabase's access tokens are "standard Supabase
+   JWTs" carrying `user_id`, `role` and `client_id`; RFC 8707 resource
+   indicators are not mentioned, and setting `aud` is described as a job for a
+   **Custom Access Token Hook**. So the check has to be built deliberately — on
+   `aud` via a hook, or failing that on `client_id` against the clients we
+   recognise. Skipping it is the token-passthrough mistake the spec names.
+2. **Scopes.** Only `openid`, `email`, `profile` and `phone` are documented.
+   Custom scopes such as `cart:write` may not exist, in which case authorisation
+   is per-client, not per-scope, and the consent page's wording has to be honest
+   about that rather than listing scopes we cannot enforce.
+3. **PKCE S256 and MAU.** PKCE is mandatory in their flow but the method is not
+   stated; and people who sign in through the OAuth server count toward the
+   project's monthly active users, which matters on the Free plan.
 
-- `GET /.well-known/oauth-protected-resource` **and**
-  `GET /.well-known/oauth-protected-resource/api/mcp` (path-scoped; serve both)
-  → `{ resource: "https://gestaltung360.com/api/mcp", authorization_servers:
-  ["https://gestaltung360.com"], scopes_supported: [...],
-  resource_documentation: "https://gestaltung360.com/legal/privacy" }`.
-- `GET /.well-known/oauth-authorization-server` → `issuer`,
-  `authorization_endpoint`, `token_endpoint`, `registration_endpoint`,
-  `code_challenge_methods_supported: ["S256"]` (if this field is absent a
-  client MUST refuse to proceed), `token_endpoint_auth_methods_supported:
-  ["none"]`, `scopes_supported`, `authorization_response_iss_parameter_supported:
-  true` (then always return `iss`, errors included).
-- `POST /api/oauth/register` — DCR. Deprecated in the newest spec in favour of
-  CIMD, but kept for the hosts that still use it.
-- `GET /[locale]/connect/authorize` — our consent page, EN + AR, in our design,
-  scopes in plain words. Requires a real Supabase sign-in (not a guest), shows
-  the client name and the redirect host, and on approval issues the code.
-- `POST /api/oauth/token` — authorization_code + refresh_token grants, verify
-  the PKCE `code_verifier` against the stored S256 challenge, exact
-  `redirect_uri` match, one-time code, and bind `audience` from the `resource`
-  parameter.
-
-MCP route changes:
-
-- Unauthenticated stays **allowed**: everything in Phases 1–3 must keep working
-  without sign-in. Only a scope-requiring tool answers 401 with
-  `WWW-Authenticate: Bearer resource_metadata="…", scope="…"`.
-- When a bearer token is present: validate it (hash lookup, not revoked, not
-  expired) and **check the audience is our MCP URI**. The spec is explicit that
-  a server MUST validate that a token was issued for it, and MUST NOT pass a
-  client's token upstream.
-- Scopes, server-defined: `project:write` (send_project into the account),
-  `cart:write` (add_parts_to_cart), `meetings:write` (book with the profile's
-  details).
-
-Signed in, the behaviour the brief asks for: `send_project` creates the project
-in the user's account with no claim step, and `book_meeting` fills the contact
-details from the profile.
+A short spike — enable it on the project, point Claude at our server, watch one
+real token arrive and print its claims — settles all three in an hour and is
+worth doing before any of the above is written.
 
 ## 4b — the cart tool (not built, depends on 4a)
 
