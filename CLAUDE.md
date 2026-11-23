@@ -49,7 +49,7 @@ The stage-by-stage log that used to live here (about 1,400 lines) is in `docs/hi
 - Never print or copy secret values, never create env files in a shared checkout, never run `vercel` or push without the owner asking.
 
 ## Architecture map
-- Two homes: **Vercel** serves the site, store, checkout, sign-in and every API route today. The **Mac Mini worker** (`services/worker`, `docs/WORKER.md`) can run the eight scheduled jobs; it is built but **OFF** (`store_settings.worker`, default off, migration 0111 not run). Nothing has moved to it. Part B (long AI routes, CAD and grading calls) is not built. Website hosting stays on Vercel.
+- Hosting (since 2026-11-23, owner: off Vercel for at least a month): the **Mac Mini** serves the site, store, checkout, sign-in and every API route, as a Node server (`server.mjs`, bound to loopback `127.0.0.1:3000`) behind a **Cloudflare Tunnel**. `server.mjs` is NOT in this repository — it exists only in the deployed copy; its header comment explains why `next start -H` cannot be used (the request origin Next builds in `attachRequestMeta()`). **Vercel is blocked and deploys nothing**, so `vercel.json` (its crons and the `www` redirect included) is inert; do not treat it as the live configuration. The **Mac Mini worker** (`services/worker`, `docs/WORKER.md`) can run the eight scheduled jobs; it is built but **OFF** (`store_settings.worker`, migration 0111 not run), so **nothing is scheduled anywhere right now** — see `docs/CRONS_OFF_VERCEL.md`. Part B (long AI routes, CAD and grading calls) is not built.
 - Stack: Next.js 15 App Router (webpack build), React 19, TypeScript strict, Tailwind 3, next-intl 4 (`en` default, `ar` RTL), Supabase, zod 4, vitest, Playwright. Detail: `docs/audit/CODE_MAP.md`.
 - Folders: `app/[locale]/**` pages and server actions; `app/api/**` route handlers; `lib/<area>/**` logic; `components/**` UI (`components/studio/**` PascalCase); `messages/{en,ar}.json`; `i18n/`; `supabase/migrations/`; `services/cad-worker/` (optional cloud CAD worker on Google Cloud Run), `services/worker/` + `services/compose.yaml` (Mac Mini worker, OFF), `grader/` (CAD Champions grader, Cloud Run).
 - Layer rules (what may import what):
@@ -108,10 +108,10 @@ Route convention: `export async function POST(request)` -> `parseJsonBody` -> `r
 - Every commit should leave typecheck, lint, unit tests and the build green.
 
 ## Hosting and CI
-- Vercel builds `main` only (`ignoreCommand` in `vercel.json`); no preview builds. Test locally: `npm run build && npm start`, then `npm run test:e2e`. The owner still has to clear the dashboard "Ignored Build Step" (`docs/ENVIRONMENT.md`).
+- Deploying means building on the Mac and restarting `server.mjs` there; there is no git-push deploy while we self-host. Test locally first: `npm run build && npm start`, then `npm run test:e2e`. (Vercel built `main` only via `ignoreCommand`; that path is dead while the account is blocked.)
 - Storefront purge tags: `parts` (everything), `parts-listing` (listing reads), `part-<sku>` (one product). Supplier crons purge per SKU; more than 100 moved products means a full purge (`lib/cache/catalog-tags.ts`).
 - `robots.txt` blocks `/api/`, account areas, query listings and `/store/search`. Store `?q` over 64 characters or `?page` over 20 answers 404.
-- CI: `.github/workflows/main.yml` runs on push to `main` and on pull requests (required check name `Main / all checks`). It has never run on GitHub; expect CI-only surprises on the first pull request. Two lists keep known-bad e2e tests out of CI only: `e2e/KNOWN_FAILING.txt` and `e2e/NEEDS_LIVE_READS.txt`. **They may only shrink**; never add a line to hide a new failure.
+- CI: `.github/workflows/main.yml` runs on push to `main` and on pull requests (required check name `Main / all checks`). First run: PR #7, 2026-11-23 — all five checks green (`all checks`, `Static checks`, `Build and e2e`, `CAD worker`, `Grader`); the Vercel check fails with "Account is blocked" and is expected to stay red while we self-host. Two lists keep known-bad e2e tests out of CI only: `e2e/KNOWN_FAILING.txt` and `e2e/NEEDS_LIVE_READS.txt`. **They may only shrink**; never add a line to hide a new failure.
 
 ## Owner decisions in force
 Full text: `docs/DECISIONS.md` (D1-D13, owner site review 2026-10-03).
