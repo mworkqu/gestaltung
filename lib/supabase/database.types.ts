@@ -5850,6 +5850,7 @@ export type Database = {
       payment_create_service: { Args: { p_user: string | null; p_service: string | null; p_amount: number | null; p_project: string | null; p_meta: JsonInput | null; p_is_test?: boolean | null }; Returns: Database["public"]["Tables"]["payments"]["Row"] };
       payment_settle: { Args: { p_payment: string | null; p_status: string | null; p_auto: boolean | null; p_verdict: JsonInput | null; p_reasons: string[] | null; p_transfer_ref: string | null }; Returns: string };
       payment_unapply_internal: { Args: { p_payment: string | null }; Returns: undefined };
+      plugin_add_to_cart: { Args: { p_lines: JsonInput | null }; Returns: Json };
       plugin_handoff_set_phone: { Args: { p_token: string | null; p_phone: string | null }; Returns: Json };
       plugin_rate_hit: { Args: { p_key: string | null; p_limit: number | null }; Returns: Json };
       price_cohort_funnel: { Args: Record<PropertyKey, never>; Returns: { cohort: string; users: number; with_project: number; bought_credits: number; with_order: number }[] };

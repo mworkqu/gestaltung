@@ -116,7 +116,10 @@ writing tools' confirmation step.
 
 - **"What personal data does the server receive?"** Name, WhatsApp number and
   optionally an e-mail address, only when the user gives them, plus a hashed IP
-  for rate limiting. No account, no sign-in, no conversation.
+  for rate limiting. No conversation, ever. Signing in is optional (it is
+  needed only for the cart tool): the server then holds an access token for
+  that account and nothing else — no password, and no reach beyond that
+  person's own projects, cart and bookings.
 - **"Can a tool read the chat?"** No. No tool takes a conversation, a
   transcript or a message history parameter, and no tool description asks for
   one. `requirement_quotes` is capped at ten strings of 140 characters, and the

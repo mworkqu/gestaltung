@@ -5643,5 +5643,27 @@
     "failed": "That did not work. Please try again.",
     "sourceClaude": "From Claude",
     "sourceChatgpt": "From ChatGPT"
+  },
+  "OauthConsent": {
+    "title": "Connect your Gestaltung360 account",
+    "intro": "{client} is asking to use your Gestaltung360 account from your chat.",
+    "canProject": "Send a design to us and save it as a project in your account.",
+    "canCart": "Put store parts in your cart. You check out on gestaltung360.com yourself.",
+    "canMeeting": "Book a paid meeting with our engineer using the name and number saved on your account.",
+    "cannot": "It cannot place an order, pay anything, or see your password.",
+    "privacy": "Your chat is never sent to us — only what you choose to send.",
+    "account": "Account:",
+    "sendsTo": "Sends you back to:",
+    "allow": "Allow",
+    "deny": "Not now",
+    "signInTitle": "Sign in first",
+    "signInBody": "Sign in to your Gestaltung360 account to connect it to your chat.",
+    "signIn": "Sign in",
+    "badRequestTitle": "Something is missing",
+    "badRequestBody": "This link is incomplete. Start again from your chat's connector settings.",
+    "notReadyTitle": "Not available yet",
+    "notReadyBody": "Connecting an account from a chat is being set up and is not available yet. Nothing on your account has changed.",
+    "failed": "That did not go through. Please try again.",
+    "unknownClient": "An AI chat"
   }
 }

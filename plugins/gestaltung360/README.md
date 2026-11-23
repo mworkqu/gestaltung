@@ -64,6 +64,20 @@ The plugin's tools appear in `/mcp` as `plugin:gestaltung360:gestaltung360`,
 and to hooks and `allowed-tools` as
 `mcp__plugin_gestaltung360_gestaltung360__<tool>`.
 
+## Signing in (optional)
+
+Seven of the eight tools work with no account at all. Only
+`add_parts_to_cart` needs one, and signing in also saves a sent project
+straight into the account and lets a booking use the name and number already
+there.
+
+The server is an OAuth 2.1 resource server: it publishes its metadata at
+`/.well-known/oauth-protected-resource/api/mcp`, and the authorization server
+is Supabase Auth on the project host. Claude registers itself, so there is
+nothing to configure in `.mcp.json` — `/mcp` offers to authenticate when a tool
+asks for it. The consent screen is on gestaltung360.com; a password is never
+shown to Claude, and a connected account still cannot place an order or pay.
+
 ## Submitting it to the Claude directory
 
 `docs/PLUGIN_SUBMISSION.md` has the steps, what the reviewer needs and the

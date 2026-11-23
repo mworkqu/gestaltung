@@ -10,7 +10,9 @@ import { EXAMPLE_BUILD_FILE } from "../build-file";
 import type { PluginProduct } from "../check-project";
 import { pluginLibraryFrom } from "../to-studio";
 import { corsPreflight, MCP_CORS_HEADERS, withCors } from "./cors";
+import { PLUGIN_SCOPES } from "../oauth";
 import {
+  CART_FAIL_TEXT,
   PluginNotSetUpError,
   rateKey,
   registerPluginServer,
@@ -20,6 +22,9 @@ import {
   TEXT_FAILED,
   TEXT_NOT_SET_UP,
   TEXT_RATE_LIMITED,
+  TEXT_SIGN_IN,
+  type AccountContact,
+  type CartLine,
   type HandoffInsert,
   type LeadInsert,
   type MeetingBookRequest,
@@ -42,6 +47,9 @@ type Captured = {
   clientMails: { to: string; mail: OwnerMail }[];
   rateKeys: string[];
   books: MeetingBookRequest[];
+  carts: { token: string; lines: CartLine[] }[];
+  claims: { token: string; handoffToken: string }[];
+  contactReads: { token: string; userId: string }[];
 };
 
 /** The free slots the fake offers: Monday 23 and Wednesday 25 November 2026, 16:00 Qatar. */
@@ -49,7 +57,18 @@ const SLOT_MON = "2026-11-23T13:00:00.000Z";
 const SLOT_WED = "2026-11-25T13:00:00.000Z";
 
 function fakeDeps(over: Partial<PluginServerDeps> = {}): { deps: PluginServerDeps; cap: Captured } {
-  const cap: Captured = { handoffs: [], leads: [], links: [], mails: [], clientMails: [], rateKeys: [], books: [] };
+  const cap: Captured = {
+    handoffs: [],
+    leads: [],
+    links: [],
+    mails: [],
+    clientMails: [],
+    rateKeys: [],
+    books: [],
+    carts: [],
+    claims: [],
+    contactReads: [],
+  };
   const deps: PluginServerDeps = {
     loadLibrary: async () => lib,
     loadProducts: async (skus) => new Map([...PRODUCTS].filter(([k]) => skus.includes(k))),
@@ -102,6 +121,23 @@ function fakeDeps(over: Partial<PluginServerDeps> = {}): { deps: PluginServerDep
       };
     },
     handoffIdForToken: async (token) => (token ? "handoff-1" : null),
+    accountContact: async (accessToken, userId) => {
+      cap.contactReads.push({ token: accessToken, userId });
+      return SAVED_CONTACT;
+    },
+    addToCart: async (accessToken, lines) => {
+      cap.carts.push({ token: accessToken, lines });
+      return {
+        ok: true,
+        added: lines.length,
+        lines: lines.map((l) => ({ sku: l.sku, name: `Part ${l.sku}`, qty: l.qty, unit_price_qar: 10 })),
+        skipped: [],
+      };
+    },
+    claimHandoffFor: async (accessToken, handoffToken) => {
+      cap.claims.push({ token: accessToken, handoffToken });
+      return "project-9";
+    },
     siteUrl: "https://gestaltung360.com",
     now: () => new Date("2026-11-18T10:30:00Z"),
     ...over,
@@ -111,10 +147,27 @@ function fakeDeps(over: Partial<PluginServerDeps> = {}): { deps: PluginServerDep
 
 let client: Client | null = null;
 
-async function connect(deps: PluginServerDeps): Promise<Client> {
+const SAVED_CONTACT: AccountContact = { name: "Noora Al-Mansoori", phone: "+97455551234", email: "noora@example.com" };
+
+/** A verified token exactly as verifyPluginToken() builds one. */
+const TOKEN = "access-token-abc";
+const AUTH = {
+  token: TOKEN,
+  clientId: "cli_claude",
+  scopes: [...Object.values(PLUGIN_SCOPES)],
+  extra: { userId: "user-7", email: "noora@example.com" },
+};
+
+async function connect(deps: PluginServerDeps, authInfo?: typeof AUTH | { token: string; clientId: string; scopes: string[] }): Promise<Client> {
   const server = new McpServer({ ...SERVER_INFO }, { instructions: SERVER_INSTRUCTIONS });
   registerPluginServer(server, deps);
   const [a, b] = InMemoryTransport.createLinkedPair();
+  // The transport is the only way a tool can learn who is calling, exactly as
+  // withMcpAuth supplies it over HTTP.
+  if (authInfo) {
+    const send = b.send.bind(b);
+    b.send = (msg, opts) => send(msg, { ...opts, authInfo });
+  }
   client = new Client({ name: "claude-ai", version: "1.0.0" });
   await Promise.all([server.connect(a), client.connect(b)]);
   return client;
@@ -154,10 +207,11 @@ function propertyNames(schema: unknown, out: string[] = []): string[] {
 }
 
 describe("plugin MCP server", () => {
-  it("lists exactly the seven tools with the right annotations and no chat-shaped inputs", async () => {
+  it("lists exactly the eight tools with the right annotations and no chat-shaped inputs", async () => {
     const c = await connect(fakeDeps().deps);
     const { tools } = await c.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
+      "add_parts_to_cart",
       "book_meeting",
       "check_project",
       "get_design_rules",
@@ -167,7 +221,7 @@ describe("plugin MCP server", () => {
       "send_project",
     ]);
     // Every writing tool says it is only called after the user agrees.
-    const WRITERS = ["send_project", "book_meeting"];
+    const WRITERS = ["send_project", "book_meeting", "add_parts_to_cart"];
     for (const t of tools) {
       if (WRITERS.includes(t.name)) {
         expect(t.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, openWorldHint: true, idempotentHint: false });
@@ -656,5 +710,160 @@ describe("helpers", () => {
     expect(first.text).not.toMatch(/SolidWorks|Fusion|OpenSCAD|FreeCAD|CadQuery/i);
     // comfortably inside the 300 kB budget
     expect(first.text.length).toBeLessThan(300_000);
+  });
+});
+
+// ── the connected account (Phase 4a) and the cart (4b) ──────────────────────
+
+describe("a connected account", () => {
+  it("adds the parts to the cart with the caller's own token and prices them in QAR", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps, AUTH);
+
+    const r = await call(c, "add_parts_to_cart", { lines: [{ sku: "VLT-1", qty: 2 }, { sku: "VLT-2", qty: 1 }], locale: "en" });
+
+    expect(r.isError).toBeFalsy();
+    // The token is passed straight through, so the database sees the person
+    // and RLS decides — the service client is never used for this.
+    expect(cap.carts).toEqual([{ token: TOKEN, lines: [{ sku: "VLT-1", qty: 2 }, { sku: "VLT-2", qty: 1 }] }]);
+    expect(firstText(r)).toContain("QAR 30");
+    expect(firstText(r)).toContain("https://gestaltung360.com/en/store/cart");
+    const data = r.structuredContent as { ok: boolean; added: number; parts_total_qar: number; cart_url: string; note: string };
+    expect(data).toMatchObject({ ok: true, added: 2, parts_total_qar: 30, cart_url: "https://gestaltung360.com/en/store/cart" });
+    // It must never look like an order was placed or a total promised.
+    expect(data.note).toMatch(/checkout on the website/i);
+    expect(firstText(r)).not.toMatch(/\border(ed)?\b/i);
+  });
+
+  it("never writes a cart without a token, even if the host ignores the challenge", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps); // no authInfo at all
+
+    const r = await call(c, "add_parts_to_cart", { lines: [{ sku: "VLT-1", qty: 1 }] });
+
+    expect(r.isError).toBe(true);
+    expect(firstText(r)).toBe(TEXT_SIGN_IN);
+    expect(cap.carts).toHaveLength(0);
+  });
+
+  it("refuses a token that carries no cart scope", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps, { token: "t", clientId: "cli", scopes: ["project:write"] });
+
+    const r = await call(c, "add_parts_to_cart", { lines: [{ sku: "VLT-1", qty: 1 }] });
+
+    expect(r.isError).toBe(true);
+    expect(cap.carts).toHaveLength(0);
+  });
+
+  it("tells the model what to do when the database refuses the cart", async () => {
+    for (const error of ["guest", "bad_lines"] as const) {
+      const { deps, cap } = fakeDeps({ addToCart: async () => ({ ok: false, error }) });
+      const c = await connect(deps, AUTH);
+      const r = await call(c, "add_parts_to_cart", { lines: [{ sku: "VLT-1", qty: 1 }] });
+      expect(firstText(r)).toContain(CART_FAIL_TEXT[error]);
+      expect((r.structuredContent as { ok: boolean }).ok).toBe(false);
+      expect(cap.leads).toHaveLength(0);
+      await client?.close();
+      client = null;
+    }
+  });
+
+  it("reports a product it could not add instead of dropping it", async () => {
+    const { deps } = fakeDeps({
+      addToCart: async () => ({ ok: true, added: 1, lines: [{ sku: "AA", name: "A part", qty: 1, unit_price_qar: 5 }], skipped: ["BB", "CC"] }),
+    });
+    const c = await connect(deps, AUTH);
+    const r = await call(c, "add_parts_to_cart", { lines: [{ sku: "AA", qty: 1 }] });
+    expect(firstText(r)).toContain("BB, CC");
+    expect((r.structuredContent as { skipped: string[] }).skipped).toEqual(["BB", "CC"]);
+  });
+
+  it("send_project puts the project straight in the account, with no claim step", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps, AUTH);
+
+    const r = await call(c, "send_project", { build: EXAMPLE_BUILD_FILE, contact: { name: "Noora", phone: "+97455551234" }, locale: "en" });
+
+    const data = r.structuredContent as { ok: boolean; link: string; project_id: string; in_account: boolean };
+    expect(data).toMatchObject({ ok: true, project_id: "project-9", in_account: true });
+    expect(data.link).toBe("https://gestaltung360.com/en/projects/project-9/studio?step=enclosure");
+    // Claimed as the person, with the hand-off token we just minted.
+    expect(cap.claims).toHaveLength(1);
+    expect(cap.claims[0]!.token).toBe(TOKEN);
+    expect(createHash("sha256").update(cap.claims[0]!.handoffToken).digest("hex")).toBe(cap.handoffs[0]!.token_hash);
+    // The owner is still told, and the lead is still created.
+    expect(cap.mails).toHaveLength(1);
+    expect(cap.leads).toHaveLength(1);
+  });
+
+  it("falls back to the 30-day link when the claim does not work", async () => {
+    const { deps, cap } = fakeDeps({ claimHandoffFor: async () => null });
+    const c = await connect(deps, AUTH);
+
+    const r = await call(c, "send_project", { build: EXAMPLE_BUILD_FILE, contact: { name: "Noora", phone: "+97455551234" } });
+
+    const data = r.structuredContent as { ok: boolean; link: string; in_account: boolean };
+    expect(data.in_account).toBe(false);
+    expect(data.link).toMatch(/\/en\/handoff\//);
+    expect(cap.handoffs).toHaveLength(1);
+  });
+
+  it("books a meeting from the saved details when the chat did not repeat them", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps, AUTH);
+
+    const r = await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "online", locale: "en" });
+
+    expect(r.isError).toBeFalsy();
+    expect(cap.contactReads).toEqual([{ token: TOKEN, userId: "user-7" }]);
+    expect(cap.books[0]).toMatchObject({ name: "Noora Al-Mansoori", phone: "+97455551234", email: "noora@example.com" });
+  });
+
+  it("prefers what the user said in the chat over the saved details", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps, AUTH);
+
+    await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "studio", name: "Ali", phone: "+97433664265", locale: "en" });
+
+    expect(cap.books[0]).toMatchObject({ name: "Ali", phone: "+97433664265" });
+  });
+
+  it("still asks for a name and number when there is no account", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+
+    const r = await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "online", locale: "en" });
+
+    expect((r.structuredContent as { ok: boolean; problems: string[] }).problems[0]).toMatch(/^name:/);
+    expect(cap.books).toHaveLength(0);
+    expect(cap.contactReads).toHaveLength(0);
+  });
+
+  it("asks for the number when the account has no phone saved", async () => {
+    const { deps, cap } = fakeDeps({ accountContact: async () => ({ name: "Noora", phone: null, email: null }) });
+    const c = await connect(deps, AUTH);
+
+    const r = await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "online", locale: "en" });
+
+    expect((r.structuredContent as { problems: string[] }).problems[0]).toMatch(/^phone:/);
+    expect(cap.books).toHaveLength(0);
+  });
+
+  it("reads no account at all on an anonymous booking", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps);
+
+    await call(c, "book_meeting", { starts_at: SLOT_MON, mode: "online", name: "Ali", phone: "+97433664265", locale: "en" });
+
+    expect(cap.contactReads).toHaveLength(0);
+    expect(cap.books).toHaveLength(1);
+  });
+
+  it("counts the cart in its own daily bucket", async () => {
+    const { deps, cap } = fakeDeps();
+    const c = await connect(deps, AUTH);
+    await call(c, "add_parts_to_cart", { lines: [{ sku: "VLT-1", qty: 1 }] });
+    expect(cap.rateKeys[0]).toMatch(/^mcp:cart:noip:\d{8}$/);
   });
 });

@@ -32,7 +32,8 @@ submission is a business act.
 | `preview_look` | no | readOnly, closed world | — | none | Returns the card plus the same facts as text |
 | `list_meeting_slots` | no | readOnly, closed world | — | none | Start times only, never a name |
 | `send_project` | **yes** | readOnly false, destructive false, open world | Required, stated in the description | name, phone, optional e-mail | Only what the user chose to share |
-| `book_meeting` | **yes** | readOnly false, destructive false, open world | Required, stated in the description | name, phone, optional e-mail | Same |
+| `book_meeting` | **yes** | readOnly false, destructive false, open world | Required, stated in the description | name, phone, optional e-mail | Same; a connected account fills in what the chat did not repeat |
+| `add_parts_to_cart` | **yes** | readOnly false, destructive false, open world | Required, stated in the description | none beyond the account | Signed in only (scope `cart:write`). SKUs and quantities only. Places no order |
 
 **Data minimisation.** No tool takes an account id, a location, a device
 identifier or a payment detail. Contact fields are optional on `send_project`
@@ -62,8 +63,8 @@ told never to invent a price, a lead time or a stock level.
 ## Before you submit
 
 - [ ] The site is up and the endpoint answers.
-- [ ] Migrations 0113 and 0114 have been run, or the meeting tools will answer
-      "not set up yet" during review.
+- [ ] Migrations 0113, 0114 and 0115 have been run, or the meeting tools and
+      the cart tool will answer "not set up yet" during review.
 - [ ] `RESEND_API_KEY` is set, so a sent project actually e-mails you.
 - [ ] The privacy paragraph (`docs/PLUGIN_PRIVACY_ADDITION.md`) is live on the
       privacy page, and its URL is the one you submit. The text already names
@@ -71,9 +72,14 @@ told never to invent a price, a lead time or a stock level.
 - [ ] Decide about sign-in. ChatGPT supports Client ID Metadata Documents,
       Dynamic Client Registration, a pre-registered client and PKCE; it does
       **not** support client credentials, service accounts or JWT bearer
-      grants. Our server is currently **anonymous-only** — every tool works
-      without an account, which is allowed and is the simplest thing to submit.
-      Sign-in (Phase 4a) is only needed for the cart tool.
+      grants. Sign-in is now built (Phase 4a): Supabase Auth is the
+      authorization server and our `/api/mcp` publishes RFC 9728 metadata at
+      `/.well-known/oauth-protected-resource/api/mcp`. It is still **optional** —
+      seven of the eight tools work with no account at all, which is the
+      simplest thing to submit. Only `add_parts_to_cart` requires one. If you
+      submit with sign-in, the OAuth server must be switched on in Supabase and
+      the project must sign JWTs with an asymmetric key first, or a reviewer who
+      tries to connect an account gets a 401 and no way forward.
 
 ## Testing in Developer Mode
 
@@ -101,7 +107,10 @@ Use the same five as the Claude submission, plus:
 
 Identical to the Claude answers in `docs/PLUGIN_SUBMISSION.md` §5: name,
 WhatsApp number and optionally an e-mail, only when the user gives them, plus a
-hashed IP for rate limits. No account, no sign-in, no conversation. Unclaimed
+hashed IP for rate limits. No conversation, ever. Signing in is optional and is
+the person's choice; when they do connect an account, the server receives an
+access token for it and nothing else — no password, and no access to anything
+outside their own projects, cart and bookings. Unclaimed
 project links expire after 30 days; projects and meetings are kept as other
 customer records. Deletion requests go to info@gestaltung360.com.
 

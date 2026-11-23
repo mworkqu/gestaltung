@@ -25,7 +25,8 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { PluginProduct } from "../check-project";
 import { pluginLibraryFrom } from "../to-studio";
-import { PluginNotSetUpError, type PluginServerDeps, type SearchPartRow } from "./register";
+import { userClient } from "./oauth";
+import { PluginNotSetUpError, type CartLineResult, type CartOutcome, type PluginServerDeps, type SearchPartRow } from "./register";
 
 const MAX_SKUS = 100;
 const DEFAULT_MIN_WALL_MM = 1.2;
@@ -232,6 +233,77 @@ export function realDeps(): PluginServerDeps {
       } catch (err) {
         if (notSetUp(err)) return null;
         console.error("[mcp] handoff lookup failed:", err);
+        return null;
+      }
+    },
+
+    // ── the connected account (Phase 4a) ───────────────────────────────────
+    // Each one acts AS the person, through a client carrying their own access
+    // token: RLS and auth.uid() decide what they may touch, so ownership is
+    // never ours to check. The service client is deliberately not used here.
+    accountContact: async (accessToken, userId) => {
+      const db = userClient(accessToken);
+      if (!db) return null;
+      try {
+        const { data, error } = await db
+          .from("profiles")
+          .select<string, { full_name: string | null; phone: string | null; email: string | null }>("full_name, phone, email")
+          .eq("id", userId)
+          .maybeSingle();
+        if (error) {
+          if (notSetUp(error)) return null;
+          throw error;
+        }
+        if (!data) return null;
+        return { name: data.full_name ?? null, phone: data.phone ?? null, email: data.email ?? null };
+      } catch (err) {
+        console.error("[mcp] account contact read failed:", err);
+        return null;
+      }
+    },
+
+    addToCart: async (accessToken, lines): Promise<CartOutcome> => {
+      const db = userClient(accessToken);
+      if (!db) return { ok: false, error: "not_set_up" };
+      try {
+        const { data, error } = await db.rpc("plugin_add_to_cart", { p_lines: lines as unknown as Json });
+        if (error) {
+          if (notSetUp(error)) return { ok: false, error: "not_set_up" };
+          throw error;
+        }
+        const row = (data ?? {}) as {
+          ok?: boolean;
+          reason?: string;
+          added?: number;
+          lines?: CartLineResult[];
+          skipped?: string[];
+        };
+        if (!row.ok) {
+          const reason = row.reason === "guest" || row.reason === "bad_lines" || row.reason === "sign_in" ? row.reason : "failed";
+          return { ok: false, error: reason };
+        }
+        return { ok: true, added: row.added ?? 0, lines: row.lines ?? [], skipped: row.skipped ?? [] };
+      } catch (err) {
+        if (notSetUp(err)) return { ok: false, error: "not_set_up" };
+        console.error("[mcp] add to cart failed:", err);
+        return { ok: false, error: "failed" };
+      }
+    },
+
+    claimHandoffFor: async (accessToken, handoffToken) => {
+      const db = userClient(accessToken);
+      if (!db) return null;
+      try {
+        const { data, error } = await db.rpc("claim_plugin_handoff", { p_token: handoffToken });
+        if (error) {
+          if (notSetUp(error)) return null;
+          throw error;
+        }
+        const row = (data ?? {}) as { ok?: boolean; project_id?: string };
+        return row.ok && typeof row.project_id === "string" ? row.project_id : null;
+      } catch (err) {
+        if (notSetUp(err)) return null;
+        console.error("[mcp] handoff claim failed:", err);
         return null;
       }
     },

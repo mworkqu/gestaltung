@@ -47,6 +47,15 @@ your account there, or anything else you did not put in the project or the
 booking. Our tools have no field for a conversation, and anything longer than
 the limits above is rejected.
 
+**If you connect your account.** You can sign in to your Gestaltung360 account
+from the assistant. The sign-in and the permission screen are on our own site,
+your password is never shown to the assistant, and you can withdraw the
+permission at any time. While it is connected, the assistant can save a project
+to your account, put parts in your cart, and book a meeting using the name and
+number already on your account. It cannot place an order, pay anything, or
+reach anything outside your own projects, cart and bookings. You never have to
+connect an account: everything except the cart works without one.
+
 **Why we use it.** To quote the product, to buy and sell the parts, to make it,
 to hold the meeting you booked, and to contact you about your own enquiry.
 
@@ -85,6 +94,13 @@ not required to keep, and tell you what we must keep and why.
 ولا ملخصًا لها، ولا تعليمات مساعدك، ولا حسابك هناك، ولا أي شيء آخر لم تضعه في
 المشروع أو في الحجز. ولا تحتوي أدواتنا على أي حقل للمحادثة، ويُرفض كل ما يتجاوز
 الحدود المذكورة أعلاه.
+
+**إذا ربطت حسابك.** يمكنك تسجيل الدخول إلى حسابك في Gestaltung360 من المساعد
+الذكي. يتم تسجيل الدخول وشاشة الموافقة على موقعنا نفسه، ولا تظهر كلمة المرور
+للمساعد أبدًا، ويمكنك سحب الموافقة في أي وقت. وأثناء الربط يستطيع المساعد حفظ
+مشروع في حسابك، وإضافة قطع إلى سلتك، وحجز اجتماع بالاسم والرقم الموجودين في
+حسابك. ولا يمكنه تنفيذ طلب شراء، ولا الدفع، ولا الوصول إلى أي شيء خارج مشاريعك
+وسلتك وحجوزاتك. ولست مضطرًا لربط حسابك: كل شيء ما عدا السلة يعمل بدون حساب.
 
 **لماذا نستخدمها.** لتسعير المنتج، ولشراء القطع وبيعها، ولتصنيعه، ولعقد
 الاجتماع الذي حجزته، وللتواصل معك بشأن طلبك أنت.
