@@ -1,7 +1,7 @@
 import { type NextRequest, type NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-import { hasSupabaseAuthCookie } from "./auth-cookie";
+import { hasSupabaseAuthCookie, supabaseAuthCookieNames } from "./auth-cookie";
 import { supabaseCookieOptions } from "./cookie-options";
 import { supabaseEnv } from "./env";
 
@@ -44,7 +44,30 @@ export async function updateSession(
 
   // IMPORTANT: getUser() revalidates the token server-side and triggers a
   // refresh when the access token has expired. Do not remove.
-  await supabase.auth.getUser();
+  //
+  // It THROWS when the refresh token is gone (revoked, already rotated by a
+  // parallel tab, or left over from a reset database): AuthApiError
+  // "Invalid Refresh Token: Refresh Token Not Found". Unhandled, that error
+  // escapes the middleware and takes down an ordinary page request. The
+  // session is simply dead, so treat it as signed-out: drop the stale cookies
+  // and let the page render for an anonymous visitor. Without clearing them
+  // the browser keeps sending the dead token and every request repeats this.
+  try {
+    await supabase.auth.getUser();
+  } catch (e) {
+    const code = isObj(e) && typeof e.code === "string" ? e.code : "";
+    const status = isObj(e) && typeof e.status === "number" ? e.status : 0;
+    const dead = code === "refresh_token_not_found" || code === "refresh_token_already_used" || status === 400;
+    if (!dead) throw e;
+    for (const name of supabaseAuthCookieNames(request.cookies.getAll().map((c) => c.name))) {
+      request.cookies.delete(name);
+      response.cookies.set(name, "", { path: "/", maxAge: 0 });
+    }
+  }
 
   return response;
+}
+
+function isObj(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
 }
