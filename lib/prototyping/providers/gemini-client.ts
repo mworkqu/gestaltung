@@ -92,7 +92,18 @@ export async function callGemini(opts: {
   if (!res) throw fail("unavailable", "no response");
 
   if (res.status === 429) throw fail("rate_limited", "HTTP 429", undefined, await res.text().catch(() => ""));
-  if (!res.ok) throw fail("unavailable", `HTTP ${res.status}`, undefined, await res.text().catch(() => ""));
+  if (!res.ok) {
+    const bad = await res.text().catch(() => "");
+    // A 4xx is OUR request being wrong, not the model being busy: it will fail
+    // identically on every retry and for every user. The caller's reason stays
+    // "unavailable" (the stored error_code vocabulary), so say it plainly in
+    // the log — a silently-retried HTTP 400 once hid a step that had never
+    // worked at all behind its deterministic fallback.
+    if (res.status >= 400 && res.status < 500) {
+      console.error(`[gemini] ${model} rejected the request (HTTP ${res.status}) — this is a bug in the request, not an outage: ${bad.slice(0, 500)}`);
+    }
+    throw fail("unavailable", `HTTP ${res.status}`, undefined, bad);
+  }
 
   const bodyText = await res.text();
   const body = (() => {

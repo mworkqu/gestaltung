@@ -6,3 +6,8 @@
 export function hasSupabaseAuthCookie(names: readonly string[]): boolean {
   return names.some((n) => n.startsWith("sb-") && n.includes("-auth-token"));
 }
+
+/** The auth-token cookies on a request, chunks included — what to clear when the session is dead. */
+export function supabaseAuthCookieNames(names: readonly string[]): string[] {
+  return names.filter((n) => n.startsWith("sb-") && n.includes("-auth-token"));
+}

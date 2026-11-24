@@ -502,7 +502,13 @@ export const MECH_RESPONSE_SCHEMA = {
   properties: {
     parts: {
       type: "ARRAY",
-      maxItems: 40,
+      // NO maxItems here. Gemini compiles responseSchema into a constrained
+      // decoder, and a bounded array multiplies its state count by the bound:
+      // with these items (14 numeric params + a 10-value enum + a nested
+      // object) any cap from 12 up is rejected with HTTP 400 "schema produces
+      // a constraint that has too many states for serving", so the mech step
+      // failed every single time and silently fell back to default parts.
+      // The 40-part cap is enforced in validateMech instead (MECH_PARTS_MAX).
       items: {
         type: "OBJECT",
         properties: {

@@ -8,9 +8,16 @@ import { defaultMechParts, type MechSummary } from "./mech-default";
 import { MECH_RESPONSE_SCHEMA, MECH_SYSTEM, mechPrompt } from "./prompts";
 import { isObj, type Outcome, type StudioCall } from "./types";
 
+/** The cap the response schema used to carry; see MECH_RESPONSE_SCHEMA on why it moved here. */
+export const MECH_PARTS_MAX = 40;
+
 export function validateMech(raw: unknown, opts: { summary: MechSummary; log: ClampLog }): { value: MechPart[] | null; errors: string[] } {
-  const list = isObj(raw) ? raw.parts : raw;
-  if (!Array.isArray(list)) return { value: null, errors: ["the answer must be {parts: MechPart[]}"] };
+  const full = isObj(raw) ? raw.parts : raw;
+  if (!Array.isArray(full)) return { value: null, errors: ["the answer must be {parts: MechPart[]}"] };
+  // Gemini can no longer be told the cap in the schema, so trim here instead of
+  // rejecting an otherwise good answer for being one part too long.
+  const list = full.length > MECH_PARTS_MAX ? full.slice(0, MECH_PARTS_MAX) : full;
+  if (list.length < full.length) opts.log.push({ path: "mech", from: `${full.length} parts`, to: `${list.length} parts` });
   const errors: string[] = [];
   const instances = new Set(opts.summary.components.map((c) => c.instanceId));
   list.forEach((p, i) => {
