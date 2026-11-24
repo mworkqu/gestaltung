@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { handleFromUrl, parseProducts, pickVariant, planChanges, robotsAllows, type MappedOffer } from "./voltaat";
+import { handleFromUrl, parseProducts, pickVariant, planChanges, planPage, robotsAllows, type MappedOffer } from "./voltaat";
 
 const ROBOTS = `# Shopify
 User-agent: *
@@ -110,5 +110,38 @@ describe("planChanges", () => {
     const { changes, dropped } = planChanges([{ ...base, id: "e", active: false, availability: "unavailable" }], cat);
     expect(dropped).toEqual([]);
     expect(changes).toEqual([expect.objectContaining({ offerId: "e", oldAvailability: "unavailable", newAvailability: "in_stock" })]);
+  });
+});
+
+describe("planPage (one catalogue page per batch)", () => {
+  const base: MappedOffer = {
+    id: "o1",
+    part_id: "p1",
+    part_name: "Servo SG90",
+    our_price: 18,
+    supplier_sku: "VT-1/A",
+    supplier_url: "https://www.voltaat.com/products/servo",
+    retail_price: 18,
+    availability: "in_stock",
+    lead_time_days: 1,
+  };
+  const page = new Map([["servo", product]]);
+
+  it("judges only the offers whose product is on this page", () => {
+    const elsewhere = { ...base, id: "o9", supplier_url: "https://www.voltaat.com/products/on-another-page" };
+    const noLink = { ...base, id: "o8", supplier_url: null };
+    const { changes, checked, missing, seen } = planPage([base, elsewhere, noLink], page);
+    expect(seen).toEqual(["o1"]);
+    expect(checked).toBe(1);
+    expect(changes.map((c) => c.offerId)).toEqual(["o1"]);
+    // Not on this page is not "dropped" and not "missing": that is decided when the pass ends.
+    expect(missing).toEqual([]);
+  });
+  it("still reports an option it cannot follow, and counts the offer as seen", () => {
+    const unclear = { ...base, id: "o2", supplier_sku: null };
+    const { missing, seen, checked } = planPage([unclear], page);
+    expect(missing).toEqual([{ offerId: "o2", partName: "Servo SG90", reason: "variant_unclear" }]);
+    expect(seen).toEqual(["o2"]);
+    expect(checked).toBe(0);
   });
 });

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  blockBackoffMinutes,
   blockedDayStreak,
   blockedUntil,
   blockErrorText,
-  DEFAULT_BLOCK_HOURS,
   parseRetryAfter,
   retryAfterFrom,
   runGuard,
@@ -40,9 +40,10 @@ describe("the blocked run remembers the wait", () => {
     expect(retryAfterFrom("blocked_429")).toBeNull();
     expect(retryAfterFrom(null)).toBeNull();
   });
-  it("falls back to a day from the blocked run when the store said nothing", () => {
-    const until = blockedUntil({ started_at: ago(0), error: "blocked_429" });
-    expect(until).toBe(new Date(now.getTime() + DEFAULT_BLOCK_HOURS * HOUR).toISOString());
+  it("falls back to the back-off when the store said nothing, or asked for less", () => {
+    expect(blockedUntil({ started_at: ago(0), error: "blocked_429" })).toBe(new Date(now.getTime() + 45 * 60_000).toISOString());
+    const in60s = new Date(now.getTime() + 60_000).toISOString();
+    expect(blockedUntil({ started_at: ago(0), error: `blocked_429 retry_after=${in60s}` }, 3)).toBe(new Date(now.getTime() + 3 * HOUR).toISOString());
   });
 });
 
@@ -63,33 +64,55 @@ describe("blockedDayStreak / shouldEmailBlocked", () => {
 });
 
 describe("runGuard", () => {
-  it("lets a first run start", () => {
+  it("lets a first batch start", () => {
     expect(runGuard([], now)).toEqual({ skip: false });
   });
-  it("keeps the second runner out while one is running (covers Vercel + the Mac Mini)", () => {
+  it("keeps the second runner out while one is running (covers every runner)", () => {
     expect(runGuard([{ status: "running", started_at: ago(5 * 60_000) }], now)).toEqual({ skip: true, reason: "already_running" });
     // A 'running' row left behind by a crashed run stops blocking after an hour.
     expect(runGuard([{ status: "running", started_at: ago(2 * HOUR) }], now)).toEqual({ skip: false });
   });
-  it("allows one good run per 20 h", () => {
-    expect(runGuard([{ status: "ok", started_at: ago(19 * HOUR) }], now)).toEqual({ skip: true, reason: "already_ran_today" });
-    expect(runGuard([{ status: "ok", started_at: ago(21 * HOUR) }], now)).toEqual({ skip: false });
+  it("keeps two batches at least 40 minutes apart", () => {
+    expect(runGuard([{ status: "ok", started_at: ago(39 * 60_000) }], now)).toEqual({ skip: true, reason: "too_soon" });
+    expect(runGuard([{ status: "failed", started_at: ago(10 * 60_000), error: "boom" }], now)).toEqual({ skip: true, reason: "too_soon" });
+    expect(runGuard([{ status: "ok", started_at: ago(41 * 60_000) }], now)).toEqual({ skip: false });
   });
-  it("waits out a block instead of trying again on the next schedule", () => {
+  it("waits out the store's Retry-After when that is the longer wait", () => {
     const blocked = { status: "blocked", started_at: ago(HOUR), error: "blocked_429 retry_after=2026-11-21T06:00:00.000Z" };
     expect(runGuard([blocked], now)).toEqual({ skip: true, reason: "blocked_until", until: "2026-11-21T06:00:00.000Z" });
     // Past the wait: try again.
     expect(runGuard([blocked], new Date("2026-11-21T06:00:01Z"))).toEqual({ skip: false });
   });
-  it("holds for a day when the store sent no Retry-After", () => {
-    const g = runGuard([{ status: "blocked", started_at: ago(2 * HOUR), error: "blocked_403" }], now);
-    expect(g).toMatchObject({ skip: true, reason: "blocked_until" });
+  it("a single refusal with a 60 s Retry-After costs one hourly batch, not a day", () => {
+    const started = ago(50 * 60_000);
+    const said = new Date(Date.parse(started) + 60_000).toISOString();
+    expect(runGuard([{ status: "blocked", started_at: started, error: `blocked_429 retry_after=${said}` }], now)).toEqual({ skip: false });
+    // ...but not before 45 minutes have passed.
+    expect(runGuard([{ status: "blocked", started_at: ago(30 * 60_000), error: `blocked_429 retry_after=${said}` }], now)).toMatchObject({
+      skip: true,
+      reason: "blocked_until",
+    });
   });
-  it("a failed run is not a block: the next schedule may try", () => {
-    expect(runGuard([{ status: "failed", started_at: ago(HOUR), error: "boom" }], now)).toEqual({ skip: false });
+  it("backs off further with every blocked batch in a row", () => {
+    expect([1, 2, 3, 4, 5, 6, 9].map(blockBackoffMinutes)).toEqual([45, 90, 180, 360, 720, 1440, 1440]);
+    const two = [
+      { status: "blocked", started_at: ago(HOUR), error: "blocked_429" },
+      { status: "blocked", started_at: ago(2 * HOUR), error: "blocked_429" },
+      { status: "ok", started_at: ago(3 * HOUR) },
+    ];
+    // Second block in a row: 90 minutes, so the batch one hour later is skipped.
+    expect(runGuard(two, now)).toEqual({ skip: true, reason: "blocked_until", until: new Date(now.getTime() + 30 * 60_000).toISOString() });
+    // A good batch in between resets the count.
+    const reset = [
+      { status: "blocked", started_at: ago(HOUR), error: "blocked_429" },
+      { status: "ok", started_at: ago(2 * HOUR) },
+      { status: "blocked", started_at: ago(3 * HOUR), error: "blocked_429" },
+    ];
+    expect(runGuard(reset, now)).toEqual({ skip: false });
   });
   it("judges by the newest finished run, ignoring 'skipped' rows", () => {
     const runs = [
+      { status: "skipped", started_at: ago(10 * 60_000) },
       { status: "blocked", started_at: ago(3 * HOUR), error: "blocked_429 retry_after=2026-11-21T06:00:00.000Z" },
       { status: "ok", started_at: ago(30 * HOUR) },
     ];

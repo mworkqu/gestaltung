@@ -1,9 +1,13 @@
 // Voltaat adapter (Task 19g). Voltaat is a Shopify store in Qatar (prices in
 // QAR). We read its public catalogue feed — /products.json, allowed by its
 // robots.txt — for NUMBERS ONLY: price and whether a variant is available.
-// Rules: honour robots.txt, one request every 5 seconds, an honest user agent
-// with a contact address, one run a day. A 403/429 stops the run; we never
-// retry around a block.
+// Rules: honour robots.txt, an honest user agent with a contact address, and
+// never retry around a 403/429.
+// The daily sync reads the feed ONE REQUEST PER BATCH, an hour apart
+// (lib/sourcing/voltaat-pass.ts): the store refuses a second request that
+// follows the first by a few seconds (429, Retry-After: 60). REQUEST_GAP_MS
+// only spaces the requests of the manual catalogue import, which still reads
+// every page in one go.
 
 import { SUPPLIER_LEAD_DAYS } from "@/lib/sourcing/lead-times";
 import { parseRetryAfter } from "@/lib/sourcing/voltaat-block";
@@ -11,8 +15,8 @@ import { parseRetryAfter } from "@/lib/sourcing/voltaat-block";
 export const VOLTAAT_BASE = "https://www.voltaat.com";
 export const USER_AGENT = "GestaltungPriceSync/1.0 (+https://gestaltung360.com; info@gestaltung360.com)";
 export const REQUEST_GAP_MS = 5000;
-const PAGE_SIZE = 250;
-const MAX_PAGES = 40;
+export const PAGE_SIZE = 250;
+export const MAX_PAGES = 40;
 
 export type VoltaatVariant = { id: number; sku: string | null; title: string; price: number; available: boolean };
 export type VoltaatProduct = { handle: string; title: string; variants: VoltaatVariant[] };
@@ -207,6 +211,25 @@ export function planChanges(
   return { changes, checked, missing, dropped };
 }
 
+/**
+ * One catalogue page against the mapped offers (the hourly batch): only the
+ * offers whose product is ON this page are judged. An offer that is not on it
+ * is simply not this batch's business — whether Voltaat dropped a product is
+ * decided when the pass ends (lib/sourcing/voltaat-pass.ts droppedAfterPass).
+ * `seen` = every offer found on the page, changed or not.
+ */
+export function planPage(
+  offers: MappedOffer[],
+  page: Map<string, VoltaatProduct>
+): { changes: OfferChange[]; checked: number; missing: MissingOffer[]; seen: string[] } {
+  const onPage = offers.filter((o) => {
+    const handle = handleFromUrl(o.supplier_url);
+    return !!handle && page.has(handle);
+  });
+  const { changes, checked, missing } = planChanges(onPage, page);
+  return { changes, checked, missing, seen: onPage.map((o) => o.id) };
+}
+
 // ── Network (server only) ───────────────────────────────────────────────────
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -234,6 +257,16 @@ export class VoltaatClient {
     const res = await this.get("/robots.txt");
     if (!res.ok) throw new Error(`robots_${res.status}`);
     return res.text();
+  }
+
+  /** One page of the public catalogue (250 products), numbers only, keyed by handle. `count` is what the store returned. */
+  async page(page: number): Promise<{ products: Map<string, VoltaatProduct>; count: number }> {
+    const res = await this.get(`/products.json?limit=${PAGE_SIZE}&page=${page}`);
+    if (!res.ok) throw new Error(`catalogue_${res.status}`);
+    const raw = ((await res.json()) as { products?: RawProduct[] }).products ?? [];
+    const products = new Map<string, VoltaatProduct>();
+    for (const p of parseProducts({ products: raw })) products.set(p.handle, p);
+    return { products, count: raw.length };
   }
 
   /** The whole public catalogue as Voltaat returns it, 250 products per request. */

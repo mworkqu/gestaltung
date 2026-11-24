@@ -53,7 +53,7 @@ describe("cron job list", () => {
     }
     expect(Object.fromEntries(defs.map((d) => [d.name, d.schedule?.cron]))).toEqual({
       "supplier-refresh": "0 5 * * *",
-      "voltaat-sync": "0 6 * * *",
+      "voltaat-sync": "23 * * * *",
       "delivery-promises": "0 7 * * *",
       notifications: "30 7 * * *",
       "anonymous-cleanup": "0 8 * * 0",

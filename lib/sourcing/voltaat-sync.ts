@@ -1,36 +1,45 @@
-// Server-only: the daily Voltaat price sync (Task 19g). Called by the cron
-// route (daily) or the admin "Run now" button. Uses the service client — the
-// cron has no user session.
+// Server-only: the Voltaat price sync (Task 19g). Called by the cron route or
+// the admin "Run now" button. Uses the service client — the cron has no user
+// session.
 //
-// Order of checks: switch off → skip; another runner mid-run, a good run in
-// the last 20 h, or an unexpired block → skip (lib/sourcing/voltaat-block.ts
-// runGuard, which reads supplier_sync_runs and so covers BOTH runners);
-// robots.txt must allow the feed; then read the catalogue once, compare with
-// every mapped Voltaat offer, and write numbers only.
-// A 403/429 stops everything and keeps the last known prices; the store's
-// Retry-After is recorded on the run so the next schedules are skipped until
-// it passes, and the owner gets ONE email once the block has lasted
-// BLOCKED_DAYS_BEFORE_EMAIL days — not one per blocked run (2026-11).
-// Every run is logged in supplier_sync_runs, and when anything moved the owner
-// gets the change report.
+// ONE REQUEST PER BATCH (2026-11-24). Voltaat's store refuses a second request
+// that follows the first by a few seconds (429, Retry-After: 60), so the sync
+// no longer reads the catalogue in one go. A schedule calls this about once an
+// hour and each call makes exactly one request: robots.txt first, then one
+// catalogue page (250 products) per batch until a page comes back short. That
+// is one pass a day, ~8 requests, spread over ~8 hours. Where the pass is
+// lives in store_settings (lib/sourcing/voltaat-pass.ts).
 //
-// Where it runs: the Mac Mini worker only (2026-11). It was removed from
-// vercel.json because Voltaat's store blocks shared cloud IP addresses; see
-// docs/WORKER.md and lib/sourcing/voltaat-block.ts.
+// Order of checks: switch off → skip; another runner mid-batch, a batch less
+// than 40 minutes ago, or an unexpired block → skip (voltaat-block.ts
+// runGuard, which reads supplier_sync_runs and so covers every runner);
+// today's pass already finished → skip. None of these makes a request.
+// A 403/429 stops the batch and keeps the last known prices; the pass stays on
+// the same page and the wait before the next try grows with every blocked
+// batch in a row. The owner gets ONE email once whole days have gone by
+// blocked (BLOCKED_DAYS_BEFORE_EMAIL), not one per blocked batch.
+// Every batch is logged in supplier_sync_runs. What moved is emailed once,
+// when the pass ends — not once per batch.
+//
+// Where it runs: the Mac that serves the site (launchd, hourly) or the Mac
+// Mini worker. It is not in vercel.json; see docs/WORKER.md.
 //
 // A mapped product that Voltaat no longer lists is marked "order on request"
-// (offer inactive → lead_time_class null) the first time it goes missing and
-// reported once; it is not nagged about again. If it comes back, the normal
-// change path re-activates it.
+// (offer inactive → lead_time_class null) once neither this pass nor the
+// previous one saw it, and reported once; it is not nagged about again. If it
+// comes back, the normal change path re-activates it.
 
-import type { DbClient } from "@/lib/supabase/db";
+import type { DbClient, Json } from "@/lib/supabase/db";
 
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
 import { renderOwnerEmail } from "@/lib/email/lead-email";
 import { dataTable } from "@/lib/email/brand-layout";
 import {
   BlockedError,
-  planChanges,
+  handleFromUrl,
+  MAX_PAGES,
+  PAGE_SIZE,
+  planPage,
   robotsAllows,
   VOLTAAT_IN_STOCK_DAYS,
   VoltaatClient,
@@ -49,20 +58,25 @@ import {
   shouldEmailBlocked,
   type RecentRun,
 } from "@/lib/sourcing/voltaat-block";
+import { afterPage, afterRobots, droppedAfterPass, nextStep, parsePassState, PASS_STATE_KEY, type PassState } from "@/lib/sourcing/voltaat-pass";
 
 export type SyncSummary = {
   status: "ok" | "blocked" | "failed" | "disabled" | "skipped";
   runId?: string;
+  /** What this batch read: "robots", or "page_3". Absent when nothing was requested. */
+  step?: string;
+  /** True on the batch that read the last catalogue page. */
+  passDone?: boolean;
   requests: number;
   checked: number;
   changed: number;
   /** Mapped products whose link/option can't be followed (owner to re-map). */
   missing: number;
-  /** Products newly marked "order on request" this run because Voltaat dropped them. */
+  /** Products newly marked "order on request" this batch because Voltaat dropped them. */
   dropped: number;
   /**
    * What the storefront must refresh (lib/cache/catalog-tags.ts): the SKUs of
-   * the products whose offer this run changed or dropped, and whether a field
+   * the products whose offer this batch changed or dropped, and whether a field
    * a listing shows moved. Empty when nothing was written.
    */
   storefront: CatalogChange;
@@ -72,14 +86,36 @@ export type SyncSummary = {
 const NO_CHANGE: CatalogChange = { skus: [], listingChanged: false };
 const UNKNOWN_CHANGE: CatalogChange = { skus: [], listingChanged: true, unknown: true };
 
-const MIN_HOURS_BETWEEN_RUNS = 20;
+/** "Run now" may follow another batch sooner than the schedule, but never inside the store's 60 s. */
+const MANUAL_MIN_MINUTES = 3;
 /** How far back the guard and the blocked-day streak look. */
 const RUN_HISTORY_DAYS = 14;
 
-/** Blocked days in a row, counting this run's block (which is not in `history` yet). */
-function blockedStreak(history: readonly RecentRun[], now: Date): number {
-  const blocked = history.filter((r) => r.status === "blocked").map((r) => r.started_at);
-  return blockedDayStreak([...blocked, now.toISOString()], now);
+type HistoryRun = RecentRun & { checked?: number | null };
+type OurChange = OfferChange & { newOurPrice: number | null };
+type OfferRow = MappedOffer & { last_checked_at: string | null; created_at: string };
+
+const utcDay = (iso: string) => new Date(iso).toISOString().slice(0, 10);
+
+/**
+ * Days in a row on which the store blocked us and no batch got any prices,
+ * counting this batch's block (which is not in `history` yet). A day on which
+ * a later batch got through is not a blocked day.
+ */
+function blockedStreak(history: readonly HistoryRun[], now: Date): number {
+  const goodDays = new Set(history.filter((r) => r.status === "ok" && (r.checked ?? 0) > 0).map((r) => utcDay(r.started_at)));
+  const blocked = [...history.filter((r) => r.status === "blocked").map((r) => r.started_at), now.toISOString()];
+  return blockedDayStreak(
+    blocked.filter((iso) => !goodDays.has(utcDay(iso))),
+    now
+  );
+}
+
+/** One email per streak: only the first blocked batch of the day that completes it. */
+function emailBlockedNow(history: readonly HistoryRun[], now: Date): boolean {
+  const today = utcDay(now.toISOString());
+  if (history.some((r) => r.status === "blocked" && utcDay(r.started_at) === today)) return false;
+  return shouldEmailBlocked(blockedStreak(history, now));
 }
 
 export async function voltaatSyncEnabled(db: DbClient): Promise<boolean> {
@@ -87,31 +123,103 @@ export async function voltaatSyncEnabled(db: DbClient): Promise<boolean> {
   return (data?.value as { enabled?: boolean } | null)?.enabled !== false;
 }
 
+async function loadPass(db: DbClient): Promise<PassState | null> {
+  const { data } = await db.from("store_settings").select("value").eq("key", PASS_STATE_KEY).maybeSingle();
+  return parsePassState(data?.value);
+}
+
+async function savePass(db: DbClient, state: PassState) {
+  const { error } = await db
+    .from("store_settings")
+    .upsert({ key: PASS_STATE_KEY, value: state as unknown as Json, updated_at: new Date().toISOString() });
+  if (error) throw new Error(`pass_state_${error.code ?? "write"}`);
+}
+
+/** Every mapped Voltaat offer (a product link, in or out of stock). Nothing else is touched. */
+async function mappedOffers(db: DbClient): Promise<OfferRow[]> {
+  const { data: sup } = await db.from("suppliers").select("id").eq("code", "voltaat").single();
+  const out: OfferRow[] = [];
+  const STEP = 1000; // PostgREST returns at most 1000 rows per request
+  for (let from = 0; ; from += STEP) {
+    const { data: rows, error } = await db
+      .from("supplier_offers")
+      .select(
+        "id, part_id, supplier_sku, supplier_url, retail_price, availability, lead_time_days, active, last_checked_at, created_at, part:parts!supplier_offers_part_id_fkey(name, unit_price)"
+      )
+      .eq("supplier_id", sup!.id)
+      .not("supplier_url", "is", null)
+      .order("id")
+      .range(from, from + STEP - 1);
+    if (error) throw new Error(`offers_${error.code ?? "read"}`);
+    for (const r of rows ?? []) out.push({ ...r, part_name: r.part?.name ?? "", our_price: Number(r.part?.unit_price ?? 0) });
+    if ((rows ?? []).length < STEP) break;
+  }
+  return out;
+}
+
+/** What the batches of one pass logged, flattened back into the three lists the report shows. */
+async function passChanges(db: DbClient, since: string) {
+  const { data } = await db
+    .from("supplier_sync_runs")
+    .select("changes")
+    .eq("supplier_code", "voltaat")
+    .eq("status", "ok")
+    .gte("started_at", since)
+    .order("started_at", { ascending: true })
+    .limit(200);
+  const changes: OurChange[] = [];
+  const dropped: DroppedOffer[] = [];
+  const missing: MissingOffer[] = [];
+  for (const row of data ?? []) {
+    for (const c of (Array.isArray(row.changes) ? row.changes : []) as Record<string, unknown>[]) {
+      if (c.dropped) dropped.push({ offerId: String(c.offerId), partId: String(c.partId), partName: String(c.partName ?? ""), alreadyOnRequest: false });
+      else if (c.missing) missing.push({ offerId: String(c.offerId), partName: String(c.partName ?? ""), reason: c.reason === "no_handle" ? "no_handle" : "variant_unclear" });
+      else if (typeof c.newRetail === "number") changes.push(c as unknown as OurChange);
+    }
+  }
+  return { changes, dropped, missing };
+}
+
 export async function runVoltaatSync(db: DbClient, trigger: "cron" | "manual"): Promise<SyncSummary> {
   const empty = { requests: 0, checked: 0, changed: 0, missing: 0, dropped: 0, storefront: NO_CHANGE };
 
   if (!(await voltaatSyncEnabled(db))) {
-    await db.from("supplier_sync_runs").insert({ supplier_code: "voltaat", trigger, status: "disabled", finished_at: new Date().toISOString() });
+    // The schedule calls hourly: log "disabled" once a day, not 24 times.
+    const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+    const { data: logged } = await db
+      .from("supplier_sync_runs")
+      .select("id")
+      .eq("supplier_code", "voltaat")
+      .eq("status", "disabled")
+      .gte("started_at", dayAgo)
+      .limit(1);
+    if (!logged?.length)
+      await db.from("supplier_sync_runs").insert({ supplier_code: "voltaat", trigger, status: "disabled", finished_at: new Date().toISOString() });
     return { status: "disabled", ...empty };
   }
 
-  // One guard for BOTH runners (Vercel and the Mac Mini worker share this
-  // table): another run in flight, a good run inside 20 h, or a block whose
-  // wait is not over all mean "not now". lib/sourcing/voltaat-block.ts.
+  // One guard for EVERY runner (they share this table): another batch in
+  // flight, a batch too recently, or a block whose wait is not over all mean
+  // "not now". lib/sourcing/voltaat-block.ts.
   const startedAt = new Date();
   const { data: recentRuns } = await db
     .from("supplier_sync_runs")
-    .select("id, status, started_at, error")
+    .select("id, status, started_at, error, checked")
     .eq("supplier_code", "voltaat")
     .gte("started_at", new Date(startedAt.getTime() - RUN_HISTORY_DAYS * 86_400_000).toISOString())
     .order("started_at", { ascending: false })
-    .limit(200);
-  const history: RecentRun[] = (recentRuns ?? []) as RecentRun[];
-  const guard = runGuard(history, startedAt, MIN_HOURS_BETWEEN_RUNS);
+    .limit(400);
+  const history: HistoryRun[] = (recentRuns ?? []) as HistoryRun[];
+  const guard = trigger === "manual" ? runGuard(history, startedAt, MANUAL_MIN_MINUTES) : runGuard(history, startedAt);
   if (guard.skip) {
     if (guard.reason === "blocked_until") console.warn(`[voltaat-sync] still blocked, next try after ${guard.until}`);
     return { status: "skipped", ...empty, error: guard.reason };
   }
+
+  // Where the pass is: robots.txt, a catalogue page, or finished for today.
+  const step = nextStep(await loadPass(db), startedAt, trigger);
+  if (step.kind === "skip") return { status: "skipped", ...empty, error: step.reason };
+  const stepName = step.kind === "robots" ? "robots" : `page_${step.page}`;
 
   const { data: run } = await db
     .from("supplier_sync_runs")
@@ -131,44 +239,62 @@ export async function runVoltaatSync(db: DbClient, trigger: "cron" | "manual"): 
 
   let wrote = false;
   try {
-    // Mapped offers: Voltaat offers with a product link (in or out of stock). Nothing else is touched.
-    const { data: sup } = await db.from("suppliers").select("id").eq("code", "voltaat").single();
-    const { data: rows } = await db
-      .from("supplier_offers")
-      .select("id, part_id, supplier_sku, supplier_url, retail_price, availability, lead_time_days, active, part:parts!supplier_offers_part_id_fkey(name, unit_price)")
-      .eq("supplier_id", sup!.id)
-      .not("supplier_url", "is", null);
-    const offers: MappedOffer[] = (rows ?? []).map((r) => ({
-      ...r,
-      part_name: r.part?.name ?? "",
-      our_price: Number(r.part?.unit_price ?? 0),
-    }));
+    const offers = await mappedOffers(db);
 
     if (!offers.length) {
       await finish({ status: "ok", checked: 0, changed: 0, missing: 0 });
-      return { status: "ok", runId, ...empty };
-    }
-    // A failure after the first offer write answers with a full purge (the
-    // per-product list is not known yet), so nothing stays stale.
-
-    const robots = await client.robots();
-    if (!robotsAllows(robots, "/products.json?limit=250&page=1")) {
-      await finish({ status: "blocked", error: "robots_disallow" });
-      // Same rule as a 403/429: one email once the block has lasted days, not
-      // one per blocked run.
-      if (shouldEmailBlocked(blockedStreak(history, startedAt)))
-        await alert(
-          `Voltaat's robots.txt has not allowed reading its catalogue for ${BLOCKED_DAYS_BEFORE_EMAIL} days. The sync stopped each time and kept the last known prices.`
-        );
-      return { status: "blocked", runId, ...empty, requests: client.requests, error: "robots_disallow" };
+      // Nothing is mapped: nothing to ask Voltaat for today.
+      await savePass(db, { ...step.state, done: true, completedAt: new Date().toISOString() });
+      return { status: "ok", runId, step: stepName, passDone: true, ...empty };
     }
 
-    const catalogue = await client.catalogue();
-    const plan = planChanges(offers, catalogue);
+    // ── Batch 0: robots.txt, the only request of this batch ────────────────
+    if (step.kind === "robots") {
+      const robots = await client.robots();
+      if (!robotsAllows(robots, `/products.json?limit=${PAGE_SIZE}&page=1`)) {
+        await finish({ status: "blocked", error: "robots_disallow" });
+        // Same rule as a 403/429: one email once the block has lasted days.
+        if (emailBlockedNow(history, startedAt))
+          await alert(
+            `Voltaat's robots.txt has not allowed reading its catalogue for ${BLOCKED_DAYS_BEFORE_EMAIL} days. The sync stopped each time and kept the last known prices.`
+          );
+        return { status: "blocked", runId, step: stepName, ...empty, requests: client.requests, error: "robots_disallow" };
+      }
+      await finish({ status: "ok", checked: 0, changed: 0, missing: 0 });
+      await savePass(db, afterRobots(step.state));
+      return { status: "ok", runId, step: stepName, passDone: false, ...empty, requests: client.requests };
+    }
+
+    // ── Batch 1..n: one catalogue page, the only request of this batch ─────
+    const { products, count } = await client.page(step.page);
+    const plan = planPage(offers, products);
+    const next = afterPage(step.state, step.page, count, PAGE_SIZE, MAX_PAGES, new Date());
 
     const now = new Date().toISOString();
-    const newlyDropped = plan.dropped.filter((d) => !d.alreadyOnRequest);
-    // Products whose offer this run writes (a "missing" offer is not written).
+    const seen = new Set(plan.seen);
+
+    // The pass ends on this page: who did neither this pass nor the last one see?
+    const noHandle: MissingOffer[] = [];
+    let newlyDropped: DroppedOffer[] = [];
+    let stillOnRequest = 0;
+    if (next.done) {
+      for (const o of offers) if (!handleFromUrl(o.supplier_url)) noHandle.push({ offerId: o.id, partName: o.part_name, reason: "no_handle" });
+      const gone = droppedAfterPass(
+        offers.map((o) => ({
+          id: o.id,
+          hasHandle: !!handleFromUrl(o.supplier_url),
+          // Seen on this very page counts as seen now; never checked falls back to when it was mapped.
+          last_checked_at: seen.has(o.id) ? now : (o.last_checked_at ?? o.created_at),
+        })),
+        next
+      );
+      const byId = new Map(offers.map((o) => [o.id, o]));
+      const all = gone.map((g) => byId.get(g.id)!).map((o) => ({ offerId: o.id, partId: o.part_id, partName: o.part_name, alreadyOnRequest: o.active === false }));
+      newlyDropped = all.filter((d) => !d.alreadyOnRequest);
+      stillOnRequest = all.length - newlyDropped.length;
+    }
+
+    // Products whose offer this batch writes (a "missing" offer is not written).
     const touchedPartIds = [...new Set([...plan.changes.map((c) => c.partId), ...newlyDropped.map((d) => d.partId)])];
     const before = touchedPartIds.length ? await snapshotParts(db, touchedPartIds) : [];
     wrote = touchedPartIds.length > 0;
@@ -190,74 +316,81 @@ export async function runVoltaatSync(db: DbClient, trigger: "cron" | "manual"): 
     // 0028 trigger clears the product's lead_time_class. Price and link are kept, so a
     // product that comes back is picked up by the change path above and re-activated.
     for (const d of newlyDropped) {
-      await db
-        .from("supplier_offers")
-        .update({ active: false, availability: "unavailable", last_checked_at: now })
-        .eq("id", d.offerId);
+      await db.from("supplier_offers").update({ active: false, availability: "unavailable" }).eq("id", d.offerId);
     }
-    const touched = new Set([...plan.changes.map((c) => c.offerId), ...plan.missing.map((m) => m.offerId), ...newlyDropped.map((d) => d.offerId)]);
-    const unchangedIds = offers.filter((o) => !touched.has(o.id)).map((o) => o.id);
-    for (let i = 0; i < unchangedIds.length; i += 200) {
-      await db.from("supplier_offers").update({ last_checked_at: now }).in("id", unchangedIds.slice(i, i + 200));
+    // Everything else found on this page was seen today (that is what the
+    // end-of-pass "dropped" check reads), whether or not its numbers moved.
+    const changedIds = new Set(plan.changes.map((c) => c.offerId));
+    const seenUnchanged = plan.seen.filter((id) => !changedIds.has(id));
+    for (let i = 0; i < seenUnchanged.length; i += 200) {
+      await db.from("supplier_offers").update({ last_checked_at: now }).in("id", seenUnchanged.slice(i, i + 200));
     }
 
     // Our price after the trigger re-derived it (mirror products follow at once).
     const partIds = [...new Set(plan.changes.map((c) => c.partId))];
-    const { data: after } = partIds.length
-      ? await db.from("parts").select("id, unit_price").in("id", partIds)
-      : { data: [] };
+    const { data: after } = partIds.length ? await db.from("parts").select("id, unit_price").in("id", partIds) : { data: [] };
     const priceNow = new Map((after ?? []).map((p) => [p.id as string, Number(p.unit_price)]));
-    const changes = plan.changes.map((c) => ({ ...c, newOurPrice: priceNow.get(c.partId) ?? null }));
+    const changes: OurChange[] = plan.changes.map((c) => ({ ...c, newOurPrice: priceNow.get(c.partId) ?? null }));
     // The 0028 trigger has re-derived price / lead class by now: compare.
-    const storefront = touchedPartIds.length
-      ? diffPartSnapshots(touchedPartIds, before, await snapshotParts(db, touchedPartIds))
-      : NO_CHANGE;
+    const storefront = touchedPartIds.length ? diffPartSnapshots(touchedPartIds, before, await snapshotParts(db, touchedPartIds)) : NO_CHANGE;
 
-    const stillOnRequest = plan.dropped.length - newlyDropped.length;
+    const missing = [...plan.missing, ...noHandle];
     await finish({
       status: "ok",
       checked: plan.checked,
       changed: changes.length,
-      missing: plan.missing.length,
+      missing: missing.length,
       changes: [
         ...changes,
         ...newlyDropped.map((d) => ({ offerId: d.offerId, partId: d.partId, partName: d.partName, dropped: true })),
-        ...plan.missing.map((m) => ({ ...m, missing: true })),
+        ...missing.map((m) => ({ ...m, missing: true })),
       ],
     });
-    if (changes.length || newlyDropped.length || plan.missing.length) await report(changes, newlyDropped, stillOnRequest, plan.missing);
+    // Only now move on: had anything above thrown, the next batch re-reads this page.
+    await savePass(db, next);
+
+    if (next.done) {
+      // ONE email for the whole pass, from what its batches logged.
+      const all = await passChanges(db, step.state.startedAt);
+      if (all.changes.length || all.dropped.length || all.missing.length) await report(all.changes, all.dropped, stillOnRequest, all.missing);
+    }
     return {
       status: "ok",
       runId,
+      step: stepName,
+      passDone: next.done,
       requests: client.requests,
       checked: plan.checked,
       changed: changes.length,
-      missing: plan.missing.length,
+      missing: missing.length,
       dropped: newlyDropped.length,
       storefront,
     };
   } catch (e) {
     if (e instanceof BlockedError) {
-      // Record what the store said we may try again: the next scheduled run
-      // reads it from this row and skips until then (runGuard).
+      // Record what the store said we may try again: the next batch reads it
+      // from this row and skips until then (runGuard). The pass stays on the
+      // same page.
       const retryAfter = e.retryAfter;
       const error = blockErrorText(e.message, retryAfter);
       await finish({ status: "blocked", error });
-      const streak = blockedStreak(history, startedAt);
-      if (shouldEmailBlocked(streak))
+      if (emailBlockedNow(history, startedAt))
         await alert(
-          `Voltaat has answered ${e.status} (${e.status === 429 ? "too many requests" : "forbidden"}) on ${BLOCKED_DAYS_BEFORE_EMAIL} days in a row. ` +
-            `The sync stops at once each time, does not retry, and keeps the last known prices. ` +
-            `A 429 for one run a day at one request every 5 seconds is almost certainly the store refusing a shared cloud IP address, not our request count: ` +
-            `running the sync from the Mac Mini worker (a Qatar line) is the fix.`
+          `Voltaat has answered ${e.status} (${e.status === 429 ? "too many requests" : "forbidden"}) on ${BLOCKED_DAYS_BEFORE_EMAIL} days in a row, and no batch got through on any of them. ` +
+            `The sync makes one request an hour, stops at once when refused, waits longer after each refusal, and keeps the last known prices. ` +
+            `It is worth asking Voltaat whether they have changed something or would rather we read prices another way.`
         );
-      else console.warn(`[voltaat-sync] blocked (${e.message}), day ${streak} of the streak; no email${retryAfter ? `, retry after ${retryAfter}` : ""}`);
-      return { status: "blocked", runId, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error };
+      else console.warn(`[voltaat-sync] ${stepName} blocked (${e.message}); no email${retryAfter ? `, store says retry after ${retryAfter}` : ""}`);
+      return { status: "blocked", runId, step: stepName, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error };
     }
     const msg = e instanceof Error ? e.message : "failed";
     await finish({ status: "failed", error: msg });
-    await alert(`The Voltaat price sync failed (${msg}). Prices were not changed.`);
-    return { status: "failed", runId, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error: msg };
+    // The next batch tries the same step again, so say it once per pass.
+    if (!step.state.failAlerted) {
+      await alert(`A Voltaat price sync batch failed (${msg}) at ${stepName}. Prices from that batch were not changed; the next batch tries again.`);
+      await savePass(db, { ...step.state, failAlerted: true }).catch(() => undefined);
+    }
+    return { status: "failed", runId, step: stepName, ...empty, storefront: wrote ? UNKNOWN_CHANGE : NO_CHANGE, requests: client.requests, error: msg };
   }
 }
 

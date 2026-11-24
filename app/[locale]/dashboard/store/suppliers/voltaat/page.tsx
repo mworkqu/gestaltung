@@ -41,7 +41,7 @@ export default async function VoltaatSyncPage({ params }: { params: Promise<{ lo
   const { data: sup } = await supabase.from("suppliers").select("id").eq("code", "voltaat").maybeSingle();
   const [settingRes, runsRes, offersRes] = await Promise.all([
     supabase.from("store_settings").select("value").eq("key", "voltaat_sync").maybeSingle(),
-    supabase.from("supplier_sync_runs").select("*").eq("supplier_code", "voltaat").order("started_at", { ascending: false }).limit(14),
+    supabase.from("supplier_sync_runs").select("*").eq("supplier_code", "voltaat").order("started_at", { ascending: false }).limit(30),
     sup
       ? supabase
           .from("supplier_offers")

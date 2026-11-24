@@ -78,15 +78,17 @@ export const CRON_JOBS: Readonly<Record<CronJobName, CronJob>> = {
       return { status: 200, body: { ...result, purged } };
     },
   },
-  // Daily Voltaat price sync. NOT in vercel.json since 2026-11: Voltaat's
-  // store answers 429 to shared cloud IP addresses, so this one runs on the
-  // Mac Mini worker (Qatar line) only. The route stays, for a manual run and
-  // for the admin "Run now" button; nothing calls it on a schedule.
+  // Voltaat price sync, ONE REQUEST PER BATCH (lib/sourcing/voltaat-pass.ts):
+  // called hourly, each call reads robots.txt or one catalogue page, and the
+  // job itself skips once the day's pass is finished — so "hourly" is ~8
+  // requests a day, not 24. NOT in vercel.json: it runs on the Mac that serves
+  // the site (launchd) or the Mac Mini worker. The route stays for those and
+  // for the admin "Run now" button.
   "voltaat-sync": {
     name: "voltaat-sync",
-    utc: "0 3 * * *",
+    utc: "23 * * * *",
     inVercelJson: false,
-    qatar: "0 6 * * *",
+    qatar: "23 * * * *",
     async run(deps) {
       const db = deps.db();
       if (!db) return noServiceKey;

@@ -211,7 +211,7 @@ curl http://127.0.0.1:8787/healthz   # "version" shows the new commit
 | Job | Vercel (UTC) | Worker (Asia/Qatar, UTC+3) |
 |---|---|---|
 | supplier-refresh | `0 2 * * *` | `0 5 * * *` |
-| voltaat-sync | **not scheduled** (worker only since 2026-11) | `0 6 * * *` |
+| voltaat-sync | **not scheduled** (worker / launchd only since 2026-11) | `23 * * * *` (hourly; one request per batch, the job skips once the day's pass is done) |
 | delivery-promises | `0 4 * * *` | `0 7 * * *` |
 | notifications | `30 4 * * *` | `30 7 * * *` |
 | anonymous-cleanup | `0 5 * * 0` | `0 8 * * 0` |
@@ -219,8 +219,8 @@ curl http://127.0.0.1:8787/healthz   # "version" shows the new commit
 | cc-payments-expire | not scheduled (docs: `0 * * * *`) | `0 * * * *` (hourly) |
 | cc-weekly-progress | not scheduled (docs: `0 6 * * 0`) | `0 9 * * 0` |
 
-**voltaat-sync runs HERE only (2026-11).** It was removed from `vercel.json`: Voltaat's Shopify store answers 429 to shared cloud IP addresses (Vercel/AWS), not to our request count — one run a day, one request every 5 s, at most 41 requests, no retry after a block. The Mac Mini's Qatar line is the fix. The Vercel route stays for a manual run and for Dashboard → Suppliers → "Run now".
-**While the worker switch is off, nothing syncs Voltaat prices**: the storefront keeps the last known prices until the owner switches the worker on (`store_settings.worker`, migration 0111). A blocked run now records the store's `Retry-After` on its `supplier_sync_runs` row, later runs skip until it passes, and the owner gets ONE email once the block has lasted three days in a row (`lib/sourcing/voltaat-block.ts`) instead of one per run. The 20 h guard reads the same table from both runners, and a `running` row younger than an hour keeps the second runner out.
+**voltaat-sync runs HERE only (2026-11), one request per batch (2026-11-24).** It was removed from `vercel.json`. Measured from the Mac's Qatar line: Voltaat's Shopify store answers 429 with `Retry-After: 60` to a second request that follows the first by a few seconds — a short rate limit, not a ban, and exactly what the old run did (robots.txt, then a catalogue page 5 s later). So the job is now called hourly and each call makes ONE request: robots.txt, then one 250-product catalogue page per batch until a page comes back short (`lib/sourcing/voltaat-pass.ts`; the position is in `store_settings.voltaat_sync_pass`). One pass a day is ~8 requests over ~8 hours; once it is finished the remaining hourly calls skip without a request. The Vercel route stays for the schedule to call and for Dashboard → Suppliers → "Run now" (one batch).
+**While neither the worker nor the Mac's launchd job runs, nothing syncs Voltaat prices**: the storefront keeps the last known prices. A blocked batch records the store's `Retry-After` on its `supplier_sync_runs` row and leaves the pass on the same page; the wait before the next try grows with every blocked batch in a row (45 min, 90 min, 3 h, 6 h, 12 h, 24 h — `lib/sourcing/voltaat-block.ts`), two batches are never closer than 40 minutes, and a `running` row younger than an hour keeps a second runner out. The owner gets ONE email once three whole days have gone by blocked, and ONE change report when a pass ends — not one per batch. A product is marked "order on request" only when neither this pass nor the previous one saw it, because a pass that takes hours can miss a product when the catalogue shifts in between.
 
 **Cache purges.** The worker cannot call `revalidateTag`; after a job that changed the storefront it calls `POST /api/internal/revalidate` (Bearer `WORKER_SECRET`, only the storefront tag shapes from `lib/cache/catalog-tags.ts`), so the per-SKU purge of Phase 2 is kept.
 

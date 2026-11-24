@@ -5,7 +5,9 @@ import { revalidateStorefront } from "@/lib/cache/storefront";
 import { isSuperAdminSession } from "@/lib/auth/guards";
 import { emptyStatus, jsonError, jsonOk } from "@/lib/http";
 
-// "Run now" from the admin. Same rules as the daily run (including one run a day).
+// "Run now" from the admin: ONE batch (one request to Voltaat) — the next step
+// of the pass in progress, or the first step of a new pass when today's is
+// finished. The hourly schedule then carries that pass on.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
