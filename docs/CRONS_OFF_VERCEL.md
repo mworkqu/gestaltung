@@ -10,9 +10,19 @@ Vercel stayed as the fallback.
 
 ## 1. What stopped the moment Vercel went away
 
-The six daily jobs are scheduled by Vercel, in `vercel.json` -> `crons`. Vercel's
-cron scheduler is the only thing that fires them today. No Vercel, no schedule:
-nothing errors and nothing is logged, the jobs simply never run.
+The six daily jobs are scheduled by Vercel, in `vercel.json` -> `crons`, and
+Vercel's cron scheduler was the only thing firing them. No Vercel, no schedule:
+nothing errors and nothing is logged, the job simply never runs.
+
+**One of the six has since been rescued.** `voltaat-sync` now has a launchd agent
+on the Mac (`~/Library/LaunchAgents/com.gestaltung.cron.voltaat.plist`, 06:00
+Qatar, which is the `0 3 * * *` UTC slot) running
+`live-scripts/cron-voltaat.sh`. So five of the six are unscheduled, not all six.
+The Mac's own `live-scripts/CRONS.md` is the authority on that route — it calls
+each cron route over HTTPS with the `CRON_SECRET` header and reasons job by job
+about which are safe to schedule. Read it before section 2: it and this file
+describe two different ways to solve the same problem, and only one of them
+needs to be chosen.
 
 | Job | Was (UTC) | What silently stops |
 |---|---|---|
@@ -138,9 +148,17 @@ The deployment is a full copy of the repository at
 a hand-written `server.mjs` bound to `127.0.0.1:3000` behind a Cloudflare
 Tunnel. `.next` there was built 2026-11-23 20:56.
 
-**`server.mjs` is not in this repository.** It is the only file at the root of
-the deployed copy that this branch does not have, and it is not tracked
-anywhere. Its header carries the reasoning for its own existence: `next start
+**`server.mjs` was not in this repository** until the commit that added this
+file; it was the only file at the root of the deployed copy that this branch did
+not have. It was not untracked by accident: it is applied to the live worktree
+by `live-scripts/patches/03-self-host-custom-server.patch`, one of eight local
+patches that `live-scripts/apply-patches.sh` re-applies on every deploy — and
+whose own header says each patch "should either be merged upstream or dropped
+once upstream has it". Now that upstream has it, patch 03 should be deleted.
+Leaving it is safe (a pure new-file patch whose file already exists with the same
+bytes is detected as already applied and skipped), but a byte of drift between
+the two copies would fail the patch and abort a deploy. Its header carries the
+reasoning for its own existence: `next start
 -H 127.0.0.1 -p 3000` makes Next build every request's absolute origin as
 `http://localhost:3000` in `attachRequestMeta()`, which then feeds
 `middleware.ts`, the Supabase auth callback and the YouTube `redirect_uri`, and
