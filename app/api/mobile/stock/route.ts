@@ -6,9 +6,11 @@ import { createRateLimiter } from "@/lib/rate-limit";
 
 // POST /api/mobile/stock — put units on our own shelf from the dashboards.
 //
-// This is the ONLY route in /api/mobile that writes anything, and it can touch
+// This is the only route in /api/mobile that CREATES anything, and it can touch
 // exactly two things: a new row in `parts` (unpublished) and the own-stock
-// count for one product. It cannot edit orders, customers, projects or prices.
+// count for one product. It cannot edit orders, customers or projects.
+// (/api/mobile/products can change an existing product's name and price, and
+// nothing else; it can create nothing.)
 //
 // Auth is the same admin-only bearer check as the read routes, so nothing
 // changes about what a stolen app binary could do: the app carries no secret,
