@@ -238,6 +238,118 @@ describe("orders section", () => {
     ...over,
   });
 
+  const detail = (section: ReturnType<typeof buildOrders>, key: string) =>
+    (section.details ?? []).find((d) => d.key === key);
+
+  it("puts who, when and how much behind the open-orders tile", () => {
+    const section = buildOrders({
+      orders: [
+        order({ id: "o1", customer_name: "Sara", status: "paid", total_qar: 300, created_at: ago(5) }),
+        order({ id: "o2", customer_name: "Ali", status: "sourcing", total_qar: 120, created_at: ago(1) }),
+        order({ id: "o3", customer_name: "Noor", status: "delivered", created_at: ago(2) }),
+      ],
+      events: [],
+      payments: [],
+      carts: [],
+      windowDays: 30,
+      now: NOW,
+    });
+
+    const tile = section.tiles.find((t) => t.label === "Still open");
+    expect(tile?.value).toBe("2");
+    expect(tile?.detail).toBe("open-orders");
+
+    const list = detail(section, "open-orders");
+    expect(list?.columns).toEqual(["Customer", "When", "QAR", "Status"]);
+    // Oldest first: a list to work through.
+    expect(list?.rows.map((r) => r[0])).toEqual(["Sara", "Ali"]);
+    expect(list?.rows[0][2]).toBe("300");
+    expect(list?.rows[0][1]).toMatch(/\d+ \w{3}, \d{2}:\d{2}/);
+  });
+
+  it("names who left a basket and what is in it", () => {
+    const section = buildOrders({
+      orders: [order({ customer_name: "Someone else", created_at: ago(10) })],
+      events: [],
+      payments: [],
+      carts: [{ user_id: "u1", part_id: "p1", quantity: 3, updated_at: ago(4) }],
+      peopleNames: { u1: "Hana" },
+      partNames: { p1: "Servo HS-422" },
+      windowDays: 30,
+      now: NOW,
+    });
+
+    const list = detail(section, "baskets");
+    expect(list?.columns).toEqual(["Who", "Item", "Qty", "Last touched"]);
+    expect(list?.rows[0][0]).toBe("Hana");
+    expect(list?.rows[0][1]).toBe("Servo HS-422");
+    expect(list?.rows[0][2]).toBe("3");
+  });
+
+  it("says Someone rather than an id when a name is missing", () => {
+    const section = buildOrders({
+      orders: [order({ created_at: ago(10) })],
+      events: [],
+      payments: [],
+      carts: [{ user_id: "u-unknown", part_id: "p-unknown", quantity: 1, updated_at: ago(4) }],
+      windowDays: 30,
+      now: NOW,
+    });
+    const row = detail(section, "baskets")?.rows[0];
+    expect(row?.[0]).toBe("Someone");
+    expect(row?.[1]).toBe("a product");
+    // The id must not reach the screen.
+    expect(row?.join(" ")).not.toContain("u-unknown");
+  });
+
+  it("stops counting a basket as left behind once its owner orders", () => {
+    const carts = [{ user_id: "u1", part_id: "p1", quantity: 2, updated_at: ago(4) }];
+    const peopleNames = { u1: "Hana" };
+
+    const stillOpen = buildOrders({
+      orders: [order({ customer_name: "Someone else", created_at: ago(10) })],
+      events: [],
+      payments: [],
+      carts,
+      peopleNames,
+      windowDays: 30,
+      now: NOW,
+    });
+    expect(stillOpen.tiles.find((t) => t.label === "Baskets left behind")?.value).toBe("1");
+
+    // Hana ordered in the last day, so her basket is not abandoned. Before the
+    // fix this compared a set of names against a user id and never matched.
+    const bought = buildOrders({
+      orders: [order({ customer_name: "Hana", created_at: ago(0) })],
+      events: [],
+      payments: [],
+      carts,
+      peopleNames,
+      windowDays: 30,
+      now: NOW,
+    });
+    expect(bought.tiles.find((t) => t.label === "Baskets left behind")?.value).toBe("0");
+    expect(detail(bought, "baskets")?.rows).toEqual([]);
+  });
+
+  it("gives every tile that claims a detail a list that exists", () => {
+    const section = buildOrders({
+      orders: [order({ status: "paid" }), order({ id: "o2", status: "cancelled" })],
+      events: [],
+      payments: [{ kind: "order", product: "Kit", amount_qar: 50, method: "bank", status: "pending", is_test: null, created_at: ago(1) }],
+      carts: [],
+      windowDays: 30,
+      now: NOW,
+    });
+    const keys = new Set((section.details ?? []).map((d) => d.key));
+    for (const tile of section.tiles) {
+      if (tile.detail) expect(keys.has(tile.detail)).toBe(true);
+    }
+    // And no list is offered that no tile points at.
+    const claimed = new Set(section.tiles.map((t) => t.detail).filter(Boolean));
+    for (const key of keys) expect(claimed.has(key)).toBe(true);
+  });
+
   it("keeps test orders out of revenue", () => {
     const section = buildOrders({
       orders: [order(), order({ id: "o2", total_qar: 9999, is_test: true })],

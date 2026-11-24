@@ -15,6 +15,8 @@ import {
   tally,
   toneUp,
   within,
+  when,
+  type DetailView,
   type Section,
   type Table,
 } from "@/lib/mobile/report";
@@ -50,13 +52,28 @@ export type PaymentRow = {
   created_at: string | null;
 };
 
-export type CartRow = { user_id: string | null; quantity: number | null; updated_at: string | null };
+export type CartRow = {
+  user_id: string | null;
+  quantity: number | null;
+  updated_at: string | null;
+  /** Which product is sitting in the basket. */
+  part_id?: string | null;
+};
 
 export type OrdersInput = {
   orders: OrderRow[];
   events: StatusEventRow[];
   payments: PaymentRow[];
   carts: CartRow[];
+  /**
+   * Who an id belongs to, and what a product is called — only for the people
+   * and products that actually appear in a basket here, so the detail lists can
+   * name them instead of showing a uuid. Missing names degrade to "Someone"
+   * and "a product", never to an id: an id on screen is no use to the owner and
+   * is more than the screen needs to show.
+   */
+  peopleNames?: Record<string, string>;
+  partNames?: Record<string, string>;
   windowDays: number;
   now?: number;
 };
@@ -106,8 +123,17 @@ export function buildOrders(input: OrdersInput): Section {
   const buyersSince = new Set(
     real.filter((o) => within(o.created_at, 1, now)).map((o) => (o.customer_name ?? "").trim().toLowerCase()),
   );
+  // The set above holds customer NAMES, so a cart's owner has to be turned into
+  // a name before it can be looked up. Comparing the user id against it — as
+  // this did until now — never matched, so every stale cart counted as
+  // abandoned even when its owner had just ordered.
+  const names = input.peopleNames ?? {};
+  const ordered = (userId: string) => {
+    const name = (names[userId] ?? "").trim().toLowerCase();
+    return name ? buyersSince.has(name) : false;
+  };
   const staleCarts = input.carts.filter(
-    (c) => c.user_id && !within(c.updated_at, 1, now) && within(c.updated_at, days, now) && !buyersSince.has(c.user_id),
+    (c) => c.user_id && !within(c.updated_at, 1, now) && within(c.updated_at, days, now) && !ordered(c.user_id),
   );
   const cartOwners = new Set(staleCarts.map((c) => c.user_id)).size;
 
@@ -131,6 +157,7 @@ export function buildOrders(input: OrdersInput): Section {
     },
     {
       label: "Orders",
+      detail: "window-orders",
       value: int(nowOrders.length),
       delta: delta(nowOrders.length, beforeOrders.length),
       tone: toneUp(nowOrders.length, beforeOrders.length),
@@ -144,19 +171,22 @@ export function buildOrders(input: OrdersInput): Section {
     },
     {
       label: "Still open",
+      detail: "open-orders",
       value: int(open.length),
       tone: open.length ? ("warn" as const) : ("good" as const),
       hint: openAgeDays === null ? undefined : `oldest ${openAgeDays} day${openAgeDays === 1 ? "" : "s"} old`,
     },
-    { label: "Delivered", value: int(delivered.length), tone: "good" as const, hint: `last ${days} days` },
+    { label: "Delivered", value: int(delivered.length), tone: "good" as const, hint: `last ${days} days`, detail: "delivered" },
     {
       label: "Cancelled",
+      detail: "cancelled",
       value: int(cancelled.length),
       tone: cancelled.length ? ("bad" as const) : ("good" as const),
       hint: `last ${days} days`,
     },
     {
       label: "Payments waiting",
+      detail: "payments-waiting",
       value: int(paymentsWaiting.length),
       tone: paymentsWaiting.length ? ("warn" as const) : ("good" as const),
       hint: "proof sent, not reviewed",
@@ -164,6 +194,7 @@ export function buildOrders(input: OrdersInput): Section {
     { label: "Repeat customers", value: int(repeat), hint: "ordered more than once" },
     {
       label: "Baskets left behind",
+      detail: "baskets",
       value: int(cartOwners),
       tone: cartOwners ? ("warn" as const) : ("flat" as const),
       hint: "items in a cart, no order since",
@@ -224,6 +255,18 @@ export function buildOrders(input: OrdersInput): Section {
   if (paymentsIn.length) notes.push(`${money(paymentsIn.reduce((s, p) => s + num(p.amount_qar), 0))} QAR approved through the payments page.`);
   if (!notes.length) notes.push("Nothing is stuck: no old open orders, no payments waiting.");
 
+  const details = orderDetails({
+    days,
+    nowOrders,
+    open,
+    delivered,
+    cancelled,
+    paymentsWaiting,
+    staleCarts,
+    peopleNames: names,
+    partNames: input.partNames ?? {},
+  });
+
   return {
     key: "orders",
     title: "Orders",
@@ -236,6 +279,7 @@ export function buildOrders(input: OrdersInput): Section {
     ],
     tables,
     notes,
+    details,
   };
 }
 
@@ -279,4 +323,120 @@ export function stageTimings(events: StatusEventRow[]): { step: string; medianHo
       return { step, medianHours: Math.round(m * 10) / 10, count: hours.length };
     })
     .sort((a, b) => order(a.step) - order(b.step));
+}
+
+/**
+ * The lists behind the tiles. Extracted from `buildOrders` only to keep that
+ * function readable — it decides nothing of its own.
+ */
+function orderDetails({
+  days,
+  nowOrders,
+  open,
+  delivered,
+  cancelled,
+  paymentsWaiting,
+  staleCarts,
+  peopleNames,
+  partNames,
+}: {
+  days: number;
+  nowOrders: OrderRow[];
+  open: OrderRow[];
+  delivered: OrderRow[];
+  cancelled: OrderRow[];
+  paymentsWaiting: PaymentRow[];
+  staleCarts: CartRow[];
+  peopleNames: Record<string, string>;
+  partNames: Record<string, string>;
+}): DetailView[] {
+  // What is behind the tiles. Each list is capped, newest or most urgent first,
+  // and names a person rather than an id.
+  const DETAIL_ROWS = 100;
+  const orderRow = (o: OrderRow) => [
+    o.customer_name?.trim() || "\u2014",
+    when(o.created_at),
+    money(num(o.total_qar)),
+    label(normaliseOrderStatus(o.status) ?? o.status),
+  ];
+  const byNewest = (a: OrderRow, b: OrderRow) => (b.created_at ?? "").localeCompare(a.created_at ?? "");
+  const ORDER_COLUMNS = ["Customer", "When", "QAR", "Status"];
+  const ORDER_ALIGN: ("l" | "r")[] = ["l", "l", "r", "l"];
+
+  return [
+    {
+      key: "window-orders",
+      title: "Orders",
+      blurb: `Every order in the last ${days} days, newest first.`,
+      columns: ORDER_COLUMNS,
+      rows: [...nowOrders].sort(byNewest).slice(0, DETAIL_ROWS).map(orderRow),
+      align: ORDER_ALIGN,
+      empty: `No orders in the last ${days} days.`,
+    },
+    {
+      key: "open-orders",
+      title: "Still open",
+      blurb: "Orders that have not been delivered or cancelled — oldest first, so the one to chase is at the top.",
+      columns: ORDER_COLUMNS,
+      // Oldest first: this is a list to work through, not to read.
+      rows: [...open]
+        .sort((a, b) => (a.created_at ?? "").localeCompare(b.created_at ?? ""))
+        .slice(0, DETAIL_ROWS)
+        .map(orderRow),
+      align: ORDER_ALIGN,
+      empty: "Nothing is open.",
+    },
+    {
+      key: "delivered",
+      title: "Delivered",
+      blurb: `Orders delivered in the last ${days} days.`,
+      columns: ORDER_COLUMNS,
+      rows: [...delivered].sort(byNewest).slice(0, DETAIL_ROWS).map(orderRow),
+      align: ORDER_ALIGN,
+      empty: `Nothing was delivered in the last ${days} days.`,
+    },
+    {
+      key: "cancelled",
+      title: "Cancelled",
+      blurb: `Orders cancelled in the last ${days} days.`,
+      columns: ORDER_COLUMNS,
+      rows: [...cancelled].sort(byNewest).slice(0, DETAIL_ROWS).map(orderRow),
+      align: ORDER_ALIGN,
+      empty: `Nothing was cancelled in the last ${days} days.`,
+    },
+    {
+      key: "payments-waiting",
+      title: "Payments waiting",
+      blurb: "Proof of payment has been sent and nobody has reviewed it yet.",
+      columns: ["What", "When", "QAR", "How"],
+      rows: [...paymentsWaiting]
+        .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+        .slice(0, DETAIL_ROWS)
+        .map((p) => [
+          p.product?.trim() || label(p.kind),
+          when(p.created_at),
+          money(num(p.amount_qar)),
+          label(p.method),
+        ]),
+      align: ["l", "l", "r", "l"],
+      empty: "No payment is waiting.",
+    },
+    {
+      key: "baskets",
+      title: "Baskets left behind",
+      blurb: "One line per product sitting in a basket: who filled it, what is in it, and when they last touched it.",
+      columns: ["Who", "Item", "Qty", "Last touched"],
+      rows: [...staleCarts]
+        .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))
+        .slice(0, DETAIL_ROWS)
+        .map((c) => [
+          (c.user_id && peopleNames[c.user_id]?.trim()) || "Someone",
+          (c.part_id && partNames[c.part_id]?.trim()) || "a product",
+          int(c.quantity ?? 0),
+          when(c.updated_at),
+        ]),
+      align: ["l", "l", "r", "l"],
+      empty: "No basket was left behind.",
+    },
+  ];
 }

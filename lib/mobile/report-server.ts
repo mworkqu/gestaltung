@@ -176,7 +176,9 @@ async function ordersSection(db: Db, now: number): Promise<Section | null> {
         .order("created_at", { ascending: false })
         .limit(1000),
     ),
-    rows<CartRow>(db.from("cart_items").select("user_id,quantity,updated_at").order("updated_at", { ascending: false }).limit(1000)),
+    rows<CartRow>(
+      db.from("cart_items").select("user_id,quantity,updated_at,part_id").order("updated_at", { ascending: false }).limit(1000),
+    ),
   ]);
 
   if (!orders.length) return null;
@@ -192,7 +194,40 @@ async function ordersSection(db: Db, now: number): Promise<Section | null> {
       .limit(4000),
   );
 
-  return buildOrders({ orders, events, payments, carts, windowDays: WINDOW_DAYS, now });
+  // Names for the ids that actually appear in a basket, so the detail list can
+  // say who and what instead of printing a uuid. Scoped to those ids, so this
+  // stays two small reads however big the catalogue and the customer list get.
+  const cartUserIds = [...new Set(carts.map((c) => c.user_id).filter(Boolean) as string[])].slice(0, 500);
+  const cartPartIds = [...new Set(carts.map((c) => c.part_id).filter(Boolean) as string[])].slice(0, 500);
+
+  const [people, partRows] = await Promise.all([
+    cartUserIds.length
+      ? rows<{ id: string; full_name: string | null; email: string | null }>(
+          db.from("profiles").select("id,full_name,email").in("id", cartUserIds).limit(500),
+        )
+      : Promise.resolve([]),
+    cartPartIds.length
+      ? rows<{ id: string; name: string | null; sku: string | null }>(
+          db.from("parts").select("id,name,sku").in("id", cartPartIds).limit(500),
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const peopleNames: Record<string, string> = {};
+  for (const p of people) {
+    // A name if there is one; otherwise the part of the email before the @, which
+    // is enough to recognise someone without putting a full address on screen.
+    const name = p.full_name?.trim() || (p.email?.includes("@") ? p.email.split("@")[0] : "");
+    if (name) peopleNames[p.id] = name;
+  }
+
+  const partNames: Record<string, string> = {};
+  for (const p of partRows) {
+    const name = p.name?.trim() || p.sku?.trim() || "";
+    if (name) partNames[p.id] = name;
+  }
+
+  return buildOrders({ orders, events, payments, carts, peopleNames, partNames, windowDays: WINDOW_DAYS, now });
 }
 
 async function peopleSection(db: Db, now: number): Promise<Section | null> {

@@ -20,6 +20,12 @@ export type Tile = {
   tone?: "good" | "warn" | "bad" | "flat";
   /** One short line under the number, for what the label cannot say. */
   hint?: string;
+  /**
+   * The key of a `DetailView` in the same section. When set, the app makes the
+   * tile tappable and pushes that list; when absent the tile is just a number.
+   * So making a figure open up is a server change, like the figure itself.
+   */
+  detail?: string;
 };
 
 export type Point = { x: string; y: number };
@@ -42,6 +48,25 @@ export type Table = {
   empty?: string;
 };
 
+/**
+ * What is behind a tile: the rows that make the number up — which orders are
+ * open, who left a basket — so a figure can be opened instead of merely read.
+ *
+ * It is a table with a key and a sentence of its own. Keeping it the same shape
+ * as `Table` means the app draws it with the view it already has.
+ */
+export type DetailView = {
+  /** Matches `Tile.detail`. Unique within the section. */
+  key: string;
+  title: string;
+  /** One sentence: what this list is, and what the owner might do about it. */
+  blurb?: string;
+  columns: string[];
+  rows: string[][];
+  align?: ("l" | "r")[];
+  empty?: string;
+};
+
 export type Section = {
   key: string;
   title: string;
@@ -54,6 +79,8 @@ export type Section = {
   tables: Table[];
   /** Plain-language findings: what stands out, what needs doing. */
   notes: string[];
+  /** The lists behind this section's tiles, if any tile has one. */
+  details?: DetailView[];
 };
 
 export type Report = {
@@ -141,6 +168,31 @@ export function daily(
 /** Rows at or after `days` ago. */
 export function since(days: number, now = Date.now()): string {
   return new Date(now - days * 86_400_000).toISOString();
+}
+
+/** `23 Nov, 14:05` in Asia/Qatar — a moment a person can act on. */
+export function when(iso: string | null | undefined): string {
+  if (!iso) return "\u2014";
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "\u2014";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: DAY_TZ,
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })
+    .format(at)
+    .replace(",", ",");
+}
+
+/** Whole days between `iso` and now, or null when there is no date. */
+export function ageDays(iso: string | null | undefined, now = Date.now()): number | null {
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
+  if (Number.isNaN(at)) return null;
+  return Math.floor((now - at) / 86_400_000);
 }
 
 export function within(iso: string | null | undefined, days: number, now = Date.now()): boolean {
