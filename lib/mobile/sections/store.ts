@@ -113,6 +113,18 @@ export function buildStore(input: StoreInput): Section {
     return published.filter((p) => !sold.has(p.id));
   })();
 
+  // Every product as a plain list — the catalogue itself, not a top-ten of it.
+  // Sorted by category so the grouping reads down the column without needing a
+  // break, then by name. Capped because the app draws a table as one stack of
+  // rows with no paging: past a hundred the section stops being readable, and
+  // the count in the note says what is not shown.
+  const CATALOGUE_ROWS = 100;
+  const catalogue = [...live].sort(
+    (a, b) =>
+      (a.store_category || a.category || "~").localeCompare(b.store_category || b.category || "~") ||
+      (a.name || a.sku || "").localeCompare(b.name || b.sku || ""),
+  );
+
   const tiles = [
     { label: "Published products", value: int(published.length), hint: `${int(live.length)} in the catalogue in all` },
     {
@@ -151,6 +163,20 @@ export function buildStore(input: StoreInput): Section {
 
   const tables: Table[] = [
     {
+      title: "Every product",
+      columns: ["Product", "Category", "Price", "Cost", "Stock", "Status"],
+      rows: catalogue.slice(0, CATALOGUE_ROWS).map((p) => [
+        p.name || p.sku || p.id,
+        p.store_category || p.category || "\u2014",
+        num(p.unit_price) > 0 ? money(num(p.unit_price)) : "\u2014",
+        num(p.landed_cost_qar) > 0 ? money(num(p.landed_cost_qar)) : "\u2014",
+        p.in_own_stock ? int(stock.get(p.id) ?? 0) : "\u2014",
+        p.is_published ? label(p.stock_status) : "draft",
+      ]),
+      align: ["l", "l", "r", "r", "r", "l"],
+      empty: "There are no products in the catalogue.",
+    },
+    {
       title: "Best sellers by units",
       columns: ["Product", "Units"],
       rows: bestSellers.map(([name, n]) => [name, int(n)]),
@@ -188,6 +214,9 @@ export function buildStore(input: StoreInput): Section {
   if (onRequest.length) notes.push(`${onRequest.length} published product${onRequest.length === 1 ? " has" : "s have"} no delivery class, so the store shows them as "on request".`);
   if (neverSold.length && published.length) notes.push(`${pct(neverSold.length, published.length)} of the catalogue has never been ordered.`);
   if (retailValue > 0) notes.push(`Stock on hand: ${money(stockValue)} QAR at cost, ${money(retailValue)} QAR at shelf price.`);
+  if (catalogue.length > CATALOGUE_ROWS) {
+    notes.push(`The product list shows the first ${int(CATALOGUE_ROWS)} of ${int(catalogue.length)} items, by category.`);
+  }
   if (!notes.length) notes.push("Nothing needs attention in the catalogue.");
 
   return {

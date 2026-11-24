@@ -131,6 +131,61 @@ describe("store section", () => {
     });
     expect(section.tiles.find((t) => t.label === "Never ordered")?.value).toBe("1");
   });
+
+  it("lists every product by category, drafts included", () => {
+    const section = buildStore({
+      parts: [
+        part({ id: "p1", name: "Servo", category: "motors" }),
+        part({ id: "p2", name: "Resistor", category: "passives" }),
+        part({ id: "p3", name: "Draft part", category: "motors", is_published: false }),
+      ],
+      ownStock: [{ part_id: "p1", qty: 4 }],
+      orderItems: [],
+      signals: [],
+      windowDays: 30,
+      now: NOW,
+    });
+    const list = section.tables.find((t) => t.title === "Every product");
+    expect(list?.columns).toEqual(["Product", "Category", "Price", "Cost", "Stock", "Status"]);
+    // motors before passives, and inside motors "Draft part" before "Servo".
+    expect(list?.rows.map((r) => r[0])).toEqual(["Draft part", "Servo", "Resistor"]);
+    expect(list?.rows[1]).toEqual(["Servo", "motors", "100", "60", "4", "in stock"]);
+    expect(list?.rows[0][5]).toBe("draft");
+  });
+
+  it("leaves merged and test products out of the list", () => {
+    const section = buildStore({
+      parts: [part({ id: "p1" }), part({ id: "p2", merged_into: "p1" }), part({ id: "p3", is_test: true })],
+      ownStock: [],
+      orderItems: [],
+      signals: [],
+      windowDays: 30,
+      now: NOW,
+    });
+    expect(section.tables.find((t) => t.title === "Every product")?.rows).toHaveLength(1);
+  });
+
+  it("caps the list at a hundred and says how many are not shown", () => {
+    const parts = Array.from({ length: 142 }, (_, i) =>
+      part({ id: `p${i}`, name: `Part ${String(i).padStart(3, "0")}` }),
+    );
+    const section = buildStore({ parts, ownStock: [], orderItems: [], signals: [], windowDays: 30, now: NOW });
+    expect(section.tables.find((t) => t.title === "Every product")?.rows).toHaveLength(100);
+    expect(section.notes.some((n) => n.includes("first 100 of 142"))).toBe(true);
+  });
+
+  it("says so rather than showing a zero when a product has no price or stock", () => {
+    const section = buildStore({
+      parts: [part({ unit_price: null, landed_cost_qar: null, in_own_stock: false, store_category: null, category: null })],
+      ownStock: [],
+      orderItems: [],
+      signals: [],
+      windowDays: 30,
+      now: NOW,
+    });
+    const row = section.tables.find((t) => t.title === "Every product")?.rows[0];
+    expect(row?.slice(1, 5)).toEqual(["\u2014", "\u2014", "\u2014", "\u2014"]);
+  });
 });
 
 describe("order stage timings", () => {
