@@ -14,7 +14,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { CalendarClock, Factory, Loader2, School, ShoppingCart } from "lucide-react";
+import type { Factory } from "lucide-react";
+import { CalendarClock, Loader2, School, ShoppingCart } from "lucide-react";
 
 import { MeetingBooking } from "@/components/meetings/booking";
 import { useRouter } from "@/i18n/navigation";
