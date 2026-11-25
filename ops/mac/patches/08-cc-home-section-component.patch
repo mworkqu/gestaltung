@@ -1,0 +1,66 @@
+diff --git a/components/home/cad-champions-section.tsx b/components/home/cad-champions-section.tsx
+new file mode 100644
+index 0000000..3d9b255
+--- /dev/null
++++ b/components/home/cad-champions-section.tsx
+@@ -0,0 +1,60 @@
++import { ArrowRight, Award, Check, GraduationCap } from "lucide-react";
++import { getTranslations } from "next-intl/server";
++
++import { ccPath } from "@/lib/cad-champions/routes";
++import type { Locale } from "@/i18n/routing";
++
++// In-page entry to CAD Champions (owner, 2026-11-22). The floating side tab is
++// easy to read as an advert and easy to miss; this sits in the scroll where the
++// rest of the offer is. Both now exist on purpose.
++//
++// A plain <a>, not the i18n Link: CC lives at /cad-champions/{locale}/… and must
++// NOT pick up the site's own /{locale} prefix.
++export async function CadChampionsSection({ locale }: { locale: string }) {
++  const t = await getTranslations("StoreLanding");
++  const points = [t("ccSectionPoint1"), t("ccSectionPoint2"), t("ccSectionPoint3")];
++
++  return (
++    <section className="neu animate-fade-up delay-2 overflow-hidden p-5 sm:p-7">
++      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-10">
++        <div className="min-w-0 flex-1 space-y-4">
++          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-cobalt">
++            <span
++              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-panel shadow-neu-sm"
++              aria-hidden
++            >
++              <GraduationCap className="h-4 w-4" />
++            </span>
++            {t("ccSectionEyebrow")}
++          </p>
++
++          <div className="space-y-2">
++            <h2 className="title-section text-balance">{t("ccSectionTitle")}</h2>
++            <p className="max-w-prose text-sm leading-relaxed text-body">{t("ccSectionText")}</p>
++          </div>
++
++          <ul className="grid gap-2 sm:grid-cols-3 lg:gap-3">
++            {points.map((point) => (
++              <li key={point} className="flex min-w-0 items-start gap-2 text-sm text-body">
++                <Check className="mt-0.5 h-4 w-4 shrink-0 text-cobalt" aria-hidden />
++                <span className="min-w-0">{point}</span>
++              </li>
++            ))}
++          </ul>
++        </div>
++
++        <div className="flex shrink-0 flex-col items-stretch gap-2 lg:items-end">
++          <a
++            href={ccPath(locale as Locale)}
++            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-cobalt px-7 text-sm font-semibold text-white shadow-neu transition-colors hover:bg-cobalt-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cobalt/60 focus-visible:ring-offset-2"
++          >
++            <Award className="h-4 w-4 shrink-0" aria-hidden />
++            {t("ccSectionCta")}
++            <ArrowRight className="h-4 w-4 shrink-0 rtl:-scale-x-100" aria-hidden />
++          </a>
++          <p className="text-center text-xs text-muted lg:text-end">{t("ccSectionNote")}</p>
++        </div>
++      </div>
++    </section>
++  );
++}

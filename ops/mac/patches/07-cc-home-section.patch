@@ -1,0 +1,64 @@
+diff --git a/app/[locale]/page.tsx b/app/[locale]/page.tsx
+index 6998621..ed4c439 100644
+--- a/app/[locale]/page.tsx
++++ b/app/[locale]/page.tsx
+@@ -23,6 +23,7 @@ import { turnstileEnabledForPages } from "@/lib/turnstile-server";
+ import { getFeaturedParts, getStoreFacets } from "@/lib/store/public-catalog";
+ import { categoryLabel } from "@/lib/store/category-label";
+ import { pageMetadata } from "@/lib/seo";
++import { CadChampionsSection } from "@/components/home/cad-champions-section";
+ import { CadChampionsSideButton } from "@/components/home/cad-champions-side-button";
+ import { VIDEOS, homeVideoSlug, videoBase, videoJsonLd } from "@/lib/videos";
+ import { cn } from "@/lib/utils";
+@@ -300,6 +301,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
+           </Link>
+         </section>
+ 
++        {/* 8b. CAD Champions in the scroll, not only as the floating tab. */}
++        <CadChampionsSection locale={locale} />
++
+         {/* 9. Callback form. */}
+         <HomeCallback turnstileEnabled={turnstileEnabled} />
+         {/* Add to cart may mint a guest session: the on-demand check (renders nothing while off). */}
+diff --git a/messages/ar.json b/messages/ar.json
+index 3257ce7..f3580f4 100644
+--- a/messages/ar.json
++++ b/messages/ar.json
+@@ -1013,7 +1013,15 @@
+     "studentsCta": "اعرف كيف نعمل مع المدارس",
+     "choiceIdeaTokens": "المشاريع الأساسية مجانية في مرحلة التخطيط. أما المشاريع متعددة المحاور أو المتحكمات أو الجاهزة للتنفيذ فتحتاج رموز الأفكار: {tier2} أو {tier3} من الرموز، بسعر {tokenPrice} ر.ق للرمز{promo, select, on { (خصم الإطلاق {discount}%، والسعر المعتاد {base} ر.ق)} other {}}. نخبرك بالتكلفة دائماً قبل أي خصم، ولا يُخصم شيء حتى توافق.",
+     "cadChampionsSide": "أبطال التصميم بالحاسوب",
+-    "cadChampionsSideLabel": "أبطال التصميم بالحاسوب: اختبار مهارات CAD وتدريب"
++    "cadChampionsSideLabel": "أبطال التصميم بالحاسوب: اختبار مهارات CAD وتدريب",
++    "ccSectionEyebrow": "أبطال التصميم بالحاسوب",
++    "ccSectionTitle": "اختبر مهاراتك في التصميم ثم طوّرها",
++    "ccSectionText": "اختبار مؤقّت ومصحّح على عمل نمذجة حقيقي — ليس اختيارًا من متعدد — مع شهادة يمكن التحقق منها، إضافة إلى دروس وتمارين تتقدم فيها بوتيرتك.",
++    "ccSectionPoint1": "اختبار مهارات مؤقّت، مصحّح مهمة بمهمة",
++    "ccSectionPoint2": "وحدات تدريبية ودروس وتمارين",
++    "ccSectionPoint3": "شهادة يمكن لأي شخص التحقق منها عبر الإنترنت",
++    "ccSectionCta": "افتح أبطال التصميم بالحاسوب",
++    "ccSectionNote": "متاح بالعربية والإنجليزية"
+   },
+   "DesignQuote": {
+     "metaTitle": "اطلب عرض سعر مجاني | Gestaltung360",
+diff --git a/messages/en.json b/messages/en.json
+index 3ae96ab..6d810b4 100644
+--- a/messages/en.json
++++ b/messages/en.json
+@@ -1013,7 +1013,15 @@
+     "studentsCta": "See how it works for schools",
+     "choiceIdeaTokens": "Basic projects are free to plan. Multi-axis, multi-controller or turnkey builds need ideation tokens: {tier2} or {tier3}, at QAR {tokenPrice} a token{promo, select, on { ({discount}% launch discount, usually QAR {base})} other {}}. We always quote the cost first, and nothing is deducted until you approve.",
+     "cadChampionsSide": "CAD Champions",
+-    "cadChampionsSideLabel": "CAD Champions: CAD skills test and training"
++    "cadChampionsSideLabel": "CAD Champions: CAD skills test and training",
++    "ccSectionEyebrow": "CAD Champions",
++    "ccSectionTitle": "Prove your CAD skills, then sharpen them",
++    "ccSectionText": "A timed, marked test of real modelling work — not multiple choice — with a verifiable certificate at the end, plus lessons and exercises to work through at your own pace.",
++    "ccSectionPoint1": "Timed skills test, marked task by task",
++    "ccSectionPoint2": "Training modules, lessons and exercises",
++    "ccSectionPoint3": "A certificate anyone can verify online",
++    "ccSectionCta": "Open CAD Champions",
++    "ccSectionNote": "Runs in English and Arabic"
+   },
+   "DesignQuote": {
+     "metaTitle": "Get a free quote | Gestaltung360",

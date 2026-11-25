@@ -14,20 +14,40 @@ The six daily jobs are scheduled by Vercel, in `vercel.json` -> `crons`, and
 Vercel's cron scheduler was the only thing firing them. No Vercel, no schedule:
 nothing errors and nothing is logged, the job simply never runs.
 
-**One of the six has since been rescued.** `voltaat-sync` now has a launchd agent
-on the Mac (`~/Library/LaunchAgents/com.gestaltung.cron.voltaat.plist`, 06:00
-Qatar, which is the `0 3 * * *` UTC slot) running
-`live-scripts/cron-voltaat.sh`. So five of the six are unscheduled, not all six.
-The Mac's own `live-scripts/CRONS.md` is the authority on that route — it calls
-each cron route over HTTPS with the `CRON_SECRET` header and reasons job by job
-about which are safe to schedule. Read it before section 2: it and this file
-describe two different ways to solve the same problem, and only one of them
-needs to be chosen.
+**One of the six has since been rescued, and it no longer resembles its Vercel
+self.** `voltaat-sync` runs on the Mac from
+`~/Library/LaunchAgents/com.gestaltung.cron.voltaat.plist`, which holds 24
+`StartCalendarInterval` slots — one per hour, each at a fixed but different
+minute between `:20` and `:39` (23, 37, 28, 21, 34, …) — firing
+`live-scripts/cron-voltaat.sh`, which since 2026-11-24 also waits a random
+0–59 s before its request, because launchd has no `Second` field and every
+firing otherwise landed exactly on `:00`.
+
+So it is hourly, not daily, and that is the point: each call makes **at most one
+request** to Voltaat, and the route answers "skipped" without contacting Voltaat
+at all once the day's pass is done, within 40 minutes of the last batch, or
+while it is waiting out a refusal. A day's pass is roughly eight requests spread
+over eight hours. It was built this way because Voltaat refused the old
+eight-requests-in-forty-seconds version with 429 on both 23 and 24 November;
+their store tolerates about one request a minute from us. The `:20`–`:39` window
+is not decoration either — it keeps any two firings more than 40 minutes apart,
+which is exactly what the route's own guard requires, and the 0–59 s wait leaves
+about a minute of margin on that. Widening the wait much further would start
+tripping the guard.
+
+So five of the six are unscheduled, not all six.
+`ops/mac/CRONS.md` is the authority on that route — it calls each cron route
+with the `CRON_SECRET` header and reasons job by job about which are safe to
+schedule. Read it before section 2: it and this file describe two different ways
+to solve the same problem, and only one of them needs to be chosen. (`ops/mac/`
+is a tracked copy of the Mac's `live-scripts/`; the Mac stays the source of
+truth. `ops/mac/README.md` says what is there and what was deliberately left
+out.)
 
 | Job | Was (UTC) | What silently stops |
 |---|---|---|
 | `supplier-refresh` | `0 2 * * *` | store prices and stock go stale |
-| `voltaat-sync` | `0 3 * * *` | supplier sync, and with it the per-SKU cache purges |
+| `voltaat-sync` | `0 3 * * *` | nothing — this one runs on the Mac now (above) |
 | `delivery-promises` | `0 4 * * *` | promise dates stop moving |
 | `notifications` | `30 4 * * *` | **the whole outbound mail drain** |
 | `anonymous-cleanup` | `0 5 * * 0` | guest rows accumulate |
@@ -37,16 +57,27 @@ needs to be chosen.
 with it stopped **no order e-mail, no delay e-mail and no meeting reminder goes
 out**. Phase 2's day-before meeting reminders ride on this job, so that part of
 PR #7 is inert until the job runs somewhere, even after the branch is deployed.
-(`RESEND_API_KEY` is also still unset, so mail would not send today in any
-case. Both have to be fixed, and fixing only one changes nothing.)
+
+`RESEND_API_KEY` is **not** the second half of this problem, whatever older
+notes say. It was set on 2026-11-22, in both `gestaltung/.env.local` (the copy
+`update-live.command` deploys from) and `gestaltung-live/.env.local` (what the
+running site reads), mode 600, alongside `RESEND_FROM` and
+`STORE_LEAD_EMAIL`; `ops/mac/SECURITY.md` records the send-only key and a real
+test message accepted for delivery. `ops/mac/CRONS.md` still says the key is
+missing and so did this file — both were written before it was set. The schedule
+is the only thing stopping the mail.
 
 The two CAD Champions jobs lose nothing here: `cc-payments-expire` and
 `cc-weekly-progress` were never in `vercel.json` and have always waited for the
 worker.
 
-Also in `vercel.json` and therefore also gone: the permanent redirect from
-`www.gestaltung360.com` to the apex domain. That has to be recreated at the new
-host or in Cloudflare, or `www` stops resolving to the site.
+The other thing `vercel.json` used to provide — the permanent redirect from
+`www.gestaltung360.com` to the apex — is **already handled** and needs nothing
+done. `ops/mac/patches/02-self-host-next-config.patch` puts it in
+`next.config.mjs` instead, deliberately there rather than in middleware so it
+also covers `/api`, `/sitemap.xml`, `/robots.txt` and `/_next`, which the
+middleware matcher skips. The tunnel passes the original `Host` header through,
+so the app sees `www` and answers 308.
 
 ## 2. The fix that already exists
 
@@ -143,10 +174,13 @@ answers the same 401. That is why Vercel reports no deployment while the live
 site serves current code, and why no `x-vercel-id` comes back: Cloudflare is in
 front of the Mac, not of Vercel.
 
-The deployment is a full copy of the repository at
-`/Users/mohmmad/Projects/gestaltung-company-webpage/gestaltung-live`, booted by
-a hand-written `server.mjs` bound to `127.0.0.1:3000` behind a Cloudflare
-Tunnel. `.next` there was built 2026-11-23 20:56.
+The deployment is a **git worktree** of
+`/Users/mohmmad/Projects/gestaltung-company-webpage/gestaltung`, checked out
+detached at `origin/main` in `…/gestaltung-live` (`ops/mac/1-build-live-site.command`
+creates it with `git worktree add --detach`), booted by a hand-written
+`server.mjs` bound to `127.0.0.1:3000` behind a Cloudflare Tunnel. `.next` there
+was built 2026-11-23 20:56. Its `.git` is a worktree pointer file, not a
+directory, which is why reading `.git/HEAD` there appears to fail.
 
 **`server.mjs` was not in this repository** until the commit that added this
 file; it was the only file at the root of the deployed copy that this branch did
@@ -166,12 +200,22 @@ reasoning for its own existence: `next start
 against 15.5.28). That is hard-won knowledge living in one untracked file on one
 machine. It belongs in git.
 
+The same was true of everything around it, so the rest of that folder is now
+copied into `ops/mac/` — the deploy script, the launch-agent installers, the
+health check, the cron, the other seven patches and the Mac's own notes. Patch
+03 is deliberately not among them, since `server.mjs` is tracked at the root
+instead. `ops/mac/README.md` explains that the Mac remains the source of truth,
+and flags that patch 02 is load-bearing: `update-live.command`'s zero-downtime
+build depends on the `distDir: process.env.NEXT_DIST_DIR` line that only that
+patch adds, so dropping it without upstreaming `distDir` would make the next
+deploy build on top of the running site.
+
 Consequences worth carrying into the other docs:
 
 - Deploying is building on the Mac and restarting `server.mjs`, not a git push.
   The "four minutes" figure from Vercel's build times does not apply.
-- `vercel.json` is inert: its crons do not fire and its `www` to apex redirect
-  does not happen. The redirect has to be recreated in Cloudflare.
+- `vercel.json` is inert: its crons do not fire. Its `www` to apex redirect is
+  already replaced in `next.config.mjs` by patch 02, so that one needs nothing.
 - The worker and the site are on the same machine, which is why
   `REVALIDATE_URL` can be loopback (section 4).
 

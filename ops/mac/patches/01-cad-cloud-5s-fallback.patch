@@ -1,0 +1,370 @@
+diff --git a/lib/cad/cloud.test.ts b/lib/cad/cloud.test.ts
+index a44ab14..f03e6ef 100644
+--- a/lib/cad/cloud.test.ts
++++ b/lib/cad/cloud.test.ts
+@@ -65,6 +65,15 @@ const json = (body: unknown, status = 200) =>
+   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+ const req = { code: "import cadquery as cq\nresult = cq.Workplane().box(1, 1, 1)\n", minWallMm: 1.2, mustContainBox: null };
+ 
++const HEALTH = `${URL_}/health`;
++const BUILD = `${URL_}/build`;
++/**
++ * buildOnce pre-flights GET /health before anything else, so every Cloud Run
++ * test routes by URL: a healthy service here, the test's own answer on /build.
++ */
++const routed = (build: (init: RequestInit) => Promise<Response> | Response, health: () => Promise<Response> | Response = () => json({ ok: true })) =>
++  (async (url: string | URL, init: RequestInit) => (String(url) === HEALTH ? health() : build(init))) as unknown as typeof fetch;
++
+ beforeEach(() => {
+   resetCloudAuth();
+   calls.credentials.length = 0;
+@@ -117,8 +126,9 @@ describe("ID token", () => {
+   it("sends the token as a Bearer header to /build", async () => {
+     const fetchImpl = vi.fn(async () => json(okBody));
+     await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
+-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+-    expect(url).toBe(`${URL_}/build`);
++    // [0] is the /health pre-flight; [1] is the build.
++    const [url, init] = fetchImpl.mock.calls[1] as unknown as [string, RequestInit];
++    expect(url).toBe(BUILD);
+     expect((init.headers as Record<string, string>).authorization).toMatch(/^Bearer h\./);
+     expect(JSON.parse(String(init.body))).toEqual({
+       code: req.code,
+@@ -133,7 +143,7 @@ describe("shared worker secret", () => {
+     const send = async () => {
+       const fetchImpl = vi.fn(async () => json(okBody));
+       await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
+-      return (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
++      return (fetchImpl.mock.calls[1] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
+     };
+     expect((await send())["x-cad-worker-token"]).toBeUndefined();
+     vi.stubEnv("CAD_WORKER_TOKEN", "s3cret");
+@@ -155,20 +165,22 @@ describe("buildOnce", () => {
+   });
+   it("a build that ran and failed is a result, not down", async () => {
+     const r = await buildOnce(req, {
+-      fetchImpl: (async () => json({ ok: false, error: "NameError: result", log: "trace", checks: [] }, 422)) as unknown as typeof fetch,
++      fetchImpl: routed(() => json({ ok: false, error: "NameError: result", log: "trace", checks: [] }, 422)),
+     });
+     expect(r).toMatchObject({ kind: "result", result: { ok: false, error: "NameError: result" } });
+   });
+   it("times out → down (timeout)", async () => {
+-    const hang: typeof fetch = (_u, init) =>
+-      new Promise((_resolve, reject) => {
+-        init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+-      });
++    const hang = routed(
++      (init) =>
++        new Promise<Response>((_resolve, reject) => {
++          init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
++        })
++    );
+     const r = await buildOnce(req, { fetchImpl: hang, timeoutMs: 20 });
+     expect(r).toMatchObject({ kind: "down", reason: "timeout" });
+   });
+   it("5xx / 403 without the contract → down (refused)", async () => {
+-    const r = await buildOnce(req, { fetchImpl: (async () => new Response("no", { status: 503 })) as unknown as typeof fetch });
++    const r = await buildOnce(req, { fetchImpl: routed(() => new Response("no", { status: 503 })) });
+     expect(r).toMatchObject({ kind: "down", reason: "refused" });
+   });
+   it("network error → down (unreachable), and never echoes the key", async () => {
+@@ -191,27 +203,110 @@ describe("buildOnce", () => {
+ });
+ 
+ describe("buildWithRetry + fallback decision", () => {
+-  it("retries once when down, then succeeds", async () => {
+-    const fetchImpl = vi
+-      .fn()
+-      .mockRejectedValueOnce(new TypeError("fetch failed"))
+-      .mockResolvedValueOnce(json(okBody));
++  /** The /build calls only: the /health pre-flight runs once per attempt. */
++  const buildCalls = (f: { mock: { calls: unknown[][] } }) => f.mock.calls.filter((c) => String(c[0]) === BUILD);
++
++  it("retries once when refused, then succeeds", async () => {
++    const build = vi.fn().mockResolvedValueOnce(new Response("unavailable", { status: 503 })).mockResolvedValueOnce(json(okBody));
++    const fetchImpl = vi.fn(routed(() => build()));
+     const r = await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
+-    expect(fetchImpl).toHaveBeenCalledTimes(2);
++    expect(build).toHaveBeenCalledTimes(2);
+     expect(r.kind).toBe("result");
+   });
+   it("worker down twice → down → fallback to the browser path", async () => {
+-    const fetchImpl = vi.fn(async () => new Response("unavailable", { status: 503 }));
++    const fetchImpl = vi.fn(routed(() => new Response("unavailable", { status: 503 })));
+     const r = await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
+-    expect(fetchImpl).toHaveBeenCalledTimes(2);
++    expect(buildCalls(fetchImpl)).toHaveLength(2);
+     expect(r.kind).toBe("down");
+     expect(nextCloudStep(r)).toEqual({ action: "fallback" });
+   });
+   it("does not retry a build that ran", async () => {
+-    const fetchImpl = vi.fn(async () => json({ ok: false, error: "bad", log: "" }));
++    const fetchImpl = vi.fn(routed(() => json({ ok: false, error: "bad", log: "" })));
+     await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
++    expect(buildCalls(fetchImpl)).toHaveLength(1);
++  });
++});
++
++// Self-hosted (Mac mini, not Vercel): an unreachable Cloud Run URL must hand the
++// request to the browser engine within 5 s, not after the token calls + 2 × 60 s.
++describe("/health pre-flight (5 s fallback budget)", () => {
++  /** Nothing listens: the pre-flight fails and no /build or Google call is made. */
++  const refuse = () =>
++    vi.fn(async (_u: string | URL, _init?: RequestInit) => {
++      throw new TypeError("fetch failed");
++    });
++
++  it("an unreachable service → down (unreachable) from /health alone, in well under 5 s", async () => {
++    const fetchImpl = refuse();
++    const started = Date.now();
++    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
++    expect(Date.now() - started).toBeLessThan(5_000);
++    expect(r).toMatchObject({ kind: "down", reason: "unreachable", engine: "cloud-run" });
++    expect(fetchImpl.mock.calls.map((c) => String(c[0]))).toEqual([HEALTH]);
++    expect(nextCloudStep(r)).toEqual({ action: "fallback" });
++  });
++
++  it("a hanging /health is aborted at the budget (CAD_CLOUD_HEALTH_TIMEOUT_MS), still unreachable", async () => {
++    vi.stubEnv("CAD_CLOUD_HEALTH_TIMEOUT_MS", "40");
++    const fetchImpl = vi.fn(
++      (_u: string | URL, init?: RequestInit) =>
++        new Promise<Response>((_resolve, reject) => {
++          init?.signal?.addEventListener("abort", () => reject(new DOMException("timed out", "TimeoutError")));
++        })
++    );
++    const started = Date.now();
++    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
++    expect(Date.now() - started).toBeLessThan(5_000);
++    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
++    expect(r.kind === "down" && r.detail).toContain("health");
++  });
++
++  it("a non-OK /health → down (unreachable) with no build call", async () => {
++    const fetchImpl = vi.fn(routed(() => json(okBody), () => new Response("nope", { status: 502 })));
++    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
++    expect(r).toMatchObject({ kind: "down", reason: "unreachable", detail: "health: HTTP 502" });
++    expect(fetchImpl.mock.calls.map((c) => String(c[0]))).toEqual([HEALTH]);
++  });
++
++  it("401/403 on /health is reachable (Cloud Run IAM): the build goes ahead", async () => {
++    const fetchImpl = vi.fn(routed(() => json(okBody), () => new Response("", { status: 403 })));
++    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
++    expect(r).toMatchObject({ kind: "result", engine: "cloud-run" });
++    expect(fetchImpl.mock.calls.map((c) => String(c[0]))).toEqual([HEALTH, BUILD]);
++  });
++
++  it("buildWithRetry never retries an unreachable pre-flight: one /health, ≤ 5 s in total", async () => {
++    const fetchImpl = refuse();
++    const started = Date.now();
++    const r = await buildWithRetry(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
++    expect(Date.now() - started).toBeLessThan(5_000);
++    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+     expect(fetchImpl).toHaveBeenCalledTimes(1);
+   });
++
++  it("buildWithRetry never retries a timeout either", async () => {
++    const hang = vi.fn(
++      routed(
++        (init) =>
++          new Promise<Response>((_resolve, reject) => {
++            init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
++          })
++      )
++    );
++    const r = await buildWithRetry(req, { fetchImpl: hang as unknown as typeof fetch, timeoutMs: 20 });
++    expect(r).toMatchObject({ kind: "down", reason: "timeout" });
++    expect(hang.mock.calls.filter((c) => String(c[0]) === BUILD)).toHaveLength(1);
++  });
++
++  it("a reachable service keeps the full build budget (the pre-flight is not subtracted)", async () => {
++    const fetchImpl = vi.fn(routed((init) => {
++      // The build still gets its own 60 s AbortController signal, not the 5 s one.
++      expect(init.signal?.aborted).toBe(false);
++      return json(okBody);
++    }));
++    const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch });
++    expect(r).toMatchObject({ kind: "result" });
++  });
+ });
+ 
+ describe("nextCloudStep", () => {
+@@ -270,11 +365,12 @@ const IAM = `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts
+ const googleIdToken = (expSeconds = 3600) =>
+   `g.${Buffer.from(JSON.stringify({ aud: URL_, exp: Math.floor(Date.now() / 1000) + expSeconds })).toString("base64url")}.s`;
+ 
+-/** Routes by URL: STS, IAM Credentials, then the worker. Records every call. */
+-function googleFetch(over: { sts?: () => Response; iam?: () => Response; worker?: () => Response } = {}) {
++/** Routes by URL: the /health pre-flight, STS, IAM Credentials, then the worker. Records every call. */
++function googleFetch(over: { health?: () => Response; sts?: () => Response; iam?: () => Response; worker?: () => Response } = {}) {
+   const calls: { url: string; init: RequestInit }[] = [];
+   const impl = vi.fn(async (url: string, init: RequestInit) => {
+     calls.push({ url, init });
++    if (url === HEALTH) return over.health?.() ?? json({ ok: true });
+     if (url === STS) return over.sts?.() ?? json({ access_token: "fed-access", token_type: "Bearer", expires_in: 3600 });
+     if (url === IAM) return over.iam?.() ?? json({ token: googleIdToken() });
+     return over.worker?.() ?? json(okBody);
+@@ -304,9 +400,9 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
+     const g = googleFetch();
+     const r = await buildOnce(req, { fetchImpl: g.impl });
+     expect(r.kind).toBe("result");
+-    expect(g.calls.map((c) => c.url)).toEqual([STS, IAM, `${URL_}/build`]);
++    expect(g.calls.map((c) => c.url)).toEqual([HEALTH, STS, IAM, BUILD]);
+ 
+-    const [sts, iam, worker] = g.calls;
++    const [, sts, iam, worker] = g.calls;
+     expect(sts.init.method).toBe("POST");
+     expect(JSON.parse(String(sts.init.body))).toEqual({
+       grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
+@@ -331,7 +427,7 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
+     // A caller-supplied token is no longer part of BuildOpts; a stale caller passing one must stay inert.
+     const stale = { fetchImpl: g.impl, oidcToken: "attacker-token" };
+     await buildOnce(req, stale);
+-    const subject = JSON.parse(String(g.calls[0].init.body)).subjectToken;
++    const subject = JSON.parse(String(g.calls.find((c) => c.url === STS)?.init.body)).subjectToken;
+     expect(subject).toBe(VERCEL_JWT);
+     expect(JSON.stringify(g.calls.map((c) => c.init.body))).not.toContain("attacker-token");
+   });
+@@ -354,7 +450,7 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
+     const stale = { fetchImpl: g.impl, oidcToken: "attacker-token" };
+     const r = await buildOnce(req, stale);
+     expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+-    expect(g.calls).toHaveLength(0);
++    expect(g.calls.map((c) => c.url)).toEqual([HEALTH]);
+   });
+ 
+   it("caches the ID token until 5 minutes before it expires", async () => {
+@@ -370,13 +466,14 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
+     expect(short.calls.filter((c) => c.url === STS)).toHaveLength(2);
+   });
+ 
+-  it("STS failure → down (unreachable) → retried once → fallback to the browser path, no worker call, no token leaked", async () => {
++  it("STS failure → down (unreachable), NOT retried → fallback to the browser path, no worker call, no token leaked", async () => {
+     const g = googleFetch({ sts: () => json({ error: "invalid_grant", error_description: "bad" }, 400) });
+     const r = await buildWithRetry(req, { fetchImpl: g.impl });
+     expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+     expect(r.kind === "down" && r.detail).toContain("sts HTTP 400 invalid_grant");
+-    expect(g.calls.filter((c) => c.url === STS)).toHaveLength(2);
+-    expect(g.calls.some((c) => c.url.startsWith(URL_))).toBe(false);
++    // "unreachable" is terminal now: one attempt, so the 5 s budget is not doubled.
++    expect(g.calls.filter((c) => c.url === STS)).toHaveLength(1);
++    expect(g.calls.some((c) => c.url === BUILD)).toBe(false);
+     expect(nextCloudStep(r)).toEqual({ action: "fallback" });
+     expect(JSON.stringify(r)).not.toContain(VERCEL_JWT);
+   });
+@@ -389,12 +486,12 @@ describe("keyless Google auth (Workload Identity Federation)", () => {
+     expect(JSON.stringify(r)).not.toContain("fed-access");
+   });
+ 
+-  it("no Vercel OIDC token anywhere → down without calling Google", async () => {
++  it("no Vercel OIDC token anywhere → down after the pre-flight, without calling Google", async () => {
+     vi.stubEnv("VERCEL_OIDC_TOKEN", "");
+     const g = googleFetch();
+     const r = await buildOnce(req, { fetchImpl: g.impl });
+-    expect(r).toMatchObject({ kind: "down", reason: "unreachable" });
+-    expect(g.calls).toHaveLength(0);
++    expect(r).toMatchObject({ kind: "down", reason: "unreachable", detail: "google auth: no Vercel OIDC token" });
++    expect(g.calls.map((c) => c.url)).toEqual([HEALTH]);
+   });
+ 
+   it("nothing configured → not_configured without a request", async () => {
+@@ -421,10 +518,11 @@ describe("part B: Mac Mini first, Cloud Run as fallback", () => {
+   });
+ 
+   it("worker off / down / refused → Cloud Run exactly as before", async () => {
+-    const fetchImpl = vi.fn(async () => json(okBody));
++    const fetchImpl = vi.fn(async (_url: string | URL) => json(okBody));
+     const r = await buildOnce(req, { fetchImpl: fetchImpl as unknown as typeof fetch, worker: cloudRun });
+     expect(r).toMatchObject({ kind: "result", engine: "cloud-run" });
+-    expect(fetchImpl).toHaveBeenCalledTimes(1);
++    // The /health pre-flight, then the build.
++    expect(fetchImpl.mock.calls.map((c) => String(c[0]))).toEqual([HEALTH, BUILD]);
+   });
+ 
+   it("Mac accepted but timed out → down (timeout) with NO Cloud Run call; nothing delivered, so nothing charged", async () => {
+diff --git a/lib/cad/cloud.ts b/lib/cad/cloud.ts
+index e73e419..11f5076 100644
+--- a/lib/cad/cloud.ts
++++ b/lib/cad/cloud.ts
+@@ -39,6 +39,8 @@ if (typeof window !== "undefined") throw new Error("lib/cad/cloud.ts is server-o
+ 
+ export const CLOUD_BUILD_TIMEOUT_MS = 60_000;
+ export const GOOGLE_CALL_TIMEOUT_MS = 10_000;
++/** The /health pre-flight budget: off Vercel an absent service must fall back in ≤ 5 s. */
++export const CLOUD_REACHABILITY_TIMEOUT_MS = 5_000;
+ const TOKEN_EARLY_MS = 5 * 60_000;
+ 
+ export const STS_URL = "https://sts.googleapis.com/v1/token";
+@@ -300,6 +302,33 @@ export type BuildOpts = {
+ const defaultWorker: WorkerRouter = async (target, body, timeoutMs) =>
+   (await import("@/lib/worker/proxy-server")).routeViaWorker(target, body, timeoutMs);
+ 
++/** The pre-flight budget: CAD_CLOUD_HEALTH_TIMEOUT_MS when it is a positive number, else 5 s. */
++export function reachabilityTimeoutMs(): number {
++  const raw = Number(process.env.CAD_CLOUD_HEALTH_TIMEOUT_MS?.trim());
++  return Number.isFinite(raw) && raw > 0 ? raw : CLOUD_REACHABILITY_TIMEOUT_MS;
++}
++
++/**
++ * GET {url}/health before any token work: off Vercel the keyless token calls
++ * alone can burn 10 s each and the build another 60 s, while a service that is
++ * not there should hand the request to the browser engine within 5 s. Returns
++ * the "down" outcome when the service could not be reached, null when it could.
++ * 401/403 means a host answered and only the token is missing: that is reachable
++ * (Cloud Run IAM rejects an unauthenticated /health), so the build goes ahead.
++ */
++async function reachabilityOutcome(url: string, doFetch: typeof fetch, timeoutMs: number): Promise<BuildOutcome | null> {
++  const down = (detail: string): BuildOutcome => ({ kind: "down", reason: "unreachable", detail, engine: "cloud-run" });
++  let res: Response;
++  try {
++    res = await doFetch(`${url}/health`, { method: "GET", signal: AbortSignal.timeout(timeoutMs), cache: "no-store" });
++  } catch (e) {
++    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
++    return down(timedOut ? `health: no answer within ${timeoutMs} ms` : "health: unreachable");
++  }
++  if (res.ok || res.status === 401 || res.status === 403) return null;
++  return down(`health: HTTP ${res.status}`);
++}
++
+ /** The /build request body (same for Cloud Run and the worker proxy). */
+ export function buildBody(req: BuildRequest) {
+   return {
+@@ -365,6 +394,15 @@ export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promis
+   if (attempt.engine === "mac") return fromWorker(attempt.outcome, timeoutMs);
+ 
+   const doFetch = opts.fetchImpl ?? fetch;
++  // Pre-flight, inside the 5 s budget (or the caller's shorter one): an absent
++  // service becomes "down" here instead of after the token calls and the build.
++  const unreachable = await reachabilityOutcome(url, doFetch, Math.min(reachabilityTimeoutMs(), timeoutMs));
++  if (unreachable) return unreachable;
++  // Keyless off Vercel: no OIDC token means no token is possible — fail without
++  // a Google call (which would otherwise cost up to GOOGLE_CALL_TIMEOUT_MS).
++  if (cloudAuthMode() === "keyless" && !vercelOidcToken())
++    return { kind: "down", reason: "unreachable", detail: "google auth: no Vercel OIDC token", engine: "cloud-run" };
++
+   const controller = new AbortController();
+   const timer = setTimeout(() => controller.abort(), timeoutMs);
+   try {
+@@ -394,10 +432,21 @@ export async function buildOnce(req: BuildRequest, opts: BuildOpts = {}): Promis
+   }
+ }
+ 
+-/** /build with one retry when the worker is down; "down" only after two misses in a row. */
++/**
++ * /build with one retry when the worker is down; "down" only after two misses in
++ * a row. A miss that already spent its whole budget is NOT retried: not_configured
++ * cannot change, and "unreachable" / "timeout" would only double the wait the
++ * browser fallback is waiting on (the 5 s pre-flight budget must stay 5 s).
++ */
++const NO_RETRY: ReadonlySet<Extract<BuildOutcome, { kind: "down" }>["reason"]> = new Set([
++  "not_configured",
++  "unreachable",
++  "timeout",
++]);
++
+ export async function buildWithRetry(req: BuildRequest, opts: BuildOpts = {}): Promise<BuildOutcome> {
+   const first = await buildOnce(req, opts);
+-  if (first.kind === "result" || first.reason === "not_configured") return first;
++  if (first.kind === "result" || NO_RETRY.has(first.reason)) return first;
+   return buildOnce(req, opts);
+ }
+ 
