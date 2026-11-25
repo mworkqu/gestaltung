@@ -6,7 +6,10 @@
  */
 import "server-only";
 
+import { randomBytes } from "node:crypto";
+
 import { getCadEngineSetting } from "@/lib/cad/engine-server";
+import { bookMeeting, freeMeetingSlots, loadMeetingSettings, sha256 } from "@/lib/meetings/server";
 import { ipHash as hashIp } from "@/lib/credits/server";
 import { defaultSiteUrl } from "@/lib/email/brand-layout";
 import { OWNER_EMAIL, sendEmail } from "@/lib/email";
@@ -22,7 +25,8 @@ import { createPublicClient } from "@/lib/supabase/public";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { PluginProduct } from "../check-project";
 import { pluginLibraryFrom } from "../to-studio";
-import { PluginNotSetUpError, type PluginServerDeps, type SearchPartRow } from "./register";
+import { userClient } from "./oauth";
+import { PluginNotSetUpError, type CartLineResult, type CartOutcome, type PluginServerDeps, type SearchPartRow } from "./register";
 
 const MAX_SKUS = 100;
 const DEFAULT_MIN_WALL_MM = 1.2;
@@ -177,6 +181,133 @@ export function realDeps(): PluginServerDeps {
       if (error) throw new Error(`plugin_handoffs link failed: ${error.message}`);
     },
     sendOwnerEmail: (mail) => sendEmail({ to: [OWNER_EMAIL], subject: mail.subject, html: mail.html, text: mail.text }),
+    sendClientEmail: (to, mail) => sendEmail({ to: [to], subject: mail.subject, html: mail.html, text: mail.text }),
+
+    // meetings (Phase 2). Each one degrades to a default or `not_set_up`
+    // before migration 0113 runs; lib/meetings/server.ts does the detecting.
+    meetingSettings: loadMeetingSettings,
+    freeMeetingSlots: (days) => freeMeetingSlots(days),
+    bookMeeting: async (req) => {
+      const token = randomBytes(32).toString("base64url");
+      const r = await bookMeeting(
+        {
+          startsAt: req.startsAt,
+          mode: req.mode,
+          name: req.name,
+          phone: req.phone,
+          email: req.email,
+          locale: req.locale,
+          topic: req.topic,
+          handoffId: req.handoffId,
+          source: "plugin",
+          chatSource: req.chatSource,
+        },
+        siteUrl,
+        token,
+      );
+      return r.ok
+        ? {
+            ok: true,
+            startsAt: r.booking.starts_at,
+            mode: r.booking.mode,
+            manageUrl: r.manageUrl,
+            invoiceQar: Number(r.booking.invoice_qar),
+          }
+        : { ok: false, error: r.error };
+    },
+    handoffIdForToken: async (token) => {
+      if (!token) return null;
+      const svc = createServiceClient();
+      if (!svc) return null;
+      try {
+        const { data, error } = await svc
+          .from("plugin_handoffs")
+          .select<string, { id: string }>("id")
+          .eq("token_hash", sha256(token))
+          .maybeSingle();
+        if (error) {
+          if (notSetUp(error)) return null;
+          throw error;
+        }
+        return data?.id ?? null;
+      } catch (err) {
+        if (notSetUp(err)) return null;
+        console.error("[mcp] handoff lookup failed:", err);
+        return null;
+      }
+    },
+
+    // ── the connected account (Phase 4a) ───────────────────────────────────
+    // Each one acts AS the person, through a client carrying their own access
+    // token: RLS and auth.uid() decide what they may touch, so ownership is
+    // never ours to check. The service client is deliberately not used here.
+    accountContact: async (accessToken, userId) => {
+      const db = userClient(accessToken);
+      if (!db) return null;
+      try {
+        const { data, error } = await db
+          .from("profiles")
+          .select<string, { full_name: string | null; phone: string | null; email: string | null }>("full_name, phone, email")
+          .eq("id", userId)
+          .maybeSingle();
+        if (error) {
+          if (notSetUp(error)) return null;
+          throw error;
+        }
+        if (!data) return null;
+        return { name: data.full_name ?? null, phone: data.phone ?? null, email: data.email ?? null };
+      } catch (err) {
+        console.error("[mcp] account contact read failed:", err);
+        return null;
+      }
+    },
+
+    addToCart: async (accessToken, lines): Promise<CartOutcome> => {
+      const db = userClient(accessToken);
+      if (!db) return { ok: false, error: "not_set_up" };
+      try {
+        const { data, error } = await db.rpc("plugin_add_to_cart", { p_lines: lines as unknown as Json });
+        if (error) {
+          if (notSetUp(error)) return { ok: false, error: "not_set_up" };
+          throw error;
+        }
+        const row = (data ?? {}) as {
+          ok?: boolean;
+          reason?: string;
+          added?: number;
+          lines?: CartLineResult[];
+          skipped?: string[];
+        };
+        if (!row.ok) {
+          const reason = row.reason === "guest" || row.reason === "bad_lines" || row.reason === "sign_in" ? row.reason : "failed";
+          return { ok: false, error: reason };
+        }
+        return { ok: true, added: row.added ?? 0, lines: row.lines ?? [], skipped: row.skipped ?? [] };
+      } catch (err) {
+        if (notSetUp(err)) return { ok: false, error: "not_set_up" };
+        console.error("[mcp] add to cart failed:", err);
+        return { ok: false, error: "failed" };
+      }
+    },
+
+    claimHandoffFor: async (accessToken, handoffToken) => {
+      const db = userClient(accessToken);
+      if (!db) return null;
+      try {
+        const { data, error } = await db.rpc("claim_plugin_handoff", { p_token: handoffToken });
+        if (error) {
+          if (notSetUp(error)) return null;
+          throw error;
+        }
+        const row = (data ?? {}) as { ok?: boolean; project_id?: string };
+        return row.ok && typeof row.project_id === "string" ? row.project_id : null;
+      } catch (err) {
+        if (notSetUp(err)) return null;
+        console.error("[mcp] handoff claim failed:", err);
+        return null;
+      }
+    },
+
     siteUrl,
     now: () => new Date(),
   };

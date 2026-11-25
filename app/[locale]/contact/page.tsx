@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MapPin, Mail, Building2, MessageCircle, Phone, BadgeCheck } from "lucide-react";
 
 import { ContactForm } from "@/components/contact-form";
+import { MeetingBooking } from "@/components/meetings/booking";
 import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
 import { getContactPhone } from "@/lib/contact-phone-server";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ export default async function ContactPage({
 
   const t = await getTranslations("Contact");
   const tCompany = await getTranslations("Company");
+  const tMeetings = await getTranslations("Meetings");
   const phone = await getContactPhone();
   // Cached public read (tag "store-settings"): the page stays static / ISR.
   const turnstileEnabled = await turnstileEnabledForPages();
@@ -153,6 +155,19 @@ export default async function ContactPage({
               {t("responseNote")}
             </span>
           </div>
+        </div>
+      </section>
+
+      {/* Paid meeting with the engineer. The card fetches the times, the price
+          and the rules from /api/meetings/slots on the client, so this page
+          stays static / ISR. */}
+      <section className="animate-fade-up delay-3 grid grid-cols-1 gap-6 lg:grid-cols-12" id="book-a-meeting">
+        <div className="lg:col-span-7">
+          <MeetingBooking />
+        </div>
+        <div className="flex flex-col justify-center gap-2 px-1 lg:col-span-5">
+          <h2 className={mono("text-[10px] text-cobalt")}>{tMeetings("cta")}</h2>
+          <p className="text-sm leading-relaxed text-body">{tMeetings("ctaHint")}</p>
         </div>
       </section>
     </div>

@@ -16,6 +16,7 @@ import { WhatsAppIcon } from "@/components/ui/whatsapp-icon";
 import { normaliseOrderStatus } from "@/lib/orders/status";
 import { promiseState } from "@/lib/orders/admin-rules";
 import { supplierAdminHref, suppliersOfOrder } from "@/lib/orders/line-suppliers";
+import { MeetingCredit } from "@/components/admin/meeting-credit";
 import { loadOrderLines } from "@/lib/admin/order-lines";
 import { qatarToday } from "@/lib/occasions";
 import { arabicCountForm } from "@/lib/text/count";
@@ -392,6 +393,9 @@ export default async function OrderDetailPage({
               </p>
               <OrderTestCancel id={order.id} status={order.status} isTest={isTest} shortId={order.id.slice(0, 8)} />
             </div>
+            {/* QAR 150 off when this customer paid for a meeting in the last 30
+                days (0113). Recording only — no total changes here. */}
+            <MeetingCredit order={order} locale={asLocale(locale)} />
           </div>
         </aside>
       </div>

@@ -9,7 +9,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 
-import { CLIENT_INFO_META_KEY, type CallToolResult, type McpServer, type ServerContext } from "@modelcontextprotocol/server";
+import { CLIENT_INFO_META_KEY, type CallToolResult, type McpServer, type ScopeChallengeHandler, type ServerContext } from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 import { leadsDashboardUrl, renderOwnerEmail } from "@/lib/email/lead-email";
@@ -17,6 +17,10 @@ import type { BrandFact } from "@/lib/email/brand-layout";
 import { isPlausibleEmail } from "@/lib/email-address";
 import { formatQar } from "@/lib/format/money";
 import { pluginProjectSubject, type PluginChatSource } from "@/lib/leads/sources";
+import { companyLine, meetingLines, modeLabel, modeLine } from "@/lib/meetings/copy";
+import { meetingBookedSubject, meetingLeadMessage, renderMeetingClientEmail, renderMeetingOwnerEmail } from "@/lib/meetings/email";
+import type { MeetingMode, MeetingSettings } from "@/lib/meetings/settings";
+import { slotLabel, slotOptions } from "@/lib/meetings/slots";
 import { isValidPhone, normalizePhone } from "@/lib/phone";
 import { STORE_CATEGORIES, type StoreCategory } from "@/lib/store/store-categories";
 import { escapeHtml } from "@/lib/text/escape";
@@ -24,7 +28,10 @@ import type { StudioDoc } from "@/lib/studio/schema";
 import { BuildFileSchema, type BuildFile } from "../build-file";
 import { checkProject, storeSkusFor, type CheckResult, type PluginProduct } from "../check-project";
 import { designRules, designRulesText } from "../design-rules";
+import { hasScope, PLUGIN_SCOPES, pluginUserFrom, type PluginScope, type PluginUser } from "../oauth";
+import { previewPayload, PREVIEW_MIME, PREVIEW_URI } from "../preview";
 import type { PluginLibrary } from "../to-studio";
+import { PREVIEW_UI_META, PREVIEW_WIDGET_HTML } from "./preview-widget";
 
 export const SERVER_INFO = { name: "gestaltung360", version: "1.0.0" } as const;
 
@@ -33,20 +40,36 @@ export const ENGINEER_LINE = "Our engineer reviews your file and quotes the best
 export const SERVER_INSTRUCTIONS = [
   "Gestaltung360 is a company in Qatar that makes electronic products from a person's idea: parts, wiring, code and a 3D-printed case.",
   "How to work: ask what the product must do; call get_design_rules; choose parts only by their library id from it; write the build file and call check_project until ok is true; describe how it will look and work, with the parts and their total in QAR.",
+  "Then call preview_look to show the user how it will look.",
   "Before sending, list exactly what will be sent (summary, parts, wiring, code, the look and the case design notes) and ask the user to agree. Never call send_project without the user's explicit agreement.",
   "Never send the chat. requirement_quotes holds at most 10 short quotes (140 characters each) of the user's own words, for key requirements only.",
   "Prices are in QAR. Never name CAD software to the user. Never promise that anything is free, and never promise a reprint or a remake.",
   `After sending, give the user the link and say: "${ENGINEER_LINE}"`,
+  "If the user wants to talk to the engineer, offer a paid meeting: call list_meeting_slots, show the times, the price and the cancellation rule, and call book_meeting only after the user explicitly agrees.",
+  "To buy the parts, offer add_parts_to_cart (it needs their connected account): list the products, the quantities and the total in QAR, and call it only after they agree. It places no order; checkout stays on the website.",
 ].join("\n");
 
-/** Per hashed IP. Reads per hour, checks per hour, sends per day. */
-export const RATE_LIMITS = { read: 120, check: 30, send: 10 } as const;
-/** Phase 2 (meeting requests); no meeting tool exists yet. */
-export const MEETING_LIMIT = 10;
+/** Per hashed IP. Reads per hour, checks per hour, sends and bookings per day. */
+export const RATE_LIMITS = { read: 120, check: 30, send: 10, meeting: 10, cart: 20 } as const;
+/** Kept as its own name because the owner's brief names it. */
+export const MEETING_LIMIT = RATE_LIMITS.meeting;
+
+/** Which buckets count per day rather than per hour. */
+const DAILY_BUCKETS: readonly RateKind[] = ["send", "meeting", "cart"];
+
+export type RateKind = keyof typeof RATE_LIMITS;
 
 export const TEXT_RATE_LIMITED = "Too many requests from your network. Please wait and try again later.";
 export const TEXT_FAILED = "Something went wrong on our side. Please try again.";
 export const TEXT_NOT_SET_UP = "Sending is being set up and is not available yet. Please try again later.";
+export const TEXT_SIGN_IN =
+  "This needs the user's Gestaltung360 account. Ask them to connect it in this chat's connector settings, then try again.";
+export const CART_FAIL_TEXT: Record<"guest" | "bad_lines" | "not_set_up" | "failed", string> = {
+  guest: "That account is a guest session, which cannot keep a cart. Ask the user to sign in on gestaltung360.com first.",
+  bad_lines: "No product to add. Call search_parts or check_project first and use the SKUs it returns.",
+  not_set_up: "The cart is being set up and is not available yet.",
+  failed: TEXT_FAILED,
+};
 
 const HANDOFF_DAYS = 30;
 const LEAD_MESSAGE_MAX = 8000;
@@ -88,6 +111,38 @@ export type LeadInsert = { name: string; phone: string; email: string | null; lo
 
 export type OwnerMail = { subject: string; html: string; text: string };
 
+// ── meetings (Phase 2) ───────────────────────────────────────────────────────
+
+export type MeetingBookRequest = {
+  startsAt: string;
+  mode: MeetingMode;
+  name: string;
+  phone: string;
+  email: string | null;
+  locale: "en" | "ar";
+  topic: string | null;
+  handoffId: string | null;
+  /** Which AI chat is booking it (0114), read from the client info. */
+  chatSource: PluginChatSource;
+};
+
+export type MeetingBookOutcome =
+  | { ok: true; startsAt: string; mode: MeetingMode; manageUrl: string; invoiceQar: number }
+  | { ok: false; error: "slot_taken" | "too_soon" | "bad_slot" | "too_many" | "not_set_up" | "failed" };
+
+// ── the connected account (Phase 4a) ─────────────────────────────────────────
+
+/** What the person already told us, so a chat never has to ask twice. */
+export type AccountContact = { name: string | null; phone: string | null; email: string | null };
+
+export type CartLine = { sku: string; qty: number };
+
+export type CartLineResult = { sku: string; name: string; qty: number; unit_price_qar: number | null };
+
+export type CartOutcome =
+  | { ok: true; added: number; lines: CartLineResult[]; skipped: string[] }
+  | { ok: false; error: "sign_in" | "guest" | "bad_lines" | "not_set_up" | "failed" };
+
 export interface PluginServerDeps {
   loadLibrary(): Promise<PluginLibrary>;
   loadProducts(skus: string[]): Promise<ReadonlyMap<string, PluginProduct>>;
@@ -102,6 +157,23 @@ export interface PluginServerDeps {
   createLead(row: LeadInsert): Promise<{ id: string }>;
   linkLead(handoffId: string, inquiryId: string): Promise<void>;
   sendOwnerEmail(mail: OwnerMail): Promise<boolean>;
+  /** One e-mail to one address (the client's confirmation). */
+  sendClientEmail(to: string, mail: OwnerMail): Promise<boolean>;
+  // meetings (Phase 2)
+  meetingSettings(): Promise<MeetingSettings>;
+  /** Free slot start times as ISO instants, already clamped to the horizon. */
+  freeMeetingSlots(days: number): Promise<string[]>;
+  bookMeeting(req: MeetingBookRequest): Promise<MeetingBookOutcome>;
+  /** The hand-off a `/handoff/<token>` link of ours names, or null. */
+  handoffIdForToken(token: string): Promise<string | null>;
+  // the connected account (Phase 4a). Each takes the caller's own access token,
+  // so the database sees the person and RLS decides what they may touch.
+  /** Their saved name / phone / e-mail, or null when nothing is saved. */
+  accountContact(accessToken: string, userId: string): Promise<AccountContact | null>;
+  /** Adds published store parts to their cart in one statement (0115). */
+  addToCart(accessToken: string, lines: CartLine[]): Promise<CartOutcome>;
+  /** Turns a hand-off into a project in their account; the project id, or null. */
+  claimHandoffFor(accessToken: string, handoffToken: string): Promise<string | null>;
   siteUrl: string;
   now(): Date;
 }
@@ -133,9 +205,9 @@ export function qatarHour(now: Date): string {
   return new Date(now.getTime() + 3 * 3_600_000).toISOString().slice(0, 13).replace(/[-T]/g, "");
 }
 
-export function rateKey(kind: "read" | "check" | "send", ipHash: string | null, now: Date): string {
+export function rateKey(kind: RateKind, ipHash: string | null, now: Date): string {
   const h = qatarHour(now);
-  return `mcp:${kind}:${ipHash ?? "noip"}:${kind === "send" ? h.slice(0, 8) : h}`;
+  return `mcp:${kind}:${ipHash ?? "noip"}:${DAILY_BUCKETS.includes(kind) ? h.slice(0, 8) : h}`;
 }
 
 export function sourceFromName(name: string | null | undefined): PluginChatSource {
@@ -165,6 +237,31 @@ function clientSource(server: McpServer, ctx: ServerContext): PluginChatSource {
 }
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+/**
+ * The hand-off token inside one of OUR links, or null. A link on any other host
+ * is ignored rather than followed, so a project can only ever be attached to a
+ * meeting through a gestaltung360.com hand-off.
+ */
+export function handoffTokenFromLink(link: string, siteUrl: string): string | null {
+  try {
+    const u = new URL(link.trim());
+    if (u.host !== new URL(siteUrl).host) return null;
+    return /^\/(?:en|ar)\/handoff\/([A-Za-z0-9_-]{20,200})\/?$/.exec(u.pathname)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** What the client's AI is told when the database refuses a booking. */
+const BOOK_FAIL_TEXT: Record<Exclude<MeetingBookOutcome & { ok: false }, { ok: true }>["error"], string> = {
+  slot_taken: "That time has just been taken. Call list_meeting_slots again and offer the user another time.",
+  too_soon: "That time is too soon. Offer a time further ahead from list_meeting_slots.",
+  bad_slot: "That is not one of our meeting times. Use a starts_at exactly as list_meeting_slots returned it.",
+  too_many: "This number already has two meetings booked. Ask the user to move or cancel one first.",
+  not_set_up: TEXT_NOT_SET_UP,
+  failed: TEXT_FAILED,
+};
 
 function publicCheck(r: CheckResult) {
   return {
@@ -308,15 +405,47 @@ export function pluginOwnerEmail(input: {
 
 // ── prompt ───────────────────────────────────────────────────────────────────
 
+/**
+ * The name and number a booking goes out with: what the user said in the chat,
+ * else what their connected account already has. Kept out of the tool handler
+ * so the handler stays readable (and under the complexity limit).
+ */
+function bookingContact(
+  said: { name?: string; phone?: string; email?: string },
+  saved: AccountContact | null,
+): { ok: true; name: string; phone: string; email: string } | { ok: false; summary: string; problem: string } {
+  const name = said.name?.trim() || saved?.name?.trim() || "";
+  const phone = said.phone?.trim() || saved?.phone?.trim() || "";
+  const email = said.email?.trim() || saved?.email?.trim() || "";
+
+  if (!name) {
+    return { ok: false, summary: "we need a name for the booking.", problem: "name: ask the user what name to put on the booking." };
+  }
+  if (!isValidPhone(phone)) {
+    return {
+      ok: false,
+      summary: "the phone number looks wrong.",
+      problem: "phone: ask for a WhatsApp number with the country code, e.g. +974 5555 1234.",
+    };
+  }
+  if (email && !isPlausibleEmail(email)) {
+    return { ok: false, summary: "the email address looks wrong.", problem: "email: ask again or leave it out." };
+  }
+  return { ok: true, name, phone, email };
+}
+
 export const DESIGN_A_PRODUCT_PROMPT = [
   "Help me design an electronic product that Gestaltung360 (a company in Qatar) can make for me. Work step by step:",
   "1. Ask me what the product must do, who it is for, where it will be used (indoor, outdoor or both), how it is powered and any size wishes. Ask short questions, one or two at a time.",
   "2. Call get_design_rules and choose parts only by their library id from it. Never invent a part.",
   "3. Write the build file and call check_project. Fix every problem it reports and call it again until ok is true. Tell me the parts and the total in QAR.",
-  "4. Describe how the product will look and work: the case shape, colour, finish, any label, where the openings go.",
+  "4. Call preview_look so I can see how it will look, and describe it too: the case shape, colour, finish, any label, where the openings go.",
   "5. List exactly what will be sent: the summary, the parts, the wiring, the code, the look and the case design notes. The chat itself is never sent; only up to 10 short quotes (max 140 characters each) of my own words for key requirements. Ask me clearly whether I agree to send it.",
-  "6. Only after I say yes, call send_project. Never send without my explicit agreement.",
-  `7. Give me the link it returns and tell me: "${ENGINEER_LINE}"`,
+  "6. When I agree, ask whether I would like to include my name and WhatsApp number so the engineer can reply to me directly, or an e-mail if I prefer. Say it is optional and that you will send the project either way. Ask once and do not press.",
+  "7. Only after I say yes, call send_project. Never send without my explicit agreement.",
+  `8. Give me the link it returns and tell me: "${ENGINEER_LINE}"`,
+  "9. Then ask whether I would like to talk to the engineer. If I do, call list_meeting_slots, show me the times in my language with the price and the cancellation rule, and call book_meeting only after I say yes.",
+  "10. If I say I want to buy the parts myself, offer to put them in my Gestaltung360 cart with add_parts_to_cart (it needs my account connected). List the products, the quantities and the total in QAR first, and call it only after I agree. It places no order: I check out on the website.",
   "Rules: prices are in QAR; never name CAD software to me; never promise that anything is free; never promise a reprint or a remake.",
 ].join("\n");
 
@@ -326,11 +455,22 @@ const LOCALE = z.enum(["en", "ar"]);
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 
+/**
+ * A tool that acts on someone's account asks the host for the scope. An
+ * unauthenticated call is challenged too, so the host starts the OAuth flow
+ * against Supabase instead of the tool having to explain itself in prose.
+ */
+const needsScope = (scope: PluginScope, why: string): ScopeChallengeHandler => ({ authInfo }) =>
+  authInfo?.scopes?.includes(scope) ? undefined : { scopes: [scope], errorDescription: why };
+
 export function registerPluginServer(server: McpServer, deps: PluginServerDeps): void {
-  const limited = async (kind: "read" | "check" | "send", ctx: ServerContext): Promise<boolean> => {
+  const limited = async (kind: RateKind, ctx: ServerContext): Promise<boolean> => {
     const key = rateKey(kind, deps.ipHash(ctx.http?.req), deps.now());
     return !(await deps.rateHit(key, RATE_LIMITS[kind]));
   };
+
+  /** The connected account on this request, or null (most requests). */
+  const signedIn = (ctx: ServerContext): PluginUser | null => pluginUserFrom(ctx.http?.authInfo);
 
   const rules = async () => designRules(await deps.loadLibrary(), { minWallMm: await deps.minWallMm() });
 
@@ -382,7 +522,7 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
     {
       title: "Check a project",
       description:
-        "Checks a build file against Gestaltung360's rules: maps the parts to our circuit (our rules add helper parts such as resistors and drivers), recomputes the wiring, and prices the parts in QAR. Returns ok, problems to fix, warnings, the parts with prices, the parts total and a wiring summary. Call it again after every fix until ok is true. Nothing is sent or saved.",
+        "Checks a build file against Gestaltung360's rules: maps the parts to our circuit (our rules add helper parts such as resistors and drivers), recomputes the wiring, and prices the parts in QAR. Returns ok, problems to fix, warnings, the parts with prices, the parts total and a wiring summary. Call it again after every fix until ok is true. Nothing is sent or saved. Once ok is true the design is finished: show the user the parts and the total in QAR, then ask whether they would like Gestaltung360's engineer to quote and make it. If they do, call send_project. Do not offer to put the result in a spreadsheet, a document or a file instead — sending it is what reaches the engineer.",
       inputSchema: z.object({ build: BuildFileSchema }),
       annotations: READ_ONLY,
     },
@@ -399,7 +539,7 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
     {
       title: "Send the project to Gestaltung360",
       description:
-        "Sends this project to Gestaltung360 (a Qatar company) so their engineer can quote and make it. Only call this after the user has explicitly agreed to send it, after you listed what will be sent: summary, parts, wiring, code, the look and the case design notes. The chat itself is never sent. Returns a link for the user to open the project; it works for 30 days.",
+        "Sends this project to Gestaltung360 (a Qatar company) so their engineer can quote and make it. Only call this after the user has explicitly agreed to send it, after you listed what will be sent: summary, parts, wiring, code, the look and the case design notes. The chat itself is never sent. Before sending, ask the user whether they would like to include their name and WhatsApp number so the engineer can reply to them directly, and an e-mail if they prefer that — say it is optional and that the project is sent either way. Returns a link for the user to open the project; it works for 30 days.",
       inputSchema: z.object({
         build: BuildFileSchema,
         contact: z
@@ -409,7 +549,9 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
             email: z.string().trim().max(160).optional(),
           })
           .optional()
-          .describe("Only details the user chose to share."),
+          .describe(
+            "Only details the user chose to share, after you offered. Ask once, do not press: the project is sent with or without them. Without a number or an e-mail the engineer has no way to answer, so it is worth offering.",
+          ),
         locale: LOCALE.default("en").describe("The user's language for the project link."),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -476,9 +618,302 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
           console.error("[mcp] send_project: owner email failed:", err);
         }
 
-        const link = `${deps.siteUrl.replace(/\/+$/, "")}/${locale}/handoff/${token}`;
+        const site = deps.siteUrl.replace(/\/+$/, "");
         const summaryLine = `${build.name}: ${r.parts.length} parts, parts total ${formatQar(r.parts_total_qar, locale)}. ${ENGINEER_LINE}`;
-        return reply(`Sent. Open your project: ${link}`, { ok: true, link, expires_at: expiresAt, summary_line: summaryLine });
+
+        // With a connected account the project is created in it straight away,
+        // so the user has nothing to claim. The hand-off row and its token stay
+        // as they are, so the link keeps working if the claim ever fails.
+        const user = signedIn(ctx);
+        if (user && hasScope(user, PLUGIN_SCOPES.project)) {
+          try {
+            const projectId = await deps.claimHandoffFor(user.token, token);
+            if (projectId) {
+              const link = `${site}/${locale}/projects/${projectId}/studio?step=enclosure`;
+              return reply(`Sent and saved to your account. Open it: ${link}`, {
+                ok: true,
+                link,
+                project_id: projectId,
+                in_account: true,
+                summary_line: summaryLine,
+              });
+            }
+          } catch (err) {
+            console.error("[mcp] send_project: claim into the account failed:", err);
+          }
+        }
+
+        const link = `${site}/${locale}/handoff/${token}`;
+        return reply(`Sent. Open your project: ${link}`, { ok: true, link, expires_at: expiresAt, in_account: false, summary_line: summaryLine });
+      }),
+  );
+
+  // ── the cart (Phase 4b, signed in) ─────────────────────────────────────────
+
+  server.registerTool(
+    "add_parts_to_cart",
+    {
+      title: "Put the parts in the user's cart",
+      description:
+        "Adds Gestaltung360 store products to the cart of the user's own account, by the sku values search_parts or check_project returned. Only call this after the user has explicitly agreed, after you listed the products, the quantities and the total in QAR. It needs their account to be connected; the chat will ask them to sign in if it is not. Nothing is ordered and no price is charged here: the user opens their cart on gestaltung360.com to check out.",
+      inputSchema: z.object({
+        lines: z
+          .array(
+            z.object({
+              sku: z.string().trim().min(2).max(40).describe("A sku exactly as search_parts or check_project returned it."),
+              qty: z.number().int().min(1).max(999).default(1).describe("How many. Raised to the product's minimum order quantity if that is higher."),
+            }),
+          )
+          .min(1)
+          .max(20),
+        locale: LOCALE.default("en").describe("The user's language for the cart link."),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      scopeChallenge: needsScope(PLUGIN_SCOPES.cart, "Connect your Gestaltung360 account to use its cart."),
+    },
+    (args, ctx) =>
+      guarded("add_parts_to_cart", async () => {
+        if (await limited("cart", ctx)) return errorReply(TEXT_RATE_LIMITED);
+
+        // The scope challenge answers an unauthenticated call before this, but
+        // a host that ignores challenges must not get an anonymous write.
+        const user = signedIn(ctx);
+        if (!user || !hasScope(user, PLUGIN_SCOPES.cart)) return errorReply(TEXT_SIGN_IN);
+
+        const out = await deps.addToCart(user.token, args.lines.map((l) => ({ sku: l.sku, qty: l.qty })));
+        if (!out.ok) {
+          if (out.error === "sign_in") return errorReply(TEXT_SIGN_IN);
+          const text = CART_FAIL_TEXT[out.error];
+          if (out.error === "not_set_up" || out.error === "failed") return errorReply(text);
+          return reply(`Not added: ${text}`, { ok: false, problems: [text] });
+        }
+
+        const cartUrl = `${deps.siteUrl.replace(/\/+$/, "")}/${args.locale}/store/cart`;
+        const total = out.lines.reduce((sum, l) => sum + (l.unit_price_qar ?? 0) * l.qty, 0);
+        const lines = out.lines.map((l) => `- ${l.qty} × ${l.name}${l.unit_price_qar === null ? "" : ` — ${formatQar(l.unit_price_qar * l.qty, args.locale)}`}`);
+        const skippedLine = out.skipped.length
+          ? ` Not added (we cannot deliver these right now): ${out.skipped.join(", ")}.`
+          : "";
+        const summary = out.added
+          ? `${out.added} product${out.added === 1 ? "" : "s"} in the cart, ${formatQar(total, args.locale)}.${skippedLine} Check out at ${cartUrl}`
+          : `Nothing was added.${skippedLine}`;
+
+        return reply(summary, {
+          ok: true,
+          added: out.added,
+          lines: out.lines,
+          skipped: out.skipped,
+          parts_total_qar: Math.round(total * 100) / 100,
+          cart_url: cartUrl,
+          lines_text: lines,
+          note: "Delivery and the binding total are shown at checkout on the website.",
+        });
+      }),
+  );
+
+  // ── how it will look (Phase 3, MCP Apps UI) ────────────────────────────────
+
+  server.registerTool(
+    "preview_look",
+    {
+      title: "Show how it will look",
+      description:
+        "Shows the user how the product will look: the case shape, its colour and finish, the parts with their prices in QAR and the total. On a client that can show a card the user sees it rendered; everywhere else the same facts come back as text. Nothing is sent or saved.",
+      inputSchema: z.object({ build: BuildFileSchema, locale: LOCALE.default("en") }),
+      annotations: READ_ONLY,
+      // MCP Apps (spec 2026-01-26) links a tool to its UI resource with
+      // _meta.ui.resourceUri; openai/outputTemplate is ChatGPT's alias for the
+      // same thing, so one server satisfies both hosts.
+      _meta: {
+        ui: { resourceUri: PREVIEW_URI },
+        "openai/outputTemplate": PREVIEW_URI,
+      },
+    },
+    (args, ctx) =>
+      guarded("preview_look", async () => {
+        if (await limited("check", ctx)) return errorReply(TEXT_RATE_LIMITED);
+        const { build, locale } = args;
+
+        const r = await runCheck(deps, build, locale);
+        if (!r.ok) return reply(`Not ready to show: ${problemsLine(r.problems.length)}`, { ok: false, problems: r.problems, warnings: r.warnings });
+
+        const payload = previewPayload(build, r, { locale, company: companyLine(locale) });
+        // A host without MCP Apps gets exactly the same facts as text, and the
+        // hand-off page stays the full preview.
+        const text = [
+          `${payload.name} — ${payload.look.shape}, ${payload.look.colour}, ${payload.look.finish}${payload.look.label ? `, label "${payload.look.label}"` : ""}.`,
+          ...payload.parts.map((p) => `- ${p.qty} × ${p.name}${p.price ? ` — ${p.price}` : ""}`),
+          `Parts total: ${payload.parts_total}`,
+          payload.wiring_summary,
+        ].join("\n");
+
+        // `build` rides along so the card's Send button can call send_project.
+        return {
+          content: [{ type: "text", text }],
+          structuredContent: { ...payload, build } as unknown as Json,
+        };
+      }),
+  );
+
+  server.registerResource(
+    "preview",
+    PREVIEW_URI,
+    { title: "How it will look", description: "The product's case, its parts and the total in QAR.", mimeType: PREVIEW_MIME },
+    async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: PREVIEW_MIME, text: PREVIEW_WIDGET_HTML, _meta: PREVIEW_UI_META }],
+    }),
+  );
+
+  // ── meetings (Phase 2) ─────────────────────────────────────────────────────
+
+  server.registerTool(
+    "list_meeting_slots",
+    {
+      title: "List free meeting times with the engineer",
+      description:
+        "Lists the free times in the next three weeks for a paid one-hour meeting with a Gestaltung360 engineer, online or at the studio in Lusail, Qatar. Times are Qatar time. Returns the price in QAR and the payment and cancellation rules. Nothing is booked by this tool.",
+      inputSchema: z.object({
+        days: z.number().int().min(1).max(21).default(21).describe("How many days ahead to look."),
+        locale: LOCALE.default("en").describe("The user's language for the time labels."),
+      }),
+      annotations: READ_ONLY,
+    },
+    (args, ctx) =>
+      guarded("list_meeting_slots", async () => {
+        if (await limited("read", ctx)) return errorReply(TEXT_RATE_LIMITED);
+        const settings = await deps.meetingSettings();
+        const slots = slotOptions(await deps.freeMeetingSlots(args.days), settings);
+        const lines = meetingLines(settings, args.locale);
+        const summary = slots.length
+          ? `${slots.length} free time${slots.length === 1 ? "" : "s"}. ${lines[0]}`
+          : "No free times in that period. Ask the user to try a later date.";
+        return reply(summary, {
+          slots,
+          price_qar: settings.price_qar,
+          lines,
+          modes: settings.modes.map((m) => ({ mode: m, label: modeLabel(m, args.locale), detail: modeLine(m, args.locale) })),
+          company: companyLine(args.locale),
+        });
+      }),
+  );
+
+  server.registerTool(
+    "book_meeting",
+    {
+      title: "Book the meeting with the engineer",
+      description:
+        "Books one paid meeting with a Gestaltung360 engineer at a time from list_meeting_slots. Only call this after the user has explicitly agreed to book it and has seen the price and the cancellation rule. It is invoiced after the meeting and only if the user is happy. Returns the time, the price and a link where the user can move or cancel it.",
+      inputSchema: z.object({
+        starts_at: z.string().trim().min(10).max(40).describe("A starts_at exactly as list_meeting_slots returned it."),
+        mode: z.enum(["online", "studio"]).describe("online = we send a Google Meet link on WhatsApp; studio = at our studio in Lusail."),
+        name: z.string().trim().min(1).max(60).optional().describe("Not needed if the user's account is connected and has a name saved."),
+        phone: z
+          .string()
+          .trim()
+          .min(6)
+          .max(20)
+          .optional()
+          .describe("WhatsApp number with the country code, e.g. +974 5555 1234. Not needed if their connected account has one."),
+        email: z.string().trim().max(160).optional().describe("Only if the user wants a confirmation by e-mail."),
+        topic: z.string().trim().max(400).optional().describe("What the user wants to talk about, in their own short words."),
+        handoff_link: z.string().trim().max(300).optional().describe("The gestaltung360.com project link from send_project, if there is one."),
+        locale: LOCALE.default("en"),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    (args, ctx) =>
+      guarded("book_meeting", async () => {
+        if (await limited("meeting", ctx)) return errorReply(TEXT_RATE_LIMITED);
+        const { locale } = args;
+        const settings = await deps.meetingSettings();
+
+        // A connected account fills in what the user did not repeat in the chat.
+        const user = signedIn(ctx);
+        const saved = user && hasScope(user, PLUGIN_SCOPES.meetings) ? await deps.accountContact(user.token, user.userId) : null;
+        const who = bookingContact(args, saved);
+        if (!who.ok) return reply(`Not booked: ${who.summary}`, { ok: false, problems: [who.problem] });
+        const { name, phone, email } = who;
+        const startsAt = new Date(args.starts_at);
+        if (Number.isNaN(startsAt.getTime())) {
+          return reply("Not booked: that is not a time we offer.", {
+            ok: false,
+            problems: ["starts_at: use a value exactly as list_meeting_slots returned it."],
+          });
+        }
+
+        const handoffId = args.handoff_link
+          ? await deps.handoffIdForToken(handoffTokenFromLink(args.handoff_link, deps.siteUrl) ?? "")
+          : null;
+
+        const booked = await deps.bookMeeting({
+          chatSource: clientSource(server, ctx),
+          startsAt: startsAt.toISOString(),
+          mode: args.mode,
+          name,
+          phone: normalizePhone(phone),
+          email: email || null,
+          locale,
+          topic: args.topic?.trim() || null,
+          handoffId,
+        });
+        if (!booked.ok) {
+          if (booked.error === "not_set_up" || booked.error === "failed") return errorReply(BOOK_FAIL_TEXT[booked.error]);
+          return reply(`Not booked: ${BOOK_FAIL_TEXT[booked.error]}`, { ok: false, problems: [BOOK_FAIL_TEXT[booked.error]] });
+        }
+
+        const bookingForMail = {
+          starts_at: booked.startsAt,
+          mode: booked.mode,
+          name,
+          phone: normalizePhone(phone),
+          email: email || null,
+          locale,
+          topic: args.topic?.trim() || null,
+          source: "plugin" as const,
+          invoice_qar: booked.invoiceQar,
+        };
+        const mailInput = { booking: bookingForMail, settings, manageUrl: booked.manageUrl, siteUrl: deps.siteUrl };
+        const timeLabel = slotLabel(booked.startsAt, locale, settings);
+
+        // The meeting is booked: from here on a failure is logged, never shown.
+        try {
+          const lead = await deps.createLead({
+            name,
+            phone: normalizePhone(phone),
+            email: email || null,
+            locale,
+            message: meetingLeadMessage(mailInput),
+          });
+          void lead;
+        } catch (err) {
+          console.error("[mcp] book_meeting: lead not saved:", err);
+        }
+        try {
+          const sent = await deps.sendOwnerEmail(renderMeetingOwnerEmail(mailInput));
+          if (!sent) console.warn("[mcp] book_meeting: owner email not sent", { subject: meetingBookedSubject(name, timeLabel) });
+        } catch (err) {
+          console.error("[mcp] book_meeting: owner email failed:", err);
+        }
+        if (email) {
+          try {
+            await deps.sendClientEmail(email, renderMeetingClientEmail(mailInput));
+          } catch (err) {
+            console.error("[mcp] book_meeting: client email failed:", err);
+          }
+        }
+
+        const lines = meetingLines(settings, locale);
+        return reply(`Booked: ${timeLabel} (${modeLabel(booked.mode, locale)}). Manage it here: ${booked.manageUrl}`, {
+          ok: true,
+          starts_at: booked.startsAt,
+          label: timeLabel,
+          mode: booked.mode,
+          mode_detail: modeLine(booked.mode, locale),
+          price_qar: booked.invoiceQar,
+          lines,
+          manage_link: booked.manageUrl,
+          company: companyLine(locale),
+        });
       }),
   );
 

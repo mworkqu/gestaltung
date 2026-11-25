@@ -1,0 +1,31 @@
+diff --git a/next.config.mjs b/next.config.mjs
+index 7d309eb..3d69109 100644
+--- a/next.config.mjs
++++ b/next.config.mjs
+@@ -20,6 +20,10 @@ const SHARP_ROUTES = [
+ 
+ /** @type {import('next').NextConfig} */
+ const nextConfig = {
++  // Self-hosted (Mac mini): let a rebuild write to a different folder so the
++  // running `next start` keeps serving the old build until the new one is
++  // finished and swapped in. Unset everywhere else, so this is ".next".
++  distDir: process.env.NEXT_DIST_DIR || ".next",
+   // F-053: the two stylesheets (~19 kB gzip) were render-blocking <link>s, two
+   // extra round trips before first paint. Inline them in the HTML instead. On a
+   // throttled link (400 kbps, 400 ms RTT) /en FCP went 2.7 s -> 0.9 s. Pages
+@@ -87,6 +91,15 @@ const nextConfig = {
+   // (308) redirects keep old links + bookmarks working, for both locales.
+   async redirects() {
+     return [
++      // Self-hosted (Mac mini) replacement for the www -> apex redirect that
++      // used to live only in vercel.json. Kept here so it also covers paths the
++      // middleware matcher skips (/api, /sitemap.xml, /robots.txt, /_next).
++      {
++        source: "/:path*",
++        has: [{ type: "host", value: "www.gestaltung360.com" }],
++        destination: "https://gestaltung360.com/:path*",
++        permanent: true,
++      },
+       // 2026-11 consolidation: the site_v2 flag is gone and the former /v2
+       // pages ARE the public pages. Old /v2 links (previews, shares) land on
+       // the public path.

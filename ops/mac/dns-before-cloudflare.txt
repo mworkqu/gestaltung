@@ -1,0 +1,51 @@
+DNS for gestaltung360.com as served by Squarespace, captured 2026-11-21 21:22 +0300
+Use this to check what Cloudflare imports. Anything here that is missing in
+Cloudflare must be added by hand, EXCEPT the two Vercel records (apex A and
+www CNAME), which the tunnel replaces.
+
+## nameservers (these are what you change at Squarespace)
+nsc1.squarespacedns.com.
+nsc2.squarespacedns.com.
+nsc3.squarespacedns.com.
+nsc4.squarespacedns.com.
+
+## website (these two get replaced by the tunnel)
+A      gestaltung360.com            76.76.21.21 
+CNAME  www.gestaltung360.com        cname.vercel-dns.com. 
+
+## EMAIL — these must survive the move, or mail stops
+MX     1 smtp.google.com.
+TXT    gestaltung360.com (SPF)      "v=spf1 include:_spf.google.com ~all" 
+TXT    _dmarc.gestaltung360.com     "v=DMARC1; p=none;" 
+TXT    google._domainkey.gestaltung360.com (DKIM) =
+           "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqKMG2aJFJZZofvPE2xInf0zmN2qOzYm9frKhx/+3bAnrsKoDCWSuPGMnEQQR1x4fGyL2Pe6FvRU5/jqw7B+YuUSz8CxghSL3tdrjVu+WMowkgdAWcybIeQDon7N/QqbHxNS8hdsuePqalVyov8u8iPHvqJyV5Bzf2INIc16Wh2unNHTS4TuKE/PaAzu1ANxLK" "c72HIgixOimc/6r2NkEDlZKjVW+BwU5n2HPyiYMUTFXjkp1171DriIiqvFBTCZb6yS01rBYbWTjxBKBGFBZ6PPIGCphafN/6r4rfL8VNd34aKG2V8pLsmKctcm5lP0cZ0ZTdW4fb+58I4FJasTJkwIDAQAB"
+
+## other records found
+_domainconnect _domainconnect.domains.squarespace.com. 
+CAA    gestaltung360.com            
+
+## note
+A zone transfer is not possible from outside, so this is only the records that
+could be looked up by name. Open the DNS page at Squarespace and compare the
+full list there against Cloudflare's imported list, row by row.
+
+## Cloudflare zone created 2026-11-21 (account M.work.qu@gmail.com, Free plan)
+All 4 email records imported byte-identical: MX 1 smtp.google.com,
+SPF, _dmarc, google._domainkey (both quoted chunks).
+Also imported: A apex 76.76.21.21 (proxied), CNAME www -> cname.vercel-dns.com
+(proxied), CNAME _domainconnect -> squarespace (proxied, can be deleted).
+No CAA record was imported (none had a value at Squarespace).
+
+## NEW nameservers to set at Squarespace
+edward.ns.cloudflare.com
+michelle.ns.cloudflare.com
+
+## FULL list read from the Squarespace DNS page 2026-11-21 (authoritative)
+Four records the Cloudflare auto-scan MISSED — all of them the Resend
+sending domain on contact.gestaltung360.com. These must be added by hand:
+MX   contact                     20  inbound-smtp.ap-northeast-1.amazonaws.com
+MX   send.contact                10  feedback-smtp.ap-northeast-1.amazonses.com
+TXT  resend._domainkey.contact       p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC3t3JztUiiy5LA1E4s6aMXSjNEghYxcFr6EaFmpNrP/gbUwQGxlQEW1qkQuD8a8qgYTMPQYUKliW+1Zl5CH3u/8y9qMJHBggDt01VN/iEERc899Www3eYKQKrYLGWET3XEQbduDk4aolSdGiXhoz/6syQrDLVYOJZBd2BdgVw7awIDAQAB
+TXT  send.contact                    v=spf1 include:amazonses.com ~all
+Squarespace also notes: "This domain is managed by Google Workspace."
+Domain lock is On (affects transfers, not nameserver changes).

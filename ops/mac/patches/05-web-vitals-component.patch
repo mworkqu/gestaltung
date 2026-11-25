@@ -1,0 +1,49 @@
+diff --git a/components/web-vitals.tsx b/components/web-vitals.tsx
+new file mode 100644
+index 0000000..e99eb13
+--- /dev/null
++++ b/components/web-vitals.tsx
+@@ -0,0 +1,43 @@
++"use client";
++
++// Core Web Vitals from real visitors (not a lab test), sent to GA4 through the
++// same consent-gated `track()` every other event uses. Before an Accept this
++// does nothing at all, exactly like the funnel events.
++//
++// WHY THIS EXISTS
++// Cloudflare Web Analytics already reports vitals for 100% of visitors without
++// cookies, and that stays the headline number. This adds the same metrics
++// *inside* GA4 so a slow page can be read next to what people did on it — e.g.
++// "/en/store was slow for this visit, and the visit had no add_to_cart".
++//
++// WHAT IS SENT
++// Only the metric name, a rounded number and Google's own good/poor rating.
++// No URL, no identifier, nothing free-text. CLS is a ratio, so it is sent
++// multiplied by 1000 (GA4 charts integers far better); divide by 1000 to read
++// it. Every other metric is whole milliseconds.
++
++import { useReportWebVitals } from "next/web-vitals";
++
++import { track, type WebVitalMetric } from "@/lib/analytics";
++
++const REPORTED: readonly string[] = ["LCP", "INP", "CLS", "FCP", "TTFB"];
++
++function rating(value: unknown): "good" | "needs-improvement" | "poor" {
++  return value === "good" || value === "needs-improvement" || value === "poor"
++    ? value
++    : "good";
++}
++
++export function WebVitals() {
++  useReportWebVitals((metric) => {
++    if (!REPORTED.includes(metric.name)) return;
++    const raw = typeof metric.value === "number" ? metric.value : 0;
++    if (!Number.isFinite(raw)) return;
++    track("web_vitals", {
++      metric: metric.name as WebVitalMetric,
++      value: Math.round(metric.name === "CLS" ? raw * 1000 : raw),
++      rating: rating((metric as { rating?: unknown }).rating),
++    });
++  });
++  return null;
++}

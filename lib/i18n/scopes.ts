@@ -108,7 +108,8 @@ export const MESSAGE_SCOPES = {
   cart: ["Cart", "Delivery", "Parts"],
   checkout: ["Checkout", "Credits", "Delivery", "Parts", "PayMethods", "Phone"],
   checkoutSuccess: ["Checkout", "Delivery", "PayMethods"],
-  contact: ["Contact", "Phone", "Turnstile"],
+  // Contact also carries the "Book a meeting with our engineer" booking card.
+  contact: ["Contact", "Phone", "Turnstile", "Meetings"],
   designQuote: ["DesignQuote", "Phone", "Turnstile"],
   // /pricing#credits: only the signed-in balance (CreditsOverview) is a client component.
   pricing: [
@@ -130,6 +131,8 @@ export const MESSAGE_SCOPES = {
   projects: ["Projects", "Turnstile"],
   // /handoff/<token> (chat plugin): the claim flow, its phone card and the guest bot check.
   handoff: ["Handoff", "Phone.invalid", "Turnstile"],
+  // /meetings/<token>: the client's own page for one paid engineer meeting.
+  meetings: ["Meetings", "Turnstile"],
   // /tokens: the pack / Maker Pass checkout with the Fawran proof upload (TokenShop).
   tokens: ["Tokens"],
   // /orders/[id]: only PaymentInstructions is a client component; the rest of
@@ -159,6 +162,8 @@ export const MESSAGE_SCOPES = {
     "Projects",
     "Parts",
     "Turnstile",
+    // The Make step's "Book a meeting with our engineer" card.
+    "Meetings",
   ],
 } as const satisfies Record<string, readonly string[]>;
 

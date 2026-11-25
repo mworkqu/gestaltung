@@ -14,8 +14,10 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Factory, Loader2, School, ShoppingCart } from "lucide-react";
+import type { Factory } from "lucide-react";
+import { CalendarClock, Loader2, School, ShoppingCart } from "lucide-react";
 
+import { MeetingBooking } from "@/components/meetings/booking";
 import { useRouter } from "@/i18n/navigation";
 import { StudioViewer } from "@/components/studio/viewer/ViewerLazy";
 import { layoutComponents } from "@/lib/studio/layout";
@@ -154,6 +156,9 @@ export function MakeStep({
             onClick={() => void orderParts()}
           />
         )}
+        {/* Talk to the engineer: a paid hour, online or at the studio. Not in a
+            class project — a class has no checkout and the teacher buys. */}
+        {!isClass && <MakeMeeting />}
       </div>
       {placed.length > 0 && (
         <div className="space-y-2">
@@ -202,6 +207,21 @@ export function MakeStep({
       )}
       {cart.state === "failed" && <Problem>{t("cartFailed")}</Problem>}
     </StepFrame>
+  );
+}
+
+/**
+ * "Book a meeting with our engineer": closed until asked for, then the same
+ * booking card the /contact page uses (one hour, QAR 150, invoiced after the
+ * meeting). The card itself fetches the times, the price and the rules.
+ */
+function MakeMeeting() {
+  const t = useTranslations("Meetings");
+  const [open, setOpen] = useState(false);
+
+  if (open) return <MeetingBooking compact />;
+  return (
+    <BigOption icon={CalendarClock} title={t("cta")} text={t("ctaHint")} busy={false} onClick={() => setOpen(true)} />
   );
 }
 

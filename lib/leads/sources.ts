@@ -53,6 +53,14 @@ export const SOURCES: Record<string, LeadSourceDef> = {
     subject: (n) => pluginProjectSubject(n, "claude"),
     fallbackMessage: "Plugin project.",
   },
+  // A paid engineer meeting booked from the chat plugin or from the website
+  // (lib/meetings). The booking code writes this lead itself; the subject
+  // carries the time, see meetingBookedSubject in lib/meetings/email.ts.
+  meeting: {
+    label: "Engineer meeting",
+    subject: (n) => `New meeting booked — ${n}`,
+    fallbackMessage: "Engineer meeting booked.",
+  },
 };
 
 /** Which AI chat sent a plugin project (plugin_handoffs.source). */

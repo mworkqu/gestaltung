@@ -1,0 +1,16 @@
+diff --git a/components/home/cad-champions-side-button.tsx b/components/home/cad-champions-side-button.tsx
+index a8014bb..81bd35e 100644
+--- a/components/home/cad-champions-side-button.tsx
++++ b/components/home/cad-champions-side-button.tsx
+@@ -17,7 +17,10 @@ export async function CadChampionsSideButton({ locale }: { locale: string }) {
+       className="fixed end-0 top-1/2 z-30 flex -translate-y-1/2 items-center gap-2 rounded-s-2xl bg-cobalt py-3 pe-3 ps-4 text-sm font-semibold text-white shadow-neu transition-colors hover:bg-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cobalt/60 focus-visible:ring-offset-2 print:hidden"
+     >
+       <GraduationCap className="h-5 w-5 shrink-0" strokeWidth={1.75} aria-hidden />
+-      <span>{t("cadChampionsSide")}</span>
++      {/* Label hidden on phones: at 375px the full pill reached across the hero
++          and sat on top of the opening paragraph. Icon only there — the
++          aria-label still names it — and the text returns from sm up. */}
++      <span className="hidden sm:inline">{t("cadChampionsSide")}</span>
+     </a>
+   );
+ }
