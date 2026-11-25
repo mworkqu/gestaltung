@@ -13,7 +13,9 @@ import {
   money,
   num,
   tally,
+  when,
   within,
+  type DetailView,
   type Section,
   type Table,
 } from "@/lib/mobile/report";
@@ -131,12 +133,14 @@ export function buildSourcing(input: SourcingInput): Section {
     { label: "Live offers", value: int(activeOffers.length), hint: "supplier prices we hold" },
     {
       label: "Prices up",
+      detail: "prices-up",
       value: int(up.length),
       tone: up.length ? ("warn" as const) : ("flat" as const),
       hint: `last ${days} days`,
     },
     {
       label: "Prices down",
+      detail: "prices-down",
       value: int(down.length),
       tone: down.length ? ("good" as const) : ("flat" as const),
       hint: `last ${days} days`,
@@ -154,6 +158,7 @@ export function buildSourcing(input: SourcingInput): Section {
     },
     {
       label: "Last sync",
+      detail: "sync-runs",
       value: lastRun?.status ? label(lastRun.status) : "never",
       tone: lastRun?.status === "ok" ? ("good" as const) : ("bad" as const),
       hint: lastRun?.started_at ? lastRun.started_at.slice(0, 10) : undefined,
@@ -229,6 +234,63 @@ export function buildSourcing(input: SourcingInput): Section {
   if (openGaps.length) notes.push(`${openGaps.length} thing${openGaps.length === 1 ? "" : "s"} were asked for that the catalogue does not carry.`);
   if (!notes.length) notes.push("Sourcing is quiet: prices steady, every offer freshly checked.");
 
+  // What is behind the tiles. Price moves name the product, because a row that
+  // only says "a price went up" cannot be acted on.
+  const DETAIL_ROWS = 100;
+  const moveRow = (m: (typeof moves)[number]) => [
+    m.product,
+    money(m.oldRetail ?? 0),
+    money(m.newRetail ?? 0),
+    when(m.at),
+  ];
+  const MOVE_COLUMNS = ["Product", "Was", "Now", "When"];
+  const MOVE_ALIGN: ("l" | "r")[] = ["l", "r", "r", "l"];
+  const bySize = (a: (typeof moves)[number], b: (typeof moves)[number]) =>
+    Math.abs((b.newRetail ?? 0) - (b.oldRetail ?? 0)) - Math.abs((a.newRetail ?? 0) - (a.oldRetail ?? 0));
+
+  const details: DetailView[] = [
+    {
+      key: "prices-up",
+      title: "Prices up",
+      blurb: `Every supplier price that rose in the last ${days} days, biggest move first. Our shelf price follows these automatically.`,
+      columns: MOVE_COLUMNS,
+      rows: [...up].sort(bySize).slice(0, DETAIL_ROWS).map(moveRow),
+      align: MOVE_ALIGN,
+      empty: `No supplier price rose in the last ${days} days.`,
+    },
+    {
+      key: "prices-down",
+      title: "Prices down",
+      blurb: `Every supplier price that fell in the last ${days} days, biggest move first.`,
+      columns: MOVE_COLUMNS,
+      rows: [...down].sort(bySize).slice(0, DETAIL_ROWS).map(moveRow),
+      align: MOVE_ALIGN,
+      empty: `No supplier price fell in the last ${days} days.`,
+    },
+    {
+      key: "sync-runs",
+      title: "Price sync runs",
+      blurb:
+        "Every run in the window, newest first: what it reached, what it changed, and what stopped it. A run that says blocked was refused by the supplier, not broken here.",
+      columns: ["When", "Supplier", "Checked", "Changed", "What happened"],
+      rows: [...input.runs]
+        .filter((r) => within(r.started_at, days, now))
+        .sort((a, b) => (b.started_at ?? "").localeCompare(a.started_at ?? ""))
+        .slice(0, DETAIL_ROWS)
+        .map((r) => [
+          when(r.started_at),
+          label(r.supplier_code),
+          int(r.checked ?? 0),
+          int(r.changed ?? 0),
+          // The error is the useful half when a run did not finish cleanly;
+          // when it did, the status alone says everything.
+          r.status === "ok" ? "finished cleanly" : `${label(r.status)}${r.error ? ` — ${r.error}` : ""}`,
+        ]),
+      align: ["l", "l", "r", "r", "l"],
+      empty: `No sync has run in the last ${days} days.`,
+    },
+  ];
+
   return {
     key: "sourcing",
     title: "Sourcing",
@@ -249,6 +311,7 @@ export function buildSourcing(input: SourcingInput): Section {
     ],
     tables,
     notes,
+    details,
   };
 }
 
