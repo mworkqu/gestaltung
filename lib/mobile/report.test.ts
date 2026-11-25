@@ -496,6 +496,32 @@ describe("access log", () => {
   });
 });
 
+describe("the wire contract", () => {
+  it("never leaves `details` off a section once the server has filled it in", () => {
+    // Swift's synthesised Codable throws on a missing key rather than using the
+    // property's default, so a section without details must still send [].
+    // This mirrors what loadReport() does before answering.
+    const section = buildStore({ parts: [], ownStock: [], orderItems: [], signals: [], windowDays: 30, now: NOW });
+    const onTheWire = { ...section, details: section.details ?? [] };
+    expect(JSON.parse(JSON.stringify(onTheWire))).toHaveProperty("details");
+    expect(onTheWire.details).toEqual([]);
+  });
+
+  it("gives the orders section its details rather than an empty list", () => {
+    const section = buildOrders({
+      orders: [
+        {
+          id: "o1", customer_name: "Sara", total_qar: 10, discount_qar: 0, status: "paid",
+          payment_method: "cash", delivery_area: null, shipping_tier: null, class_id: null,
+          created_at: ago(1), is_test: null,
+        },
+      ],
+      events: [], payments: [], carts: [], windowDays: 30, now: NOW,
+    });
+    expect((section.details ?? []).length).toBeGreaterThan(0);
+  });
+});
+
 describe("every section", () => {
   // The dashboard must read as "nothing to do here", never as a blank screen,
   // on a database with nothing in it.

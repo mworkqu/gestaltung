@@ -72,7 +72,16 @@ export async function loadReport(): Promise<{ ok: true; data: Report } | { ok: f
     trafficSection(now),
   ]);
 
-  const sections = built.filter((s): s is Section => s !== null);
+  // Every optional field is filled in before the report leaves the server.
+  //
+  // The apps decode this with Swift's synthesised Codable, which does NOT fall
+  // back to a property's default when a key is missing — it throws, and the
+  // whole report fails to read. A section without details therefore has to send
+  // `details: []` rather than leave the key out. Anything optional added to
+  // Section in future belongs here too.
+  const sections = built
+    .filter((s): s is Section => s !== null)
+    .map((s) => ({ ...s, details: s.details ?? [] }));
   const unavailable = built.map((s, i) => (s === null ? SECTION_KEYS[i] : null)).filter((k): k is string => k !== null);
 
   return {
