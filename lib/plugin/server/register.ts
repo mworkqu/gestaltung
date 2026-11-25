@@ -441,10 +441,11 @@ export const DESIGN_A_PRODUCT_PROMPT = [
   "3. Write the build file and call check_project. Fix every problem it reports and call it again until ok is true. Tell me the parts and the total in QAR.",
   "4. Call preview_look so I can see how it will look, and describe it too: the case shape, colour, finish, any label, where the openings go.",
   "5. List exactly what will be sent: the summary, the parts, the wiring, the code, the look and the case design notes. The chat itself is never sent; only up to 10 short quotes (max 140 characters each) of my own words for key requirements. Ask me clearly whether I agree to send it.",
-  "6. Only after I say yes, call send_project. Never send without my explicit agreement.",
-  `7. Give me the link it returns and tell me: "${ENGINEER_LINE}"`,
-  "8. Then ask whether I would like to talk to the engineer. If I do, call list_meeting_slots, show me the times in my language with the price and the cancellation rule, and call book_meeting only after I say yes.",
-  "9. If I say I want to buy the parts myself, offer to put them in my Gestaltung360 cart with add_parts_to_cart (it needs my account connected). List the products, the quantities and the total in QAR first, and call it only after I agree. It places no order: I check out on the website.",
+  "6. When I agree, ask whether I would like to include my name and WhatsApp number so the engineer can reply to me directly, or an e-mail if I prefer. Say it is optional and that you will send the project either way. Ask once and do not press.",
+  "7. Only after I say yes, call send_project. Never send without my explicit agreement.",
+  `8. Give me the link it returns and tell me: "${ENGINEER_LINE}"`,
+  "9. Then ask whether I would like to talk to the engineer. If I do, call list_meeting_slots, show me the times in my language with the price and the cancellation rule, and call book_meeting only after I say yes.",
+  "10. If I say I want to buy the parts myself, offer to put them in my Gestaltung360 cart with add_parts_to_cart (it needs my account connected). List the products, the quantities and the total in QAR first, and call it only after I agree. It places no order: I check out on the website.",
   "Rules: prices are in QAR; never name CAD software to me; never promise that anything is free; never promise a reprint or a remake.",
 ].join("\n");
 
@@ -521,7 +522,7 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
     {
       title: "Check a project",
       description:
-        "Checks a build file against Gestaltung360's rules: maps the parts to our circuit (our rules add helper parts such as resistors and drivers), recomputes the wiring, and prices the parts in QAR. Returns ok, problems to fix, warnings, the parts with prices, the parts total and a wiring summary. Call it again after every fix until ok is true. Nothing is sent or saved.",
+        "Checks a build file against Gestaltung360's rules: maps the parts to our circuit (our rules add helper parts such as resistors and drivers), recomputes the wiring, and prices the parts in QAR. Returns ok, problems to fix, warnings, the parts with prices, the parts total and a wiring summary. Call it again after every fix until ok is true. Nothing is sent or saved. Once ok is true the design is finished: show the user the parts and the total in QAR, then ask whether they would like Gestaltung360's engineer to quote and make it. If they do, call send_project. Do not offer to put the result in a spreadsheet, a document or a file instead — sending it is what reaches the engineer.",
       inputSchema: z.object({ build: BuildFileSchema }),
       annotations: READ_ONLY,
     },
@@ -538,7 +539,7 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
     {
       title: "Send the project to Gestaltung360",
       description:
-        "Sends this project to Gestaltung360 (a Qatar company) so their engineer can quote and make it. Only call this after the user has explicitly agreed to send it, after you listed what will be sent: summary, parts, wiring, code, the look and the case design notes. The chat itself is never sent. Returns a link for the user to open the project; it works for 30 days.",
+        "Sends this project to Gestaltung360 (a Qatar company) so their engineer can quote and make it. Only call this after the user has explicitly agreed to send it, after you listed what will be sent: summary, parts, wiring, code, the look and the case design notes. The chat itself is never sent. Before sending, ask the user whether they would like to include their name and WhatsApp number so the engineer can reply to them directly, and an e-mail if they prefer that — say it is optional and that the project is sent either way. Returns a link for the user to open the project; it works for 30 days.",
       inputSchema: z.object({
         build: BuildFileSchema,
         contact: z
@@ -548,7 +549,9 @@ export function registerPluginServer(server: McpServer, deps: PluginServerDeps):
             email: z.string().trim().max(160).optional(),
           })
           .optional()
-          .describe("Only details the user chose to share."),
+          .describe(
+            "Only details the user chose to share, after you offered. Ask once, do not press: the project is sent with or without them. Without a number or an e-mail the engineer has no way to answer, so it is worth offering.",
+          ),
         locale: LOCALE.default("en").describe("The user's language for the project link."),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
