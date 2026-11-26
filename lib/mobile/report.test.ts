@@ -102,6 +102,21 @@ describe("store section", () => {
     expect(section.notes.some((n) => n.includes("down to"))).toBe(true);
   });
 
+  it("says where a missing delivery class is actually fixed, since no screen sets it", () => {
+    const section = buildStore({
+      parts: [part({ lead_time_class: null })],
+      ownStock: [],
+      orderItems: [],
+      signals: [],
+      windowDays: 30,
+      now: NOW,
+    });
+    const note = section.notes.find((n) => n.includes("no delivery time"));
+    expect(note).toContain("no admin screen");
+    expect(note).toContain("parts.lead_time_class");
+    expect(note).toContain("3_5_days");
+  });
+
   it("ranks best sellers by units and by revenue separately", () => {
     const section = buildStore({
       parts: [part(), part({ id: "p2", name: "Resistor" })],
@@ -427,6 +442,43 @@ describe("price moves", () => {
     expect(priceMoves([{ ...base, started_at: ago(1), changes: null }])).toEqual([]);
     expect(priceMoves([{ ...base, started_at: ago(1), changes: "oops" }])).toEqual([]);
     expect(priceMoves([{ ...base, started_at: null, changes: [{ partName: "x" }] }])).toEqual([]);
+  });
+});
+
+describe("sourcing findings say what to do", () => {
+  const run = (over: Record<string, unknown>) => ({
+    supplier_code: "voltaat",
+    trigger: "cron",
+    status: "blocked",
+    started_at: ago(1),
+    finished_at: ago(1),
+    requests: 3,
+    checked: 3,
+    changed: 0,
+    missing: 0,
+    error: null,
+    changes: null,
+    ...over,
+  });
+  const build = (runs: ReturnType<typeof run>[]) =>
+    buildSourcing({ suppliers: [], offers: [], runs, gaps: [], windowDays: 30, now: Date.now() });
+
+  it("tells a rate limit, which needs nothing, from a refused key, which does not", () => {
+    const note = build([run({ error: "mouser_rate_limited" })]).notes.find((n) => n.includes("did not finish cleanly"));
+    expect(note).toContain("only rate-limited");
+    expect(note).toContain("next hourly batch");
+    expect(note).not.toContain("401/403");
+  });
+
+  it("names the key as the thing to change when the supplier refused us", () => {
+    const note = build([run({ error: "digikey_401" })]).notes.find((n) => n.includes("did not finish cleanly"));
+    expect(note).toContain("401/403");
+    expect(note).toContain("until the key is replaced");
+  });
+
+  it("points at the list that holds the reason, either way", () => {
+    const note = build([run({ error: "something else entirely" })]).notes.find((n) => n.includes("did not finish cleanly"));
+    expect(note).toContain("Last sync");
   });
 });
 

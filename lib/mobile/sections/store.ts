@@ -209,9 +209,27 @@ export function buildStore(input: StoreInput): Section {
   ];
 
   const notes: string[] = [];
-  if (low.length) notes.push(`${low.length} product${low.length === 1 ? "" : "s"} in Lusail ${low.length === 1 ? "is" : "are"} down to ${LOW_STOCK} or fewer.`);
+  if (low.length) {
+    notes.push(
+      `${low.length} product${low.length === 1 ? "" : "s"} in Lusail ${low.length === 1 ? "is" : "are"} down to ${LOW_STOCK} or fewer. ` +
+        `The "Running out" list below names them; restock them from Store \u2192 Restock in the dashboard.`,
+    );
+  }
   if (unservedRequests.length) notes.push(`${unservedRequests.length} request${unservedRequests.length === 1 ? "" : "s"} still waiting to be served.`);
-  if (onRequest.length) notes.push(`${onRequest.length} published product${onRequest.length === 1 ? " has" : "s have"} no delivery time set, so the store shows ${onRequest.length === 1 ? "it" : "them"} as "on request" instead of with a delivery date. This is about the catalogue, not about orders.`);
+  if (onRequest.length) {
+    // The fix is spelled out because there is no screen for it: nothing in
+    // app/ or components/ writes parts.lead_time_class. A null there is also
+    // the backup-supplier queue — app/api/admin/sourcing-backup looks for
+    // exactly this set — so "find it a supplier" and "set the column" are the
+    // two real answers. The four values are the ones 0028's check constraint
+    // allows; null itself is what the store reads as "on request".
+    notes.push(
+      `${onRequest.length} published product${onRequest.length === 1 ? " has" : "s have"} no delivery time set, so the store shows ` +
+        `${onRequest.length === 1 ? "it" : "them"} as "on request" instead of with a delivery date. This is about the catalogue, not about orders. ` +
+        `There is no admin screen for this field: either give the product a supplier offer, which is what the backup-supplier search is for, ` +
+        `or set parts.lead_time_class in Supabase to in_stock, 3_5_days, 1_2_weeks or 2_4_weeks.`,
+    );
+  }
   if (neverSold.length && published.length) notes.push(`${pct(neverSold.length, published.length)} of the catalogue has never been ordered.`);
   if (retailValue > 0) notes.push(`Stock on hand: ${money(stockValue)} QAR at cost, ${money(retailValue)} QAR at shelf price.`);
   if (catalogue.length > CATALOGUE_ROWS) {

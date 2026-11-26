@@ -226,13 +226,7 @@ export function buildSourcing(input: SourcingInput): Section {
     breakdown("Offer availability", tally(activeOffers, (o) => label(o.availability)), ["Availability", "Offers"]),
   ];
 
-  const notes: string[] = [];
-  if (failedRuns.length) notes.push(`${failedRuns.length} price sync run${failedRuns.length === 1 ? "" : "s"} did not finish cleanly in the last ${days} days.`);
-  if (stale.length) notes.push(`${stale.length} offer${stale.length === 1 ? " has" : "s have"} not been re-checked in a week — the sync is not reaching them.`);
-  if (up.length) notes.push(`${up.length} supplier price${up.length === 1 ? "" : "s"} went up; our shelf price follows automatically.`);
-  if (unavailable.length) notes.push(`${unavailable.length} offer${unavailable.length === 1 ? " is" : "s are"} out of stock at the supplier.`);
-  if (openGaps.length) notes.push(`${openGaps.length} thing${openGaps.length === 1 ? "" : "s"} were asked for that the catalogue does not carry.`);
-  if (!notes.length) notes.push("Sourcing is quiet: prices steady, every offer freshly checked.");
+  const notes = sourcingNotes({ failedRuns, stale, up, unavailable, openGaps, days });
 
   // What is behind the tiles. Price moves name the product, because a row that
   // only says "a price went up" cannot be acted on.
@@ -335,4 +329,63 @@ export function priceMoves(runs: SyncRunRow[]): Move[] {
     }
   }
   return out.filter((m) => m.at);
+}
+
+/**
+ * The findings, and what to do about each one. Kept out of `buildSourcing` so
+ * that function stays under the line cap, exactly as `orderDetails` is in the
+ * orders section.
+ *
+ * Every note that can be acted on says how. A count on its own ("14 runs did
+ * not finish cleanly") tells the owner something is wrong and nothing about
+ * whether it is theirs to fix.
+ *
+ * Only the failed runs are read field by field; the other four are counted and
+ * nothing more, so they are typed as the lists they are and no narrower.
+ */
+function sourcingNotes(n: {
+  failedRuns: SyncRunRow[];
+  stale: unknown[];
+  up: unknown[];
+  unavailable: unknown[];
+  openGaps: unknown[];
+  days: number;
+}): string[] {
+  const { failedRuns, stale, up, unavailable, openGaps, days } = n;
+  const notes: string[] = [];
+  if (failedRuns.length) {
+    // "Did not finish cleanly" covers two different situations with two
+    // different answers, so the note says which one this is. api-refresh.ts
+    // sets "blocked" only for /rate_limited|_403|_401/: a rate limit clears
+    // itself on the next hourly batch, but a 401 or 403 is our credentials and
+    // stays broken until someone changes the key.
+    const credentials = failedRuns.filter((r) => /_401|_403/.test(r.error ?? ""));
+    const limited = failedRuns.filter((r) => /rate_limit/i.test(r.error ?? ""));
+    let line = `${failedRuns.length} price sync run${failedRuns.length === 1 ? "" : "s"} did not finish cleanly in the last ${days} days. `;
+    line += `Open "Last sync" above to read what stopped each one. `;
+    if (credentials.length) {
+      line += `${credentials.length} of them ${credentials.length === 1 ? "was" : "were"} refused outright (401/403) — that is the supplier key, and it stays broken until the key is replaced. `;
+    }
+    if (limited.length) {
+      line += `${limited.length} ${limited.length === 1 ? "was" : "were"} only rate-limited, which needs nothing: the offers not reached keep their last numbers and go first in the next hourly batch.`;
+    }
+    notes.push(line.trim());
+  }
+  if (stale.length) {
+    notes.push(
+      `${stale.length} offer${stale.length === 1 ? " has" : "s have"} not been re-checked in a week — the sync is not reaching them. ` +
+        `Each batch has a time budget and takes the oldest-checked first, so a backlog clears on its own; if these are the same offers week after week, ` +
+        `their supplier is the one being refused, and "Last sync" names it.`,
+    );
+  }
+  if (up.length) notes.push(`${up.length} supplier price${up.length === 1 ? "" : "s"} went up; our shelf price follows automatically.`);
+  if (unavailable.length) {
+    notes.push(
+      `${unavailable.length} offer${unavailable.length === 1 ? " is" : "s are"} out of stock at the supplier. ` +
+        `A product with no other live offer falls back to "order on request" and loses its delivery date, so these are worth a second supplier.`,
+    );
+  }
+  if (openGaps.length) notes.push(`${openGaps.length} thing${openGaps.length === 1 ? "" : "s"} were asked for that the catalogue does not carry.`);
+  if (!notes.length) notes.push("Sourcing is quiet: prices steady, every offer freshly checked.");
+  return notes;
 }

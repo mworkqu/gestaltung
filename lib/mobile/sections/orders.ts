@@ -247,10 +247,25 @@ export function buildOrders(input: OrdersInput): Section {
   ];
 
   const notes: string[] = [];
-  if (openAgeDays !== null && openAgeDays >= 7) notes.push(`An order has been open for ${openAgeDays} days — the oldest unfinished one.`);
-  if (paymentsWaiting.length) notes.push(`${paymentsWaiting.length} payment${paymentsWaiting.length === 1 ? "" : "s"} waiting to be reviewed.`);
+  if (openAgeDays !== null && openAgeDays >= 7) {
+    notes.push(
+      `An order has been open for ${openAgeDays} days — the oldest unfinished one. ` +
+        `Tap "Open orders" to see it: that list is oldest first, so the ones worth chasing are at the top.`,
+    );
+  }
+  if (paymentsWaiting.length) {
+    notes.push(
+      `${paymentsWaiting.length} payment${paymentsWaiting.length === 1 ? "" : "s"} waiting to be reviewed. ` +
+        `Tap the tile to see whose, then approve or reject them on the dashboard's Payments page — until then the order cannot move on.`,
+    );
+  }
   if (cancelled.length && nowOrders.length) notes.push(`${cancelled.length} of ${nowOrders.length} orders in this window were cancelled.`);
-  if (cartOwners) notes.push(`${cartOwners} basket${cartOwners === 1 ? "" : "s"} were filled and left without an order.`);
+  if (cartOwners) {
+    notes.push(
+      `${cartOwners} basket${cartOwners === 1 ? " was" : "s were"} filled and left without an order. ` +
+        `Tap "Baskets" for who and what — a left basket with a phone number on the account is a call worth making.`,
+    );
+  }
   if (discounted.length) notes.push(`${discounted.length} order${discounted.length === 1 ? "" : "s"} carried a discount.`);
   if (paymentsIn.length) notes.push(`${money(paymentsIn.reduce((s, p) => s + num(p.amount_qar), 0))} QAR approved through the payments page.`);
   if (!notes.length) notes.push("Nothing is stuck: no old open orders, no payments waiting.");
