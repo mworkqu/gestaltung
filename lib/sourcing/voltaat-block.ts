@@ -4,7 +4,7 @@
 // What the block is (measured 2026-11-24 from the Mac's Qatar line): the store
 // answers 429 with `Retry-After: 60` to a second request that follows the
 // first by a few seconds. It is a short rate limit, not a ban. So the sync now
-// makes one request per hourly batch (lib/sourcing/voltaat-pass.ts), and here:
+// makes one request per hourly batch (lib/sourcing/voltaat-plan.ts), and here:
 //   * a blocked batch is waited out — the store's Retry-After, and never less
 //     than a back-off that grows with every blocked batch in a row;
 //   * two batches are never closer than MIN_MINUTES_BETWEEN_BATCHES;

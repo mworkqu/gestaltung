@@ -19,7 +19,7 @@ const HOUR = 3600_000;
  */
 const DEDUPE: Record<CronJobName, number> = {
   "supplier-refresh": 6 * HOUR,
-  // Hourly, one request per batch (lib/sourcing/voltaat-pass.ts).
+  // Hourly, one request per batch (lib/sourcing/voltaat-plan.ts).
   "voltaat-sync": HOUR / 2,
   "delivery-promises": 6 * HOUR,
   notifications: 6 * HOUR,

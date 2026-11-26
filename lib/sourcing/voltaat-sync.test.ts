@@ -1,6 +1,6 @@
-// A whole pass of the Voltaat sync against an in-memory database: one request
-// per batch, the pass position in store_settings, drops decided over two
-// passes, and ONE report email when the pass ends.
+// The Voltaat sync against an in-memory database: one request per batch, only
+// for the page with due items, drops decided once every page was read twice,
+// and ONE report email a day.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DbClient } from "@/lib/supabase/db";
@@ -81,6 +81,7 @@ function fakeDb(tables: Record<string, Row[]>) {
       upsert: (p: Row) => ((op = "upsert"), (payload = p), q),
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
       gte: (c: string, v: string) => (filters.push((r) => String(r[c]) >= v), q),
+      gt: (c: string, v: number) => (filters.push((r) => Number(r[c] ?? 0) > v), q),
       in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), q),
       not: (c: string) => (filters.push((r) => r[c] !== null && r[c] !== undefined), q),
       order: (col: string, o?: { ascending?: boolean }) => ((order = { col, asc: o?.ascending !== false }), q),
@@ -130,26 +131,26 @@ function setup() {
 }
 
 const HOUR = 3600_000;
+const DAY = 24 * HOUR;
 const offerById = (tables: Record<string, Row[]>, id: string) => tables.supplier_offers.find((o) => o.id === id)!;
-const passState = (tables: Record<string, Row[]>) => tables.store_settings.find((r) => r.key === "voltaat_sync_pass")?.value as Row;
+const planState = (tables: Record<string, Row[]>) => tables.store_settings.find((r) => r.key === "voltaat_sync_plan")?.value as { pages: Record<string, { offerIds: string[] }>; lastPage: number | null };
+const steps = (tables: Record<string, Row[]>) => tables.supplier_sync_runs.length;
 
-describe("runVoltaatSync: one request per batch", () => {
+describe("runVoltaatSync: one request per batch, only for what is due", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-11-24T21:23:00Z")); // 00:23 in Qatar
+    vi.setSystemTime(new Date("2026-11-26T21:23:00Z"));
     m.sendEmail.mockClear();
     m.requests = 0;
     m.page.mockReset();
-    // Page size is 2 here: page 1 is full, page 2 is short and ends the pass.
+    // Page size is 2 here: page 1 is full, page 2 is short and ends the catalogue.
     m.page.mockImplementation(async (n: number) => (n === 1 ? pageOf(product("alpha", 12), product("bravo", 20)) : pageOf(product("charlie", 30, false))));
   });
 
-  it("reads robots, then one page per batch, and reports once when the pass ends", async () => {
+  it("reads robots once, then each page once, then stops asking", async () => {
     const { tables, db } = setup();
 
-    const b0 = await runVoltaatSync(db, "cron");
-    expect(b0).toMatchObject({ status: "ok", step: "robots", requests: 1, passDone: false });
-    expect(passState(tables)).toMatchObject({ nextPage: 1, done: false });
+    expect(await runVoltaatSync(db, "cron")).toMatchObject({ status: "ok", step: "robots", requests: 1 });
 
     // Ten minutes later: too soon, and no request is made.
     vi.advanceTimersByTime(10 * 60_000);
@@ -158,31 +159,56 @@ describe("runVoltaatSync: one request per batch", () => {
 
     vi.advanceTimersByTime(HOUR);
     const b1 = await runVoltaatSync(db, "cron");
-    expect(b1).toMatchObject({ status: "ok", step: "page_1", requests: 1, checked: 2, changed: 1, dropped: 0, passDone: false });
+    expect(b1).toMatchObject({ status: "ok", step: "page_1", requests: 1, checked: 2, changed: 1, dropped: 0 });
     expect(offerById(tables, "a").retail_price).toBe(12);
-    expect(offerById(tables, "b").last_checked_at).not.toBe(OLD);
     expect(offerById(tables, "c").last_checked_at).toBe(OLD); // not on page 1: untouched
-    expect(m.sendEmail).not.toHaveBeenCalled(); // no email per batch
+    expect(planState(tables).pages["1"].offerIds.sort()).toEqual(["a", "b"]);
 
+    // Next batch: NOT page 1 again — the page it has not read, where the unread items must be.
     vi.advanceTimersByTime(HOUR);
     const b2 = await runVoltaatSync(db, "cron");
-    expect(b2).toMatchObject({ status: "ok", step: "page_2", requests: 1, checked: 1, changed: 1, passDone: true });
+    expect(b2).toMatchObject({ status: "ok", step: "page_2", checked: 1, changed: 1, dropped: 0 });
     expect(offerById(tables, "c")).toMatchObject({ availability: "unavailable", active: false });
-    // First pass on record: nothing is called "dropped" yet.
-    expect(b2.dropped).toBe(0);
-    expect(offerById(tables, "d").active).toBe(true);
-    // One email for the whole pass, covering both batches' changes.
-    expect(m.sendEmail).toHaveBeenCalledTimes(1);
-    expect(m.sendEmail.mock.calls[0][0]).toMatchObject({ subject: "Voltaat prices: 2 change(s) today" });
+    expect(planState(tables).lastPage).toBe(2);
+    expect(offerById(tables, "d").active).toBe(true); // every page read once only: not "dropped" yet
 
-    // The rest of the day: the schedule keeps calling, nothing is requested.
-    vi.advanceTimersByTime(HOUR);
-    expect(await runVoltaatSync(db, "cron")).toMatchObject({ status: "skipped", error: "already_ran_today", requests: 0 });
+    // Everything was just read: hour after hour, nothing is sent to Voltaat.
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(HOUR);
+      expect(await runVoltaatSync(db, "cron")).toMatchObject({ status: "skipped", error: "nothing_due", requests: 0 });
+    }
     expect(m.requests).toBe(3);
-    expect(tables.supplier_sync_runs).toHaveLength(3);
+    expect(steps(tables)).toBe(3);
+    // One report for the day, not one per batch.
+    expect(m.sendEmail).toHaveBeenCalledTimes(1);
   });
 
-  it("drops a product only after two whole passes missed it", async () => {
+  it("checks an item that keeps changing sooner than one that never does", async () => {
+    const { tables, db } = setup();
+    // "alpha" changed three times in the last weeks: daily pace. The rest: weekly.
+    tables.supplier_sync_runs.push({
+      id: "old-run",
+      supplier_code: "voltaat",
+      status: "ok",
+      changed: 3,
+      started_at: "2026-11-10T03:00:00.000Z",
+      changes: [1, 2, 3].map((n) => ({ offerId: "a", newRetail: n })),
+    });
+    for (let i = 0; i < 3; i++) {
+      await runVoltaatSync(db, "cron"); // robots, page 1, page 2
+      vi.advanceTimersByTime(HOUR);
+    }
+    const before = m.requests;
+
+    // A day later only page 1 (where alpha is) is worth a request.
+    vi.advanceTimersByTime(DAY);
+    expect(await runVoltaatSync(db, "cron")).toMatchObject({ status: "ok", step: "page_1", due: 1 });
+    vi.advanceTimersByTime(HOUR);
+    expect(await runVoltaatSync(db, "cron")).toMatchObject({ status: "skipped", error: "nothing_due" });
+    expect(m.requests).toBe(before + 1);
+  });
+
+  it("drops a product only after every page was read twice without it", async () => {
     const { tables, db } = setup();
     for (let i = 0; i < 3; i++) {
       await runVoltaatSync(db, "cron");
@@ -190,26 +216,24 @@ describe("runVoltaatSync: one request per batch", () => {
     }
     expect(offerById(tables, "d").active).toBe(true);
 
-    vi.advanceTimersByTime(24 * HOUR); // the next Qatar day
+    vi.advanceTimersByTime(7 * DAY); // the weekly items are due again
     let last = await runVoltaatSync(db, "cron");
-    expect(last.step).toBe("robots");
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3 && !(last.dropped ?? 0); i++) {
       vi.advanceTimersByTime(HOUR);
       last = await runVoltaatSync(db, "cron");
     }
-    expect(last).toMatchObject({ step: "page_2", passDone: true, dropped: 1 });
+    expect(last).toMatchObject({ status: "ok", dropped: 1 });
     expect(offerById(tables, "d")).toMatchObject({ active: false, availability: "unavailable" });
     expect(offerById(tables, "a").active).toBe(true);
   });
 
-  it("a refusal keeps the pass on the same page and waits before asking again", async () => {
+  it("a refusal remembers nothing as read and waits before asking again", async () => {
     const { tables, db } = setup();
     await runVoltaatSync(db, "cron"); // robots
     vi.advanceTimersByTime(HOUR);
     m.page.mockRejectedValueOnce(new BlockedError(429, new Date(Date.now() + 60_000).toISOString()));
-    const blocked = await runVoltaatSync(db, "cron");
-    expect(blocked).toMatchObject({ status: "blocked", step: "page_1", requests: 1 });
-    expect(passState(tables)).toMatchObject({ nextPage: 1, done: false });
+    expect(await runVoltaatSync(db, "cron")).toMatchObject({ status: "blocked", step: "page_1", requests: 1 });
+    expect(planState(tables).pages).toEqual({});
     expect(m.sendEmail).not.toHaveBeenCalled();
 
     // 30 minutes later is inside the 45-minute back-off: no request.

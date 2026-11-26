@@ -79,12 +79,12 @@ export const CRON_JOBS: Readonly<Record<CronJobName, CronJob>> = {
       return { status: 200, body: { ...result, purged } };
     },
   },
-  // Voltaat price sync, ONE REQUEST PER BATCH (lib/sourcing/voltaat-pass.ts):
-  // called hourly, each call reads robots.txt or one catalogue page, and the
-  // job itself skips once the day's pass is finished — so "hourly" is ~8
-  // requests a day, not 24. NOT in vercel.json: it runs on the Mac that serves
-  // the site (launchd) or the Mac Mini worker. The route stays for those and
-  // for the admin "Run now" button.
+  // Voltaat price sync, ONE REQUEST PER BATCH and only for what is due
+  // (lib/sourcing/voltaat-plan.ts): called hourly, each call reads at most the
+  // one catalogue page with the most due items, and makes no request when
+  // nothing is due. NOT in vercel.json: it runs on the Mac that serves the
+  // site (launchd) or the Mac Mini worker. The route stays for those and for
+  // the admin "Run now" button.
   "voltaat-sync": {
     name: "voltaat-sync",
     utc: "23 * * * *",

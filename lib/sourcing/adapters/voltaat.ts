@@ -4,7 +4,7 @@
 // Rules: honour robots.txt, an honest user agent with a contact address, and
 // never retry around a 403/429.
 // The daily sync reads the feed ONE REQUEST PER BATCH, an hour apart
-// (lib/sourcing/voltaat-pass.ts): the store refuses a second request that
+// (lib/sourcing/voltaat-plan.ts): the store refuses a second request that
 // follows the first by a few seconds (429, Retry-After: 60). REQUEST_GAP_MS
 // only spaces the requests of the manual catalogue import, which still reads
 // every page in one go.
@@ -215,7 +215,7 @@ export function planChanges(
  * One catalogue page against the mapped offers (the hourly batch): only the
  * offers whose product is ON this page are judged. An offer that is not on it
  * is simply not this batch's business — whether Voltaat dropped a product is
- * decided when the pass ends (lib/sourcing/voltaat-pass.ts droppedAfterPass).
+ * decided when the pass ends (lib/sourcing/voltaat-plan.ts droppedAfterPass).
  * `seen` = every offer found on the page, changed or not.
  */
 export function planPage(
