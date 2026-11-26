@@ -64,6 +64,35 @@ export function isPageView(entry: AccessEntry): boolean {
   return true;
 }
 
+// Anything on the public internet is swept all day by scanners asking for files
+// a careless server would hand over: /.env, /.git/config, /wp-admin/install.php,
+// /terraform.tfstate. Each one is a 404, which is the right answer, and none of
+// them is a broken link. Counted together with real missing pages they bury
+// them — on the first full day of this log, about 370 of 390.
+const PROBE_PATTERNS: RegExp[] = [
+  // A hidden file or folder anywhere in the path. /.well-known/ is a real,
+  // standard location, so it is not one.
+  /\/\.(?!well-known\/)/,
+  // A repository under any name (/www.git/config), and the repo's own notes.
+  /\.git(?:\/|$)/i,
+  /\.md$/i,
+  // File types this site never serves outside /_next/: server scripts, config,
+  // dumps, archives, and loose scripts or data files.
+  /\.(?:php\d?|aspx?|jspx?|cgi|env|sql|bak|old|save|swp|zip|tar|t?gz|rar|7z|ya?ml|toml|ini|conf|config|log|lock|tfstate|tfvars|properties|py|rb|sh|json|js|css|map|webmanifest)$/i,
+  // Other products' admin and debug pages.
+  /(?:^|\/)(?:wp-[a-z]+|wordpress|phpmyadmin|pma|adminer|cgi-bin|actuator|graphql|telescope|_ignition|swagger[^/]*|vendor|node_modules|storage\/logs|debug|server-status|theme|static\/sspanel|reconx-[0-9a-f]+|phpinfo|info|_profiler|_environment|__\w+__)(?:\/|$)/i,
+  // API guesses that are not ours: every real endpoint here is /api/<area>/…
+  /^\/api\/(?:env|config|v\d+)(?:\/|$)/i,
+  // A bare /_next, and the health pages of other frameworks.
+  /^\/_next\/?$/,
+  /^(?:\/[a-z]{2})?\/health\/?$/i,
+];
+
+/** A request for a file or page only a scanner would ask this site for. */
+export function isProbe(path: string): boolean {
+  return PROBE_PATTERNS.some((re) => re.test(path));
+}
+
 export function parseAccessLog(text: string): AccessEntry[] {
   const out: AccessEntry[] = [];
   for (const line of text.split("\n")) {
@@ -117,7 +146,11 @@ export function buildTraffic(input: TrafficInput): Section {
   const earlierViews = views.filter((e) => e.t < half).length;
 
   const errors = all.filter((e) => e.s >= 500);
-  const notFound = all.filter((e) => e.s === 404);
+  // A missing page is only worth reading about when a person or a link of ours
+  // could have asked for it; scanner probes are counted, then set aside.
+  const missing = all.filter((e) => e.s === 404);
+  const probes = missing.filter((e) => isProbe(e.p));
+  const notFound = missing.filter((e) => !isProbe(e.p));
   const slow = views.filter((e) => e.d > 1000);
 
   const durations = views.map((e) => e.d).filter((d) => d > 0).sort((a, b) => a - b);
@@ -174,7 +207,7 @@ export function buildTraffic(input: TrafficInput): Section {
       label: "Not found",
       value: int(notFound.length),
       tone: notFound.length > views.length * 0.05 ? ("warn" as const) : ("flat" as const),
-      hint: "status 404",
+      hint: probes.length ? `${int(probes.length)} scanner probes left out` : "status 404",
     },
     {
       label: "Median page time",
@@ -240,6 +273,7 @@ export function buildTraffic(input: TrafficInput): Section {
     days,
     errors: errors.length,
     notFound: notFound.length,
+    probes: probes.length,
     slow: slow.length,
     bots: bots.length,
     visits: visits.length,
@@ -290,6 +324,7 @@ function trafficNotes(n: {
   days: number;
   errors: number;
   notFound: number;
+  probes: number;
   slow: number;
   bots: number;
   visits: number;
@@ -300,6 +335,10 @@ function trafficNotes(n: {
   if (n.daysOnFile < n.days) notes.push(`The log covers ${n.daysOnFile} day${n.daysOnFile === 1 ? "" : "s"} so far, not the full ${n.days}.`);
   if (n.errors) notes.push(`${n.errors} request${n.errors === 1 ? "" : "s"} ended in a server error.`);
   if (n.notFound) notes.push(`${n.notFound} request${n.notFound === 1 ? "" : "s"} hit a page that does not exist.`);
+  if (n.probes)
+    notes.push(
+      `${n.probes} more ${n.probes === 1 ? "was a scanner" : "were scanners"} looking for files such as /.env. All were refused, and none is a broken link.`,
+    );
   if (n.slow) notes.push(`${n.slow} page view${n.slow === 1 ? "" : "s"} took over a second to answer.`);
   if (n.bots > n.requests / 2) notes.push("More than half of all requests were crawlers, not people.");
   if (n.visits && n.bounced / n.visits > 0.7) notes.push(`${pct(n.bounced, n.visits)} of visits were a single page.`);

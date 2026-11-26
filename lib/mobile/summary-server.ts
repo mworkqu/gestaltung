@@ -11,6 +11,7 @@ import {
   type SessionInput,
   type UsageInput,
 } from "@/lib/mobile/summary";
+import { paged } from "@/lib/mobile/paged";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Reads for the phone dashboard. The service client is used because the caller
@@ -37,11 +38,17 @@ export async function loadSummary({ includeTest }: { includeTest: boolean }): Pr
     db.from("analysis_runs").select(RUN_COLUMNS).order("created_at", { ascending: false }).limit(1000),
     db.from("idea_sessions").select("project_id,edit_turns,tier").limit(1000),
     db.from("profiles").select("id,full_name,email,role").limit(1000),
-    db
-      .from("ai_usage")
-      .select("project_id,outcome,error_code,cost_usd,created_at,is_test")
-      .order("created_at", { ascending: false })
-      .limit(2000),
+    // Past the 1,000 rows one request is answered with, so read in pages.
+    paged<UsageInput>(
+      (from, to) =>
+        db
+          .from("ai_usage")
+          .select("project_id,outcome,error_code,cost_usd,created_at,is_test")
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      2000,
+    ),
     db
       .from("inquiries")
       .select("id,project_id,name,status,final_quote_qar,created_at,is_test")
@@ -56,7 +63,7 @@ export async function loadSummary({ includeTest }: { includeTest: boolean }): Pr
       runs: (runs.data ?? []) as unknown as RunInput[],
       sessions: (sessions.data ?? []) as unknown as SessionInput[],
       profiles: (profiles.data ?? []) as unknown as ProfileInput[],
-      usage: (usage.data ?? []) as unknown as UsageInput[],
+      usage: usage.rows,
       inquiries: (inquiries.data ?? []) as unknown as InquiryInput[],
       includeTest,
       now: new Date(),

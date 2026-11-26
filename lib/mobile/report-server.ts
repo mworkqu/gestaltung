@@ -118,8 +118,9 @@ async function storeSection(db: Db, now: number): Promise<Section | null> {
   const [parts, ownStock, orders, signals] = await Promise.all([
     allRows<PartRow>(() => db.from("parts").select(PART_COLUMNS).order("created_at", { ascending: false }).order("id"), 5000),
     allRows<OwnStockRow>(() => db.from("own_stock").select("part_id,qty").order("part_id"), 5000),
-    rows<{ id: string; created_at: string | null; is_test: boolean | null }>(
-      db.from("part_orders").select("id,created_at,is_test").order("created_at", { ascending: false }).limit(1500),
+    allRows<{ id: string; created_at: string | null; is_test: boolean | null }>(
+      () => db.from("part_orders").select("id,created_at,is_test").order("created_at", { ascending: false }).order("id"),
+      1500,
     ),
     allRows<SignalRow>(
       () =>
@@ -192,12 +193,14 @@ async function sourcingSection(db: Db, now: number): Promise<Section | null> {
 
 async function ordersSection(db: Db, now: number): Promise<Section | null> {
   const [orders, payments, carts] = await Promise.all([
-    rows<OrderRow>(
-      db
-        .from("part_orders")
-        .select("id,customer_name,total_qar,discount_qar,status,payment_method,delivery_area,shipping_tier,class_id,created_at,is_test")
-        .order("created_at", { ascending: false })
-        .limit(1500),
+    allRows<OrderRow>(
+      () =>
+        db
+          .from("part_orders")
+          .select("id,customer_name,total_qar,discount_qar,status,payment_method,delivery_area,shipping_tier,class_id,created_at,is_test")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      1500,
     ),
     rows<PaymentRow>(
       db
@@ -213,15 +216,10 @@ async function ordersSection(db: Db, now: number): Promise<Section | null> {
 
   if (!orders.length) return null;
 
-  const events = await rows<StatusEventRow>(
-    db
-      .from("order_status_history")
-      .select("order_id,status,changed_at")
-      .in(
-        "order_id",
-        orders.slice(0, 400).map((o) => o.id),
-      )
-      .limit(4000),
+  const eventOrderIds = orders.slice(0, 400).map((o) => o.id);
+  const events = await allRows<StatusEventRow>(
+    () => db.from("order_status_history").select("order_id,status,changed_at").in("order_id", eventOrderIds).order("id"),
+    4000,
   );
 
   // Names for the ids that actually appear in a basket, so the detail list can
@@ -262,7 +260,7 @@ async function ordersSection(db: Db, now: number): Promise<Section | null> {
 
 async function peopleSection(db: Db, now: number): Promise<Section | null> {
   const [profiles, inquiries, reviews, deletions, buyers] = await Promise.all([
-    rows<ProfileRow>(db.from("profiles").select("id,role,full_name,email,phone,locale,created_at").limit(3000)),
+    allRows<ProfileRow>(() => db.from("profiles").select("id,role,full_name,email,phone,locale,created_at").order("id"), 3000),
     rows<InquiryRow>(
       db
         .from("inquiries")
@@ -274,7 +272,10 @@ async function peopleSection(db: Db, now: number): Promise<Section | null> {
       db.from("reviews").select("score,status,comment,first_name,created_at").order("created_at", { ascending: false }).limit(500),
     ),
     rows<DeletionRow>(db.from("cc_deletion_requests").select("created_at,status").order("created_at", { ascending: false }).limit(200)),
-    rows<{ customer_name: string | null }>(db.from("part_orders").select("customer_name").not("is_test", "is", true).limit(2000)),
+    allRows<{ customer_name: string | null }>(
+      () => db.from("part_orders").select("customer_name").not("is_test", "is", true).order("id"),
+      2000,
+    ),
   ]);
 
   if (!profiles.length) return null;
@@ -292,29 +293,46 @@ async function peopleSection(db: Db, now: number): Promise<Section | null> {
 
 async function championsSection(db: Db, now: number): Promise<Section | null> {
   const [students, enrollments, payments, attempts, progress, xp, plans, cohorts, flags, certificates] = await Promise.all([
-    rows<CcProfileRow>(
-      db
-        .from("cc_profiles")
-        .select("id,full_name,institution,study_level,cad_experience,preferred_locale,onboarding_completed_at,last_active_at,created_at")
-        .limit(2000),
+    allRows<CcProfileRow>(
+      () =>
+        db
+          .from("cc_profiles")
+          .select("id,full_name,institution,study_level,cad_experience,preferred_locale,onboarding_completed_at,last_active_at,created_at")
+          .order("id"),
+      2000,
     ),
-    rows<EnrollmentRow>(db.from("cc_enrollments").select("user_id,plan_id,cohort_id,status,starts_at,ends_at,created_at").limit(2000)),
-    rows<CcPaymentRow>(
-      db
-        .from("cc_payments")
-        .select("user_id,plan_id,amount_qar,discount_qar,method,status,created_at,paid_at")
-        .order("created_at", { ascending: false })
-        .limit(2000),
+    allRows<EnrollmentRow>(
+      () => db.from("cc_enrollments").select("user_id,plan_id,cohort_id,status,starts_at,ends_at,created_at").order("id"),
+      2000,
     ),
-    rows<AttemptRow>(
-      db
-        .from("cc_attempts")
-        .select("user_id,test_id,status,percent,band,started_at,submitted_at,graded_at")
-        .order("started_at", { ascending: false })
-        .limit(2000),
+    allRows<CcPaymentRow>(
+      () =>
+        db
+          .from("cc_payments")
+          .select("user_id,plan_id,amount_qar,discount_qar,method,status,created_at,paid_at")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      2000,
     ),
-    rows<LessonProgressRow>(
-      db.from("cc_lesson_progress").select("user_id,watched_percent,completed_at,updated_at").order("updated_at", { ascending: false }).limit(4000),
+    allRows<AttemptRow>(
+      () =>
+        db
+          .from("cc_attempts")
+          .select("user_id,test_id,status,percent,band,started_at,submitted_at,graded_at")
+          .order("started_at", { ascending: false })
+          .order("id"),
+      2000,
+    ),
+    // No id here: the key is (user_id, lesson_id), so both close the order.
+    allRows<LessonProgressRow>(
+      () =>
+        db
+          .from("cc_lesson_progress")
+          .select("user_id,watched_percent,completed_at,updated_at")
+          .order("updated_at", { ascending: false })
+          .order("user_id")
+          .order("lesson_id"),
+      4000,
     ),
     rows<XpRow>(db.from("cc_student_xp").select("user_id,xp,streak_weeks").order("xp", { ascending: false }).limit(500)),
     rows<PlanRow>(db.from("cc_plans").select("id,slug,name_en,price_qar").limit(50)),

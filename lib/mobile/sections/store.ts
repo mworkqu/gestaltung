@@ -150,7 +150,7 @@ export function buildStore(input: StoreInput): Section {
       label: "On request",
       value: int(onRequest.length),
       tone: onRequest.length > published.length / 2 ? ("warn" as const) : ("flat" as const),
-      hint: "no delivery class yet",
+      hint: "no delivery time set",
     },
     { label: "Never ordered", value: int(neverSold.length), hint: "published, never in an order" },
     {
@@ -211,7 +211,7 @@ export function buildStore(input: StoreInput): Section {
   const notes: string[] = [];
   if (low.length) notes.push(`${low.length} product${low.length === 1 ? "" : "s"} in Lusail ${low.length === 1 ? "is" : "are"} down to ${LOW_STOCK} or fewer.`);
   if (unservedRequests.length) notes.push(`${unservedRequests.length} request${unservedRequests.length === 1 ? "" : "s"} still waiting to be served.`);
-  if (onRequest.length) notes.push(`${onRequest.length} published product${onRequest.length === 1 ? " has" : "s have"} no delivery class, so the store shows them as "on request".`);
+  if (onRequest.length) notes.push(`${onRequest.length} published product${onRequest.length === 1 ? " has" : "s have"} no delivery time set, so the store shows ${onRequest.length === 1 ? "it" : "them"} as "on request" instead of with a delivery date. This is about the catalogue, not about orders.`);
   if (neverSold.length && published.length) notes.push(`${pct(neverSold.length, published.length)} of the catalogue has never been ordered.`);
   if (retailValue > 0) notes.push(`Stock on hand: ${money(stockValue)} QAR at cost, ${money(retailValue)} QAR at shelf price.`);
   if (catalogue.length > CATALOGUE_ROWS) {

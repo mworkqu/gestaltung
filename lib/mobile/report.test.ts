@@ -7,7 +7,7 @@ import { buildOrders, stageTimings } from "@/lib/mobile/sections/orders";
 import { buildPeople } from "@/lib/mobile/sections/people";
 import { buildSourcing, priceMoves } from "@/lib/mobile/sections/sourcing";
 import { buildStore } from "@/lib/mobile/sections/store";
-import { buildTraffic, isPageView, parseAccessLog } from "@/lib/mobile/sections/traffic";
+import { buildTraffic, isPageView, isProbe, parseAccessLog } from "@/lib/mobile/sections/traffic";
 
 // A fixed "now" so every window is deterministic. Mid-afternoon in Doha, so a
 // day bucket cannot straddle midnight by accident.
@@ -493,6 +493,65 @@ describe("access log", () => {
     expect(section.tiles.find((t) => t.label === "Server errors")?.value).toBe("1");
     expect(section.tiles.find((t) => t.label === "Not found")?.value).toBe("1");
     expect(section.tables.find((t) => t.title === "Broken links asked for")?.rows[0]).toEqual(["/nope", "1"]);
+  });
+
+  it("tells a scanner probe from a page someone could have wanted", () => {
+    for (const path of [
+      "/.env",
+      "/.env.production",
+      "/.git/config",
+      "/backup/.git/HEAD",
+      "/wp-admin/install.php",
+      "/.aws/credentials",
+      "/terraform.tfstate",
+      "/config.yml",
+      "/secrets.json",
+      "/en/actuator/env",
+      "/en/graphql",
+      "/api/env",
+      "/api/v1/version",
+      "/storage/logs/laravel.log",
+      "/theme/v2board/assets/umi.css",
+      "/_next",
+      "/_next/static/chunks/main-app-52be0fcca3b4569c.js.map",
+      "/en/health",
+      "/www.git/config",
+      "/CLAUDE.md",
+      "/en/phpinfo",
+      "/en/__l2s_debug_probe__",
+    ]) {
+      expect(isProbe(path), path).toBe(true);
+    }
+    for (const path of [
+      "/en/store/VLT-31522003452006",
+      "/en/store/GR-010",
+      "/ar/store",
+      "/api/mobile/report",
+      "/en/old-page",
+      "/.well-known/security.txt",
+      "/images/missing.png",
+      "/en/studio/debugging-a-circuit",
+      "/en/store/information-kit",
+      "/apple-touch-icon.png",
+    ]) {
+      expect(isProbe(path), path).toBe(false);
+    }
+  });
+
+  it("leaves scanner probes out of the missing pages, and says how many", () => {
+    const hit = (p: string, i: number) => ({ t: NOW - 1000 * (i + 1), p, s: 404, d: 5, v: "s", b: 0 as const, c: "", r: "" });
+    const section = buildTraffic({
+      entries: ["/.env", "/.git/config", "/wp-admin/install.php", "/en/store/GR-010"].map(hit),
+      windowDays: 30,
+      daysOnFile: 1,
+      now: NOW,
+    });
+    const tile = section.tiles.find((t) => t.label === "Not found");
+    expect(tile?.value).toBe("1");
+    expect(tile?.hint).toBe("3 scanner probes left out");
+    expect(section.tables.find((t) => t.title === "Broken links asked for")?.rows).toEqual([["/en/store/GR-010", "1"]]);
+    expect(section.notes).toContain("1 request hit a page that does not exist.");
+    expect(section.notes.some((n) => n.startsWith("3 more were scanners"))).toBe(true);
   });
 });
 
