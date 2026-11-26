@@ -12,6 +12,7 @@ import "server-only";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { paged } from "@/lib/mobile/paged";
 import { since, type Report, type Section } from "@/lib/mobile/report";
 import { buildCad, type AnalysisRow, type CadRow, type CreditRow, type UsageRow } from "@/lib/mobile/sections/cad";
 import {
@@ -50,6 +51,22 @@ async function rows<T>(query: PromiseLike<{ data: unknown; error: unknown }>): P
     const res = await query;
     if (res.error || !Array.isArray(res.data)) return [];
     return res.data as T[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rows of a table that can pass the 1,000 one request is answered with, read a
+ * page at a time (lib/mobile/paged.ts). `build` must return the query with a
+ * total order — a unique column last — and without a limit.
+ */
+async function allRows<T>(
+  build: () => { range(from: number, to: number): PromiseLike<{ data: unknown; error: unknown }> },
+  cap: number,
+): Promise<T[]> {
+  try {
+    return (await paged<T>((from, to) => build().range(from, to), cap)).rows;
   } catch {
     return [];
   }
@@ -99,17 +116,19 @@ const PART_COLUMNS =
 
 async function storeSection(db: Db, now: number): Promise<Section | null> {
   const [parts, ownStock, orders, signals] = await Promise.all([
-    rows<PartRow>(db.from("parts").select(PART_COLUMNS).order("created_at", { ascending: false }).limit(3000)),
-    rows<OwnStockRow>(db.from("own_stock").select("part_id,qty").limit(3000)),
+    allRows<PartRow>(() => db.from("parts").select(PART_COLUMNS).order("created_at", { ascending: false }).order("id"), 5000),
+    allRows<OwnStockRow>(() => db.from("own_stock").select("part_id,qty").order("part_id"), 5000),
     rows<{ id: string; created_at: string | null; is_test: boolean | null }>(
       db.from("part_orders").select("id,created_at,is_test").order("created_at", { ascending: false }).limit(1500),
     ),
-    rows<SignalRow>(
-      db
-        .from("demand_signals")
-        .select("kind,part_id,search_term,source_page,served_at,created_at")
-        .order("created_at", { ascending: false })
-        .limit(3000),
+    allRows<SignalRow>(
+      () =>
+        db
+          .from("demand_signals")
+          .select("kind,part_id,search_term,source_page,served_at,created_at")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      3000,
     ),
   ]);
 
@@ -148,11 +167,13 @@ async function orderItems(db: Db, orderIds: string[]): Promise<OrderItemRow[]> {
 async function sourcingSection(db: Db, now: number): Promise<Section | null> {
   const [suppliers, offers, runs, gaps] = await Promise.all([
     rows<SupplierRow>(db.from("suppliers").select("id,code,name,active,commission_percent,default_currency").limit(200)),
-    rows<OfferRow>(
-      db
-        .from("supplier_offers")
-        .select("part_id,supplier_id,cost,retail_price,currency,availability,lead_time_days,last_checked_at,active")
-        .limit(5000),
+    allRows<OfferRow>(
+      () =>
+        db
+          .from("supplier_offers")
+          .select("part_id,supplier_id,cost,retail_price,currency,availability,lead_time_days,last_checked_at,active")
+          .order("id"),
+      10000,
     ),
     rows<SyncRunRow>(
       db
@@ -322,26 +343,32 @@ async function championsSection(db: Db, now: number): Promise<Section | null> {
 
 async function cadSection(db: Db, now: number): Promise<Section | null> {
   const [cad, analyses, usage, credits] = await Promise.all([
-    rows<CadRow>(
-      db
-        .from("cad_generations")
-        .select("project_id,user_id,tier,status,error,charged,model,created_at,delivered_at")
-        .order("created_at", { ascending: false })
-        .limit(2000),
+    allRows<CadRow>(
+      () =>
+        db
+          .from("cad_generations")
+          .select("project_id,user_id,tier,status,error,charged,model,created_at,delivered_at")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      2000,
     ),
-    rows<AnalysisRow>(
-      db
-        .from("analysis_runs")
-        .select("project_id,feature,provider,model,outcome,error,created_at")
-        .order("created_at", { ascending: false })
-        .limit(3000),
+    allRows<AnalysisRow>(
+      () =>
+        db
+          .from("analysis_runs")
+          .select("project_id,feature,provider,model,outcome,error,created_at")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      3000,
     ),
-    rows<UsageRow>(
-      db
-        .from("ai_usage")
-        .select("provider,model,feature,outcome,error_code,total_tokens,cost_usd,latency_ms,created_at,is_test")
-        .order("created_at", { ascending: false })
-        .limit(4000),
+    allRows<UsageRow>(
+      () =>
+        db
+          .from("ai_usage")
+          .select("provider,model,feature,outcome,error_code,total_tokens,cost_usd,latency_ms,created_at,is_test")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      4000,
     ),
     rows<CreditRow>(db.from("credits_ledger").select("kind,delta,reason,created_at").order("created_at", { ascending: false }).limit(1000)),
   ]);

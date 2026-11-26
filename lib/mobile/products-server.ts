@@ -4,6 +4,7 @@
 // only fetches rows and hands them over, and applies an edit to exactly the
 // columns that edit named.
 
+import { paged } from "@/lib/mobile/paged";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   buildProductList,
@@ -19,7 +20,9 @@ import {
 const PART_COLUMNS =
   "id,sku,name,category,store_category,unit_price,landed_cost_qar,stock_status,is_published,in_own_stock,merged_into,is_test,image_url,images,lead_time_class";
 
-const PART_CAP = 3000;
+// Read a page at a time: one request is answered with 1,000 rows at most, and
+// the catalogue is past that (lib/mobile/paged.ts).
+const PART_CAP = 5000;
 
 export async function loadProducts({
   category,
@@ -32,8 +35,11 @@ export async function loadProducts({
   if (!db) return { ok: false, error: "unavailable" };
 
   const [parts, stock] = await Promise.all([
-    db.from("parts").select(PART_COLUMNS).limit(PART_CAP),
-    db.from("own_stock").select("part_id,qty").limit(PART_CAP),
+    paged<ProductPartRow>((from, to) => db.from("parts").select(PART_COLUMNS).order("id").range(from, to), PART_CAP),
+    paged<ProductStockRow>(
+      (from, to) => db.from("own_stock").select("part_id,qty").order("part_id").range(from, to),
+      PART_CAP,
+    ),
   ]);
 
   if (parts.error) return { ok: false, error: "unavailable" };
@@ -41,10 +47,10 @@ export async function loadProducts({
   return {
     ok: true,
     data: buildProductList({
-      parts: (parts.data ?? []) as unknown as ProductPartRow[],
+      parts: parts.rows,
       // Stock is a nicety: without it the list still reads, it just cannot say
       // how many are on the shelf.
-      ownStock: stock.error ? [] : ((stock.data ?? []) as unknown as ProductStockRow[]),
+      ownStock: stock.rows,
       category,
       limit,
     }),
