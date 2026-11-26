@@ -679,6 +679,55 @@ describe("every section", () => {
     for (const section of sections) expect(section.symbol).not.toBe("");
   });
 
+  it("never offers a link, on a tile or a row, that leads to no list", () => {
+    // A row that looks tappable and does nothing is worse than a row that does
+    // not look tappable, so this holds for the populated sections too.
+    const populated = [
+      buildStore({
+        parts: [
+          {
+            id: "p1", sku: "S1", name: "Servo", category: "motors", store_category: null,
+            unit_price: 100, landed_cost_qar: 60, lead_time_class: "in_stock", stock_status: "in_stock",
+            is_published: true, merged_into: null, is_test: null, in_own_stock: true, created_at: ago(2),
+          },
+        ],
+        ownStock: [], orderItems: [], signals: [], ...empty,
+      }),
+      ...sections,
+    ];
+    for (const section of populated) {
+      const keys = new Set((section.details ?? []).map((d) => d.key));
+      for (const tile of section.tiles) {
+        if (tile.detail) expect(keys.has(tile.detail)).toBe(true);
+      }
+      for (const table of section.tables) {
+        for (const link of table.links ?? []) {
+          if (link) expect(keys.has(link)).toBe(true);
+        }
+      }
+      for (const detail of section.details ?? []) {
+        for (const link of detail.links ?? []) {
+          if (link) expect(keys.has(link)).toBe(true);
+        }
+      }
+      expect(new Set((section.details ?? []).map((d) => d.key)).size).toBe((section.details ?? []).length);
+    }
+  });
+
+  it("opens a category from the store breakdown", () => {
+    const parts = ["motors", "motors", "sensors"].map((c, i) => ({
+      id: `p${i}`, sku: `S${i}`, name: `Part ${i}`, category: c, store_category: null,
+      unit_price: 10, landed_cost_qar: 5, lead_time_class: "in_stock", stock_status: "in_stock",
+      is_published: true, merged_into: null, is_test: null, in_own_stock: false, created_at: ago(2),
+    }));
+    const section = buildStore({ parts, ownStock: [], orderItems: [], signals: [], ...empty });
+    const table = section.tables.find((t) => t.title === "By category");
+    expect(table?.links?.length).toBe(table?.rows.length);
+    const motors = section.details?.find((d) => d.key === table?.links?.[table.rows.findIndex((r) => r[0] === "motors")]);
+    expect(motors?.rows).toHaveLength(2);
+    expect(motors?.title).toBe("motors");
+  });
+
   it("charts every day of the window, even an empty one", () => {
     for (const section of sections) {
       for (const series of section.series) expect(series.points).toHaveLength(30);

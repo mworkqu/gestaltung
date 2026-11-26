@@ -17,6 +17,7 @@ import {
   tally,
   toneUp,
   within,
+  type DetailView,
   type Section,
   type Table,
 } from "@/lib/mobile/report";
@@ -37,6 +38,9 @@ export type PartRow = {
   in_own_stock: boolean | null;
   created_at: string | null;
 };
+
+/** How many product rows one list carries, in the table and in a category. */
+const CATALOGUE_ROWS = 100;
 
 export type OwnStockRow = { part_id: string; qty: number | string | null };
 
@@ -118,7 +122,6 @@ export function buildStore(input: StoreInput): Section {
   // break, then by name. Capped because the app draws a table as one stack of
   // rows with no paging: past a hundred the section stops being readable, and
   // the count in the note says what is not shown.
-  const CATALOGUE_ROWS = 100;
   const catalogue = [...live].sort(
     (a, b) =>
       (a.store_category || a.category || "~").localeCompare(b.store_category || b.category || "~") ||
@@ -160,6 +163,11 @@ export function buildStore(input: StoreInput): Section {
       hint: "someone asked, nothing sent",
     },
   ];
+
+  // Each category row opens the products in it. The rows were the one thing on
+  // the owner's screenshots marked "non clickable": a count you cannot open is
+  // a dead end when the question is always "which ones?".
+  const byCategory = categoryDrilldown(published, stock);
 
   const tables: Table[] = [
     {
@@ -204,7 +212,7 @@ export function buildStore(input: StoreInput): Section {
       align: ["l", "r"],
       empty: "No searches recorded in this window.",
     },
-    breakdown("By category", tally(published, (p) => p.store_category || p.category).slice(0, 12), ["Category", "Products"]),
+    { ...byCategory.table, links: byCategory.links },
     breakdown("Stock status", tally(published, (p) => label(p.stock_status)), ["Status", "Products"]),
   ];
 
@@ -255,7 +263,51 @@ export function buildStore(input: StoreInput): Section {
     ],
     tables,
     notes,
+    details: byCategory.details,
   };
+}
+
+/**
+ * The "By category" table, plus one list per category behind it.
+ *
+ * The table and its lists are built together on purpose: a link whose key has
+ * no detail is a row that looks tappable and does nothing, and keeping the two
+ * in one function is what makes that impossible.
+ */
+function categoryDrilldown(
+  published: PartRow[],
+  stock: Map<string, number>,
+): { table: Table; links: (string | null)[]; details: DetailView[] } {
+  const counts = tally(published, (p) => p.store_category || p.category).slice(0, 12);
+  const table = breakdown("By category", counts, ["Category", "Products"]);
+
+  const details: DetailView[] = [];
+  const links: (string | null)[] = [];
+  for (const [name] of counts) {
+    const inIt = published
+      .filter((p) => (p.store_category || p.category || "unknown") === name)
+      .sort((a, b) => (a.name || a.sku || "").localeCompare(b.name || b.sku || ""));
+    // A key the app can match and a person can read in a URL-ish way. Index
+    // keeps it unique even if two names slug to the same thing.
+    const key = `category-${details.length}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+    details.push({
+      key,
+      title: name,
+      blurb: `The ${int(inIt.length)} published product${inIt.length === 1 ? "" : "s"} in ${name}.`,
+      columns: ["Product", "Price", "Cost", "Stock", "Status"],
+      rows: inIt.slice(0, CATALOGUE_ROWS).map((p) => [
+        p.name || p.sku || p.id,
+        num(p.unit_price) > 0 ? money(num(p.unit_price)) : "\u2014",
+        num(p.landed_cost_qar) > 0 ? money(num(p.landed_cost_qar)) : "\u2014",
+        p.in_own_stock ? int(stock.get(p.id) ?? 0) : "\u2014",
+        p.is_published ? label(p.stock_status) : "draft",
+      ]),
+      align: ["l", "r", "r", "r", "l"],
+      empty: `Nothing is published in ${name}.`,
+    });
+    links.push(key);
+  }
+  return { table, links, details };
 }
 
 function median(values: number[]): number | null {

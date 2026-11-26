@@ -46,6 +46,14 @@ export type Table = {
   align?: ("l" | "r")[];
   /** Shown instead of the table when `rows` is empty. */
   empty?: string;
+  /**
+   * Per row, the key of a `DetailView` in the same section, or null for a row
+   * that leads nowhere. Same idea as `Tile.detail`: which rows open is the
+   * site's decision, so a new drill-down is a deploy and not a new build.
+   *
+   * Shorter than `rows` is fine — the rows past its end simply do not open.
+   */
+  links?: (string | null)[];
 };
 
 /**
@@ -65,6 +73,8 @@ export type DetailView = {
   rows: string[][];
   align?: ("l" | "r")[];
   empty?: string;
+  /** As `Table.links`: a row here can open another detail in the section. */
+  links?: (string | null)[];
 };
 
 export type Section = {
