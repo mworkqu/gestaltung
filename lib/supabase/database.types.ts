@@ -5873,6 +5873,8 @@ export type Database = {
       set_meeting_status: { Args: { p_id: string | null; p_status: string | null; p_note?: string | null }; Returns: Json };
       set_order_payment_method: { Args: { p_order: string | null; p_method: string | null }; Returns: boolean };
       set_order_status: { Args: { p_order: string | null; p_status: string | null; p_note?: string | null }; Returns: Json };
+      set_order_status_internal: { Args: { p_order: string | null; p_status: string | null; p_note?: string | null }; Returns: Json };
+      set_order_status_service: { Args: { p_order: string | null; p_status: string | null; p_note?: string | null }; Returns: Json };
       set_own_stock: { Args: { p_part: string | null; p_qty: number | null }; Returns: undefined };
       set_review_status: { Args: { p_review: string | null; p_status: string | null }; Returns: boolean };
       spend_credit: { Args: { p_step: string | null; p_project: string | null }; Returns: Json };
